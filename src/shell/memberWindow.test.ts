@@ -12,6 +12,9 @@ import {
   MEMBER_WINDOW_SIZE,
   memberIndexAtOffset,
   memberPrefixHeight,
+  memberRowKey,
+  memberRowHeight,
+  rebaseMemberOffset,
   memberWindowSectionsEqual,
   sectionMemberWindow,
 } from './memberWindow';
@@ -44,6 +47,72 @@ describe('flattenMemberRows', () => {
 });
 
 describe('computeMemberWindow', () => {
+  it('keeps the anchor inside even a small window and caps oversized requests', () => {
+    const rows = flattenMemberRows([group('member', 'members',
+      Array.from({ length: 3000 }, (_, i) => `nick${i}`))]);
+    const offset = memberPrefixHeight(rows, 120);
+    for (const capacity of [1, 8, 96, 3000, NaN]) {
+      const win = computeMemberWindow(rows, offset, capacity);
+      expect(win.start).toBeLessThanOrEqual(120);
+      expect(win.end).toBeGreaterThan(120);
+      expect(win.rendered).toBeLessThanOrEqual(MEMBER_WINDOW_SIZE);
+    }
+  });
+
+  it('uses measured variable heights for lookup, spacers and anchor corrections', () => {
+    const rows = flattenMemberRows([group('member', 'members', ['a', 'long-name', 'c'])]);
+    const before = { groupRowPx: 28, userRowPx: 52 };
+    const after = { ...before, heights: new Map([
+      [memberRowKey(rows[0]!), 38.5],
+      [memberRowKey(rows[1]!), 54],
+      [memberRowKey(rows[2]!), 104.75],
+    ]) };
+    expect(memberPrefixHeight(rows, 3, after)).toBe(197.25);
+    expect(memberIndexAtOffset(rows, 197.24, after)).toBe(2);
+    expect(memberIndexAtOffset(rows, 197.25, after)).toBe(3);
+    expect(rebaseMemberOffset(rows, 28 + 52 * 2 + 9, before, after)).toBe(206.25);
+    expect(rebaseMemberOffset(rows, 206.25, after, before)).toBe(141);
+  });
+
+  it('retains identity heights through reordered groups and ignores invalid measurements', () => {
+    const rows = flattenMemberRows([group('member', 'members', ['a', 'b'])]);
+    const metrics = { groupRowPx: 28, userRowPx: 52, heights: new Map([
+      [memberRowKey(rows[1]!), 112], [memberRowKey(rows[2]!), NaN],
+    ]) };
+    const reordered = flattenMemberRows([group('member', 'members', ['b', 'a'])]);
+    expect(memberRowHeight(reordered[2]!, metrics)).toBe(112);
+    expect(memberRowHeight(reordered[1]!, metrics)).toBe(52);
+    metrics.heights.set(memberRowKey(rows[2]!), 0);
+    expect(memberRowHeight(rows[2]!, metrics)).toBe(52);
+  });
+
+  it('conserves all 3k row heights across top, middle, group boundaries and tail', () => {
+    const rows = flattenMemberRows([
+      group('op', 'ops', Array.from({ length: 1500 }, (_, i) => `op${i}`)),
+      group('member', 'members', Array.from({ length: 1500 }, (_, i) => `nick${i}`)),
+    ]);
+    for (const scale of [1, 2, 3]) {
+      const metrics = { groupRowPx: 32 * scale, userRowPx: 56 * scale,
+        heights: new Map(rows.map((row, i) => [memberRowKey(row),
+          (row.kind === 'group' ? 38 : i % 7 === 0 ? 118 : 56) * scale])) };
+      const total = memberPrefixHeight(rows, rows.length, metrics);
+      for (const index of [0, 45, 1499, 1500, 1501, 1502, 2970, 3001]) {
+        const offset = memberPrefixHeight(rows, index, metrics) + 1;
+        const win = computeMemberWindow(rows, offset, undefined, metrics);
+        expect(win.start).toBeLessThanOrEqual(index);
+        expect(win.end).toBeGreaterThan(index);
+        expect(win.rendered).toBeLessThanOrEqual(MEMBER_WINDOW_SIZE);
+        const renderedHeight = rows.slice(win.start, win.end)
+          .reduce((sum, row) => sum + memberRowHeight(row, metrics), 0);
+        expect(memberPrefixHeight(rows, win.start, metrics) + renderedHeight
+          + total - memberPrefixHeight(rows, win.end, metrics)).toBe(total);
+        const sections = sectionMemberWindow(rows, win.start, win.end);
+        expect(sections.filter((section) => !section.continuation).length)
+          .toBe(rows.slice(win.start, win.end).filter((row) => row.kind === 'group').length);
+      }
+    }
+  });
+
   it('keeps a small roster fully rendered from the top', () => {
     const rows = flattenMemberRows([group('member', 'members', ['a', 'b', 'c'])]);
     const window = computeMemberWindow(rows, 0);

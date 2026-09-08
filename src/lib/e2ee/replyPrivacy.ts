@@ -3,7 +3,17 @@ import type { ChatMessage } from '@/lib/irc/types';
 import { isEnvelope, LOCKED_PLACEHOLDER } from './dmCipher';
 import { GROUP_LOCKED_PLACEHOLDER, isGroupEnvelope } from './groupEnvelope';
 
-type ReplyPreviewSource = Pick<ChatMessage, 'text' | 'plaintext' | 'encrypted'>;
+type ReplyPreviewSource = Pick<
+  ChatMessage,
+  'text' | 'plaintext' | 'encrypted' | 'deleted' | 'redacted'
+>;
+
+/** Withdrawn bodies are no longer valid reply context, even if memory kept a plaintext copy. */
+export function isWithdrawnMessage(
+  message: Pick<ChatMessage, 'deleted' | 'redacted'>,
+): boolean {
+  return message.deleted === true || message.redacted === true;
+}
 
 /** True for any on-wire E2EE body (DM or room) that must never paint as plaintext. */
 export function isEncryptedWireText(text: string): boolean {
@@ -22,12 +32,14 @@ export function hasEncryptedMessageBoundary(message: ReplyPreviewSource): boolea
 
 /** Active composer previews may use decrypted memory, but never the envelope. */
 export function activeReplyPreviewText(message: ReplyPreviewSource): string {
+  if (isWithdrawnMessage(message)) return '[message deleted]';
   if (!hasEncryptedMessageBoundary(message)) return message.text;
   return message.plaintext ?? lockedPlaceholderForText(message.text);
 }
 
 /** Durable reply snapshots never duplicate decrypted text or ciphertext. */
 export function persistedReplyPreviewText(message: ReplyPreviewSource): string {
+  if (isWithdrawnMessage(message)) return '[message deleted]';
   return hasEncryptedMessageBoundary(message)
     ? lockedPlaceholderForText(message.text)
     : message.text;

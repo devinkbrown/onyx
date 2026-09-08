@@ -45,11 +45,26 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
     store.setState({
       connectionStatus: 'connected',
       ourNick: 'ui-qa',
-      activeView: { kind: 'home' },
+      channels: new Map([['#root', {
+        name: '#root',
+        topic: 'UI quality assurance',
+        topicSetBy: 'server',
+        topicSetAt: null,
+        modes: '',
+        users: new Map([['ui-qa', { nick: 'ui-qa', modes: new Set() }]]),
+        unread: 0,
+        highlights: 0,
+        createdAt: null,
+        messages: [],
+      }]]),
+      activeView: { kind: 'channel', channel: '#root' },
     });
   });
 
-  await page.getByRole('button', { name: 'Search messages' }).click();
+  // Home no longer has a search button. Exercise the conversation ribbon's
+  // actual control, including its focus return when search closes.
+  const trigger = page.getByRole('button', { name: 'Search messages', exact: true });
+  await trigger.click();
   const search = page.locator('.onyx-message-search');
   const surface = search.locator('.onyx-message-search__surface');
   const input = page.getByRole('searchbox', { name: 'Search messages' });
@@ -79,6 +94,7 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
       surfaceRight: surfaceRect.right,
       inputTop: inputRect.top,
       inputBottom: inputRect.bottom,
+      inputWidth: inputRect.width,
       closeTop: closeRect.top,
       closeBottom: closeRect.bottom,
       closeRight: closeRect.right,
@@ -100,6 +116,7 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
   expect(openingGeometry.surfaceRight).toBeLessThanOrEqual(openingGeometry.rootRight);
   expect(openingGeometry.inputTop).toBeGreaterThanOrEqual(openingGeometry.surfaceTop);
   expect(openingGeometry.inputBottom).toBeLessThanOrEqual(openingGeometry.surfaceBottom);
+  expect(openingGeometry.inputWidth).toBeGreaterThanOrEqual(120);
   expect(openingGeometry.closeTop).toBeGreaterThanOrEqual(openingGeometry.surfaceTop);
   expect(openingGeometry.closeBottom).toBeLessThanOrEqual(openingGeometry.surfaceBottom);
   expect(openingGeometry.closeRight).toBeLessThanOrEqual(320 - 24);
@@ -107,9 +124,22 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
   expect(openingGeometry.closeHeight).toBeGreaterThanOrEqual(44);
 
   await input.fill('roadmap');
-  await expect(search.locator('.onyx-message-search__saved')).toBeVisible();
+  const body = search.locator('.onyx-message-search__body');
+  const savedName = body.getByRole('textbox', { name: 'Saved search name' });
+  await savedName.scrollIntoViewIfNeeded();
+  await savedName.fill('Roadmap notes');
+  await expect(savedName).toHaveValue('Roadmap notes');
+  const advanced = body.getByRole('button', { name: 'Advanced', exact: true });
+  await expect(advanced).toHaveAttribute('aria-expanded', 'false');
+  await advanced.click();
+  const related = body.getByRole('button', { name: 'Related terms', exact: true });
+  await related.scrollIntoViewIfNeeded();
+  await related.focus();
+  await expect(related).toBeFocused();
   const populatedGeometry = await search.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
+    const body = element.querySelector<HTMLElement>('.onyx-message-search__body')!;
+    body.scrollTop = body.scrollHeight;
+    const bodyRect = body.getBoundingClientRect();
     const rootRect = element.getBoundingClientRect();
     const surfaceRect = element.querySelector<HTMLElement>('.onyx-message-search__surface')!
       .getBoundingClientRect();
@@ -122,6 +152,12 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
       rootScrollHeight: element.scrollHeight,
       rootScrollTop: element.scrollTop,
       rootTop: rootRect.top,
+      rootBottom: rootRect.bottom,
+      bodyTop: bodyRect.top,
+      bodyBottom: bodyRect.bottom,
+      bodyClientHeight: body.clientHeight,
+      bodyScrollHeight: body.scrollHeight,
+      bodyScrollTop: body.scrollTop,
       surfaceTop: surfaceRect.top,
       surfaceBottom: surfaceRect.bottom,
       closeTop: closeRect.top,
@@ -144,8 +180,13 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
 
   expect(populatedGeometry.wideElements).toEqual([]);
   expect(populatedGeometry.rootScrollWidth).toBe(populatedGeometry.rootClientWidth);
-  expect(populatedGeometry.rootScrollHeight).toBeGreaterThan(populatedGeometry.rootClientHeight);
-  expect(populatedGeometry.rootScrollTop).toBeGreaterThan(0);
+  expect(populatedGeometry.rootScrollHeight).toBe(populatedGeometry.rootClientHeight);
+  expect(populatedGeometry.rootScrollTop).toBe(0);
+  expect(populatedGeometry.bodyScrollHeight).toBeGreaterThan(populatedGeometry.bodyClientHeight);
+  expect(populatedGeometry.bodyScrollTop).toBeGreaterThan(0);
+  expect(populatedGeometry.bodyClientHeight).toBeGreaterThanOrEqual(44);
+  expect(populatedGeometry.bodyTop).toBeGreaterThanOrEqual(populatedGeometry.surfaceBottom);
+  expect(populatedGeometry.bodyBottom).toBeLessThanOrEqual(populatedGeometry.rootBottom);
   expect(populatedGeometry.surfaceTop).toBeGreaterThanOrEqual(populatedGeometry.rootTop);
   expect(populatedGeometry.closeTop).toBeGreaterThanOrEqual(populatedGeometry.surfaceTop);
   expect(populatedGeometry.closeBottom).toBeLessThanOrEqual(populatedGeometry.surfaceBottom);
@@ -154,4 +195,5 @@ test('keeps message search usable at 400% short reflow', async ({ page, browserN
   await expect(close).toBeFocused();
   await close.press('Escape');
   await expect(surface).toBeHidden();
+  await expect(trigger).toBeFocused();
 });

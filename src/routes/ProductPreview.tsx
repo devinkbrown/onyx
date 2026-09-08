@@ -1,89 +1,73 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-/** Static, keyboard-operable community preview — a labeled room, not live data. */
+/** Static, keyboard-operable community preview — a fictional game-night room. */
 import { createSignal, For, type JSX } from 'solid-js';
 
 type PreviewState = 'room' | 'home' | 'messages';
-type RoomChip = { name: string; kind: 'room' | 'person'; active?: boolean; unread?: boolean };
+type PreviewPerson = { name: string; initial: string; kind: 'person' | 'room' };
 type PreviewMessage = { nick: string; initial: string; text: string; time: string; you?: boolean };
 type PreviewPanel = {
   id: PreviewState;
   label: string;
   title: string;
   body: string;
-  items: readonly string[];
   roomTitle: string;
   roomTopic: string;
-  rooms: readonly RoomChip[];
+  people: readonly PreviewPerson[];
   messages: readonly PreviewMessage[];
-  stage?: { title: string; detail: string } | null;
-  composer: string;
 };
 
 const PANELS: readonly PreviewPanel[] = [
   {
     id: 'room',
     label: 'Room',
-    title: 'Friends in a room that stays open.',
-    body: 'A labeled look at a room.',
-    items: ['A shared room', 'People you invited', 'A call when you want one'],
-    roomTitle: 'Weekend plans',
-    roomTopic: 'Saturday dinner and a porch call',
-    rooms: [
-      { name: 'Home', kind: 'room' },
-      { name: 'Weekend plans', kind: 'room', active: true },
-      { name: 'Studio hours', kind: 'room', unread: true },
-      { name: '@mika', kind: 'person' },
+    title: 'A room with room to stay awhile.',
+    body: 'A fictional game-night room, shown as a static example.',
+    roomTitle: 'Friday co-op',
+    roomTopic: 'Co-op tonight; voice when we need it.',
+    people: [
+      { name: 'mika', initial: 'M', kind: 'person' },
+      { name: 'jun', initial: 'J', kind: 'person' },
+      { name: 'you', initial: 'Y', kind: 'person' },
     ],
     messages: [
-      { nick: 'mika', initial: 'M', text: 'dinner’s at 7:30 if that still works', time: '19:42' },
-      { nick: 'you', initial: 'Y', text: 'perfect — I’ll grab bread on the way', time: '19:43', you: true },
-      { nick: 'jun', initial: 'J', text: 'joining the porch call after the dishes', time: '19:44' },
+      { nick: 'mika', initial: 'M', text: 'One more round?', time: '19:42' },
+      { nick: 'jun', initial: 'J', text: 'Give me five minutes.', time: '19:43' },
+      { nick: 'you', initial: 'Y', text: 'I’ll meet you in voice.', time: '19:44', you: true },
     ],
-    stage: { title: 'Porch call', detail: 'Hop in when you are ready' },
-    composer: 'Message Weekend plans',
   },
   {
     id: 'home',
     label: 'Home',
-    title: 'Catch up when you get back.',
-    body: 'Home is a quiet list of rooms you already share.',
-    items: ['What you missed', 'Saved on this device', 'Pick up mid-conversation'],
+    title: 'Pick up where you left off.',
+    body: 'A fictional Home view showing a few places to return to.',
     roomTitle: 'Home',
-    roomTopic: 'Come back whenever you like',
-    rooms: [
-      { name: 'Home', kind: 'room', active: true },
-      { name: 'Weekend plans', kind: 'room' },
-      { name: 'Studio hours', kind: 'room', unread: true },
-      { name: '@mika', kind: 'person' },
+    roomTopic: 'Rooms you already share',
+    people: [
+      { name: 'Friday co-op', initial: 'F', kind: 'room' },
+      { name: 'Studio hours', initial: 'S', kind: 'room' },
+      { name: '@mika', initial: 'M', kind: 'person' },
     ],
     messages: [
-      { nick: 'Weekend plans', initial: 'W', text: 'jun replied about the porch call', time: 'today' },
-      { nick: 'Studio hours', initial: 'S', text: 'Two notes waiting since last time', time: 'today' },
-      { nick: '@mika', initial: 'M', text: 'Your draft is still here', time: 'local' },
+      { nick: 'Friday co-op', initial: 'F', text: 'One more round?', time: 'last time' },
+      { nick: 'Studio hours', initial: 'S', text: 'Give me five minutes.', time: 'on device' },
+      { nick: '@mika', initial: 'M', text: 'I’ll meet you in voice.', time: 'saved here' },
     ],
-    stage: null,
-    composer: 'Jump to a room',
   },
   {
     id: 'messages',
     label: 'Messages',
-    title: 'A quiet side conversation.',
-    body: 'Direct messages sit next to rooms.',
-    items: ['Same people', 'A side chat', 'Shown as a DM, not a room'],
+    title: 'A quieter side conversation.',
+    body: 'A fictional DM shape: a direct conversation beside your rooms.',
     roomTitle: '@mika',
     roomTopic: 'Just the two of you',
-    rooms: [
-      { name: 'Home', kind: 'room' },
-      { name: 'Weekend plans', kind: 'room' },
-      { name: '@mika', kind: 'person', active: true },
-      { name: '@jun', kind: 'person' },
+    people: [
+      { name: 'mika', initial: 'M', kind: 'person' },
+      { name: 'you', initial: 'Y', kind: 'person' },
     ],
     messages: [
-      { nick: 'mika', initial: 'M', text: 'can you send the address again?', time: '19:40' },
-      { nick: 'you', initial: 'Y', text: 'on my way — I’ll drop it here', time: '19:41', you: true },
+      { nick: 'mika', initial: 'M', text: 'One more round?', time: '19:42' },
+      { nick: 'you', initial: 'Y', text: 'I’ll meet you in voice.', time: '19:43', you: true },
     ],
-    stage: null,
-    composer: 'Message @mika',
   },
 ];
 
@@ -91,6 +75,7 @@ export function ProductPreview(): JSX.Element {
   const [active, setActive] = createSignal<PreviewState>('room');
   let tablistRef: HTMLDivElement | undefined;
   const current = () => PANELS.find((panel) => panel.id === active()) ?? PANELS[0]!;
+
   const select = (index: number, moveFocus = false) => {
     const id = PANELS[index]?.id ?? 'room';
     setActive(id);
@@ -108,54 +93,84 @@ export function ProductPreview(): JSX.Element {
   return (
     <section class="product-preview" id="community" aria-labelledby="product-preview-title" data-product-preview data-preview-state={active()}>
       <div class="product-preview__head">
-        <p class="product-preview__eyebrow">Preview</p>
-        <h2 id="product-preview-title">A look inside a room</h2>
-        <p>Weekend plans — a labeled conversation, not a live room.</p>
+        <div>
+          <p class="product-preview__label">Fictional game-night preview</p>
+          <h2 id="product-preview-title">Friday co-op</h2>
+        </div>
+        <p class="product-preview__disclaimer">Not a live room. The controls below only change this example.</p>
       </div>
-      <div ref={(element) => { tablistRef = element; }} class="product-preview__tabs" role="tablist" aria-label="Preview areas" onKeyDown={onKeyDown}>
+
+      <div ref={(element) => { tablistRef = element; }} class="product-preview__tabs" role="tablist" aria-label="Preview areas" aria-describedby="preview-tabs-help" onKeyDown={onKeyDown}>
         <For each={PANELS}>{(panel) => (
-          <button type="button" role="tab" aria-selected={active() === panel.id} aria-controls={`preview-panel-${panel.id}`} id={`preview-tab-${panel.id}`} tabindex={active() === panel.id ? 0 : -1} onClick={() => setActive(panel.id)}>{panel.label}</button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={active() === panel.id}
+            aria-controls={`preview-panel-${panel.id}`}
+            id={`preview-tab-${panel.id}`}
+            tabIndex={active() === panel.id ? 0 : -1}
+            onClick={() => setActive(panel.id)}
+          >
+            {panel.label}
+          </button>
         )}</For>
       </div>
-      <div class="product-preview__canvas" role="tabpanel" id={`preview-panel-${current().id}`} aria-labelledby={`preview-tab-${current().id}`} tabindex="0">
-        <span class="product-preview__canvas-label">Preview · {current().label}</span>
-        <div class="product-preview__window" aria-hidden="true">
-          <div class="product-preview__rail">
-            <For each={current().rooms}>{(room) => (
-              <span classList={{ 'is-active': !!room.active, 'is-unread': !!room.unread, 'is-person': room.kind === 'person', 'is-room': room.kind === 'room' }}>
-                <b aria-hidden="true">{room.kind === 'person' ? room.name.replace(/^@/, '').slice(0, 1).toUpperCase() : room.name.slice(0, 1)}</b>
-                <em>{room.name}</em>
-              </span>
-            )}</For>
-          </div>
-          <div class="product-preview__content">
-            <div class="product-preview__roombar">
-              <strong>{current().roomTitle}</strong>
-              <small>{current().roomTopic}</small>
+      <span id="preview-tabs-help" class="product-preview__a11y-note">Use the arrow keys to move between preview areas.</span>
+
+      <div class="product-preview__canvas" role="tabpanel" id={`preview-panel-${current().id}`} aria-labelledby={`preview-tab-${current().id}`} tabIndex="0">
+        <div class="product-preview__scene" data-preview-scene>
+          <div class="product-preview__scene-topline">
+            <div class="product-preview__scene-brand"><span aria-hidden="true" /> <strong>Onyx</strong></div>
+            <span class="product-preview__scene-state">Static example</span>
+            <div class="home-mascot-scene" aria-hidden="true">
+              <img class="home-mascot" src="/brand/mascot-transparent.png" width="132" height="132" alt="" decoding="async" />
             </div>
-            {current().stage ? (
-              <div class="product-preview__stage">
-                <strong>{current().stage!.title}</strong>
-                <small>{current().stage!.detail}</small>
-                <em>Call</em>
-              </div>
-            ) : null}
-            <div class="product-preview__thread">
-              <For each={current().messages}>{(msg) => (
-                <div class="product-preview__msg" classList={{ 'is-you': !!msg.you }}>
-                  <span class="product-preview__face" data-you={msg.you ? 'true' : undefined}>{msg.initial}</span>
-                  <p><b>{msg.nick}</b> {msg.text}</p>
-                  <time>{msg.time}</time>
+          </div>
+
+          <div class="product-preview__scene-layout">
+            <div class="product-preview__room-context">
+              <p class="product-preview__scene-label">Room</p>
+              <div class="product-preview__room-title">
+                <span class="product-preview__room-glyph" aria-hidden="true">{current().roomTitle.slice(0, 1)}</span>
+                <div>
+                  <h3>{current().roomTitle}</h3>
+                  <p>{current().roomTopic}</p>
                 </div>
-              )}</For>
+              </div>
+              <ul class="product-preview__people" aria-label="People in this fictional scene">
+                <For each={current().people}>{(person) => (
+                  <li>
+                    <span classList={{ 'is-room': person.kind === 'room' }} aria-hidden="true">{person.initial}</span>
+                    <strong>{person.name}</strong>
+                  </li>
+                )}</For>
+              </ul>
             </div>
-            <div class="product-preview__composer">{current().composer}</div>
+
+            <div class="product-preview__conversation">
+              <div class="product-preview__conversation-head">
+                <span>Conversation</span>
+                <strong>{current().roomTitle}</strong>
+              </div>
+              <div class="product-preview__messages">
+                <For each={current().messages}>{(message) => (
+                  <article class="product-preview__message" classList={{ 'is-you': !!message.you }}>
+                    <span class="product-preview__face" aria-hidden="true">{message.initial}</span>
+                    <div>
+                      <p class="product-preview__message-meta"><strong>{message.nick}</strong><time>{message.time}</time></p>
+                      <p class="product-preview__message-text">{message.text}</p>
+                    </div>
+                  </article>
+                )}</For>
+              </div>
+            </div>
           </div>
+
         </div>
-        <div class="product-preview__copy">
+
+        <div class="product-preview__caption">
           <h3>{current().title}</h3>
           <p>{current().body}</p>
-          <ul><For each={current().items}>{(item) => <li>{item}</li>}</For></ul>
         </div>
       </div>
     </section>

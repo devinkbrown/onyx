@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { store } from '@/lib/store/store';
+import { selectIsChannelOp, store } from '@/lib/store/store';
 import type { Channel } from '@/lib/irc/types';
 import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { ModerationCockpit } from './ModerationCockpit';
@@ -64,6 +65,62 @@ describe('ModerationCockpit', () => {
     expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', 'ada!*@*');
     fireEvent.click(screen.getByTestId('moderation-review-confirm'));
     expect(client.sendRaw).toHaveBeenCalledWith('MODE', '#garden', '+b', 'ada!*@*');
+  });
+
+  it('invalidates a pending review when its room prop changes', async () => {
+    const client = seed();
+    const garden = store.getState().channels.get('#garden');
+    expect(garden).toBeDefined();
+    store.setState({
+      channels: new Map(store.getState().channels).set('#other', { ...garden!, name: '#other' }),
+    });
+    const [channel, setChannel] = createSignal('#garden');
+    render(() => <ModerationCockpit channel={channel()} />);
+
+    fireEvent.input(screen.getByLabelText('Block an address in this room'), { target: { value: 'ada!*@*' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review block' }));
+    expect(screen.getByTestId('moderation-action-review')).toBeInTheDocument();
+
+    client.sendRaw.mockClear();
+    setChannel('#other');
+
+    await waitFor(() => expect(screen.queryByTestId('moderation-action-review')).toBeNull());
+    expect(client.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', 'ada!*@*');
+  });
+
+  it('rejects a stale block after a same-room owner and client replacement, then accepts a fresh review', async () => {
+    const clientA = seed();
+    render(() => <ModerationCockpit channel="#garden" />);
+
+    const mask = 'ada!*@*';
+    fireEvent.input(screen.getByLabelText('Block an address in this room'), { target: { value: mask } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review block' }));
+    const staleConfirm = screen.getByTestId('moderation-review-confirm');
+    clientA.sendRaw.mockClear();
+
+    const clientB = { sendRaw: vi.fn(() => true) };
+    const currentServer = store.getState().server;
+    expect(currentServer).toBeDefined();
+    store.setState({
+      client: clientB as never,
+      server: currentServer ? {
+        ...currentServer,
+        id: 'garden-replacement',
+        url: 'wss://garden-replacement.test',
+        account: 'replacement-account',
+      } : null,
+    });
+    expect(selectIsChannelOp('#garden')(store.getState())).toBe(true);
+
+    await waitFor(() => expect(screen.queryByTestId('moderation-action-review')).toBeNull());
+    fireEvent.click(staleConfirm);
+    expect(clientA.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', mask);
+    expect(clientB.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '+b', mask);
+    expect(screen.getByLabelText('Block an address in this room')).toHaveValue(mask);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review block' }));
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
+    expect(clientB.sendRaw).toHaveBeenCalledWith('MODE', '#garden', '+b', mask);
   });
 
   it('does not render change controls for members without moderation permission', () => {

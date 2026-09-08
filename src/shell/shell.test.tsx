@@ -1086,6 +1086,7 @@ describe('AppShell', () => {
 
       // Act
       const { getByRole } = render(() => <AppShell />);
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
 
       // Assert — carol appears in member list without a role badge
       const aside = getByRole('complementary', { name: 'Member list for #general' });
@@ -1264,11 +1265,12 @@ describe('AppShell', () => {
         networkName: 'Onyx',
       }, true);
 
-      const { getByRole } = render(() => <AppShell />);
+      const { getByRole, queryByRole } = render(() => <AppShell />);
 
-      const ribbon = getByRole('banner', { name: 'Room information' });
-      expect(ribbon.textContent).toContain('Home');
-      expect(ribbon.textContent).not.toContain('Onyx');
+      expect(queryByRole('banner', { name: 'Room information' })).toBeNull();
+      expect(getByRole('navigation', { name: 'Primary' }))
+        .toContainElement(getByRole('button', { name: 'Home' }));
+      expect(getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     });
 
     it('shows the channel name and topic in the ribbon', () => {
@@ -1745,6 +1747,7 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('aside.shell-members');
       expect(memberList).not.toBeNull();
+      if (!memberList) throw new Error('member list should remain mounted after shell render');
       expect(memberList).toHaveAttribute('aria-label', 'Member list');
       expect(memberList).toHaveAttribute('aria-hidden', 'true');
       expect(memberList).toHaveAttribute('inert');
@@ -1755,11 +1758,24 @@ describe('AppShell', () => {
       store.getState()._handleMessage(parseIRCMessage(':server 353 Guest42 = #root :Guest42 Alice @Bob'));
       store.getState()._handleMessage(parseIRCMessage(':server 366 Guest42 #root :End of /NAMES list'));
 
-      // Assert — the existing column reacts to activeView + roster state instead
-      // of requiring a shell remount or a manual member-list toggle.
+      // Assert — the existing column reacts to activeView + roster state while
+      // preserving the user's closed People preference until explicitly opened.
       await waitFor(() => {
         expect(container.querySelector('aside.shell-members')).toBe(memberList);
         expect(memberList).toHaveAttribute('aria-label', 'Member list for #root');
+        expect(memberList).toHaveAttribute('aria-hidden', 'true');
+        expect(memberList).toHaveAttribute('inert');
+        expect(memberList.textContent).toContain('Guest42');
+        expect(memberList.textContent).toContain('Alice');
+        expect(memberList.textContent).toContain('Bob');
+      });
+
+      // Act — the user opens People after the authoritative NAMES roster lands.
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+
+      // Assert — the same mounted node becomes usable with the live roster.
+      await waitFor(() => {
+        expect(container.querySelector('aside.shell-members')).toBe(memberList);
         expect(memberList).toHaveAttribute('aria-hidden', 'false');
         expect(memberList).not.toHaveAttribute('inert');
         expect(within(memberList!).getByText('Guest42', { exact: true })).toBeInTheDocument();
@@ -1791,6 +1807,16 @@ describe('AppShell', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('shell-suspended')).not.toBeInTheDocument();
         expect(container.querySelector('[data-testid="app-shell"]')).toBeInTheDocument();
+      });
+      const memberList = container.querySelector<HTMLElement>('aside.shell-members');
+      expect(memberList).not.toBeNull();
+      expect(memberList).toHaveAttribute('aria-hidden', 'true');
+      expect(memberList).toHaveAttribute('inert');
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).not.toHaveAttribute('inert');
         const roster = screen.getByRole('region', { name: 'People in #general' });
         expect(roster).toBeInTheDocument();
         expect(within(roster).getByText('alice', { exact: true })).toBeInTheDocument();
@@ -2259,6 +2285,30 @@ describe('AppShell', () => {
       });
     });
 
+    it('opens the default-visible desktop People column on its first click', async () => {
+      stubMobileViewport(false);
+      seedStore('#general');
+      // `seedStore` keeps the real store default: showMemberList=true. The
+      // shell deliberately keeps that column visually closed until the user
+      // first asks for People, so this catches the touched-state ordering bug.
+
+      const { container } = render(() => <AppShell />);
+      const memberList = container.querySelector<HTMLElement>('.shell-members');
+      const membersButton = screen.getByRole('button', { name: /3 members — toggle member list/i });
+      expect(memberList).not.toBeNull();
+      expect(memberList).toHaveAttribute('aria-hidden', 'true');
+      expect(store.getState().showMemberList).toBe(true);
+
+      fireEvent.click(membersButton);
+
+      await waitFor(() => {
+        expect(memberList).toHaveAttribute('aria-hidden', 'false');
+        expect(memberList).not.toHaveAttribute('inert');
+        expect(screen.getByRole('region', { name: 'People in #general' })).toBeInTheDocument();
+      });
+      expect(store.getState().showMemberList).toBe(true);
+    });
+
     it('hands focus to the DM composer when Message hides the desktop member column', async () => {
       stubMobileViewport(false);
       seedStore('#general');
@@ -2266,6 +2316,8 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       fireEvent.click(within(memberList!).getByRole('button', { name: /Open member details for alice/i }));
       fireEvent.click(screen.getByRole('button', { name: 'Send DM to alice' }));
 
@@ -2296,10 +2348,8 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
-      if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
-        await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
-      }
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
       fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
@@ -2342,6 +2392,8 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
       fireEvent.click(screen.getByTestId('people-profile-advanced-toggle'));
@@ -2375,6 +2427,8 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       memberTrigger.focus();
       fireEvent.click(memberTrigger);
@@ -2422,10 +2476,8 @@ describe('AppShell', () => {
       const { container } = render(() => <AppShell />);
       const memberList = container.querySelector<HTMLElement>('.shell-members');
       expect(memberList).not.toBeNull();
-      if (mobile) {
-        fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
-        await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
-      }
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => expect(memberList).toHaveAttribute('aria-hidden', 'false'));
 
       const memberTrigger = within(memberList!).getByRole('button', { name: /Open member details for alice/i });
       fireEvent.click(memberTrigger);
@@ -2497,9 +2549,9 @@ describe('AppShell', () => {
     });
 
     it('models the column-4 slot as a single tri-state attribute (members ↔ context)', async () => {
-      // Arrange — desktop viewport, an active channel so the member roster
-      // owns the slot by default (Context must REPLACE it, per asideOccupant
-      // in AppShell.tsx — never both at once).
+      // Arrange — desktop viewport, an active channel with a mounted but
+      // initially closed People surface (Context must REPLACE it once opened,
+      // per asideOccupant in AppShell.tsx — never both at once).
       stubMobileViewport(false);
       seedStore('#general');
 
@@ -2513,14 +2565,22 @@ describe('AppShell', () => {
       // getByRole would fail to find it before Context ever opens.
       const closeRail = rail.querySelector<HTMLButtonElement>('.shell-context-rail__close')!;
 
-      // Assert — closed by default: roster owns the slot, Context is inert.
-      expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
-      expect(roster).not.toHaveAttribute('inert');
+      // Assert — closed by default: no optional occupant owns the slot, and the
+      // mounted roster is inert until the user explicitly opens People.
+      expect(shellEl).toHaveAttribute('data-shell-aside', 'none');
+      expect(roster).toHaveAttribute('aria-hidden', 'true');
+      expect(roster).toHaveAttribute('inert');
       expect(rail).toHaveAttribute('inert');
       expect(rail).toHaveAttribute('data-open', 'false');
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
-      // Act — open Context.
+      // Act — explicitly open People, then open Context.
+      fireEvent.click(screen.getByRole('button', { name: /members — toggle member list/i }));
+      await waitFor(() => {
+        expect(shellEl).toHaveAttribute('data-shell-aside', 'members');
+        expect(roster).not.toHaveAttribute('inert');
+        expect(roster).toHaveAttribute('aria-hidden', 'false');
+      });
       fireEvent.click(trigger);
 
       // Assert — Context now owns the slot: roster goes inert, rail does not.

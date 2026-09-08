@@ -58,7 +58,8 @@ describe('Shell phone contracts', () => {
     const navStart = mobile.indexOf('.shell-mobile-nav {');
     expect(navStart).toBeGreaterThanOrEqual(0);
     const navChunk = mobile.slice(navStart, navStart + 900);
-    expect(navChunk).toMatch(/background:\s*color-mix/);
+    expect(navChunk).toMatch(/background:\s*var\(--stone\)/);
+    expect(navChunk).toMatch(/backdrop-filter:\s*none/);
     expect(navChunk).not.toMatch(/box-shadow:\s*[\s\S]*0 -22px/);
   });
 });
@@ -78,6 +79,14 @@ describe('Home phone hierarchy contracts', () => {
     expect(homeCss).toMatch(/orientation:\s*landscape/);
     expect(homeCss).toMatch(/max-width:\s*390px/);
   });
+
+  it('keeps Home in the explicit phone content row and wraps date labels inside the feed', () => {
+    const mobile = mobileShellBlock();
+    expect(mobile).toMatch(/\.shell\s*\{[\s\S]*?grid-template-rows:\s*minmax\(0,\s*1fr\)/);
+    expect(mobile).toMatch(/\.shell\s*>\s*\.shell-conversation\s*\{[\s\S]*?grid-row:\s*1/);
+    expect(shellCss).toMatch(/\.shell-day-divider::before,[\s\n]*\.shell-day-divider::after\s*\{[\s\S]*?min-width:\s*0/s);
+    expect(shellCss).toMatch(/\.shell-day-divider-label\s*\{[\s\S]*?flex:\s*0\s+1\s+auto;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*calc\(100%\s*-\s*12px\);[\s\S]*?overflow-wrap:\s*anywhere/s);
+  });
 });
 
 describe('Calls / Connect / Appearance phone contracts', () => {
@@ -88,9 +97,9 @@ describe('Calls / Connect / Appearance phone contracts', () => {
     expect(callsCss).not.toMatch(/content:\s*['"][^'"]*(Join call|Accept|Start ringing)/i);
   });
 
-  it('Connect front door uses 17px inputs and sticky primary on phone', () => {
-    expect(connectCss).toMatch(/@media \(max-width:\s*520px\)/);
-    expect(connectCss).toMatch(/\.conn \.onyx-field__input,\s*\n\s*\.conn-password-toggle,\s*\n\s*\.conn-passkey-button,\s*\n\s*\.conn-submit\s*\{[^}]*font-size:\s*17px/s);
+  it('Connect front door uses readable inputs and sticky primary on phone', () => {
+    expect(connectCss).toMatch(/@media \(max-width:\s*42rem\)/);
+    expect(connectCss).toMatch(/\.conn \.onyx-field__input\s*\{[^}]*font:\s*1rem\/1\.4 var\(--font-sans\)/s);
     expect(connectCss).toMatch(/\.conn-actions\s*\{[^}]*position:\s*sticky/s);
     expect(connectCss).toMatch(/min-height:\s*48px/);
   });

@@ -69,8 +69,32 @@
 
 @media (max-width: 520px) {
   .shell-composer-action-label { display: none; }
-  .shell-composer-tool,
-  .shell-composer-send { width: 44px; min-width: 44px; padding-inline: 0; }
+  .shell-composer-inner {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .shell-composer-inner > .shell-composer-textarea {
+    order: -1;
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .shell-composer-inner > .shell-composer-tool,
+  .shell-composer-inner > .shell-composer-send {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    padding-inline: 0;
+  }
+  .shell-composer-inner > .shell-composer-more-wrap {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+  }
+  .shell-composer-more-wrap > .shell-composer-tool--more {
+    width: 44px;
+    min-width: 44px;
+    padding-inline: 0;
+  }
 }
 
 @media (forced-colors: active) {

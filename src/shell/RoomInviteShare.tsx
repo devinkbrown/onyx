@@ -139,11 +139,11 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
     >
       <div class="room-invite-share">
         <p class="room-invite-share__copy">
-          Send this link. Friends choose a name and join.
+          Send this link. Friends choose a name and request access.
         </p>
         <p class="room-invite-share__context" role="status">
           {connectionStatus() === 'connected'
-            ? 'Anyone with the link can choose to join this room.'
+            ? 'Anyone with the link can open the invite. Room access rules still apply.'
             : 'You’re offline. You can still copy this link and share it.'}
         </p>
         <div class="room-invite-share__preview" role="group" aria-label="Invite preview">
@@ -161,7 +161,7 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
           <Show when={canShare()}>
             <Button
               type="button"
-              variant="primary"
+              variant="ghost"
               size="sm"
               disabled={shareBusy() || copyBusy()}
               aria-busy={shareBusy()}
@@ -184,15 +184,16 @@ export function RoomInviteShare(props: RoomInviteShareProps) {
         <Show when={!canShare()}>
           <p class="room-invite-share__fallback">Sharing is not available here. Copy the link instead.</p>
         </Show>
-        <span
-          class="sr-only"
+        {/* Mount before async feedback so assistive technology can observe text updates. */}
+        <p
+          class="room-invite-share__status"
           role="status"
           aria-live="polite"
           aria-atomic="true"
           data-testid="room-invite-share-status"
         >
           {copyStatus()}
-        </span>
+        </p>
       </div>
     </Sheet>
   );

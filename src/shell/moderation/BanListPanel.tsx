@@ -5,10 +5,14 @@
  */
 import { createEffect, createMemo, createSignal, createUniqueId, For, on, Show, splitProps, type JSX } from 'solid-js';
 import {
+  captureDeviceMemoryContext,
   getState,
+  isDeviceMemoryContextCurrent,
   selectBanListView,
   selectIsChannelOp,
   useStore,
+  type DeviceMemoryContext,
+  type OnyxState,
 } from '@/lib/store';
 import type { BanListEntry } from '@/lib/moderation/banListView';
 import type { ModerationActionDraft, NormalizedModerationAction } from '@/lib/moderation/actionModel';
@@ -18,6 +22,57 @@ import './moderation-desk.css';
 export type BanListPanelProps = {
   channel: string;
 };
+
+type ModerationReviewAuthority = {
+  account: string | null;
+  serverId: string | null;
+  serverUrl: string | null;
+  client: OnyxState['client'];
+  deviceMemory: DeviceMemoryContext | null;
+};
+
+function captureModerationReviewAuthority(state: OnyxState): ModerationReviewAuthority {
+  return {
+    account: state.server?.account ?? null,
+    serverId: state.server?.id ?? null,
+    serverUrl: state.server?.url ?? null,
+    client: state.client,
+    deviceMemory: captureDeviceMemoryContext(state),
+  };
+}
+
+function moderationReviewAuthorityIsCurrent(
+  captured: ModerationReviewAuthority,
+  state: OnyxState,
+): boolean {
+  const currentDeviceMemory = captureDeviceMemoryContext(state);
+  return captured.account === (state.server?.account ?? null)
+    && captured.serverId === (state.server?.id ?? null)
+    && captured.serverUrl === (state.server?.url ?? null)
+    && captured.client === state.client
+    && (captured.deviceMemory === null
+      ? currentDeviceMemory === null
+      : currentDeviceMemory !== null && isDeviceMemoryContextCurrent(captured.deviceMemory, state));
+}
+
+function moderationReviewAuthorityEqual(
+  left: ModerationReviewAuthority,
+  right: ModerationReviewAuthority,
+): boolean {
+  const leftDeviceMemory = left.deviceMemory;
+  const rightDeviceMemory = right.deviceMemory;
+  return left.account === right.account
+    && left.serverId === right.serverId
+    && left.serverUrl === right.serverUrl
+    && left.client === right.client
+    && ((leftDeviceMemory === null && rightDeviceMemory === null)
+      || (leftDeviceMemory !== null
+        && rightDeviceMemory !== null
+        && leftDeviceMemory.generation === rightDeviceMemory.generation
+        && leftDeviceMemory.client === rightDeviceMemory.client
+        && leftDeviceMemory.owner.serverUrl === rightDeviceMemory.owner.serverUrl
+        && leftDeviceMemory.owner.identity === rightDeviceMemory.owner.identity));
+}
 
 export function BanListPanel(props: BanListPanelProps): JSX.Element {
   const [local] = splitProps(props, ['channel']);
@@ -31,7 +86,31 @@ export function BanListPanel(props: BanListPanelProps): JSX.Element {
   const ourNick = useStore((s) => s.ourNick);
   const connected = createMemo(() => connectionStatus() === 'connected' && serverConnected());
   const [pending, setPending] = createSignal<ModerationActionDraft | null>(null);
+  const [reviewAuthority, setReviewAuthority] = createSignal<ModerationReviewAuthority | null>(null);
   const [returnFocus, setReturnFocus] = createSignal<HTMLElement | null>(null);
+  const liveReviewAuthority = useStore(captureModerationReviewAuthority, moderationReviewAuthorityEqual);
+
+  createEffect(on(
+    liveReviewAuthority,
+    (authority, previous) => {
+      if (previous !== undefined && !moderationReviewAuthorityEqual(authority, previous)) {
+        setPending(null);
+        setReviewAuthority(null);
+        setReturnFocus(null);
+      }
+    },
+  ));
+
+  createEffect(on(
+    () => local.channel,
+    (channel, previous) => {
+      if (previous !== undefined && channel !== previous) {
+        setPending(null);
+        setReviewAuthority(null);
+        setReturnFocus(null);
+      }
+    },
+  ));
 
   createEffect(on(
     () => [local.channel, connected(), canModerate()] as const,
@@ -49,13 +128,31 @@ export function BanListPanel(props: BanListPanelProps): JSX.Element {
   function requestUnban(entry: BanListEntry, event: MouseEvent): void {
     const target = event.currentTarget;
     setReturnFocus(target instanceof HTMLElement ? target : null);
+    setReviewAuthority(captureModerationReviewAuthority(getState()));
     setPending({ kind: 'unban', channel: local.channel, mask: entry.mask });
   }
 
   function applyUnban(action: NormalizedModerationAction): void {
-    if (action.kind !== 'unban') return;
-    getState().unbanMask(action.channel, action.mask);
+    const state = getState();
+    const currentConnected = state.connectionStatus === 'connected' && !!state.server?.connected;
+    const currentCanModerate = selectIsChannelOp(local.channel)(state);
+    const capturedAuthority = reviewAuthority();
+    if (
+      action.kind !== 'unban'
+      || action.channel.trim().toLowerCase() !== local.channel.trim().toLowerCase()
+      || !currentConnected
+      || !currentCanModerate
+      || !capturedAuthority
+      || !moderationReviewAuthorityIsCurrent(capturedAuthority, state)
+    ) {
+      setPending(null);
+      setReviewAuthority(null);
+      setReturnFocus(null);
+      return;
+    }
+    state.unbanMask(action.channel, action.mask);
     setPending(null);
+    setReviewAuthority(null);
   }
 
   const visibleEntries = createMemo(() => {
@@ -86,7 +183,10 @@ export function BanListPanel(props: BanListPanelProps): JSX.Element {
   return (
     <section class="moderation-desk__bans" aria-labelledby={titleId} data-testid="ban-list-panel">
       <div class="moderation-cockpit__head">
-        <h4 id={titleId}>Active blocks</h4>
+        <div>
+          <h4 id={titleId}>Active blocks</h4>
+          <span class="moderation-desk__room">{local.channel}</span>
+        </div>
         <button
           type="button"
           data-testid="ban-list-refresh"
@@ -135,7 +235,10 @@ export function BanListPanel(props: BanListPanelProps): JSX.Element {
         canModerate={canModerate()}
         returnFocus={returnFocus()}
         onConfirm={applyUnban}
-        onCancel={() => setPending(null)}
+        onCancel={() => {
+          setPending(null);
+          setReviewAuthority(null);
+        }}
       />
     </section>
   );

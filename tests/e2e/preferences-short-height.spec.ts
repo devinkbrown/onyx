@@ -52,7 +52,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
   await page.getByRole('button', { name: 'Open You' }).click();
   await page.getByRole('dialog', { name: 'You' }).getByRole('button', { name: 'Preferences', exact: true }).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Preferences' });
+  const dialog = page.getByRole('dialog', { name: 'Device preferences', exact: true });
   const close = page.getByRole('button', { name: 'Close preferences' });
   await expect(dialog).toBeVisible();
   await expect(close).toBeFocused();
@@ -66,6 +66,7 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
     const tabButtons = Array.from(tabs.querySelectorAll<HTMLElement>('[role="tab"]'));
     const reset = panel.querySelector<HTMLElement>('.pref-reset-all')!;
     const content = panel.querySelector<HTMLElement>('.pref-category-content')!;
+    const status = panel.querySelector<HTMLElement>('.pref-save-status')!;
     const panelRect = panel.getBoundingClientRect();
     const headerRect = header.getBoundingClientRect();
     const bodyRect = body.getBoundingClientRect();
@@ -99,6 +100,9 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
       resetFontSize: Number.parseFloat(getComputedStyle(reset).fontSize),
       contentTop: contentRect.top,
       contentBottom: contentRect.bottom,
+      statusFontSize: Number.parseFloat(getComputedStyle(status).fontSize),
+      statusClientHeight: status.clientHeight,
+      statusScrollHeight: status.scrollHeight,
     };
   });
 
@@ -132,6 +136,9 @@ test('keeps the Preferences close action and body usable at 400% short reflow', 
   expect(openingGeometry.resetFontSize).toBeLessThanOrEqual(14);
   expect(openingGeometry.contentTop).toBeLessThan(openingGeometry.bodyBottom);
   expect(openingGeometry.contentBottom).toBeGreaterThan(openingGeometry.bodyTop);
+  expect(openingGeometry.statusFontSize).toBeGreaterThanOrEqual(14);
+  expect(openingGeometry.statusFontSize).toBeLessThanOrEqual(16);
+  expect(openingGeometry.statusScrollHeight).toBe(openingGeometry.statusClientHeight);
 
   await page.keyboard.press('Tab');
   await expect(page.getByRole('tab', { name: /^Display/ })).toBeFocused();

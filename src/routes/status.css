@@ -1,145 +1,153 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Public Status — one honest sentence for tonight. PublicFrame owns chrome. */
-.status-route {
-  min-width: 0;
-  color: var(--paper);
-}
+/* Status keeps the public contract readable at a glance: one observation,
+   one honest next step, and no decorative telemetry. */
 
-.status-route,
-.status-route * {
-  max-width: 100%;
+.status-route {
+  --status-current: var(--route-cobalt-strong);
+  --status-ok: var(--ok);
+  --status-warn: var(--warn);
+  min-width: 0;
+  color: var(--route-text);
+  overflow-x: clip;
 }
 
 .status-route .r-wrap {
+  position: relative;
+  z-index: 1;
   min-width: 0;
 }
 
 .status-hero {
-  position: relative;
-  padding-block: clamp(48px, 8vw, 112px) clamp(36px, 6vw, 72px);
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(18rem, 1.18fr);
+  grid-template-areas:
+    "kicker observation"
+    "title observation"
+    "lede observation"
+    "check check";
+  gap: 0.75rem clamp(2rem, 7vw, 7rem);
+  align-items: start;
+  padding-block: clamp(4rem, 10vw, 8rem) clamp(3rem, 7vw, 5rem);
+  border-bottom: 1px solid var(--route-line);
 }
 
 .status-kicker {
-  display: block;
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  grid-area: kicker;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--status-current);
+  font: 700 0.9rem/1.2 var(--font-sans);
+  letter-spacing: 0;
   text-transform: none;
-  color: var(--paper-dim);
+}
+
+.status-kicker::before {
+  content: '';
+  width: 1.5rem;
+  height: 0.18rem;
+  background: currentColor;
 }
 
 .status-route .status-hero h1 {
-  margin: 18px 0 0;
-  max-width: 16ch;
-  font-family: var(--font-sans);
-  font-size: clamp(2.2rem, 1.4rem + 4vw, 4.2rem);
-  font-weight: 650;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  text-transform: none;
+  grid-area: title;
+  max-width: 18ch;
+  margin: 1rem 0 0;
+  color: var(--route-text);
+  font: 650 clamp(2.5rem, 5vw, 4.8rem)/0.98 var(--font-sans);
+  letter-spacing: -0.04em;
   text-wrap: balance;
 }
 
 .status-lede {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  margin: 22px 0 0;
-  max-width: 28ch;
-  font-family: var(--font-serif);
-  font-optical-sizing: auto;
-  font-weight: 380;
-  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.45rem);
-  line-height: 1.4;
-  color: var(--paper);
+  grid-area: lede;
+  max-width: 43ch;
+  margin: 1.5rem 0 0;
+  color: var(--route-muted);
+  font: 1.12rem/1.6 var(--font-sans);
+  text-wrap: pretty;
 }
 
 .status-observation {
+  grid-area: observation;
   display: grid;
   grid-template-columns: auto minmax(8rem, max-content) minmax(0, 1fr);
   align-items: center;
   gap: 0.75rem 1rem;
-  margin-top: clamp(1.5rem, 4vw, 2.75rem);
-  padding-block: 0.9rem;
-  border-block: 1px solid var(--seam-faint);
-  color: var(--paper-dim);
+  max-width: 42rem;
+  margin: 1rem 0 0;
+  padding: 1.25rem 0;
+  border-block: 1px solid var(--route-line);
+  color: var(--route-muted);
 }
 
 .status-observation__marker {
-  width: 0.7rem;
-  height: 0.7rem;
+  width: 0.75rem;
+  height: 0.75rem;
   border: 1px solid currentColor;
-  border-radius: var(--r-pill);
-  color: var(--paper-mute);
+  border-radius: 50%;
+  color: var(--status-warn);
   background: transparent;
-  box-shadow: 0 0 0 0.25rem color-mix(in oklab, currentColor 12%, transparent);
 }
 
 .status-observation__label {
-  color: var(--paper);
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  color: var(--route-text);
+  font: 700 0.9rem/1.25 var(--font-sans);
 }
 
 .status-observation__detail {
   min-width: 0;
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.5;
+  color: var(--route-muted);
+  font: 0.96rem/1.5 var(--font-sans);
   overflow-wrap: anywhere;
 }
 
 .status-observation[data-feed-state='current'] .status-observation__marker {
-  color: var(--ok);
+  color: var(--status-ok);
   background: currentColor;
 }
 
 .status-observation[data-feed-state='degraded'] .status-observation__marker,
 .status-observation[data-feed-state='stale'] .status-observation__marker,
-.status-observation[data-feed-state='future'] .status-observation__marker,
-.status-observation[data-feed-state='unknown'] .status-observation__marker {
-  color: var(--warn);
+.status-observation[data-feed-state='future'] .status-observation__marker {
+  color: var(--status-warn);
   background: currentColor;
 }
 
+.status-observation[data-feed-state='unknown'] .status-observation__marker {
+  color: var(--route-danger);
+  background: transparent;
+}
+
 .status-observation[data-feed-state='loading'] .status-observation__marker {
-  color: var(--public-current, var(--lapis-bright));
+  color: var(--status-current);
   border-style: dashed;
 }
 
 .status-check {
+  grid-area: check;
   display: flex;
-  justify-content: flex-end;
-  margin-top: 14px;
+  justify-content: flex-start;
+  margin-top: 1rem;
 }
 
 .status-check__button {
   min-width: var(--target-min, 44px);
   min-height: var(--target-min, 44px);
-  padding-inline: 15px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-pill);
-  color: var(--paper-dim);
-  background: color-mix(in oklab, var(--stone) 52%, transparent);
-  font: 650 0.78rem/1 var(--font-sans);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--route-edge);
+  border-radius: 0.35rem;
+  color: var(--route-text);
+  background: var(--route-raised);
+  font: 700 0.86rem/1 var(--font-sans);
+  cursor: pointer;
 }
 
 .status-check__button:hover:not(:disabled),
 .status-check__button:focus-visible {
-  border-color: color-mix(in oklab, var(--public-current, var(--lapis-bright)) 55%, var(--seam-faint));
-  color: var(--paper);
-  background: color-mix(in oklab, var(--public-current, var(--lapis)) 13%, var(--stone));
-}
-
-.status-check__button:focus-visible {
-  outline: var(--focus-ring, 2px solid var(--public-current, var(--lapis-bright)));
-  outline-offset: 2px;
+  border-color: var(--status-current);
+  background: var(--route-surface);
 }
 
 .status-check__button:disabled {
@@ -148,24 +156,26 @@
 }
 
 .status-quiet {
-  padding-block: clamp(2.4rem, 6vw, 4.8rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1.5rem;
+  padding-block: clamp(3rem, 8vw, 7rem);
 }
 
 .status-quiet h2 {
+  max-width: 22ch;
   margin: 0;
-  font-family: var(--font-sans);
-  font-size: clamp(1.4rem, 1.1rem + 1.2vw, 2rem);
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  color: var(--route-text);
+  font: 650 clamp(1.9rem, 3.4vw, 3.5rem)/1 var(--font-sans);
+  letter-spacing: -0.035em;
 }
 
 .status-quiet p {
-  margin: 12px 0 0;
-  max-width: 48ch;
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--paper-dim);
+  max-width: 52ch;
+  margin: 1rem 0 0;
+  color: var(--route-muted);
+  font: 1rem/1.6 var(--font-sans);
 }
 
 .status-quiet-link {
@@ -173,38 +183,71 @@
   align-items: center;
   min-width: var(--target-min, 44px);
   min-height: var(--target-min, 44px);
-  margin-top: 16px;
-  font-family: var(--font-sans);
-  color: var(--paper-dim);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--route-edge);
+  color: var(--route-text);
+  background: var(--route-raised);
+  font: 700 0.9rem/1.1 var(--font-sans);
+  text-decoration: none;
 }
 
 .status-quiet-link:hover,
 .status-quiet-link:focus-visible {
-  color: var(--public-signal-strong, var(--lapis-bright));
+  border-color: var(--status-current);
+  background: var(--route-surface);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 48rem) {
+  .status-hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "kicker"
+      "title"
+      "lede"
+      "observation"
+      "check";
+  }
+
   .status-observation {
     grid-template-columns: auto minmax(0, 1fr);
+    max-width: none;
+    margin-top: 1.5rem;
   }
 
   .status-observation__detail {
     grid-column: 2;
   }
+
+  .status-quiet {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
+
+@media (max-width: 42rem) {
+  .status-hero { padding-block: 3rem 2.5rem; }
+
+  .status-route .status-hero h1 {
+    max-width: 18ch;
+    font-size: clamp(2.5rem, 11vw, 4.5rem);
+  }
+
+  .status-lede,
+  .status-observation__detail,
+  .status-quiet p { font-size: 1.0625rem; }
+
+  .status-check__button,
+  .status-quiet-link { width: 100%; }
 }
 
 @media (max-width: 42rem) and (max-height: 30rem) {
-  .status-route .status-hero h1 {
-    max-width: none;
-    font-size: min(1rem, 64px);
-    line-height: 1.1;
-    overflow-wrap: anywhere;
-  }
+  .status-route,
+  .status-route .r-wrap,
+  .status-observation,
+  .status-quiet { min-width: 0; max-width: 100%; }
 
-  .status-scroll-surface:focus-visible {
-    outline: var(--focus-ring, 2px solid var(--public-current, var(--lapis-bright)));
-    outline-offset: 3px;
-  }
+  .status-route .status-hero h1,
+  .status-quiet h2 { font-size: 2.75rem; overflow-wrap: anywhere; }
 
   .status-scroll-surface {
     max-height: calc(100svh - 1rem);
@@ -213,81 +256,17 @@
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
   }
-
-  .status-lede {
-    width: 100%;
-    font-size: min(1rem, 24px);
-  }
-
-  .status-observation {
-    grid-template-columns: 12px minmax(0, 1fr);
-    gap: 8px 12px;
-    margin-top: 24px;
-    padding-block: 14px;
-  }
-
-  .status-observation__marker {
-    width: 10px;
-    height: 10px;
-    box-shadow: none;
-  }
-
-  .status-observation__label {
-    font-size: 16px;
-  }
-
-  .status-observation__detail,
-  .status-quiet p {
-    font-size: 16px;
-  }
-
-  .status-quiet-link {
-    width: 100%;
-    min-height: 44px;
-  }
-
-  .status-check__button {
-    width: 100%;
-    min-height: 44px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .status-quiet-link,
-  .status-check__button {
-    transition: none;
-  }
+  .status-check__button,
+  .status-quiet-link { transition: none; }
 }
 
 @media (forced-colors: active) {
-  .status-kicker,
-  .status-route .status-hero h1,
-  .status-lede {
-    color: CanvasText;
-  }
-
-  .status-observation {
-    border-color: CanvasText;
-  }
-
-  .status-observation__marker,
-  .status-observation[data-feed-state] .status-observation__marker {
-    color: CanvasText;
-    background: Canvas;
-    box-shadow: none;
-  }
-
-  .status-observation[data-feed-state='current'] .status-observation__marker {
-    background: Highlight;
-  }
-
-  .status-check__button {
-    border-color: CanvasText;
-    color: CanvasText;
-    background: Canvas;
-  }
-
-  .status-check__button:focus-visible {
-    outline-color: Highlight;
-  }
+  .status-observation,
+  .status-check__button,
+  .status-quiet-link { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .status-observation__marker { border-color: CanvasText; background: Canvas; }
+  .status-observation[data-feed-state='current'] .status-observation__marker { background: Highlight; }
 }

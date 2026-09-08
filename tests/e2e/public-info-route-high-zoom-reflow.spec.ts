@@ -91,7 +91,7 @@ for (const route of routes) {
         toggle: bounds(document.querySelector<HTMLElement>('.public-frame__menu-toggle')!),
         surfaces: Array.from(document.querySelectorAll<HTMLElement>(
           '.public-frame, .public-frame__header, .public-frame__main, .public-frame__footer,'
-          + ' .ui-root.data-page, .data-hero, .r-section, .data-card',
+          + ' .ui-root.data-page, .public-info-article, .public-info-statement',
         )).map((element) => ({
           className: element.className,
           clientWidth: element.clientWidth,
@@ -111,11 +111,11 @@ for (const route of routes) {
           }))
           .filter(({ left, right }) => left < -1 || right > viewportWidth + 1)
           .slice(0, 12),
-        heroFontSize: Number.parseFloat(getComputedStyle(
-          document.querySelector<HTMLElement>('.data-hero h1')!,
+        articleHeadingFontSize: Number.parseFloat(getComputedStyle(
+          document.querySelector<HTMLElement>('.public-info-article__header h1')!,
         ).fontSize),
-        cardCopyFontSize: Number.parseFloat(getComputedStyle(
-          document.querySelector<HTMLElement>('.data-card p')!,
+        statementCopyFontSize: Number.parseFloat(getComputedStyle(
+          document.querySelector<HTMLElement>('.public-info-statement > p:last-child')!,
         ).fontSize),
         controls: Array.from(document.querySelectorAll<HTMLElement>(
           '.public-frame__header a, .public-frame__header button, .public-frame__footer a',
@@ -145,9 +145,9 @@ for (const route of routes) {
 
     expect(geometry.toggle.width).toBe(44);
     expect(geometry.toggle.height).toBe(44);
-    expect(geometry.heroFontSize).toBeLessThanOrEqual(64);
-    expect(geometry.cardCopyFontSize).toBeGreaterThanOrEqual(16);
-    expect(geometry.cardCopyFontSize).toBeLessThanOrEqual(24);
+    expect(geometry.articleHeadingFontSize).toBeLessThanOrEqual(64);
+    expect(geometry.statementCopyFontSize).toBeGreaterThanOrEqual(16);
+    expect(geometry.statementCopyFontSize).toBeLessThanOrEqual(24);
 
     for (const control of geometry.controls) {
       expect(control.left, control.text).toBeGreaterThanOrEqual(0);

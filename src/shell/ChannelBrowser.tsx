@@ -251,11 +251,16 @@ export default function ChannelBrowser(): JSX.Element {
                       const member = () => isJoined(row.name);
                       const soft = () => isSoftLaunchRoom(row);
                       return (
-                        <li class={`chb-row${member() ? ' chb-row--joined' : ''}${!soft() && row.count > 0 ? ' chb-row--live' : ''}`}>
+                        <li
+                          class={`chb-row${member() ? ' chb-row--joined' : ''}${!soft() && row.count > 0 ? ' chb-row--live' : ''}`}
+                          data-room-state={member() ? 'joined' : soft() ? 'new' : row.count > 0 ? 'active' : 'quiet'}
+                        >
                           <div class="chb-card" data-room-card>
                             <div class="chb-card-head">
                               <span class="chb-sigil" aria-hidden="true">#</span>
-                              <span class="chb-name">{row.name}</span>
+                              <span class="chb-room-copy">
+                                <span class="chb-name">{row.name}</span>
+                              </span>
                               <Show when={member()}>
                                 <span class="chb-pill chb-pill--in">In room</span>
                               </Show>

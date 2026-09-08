@@ -242,7 +242,7 @@ export function YouNotifications(): JSX.Element {
               {(kind) => (
                 <li class="you-notify-kind" data-on={kindsOn() ? 'true' : 'false'} data-kind={kind}>
                   <span class="you-notify-kind-mark" aria-hidden="true" />
-                  <p class="you-notify-kind-title">{CLOSED_TAB_KIND_COPY[kind].title}</p>
+                  <h4 class="you-notify-kind-title">{CLOSED_TAB_KIND_COPY[kind].title}</h4>
                   <p class="you-notify-kind-body">{CLOSED_TAB_KIND_COPY[kind].body}</p>
                 </li>
               )}

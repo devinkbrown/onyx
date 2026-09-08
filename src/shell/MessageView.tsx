@@ -59,6 +59,8 @@ import { deviceMemoryOwnerKey, loadRecent } from '@/lib/vault/historyVault';
 import { revisionsFor, type EditRevision } from '@/lib/vault/editHistory';
 import { DM_EMPTY_BODY, DM_EMPTY_TITLE } from '@/lib/e2ee/dmPrivacyChrome';
 import {
+  hasEncryptedMessageBoundary,
+  isWithdrawnMessage,
   lockedPlaceholderForText,
   sanitizePersistedReplyPreviewText,
 } from '@/lib/e2ee/replyPrivacy';
@@ -186,7 +188,8 @@ function clipped(text: string, max: number): string {
  *    (SC 1.3.1 / 1.4.1 / 4.1.2).
  */
 export function messageAccessibleLabel(msg: ChatMessage): string {
-  const locked = Boolean(msg.encrypted && msg.plaintext === undefined);
+  const encrypted = hasEncryptedMessageBoundary(msg);
+  const locked = encrypted && msg.plaintext === undefined;
   let body: string;
   if (msg.deleted || msg.redacted) {
     body = '[message deleted]';
@@ -196,7 +199,7 @@ export function messageAccessibleLabel(msg: ChatMessage): string {
     body = `* ${msg.from} ${msg.plaintext ?? msg.text}`;
   } else {
     // Prefer decrypted plaintext; never read ciphertext when a sealed body is open.
-    body = msg.encrypted
+    body = encrypted
       ? (msg.plaintext ?? lockedPlaceholderForText(msg.text))
       : msg.text;
   }
@@ -605,9 +608,10 @@ function MsgBody(props: MsgBodyProps): JSX.Element {
   // An E2EE body with no decrypted plaintext yet (missing DM/room key, or
   // sealed to a different device) shows a locked placeholder; `text` stays
   // ciphertext at rest.
-  const locked = createMemo(() => local.msg.encrypted && local.msg.plaintext === undefined);
+  const encrypted = createMemo(() => hasEncryptedMessageBoundary(local.msg));
+  const locked = createMemo(() => encrypted() && local.msg.plaintext === undefined);
   const bodyText = createMemo(() =>
-    local.msg.encrypted ? (local.msg.plaintext ?? '') : local.msg.text,
+    encrypted() ? (local.msg.plaintext ?? '') : local.msg.text,
   );
 
   const cls = createMemo(() => {
@@ -711,23 +715,25 @@ function EditedMarker(props: { messageId: string }): JSX.Element {
 type ThreadPanelProps = {
   parentId: string;
   messages: ChatMessage[];
+  onReply?: (message: ChatMessage) => void;
 };
 
 /** Visible body for thread rows — same deleted/locked/action rules as MsgBody,
  *  so the side panel never paints E2EE ciphertext or withdrawn text. */
 function threadDisplayText(msg: ChatMessage): string {
   if (msg.deleted || msg.redacted) return '[message deleted]';
-  if (msg.encrypted && msg.plaintext === undefined) {
+  const encrypted = hasEncryptedMessageBoundary(msg);
+  if (encrypted && msg.plaintext === undefined) {
     return lockedPlaceholderForText(msg.text);
   }
   if (msg.type === 'action') return `* ${msg.from} ${msg.plaintext ?? msg.text}`;
-  return msg.encrypted
+  return encrypted
     ? (msg.plaintext ?? lockedPlaceholderForText(msg.text))
     : msg.text;
 }
 
 export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
-  const [local] = splitProps(props, ['parentId', 'messages']);
+  const [local] = splitProps(props, ['parentId', 'messages', 'onReply']);
 
   const threadMessages = createMemo(() =>
     local.messages.filter((m) => m.replyTo?.id === local.parentId)
@@ -738,7 +744,14 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
   return (
     <div class="shell-thread-panel">
       {/* Parent message */}
-      <Show when={parent()}>
+      <Show
+        when={parent()}
+        fallback={(
+          <p class="shell-thread-state shell-thread-state--missing" role="status">
+            Parent message is not loaded in this transcript.
+          </p>
+        )}
+      >
         {(p) => (
           <article
             class="shell-thread-msg"
@@ -750,6 +763,15 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
               <time dateTime={p().time.toISOString()} aria-hidden="true">{fmtTime(p().time)}</time>
             </div>
             <p class="shell-thread-msg-text">{threadDisplayText(p())}</p>
+            <Show when={local.onReply && !isWithdrawnMessage(p())}>
+              <button
+                type="button"
+                class="shell-thread-reply"
+                onClick={() => local.onReply?.(p())}
+              >
+                Reply
+              </button>
+            </Show>
           </article>
         )}
       </Show>
@@ -759,8 +781,8 @@ export function ThreadPanel(props: ThreadPanelProps): JSX.Element {
         <Show
           when={threadMessages().length > 0}
           fallback={
-            <p style={{ color: 'var(--paper-mute)', 'font-family': 'var(--font-mono)', 'font-size': '0.78rem' }}>
-              no replies yet
+            <p class="shell-thread-state" role="status">
+              No replies loaded yet.
             </p>
           }
         >
@@ -937,7 +959,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   // One O(n) pass builds the set of parent ids that have at least one reply, so
   // each rendered row answers "has a thread?" in O(1) instead of re-scanning the
   // whole buffer per row (which is O(rows × total) and janks large channels).
-  const threadParents = createMemo(() => threadParentIds(messages()));
+  const threadParents = createMemo(() => threadParentIds(allMessages()));
 
   const followTarget = createMemo(() => {
     const view = activeView();
@@ -1540,6 +1562,15 @@ export function MessageView(props: MessageViewProps): JSX.Element {
   function openThread(msgId: string): void {
     setThreadParentId(msgId);
     setThreadOpen(true);
+  }
+
+  function replyFromThread(message: ChatMessage): void {
+    if (isWithdrawnMessage(message)) return;
+    // Composer owns focus and target scoping. Closing the Sheet first leaves
+    // the existing composer reachable to its focus effect instead of placing
+    // focus behind an active modal surface.
+    setThreadOpen(false);
+    getState().setReplyingTo(message);
   }
 
   const topicSummaries = createMemo(() => summarizeTopics(
@@ -2181,6 +2212,7 @@ export function MessageView(props: MessageViewProps): JSX.Element {
               };
               const rowGesture = createRowGesture({
                 onSwipeReply: () => {
+                  if (isWithdrawnMessage(msg)) return;
                   getState().setReplyingTo(msg);
                 },
                 onLongPressMenu: () => {
@@ -2301,12 +2333,16 @@ export function MessageView(props: MessageViewProps): JSX.Element {
                     <span class="shell-msg-swipe-affordance" aria-hidden="true">
                       <ReplyIcon class="shell-msg-swipe-affordance-icon" />
                     </span>
-                    <span class="shell-msg-cont-ts" aria-hidden="true">
+                    <time
+                      class="shell-msg-cont-ts"
+                      dateTime={msg.time.toISOString()}
+                      aria-hidden="true"
+                    >
                       {fmtTime(msg.time)}
                       <Show when={msg.pending}>
                         <span class="shell-msg-pending-mark">Queued</span>
                       </Show>
-                    </span>
+                    </time>
                     <MessageMenu
                       msg={msg}
                       target={activeTarget()}
@@ -2379,7 +2415,8 @@ export function MessageView(props: MessageViewProps): JSX.Element {
           {(pid) => (
             <ThreadPanel
               parentId={pid()}
-              messages={messages()}
+              messages={allMessages()}
+              onReply={replyFromThread}
             />
           )}
         </Show>

@@ -1,214 +1,73 @@
-/* ConnectPulse — quiet secondary rail beside the connect card */
+/* ConnectPulse is an optional factual network rail. It uses the same matte
+   surfaces as Connect and never turns activity data into an admission claim. */
+
 .cpulse {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  max-width: 380px;
-  padding: 26px 4px;
-  align-self: center;
-}
-
-.cpulse-eyebrow {
-  margin: 0 0 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
-}
-.cpulse-eyebrow::after {
-  content: '';
-  display: block;
-  width: 44px;
-  height: 1px;
-  margin-top: 10px;
-  background: var(--seam-faint);
-}
-
-.cpulse-wire {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.55;
-  color: var(--paper-dim);
-  overflow-wrap: anywhere;
-}
-/* Truthful live mark — solid ok, optional opacity pulse, no expanding glow ring. */
-.cpulse-wire-live {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--ok);
-  box-shadow: none;
-  transform: translateY(1px);
-  animation: cpulse-live 2.4s var(--ease) infinite;
-}
-@keyframes cpulse-live {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.4; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .cpulse-wire-live { animation: none; }
-}
-.cpulse-wire-body b {
+  display: grid;
+  align-content: center;
+  gap: 1rem;
+  min-width: 0;
+  max-width: 24rem;
   color: var(--paper);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.cpulse-wire-sep {
-  margin: 0 7px;
-  color: var(--paper-mute);
+  font-family: var(--font-sans);
 }
 
-.cpulse-wire-ledger {
-  color: var(--lapis-bright);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-@media (forced-colors: active) {
-  .cpulse-deeplink, .cpulse-room { border-color: CanvasText; background: Canvas; }
-  .cpulse-wire-ledger, .cpulse-room-name, .cpulse-deeplink-chan { color: LinkText; }
-}
-
-.cpulse-wire-ledger:hover,
-.cpulse-wire-ledger:focus-visible {
-  color: var(--paper);
-  text-decoration: underline;
-}
+.cpulse-head { display: grid; gap: 0.4rem; }
+.cpulse-eyebrow { margin: 0; color: var(--lapis-bright); font: 700 0.9rem/1.2 var(--font-sans); }
+.cpulse-wire { display: flex; align-items: baseline; gap: 0.55rem; margin: 0; color: var(--paper-dim); font: 0.86rem/1.5 var(--font-sans); overflow-wrap: anywhere; }
+.cpulse-wire-live { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 50%; background: var(--ok); }
+.cpulse-wire-body b { color: var(--paper); font-weight: 700; }
+.cpulse-wire-sep { color: var(--paper-mute); }
+.cpulse-wire-ledger { color: var(--lapis-bright); font-weight: 700; text-underline-offset: 0.2em; }
 
 .cpulse-deeplink {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid var(--seam-faint);
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone) 40%, transparent);
-}
-.cpulse-deeplink-label {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
-}
-.cpulse-deeplink-chan {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--lapis);
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--stone-3);
+  background: var(--stone-2);
 }
 
-.cpulse-rooms {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.cpulse-room {
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 40%, transparent);
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone) 48%, transparent);
-  backdrop-filter: none;
-}
-.cpulse-room-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.cpulse-room-name {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--lapis-bright);
-  text-decoration: none;
-}
+.cpulse-deeplink-label { color: var(--paper-dim); font-size: 0.8rem; }
+.cpulse-deeplink-chan { color: var(--lapis-bright); font-family: var(--font-mono); font-weight: 700; }
 
-.cpulse-room-name:hover,
-.cpulse-room-name:focus-visible {
-  color: var(--paper);
-  text-decoration: underline;
-}
-.cpulse-room-meta {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  color: var(--paper-mute);
-}
-.cpulse-room-topic {
-  margin: 3px 0 0;
-  font-size: 0.76rem;
-  color: var(--paper-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.cpulse-rooms { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.cpulse-room { padding: 0.75rem; border: 1px solid var(--stone-3); border-inline-start: 0.25rem solid var(--lapis); background: var(--stone); }
+.cpulse-room-head { display: flex; align-items: baseline; gap: 0.6rem; }
+.cpulse-room-name { color: var(--lapis-bright); font-family: var(--font-mono); font-weight: 700; text-underline-offset: 0.2em; }
+.cpulse-room-meta { margin-left: auto; color: var(--paper-mute); font-size: 0.75rem; text-align: end; }
+.cpulse-room-topic { margin: 0.3rem 0 0; color: var(--paper-dim); font-size: 0.85rem; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cpulse-room-topic.is-empty { color: var(--paper-mute); font-style: italic; }
 
-.cpulse-nodes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  padding-top: 4px;
-}
-.cpulse-node {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: var(--paper-mute);
-}
-.cpulse-node-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--paper-mute);
-  flex: none;
-  box-shadow: none;
-}
-.cpulse-node[data-nearest='true'] .cpulse-node-dot {
-  background: var(--lapis);
-  box-shadow: none;
-}
+.cpulse-nodes { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; padding-top: 0.35rem; border-top: 1px solid var(--line); }
+.cpulse-node { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--paper-mute); font: 0.72rem/1.3 var(--font-mono); }
+.cpulse-node-dot { width: 0.45rem; height: 0.45rem; flex: none; border-radius: 50%; background: var(--paper-mute); }
+.cpulse-node[data-nearest='true'] .cpulse-node-dot { background: var(--lapis); }
 .cpulse-node[data-nearest='true'] .cpulse-node-host { color: var(--paper); }
-.cpulse-node-ms { color: var(--paper-mute); }
 
-/* Stage layout — the CARD is dead-center in the viewport; the pulse lives
-   in the right gutter as a secondary rail. Symmetric 1fr spacers keep the
-   dialog on the true center line (the user reads the card as "the dialog"
-   — it should not drift left to make room for the rail). */
-.conn-stage {
-  display: grid;
-  grid-template-columns: 1fr minmax(0, 540px) 1fr;
-  gap: clamp(20px, 3.5vw, 56px);
-  align-items: center;
-  width: 100%;
-}
-.conn-stage > .conn-card { grid-column: 2; }
-.conn-stage > .cpulse { grid-column: 3; justify-self: start; }
-@media (max-width: 1180px) {
-  .conn-stage { grid-template-columns: minmax(0, 540px); justify-content: center; }
-  .conn-stage > .conn-card { grid-column: 1; justify-self: center; }
-  .conn-stage > .cpulse { grid-column: 1; justify-self: center; width: min(540px, calc(100vw - 40px)); max-width: none; padding-top: 0; }
-  .cpulse-rooms { display: none; } /* keep the narrow door light */
+.cpulse-wire-ledger:hover,
+.cpulse-wire-ledger:focus-visible,
+.cpulse-room-name:hover,
+.cpulse-room-name:focus-visible { color: var(--paper); }
+
+@media (max-width: 60rem) {
+  .cpulse { max-width: 32rem; }
 }
 
-@media (max-width: 520px) {
-  .conn-stage {
-    display: block;
-    min-height: 100svh;
-  }
+@media (max-width: 42rem) {
+  .cpulse { max-width: 100%; }
+  .cpulse-rooms { display: none; }
+}
 
-  .conn-stage > .cpulse {
-    display: none;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .cpulse-wire-live { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .cpulse-deeplink,
+  .cpulse-room { border-color: CanvasText; background: Canvas; }
+  .cpulse-wire-ledger,
+  .cpulse-room-name,
+  .cpulse-deeplink-chan { color: LinkText; }
 }

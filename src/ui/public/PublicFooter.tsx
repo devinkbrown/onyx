@@ -14,7 +14,7 @@ export function PublicFooter(): JSX.Element {
   return (
     <footer class="public-frame__footer">
       <div class="public-frame__footer-inner">
-        <div>
+        <div class="public-frame__footer-identity">
           <a class="public-frame__footer-brand" href={publicRouteById('home').href}>
             <img class="public-frame__mark" src="/brand/mark.png" width="28" height="28" alt="" />
             <span>Onyx</span>
@@ -22,9 +22,12 @@ export function PublicFooter(): JSX.Element {
           <p>Rooms, messages, and calls for friends, clubs, and creators.</p>
         </div>
         <nav aria-label="Footer navigation">
-          <For each={FOOTER_LINKS}>
-            {(link) => <a href={link.href}>{link.label}</a>}
-          </For>
+          <p class="public-frame__footer-title">Explore Onyx</p>
+          <div class="public-frame__footer-links">
+            <For each={FOOTER_LINKS}>
+              {(link) => <a href={link.href}>{link.label}</a>}
+            </For>
+          </div>
         </nav>
       </div>
     </footer>

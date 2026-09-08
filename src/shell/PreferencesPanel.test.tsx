@@ -267,6 +267,8 @@ describe('PreferencesPanel', () => {
     expect(screen.getByRole('tab', { name: /^Display/ })).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Display');
     expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(6);
+    expect(screen.getByTestId('preferences-panel').querySelector('.pref-category-content'))
+      .toHaveAttribute('data-layout', 'category-detail');
     expect(screen.getByRole('button', { name: 'Open appearance settings' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Export vault' })).not.toBeInTheDocument();
 
@@ -2264,6 +2266,24 @@ describe('PreferencesPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Roomy' }));
 
     expect(screen.getByText('Saved on this device.')).toBeInTheDocument();
+    expect(screen.getByTestId('preferences-save-status')).toHaveAttribute('data-state', 'saved');
+  });
+
+  it('keeps persistence feedback in a live status region without a decorative eyebrow', () => {
+    _resetPreferencePersistenceStateForTests();
+    renderPreferences();
+
+    const status = screen.getByTestId('preferences-save-status');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('data-state', 'unknown');
+    expect(status).toHaveTextContent('Storage not yet verified; change a preference to test saving.');
+    expect(screen.getByTestId('preferences-panel')).not.toHaveTextContent(/^Browse$/);
+    expect(screen.queryByText('Browse')).not.toBeInTheDocument();
+
+    const display = screen.getByRole('tab', { name: /^Display/ });
+    expect(display).toHaveAccessibleName('Display');
+    expect(display).toHaveTextContent('Reading and rhythm');
   });
 
   it('selects a default vault search mode, persisting it and applying it live', () => {
@@ -3330,7 +3350,7 @@ describe('PreferencesPanel', () => {
     renderPreferences('Accessibility');
 
     const reset = screen.getByRole('button', { name: 'Reset to defaults' });
-    const status = screen.getByRole('status');
+    const status = screen.getByRole('status', { name: 'Reset confirmation' });
     const announcements: string[] = [];
     const observer = new MutationObserver(() => {
       if (status.textContent === 'Preferences reset to defaults.') {

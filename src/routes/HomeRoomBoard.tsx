@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * The public home has no room-presence API. This is therefore an honest room
- * switchboard: it helps a visitor choose a known, useful way into Onyx rather
- * than implying that these are live occupancy or activity figures.
+ * The public home has no room-presence API. This is therefore an honest set of
+ * entry choices: it helps a visitor choose a useful way into Onyx without
+ * implying that any room or person is live.
  */
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { publicRouteById } from '@/ui/navigation/publicRouteManifest';
@@ -12,48 +12,42 @@ type RoomIntent = 'public-room' | 'bring-people' | 'learn';
 type RoomRoute = {
   id: RoomIntent;
   tab: string;
-  kicker: string;
   title: string;
   copy: string;
   action: string;
   href: string;
   note: string;
-  route: readonly string[];
 };
+
+const PUBLIC_ROOM_HREF = `${publicRouteById('invite').href}?join=%23root`;
 
 const ROOM_ROUTES: readonly RoomRoute[] = [
   {
     id: 'public-room',
     tab: 'Meet people',
-    kicker: 'Known public room',
     title: 'Walk into the public room.',
     copy: 'Start with the room that is open to everyone, then decide where you want to go next.',
     action: 'Open the public room',
-    href: `${publicRouteById('invite').href}?join=%23root`,
-    note: 'This opens the official app with the public-room link ready.',
-    route: ['Open Onyx', 'Enter the public room', 'Choose your next room'],
+    href: PUBLIC_ROOM_HREF,
+    note: 'The room link opens with the public room ready; this page does not show who is online.',
   },
   {
     id: 'bring-people',
     tab: 'Bring people',
-    kicker: 'Start with your people',
-    title: 'Make the room yours.',
-    copy: 'Open Onyx first. From there, create a room or share an invite with the people you already know.',
+    title: 'Bring your people along.',
+    copy: 'Open Onyx, make a room, then share its invite when the room is ready. Friends, clubs, and ordinary hangouts all fit here.',
     action: 'Open Onyx',
     href: '/app/',
     note: 'Room creation and invitations happen in the app, not on this page.',
-    route: ['Open Onyx', 'Make a room', 'Share an invite'],
   },
   {
     id: 'learn',
     tab: 'Get oriented',
-    kicker: 'First time here',
-    title: 'Take the small first step.',
-    copy: 'A short guide shows how rooms, invitations, messages, and calls fit together before you open the app.',
+    title: 'Get oriented, then join in.',
+    copy: 'Read the short guide for rooms, messages, calls, and coming back later without losing the thread.',
     action: 'Read the first-room guide',
     href: publicRouteById('guides').href,
     note: 'The guide is local reading; it does not create an account or send anything.',
-    route: ['Read the guide', 'Open a room', 'Invite someone when ready'],
   },
 ];
 
@@ -79,9 +73,8 @@ export function HomeRoomBoard(): JSX.Element {
   return (
     <section class="home-room-board" aria-labelledby="room-board-title" data-home-room-board data-room-intent={intent()}>
       <div class="home-room-board__heading">
-        <p class="home-room-board__eyebrow">Choose your way in</p>
-        <h2 id="room-board-title">One doorway. Three good first moves.</h2>
-        <p>Pick what you want to do. These are clear paths into Onyx, not a live list of who is online.</p>
+        <h2 id="room-board-title">For the next match. And the conversation after.</h2>
+        <p>Onyx gives friends, clubs, and ordinary hangouts a room to return to. Pick a useful way in; this is not a live list of who is online.</p>
       </div>
 
       <div ref={(element) => { tablist = element; }} class="home-room-board__tabs" role="tablist" aria-label="Choose a first-room route" onKeyDown={onKeyDown}>
@@ -92,7 +85,7 @@ export function HomeRoomBoard(): JSX.Element {
             id={`room-route-${item.id}`}
             aria-controls={`room-route-panel-${item.id}`}
             aria-selected={intent() === item.id}
-            tabindex={intent() === item.id ? 0 : -1}
+            tabIndex={intent() === item.id ? 0 : -1}
             onClick={() => setIntent(item.id)}
           >
             {item.tab}
@@ -100,26 +93,19 @@ export function HomeRoomBoard(): JSX.Element {
         )}</For>
       </div>
 
-      <div class="home-room-board__panel" role="tabpanel" id={`room-route-panel-${active().id}`} aria-labelledby={`room-route-${active().id}`} tabindex="0">
-        <div class="home-room-board__map" aria-hidden="true">
-          <span class="home-room-board__current" />
-          <span class="home-room-board__line home-room-board__line--one" />
-          <span class="home-room-board__line home-room-board__line--two" />
-          <span class="home-room-board__line home-room-board__line--three" />
-          <span class="home-room-board__node home-room-board__node--one" />
-          <span class="home-room-board__node home-room-board__node--two" />
-          <span class="home-room-board__node home-room-board__node--three" />
-        </div>
+      <div class="home-room-board__panel" role="tabpanel" id={`room-route-panel-${active().id}`} aria-labelledby={`room-route-${active().id}`} tabIndex="0">
         <div class="home-room-board__content">
-          <p class="home-room-board__kicker">{active().kicker}</p>
           <h3>{active().title}</h3>
           <p>{active().copy}</p>
-          <ol aria-label="What happens next">
-            <For each={active().route}>{(step, index) => <li><span>{index() + 1}</span>{step}</li>}</For>
-          </ol>
-          <a class="home-room-board__action" href={active().href}>{active().action}<span aria-hidden="true">→</span></a>
+          <a class="home-room-board__action" href={active().href}>{active().action}</a>
           <p class="home-room-board__note" aria-live="polite">{active().note}</p>
         </div>
+        <nav class="home-room-board__links" aria-label="Useful ways into Onyx">
+          <a href={PUBLIC_ROOM_HREF}>Public room</a>
+          <a href="/app/">Invite friends</a>
+          <a href={publicRouteById('guides').href}>Getting started</a>
+          <a href={publicRouteById('download').href}>Browser and device help</a>
+        </nav>
       </div>
       <Show when={intent() === 'public-room'}>
         <p class="home-room-board__footnote">Want a quieter start? <a href={publicRouteById('guides').href}>Read the guide first</a>.</p>

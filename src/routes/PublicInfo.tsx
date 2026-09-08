@@ -27,8 +27,22 @@ const PUBLIC_INFO_PATHS = {
   '/agents/': 'agents',
 } as const satisfies Readonly<Record<string, PublicInfoPage>>;
 
+const PUBLIC_INFO_PATH_ALIASES = {
+  '/accessibility': 'accessibility',
+  '/glossary': 'glossary',
+  '/integrations': 'integrations',
+  '/agents': 'agents',
+} as const satisfies Readonly<Record<string, PublicInfoPage>>;
+
+function publicInfoPageForPath(path: string): PublicInfoPage | undefined {
+  return (
+    PUBLIC_INFO_PATHS[path as keyof typeof PUBLIC_INFO_PATHS] ??
+    PUBLIC_INFO_PATH_ALIASES[path as keyof typeof PUBLIC_INFO_PATH_ALIASES]
+  );
+}
+
 export function resolvePublicInfoPage(path: string): PublicInfoPage {
-  const page = PUBLIC_INFO_PATHS[path as keyof typeof PUBLIC_INFO_PATHS];
+  const page = publicInfoPageForPath(path);
   if (!page) throw new Error('Onyx: PublicInfo route was not allowlisted');
   return page;
 }
@@ -65,15 +79,15 @@ export function PublicInfo(props: { page: PublicInfoPage }) {
       <div class={`ui-root r data-page public-info-page public-info-page--${props.page}`}>
         <div class="r-ground" aria-hidden="true" />
         <div class="r-flecks" aria-hidden="true" />
-        <section class="r-wrap data-hero">
-          <p class="r-kicker">public contract</p>
-          <h1>{item()[0]}</h1>
-          <p class="sub">{item()[1]}</p>
-        </section>
-        <section class="r-wrap r-section">
-          <article class="data-card public-info-card">
-            <div class="label">Onyx · public statement</div>
-            <h2>{item()[0]}</h2>
+        <section class="r-wrap r-section public-info-article" aria-labelledby={`public-info-${props.page}-heading`}>
+          <div class="public-info-article__header">
+            <p class="r-kicker">public contract</p>
+            <h1 id={`public-info-${props.page}-heading`}>{item()[0]}</h1>
+            <p class="sub">{item()[1]}</p>
+          </div>
+          <article class="public-info-statement" aria-labelledby={`public-info-${props.page}-statement`}>
+            <p class="label">Onyx · public statement</p>
+            <h2 id={`public-info-${props.page}-statement`}>The statement</h2>
             <p>{item()[2]}</p>
           </article>
         </section>
@@ -85,7 +99,7 @@ export function PublicInfo(props: { page: PublicInfoPage }) {
 /** Route-facing resolver; the named component remains useful for focused rendering tests. */
 export default function PublicInfoRoute() {
   const location = useLocation();
-  const page = () => PUBLIC_INFO_PATHS[location.pathname as keyof typeof PUBLIC_INFO_PATHS];
+  const page = () => publicInfoPageForPath(location.pathname);
   return (
     <Show when={page()} fallback={<NotFoundPage />}>
       {(currentPage) => <PublicInfo page={currentPage()} />}

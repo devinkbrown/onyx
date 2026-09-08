@@ -15,23 +15,25 @@ export function PublicHeader(props: { currentPath?: string; navItems?: readonly 
           aria-label="Onyx home"
           aria-current={brandIsCurrent() ? 'page' : undefined}
         >
-          <img
-            class="public-frame__lockup"
-            src="/brand/lockup.png"
-            width="200"
-            height="78"
-            alt=""
-            decoding="async"
-          />
-          <BrandMark size={32} />
-          <img
-            class="public-frame__wordmark"
-            src="/brand/wordmark.png"
-            width="86"
-            height="37"
-            alt=""
-            decoding="async"
-          />
+          <span class="public-frame__brand-visual" aria-hidden="true">
+            <img
+              class="public-frame__lockup"
+              src="/brand/lockup.png"
+              width="200"
+              height="78"
+              alt=""
+              decoding="async"
+            />
+            <BrandMark size={40} />
+            <img
+              class="public-frame__wordmark"
+              src="/brand/wordmark.png"
+              width="86"
+              height="37"
+              alt=""
+              decoding="async"
+            />
+          </span>
         </a>
         <PublicNav currentPath={props.currentPath} items={props.navItems} />
       </div>

@@ -3,7 +3,7 @@ const DEFAULT_ORIGIN = 'https://eshmaki.me';
 
 /** Home / share description: 110–160 characters, local history + no ads. */
 export const PUBLIC_HOME_DESCRIPTION =
-  'Rooms, calls, and private DMs. History stays on this device — about 400 messages per room. No ads. Open it in your browser.';
+  'Good company. Great nights. Rooms, calls, and private DMs for friends and clubs. History stays on this device — about 400 messages per room. No ads.';
 
 function upsertMeta(selector: string, attrs: Record<string, string>): HTMLMetaElement {
   let meta = document.querySelector<HTMLMetaElement>(selector);
@@ -69,7 +69,7 @@ export function setPageMeta(title: string, description: string, path = '/'): voi
   upsertMeta('meta[property="og:image:height"]', { property: 'og:image:height', content: '630' });
   upsertMeta('meta[property="og:image:alt"]', {
     property: 'og:image:alt',
-    content: 'Onyx — a quiet harbor at night. Conversation glowing on a dark pier.',
+    content: 'Onyx — a social room for game nights, messages, and calls.',
   });
   upsertMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary_large_image' });
   upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: title });
@@ -77,7 +77,7 @@ export function setPageMeta(title: string, description: string, path = '/'): voi
   upsertMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: image });
   upsertMeta('meta[name="twitter:image:alt"]', {
     name: 'twitter:image:alt',
-    content: 'Onyx — a quiet harbor at night. Conversation glowing on a dark pier.',
+    content: 'Onyx — a social room for game nights, messages, and calls.',
   });
   upsertLink('link[rel="canonical"]', { rel: 'canonical', href: url });
 

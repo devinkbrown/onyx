@@ -1,721 +1,133 @@
-/* Getting started / Guides — community how-tos. Instrument Sans only.
-   No Anton, no neon, no uppercase shout. */
-.guides-page {
-  --guides-current: var(--public-current, var(--lapis));
-  --guides-paper: var(--public-text, var(--paper));
-  --guides-muted: var(--public-muted, var(--paper-dim));
-}
-
-.guides-page .r-kicker {
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: var(--guides-muted);
-}
-.guides-page .r-kicker::before { content: none; }
-
-.guides-page .data-hero h1 {
-  font-family: var(--font-serif);
-  font-weight: 520;
-  font-size: clamp(2rem, 1.4rem + 2vw, 3rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  text-transform: none;
-}
-
-.guides-page .data-hero .sub {
-  max-width: 46rem;
-  font-family: var(--font-sans);
-}
-
-.guides-hero-actions,
-.guides-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin-top: 1.25rem;
-}
-
-.guides-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--target-min, 44px);
-  padding: 0.45rem 0.95rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 46%, var(--public-line, var(--seam-faint)));
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--guides-current) 12%, transparent);
-  color: var(--guides-paper);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-.guides-action:hover,
-.guides-action:focus-visible {
-  background: color-mix(in oklab, var(--guides-current) 22%, transparent);
-}
-
-.guides-body {
-  display: grid;
-  gap: 1.25rem;
-  padding-block-start: 0;
-}
-
-/* A quiet route map: it turns the existing newcomer sequence into a path
-   without competing with the how-to copy below it. */
-.guides-progress {
-  position: relative;
-  min-width: 0;
-  box-sizing: border-box;
-  display: grid;
-  gap: 0.8rem;
-  padding: clamp(1rem, 2.6vw, 1.5rem);
-  border: 1px solid color-mix(in oklab, var(--guides-current) 38%, var(--public-line, var(--seam-faint)));
-  border-inline-start: 5px solid var(--guides-current);
-  background:
-    linear-gradient(105deg, color-mix(in oklab, var(--guides-current) 13%, transparent), transparent 48%),
-    var(--public-raised, var(--stone-2));
-}
-
-.guides-progress *,
-.guides-route-map *,
-.guides-route__item,
-.guides-route__card {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-wrap: anywhere;
-}
-
-.guides-progress__head,
-.guides-card__meta,
-.guides-progress__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-}
-
+/* Guides: a compact task index beside readable steps. Progress remains local. */
+.guides-page { width: 100%; min-width: 0; color: var(--route-text); overflow-x: clip; }
+.guides-page .r-wrap { position: relative; z-index: 1; min-width: 0; }
+.guides-page .data-hero { padding-block: clamp(2.25rem, 4vw, 4rem) clamp(1.75rem, 3vw, 2.75rem); border-bottom: 1px solid var(--route-line); }
+.guides-page .data-hero h1 { max-width: 20ch; margin-top: 0.75rem; font: 700 clamp(2.25rem, 4vw, 3.5rem)/1.08 var(--font-sans); letter-spacing: -0.025em; }
+.guides-page .data-hero .sub { max-width: 62ch; }
+.guides-kicker,
 .guides-progress__eyebrow,
-.guides-progress__count {
-  margin: 0;
-  color: var(--guides-muted);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.guides-progress h2 {
-  margin: 0.2rem 0 0;
-  font-family: var(--font-serif);
-  font-size: clamp(1.35rem, 1.1rem + 0.9vw, 1.85rem);
-  font-weight: 520;
-  letter-spacing: -0.018em;
-}
-
-.guides-progress__count {
-  flex: 0 0 auto;
-  color: var(--guides-paper);
-  text-transform: none;
-}
-
-.guides-progress__meter {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  height: 0.45rem;
-  appearance: none;
-  border: 0;
-  border-radius: 999px;
-  overflow: hidden;
-  background: color-mix(in oklab, var(--guides-current) 16%, var(--public-line, var(--seam-faint)));
-}
-
-.guides-progress__meter::-webkit-progress-bar {
-  background: color-mix(in oklab, var(--guides-current) 16%, var(--public-line, var(--seam-faint)));
-}
-
-.guides-progress__meter::-webkit-progress-value {
-  background: var(--guides-current);
-}
-
-.guides-progress__meter::-moz-progress-bar {
-  background: var(--guides-current);
-}
-
-.guides-progress__status {
-  margin: 0;
-  color: var(--guides-muted);
-  font-family: var(--font-sans);
-}
-
-.guides-route-map {
-  display: grid;
-  min-width: 0;
-  box-sizing: border-box;
-  gap: 0.7rem;
-  padding-block: 0.75rem 0.2rem;
-  border-block: 1px solid color-mix(in oklab, var(--guides-current) 24%, var(--public-line, var(--seam-faint)));
-}
-
-.guides-progress,
-.guides-route-map,
-.guides-route,
-.guides-route__card {
-  overflow: clip;
-}
-
-.guides-route-map__head,
+.guides-route-map__eyebrow,
 .guides-snapshot__eyebrow,
-.guides-share__eyebrow {
-  margin: 0;
-  color: var(--guides-muted);
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+.guides-share__eyebrow,
+.guides-index__eyebrow { margin: 0; color: var(--route-cobalt-strong); font: 650 0.95rem/1.3 var(--font-sans); letter-spacing: 0; text-transform: none; }
+.guides-hero-actions { margin: 1.75rem 0 0; }
+.guides-action { display: inline-flex; align-items: center; justify-content: center; min-width: var(--target-min, 44px); min-height: var(--target-min, 44px); padding: 0.7rem 0.95rem; border: 1px solid var(--route-action); color: var(--route-on-action); background: var(--route-action); font: 750 0.95rem/1.1 var(--font-sans); text-decoration: none; }
+.guides-action:hover,
+.guides-action:focus-visible { border-color: var(--route-text); color: var(--route-void); background: var(--route-text); }
 
+.guides-body { display: grid; grid-template-columns: minmax(13rem, 0.34fr) minmax(0, 1fr); align-items: start; gap: clamp(2rem, 6vw, 6rem); padding-block: clamp(2.25rem, 4vw, 4rem); }
+.guides-index { min-width: 0; }
+.guides-index h2 { margin: 0.7rem 0 0; color: var(--route-text); font: 700 1.55rem/1.15 var(--font-sans); letter-spacing: -0.02em; }
+.guides-index nav { margin-top: 1.25rem; }
+.guides-index__list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--route-line); }
+.guides-index__link { display: flex; align-items: center; min-width: 0; min-height: var(--target-min, 44px); padding-block: 0.7rem; border-bottom: 1px solid var(--route-line); color: var(--route-muted); font-size: 0.95rem; font-weight: 650; line-height: 1.35; text-decoration: none; }
+.guides-index__link:hover,
+.guides-index__link:focus-visible { color: var(--route-text); }
+.guides-content { min-width: 0; max-width: 72ch; }
+.guides-progress { display: grid; gap: 1.25rem; padding-bottom: 2rem; border-bottom: 1px solid var(--route-line); }
+.guides-progress__head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.guides-progress h2,
 .guides-route-map h3,
 .guides-snapshot h3,
-.guides-share h3 {
-  margin: 0.25rem 0 0;
-  color: var(--guides-paper);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 650;
-  line-height: 1.25;
-}
-
-.guides-route {
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.55rem;
-  margin: 0;
-  padding: 0.35rem 0 0;
-  list-style: none;
-}
-
-.guides-route::before {
-  position: absolute;
-  inset: 1.35rem 8% auto;
-  height: 1px;
-  background: color-mix(in oklab, var(--guides-current) 42%, var(--public-line, var(--seam-faint)));
-  content: "";
-}
-
-.guides-route__item {
-  position: relative;
-  min-width: 0;
-}
-
-.guides-route__card {
-  position: relative;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-wrap: anywhere;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0.45rem;
-  min-height: 6.3rem;
-  padding: 0.55rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 31%, var(--public-line, var(--seam-faint)));
-  border-radius: 4px;
-  background: var(--public-raised, var(--stone-2));
-  color: var(--guides-paper);
-  font-family: var(--font-sans);
-  text-decoration: none;
-}
-
-.guides-route__number {
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 1.55rem;
-  height: 1.55rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 58%, var(--public-line, var(--seam-faint)));
-  border-radius: 50%;
-  background: var(--public-raised, var(--stone-2));
-  color: var(--guides-paper);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-.guides-route__copy {
-  display: grid;
-  width: 100%;
-  max-width: 100%;
-  align-content: start;
-  gap: 0.3rem;
-  min-width: 0;
-}
-
-.guides-route__state {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  color: var(--guides-muted);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.guides-route__title {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  font-size: 0.86rem;
-  font-weight: 620;
-  line-height: 1.2;
-}
-
-.guides-route__item[data-state='done'] .guides-route__card {
-  border-color: color-mix(in oklab, var(--guides-current) 66%, var(--public-line, var(--seam-faint)));
-  background: color-mix(in oklab, var(--guides-current) 11%, var(--public-raised, var(--stone-2)));
-}
-
-.guides-route__item[data-state='done'] .guides-route__number,
-.guides-route__card[aria-current='step'] .guides-route__number {
-  border-color: var(--guides-current);
-  background: var(--guides-current);
-  color: var(--public-raised, var(--stone-2));
-}
-
-.guides-route__card[aria-current='step'] {
-  border-color: var(--guides-current);
-  background: color-mix(in oklab, var(--guides-current) 18%, var(--public-raised, var(--stone-2)));
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--guides-current) 24%, transparent);
-}
-
-.guides-route__item[data-state='later'] .guides-route__card {
-  color: color-mix(in oklab, var(--guides-paper) 82%, var(--guides-muted));
-}
-
-.guides-starter-details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.8rem;
-}
-
+.guides-share h3 { margin: 0.6rem 0 0; color: var(--route-text); font: 700 1.35rem/1.18 var(--font-sans); letter-spacing: -0.015em; }
+.guides-progress__count { color: var(--route-muted); font: 700 0.85rem/1.2 var(--font-sans); white-space: nowrap; }
+.guides-progress__meter { width: 100%; height: 0.75rem; accent-color: var(--route-cobalt); }
+.guides-progress__meter::-webkit-progress-bar { background: var(--route-void); }
+.guides-progress__meter::-webkit-progress-value,
+.guides-progress__meter::-moz-progress-bar { background: var(--route-cobalt); }
+.guides-progress__status { margin: 0; color: var(--route-muted); font-size: 0.95rem; line-height: 1.5; }
+.guides-route-map { padding-top: 1.25rem; border-top: 1px solid var(--route-line); }
+.guides-route { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.45rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.guides-route__item { min-width: 0; }
+.guides-route__card { display: flex; min-width: 0; min-height: var(--target-min, 44px); align-items: center; padding: 0.65rem 0.7rem; border: 1px solid var(--route-edge); border-radius: 0.45rem; color: var(--route-muted); background: transparent; text-decoration: none; }
+.guides-route__card:hover,
+.guides-route__card:focus-visible,
+.guides-route__card[aria-current='step'] { border-color: var(--route-cobalt-strong); color: var(--route-text); }
+.guides-route__copy { display: grid; gap: 0.2rem; min-width: 0; }
+.guides-route__state { color: var(--route-faint); font: 650 0.78rem/1.2 var(--font-sans); }
+.guides-route__title { color: inherit; font-size: 0.86rem; line-height: 1.35; overflow-wrap: anywhere; }
+.guides-route__item[data-state='done'] .guides-route__card { border-color: var(--route-ok, var(--ok)); }
+.guides-route__item[data-state='later'] .guides-route__card { opacity: 0.76; }
+.guides-starter-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
 .guides-snapshot,
-.guides-share {
-  min-width: 0;
-  padding: 0.9rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 27%, var(--public-line, var(--seam-faint)));
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--public-raised, var(--stone-2)) 90%, var(--guides-current));
-}
-
-.guides-snapshot ul {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0.8rem 0 0;
-  padding-inline-start: 1.15rem;
-  color: var(--guides-muted);
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  line-height: 1.38;
-}
-
-.guides-snapshot li::marker {
-  color: var(--guides-current);
-}
-
-.guides-share > p:not(.guides-share__eyebrow, .guides-share__status) {
-  margin: 0.75rem 0 0;
-  color: var(--guides-muted);
-  font-family: var(--font-sans);
-  font-size: 0.94rem;
-  line-height: 1.4;
-}
-
-.guides-share__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 0.8rem;
-}
-
+.guides-share { min-width: 0; padding-top: 1.25rem; border-top: 1px solid var(--route-line); }
+.guides-snapshot ul { margin: 1rem 0 0; padding-left: 1.1rem; color: var(--route-muted); font-size: 0.95rem; line-height: 1.55; }
+.guides-snapshot li + li { margin-top: 0.5rem; }
+.guides-snapshot li::marker { color: var(--route-cobalt); }
+.guides-share > p:not(.guides-share__eyebrow, .guides-share__status) { margin: 0.8rem 0 0; color: var(--route-muted); font-size: 0.95rem; line-height: 1.5; }
+.guides-share__actions,
+.guides-card-actions { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 1rem; }
 .guides-copy,
-.guides-download {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--target-min, 44px);
-  padding: 0.38rem 0.72rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 48%, var(--public-line, var(--seam-faint)));
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--guides-current) 12%, transparent);
-  color: var(--guides-paper);
-  font: 600 0.86rem var(--font-sans);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.guides-copy:hover:not(:disabled),
+.guides-download,
+.guides-reset,
+.guides-step-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: var(--target-min, 44px); min-height: 44px; padding: 0.65rem 0.8rem; border: 1px solid var(--route-edge); border-radius: 0.45rem; color: var(--route-text); background: var(--route-raised); font: 700 0.86rem/1.1 var(--font-sans); text-decoration: none; cursor: pointer; }
+.guides-copy:hover,
 .guides-copy:focus-visible,
 .guides-download:hover,
-.guides-download:focus-visible {
-  background: color-mix(in oklab, var(--guides-current) 22%, transparent);
-}
-
-.guides-copy:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.guides-share__status {
-  min-height: 1.35rem;
-  margin: 0.6rem 0 0;
-  color: var(--guides-muted);
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.guides-route__card:focus-visible,
-.guides-copy:focus-visible,
-.guides-download:focus-visible {
-  outline: 2px solid var(--guides-paper);
-  outline-offset: 3px;
-}
-
-.guides-progress__actions {
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-
-.guides-reset,
-.guides-step-toggle {
-  min-height: 40px;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid color-mix(in oklab, var(--guides-current) 42%, var(--public-line, var(--seam-faint)));
-  border-radius: 4px;
-  background: transparent;
-  color: var(--guides-paper);
-  font: 600 0.9rem var(--font-sans);
-  cursor: pointer;
-}
-
+.guides-download:focus-visible,
 .guides-reset:hover,
 .guides-reset:focus-visible,
 .guides-step-toggle:hover,
-.guides-step-toggle:focus-visible {
-  background: color-mix(in oklab, var(--guides-current) 14%, transparent);
+.guides-step-toggle:focus-visible { border-color: var(--route-cobalt-strong); }
+.guides-copy:disabled { cursor: wait; opacity: 0.6; }
+.guides-share__status { min-height: 1.4em; margin: 0.8rem 0 0; color: var(--route-muted); font-size: 0.86rem; line-height: 1.45; }
+.guides-progress__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--route-line); }
+.guides-reset { border: 0; color: var(--route-muted); background: transparent; }
+
+.guides-card { min-width: 0; margin: 0; padding-block: 2.25rem; border-bottom: 1px solid var(--route-line); background: transparent; }
+.guides-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.guides-card .label { color: var(--route-cobalt-strong); font: 650 0.95rem/1.3 var(--font-sans); letter-spacing: 0; text-transform: none; }
+.guides-card h2 { margin: 0.7rem 0 0; color: var(--route-text); font: 700 clamp(1.45rem, 2vw, 2rem)/1.15 var(--font-sans); letter-spacing: -0.02em; }
+.guides-card p { max-width: 68ch; margin: 0.85rem 0 0; color: var(--route-muted); font-size: 1rem; line-height: 1.6; }
+.guides-card--principles { padding-top: 2rem; }
+.guides-card--complete { border-bottom-color: var(--route-ok, var(--ok)); }
+.guides-card--complete .guides-step-toggle { border-color: var(--route-ok, var(--ok)); color: var(--route-ok, var(--ok)); }
+.guides-card--optional { background: transparent; }
+
+@media (max-width: 60rem) {
+  .guides-route { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-
-.guides-card__meta {
-  align-items: flex-start;
-}
-
-.guides-card--complete {
-  border-inline-start: 3px solid var(--guides-current);
-}
-
-.guides-card--complete .guides-step-toggle {
-  border-color: var(--guides-current);
-  background: color-mix(in oklab, var(--guides-current) 14%, transparent);
-}
-
-.guides-page .guides-card h2 {
-  font-family: var(--font-sans);
-  font-size: clamp(1.2rem, 1rem + 0.8vw, 1.55rem);
-  font-weight: 650;
-  line-height: 1.25;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.guides-page .guides-card p {
-  font-family: var(--font-sans);
-  max-width: 46rem;
-}
-
-.guides-page .data-card .label,
-.guides-page .public-info-card .label {
-  font-family: var(--font-sans);
-  font-size: 0.82rem;
-  font-weight: 550;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.guides-card--optional {
-  border-color: var(--public-line, var(--seam-faint));
-  background: var(--public-raised, var(--stone-2));
-}
-
-@media (max-width: 920px) {
-  .guides-page .data-hero h1 {
-    font-size: 40px !important;
-  }
-
-  .guides-page .guides-card h2 {
-    font-size: 22px;
-  }
-
-  .guides-route {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .guides-route::before {
-    display: none;
-  }
-}
-
-@media (max-width: 46rem) {
-  .guides-route {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .guides-starter-details {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 34rem) {
-  .guides-page .data-hero {
-    padding-block: 20px 16px;
-  }
-
-  .guides-page .data-hero h1 {
-    font-size: clamp(2rem, 10vw, 2.45rem);
-  }
-
-  .guides-page .data-hero .sub,
-  .guides-page .guides-card p {
-    font-size: 17px !important;
-  }
-
-  .guides-hero-actions,
-  .guides-card-actions,
-  .guides-progress__actions,
-  .guides-share__actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .guides-action {
-    width: 100%;
-    min-height: 48px;
-    font-size: 1.05rem;
-    border-radius: 16px;
-  }
-
-  .guides-progress__head,
-  .guides-card__meta {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .guides-progress__count {
-    margin-top: -0.25rem;
-  }
-
-  .guides-route {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .guides-route__card {
-    min-height: 0;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .guides-route__number { justify-self: start; }
-
-  .guides-copy,
-  .guides-download {
-    width: 100%;
-    min-height: 48px;
-    border-radius: 16px;
-  }
-
-  .guides-reset,
-  .guides-step-toggle {
-    min-height: 44px;
-  }
-}
-
-/* The root-font-size fixture turns the ordinary mobile breakpoint into a
-   narrow physical viewport. Keep each named route-map descendant's own
-   scrollable width bounded, rather than relying on an ancestor clip. */
-@media (max-width: 42rem) and (max-height: 30rem) {
-  /* At extreme root-font zoom, rem padding becomes wider than the physical
-     card. Keep the route-map panels content-box bounded and let their text
-     wrap inside the available column. */
-  .guides-page .guides-progress,
-  .guides-page .guides-snapshot,
-  .guides-page .guides-share {
-    padding: 8px;
-    gap: 8px;
-    min-width: 0;
-    min-inline-size: 0;
-    max-width: 100%;
-    max-inline-size: 100%;
-    box-sizing: border-box;
-  }
-
-  .guides-page .data-hero h1 {
-    font-size: 40px;
-  }
-
-  .guides-page .data-hero .sub,
-  .guides-page .guides-card p {
-    font-size: 17px;
-  }
-
-  .guides-page .guides-starter-details,
-  .guides-page .guides-snapshot,
-  .guides-page .guides-share,
-  .guides-page .guides-snapshot ul,
-  .guides-page .guides-snapshot li,
-  .guides-page .guides-share__eyebrow,
-  .guides-page .guides-snapshot__eyebrow,
-  .guides-page .guides-snapshot h3,
-  .guides-page .guides-share h3 {
-    inline-size: 100%;
-    max-inline-size: 100%;
-    min-inline-size: 0;
-    box-sizing: border-box;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    white-space: normal;
-  }
-
-  .guides-page .guides-starter-details {
-    grid-template-columns: minmax(0, 1fr);
-    width: 100%;
-    box-sizing: content-box;
-  }
-
-  .guides-page .guides-snapshot ul {
-    width: 100%;
-    inline-size: 100%;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-    margin-top: 8px;
-    padding-inline-start: 16px;
-    font-size: 14px;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    overflow: clip;
-  }
-
-  .guides-page .guides-starter-details * {
-    min-inline-size: 0;
-    max-inline-size: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    overflow: clip;
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box;
-    overflow-x: hidden !important;
-    overflow-y: visible;
-  }
-
-  .guides-page .guides-share > *,
-  .guides-page .guides-share__actions > *,
-  .guides-page .guides-share__status,
-  .guides-page .guides-share p,
-  .guides-page .guides-share h3,
-  .guides-page .guides-snapshot p,
-  .guides-page .guides-snapshot h3 {
-    min-width: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  .guides-page .guides-share__eyebrow,
-  .guides-page .guides-snapshot__eyebrow {
-    font-size: 12px;
-  }
-
-  .guides-page .guides-share__actions {
-    gap: 6px;
-    margin-top: 8px;
-  }
-
-  .guides-page .guides-copy,
-  .guides-page .guides-download {
-    max-width: 100%;
-    padding-inline: 8px;
-    font-size: 14px;
-  }
-
-  .guides-page .guides-route {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .guides-page .guides-route__card,
-  .guides-page .guides-route__copy {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .guides-page .guides-route__state,
-  .guides-page .guides-route__title,
-  .guides-page .guides-starter-details,
-  .guides-page .guides-starter-details > * {
-    width: 100%;
-    inline-size: 100%;
-    min-width: 0;
-    min-inline-size: 0;
-    max-width: 100%;
-    max-inline-size: 100%;
-    box-sizing: border-box;
-  }
-
-  .guides-page .guides-starter-details,
-  .guides-page .guides-starter-details * {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-}
-
-@media (forced-colors: active) {
+@media (max-width: 44rem) {
+  .guides-page .data-hero { padding-block: 2.25rem 2rem; }
+  .guides-page .data-hero h1 { font-size: clamp(2.25rem, 11vw, 3.25rem); }
+  .guides-body { grid-template-columns: 1fr; gap: 2.5rem; }
+  .guides-index__list { display: flex; flex-wrap: wrap; gap: 0.5rem; border-top: 0; }
+  .guides-index__list li { flex: 1 1 10rem; min-width: 0; }
+  .guides-index__link { min-height: 48px; padding: 0.7rem; border: 1px solid var(--route-edge); border-radius: 0.45rem; }
+  .guides-route,
+  .guides-starter-details { grid-template-columns: 1fr; }
+  .guides-route__card { min-height: 0; }
+  .guides-progress__head { display: block; }
+  .guides-progress__count { display: inline-flex; margin-top: 0.75rem; }
   .guides-action,
+  .guides-share__actions > *,
+  .guides-progress__actions > * { width: 100%; }
+}
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .guides-page,
+  .guides-page .r-wrap,
+  .guides-progress,
+  .guides-card { min-width: 0; max-width: 100%; }
+  .guides-card__meta { flex-wrap: wrap; }
+  .guides-page .data-hero h1 { font-size: min(2.5rem, 20vw); overflow-wrap: anywhere; }
+  .guides-card p,
+  .guides-snapshot li,
+  .guides-share > p:not(.guides-share__eyebrow, .guides-share__status) { font-size: min(1.125rem, 7.5vw); overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guides-action,
+  .guides-copy,
+  .guides-download,
+  .guides-reset,
+  .guides-step-toggle { transition: none; }
+}
+@media (forced-colors: active) {
+  .guides-route__card,
+  .guides-card,
+  .guides-copy,
+  .guides-download,
   .guides-reset,
   .guides-step-toggle,
-  .guides-route__card,
-  .guides-copy,
-  .guides-download {
-    border-color: CanvasText;
-    background: Canvas;
-    color: CanvasText;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .guides-action {
-    transition: none;
-  }
+  .guides-index__link { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .guides-action { border-color: ButtonText; background: Highlight; color: HighlightText; }
 }

@@ -14,11 +14,28 @@
 }
 
 .shell-member-presence {
+  box-sizing: border-box;
   background: var(--ok, #4caf82);
+  outline: 1px solid color-mix(in oklab, var(--stone-2) 72%, var(--ink));
+  outline-offset: 1px;
 }
 
 .shell-member-presence--away {
   background: var(--paper-mute, #89919a);
+  border-radius: 2px;
+  outline-color: color-mix(in oklab, var(--paper-mute) 76%, var(--ink));
+}
+
+/* The row already says "Away" in text. The compact shape keeps that state
+   legible in a scan even when colour perception is unavailable. */
+.shell-member-row--away .shell-member-presence,
+.shell-facepile-avatar--away {
+  opacity: 0.76;
+}
+
+.shell-member-row:not(.shell-member-row--away) .shell-member-presence,
+.shell-facepile-avatar:not(.shell-facepile-avatar--away) {
+  opacity: 1;
 }
 
 .shell-members-refresh[role='status'] {
@@ -50,5 +67,6 @@
     forced-color-adjust: none;
     background: ButtonText;
     border: 1px solid ButtonText;
+    border-radius: 2px;
   }
 }

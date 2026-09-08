@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { ENVELOPE_PREFIX, LOCKED_PLACEHOLDER } from './dmCipher';
 import { GROUP_ENVELOPE_PREFIX, GROUP_LOCKED_PLACEHOLDER } from './groupEnvelope';
 import {
+  activeReplyPreviewText,
   hasEncryptedMessageBoundary,
   isEncryptedWireText,
   lockedPlaceholderForText,
+  persistedReplyPreviewText,
   sanitizePersistedReplyPreviewText,
 } from './replyPrivacy';
 
@@ -28,6 +30,25 @@ describe('replyPrivacy — group + DM envelope boundary', () => {
   it('treats group envelopes as encrypted even without the encrypted flag', () => {
     const msg = { text: `${GROUP_ENVELOPE_PREFIX}opaque`, encrypted: undefined as boolean | undefined };
     expect(hasEncryptedMessageBoundary(msg)).toBe(true);
+  });
+
+  it('hides retained plaintext from active and durable withdrawn reply previews', () => {
+    const redacted = {
+      text: '[Message deleted]',
+      plaintext: 'retained parent secret',
+      encrypted: true,
+      redacted: true,
+    };
+    const deleted = {
+      text: 'retained deleted secret',
+      plaintext: 'retained deleted secret',
+      deleted: true,
+    };
+
+    expect(activeReplyPreviewText(redacted)).toBe('[message deleted]');
+    expect(persistedReplyPreviewText(redacted)).toBe('[message deleted]');
+    expect(activeReplyPreviewText(deleted)).toBe('[message deleted]');
+    expect(persistedReplyPreviewText(deleted)).toBe('[message deleted]');
   });
 
   it('sanitizes persisted reply previews for room envelopes fail-closed', () => {

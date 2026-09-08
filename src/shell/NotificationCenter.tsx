@@ -27,6 +27,14 @@ const TYPE_GLYPH: Record<Notification['type'], string> = {
   error: '!',
 };
 
+const TYPE_LABEL: Record<Notification['type'], string> = {
+  mention: 'Mention',
+  dm: 'Direct message',
+  follow: 'Followed conversation',
+  system: 'System',
+  error: 'Error',
+};
+
 type InboxFilter = 'all' | 'attention' | 'other';
 
 const INBOX_FILTERS: readonly { id: InboxFilter; label: string }[] = [
@@ -83,6 +91,9 @@ export function NotificationCenter(): JSX.Element {
   const unreadCount = createMemo(
     () =>
       notifications().filter((n) => isAttentionNotification(n) && !readIds().has(n.id)).length,
+  );
+  const unreadNotificationCount = createMemo(
+    () => notifications().filter((n) => !readIds().has(n.id)).length,
   );
   const filterCounts = createMemo(() => {
     const current = notifications();
@@ -273,12 +284,14 @@ export function NotificationCenter(): JSX.Element {
             <div class="notif-center__heading">
               <h2>Inbox</h2>
               <span class="notif-center__summary" aria-live="polite" aria-atomic="true">
-                {unreadCount() > 0 ? `${unreadCount()} unread` : 'No unread conversations'}
+                {unreadNotificationCount() > 0
+                  ? `${unreadNotificationCount()} unread notification${unreadNotificationCount() === 1 ? '' : 's'}`
+                  : 'No unread notifications'}
               </span>
             </div>
-            <Show when={unreadCount() > 0}>
+            <Show when={unreadNotificationCount() > 0}>
               <button type="button" class="notif-center__action" onClick={() => getState().markAllNotificationsRead()}>
-                Mark all read
+                Mark notifications read
               </button>
             </Show>
             <a class="notif-center__ledger" href="/stats/" aria-label="Open public room ledger">
@@ -341,12 +354,13 @@ export function NotificationCenter(): JSX.Element {
                         aria-label={openLabel(n)}
                         onClick={() => activateNotification(n)}
                       >
-                        <span class="notif-center__glyph" aria-hidden="true">{TYPE_GLYPH[n.type]}</span>
-                        <span class="notif-center__text">
-                          <span class="notif-center__meta">
-                            <Show when={n.from}><strong>{n.from}</strong></Show>
-                            <Show when={n.channel}><span class="notif-center__chan">{n.channel}</span></Show>
-                            <span class="notif-center__when">{relTime(n.at.getTime() / 1000, nowMs())}</span>
+                          <span class="notif-center__glyph" aria-hidden="true">{TYPE_GLYPH[n.type]}</span>
+                          <span class="notif-center__text">
+                            <span class="notif-center__meta">
+                              <span class="notif-center__category">{TYPE_LABEL[n.type]}</span>
+                              <Show when={n.from}><strong>{n.from}</strong></Show>
+                              <Show when={n.channel}><span class="notif-center__chan">{n.channel}</span></Show>
+                              <span class="notif-center__when">{relTime(n.at.getTime() / 1000, nowMs())}</span>
                           </span>
                           <span class="notif-center__preview">{n.text}</span>
                         </span>

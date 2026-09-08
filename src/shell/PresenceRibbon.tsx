@@ -63,6 +63,14 @@ function classifyCallsHubPresentation(callState: string, callStartedAt: number |
 
 export type PresenceRibbonProps = {
   selfNick?: string;
+  roomCurrent?: {
+    kind: 'home' | 'room' | 'message' | 'status' | 'calls';
+    label: string;
+    detail: string;
+  };
+  contextOpen?: boolean;
+  contextTriggerRef?: (element: HTMLButtonElement) => void;
+  onToggleContext?: () => void;
   onToggleMembers?: () => void;
   /**
    * True when the member surface is actually open for this room — desktop
@@ -160,6 +168,10 @@ export function buildVoiceRoomStatus(input: VoiceRoomStatusInput): VoiceRoomStat
 export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const [local] = splitProps(props, [
     'selfNick',
+    'roomCurrent',
+    'contextOpen',
+    'contextTriggerRef',
+    'onToggleContext',
     'onToggleMembers',
     'membersOpen',
     'showJoinVoice',
@@ -312,6 +324,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
   const [mediaIndexOpen, setMediaIndexOpen] = createSignal(false);
   const [moreOpen, setMoreOpen] = createSignal(false);
   let moreMenuRef: HTMLDivElement | undefined;
+  let moreTriggerContentRef: HTMLSpanElement | undefined;
 
   createEffect(() => {
     if (local.contextActionsOnly && !hasContextActions()) setMoreOpen(false);
@@ -503,6 +516,19 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     action();
   }
 
+  function searchFromMore(): void {
+    const trigger = moreTriggerContentRef?.closest('button');
+    const view = activeView();
+    setMoreOpen(false);
+    // Let Popover finish its focus return before Search captures its opener.
+    // The menu item unmounts; the surviving Actions button owns Escape return.
+    queueMicrotask(() => {
+      if (!trigger?.isConnected || moreOpen() || activeView() !== view) return;
+      trigger.focus({ preventScroll: true });
+      openMessageSearch();
+    });
+  }
+
   function moreMenuItems(): HTMLElement[] {
     if (!moreMenuRef) return [];
     // Multiple section menus share one roving set across the More panel.
@@ -541,6 +567,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
     }
   }
 
+  const phoneSearchMenuItem = (): JSX.Element => (
+    <Show when={local.contextActionsOnly}>
+      <button
+        type="button"
+        class="shell-ribbon-more-item"
+        role="menuitem"
+        data-testid="ribbon-more-search"
+        onClick={searchFromMore}
+        onKeyDown={onMoreMenuKeyDown}
+      >
+        Search messages
+      </button>
+    </Show>
+  );
+
   /** Jump to date lives in More (This room / Conversation), one click → sheet. */
   const jumpDateMenuItem = (ariaLabel: string): JSX.Element => (
     <button
@@ -569,6 +610,21 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
       {/* Inner row shares the conversation reading measure so the title and
           place strip stay aligned to the conversation column chrome. */}
       <div class="shell-ribbon-inner presence-ribbon-surface">
+      <Show when={local.roomCurrent}>
+        {(current) => (
+          <div
+            id="shell-room-current"
+            class="shell-room-current sr-only"
+            data-shell-current-kind={current().kind}
+            role="note"
+            aria-label={`Room current: ${current().label}, ${current().detail}`}
+          >
+            <span class="shell-room-current__kicker">Room current</span>
+            <span class="shell-room-current__label">{current().label}</span>
+            <span class="shell-room-current__detail">{current().detail}</span>
+          </div>
+        )}
+      </Show>
       {/* ── LEFT: conversation identity (what you're looking at) ── */}
       <div class="shell-ribbon-identity">
         <Show when={channelName()} fallback={
@@ -852,6 +908,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
             panelLabel={local.contextActionsOnly ? contextActionsLabel() : 'More room and workspace actions'}
             trigger={
               <span
+                ref={moreTriggerContentRef}
                 class="shell-ribbon-iconbtn shell-ribbon-action shell-ribbon-more-trigger"
                 data-testid="ribbon-more"
               >
@@ -918,6 +975,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                     role="menu"
                     aria-labelledby="ribbon-more-room-label"
                   >
+                    {phoneSearchMenuItem()}
                     <Show when={showCallJoinInMore()}>
                       <button
                         type="button"
@@ -1299,6 +1357,7 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
                       role="menu"
                       aria-labelledby="ribbon-more-conv-label"
                     >
+                      {phoneSearchMenuItem()}
                       <button
                         type="button"
                         class="shell-ribbon-more-item"
@@ -1434,6 +1493,30 @@ export function PresenceRibbon(props: PresenceRibbonProps): JSX.Element {
               </Show>
             </div>
             </Popover>
+          </div>
+        </Show>
+
+        <Show when={local.onToggleContext !== undefined}>
+          <span class="shell-ribbon-divider" aria-hidden="true" />
+          <div class="shell-ribbon-group shell-ribbon-context-group" role="group" aria-label="Context">
+            <button
+              ref={local.contextTriggerRef}
+              type="button"
+              class="shell-ribbon-iconbtn shell-ribbon-action shell-room-current__context"
+              data-testid="ribbon-context"
+              aria-expanded={local.contextOpen === true}
+              aria-controls="shell-context-rail"
+              aria-describedby={local.roomCurrent ? 'shell-room-current' : undefined}
+              title="Open room context"
+              onClick={() => local.onToggleContext?.()}
+            >
+              <svg class="shell-ribbon-ico" viewBox="0 0 24 24" aria-hidden="true"
+                fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 5.5h16v11H8l-4 3v-14Z" />
+                <path d="M8 9.5h8M8 13h5" />
+              </svg>
+              <span class="shell-ribbon-action-label">Context</span>
+            </button>
           </div>
         </Show>
 

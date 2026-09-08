@@ -52,7 +52,7 @@ describe('Transcript and composer commercial chrome', () => {
     expect(css).toMatch(/\.shell-composer-inner\s*\{[^}]*box-shadow:\s*none/s);
     expect(css).toMatch(/\.shell-composer-tool\s*\{[^}]*width:\s*var\(--target-min, 44px\)/s);
     expect(css).toMatch(/\.shell-composer-send\s*\{[^}]*width:\s*var\(--target-min, 44px\)/s);
-    expect(css).toMatch(/\.shell-composer-send:not\(:disabled\)\s*\{[^}]*background:\s*var\(--lapis\)/s);
+    expect(css).toMatch(/\.shell-composer-send:not\(:disabled\)\s*\{[^}]*background:\s*var\(--commercial-action-primary,\s*#ff987d\)/s);
     expect(css).toMatch(/\.shell-composer-context\s*\{[^}]*border-left:\s*3px\s+solid\s+var\(--lapis\)/s);
     expect(css).toMatch(/\.shell-msg-pending-mark\s*\{/s);
   });
@@ -87,7 +87,7 @@ describe('Transcript and composer commercial chrome', () => {
   it('keeps swipe chrome matte and the row a grid line — no bubble or liquid glass', () => {
     const gesture = stripComments(gestureCss);
     expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*display:\s*grid/s);
-    expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*grid-template-columns:\s*40px 1fr/s);
+    expect(css).toMatch(/\.shell-msg-group\s*\{[^}]*grid-template-columns:\s*40px minmax\(0,\s*1fr\)/s);
     expect(gesture).toMatch(/\.shell-msg--swiping\s*\{[^}]*touch-action:\s*none/s);
     expect(gesture).toMatch(/transform:\s*translateX\(var\(--row-swipe-x/);
     expect(gesture).toMatch(/prefers-reduced-motion:\s*reduce/);

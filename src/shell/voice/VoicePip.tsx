@@ -155,7 +155,17 @@ function LeaveIcon() {
   );
 }
 
-export function VoicePip() {
+export type VoicePipProps = {
+  /**
+   * AppShell owns one persistent VoiceBar across every primary surface. When
+   * supplied, the PIP stays out of the tree so an active call has one control
+   * owner instead of two competing mute/leave surfaces. Standalone hosts omit
+   * this prop and retain the original PIP presentation contract.
+   */
+  activeSurface?: 'conversation' | 'calls';
+};
+
+export function VoicePip(props: VoicePipProps = {}) {
   const state = useStore((storeState) => ({
     activeView: storeState.activeView,
     voice: storeState.voice,
@@ -175,6 +185,7 @@ export function VoicePip() {
   const target = createMemo(() => state().voice.callChannel ?? state().voice.callWith.trim());
   const isChannel = createMemo(() => Boolean(state().voice.callChannel));
   const isVisible = createMemo(() => {
+    if (props.activeSurface !== undefined) return false;
     const callState = state().voice.callState as string;
     const callTarget = target();
     if (!callTarget || !callStateIsLive(callState)) return false;

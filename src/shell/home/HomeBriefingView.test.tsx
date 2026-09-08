@@ -109,6 +109,7 @@ function renderView(over: Partial<{
   caughtUpMentions: number;
   firstHourWelcome: boolean;
   formation: HomeBriefingViewProps['formationStrip'] extends () => infer T ? T : never;
+  joinedRooms: readonly string[];
 }> = {}) {
   const model = over.briefing ?? briefing();
   const rooms = over.caughtUpRooms ?? (model.catchUpFromMemory ? 0 : Math.max(1, model.inbox.mentions.length + model.inbox.missed.length));
@@ -132,6 +133,7 @@ function renderView(over: Partial<{
       firstHourTip={() => null}
       formationStrip={() => over.formation ?? null}
       isJoined={() => false}
+      joinedRooms={() => over.joinedRooms ?? []}
       caughtUpPlan={() => rooms > 0
         ? { targets: [{ kind: 'channel', target: '#mentions', unread, highlights: 0 }], rooms, unread, mentions }
         : EMPTY_CAUGHT_UP}
@@ -218,9 +220,31 @@ describe('HomeBriefingView — presentation contract', () => {
     });
     expect(screen.getByRole('heading', { name: 'The room is quiet.' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'The room is quiet' })).toBeInTheDocument();
-    expect(screen.queryByText(/JOIN|PART|NICK|oper|mesh|ledger|channel list|unreal/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\bJOIN\b|\bPART\b|\bNICK\b|oper|mesh|ledger|channel list|unreal/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start a room' })).toBeInTheDocument();
+  });
+
+  it('provides genuine joined and recently visited room access without invented activity', () => {
+    const openRoom = vi.fn();
+    const joinRoom = vi.fn();
+    renderView({
+      joinedRooms: ['#lounge'],
+      briefing: briefing({ recentRooms: ['#recent'] }),
+      actions: actions({ openOrJoinActiveRoom: openRoom, joinRecentRoom: joinRoom }),
+    });
+
+    const access = screen.getByRole('region', { name: 'Room access' });
+    expect(access).toHaveTextContent('Joined rooms');
+    expect(access).toHaveTextContent('#lounge');
+    expect(access).toHaveTextContent('Recently visited');
+    expect(access).toHaveTextContent('recent');
+    expect(access).not.toHaveTextContent(/online|active users|messages today|streak/i);
+
+    fireEvent.click(within(access).getByRole('button', { name: /lounge.*Open/i }));
+    fireEvent.click(within(access).getByRole('button', { name: /recent.*Join/i }));
+    expect(openRoom).toHaveBeenCalledWith('#lounge');
+    expect(joinRoom).toHaveBeenCalledWith('#recent');
   });
 
   it('nags a founder with real names and the existing Reshare action', () => {

@@ -145,6 +145,7 @@ describe('MessageSearch', () => {
     expect(screen.getByRole('searchbox', { name: 'Search messages' })).toHaveValue('needle');
     expect(screen.getByRole('group', { name: 'Search result navigation' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Visible message search provenance: This device/i)).toBeInTheDocument();
+    expect(screen.getByTestId('message-search-target')).toHaveTextContent('Searching in #root');
 
     const archivedList = screen.getByRole('list', { name: 'Archived message results' });
     expect(screen.getByLabelText(/Archived message search provenance: This server/i)).toBeInTheDocument();
@@ -302,6 +303,37 @@ describe('MessageSearch', () => {
     fireEvent.keyDown(input, { key: 'Escape' });
 
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it('keeps query and close outside the tools scroller and closes from disclosed controls', async () => {
+    store.setState({ ...initialState, activeView: { kind: 'home' } }, true);
+    render(() => <button type="button">Find messages</button>);
+    const trigger = screen.getByRole('button', { name: 'Find messages' });
+    trigger.focus();
+    openMessageSearchWithQuery('release');
+    render(() => <MessageSearch />);
+
+    const search = screen.getByRole('search', { name: 'Message search' });
+    const body = search.querySelector<HTMLElement>('.onyx-message-search__body')!;
+    const input = screen.getByRole('searchbox', { name: 'Search messages' });
+    const close = screen.getByRole('button', { name: 'Close search' });
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(body).not.toContainElement(input);
+    expect(body).not.toContainElement(close);
+    expect(within(body).getByRole('group', { name: 'Search result navigation' })).toBeInTheDocument();
+    expect(within(body).getByRole('textbox', { name: 'Saved search name' })).toBeInTheDocument();
+
+    fireEvent.click(within(body).getByRole('button', { name: 'Advanced' }));
+    const related = within(body).getByRole('button', { name: 'Related terms' });
+    fireEvent.click(related);
+    expect(related).toHaveAttribute('aria-pressed', 'true');
+    expect(input).toHaveValue('release');
+    // The matching mode outlives the overlay; leave subsequent cases at default.
+    fireEvent.click(within(body).getByRole('button', { name: 'Text + related' }));
+    related.focus();
+    fireEvent.keyDown(related, { key: 'Escape' });
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it('refocuses and selects the query when open is requested again', async () => {

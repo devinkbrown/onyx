@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from 'vitest';
 
-import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { ENVELOPE_PREFIX, LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { GROUP_LOCKED_PLACEHOLDER } from '@/lib/e2ee/groupEnvelope';
 import type { ChatMessage } from '@/lib/irc/types';
 import type { ReviewHistoryEntry } from '@/lib/notifications/reviewHistory';
@@ -202,6 +202,26 @@ describe('messageAccessibleLabel (dense transcript a11y)', () => {
     expect(label).toContain(GROUP_LOCKED_PLACEHOLDER);
     expect(label).not.toContain('ONYXROOM1');
     expect(label).not.toContain('room-ciphertext-must-not-leak');
+  });
+
+  it('locks a legacy DM envelope in the accessible label when the flag is omitted', () => {
+    const legacy: ChatMessage = {
+      ...message('m2legacy', 'alice', `${ENVELOPE_PREFIX}legacy-ciphertext`, 0),
+    };
+    const label = messageAccessibleLabel(legacy);
+
+    expect(label).toContain(LOCKED_PLACEHOLDER);
+    expect(label).not.toContain(ENVELOPE_PREFIX);
+    expect(label).not.toContain('legacy-ciphertext');
+
+    const openedLegacy: ChatMessage = {
+      ...legacy,
+      encrypted: false,
+      plaintext: 'legacy decrypted text',
+    };
+    const openedLabel = messageAccessibleLabel(openedLegacy);
+    expect(openedLabel).toContain('legacy decrypted text');
+    expect(openedLabel).not.toContain(ENVELOPE_PREFIX);
   });
 
   it('prefers decrypted plaintext over the sealed wire body', () => {

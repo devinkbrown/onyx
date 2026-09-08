@@ -496,52 +496,70 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
         onKeyDown={handleSearchKeyDown}
       >
         <div class="onyx-message-search__surface">
-          <label class="sr-only" for={INPUT_ID}>Search messages</label>
-          <svg
-            class="onyx-message-search__sigil"
-            viewBox="0 0 16 16"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            aria-hidden="true"
+          <div class="onyx-message-search__query-field">
+            <label class="sr-only" for={INPUT_ID}>Search messages</label>
+            <input
+              ref={inputRef}
+              id={INPUT_ID}
+              class="onyx-message-search__input"
+              type="search"
+              value={search.query()}
+              maxlength={MESSAGE_SEARCH_QUERY_MAX}
+              autocomplete="off"
+              spellcheck={false}
+              aria-label="Search messages"
+              aria-describedby={`${SEARCH_STATUS_ID} ${SEARCH_HELP_ID}`}
+              aria-controls={controlledResults()}
+              aria-keyshortcuts="Enter Shift+Enter Control+Enter Meta+Enter Escape"
+              placeholder={search.hasConversation()
+                ? `Find messages in ${search.targetLabel()}`
+                : search.localHistoryEnabled()
+                  ? 'Search messages saved on this device'
+                  : 'Device history is turned off'}
+              disabled={!search.hasConversation() && !search.localHistoryEnabled()}
+              onInput={handleInput}
+              onCompositionEnd={handleCompositionEnd}
+              onKeyDown={handleKeyDown}
+            />
+            <span class="onyx-message-search__count" aria-hidden="true">
+              {countLabel()}
+            </span>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            class="onyx-message-search__button onyx-message-search__button--close"
+            aria-label="Close search"
+            aria-keyshortcuts="Escape"
+            title="Close search"
+            onClick={() => closeMessageSearch()}
           >
-            <circle cx="7" cy="7" r="4.25" />
-            <line x1="10.4" y1="10.4" x2="13.5" y2="13.5" />
-          </svg>
-          <input
-            ref={inputRef}
-            id={INPUT_ID}
-            class="onyx-message-search__input"
-            type="search"
-            value={search.query()}
-            maxlength={MESSAGE_SEARCH_QUERY_MAX}
-            autocomplete="off"
-            spellcheck={false}
-            aria-label="Search messages"
-            aria-describedby={`${SEARCH_STATUS_ID} ${SEARCH_HELP_ID}`}
-            aria-controls={controlledResults()}
-            aria-keyshortcuts="Enter Shift+Enter Control+Enter Meta+Enter Escape"
-            placeholder={search.hasConversation()
-              ? `Find messages in ${search.targetLabel()}`
-              : search.localHistoryEnabled()
-                ? 'Search messages saved on this device'
-                : 'Device history is turned off'}
-            disabled={!search.hasConversation() && !search.localHistoryEnabled()}
-            onInput={handleInput}
-            onCompositionEnd={handleCompositionEnd}
-            onKeyDown={handleKeyDown}
-          />
-          <span class="onyx-message-search__count" aria-hidden="true">
-            {countLabel()}
-          </span>
-          <ProvenanceBadge
-            scope="device"
-            subject="Visible message search"
-            class="onyx-message-search__provenance"
-          />
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <line x1="4" y1="4" x2="12" y2="12" />
+              <line x1="12" y1="4" x2="4" y2="12" />
+            </svg>
+          </button>
+        </div>
+        <div class="onyx-message-search__body">
+          <div class="onyx-message-search__target" data-testid="message-search-target">
+            <span class="onyx-message-search__target-kicker">Searching in</span>
+            {' '}
+            <strong>{search.targetLabel()}</strong>
+            <ProvenanceBadge
+              scope="device"
+              subject="Visible message search"
+              class="onyx-message-search__provenance"
+            />
+          </div>
           <div class="onyx-message-search__controls" role="group" aria-label="Search result navigation">
             <button
               type="button"
@@ -589,202 +607,278 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                 <path d="M4.5 9.5 8 13l3.5-3.5" />
               </svg>
             </button>
-            <button
-              ref={closeRef}
-              type="button"
-              class="onyx-message-search__button onyx-message-search__button--close"
-              aria-label="Close search"
-              aria-keyshortcuts="Escape"
-              title="Close search"
-              onClick={() => closeMessageSearch()}
+          </div>
+          <Show when={/^[#&]/.test(search.targetLabel())}>
+            <a
+              class="onyx-message-search__ledger"
+              href={statsRoomHref(search.targetLabel())}
+              aria-label={`Room ledger for ${search.targetLabel()}`}
             >
-              <svg
-                viewBox="0 0 16 16"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                stroke-linecap="round"
-                aria-hidden="true"
-              >
-                <line x1="4" y1="4" x2="12" y2="12" />
-                <line x1="12" y1="4" x2="4" y2="12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <Show when={/^[#&]/.test(search.targetLabel())}>
-          <a
-            class="onyx-message-search__ledger"
-            href={statsRoomHref(search.targetLabel())}
-            aria-label={`Room ledger for ${search.targetLabel()}`}
-          >
-            Room ledger
-          </a>
-        </Show>
-        <Show when={!search.hasConversation() && !search.localHistoryEnabled()}>
-          <div class="onyx-message-search__history-off" role="status">
-            <span>Device history is off, so there are no remembered conversations to search.</span>
-            <button
-              type="button"
-              class="onyx-message-search__deep"
-              onClick={() => {
-                closeMessageSearch();
-                openPreferences('history');
-              }}
-            >
-              Open history preferences
-            </button>
-          </div>
-        </Show>
-        <Show when={savedSearches().length > 0 || search.query().trim().length >= 2}>
-          <section class="onyx-message-search__saved" aria-label="Saved searches">
-            <div class="onyx-message-search__saved-bar">
-              <ProvenanceBadge scope="device" subject="Saved searches" />
-              <span class="onyx-message-search__vault-label">Saved on this device</span>
-              <span class="onyx-message-search__server-count">
-                {savedSearches().length} saved
-              </span>
-            </div>
-            <Show when={search.query().trim().length >= 2}>
-              <form class="onyx-message-search__save-form" onSubmit={handleSave}>
-                <label class="sr-only" for="onyx-message-search-save-label">Saved search name</label>
-                <input
-                  id="onyx-message-search-save-label"
-                  class="onyx-message-search__save-input"
-                  value={savedLabel()}
-                  maxlength="120"
-                  placeholder="Name this device search"
-                  onInput={(event) => setSavedLabel(event.currentTarget.value)}
-                />
-                <button
-                  type="submit"
-                  class="onyx-message-search__deep"
-                  disabled={!savedLabel().trim() || savedBusy()}
-                >
-                  {savedStatus() === 'saving' ? 'Saving…' : 'Save search'}
-                </button>
-              </form>
-            </Show>
-            <Show when={savedSearches().length > 0}>
-              <ul class="onyx-message-search__saved-list" aria-label="Saved search list">
-                <For each={savedSearches()}>
-                  {(saved) => (
-                    <li class="onyx-message-search__saved-row">
-                      <button
-                        type="button"
-                        class="onyx-message-search__saved-run"
-                        onClick={() => runSavedSearch(saved)}
-                        aria-label={`Run saved search ${saved.label}`}
-                      >
-                        <strong>{saved.label}</strong>
-                        <span>{saved.query}</span>
-                        <small>
-                          {saved.mode === 'exact'
-                            ? 'Exact text'
-                            : saved.mode === 'hybrid'
-                              ? 'Text + related terms'
-                              : 'Related terms'}
-                        </small>
-                      </button>
-                      <button
-                        type="button"
-                        class="onyx-message-search__saved-delete"
-                        onClick={() => void removeSavedSearch(saved)}
-                        aria-label={`Delete saved search ${saved.label}`}
-                        disabled={savedBusy()}
-                      >
-                        {savedStatus() === 'deleting' ? 'Deleting…' : 'Delete'}
-                      </button>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </Show>
-          </section>
-        </Show>
-        <p
-          class={savedStatus() === 'error' ? 'onyx-message-search__server-error' : 'sr-only'}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {savedStatusMessage()}
-        </p>
-        <Show when={search.recallSuggestions().length > 0}>
-          <div class="onyx-message-search__recall" role="group" aria-label="Device recall terms">
-            <ProvenanceBadge scope="device" subject="Search recall terms" />
-            <For each={search.recallSuggestions()}>
-              {(term) => (
-                <button
-                  type="button"
-                  class="onyx-message-search__recall-chip"
-                  onClick={() => search.applyRecallSuggestion(term)}
-                >
-                  {term}
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
-        <Show when={
-          search.query().trim().length > 0
-          && !search.serverSearchBlockedByE2ee()
-          && (search.canServerSearch() || search.serverStatus() !== 'idle')
-        }>
-          <div
-            class="onyx-message-search__server"
-            data-testid="server-search"
-            aria-busy={search.serverStatus() === 'pending'}
-          >
-            <div class="onyx-message-search__server-bar">
-              <ProvenanceBadge scope="server" subject="Archived message search" />
+              Room ledger
+            </a>
+          </Show>
+          <Show when={!search.hasConversation() && !search.localHistoryEnabled()}>
+            <div class="onyx-message-search__history-off" role="status">
+              <span>Device history is off, so there are no remembered conversations to search.</span>
               <button
                 type="button"
                 class="onyx-message-search__deep"
-                disabled={!search.canServerSearch() || search.serverStatus() === 'pending'}
-                onClick={() => search.runServerSearch()}
-                title="Search the server's full history for this conversation (Ctrl+Enter)"
+                onClick={() => {
+                  closeMessageSearch();
+                  openPreferences('history');
+                }}
               >
-                {search.serverStatus() === 'pending'
-                  ? 'Searching archived history…'
-                  : 'Search full server history'}
+                Open history preferences
               </button>
-              <Show when={search.serverStatus() === 'done'}>
+            </div>
+          </Show>
+          <Show when={savedSearches().length > 0 || search.query().trim().length >= 2}>
+            <section class="onyx-message-search__saved" aria-label="Saved searches">
+              <div class="onyx-message-search__saved-bar">
+                <strong class="onyx-message-search__section-title">Saved searches</strong>
+                <ProvenanceBadge scope="device" subject="Saved searches" />
+                <span class="onyx-message-search__vault-label">Saved on this device</span>
                 <span class="onyx-message-search__server-count">
-                  {search.serverResults().length === 0
-                    ? 'no archived matches'
-                    : `${search.serverResults().length} archived match${search.serverResults().length === 1 ? '' : 'es'}`}
+                  {savedSearches().length} saved
                 </span>
+              </div>
+              <Show when={search.query().trim().length >= 2}>
+                <form class="onyx-message-search__save-form" onSubmit={handleSave}>
+                  <label class="sr-only" for="onyx-message-search-save-label">Saved search name</label>
+                  <input
+                    id="onyx-message-search-save-label"
+                    class="onyx-message-search__save-input"
+                    value={savedLabel()}
+                    maxlength="120"
+                    placeholder="Name this device search"
+                    onInput={(event) => setSavedLabel(event.currentTarget.value)}
+                  />
+                  <button
+                    type="submit"
+                    class="onyx-message-search__deep"
+                    disabled={!savedLabel().trim() || savedBusy()}
+                  >
+                    {savedStatus() === 'saving' ? 'Saving…' : 'Save search'}
+                  </button>
+                </form>
               </Show>
-              <Show when={search.serverStatus() === 'error'}>
-                <span class="onyx-message-search__server-error">
-                  {search.serverError()}
-                </span>
+              <Show when={savedSearches().length > 0}>
+                <ul class="onyx-message-search__saved-list" aria-label="Saved search list">
+                  <For each={savedSearches()}>
+                    {(saved) => (
+                      <li class="onyx-message-search__saved-row">
+                        <button
+                          type="button"
+                          class="onyx-message-search__saved-run"
+                          onClick={() => runSavedSearch(saved)}
+                          aria-label={`Run saved search ${saved.label}`}
+                        >
+                          <strong>{saved.label}</strong>
+                          <span>{saved.query}</span>
+                          <small>
+                            {saved.mode === 'exact'
+                              ? 'Exact text'
+                              : saved.mode === 'hybrid'
+                                ? 'Text + related terms'
+                                : 'Related terms'}
+                          </small>
+                        </button>
+                        <button
+                          type="button"
+                          class="onyx-message-search__saved-delete"
+                          onClick={() => void removeSavedSearch(saved)}
+                          aria-label={`Delete saved search ${saved.label}`}
+                          disabled={savedBusy()}
+                        >
+                          {savedStatus() === 'deleting' ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
               </Show>
-              <Show when={search.serverStatus() === 'done' && search.serverNotice()}>
-                <span class="onyx-message-search__server-notice">
-                  {search.serverNotice()}
-                </span>
+            </section>
+          </Show>
+          <p
+            class={savedStatus() === 'error' ? 'onyx-message-search__server-error' : 'sr-only'}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {savedStatusMessage()}
+          </p>
+          <Show when={search.recallSuggestions().length > 0}>
+            <div class="onyx-message-search__recall" role="group" aria-label="Device recall terms">
+              <ProvenanceBadge scope="device" subject="Search recall terms" />
+              <For each={search.recallSuggestions()}>
+                {(term) => (
+                  <button
+                    type="button"
+                    class="onyx-message-search__recall-chip"
+                    onClick={() => search.applyRecallSuggestion(term)}
+                  >
+                    {term}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+          <Show when={
+            search.query().trim().length > 0
+            && !search.serverSearchBlockedByE2ee()
+            && (search.canServerSearch() || search.serverStatus() !== 'idle')
+          }>
+            <div
+              class="onyx-message-search__server"
+              data-testid="server-search"
+              aria-busy={search.serverStatus() === 'pending'}
+            >
+              <div class="onyx-message-search__server-bar">
+                <strong class="onyx-message-search__section-title">Archived history</strong>
+                <ProvenanceBadge scope="server" subject="Archived message search" />
+                <button
+                  type="button"
+                  class="onyx-message-search__deep"
+                  disabled={!search.canServerSearch() || search.serverStatus() === 'pending'}
+                  onClick={() => search.runServerSearch()}
+                  title="Search the server's full history for this conversation (Ctrl+Enter)"
+                >
+                  {search.serverStatus() === 'pending'
+                    ? 'Searching archived history…'
+                    : 'Search full server history'}
+                </button>
+                <Show when={search.serverStatus() === 'done'}>
+                  <span class="onyx-message-search__server-count">
+                    {search.serverResults().length === 0
+                      ? 'no archived matches'
+                      : `${search.serverResults().length} archived match${search.serverResults().length === 1 ? '' : 'es'}`}
+                  </span>
+                </Show>
+                <Show when={search.serverStatus() === 'error'}>
+                  <span class="onyx-message-search__server-error">
+                    {search.serverError()}
+                  </span>
+                </Show>
+                <Show when={search.serverStatus() === 'done' && search.serverNotice()}>
+                  <span class="onyx-message-search__server-notice">
+                    {search.serverNotice()}
+                  </span>
+                </Show>
+              </div>
+              <Show when={search.serverStatus() === 'done' && search.serverResults().length > 0}>
+                <ul
+                  id={SERVER_RESULTS_ID}
+                  class="onyx-message-search__server-list"
+                  role="list"
+                  aria-label="Archived message results"
+                >
+                  <For each={search.serverResults()}>
+                    {(result) => (
+                      <li>
+                        <button
+                          type="button"
+                          class="onyx-message-search__server-row"
+                          title="Open archived context and jump to this message"
+                          onClick={() => search.openServerResult(result)}
+                        >
+                          <span class="onyx-message-search__server-when">{timeLabel(result.time)}</span>
+                          <strong>{result.from}</strong>
+                          <span class="onyx-message-search__server-text">{result.text}</span>
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
               </Show>
             </div>
-            <Show when={search.serverStatus() === 'done' && search.serverResults().length > 0}>
+          </Show>
+          <Show when={search.serverSearchBlockedByE2ee() && search.query().trim().length > 0}>
+            <div class="onyx-message-search__history-off" role="status">
+              Encrypted DM search stays on this device. Loaded decrypted lines are searched here;
+              query text and ciphertext history are not sent to server search.
+            </div>
+          </Show>
+          <Show when={search.query().trim().length >= 2 && search.serverStatus() !== 'pending' && search.vaultStatus() !== 'pending' && search.resultCount() === 0 && search.serverResults().length === 0 && search.vaultResults().length === 0}>
+            <div class="onyx-message-search__empty" role="status">
+              <strong>No matches yet</strong>
+              <span>Try a shorter phrase, or search full server history if it’s available.</span>
+            </div>
+          </Show>
+          <Show when={search.query().trim().length >= 2}>
+            <div class="onyx-message-search__advanced">
+              <button
+                type="button"
+                class="onyx-message-search__advanced-toggle"
+                aria-expanded={advancedOpen()}
+                aria-controls="onyx-message-search-advanced"
+                onClick={() => setAdvancedOpen((open) => !open)}
+              >
+                Advanced
+              </button>
+              <Show when={advancedOpen()}>
+                <div
+                  id="onyx-message-search-advanced"
+                  class="onyx-message-search__recall onyx-message-search__recall--modes"
+                >
+                  <ProvenanceBadge scope="device" subject="Device recall matching mode" />
+                  <span class="onyx-message-search__vault-label">Device recall</span>
+                  <div
+                    class="onyx-message-search__segmented"
+                    role="group"
+                    aria-label="Device recall matching mode"
+                  >
+                    <For each={VAULT_MODE_OPTIONS}>
+                      {(option) => (
+                        <button
+                          type="button"
+                          class="onyx-message-search__segment"
+                          aria-pressed={search.vaultMode() === option.mode}
+                          data-mode={option.mode}
+                          data-active={search.vaultMode() === option.mode}
+                          title={option.title}
+                          onClick={() => search.setVaultMode(option.mode)}
+                        >
+                          {option.label}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+            </div>
+          </Show>
+          <Show when={search.vaultResults().length > 0}>
+            <div class="onyx-message-search__vault" data-testid="vault-search">
+              <div class="onyx-message-search__vault-bar">
+                <strong class="onyx-message-search__section-title">Remembered elsewhere</strong>
+                <ProvenanceBadge scope="device" subject="Device-memory message search" />
+                <span class="onyx-message-search__vault-label">
+                  {search.vaultMode() === 'semantic'
+                    ? 'Related terms on this device'
+                    : search.vaultMode() === 'hybrid'
+                      ? 'Recalled on this device'
+                      : 'Saved on this device'}
+                </span>
+                <span class="onyx-message-search__server-count">
+                  {search.vaultResults().length} remembered
+                </span>
+              </div>
               <ul
-                id={SERVER_RESULTS_ID}
+                id={VAULT_RESULTS_ID}
                 class="onyx-message-search__server-list"
                 role="list"
-                aria-label="Archived message results"
+                aria-label="Device-memory message results"
               >
-                <For each={search.serverResults()}>
+                <For each={search.vaultResults()}>
                   {(result) => (
                     <li>
                       <button
                         type="button"
                         class="onyx-message-search__server-row"
-                        title="Open archived context and jump to this message"
-                        onClick={() => search.openServerResult(result)}
+                        title={`Open ${result.target} at this message`}
+                        onClick={() => search.openVaultResult(result)}
                       >
+                        <span class="onyx-message-search__vault-target">{result.target}</span>
                         <span class="onyx-message-search__server-when">{timeLabel(result.time)}</span>
                         <strong>{result.from}</strong>
                         <span class="onyx-message-search__server-text">{result.text}</span>
@@ -793,105 +887,9 @@ export function MessageSearch(props: MessageSearchProps): JSX.Element {
                   )}
                 </For>
               </ul>
-            </Show>
-          </div>
-        </Show>
-        <Show when={search.serverSearchBlockedByE2ee() && search.query().trim().length > 0}>
-          <div class="onyx-message-search__history-off" role="status">
-            Encrypted DM search stays on this device. Loaded decrypted lines are searched here;
-            query text and ciphertext history are not sent to server search.
-          </div>
-        </Show>
-        <Show when={search.query().trim().length >= 2 && search.serverStatus() !== 'pending' && search.vaultStatus() !== 'pending' && search.resultCount() === 0 && search.serverResults().length === 0 && search.vaultResults().length === 0}>
-          <div class="onyx-message-search__empty" role="status">
-            <strong>No matches yet</strong>
-            <span>Try a shorter phrase, or search full server history if it’s available.</span>
-          </div>
-        </Show>
-        <Show when={search.query().trim().length >= 2}>
-          <div class="onyx-message-search__advanced">
-            <button
-              type="button"
-              class="onyx-message-search__advanced-toggle"
-              aria-expanded={advancedOpen()}
-              aria-controls="onyx-message-search-advanced"
-              onClick={() => setAdvancedOpen((open) => !open)}
-            >
-              Advanced
-            </button>
-            <Show when={advancedOpen()}>
-              <div
-                id="onyx-message-search-advanced"
-                class="onyx-message-search__recall onyx-message-search__recall--modes"
-              >
-                <ProvenanceBadge scope="device" subject="Device recall matching mode" />
-                <span class="onyx-message-search__vault-label">Device recall</span>
-                <div
-                  class="onyx-message-search__segmented"
-                  role="group"
-                  aria-label="Device recall matching mode"
-                >
-                  <For each={VAULT_MODE_OPTIONS}>
-                    {(option) => (
-                      <button
-                        type="button"
-                        class="onyx-message-search__segment"
-                        aria-pressed={search.vaultMode() === option.mode}
-                        data-mode={option.mode}
-                        data-active={search.vaultMode() === option.mode}
-                        title={option.title}
-                        onClick={() => search.setVaultMode(option.mode)}
-                      >
-                        {option.label}
-                      </button>
-                    )}
-                  </For>
-                </div>
-              </div>
-            </Show>
-          </div>
-        </Show>
-        <Show when={search.vaultResults().length > 0}>
-          <div class="onyx-message-search__vault" data-testid="vault-search">
-            <div class="onyx-message-search__vault-bar">
-              <ProvenanceBadge scope="device" subject="Device-memory message search" />
-              <span class="onyx-message-search__vault-label">
-                {search.vaultMode() === 'semantic'
-                  ? 'Related terms on this device'
-                  : search.vaultMode() === 'hybrid'
-                    ? 'Recalled on this device'
-                    : 'Saved on this device'}
-              </span>
-              <span class="onyx-message-search__server-count">
-                {search.vaultResults().length} remembered
-              </span>
             </div>
-            <ul
-              id={VAULT_RESULTS_ID}
-              class="onyx-message-search__server-list"
-              role="list"
-              aria-label="Device-memory message results"
-            >
-              <For each={search.vaultResults()}>
-                {(result) => (
-                  <li>
-                    <button
-                      type="button"
-                      class="onyx-message-search__server-row"
-                      title={`Open ${result.target} at this message`}
-                      onClick={() => search.openVaultResult(result)}
-                    >
-                      <span class="onyx-message-search__vault-target">{result.target}</span>
-                      <span class="onyx-message-search__server-when">{timeLabel(result.time)}</span>
-                      <strong>{result.from}</strong>
-                      <span class="onyx-message-search__server-text">{result.text}</span>
-                    </button>
-                  </li>
-                )}
-              </For>
-            </ul>
-          </div>
-        </Show>
+          </Show>
+        </div>
         <span id={SEARCH_HELP_ID} class="sr-only">
           Enter moves to the next visible match. Shift Enter moves to the previous match.
           Control or Command Enter searches full server history when available. Escape closes search.

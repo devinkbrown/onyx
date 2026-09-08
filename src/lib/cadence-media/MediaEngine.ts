@@ -312,6 +312,22 @@ function parseVideoJoinPayload(payload: string): VideoCaptureProfile {
 // Main engine
 // -------------------------------------------------------------------
 
+export type LocalRecordingStartResult =
+  | { started: true }
+  | { started: false; reason: 'no-media' | 'already-recording' | 'finalizing' | 'unavailable' | 'failed' };
+
+/** Local-only capture. Chunks stay with this session until the blob is consumed. */
+type LocalRecordingSession = {
+  recorder: MediaRecorder;
+  chunks: Blob[];
+  mimeType: string;
+  stopped: Promise<void>;
+  markStopped: () => void;
+  stopSettled: boolean;
+  finalize: Promise<Blob | null> | null;
+  blob: Blob | null;
+};
+
 export class CadenceMediaEngine {
   private client: IRCClient | null = null;
   private readonly cb: CadenceMediaCallbacks;
@@ -430,9 +446,8 @@ export class CadenceMediaEngine {
   private pttActive = false;
 
   /* Recording */
-  private recorder:   MediaRecorder | null = null;
-  private recChunks:  Blob[] = [];
-  private recMimeType = 'video/webm;codecs=opus';
+  private recLive: LocalRecordingSession | null = null;
+  private recFinalizing: LocalRecordingSession | null = null;
   private nearCapacityFired = false;
 
   /* Adaptive network */
@@ -1516,31 +1531,58 @@ export class CadenceMediaEngine {
       JSON.stringify({ target: targetNick, reason }));
   }
 
-  startRecording() {
-    if (this.recorder || !this.localStream) return;
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('video/webm;codecs=opus') ? 'video/webm;codecs=opus' : 'audio/webm';
-    this.recMimeType = mimeType; this.recChunks = [];
+  startRecording(): LocalRecordingStartResult {
+    if (!this.localStream) return { started: false, reason: 'no-media' };
+    if (this.recLive) return { started: false, reason: 'already-recording' };
+    // A previous capture still waiting for onstop must not mix into a new one.
+    if (this.recFinalizing && this.recFinalizing.blob == null) return { started: false, reason: 'finalizing' };
+    if (typeof MediaRecorder === 'undefined') return { started: false, reason: 'unavailable' };
+    this.recFinalizing = null;
     try {
-      this.recorder = new MediaRecorder(this.localStream, { mimeType });
-      this.recorder.ondataavailable = e => { if (e.data.size > 0) this.recChunks.push(e.data); };
-      this.recorder.start(1000);
-    } catch { this.recorder = null; return; }
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=opus') ? 'video/webm;codecs=opus' : 'audio/webm';
+      const rec = new MediaRecorder(this.localStream, { mimeType });
+      const session: LocalRecordingSession = {
+        recorder: rec,
+        chunks: [],
+        mimeType,
+        stopped: Promise.resolve(),
+        markStopped: () => {},
+        stopSettled: false,
+        finalize: null,
+        blob: null,
+      };
+      session.stopped = new Promise<void>((resolve) => {
+        session.markStopped = () => {
+          if (session.stopSettled) return;
+          session.stopSettled = true;
+          resolve();
+        };
+      });
+      const onData = (event: BlobEvent): void => {
+        if (event.data.size > 0) session.chunks.push(event.data);
+      };
+      const onStop = () => { session.markStopped(); };
+      if (typeof rec.addEventListener === 'function') {
+        rec.addEventListener('dataavailable', onData);
+        rec.addEventListener('stop', onStop);
+      } else {
+        rec.ondataavailable = onData;
+        rec.onstop = onStop;
+      }
+      rec.start(1000);
+      this.recLive = session;
+    } catch { return { started: false, reason: 'failed' }; }
     if (this.activeRoom) this.mediaframeCmd(this.activeRoom, 'RECORD_START');
+    return { started: true };
   }
 
   async stopRecording(): Promise<Blob | null> {
-    if (!this.recorder) return null;
-    return new Promise(resolve => {
-      const rec = this.recorder!;
-      rec.onstop = () => {
-        resolve(new Blob(this.recChunks, { type: this.recMimeType }));
-        this.recChunks = []; this.recorder = null;
-      };
-      rec.stop();
-      if (this.activeRoom) this.mediaframeCmd(this.activeRoom, 'RECORD_STOP');
-    });
+    const session = this.recFinalizing ?? this.recLive;
+    const blob = await this.finalizeLocalRecording(this.activeRoom);
+    if (this.recFinalizing === session) this.recFinalizing = null;
+    return blob;
   }
 
   async startScreenShare(channel?: string) {
@@ -2550,7 +2592,10 @@ export class CadenceMediaEngine {
     this.suggestedBps = 0; this.networkTier = 0; this.videoSkipCount = 0;
     this.audioQuality = AUDIO_QUALITY; this.nearCapacityFired = false;
     this.pttMode = false; this.pttActive = false;
-    if (this.recorder) { this.recorder.stop(); this.recorder = null; this.recChunks = []; }
+    // Stop the recorder now (while the stream still exists) but keep this
+    // session's chunks until stopRecording consumes the blob. Call-end must
+    // not drop the save, and must not wait for onstop before releasing media.
+    this.finalizeLocalRecording(this.activeRoom);
     if (this.unloadHandler && typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', this.unloadHandler);
       this.unloadHandler = null;
@@ -2559,6 +2604,40 @@ export class CadenceMediaEngine {
     this.releaseMedia();
     this.callState = 'idle'; this.callWith = ''; this.activeRoom = null;
     this.cb.onCallState('idle', '', null);
+  }
+
+  /** Coalesce recorder.stop; preserve chunks until the returned blob is consumed. */
+  private finalizeLocalRecording(room: string | null): Promise<Blob | null> {
+    const session = this.recFinalizing ?? this.recLive;
+    if (!session) return Promise.resolve(null);
+    if (session.finalize) return session.finalize;
+    if (this.recLive === session) this.recLive = null;
+    this.recFinalizing = session;
+    const recordRoom = room && room.length > 0 ? room : null;
+    session.finalize = (async () => {
+      const rec = session.recorder;
+      const recorderIsActive = (): boolean => rec.state !== 'inactive';
+      if (recorderIsActive()) {
+        try {
+          rec.stop();
+          // Existing mediaframeCmd default is a no-op for RECORD_STOP (no new protocol).
+          // Only emit while the captured room is still a real session.
+          if (recordRoom) this.mediaframeCmd(recordRoom, 'RECORD_STOP');
+        } catch {
+          // Lifetime onstop still wins if it is already queued. Force-complete
+          // only when stop failed while the recorder is still live, so the UI
+          // cannot hang waiting for an onstop that will never run.
+          if (!session.stopSettled && recorderIsActive()) session.markStopped();
+        }
+      }
+      await session.stopped;
+      if (!session.blob) {
+        session.blob = new Blob(session.chunks, { type: session.mimeType });
+        session.chunks.length = 0;
+      }
+      return session.blob;
+    })();
+    return session.finalize;
   }
 
   private startRingTimer(target: string) {

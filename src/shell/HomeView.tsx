@@ -32,6 +32,7 @@ export function HomeView() {
       firstHourTip={home.firstHourTip}
       formationStrip={home.formationStrip}
       isJoined={home.isJoined}
+      joinedRooms={home.joinedRooms}
       caughtUpPlan={home.caughtUpPlan}
       actions={home.actions}
     />

@@ -9,6 +9,8 @@ import { RoomInviteShare } from './RoomInviteShare';
 import { closeRoomInviteShare, openRoomInviteShare } from './roomInviteShareState';
 
 const initialState = store.getInitialState();
+const originalShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+const originalCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare');
 
 function makeChannel(name: string, topic = ''): Channel {
   return {
@@ -40,6 +42,10 @@ afterEach(() => {
   cleanup();
   closeRoomInviteShare();
   vi.restoreAllMocks();
+  if (originalShare) Object.defineProperty(navigator, 'share', originalShare);
+  else Reflect.deleteProperty(navigator, 'share');
+  if (originalCanShare) Object.defineProperty(navigator, 'canShare', originalCanShare);
+  else Reflect.deleteProperty(navigator, 'canShare');
   store.setState(initialState, true);
 });
 
@@ -52,6 +58,11 @@ describe('RoomInviteShare', () => {
     expect(screen.getByRole('group', { name: 'Invite preview' })).toHaveTextContent('#lounge');
     expect(screen.getByText('Friday hangout')).toBeInTheDocument();
     expect(screen.getByText(/Send this link/)).toBeInTheDocument();
+    expect(screen.getByText('Anyone with the link can open the invite. Room access rules still apply.')).toHaveAttribute(
+      'role',
+      'status',
+    );
+    expect(screen.queryByText(/choose to join this room/i)).toBeNull();
     expect(screen.getByText(`${window.location.origin}/invite/?join=%23lounge`)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument();
     expect(screen.queryByText(/mesh|handshake|claim path|IRC|MODE/i)).not.toBeInTheDocument();
@@ -93,6 +104,49 @@ describe('RoomInviteShare', () => {
     expect(writeClipboardText).toHaveBeenCalledWith(`${window.location.origin}/invite/?join=%23lounge`);
   });
 
+  it('mounts an empty live region before actions and retains it across success, failure, and cancellation', async () => {
+    vi.spyOn(clipboard, 'writeClipboardText')
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const share = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Share unavailable'))
+      .mockRejectedValueOnce(new DOMException('Cancelled', 'AbortError'));
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+    openRoomInviteShare('#lounge');
+    render(() => <RoomInviteShare />);
+
+    const status = screen.getByTestId('room-invite-share-status');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
+    expect(status).toBeEmptyDOMElement();
+
+    for (const result of [
+      'Invite link copied to clipboard.',
+      'Copy failed. Select and copy the link shown above.',
+      'Invite link copied to clipboard.',
+    ]) {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy link' }));
+      expect(await screen.findByText(result)).toBe(status);
+      expect(status).toBeVisible();
+      expect(status).not.toHaveClass('sr-only');
+    }
+
+    for (const result of [
+      'Invite shared.',
+      'Could not open the share sheet. Copy the link instead.',
+      'Share cancelled. The link is still available below.',
+    ]) {
+      fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+      expect(screen.getByText('Opening your device share sheet.')).toBe(status);
+      expect(await screen.findByText(result)).toBe(status);
+      expect(status).toBeVisible();
+    }
+  });
+
   it('offers native share when the browser accepts the payload', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
@@ -100,7 +154,10 @@ describe('RoomInviteShare', () => {
     openRoomInviteShare('#lounge');
     render(() => <RoomInviteShare />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    const shareButton = screen.getByRole('button', { name: 'Share' });
+    expect(shareButton).toHaveClass('onyx-button--ghost');
+    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveClass('onyx-button--primary');
+    fireEvent.click(shareButton);
 
     expect(await screen.findByText('Invite shared.')).toHaveAttribute('role', 'status');
     expect(share).toHaveBeenCalledWith(expect.objectContaining({

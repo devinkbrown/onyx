@@ -33,11 +33,37 @@ describe('setPageMeta', () => {
     expect(JSON.stringify(jsonLd)).not.toMatch(/aggregateRating/i);
   });
 
+  it('keeps the finalized Home title and share metadata aligned', () => {
+    const title = 'Onyx — good company. Great nights.';
+    setPageMeta(title, PUBLIC_HOME_DESCRIPTION, '/');
+
+    expect(document.title).toBe(title);
+    for (const selector of [
+      'meta[name="description"]',
+      'meta[property="og:description"]',
+      'meta[name="twitter:description"]',
+    ]) {
+      expect(document.querySelector(selector)?.getAttribute('content')).toBe(PUBLIC_HOME_DESCRIPTION);
+    }
+    for (const selector of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+      expect(document.querySelector(selector)?.getAttribute('content')).toBe(title);
+    }
+
+    const canonical = `${window.location.origin}/`;
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(canonical);
+    const jsonLd = JSON.parse(document.querySelector('script[data-onyx-route-jsonld]')?.textContent ?? '{}') as {
+      '@graph'?: Array<Record<string, unknown>>;
+    };
+    const webPage = (jsonLd['@graph'] ?? []).find((node) => node['@type'] === 'WebPage');
+    expect(webPage).toMatchObject({ name: title, description: PUBLIC_HOME_DESCRIPTION, url: canonical });
+  });
+
   it('keeps the Home share description in the 110–160 band with local history and no ads', () => {
     expect(PUBLIC_HOME_DESCRIPTION.length).toBeGreaterThanOrEqual(110);
     expect(PUBLIC_HOME_DESCRIPTION.length).toBeLessThanOrEqual(160);
     expect(PUBLIC_HOME_DESCRIPTION).toMatch(/400/);
     expect(PUBLIC_HOME_DESCRIPTION).toMatch(/No ads/);
+    expect(PUBLIC_HOME_DESCRIPTION).toContain('Good company. Great nights.');
     expect(PUBLIC_HOME_DESCRIPTION).not.toMatch(/fully encrypted|mesh telemetry|cloud history/i);
   });
 });

@@ -35,6 +35,7 @@ export type HomeBriefingViewProps = {
   firstHourTip: () => unknown;
   formationStrip: () => FormationStrip | null;
   isJoined: (name: string) => boolean;
+  joinedRooms: () => readonly string[];
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
 };
@@ -194,11 +195,11 @@ function CatchUpSignalStrip(props: { plan: () => CaughtUpPlan }): JSX.Element {
   return (
     <section class="home-signal-strip" data-home-band="signal" aria-label="Catch-up summary">
       <div class="home-signal-strip__lead">
-        <span class="home-signal-strip__eyebrow">Catch-up signal</span>
         <p class="home-signal-strip__headline">
-          <span class="home-signal-strip__count">{plan().rooms}</span>
+          <strong>Needs your attention</strong>
           {' '}
-          <span>
+          <span class="home-signal-strip__message">
+            <span class="home-signal-strip__count">{plan().rooms}</span>{' '}
             {plan().rooms === 1 ? 'conversation needs you' : 'conversations need you'}
           </span>
         </p>
@@ -217,9 +218,66 @@ function CatchUpSignalStrip(props: { plan: () => CaughtUpPlan }): JSX.Element {
   );
 }
 
+function HomeRoomAccess(props: {
+  joinedRooms: () => readonly string[];
+  recentRooms: () => readonly string[];
+  onOpen: (room: string) => void;
+  onJoin: (room: string) => void;
+}): JSX.Element {
+  return (
+    <Show when={props.joinedRooms().length > 0 || props.recentRooms().length > 0}>
+      <section class="home-room-access" data-home-band="room-access" aria-label="Room access">
+        <div class="home-room-access__head">
+          <h2 id="home-room-access-title">Your rooms</h2>
+          <p class="home-room-access__note">Joined and recently visited</p>
+        </div>
+        <div class="home-room-access__lists">
+          <Show when={props.joinedRooms().length > 0}>
+            <div class="home-room-access__group">
+              <h3>Joined rooms</h3>
+              <div class="home-room-access__items">
+                <For each={props.joinedRooms()}>
+                  {(room) => (
+                    <button type="button" class="home-room-access__room" onClick={() => props.onOpen(room)}>
+                      <span class="home-room-access__mark" aria-hidden="true">#</span>
+                      <span class="home-room-access__name">{room.replace(/^[#&]/, '')}</span>
+                      <span class="home-room-access__verb">Open</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+          <Show when={props.recentRooms().length > 0}>
+            <div class="home-room-access__group">
+              <h3>Recently visited</h3>
+              <div class="home-room-access__items">
+                <For each={props.recentRooms()}>
+                  {(room) => (
+                    <button type="button" class="home-room-access__room home-room-access__room--recent" onClick={() => props.onJoin(room)}>
+                      <span class="home-room-access__mark" aria-hidden="true">↗</span>
+                      <span class="home-room-access__name">{room.replace(/^[#&]/, '')}</span>
+                      <span class="home-room-access__verb">Join</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </div>
+      </section>
+    </Show>
+  );
+}
+
 export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
   const inbox = () => props.briefing().inbox;
   const title = () => inbox().empty ? 'The room is quiet.' : 'What did you miss?';
+  const quietDescription = () => props.briefing().showCaughtUpEmpty
+    ? 'Nothing needs your attention right now.'
+    : props.connectionStatus() === 'connected'
+      ? 'Find a room to join, or start one for your people.'
+      : 'Reconnect to see live rooms, or use what is saved on this device.';
   const canPointAtRooms = () =>
     typeof props.actions.openBrowseRooms === 'function'
     && typeof props.actions.openCreateRoom === 'function';
@@ -237,16 +295,117 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
           <Show when={!props.briefing().catchUpFromMemory && props.caughtUpPlan().rooms > 0}>
             <CatchUpSignalStrip plan={props.caughtUpPlan} />
           </Show>
+          <Show when={props.briefing().showCaughtUpEmpty}>
+            <p class="home-caught-up-note" role="status">Caught up in the rooms you joined.</p>
+          </Show>
         </header>
 
-        <Show when={props.formationStrip()}>
-          {(strip) => (
-            <HomeFormationStrip
-              strip={strip()}
-              onOpen={props.actions.openFormationRoom}
-              onReshare={props.actions.reshareFormation}
-            />
-          )}
+        <Show when={!inbox().empty}>
+          <section
+            class="home-inbox"
+            data-catchup-source={props.briefing().catchUpFromMemory ? 'memory' : 'live'}
+            data-home-band="inbox"
+            aria-label="Catch up on what you missed"
+          >
+            <div class="home-catchup-head">
+              <div>
+                <h2 class="home-inbox-label">Needs your attention</h2>
+                <p class="home-catchup-summary">
+                  {props.briefing().catchUpTotals.unread} unread
+                  <Show when={props.briefing().catchUpTotals.mentions > 0}>
+                    {' · '}
+                    {props.briefing().catchUpTotals.mentions} mention{props.briefing().catchUpTotals.mentions === 1 ? '' : 's'}
+                  </Show>
+                  {' · '}
+                  <span class="home-catchup-source">{props.briefing().catchUpSourceLabel}</span>
+                </p>
+              </div>
+              <Show when={!props.briefing().catchUpFromMemory}>
+                <HomeMarkCaughtUp
+                  plan={props.caughtUpPlan}
+                  onMarkCaughtUp={props.actions.markAllCaughtUp}
+                />
+              </Show>
+            </div>
+
+            <Show when={inbox().mentions.length > 0}>
+              <div
+                class="home-catchup-tier home-catchup-tier--attention"
+                data-home-stratum="attention"
+                role="group"
+                aria-label="Mentions"
+              >
+                <h2 class="home-inbox-label">Mentions</h2>
+                <ul class="home-inbox-list">
+                  <For each={inbox().mentions}>
+                    {(row) => (
+                      <InboxRow
+                        row={row}
+                        nowMs={props.nowMs()}
+                        onOpen={props.actions.openInboxRow}
+                      />
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </Show>
+
+            <Show when={inbox().missed.length > 0}>
+              <div
+                class="home-catchup-tier"
+                data-home-stratum="missed"
+                role="group"
+                aria-label="Unread rooms and messages"
+              >
+                <h2 class="home-inbox-label">Unread</h2>
+                <ul class="home-inbox-list">
+                  <For each={inbox().missed}>
+                    {(row) => (
+                      <InboxRow
+                        row={row}
+                        nowMs={props.nowMs()}
+                        onOpen={props.actions.openInboxRow}
+                      />
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </Show>
+
+            <Show when={inbox().invites.length > 0}>
+              <div
+                class="home-catchup-tier"
+                data-home-stratum="invites"
+                role="group"
+                aria-label="Room invites"
+              >
+                <h2 class="home-inbox-label">Invites</h2>
+                <ul class="home-inbox-list">
+                  <For each={inbox().invites}>
+                    {(invite) => (
+                      <InviteRow invite={invite} onOpen={props.actions.openInboxInvite} />
+                    )}
+                  </For>
+                </ul>
+              </div>
+            </Show>
+          </section>
+        </Show>
+
+        <Show when={props.briefing().resume.length > 0}>
+          <section class="home-continue" aria-label="Continue reading" data-home-band="continue">
+            <div class="home-catchup-head">
+              <h2 class="home-inbox-label">Continue reading</h2>
+              <span class="home-catchup-summary">Exact first-unread points</span>
+            </div>
+            <ul class="home-inbox-list">
+              <For each={props.briefing().resume}>
+                {(point) => (
+                  <ContinueRow point={point} nowMs={props.nowMs()} onOpen={props.actions.resumeAt} />
+                )}
+              </For>
+            </ul>
+          </section>
         </Show>
 
         <Show when={props.outboxChrome()}>
@@ -350,109 +509,14 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
           </section>
         </Show>
 
-        <Show when={!inbox().empty}>
-          <section
-            class="home-inbox"
-            data-catchup-source={props.briefing().catchUpFromMemory ? 'memory' : 'live'}
-            data-home-band="inbox"
-            aria-label="Catch up on what you missed"
-          >
-            <div class="home-catchup-head">
-              <span class="home-catchup-summary">
-                {props.briefing().catchUpTotals.unread} unread
-                <Show when={props.briefing().catchUpTotals.mentions > 0}>
-                  {' · '}
-                  {props.briefing().catchUpTotals.mentions} mention{props.briefing().catchUpTotals.mentions === 1 ? '' : 's'}
-                </Show>
-                {' · '}
-                <span class="home-catchup-source">{props.briefing().catchUpSourceLabel}</span>
-              </span>
-              <Show when={!props.briefing().catchUpFromMemory}>
-                <HomeMarkCaughtUp
-                  plan={props.caughtUpPlan}
-                  onMarkCaughtUp={props.actions.markAllCaughtUp}
-                />
-              </Show>
-            </div>
-
-            <Show when={inbox().mentions.length > 0}>
-              <div
-                class="home-catchup-tier home-catchup-tier--attention"
-                data-home-stratum="attention"
-                role="group"
-                aria-label="Mentions"
-              >
-                <h2 class="home-inbox-label">Mentions</h2>
-                <ul class="home-inbox-list">
-                  <For each={inbox().mentions}>
-                    {(row) => (
-                      <InboxRow
-                        row={row}
-                        nowMs={props.nowMs()}
-                        onOpen={props.actions.openInboxRow}
-                      />
-                    )}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-
-            <Show when={inbox().missed.length > 0}>
-              <div
-                class="home-catchup-tier"
-                data-home-stratum="missed"
-                role="group"
-                aria-label="Unread rooms and messages"
-              >
-                <h2 class="home-inbox-label">Unread</h2>
-                <ul class="home-inbox-list">
-                  <For each={inbox().missed}>
-                    {(row) => (
-                      <InboxRow
-                        row={row}
-                        nowMs={props.nowMs()}
-                        onOpen={props.actions.openInboxRow}
-                      />
-                    )}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-
-            <Show when={inbox().invites.length > 0}>
-              <div
-                class="home-catchup-tier"
-                data-home-stratum="invites"
-                role="group"
-                aria-label="Room invites"
-              >
-                <h2 class="home-inbox-label">Invites</h2>
-                <ul class="home-inbox-list">
-                  <For each={inbox().invites}>
-                    {(invite) => (
-                      <InviteRow invite={invite} onOpen={props.actions.openInboxInvite} />
-                    )}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-          </section>
-        </Show>
-
-        <Show when={props.briefing().resume.length > 0}>
-          <section class="home-continue" aria-label="Continue reading" data-home-band="continue">
-            <div class="home-catchup-head">
-              <h2 class="home-inbox-label">Continue reading</h2>
-              <span class="home-catchup-summary">Your last stopping points</span>
-            </div>
-            <ul class="home-inbox-list">
-              <For each={props.briefing().resume}>
-                {(point) => (
-                  <ContinueRow point={point} nowMs={props.nowMs()} onOpen={props.actions.resumeAt} />
-                )}
-              </For>
-            </ul>
-          </section>
+        <Show when={props.formationStrip()}>
+          {(strip) => (
+            <HomeFormationStrip
+              strip={strip()}
+              onOpen={props.actions.openFormationRoom}
+              onReshare={props.actions.reshareFormation}
+            />
+          )}
         </Show>
 
         <Show when={props.briefing().showQuietEmpty}>
@@ -461,6 +525,7 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             data-home-band="caught-up"
             aria-label="The room is quiet"
           >
+            <p class="home-empty-copy">{quietDescription()}</p>
             <Show when={canPointAtRooms()}>
               <div class="home-empty-actions" role="group" aria-label="Find or start a room">
                 <button
@@ -483,6 +548,13 @@ export function HomeBriefingView(props: HomeBriefingViewProps): JSX.Element {
             </Show>
           </section>
         </Show>
+
+        <HomeRoomAccess
+          joinedRooms={props.joinedRooms}
+          recentRooms={() => props.briefing().recentRooms}
+          onOpen={props.actions.openOrJoinActiveRoom}
+          onJoin={props.actions.joinRecentRoom}
+        />
       </div>
     </div>
   );

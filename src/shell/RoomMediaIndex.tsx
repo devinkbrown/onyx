@@ -4,9 +4,12 @@
  * Filters this-device transcript + vault. No dest unfurl, no gallery write.
  */
 
-import { createMemo, createResource, For, Show, splitProps, type JSX } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, Show, splitProps, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import { Tabs } from '@/primitives/Tabs';
+import { preferences } from '@/lib/prefs/preferences';
+import { isPreviewableUrl } from '@/lib/preview/linkPreview';
+import { unfurlPrivacyFromPrefs } from '@/lib/preview/unfurlPrivacy';
 import {
   getState,
   selectDeviceMemoryOwner,
@@ -14,6 +17,7 @@ import {
 } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
 import { loadRecentWithStatus, VAULT_KEEP, type RecentHistoryStatus } from '@/lib/vault/historyVault';
+import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import {
   ROOM_MEDIA_EMPTY,
   indexRoomMedia,
@@ -46,6 +50,40 @@ function sameOwner(
   return left?.serverUrl === right?.serverUrl && left?.identity === right?.identity;
 }
 
+function isSameOriginHttpUrl(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && parsed.username === ''
+      && parsed.password === ''
+      && parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function mediaHost(url: string): string {
+  try {
+    return new URL(url).hostname || 'external host';
+  } catch {
+    return 'external host';
+  }
+}
+
+function mediaScopeKey(
+  open: boolean,
+  target: string,
+  owner: ReturnType<typeof selectDeviceMemoryOwner>,
+): string {
+  return [
+    open ? 'open' : 'closed',
+    target,
+    owner?.serverUrl ?? '',
+    owner?.identity ?? '',
+  ].join('\u0000');
+}
+
 export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
   const [local] = splitProps(props, ['target', 'open', 'onOpenChange']);
 
@@ -63,6 +101,7 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
   });
 
   const memoryOwner = useStore(selectDeviceMemoryOwner, sameOwner);
+  const scopeKey = createMemo(() => mediaScopeKey(local.open, local.target, memoryOwner()));
 
   const [vaultResult, { refetch: retryVault }] = createResource(
     () => ({
@@ -107,6 +146,14 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
       closeLabel="Close pictures, files, and links"
     >
       <div class="room-media-index" data-testid="room-media-index">
+        <div class="room-media-index-context" data-testid="room-media-index-context">
+          <div class="room-media-index-context-copy">
+            <span class="room-media-index-context-kicker">Conversation media</span>
+            {' '}
+            <strong dir="auto">{local.target}</strong>
+          </div>
+          <ProvenanceBadge scope="device" subject="Conversation media index" />
+        </div>
         <Tabs defaultValue="pictures">
           <Tabs.List class="room-media-index-filters" aria-label="Pictures, files, and links">
             <For each={FILTERS}>
@@ -135,7 +182,11 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
           </Show>
           <For each={FILTERS}>
             {(filter) => (
-              <Tabs.Content class="room-media-index-panel" value={filter.id}>
+              <Tabs.Content
+                class="room-media-index-panel"
+                value={filter.id}
+                data-media-filter={filter.id}
+              >
                   <ul class="room-media-index-list" aria-label={`${filter.label} in this conversation`}>
                       <For each={itemsForFilter(index(), filter.id)}>
                         {(item) => (
@@ -144,6 +195,7 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
                               <PictureRow
                                 item={item as RoomMediaPicture}
                                 onJump={jumpTo}
+                                scopeKey={scopeKey()}
                               />
                             </Show>
                             <Show when={item.kind === 'file'}>
@@ -171,23 +223,98 @@ export function RoomMediaIndex(props: RoomMediaIndexProps): JSX.Element {
 function PictureRow(props: {
   item: RoomMediaPicture;
   onJump: (messageId: string) => void;
+  scopeKey: string;
 }): JSX.Element {
-  const [local] = splitProps(props, ['item', 'onJump']);
+  const [local] = splitProps(props, ['item', 'onJump', 'scopeKey']);
   const label = createMemo(() => local.item.name ?? 'Picture');
+  const [previewFailed, setPreviewFailed] = createSignal(false);
+  const [externalAllowed, setExternalAllowed] = createSignal(false);
+
+  // Match MessageText's media boundary: same-origin resources are safe to
+  // render locally, while public resources must pass the current unfurl
+  // policy and remain inert until this picture gets its own consent.
+  const sameOrigin = createMemo(() => isSameOriginHttpUrl(local.item.href));
+  const privacy = createMemo(() => unfurlPrivacyFromPrefs(preferences()));
+  const safeHref = createMemo(() => {
+    const href = local.item.href;
+    const currentPrivacy = privacy();
+    if (!currentPrivacy.linkPreviews) return null;
+    return sameOrigin() || isPreviewableUrl(href, currentPrivacy) ? href : null;
+  });
+  const allowedHref = createMemo(() => {
+    const href = safeHref();
+    return href && (sameOrigin() || externalAllowed()) ? href : null;
+  });
+
+  let observedItem = '';
+  createEffect(() => {
+    const nextItem = `${local.scopeKey}\u0000${local.item.id}\u0000${local.item.href}\u0000${JSON.stringify(privacy())}`;
+    if (nextItem === observedItem) return;
+    observedItem = nextItem;
+    setPreviewFailed(false);
+    setExternalAllowed(false);
+  });
 
   return (
-    <button
-      type="button"
-      class="room-media-index-row"
-      aria-label={`Jump to picture ${label()}`}
-      onClick={() => local.onJump(local.item.messageId)}
+    <div
+      class="room-media-index-row room-media-index-row--picture"
     >
-      <span class="room-media-index-squircle" aria-hidden="true" />
+      <span
+        class="room-media-index-picture-frame"
+        data-preview-state={previewFailed() ? 'unavailable' : 'available'}
+      >
+        <Show
+          when={allowedHref()}
+          fallback={(
+            <Show
+              when={safeHref() && !sameOrigin()}
+              fallback={<span class="room-media-index-picture-fallback">Preview unavailable</span>}
+            >
+              <button
+                type="button"
+                class="room-media-index-jump room-media-index-picture-load"
+                aria-label={`Load external picture from ${mediaHost(local.item.href)}`}
+                onClick={() => setExternalAllowed(true)}
+              >
+                Load picture
+              </button>
+            </Show>
+          )}
+        >
+          {(href) => (
+            <Show
+              when={!previewFailed()}
+              fallback={<span class="room-media-index-picture-fallback">Preview unavailable</span>}
+            >
+              <img
+                src={href()}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                onError={() => setPreviewFailed(true)}
+              />
+            </Show>
+          )}
+        </Show>
+      </span>
       <span class="room-media-index-copy">
         <span class="room-media-index-title" title={label()}>{label()}</span>
-        <span class="room-media-index-meta">{local.item.from}</span>
+        <span class="room-media-index-meta">
+          <span>{local.item.from}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{local.item.sizeLabel ?? 'Size not recorded'}</span>
+        </span>
       </span>
-    </button>
+      <button
+        type="button"
+        class="room-media-index-jump"
+        aria-label={`Jump to picture ${label()}`}
+        onClick={() => local.onJump(local.item.messageId)}
+      >
+        Jump
+      </button>
+    </div>
   );
 }
 
@@ -201,7 +328,7 @@ function FileRow(props: {
   return (
     <button
       type="button"
-      class="room-media-index-row"
+      class="room-media-index-row room-media-index-row--file"
       aria-label={`Jump to file ${label()}`}
       onClick={() => local.onJump(local.item.messageId)}
     >
@@ -209,7 +336,9 @@ function FileRow(props: {
       <span class="room-media-index-copy">
         <span class="room-media-index-title" title={label()}>{label()}</span>
         <span class="room-media-index-meta">
-          {local.item.sizeLabel ?? local.item.from}
+          <span>{local.item.from}</span>
+          <span aria-hidden="true"> · </span>
+          <span>{local.item.sizeLabel ?? 'Size not recorded'}</span>
         </span>
       </span>
     </button>
@@ -234,7 +363,11 @@ function LinkRow(props: {
       >
         <span class="room-media-index-copy">
           <span class="room-media-index-title">{local.item.domain}</span>
-          <span class="room-media-index-meta" dir="auto">{local.item.href}</span>
+          <span class="room-media-index-meta" dir="auto">
+            <span>{local.item.href}</span>
+            <span aria-hidden="true"> · </span>
+            <span>{local.item.from}</span>
+          </span>
         </span>
       </a>
       <button

@@ -426,6 +426,18 @@ describe('voice overlays', () => {
     expect(screen.queryByTestId('voice-pip')).toBeNull();
   });
 
+  it('suppresses the duplicate PIP when AppShell owns the active call surface', () => {
+    store.setState({
+      activeView: { kind: 'channel', channel: '#general' },
+      ourNick: 'onyx',
+    });
+    store.getState().setVoiceCallState({ callState: 'in_call', callChannel: '#voice' });
+
+    render(() => <VoicePip activeSurface="calls" />);
+
+    expect(screen.queryByTestId('voice-pip')).toBeNull();
+  });
+
   it('migrates a valid legacy PIP position into the onyx namespace', () => {
     window.localStorage.setItem(
       LEGACY_VOICE_PIP_POSITION_STORAGE_KEY,

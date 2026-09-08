@@ -258,10 +258,24 @@
    selected states. */
 
 .pref-panel {
+  --pref-text: var(--ui-text-primary, var(--paper));
+  --pref-muted: var(--ui-text-secondary, var(--paper-dim));
+  --pref-faint: var(--ui-text-muted, var(--paper-mute));
+  --pref-line: var(--ui-surface-line, var(--line));
+  --pref-line-faint: var(--ui-surface-line-faint, var(--seam-faint));
+  --pref-raised: var(--ui-surface-raised, var(--stone-2));
+  --pref-action: var(--ui-action-primary, var(--lapis));
+  --pref-action-ink: var(--ui-text-on-action, var(--on-accent));
+  --pref-danger: var(--ui-status-danger, var(--danger));
+  --pref-success: var(--ui-status-success, var(--ok, var(--lapis-bright)));
+  --pref-warning: var(--ui-status-warning, var(--warn));
+  --pref-focus: var(--ui-border-focus, var(--lapis-bright));
   display: grid;
-  grid-template-columns: minmax(9rem, 11rem) minmax(0, 1fr);
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
   align-items: start;
   gap: clamp(var(--space-4), 4vw, var(--space-7));
+  color: var(--pref-text);
+  font-family: var(--font-sans);
 }
 
 .onyx-sheet:has(.pref-panel) .onyx-sheet__panel {
@@ -282,21 +296,13 @@
   gap: var(--space-2);
 }
 
-.pref-category-nav__eyebrow {
-  margin: 0;
-  color: var(--paper-mute);
-  font: 700 0.64rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .pref-category-tabs {
   display: grid;
   gap: 3px;
   min-width: 0;
   max-width: 100%;
   padding-left: var(--space-2);
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--pref-line);
 }
 
 .pref-reset-all {
@@ -313,11 +319,12 @@
   gap: 2px;
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   background: transparent;
-  color: var(--paper-dim);
+  color: var(--pref-muted);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -333,62 +340,61 @@
 }
 
 .pref-category-tab:hover {
-  color: var(--paper);
-  background: color-mix(in oklab, var(--lapis) 10%, transparent);
+  color: var(--pref-text);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--pref-action) 10%, transparent));
 }
 
 .pref-category-tab:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--pref-focus);
   outline-offset: 2px;
 }
 
 .pref-category-tab[aria-selected='true'] {
-  color: var(--paper);
-  background: color-mix(in oklab, var(--lapis) 19%, transparent);
+  color: var(--pref-text);
+  background: var(--ui-surface-selected, color-mix(in oklab, var(--pref-action) 16%, transparent));
 }
 
 .pref-category-tab[aria-selected='true']::before {
-  background: var(--lapis-bright);
+  background: var(--pref-action);
 }
 
 .pref-category-tab__label {
-  font-size: 0.82rem;
-  font-weight: 720;
+  font-size: 1rem;
+  font-weight: 650;
   line-height: 1.25;
 }
 
 .pref-category-tab__summary {
-  color: var(--paper-mute);
-  font: 0.64rem/1.35 var(--font-mono);
+  color: var(--pref-faint);
+  font: 0.8125rem/1.35 var(--font-sans);
 }
 
 .pref-category-content {
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-/* Keep the current category and persistence scope visible while the sheet's
-   many controls progressively disclose their own detail. */
-.pref-context-cue {
+.pref-save-status {
   grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
-  background: color-mix(in oklab, var(--lapis) 7%, transparent);
-  color: var(--paper-mute);
-  font-size: 0.75rem;
-  line-height: 1.4;
+  min-height: 1.45em;
+  color: var(--pref-muted);
+  font-size: 1rem;
+  line-height: 1.45;
 }
 
-.pref-context-cue > span {
-  color: var(--paper);
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.pref-save-status[data-state='pending'] {
+  color: var(--pref-warning);
+}
+
+.pref-save-status[data-state='saved'] {
+  color: var(--pref-success);
+}
+
+.pref-save-status[data-state='unavailable'] {
+  color: var(--pref-danger);
 }
 
 .pref-category-panel {
@@ -413,9 +419,9 @@
   gap: var(--space-3);
   min-width: 0;
   padding: var(--space-2);
-  border: 1px solid color-mix(in oklab, var(--lapis-bright) 22%, var(--line));
+  border: 1px solid var(--pref-line-faint);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--ink) 40%, transparent);
+  background: transparent;
 }
 
 .pref-transfer-tools {
@@ -423,12 +429,10 @@
   padding: var(--space-2) 0 var(--space-2) var(--space-1);
 }
 
-.pref-transfer-tools__eyebrow {
-  margin: 0 0 var(--space-2) var(--space-2);
-  color: var(--lapis-bright);
-  font: 700 0.6rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.pref-transfer-tools__title {
+  margin: 0 0 var(--space-2);
+  color: var(--pref-text);
+  font: 650 1rem/1.3 var(--font-sans);
 }
 
 .pref-transfer-tools__list {
@@ -445,11 +449,12 @@
   gap: 2px;
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   padding: var(--space-2);
   border: 0;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
   background: transparent;
-  color: var(--paper-dim);
+  color: var(--pref-muted);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -555,15 +560,6 @@
     padding: var(--space-1);
   }
 
-  .pref-transfer-tools__eyebrow {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
   .pref-transfer-tools__list {
     display: flex;
     gap: var(--space-1);
@@ -632,6 +628,12 @@
     gap: var(--space-4);
   }
 
+  .pref-category-content {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
   .pref-category-nav {
     position: sticky;
     top: 0;
@@ -643,23 +645,15 @@
     background: color-mix(in oklab, var(--ink) 98%, transparent);
   }
 
-  .pref-category-nav__eyebrow {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
   .pref-category-tabs {
     display: flex;
     gap: var(--space-1);
     overflow-x: auto;
-    padding: 0 0 var(--space-1);
+    padding: 0 4px var(--space-1);
     border-left: 0;
     overscroll-behavior-inline: contain;
     scroll-snap-type: inline proximity;
+    scroll-padding-inline: 4px;
     scrollbar-width: thin;
   }
 
@@ -675,7 +669,7 @@
   .pref-category-tab {
     flex: 0 0 auto;
     width: auto;
-    max-width: 100%;
+    max-width: calc(100% - 4px);
     min-height: 2.75rem;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--line);
@@ -690,8 +684,9 @@
   }
 
   .pref-category-tab[aria-selected='true'] {
-    border-color: color-mix(in oklab, var(--lapis-bright) 68%, var(--line));
-    background: color-mix(in oklab, var(--lapis) 24%, var(--ink));
+    border-color: var(--pref-action);
+    color: var(--pref-action-ink);
+    background: var(--pref-action);
   }
 
   .pref-category-tab__summary {
@@ -741,15 +736,9 @@
     gap: 8px;
   }
 
-  .pref-context-cue {
-    gap: 4px;
-    padding: 4px 8px;
+  .pref-save-status {
     font-size: 14px;
-    line-height: 1.3;
-  }
-
-  .pref-context-cue > span {
-    font-size: 12px;
+    line-height: 1.4;
   }
 
   .pref-category-nav {
@@ -762,7 +751,7 @@
   .pref-category-tabs {
     align-items: stretch;
     gap: 4px;
-    padding: 0;
+    padding: 0 4px;
     scroll-padding-inline: 4px;
   }
 
@@ -810,12 +799,11 @@
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--paper);
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--pref-text);
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: 0;
 }
 
 .pref-group-head {
@@ -836,20 +824,18 @@
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--paper-dim);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--pref-text);
 }
 
 .pref-desc {
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
+  font-size: 1rem;
+  line-height: 1.5;
   overflow-wrap: anywhere;
-  color: var(--paper-mute);
+  color: var(--pref-muted);
 }
 
 .pref-discord-bot-steps {
@@ -859,21 +845,21 @@
 
 .pref-more {
   margin-top: var(--space-3);
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--pref-line-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 32%, transparent);
+  background: transparent;
 }
 
 .pref-more > summary {
   min-height: 44px;
   padding: 10px 12px;
   cursor: pointer;
-  font: 650 0.85rem var(--font-sans);
-  color: var(--paper);
+  font: 650 1rem var(--font-sans);
+  color: var(--pref-text);
 }
 
 .pref-more[open] > summary {
-  border-bottom: 1px solid var(--seam-faint);
+  border-bottom: 1px solid var(--pref-line-faint);
 }
 
 .pref-action-card {
@@ -883,23 +869,22 @@
   width: 100%;
   min-height: 52px;
   padding: var(--space-3);
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--pref-line-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 48%, transparent);
-  color: var(--paper);
+  background: transparent;
+  color: var(--pref-text);
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
 .pref-action-card:hover {
-  border-color: color-mix(in oklab, var(--lapis-bright) 45%, var(--line));
-  background: color-mix(in oklab, var(--ink) 54%, transparent);
+  border-color: var(--pref-line);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--pref-action) 8%, transparent));
 }
 
 .pref-action-card:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--pref-focus);
   outline-offset: 2px;
 }
 
@@ -909,9 +894,9 @@
   flex: none;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--pref-line);
   border-radius: 4px;
-  color: var(--lapis-bright);
+  color: var(--pref-action);
   font-size: 1rem;
 }
 
@@ -923,9 +908,9 @@
 
 .pref-action-card__title {
   overflow-wrap: anywhere;
-  color: var(--paper);
-  font-size: 0.9rem;
-  font-weight: 700;
+  color: var(--pref-text);
+  font-size: 1rem;
+  font-weight: 650;
 }
 
 /* Segmented control — a row of mutually-exclusive options. */
@@ -934,41 +919,41 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--pref-line);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--ink) 45%, transparent);
+  background: transparent;
 }
 
 .pref-segment {
   flex: 1 1 5rem;
   min-width: min(100%, 5rem);
+  min-height: 44px;
   appearance: none;
   cursor: pointer;
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--paper-dim);
+  color: var(--pref-muted);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 1rem;
   letter-spacing: 0.01em;
   overflow-wrap: anywhere;
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 .pref-segment:hover {
-  color: var(--paper);
-  background: color-mix(in oklab, var(--lapis) 12%, transparent);
+  color: var(--pref-text);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--pref-action) 10%, transparent));
 }
 
 .pref-segment:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--pref-focus);
   outline-offset: 2px;
 }
 
 .pref-segment[aria-checked='true'] {
-  color: var(--ink);
-  background: var(--lapis-bright);
+  color: var(--pref-action-ink);
+  background: var(--pref-action);
   font-weight: 700;
 }
 
@@ -1000,20 +985,20 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
+  min-height: 44px;
   appearance: none;
   cursor: pointer;
   padding: var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--pref-line);
   border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--ink) 45%, transparent);
-  color: var(--paper);
+  background: transparent;
+  color: var(--pref-text);
   font: inherit;
   text-align: left;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
 .pref-toggle:not(:disabled):hover {
-  border-color: var(--seam);
+  border-color: var(--pref-line);
 }
 
 .pref-toggle:disabled {
@@ -1022,7 +1007,7 @@
 }
 
 .pref-toggle:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--pref-focus);
   outline-offset: 2px;
 }
 
@@ -1034,7 +1019,7 @@
 }
 
 .pref-toggle-title {
-  font-size: 0.86rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -1061,35 +1046,35 @@
 }
 
 .pref-toggle[aria-checked='true'] .pref-switch {
-  background: var(--lapis-bright);
+  background: var(--pref-action);
 }
 
 .pref-toggle[aria-checked='true'] .pref-switch::after {
   transform: translateX(16px);
-  background: var(--ink);
+  background: var(--pref-action-ink);
 }
 
 .pref-reset {
   align-self: flex-start;
   appearance: none;
   cursor: pointer;
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--pref-line);
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--paper-dim);
+  color: var(--pref-muted);
   font: inherit;
-  font-size: 0.8rem;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  font-size: 1rem;
 }
 
 .pref-reset:hover {
-  color: var(--paper);
-  border-color: var(--seam);
+  color: var(--pref-text);
+  border-color: var(--pref-line);
 }
 
 .pref-reset:focus-visible {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--pref-focus);
   outline-offset: 2px;
 }
 
@@ -1100,13 +1085,13 @@
 }
 
 .pref-reset--danger {
-  color: var(--danger);
-  border-color: color-mix(in oklab, var(--danger) 45%, var(--line));
+  color: var(--pref-danger);
+  border-color: color-mix(in oklab, var(--pref-danger) 45%, var(--pref-line));
 }
 
 .pref-reset--danger:hover {
-  color: var(--danger);
-  border-color: var(--danger);
+  color: var(--pref-danger);
+  border-color: var(--pref-danger);
 }
 
 .pref-clear-history__actions {
@@ -1196,14 +1181,14 @@
 
 .pref-status {
   margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.35;
+  font-size: 1rem;
+  line-height: 1.45;
   overflow-wrap: anywhere;
-  color: var(--lapis-bright);
+  color: var(--pref-success);
 }
 
 .pref-status--error {
-  color: color-mix(in oklab, var(--danger) 72%, var(--paper));
+  color: var(--pref-danger);
 }
 
 .pref-count {

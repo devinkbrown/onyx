@@ -1,6 +1,6 @@
 /* ── Onyx AppShell — quiet threshold × terminal ──────────────────────────────
-   Layout: CSS grid — [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
-   PresenceRibbon spans the top of the conversation column.
+   Layout: CSS grid — [ global top bar / collection sidebar / conversation / details ]
+   ServerRail owns the global top bar; PresenceRibbon owns the room header.
    Background canvas is fixed at page layer 0; shell chrome sits at layer 1.
    Matte surfaces, fine borders, quiet cyan signal — no decorative drift/glow.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -10,10 +10,10 @@
   position: relative;
   z-index: 1;
   isolation: isolate;
-  /* Commercial product rail (was 224px power-user). Mobile drawer overrides
-     width independently at the max-width:900px breakpoint. */
-  --shell-rail-w: 72px;
-  --shell-sidebar-w: 304px;
+  /* Astra shell: the product bar spans the first row and one collection column
+     anchors the second. Mobile drawer rules override the sidebar independently. */
+  --shell-rail-w: 0px;
+  --shell-sidebar-w: 256px;
   /* Column 4 is a single-occupant slot: exactly one of the member roster or
      the Context rail may claim it at a time. `data-shell-aside` on this root
      ("members" | "context" | "none" — see AppShell.tsx's asideOccupant memo)
@@ -36,24 +36,21 @@
      selectors on the same element can never fight over a literal track
      list. */
   grid-template-columns:
-    var(--shell-rail-w)
     var(--shell-sidebar-w)
-    1fr
+    minmax(0, 1fr)
     var(--shell-aside-w);
   /* minmax(0, 1fr): plain `1fr` is minmax(auto, 1fr), so a dense nicklist (or
      long sidebar/feed) could inflate the row past 100svh and clip under
      overflow:hidden instead of scrolling inside its column. */
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
   height: 100svh;
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--paper);
-  /* Hard product strata sit on opaque chrome; keep only a faint canvas wash so
-     the page-layer Background still breathes without softening column planes. */
-  background: color-mix(in oklab, var(--ink) 72%, transparent);
-  /* Chat column veil — shared by conversation, ribbon, composer so scenes show through. */
-  --shell-chat-veil: color-mix(in oklab, var(--ink) 38%, transparent);
-  --shell-chat-chrome-veil: color-mix(in oklab, var(--ink) 55%, transparent);
+  /* Matte product strata: the default chat never inherits a scene wash. */
+  background: var(--ink);
+  --shell-chat-veil: var(--ink);
+  --shell-chat-chrome-veil: var(--stone);
 }
 
 /* Reduce transparency: opt out of the veil (and the canvas wash above) at their
@@ -136,47 +133,58 @@
 
 /* ── Server rail ── */
 .shell-rail {
-  grid-column: 1;
+  grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  padding: 10px 0 12px;
-  background: color-mix(in oklab, var(--stone) 42%, var(--ink));
-  border-right: 1px solid var(--seam);
+  gap: 10px;
+  min-width: 0;
+  min-height: 56px;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--stone);
+  border-right: 0;
+  border-bottom: 1px solid var(--seam);
   overflow: hidden;
-  width: var(--shell-rail-w, 72px);
+  width: auto;
 }
 
 .shell-rail-sep {
-  width: 28px;
-  height: 1px;
-  margin: 4px auto;
+  width: 1px;
+  height: 24px;
+  margin: 0 2px;
   background: var(--seam-faint);
+  flex: none;
 }
 
 /* Atlas product dock: destinations live beside the network mark, leaving the
    personal rail for conversations rather than a second global nav. */
 .shell-rail .shell-primary-nav {
-  width: 100%;
-  display: grid;
-  gap: 6px;
-  padding: 2px 10px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
   border: 0;
 }
 .shell-rail .shell-primary-nav-context { display: none; }
 .shell-rail .shell-primary-nav-btn {
-  display: grid;
-  grid-template-columns: 1fr;
-  place-items: center;
-  gap: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   min-height: 44px;
-  padding: 5px 2px;
-  border-radius: var(--r-md);
-  font-size: var(--text-2xs);
-  text-align: center;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  font-size: 0.84rem;
+  white-space: nowrap;
+  text-align: left;
 }
-.shell-rail .shell-primary-nav-icon { min-width: 0; font-size: 0.9rem; }
+.shell-rail .shell-primary-nav-icon { min-width: 20px; font-size: 0.95rem; }
+.shell-rail > .shell-rail-entry--active::before { display: none; }
 
 .shell-rail-entry {
   position: relative;
@@ -297,9 +305,10 @@
 }
 
 .shell-rail-bottom {
-  margin-top: auto;
+  margin-top: 0;
+  margin-left: auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
 }
@@ -313,14 +322,22 @@
 }
 
 .shell-sidebar {
-  grid-column: 2;
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
-  background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+  min-width: 0;
+  min-height: 0;
+  background: var(--stone);
   border-right: 1px solid var(--seam);
   overflow: hidden;
   overflow: clip;
 }
+
+/* Primary destinations live in the global top bar. Keep the component mounted
+   for standalone ChannelSidebar hosts and direct a11y tests, but remove the
+   duplicate visual dock from the connected shell. */
+.shell .shell-sidebar > .shell-primary-nav { display: none; }
 
 .shell-sidebar-head {
   display: flex;
@@ -1279,7 +1296,8 @@
 
 /* ── Conversation column ── */
 .shell-conversation {
-  grid-column: 3;
+  grid-column: 2;
+  grid-row: 2;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1297,14 +1315,19 @@
 }
 
 .shell-room-current__context {
-  margin-left: auto;
-  min-height: 28px;
-  padding: 3px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: var(--space-1);
+  margin: 0;
+  min-height: var(--target-min, 44px);
+  padding: 0 var(--space-2);
   border: 1px solid var(--seam-faint);
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--paper-dim);
-  font: inherit;
+  font: 650 var(--text-xs)/1 var(--font-sans);
   cursor: pointer;
 }
 .shell-room-current__context:hover { color: var(--paper); border-color: var(--seam); }
@@ -1312,12 +1335,13 @@
 /* Context is an opt-in desktop rail. It does not compete with the initial
    reading canvas, and replaces (rather than overlays) the member rail. */
 .shell-context-rail {
-  grid-column: 4;
+  grid-column: 3;
+  grid-row: 2;
   display: none;
   min-width: 0;
   overflow: auto;
   padding: var(--space-4);
-  background: color-mix(in oklab, var(--surface-face) 92%, var(--ink));
+  background: var(--surface-raised, var(--stone-2));
   border-left: 1px solid var(--seam-faint);
 }
 /* Breakpoint-scoped, not just attribute-gated: a bare `.shell[data-shell-aside=
@@ -1378,18 +1402,9 @@
   display: none;
 }
 
-/* The room-current host is also the desktop Context entry point. Keep it in
-   the ribbon's corner so the control remains discoverable without consuming a
-   fourth grid column before the rail is opened. */
-@media (min-width: 901px) {
-  .shell-room-current {
-    display: block;
-    position: absolute;
-    top: 56px;
-    right: var(--space-3);
-    z-index: 4;
-  }
-}
+/* The orientation note travels with the ribbon, but never takes layout space.
+   The visible Context disclosure is a sibling action in the same header flow. */
+.shell-ribbon-inner > .shell-room-current { display: block; }
 .shell-room-current__kicker {
   flex: 0 0 auto;
   color: var(--paper-mute);
@@ -1465,49 +1480,23 @@
   padding: 0 clamp(12px, 1.8vw, 20px);
   /* Commercial header budget — 56px desktop, primary Call/People/More ≥40px. */
   height: 56px;
-  background: var(--shell-chat-chrome-veil);
+  background: var(--stone);
   border-bottom: 1px solid var(--seam);
   overflow: hidden;
 }
 
 .shell[data-room-identity] .shell-ribbon {
-  background: color-mix(in oklab, var(--room-accent-wash) 22%, var(--ink));
-  border-bottom-color: var(--room-accent-border);
-  box-shadow: inset 0 -1px 0 var(--room-accent-soft);
+  background: var(--stone);
+  border-bottom-color: var(--seam);
+  box-shadow: none;
 }
 
 .shell-ribbon::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklab, var(--lapis) 18%, transparent) 14%,
-    var(--seam) 34%,
-    var(--lapis-bright) 52%,
-    var(--seam) 70%,
-    color-mix(in oklab, var(--lapis) 16%, transparent) 88%,
-    transparent 100%
-  );
-  opacity: 0.72;
-  pointer-events: none;
+  display: none;
 }
 
 .shell[data-room-identity] .shell-ribbon::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in oklab, var(--room-accent) 30%, transparent) 18%,
-    var(--room-accent-border) 42%,
-    var(--room-accent-strong) 56%,
-    var(--room-accent-border) 72%,
-    transparent 100%
-  );
-  opacity: 0.9;
+  display: none;
 }
 
 /* Inner row carries the reading measure; the ribbon itself stays full-bleed
@@ -1606,6 +1595,7 @@
   gap: var(--gap-tight);
   flex: none;
   margin-left: auto;
+  min-width: 0;
 }
 
 /* A cluster of same-scope controls sits tight; the divider does the separating. */
@@ -2963,9 +2953,7 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  /* No opaque base — the translucent .shell-conversation veil behind this is the
-     legibility layer, so the feed lets the background canvas read through. */
-  background: transparent;
+  background: var(--ink);
 }
 
 /* Visually hidden — MessageView keeps the current-conversation receipt for AT.
@@ -3019,6 +3007,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  min-width: 0;
   overscroll-behavior: contain;
   padding: var(--space-3) 0 var(--space-2);
   scrollbar-width: thin;
@@ -3427,10 +3416,10 @@
 .shell-msg-group {
   position: relative;
   display: grid;
-  grid-template-columns: 40px 1fr;
+  grid-template-columns: 40px minmax(0, 1fr);
   gap: 0 var(--space-3);
-  padding: var(--space-2) var(--space-5) var(--space-1);
-  margin-top: var(--space-4);
+  padding: var(--space-1) var(--space-4);
+  margin-top: 0.75rem;
   max-width: var(--shell-measure);
   margin-inline: auto;
   border-radius: var(--r-sm);
@@ -3475,10 +3464,16 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 2px;
   margin-bottom: var(--space-1);
 }
 
 .shell-msg-author {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   font-weight: 600;
@@ -3493,7 +3488,10 @@
   font-size: var(--text-2xs);
   color: var(--paper-dim);
   letter-spacing: 0.04em;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   opacity: 0.85;
 }
 
@@ -3586,6 +3584,7 @@
   color: var(--paper);
   word-break: break-word;
   overflow-wrap: break-word;
+  min-width: 0;
 }
 
 /* Links surface as bioluminescent crest — the brightest blue, clearly tappable,
@@ -3646,9 +3645,9 @@
 .shell-msg-cont {
   position: relative; /* anchor for the per-message action bar (.msg-menu) */
   display: grid;
-  grid-template-columns: 40px 1fr;
+  grid-template-columns: 40px minmax(0, 1fr);
   gap: 0 var(--space-3);
-  padding: 2px var(--space-5);
+  padding: 2px var(--space-4);
   max-width: var(--shell-measure);
   margin-inline: auto;
   border-radius: var(--r-sm);
@@ -3667,6 +3666,9 @@
   letter-spacing: 0.04em;
   text-align: right;
   padding-right: 2px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
@@ -4309,7 +4311,7 @@
   position: relative;
   flex: none;
   padding: var(--space-2) var(--space-3) var(--space-3);
-  background: var(--shell-chat-chrome-veil);
+  background: var(--stone);
   border-top: 1px solid var(--seam);
 }
 
@@ -4893,7 +4895,7 @@
   min-width: 0;
   min-height: 48px;
   padding: 4px;
-  background: color-mix(in oklab, var(--ink) 82%, var(--stone-2));
+  background: var(--stone-2);
   border: 1px solid var(--seam);
   border-radius: var(--composer-radius, var(--r-lg));
   box-shadow: none;
@@ -4910,8 +4912,8 @@
 /* Focus ring stays inset — no outer bloom around the composer field. */
 .shell-composer-inner:focus-within {
   border-color: var(--lapis);
-  background: color-mix(in oklab, var(--ink) 62%, var(--stone-2));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lapis) 40%, transparent);
+  background: var(--stone-2);
+  box-shadow: none;
 }
 
 .shell-composer-textarea {
@@ -5147,12 +5149,12 @@
 .shell-composer-send:not(:disabled) {
   color: var(--on-accent);
   border-color: transparent;
-  background: var(--lapis);
+  background: var(--commercial-action-primary, #ff987d);
   box-shadow: none;
 }
 
 .shell-composer-send:hover:not(:disabled) {
-  background: var(--lapis-bright);
+  background: color-mix(in oklab, var(--commercial-action-primary, #ff987d) 86%, white);
   color: var(--ink);
   box-shadow: none;
 }
@@ -5267,13 +5269,14 @@
 
 /* ── Member list ── */
 .shell-members {
-  grid-column: 4;
+  grid-column: 3;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   /* Allow the grid item to shrink below content height so .shell-members-scroll
      owns overflow for dense rosters (grid default min-height:auto prevents it). */
   min-height: 0;
-  background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+  background: var(--surface-raised, var(--stone-2));
   border-left: 1px solid var(--seam);
   overflow: hidden;
   overflow: clip;
@@ -6145,9 +6148,8 @@
     --mnav-h: max(56px, 2.25rem);
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr);
-    /* Sit above the fixed bottom tab bar; clear the notch up top.
-       Transparent so the page-layer scene is the harbor, not a second ink void. */
-    background: transparent;
+    /* Sit above the fixed bottom tab bar; clear the notch up top. */
+    background: var(--ink);
     height: calc(
       100svh
       - var(--mnav-h)
@@ -6162,10 +6164,6 @@
   /* The fixed bottom rail already owns these five destinations on mobile.
      Repeating them inside the room drawer wastes most of a zoomed viewport. */
   .shell-sidebar .shell-primary-nav { display: none; }
-
-  .shell-room-current {
-    display: none;
-  }
 
   /* Channel drawer — slides in from the left, stops above the tab bar */
   .shell-sidebar {
@@ -6188,7 +6186,7 @@
     grid-column: unset;
     border-right: 1px solid var(--seam);
     border-radius: 0 var(--r-lg) var(--r-lg) 0;
-    background: color-mix(in oklab, var(--ink) 96%, var(--stone));
+    background: var(--stone);
     box-shadow: none;
   }
   /* Off-canvas is not enough for keyboard/AT: remove the closed drawer from
@@ -6272,24 +6270,25 @@
   }
   .shell-members:not(.shell-members--hidden) { transform: translateX(0); }
 
-  .shell-conversation {
+  /* The phone shell has one explicit content row. Keep the conversation in
+     that row even when its Home child is conditionally mounted; otherwise the
+     desktop grid-row: 2 declaration creates a zero-height implicit row and
+     Home paints into the blank track. */
+  .shell > .shell-conversation {
     grid-column: 1;
+    grid-row: 1;
     margin: 0;
     border: 0;
     border-radius: 0;
     box-shadow: none;
     min-width: 0;
-    /* Reading plane over the harbor — translucent enough that Adaptive-still
-       and Animated scenes remain visible atmosphere, not a second ink void. */
-    background: color-mix(in oklab, var(--ink) 38%, transparent);
+    background: var(--ink);
   }
 
-  .shell-context-rail,
-  .shell-room-current__context { display: none; }
+  .shell-context-rail { display: none; }
 
   .shell-conversation::before {
-    top: 42px;
-    opacity: 0.28;
+    display: none;
   }
 
   /* Ribbon lives inside the shell, which already applies safe-area-inset-top.
@@ -6298,7 +6297,7 @@
     height: 56px;
     min-height: 56px;
     padding: 0 10px;
-    background: color-mix(in oklab, var(--ink) 94%, var(--stone));
+    background: var(--stone);
     border-bottom: 1px solid var(--seam-faint);
     box-shadow: none;
   }
@@ -6597,9 +6596,9 @@
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
     /* Matte product rail — no gradient wash / glow stack. */
-    background: color-mix(in oklab, var(--surface-void, var(--ink)) 96%, var(--surface-face, var(--stone)));
+    background: var(--stone);
     border-top: 1px solid var(--seam);
-    box-shadow: 0 -8px 24px -20px color-mix(in oklab, var(--ink) 70%, transparent);
+    box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -6653,8 +6652,8 @@
     box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--mobile-accent) 72%, transparent);
   }
   .shell-mobile-nav-btn--dialog-open {
-    color: var(--gold-bright);
-    box-shadow: inset 0 -2px 0 var(--gold);
+    color: var(--lapis-bright);
+    box-shadow: inset 0 -2px 0 var(--lapis);
   }
   .shell-mobile-nav-btn--dialog-open .shell-mobile-nav-icon {
     color: var(--gold-bright);
@@ -6943,19 +6942,7 @@
   }
 }
 
-@media (max-width: 420px) {
-  .shell-room-current {
-    display: none;
-  }
-}
-
 @media (forced-colors: active) {
-  .shell-room-current {
-    display: none;
-    border-bottom-color: CanvasText;
-    box-shadow: inset 2px 0 0 Highlight;
-    color: CanvasText;
-  }
   .shell-room-current__kicker { color: Highlight; }
   .shell-room-current__label,
   .shell-room-current__detail { color: CanvasText; }
@@ -7010,6 +6997,29 @@
 
 /* Narrowest phones (~320 CSS px): keep five destinations + usable composer. */
 @media (max-width: 360px) {
+  .shell-day-divider {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding-inline: 0;
+    gap: 6px;
+  }
+
+  .shell-day-divider::before,
+  .shell-day-divider::after {
+    min-width: 0;
+  }
+
+  .shell-day-divider-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 12px);
+    box-sizing: border-box;
+    padding-inline: 6px;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
   .shell-ribbon-channel {
     max-width: min(40vw, 11ch);
     font-size: 0.94rem;
@@ -7028,6 +7038,24 @@
     font-size: 0.56rem;
     letter-spacing: 0.04em;
     padding-inline: 1px;
+  }
+
+  .shell-msg-cont {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .shell-msg-cont-ts,
+  .shell-msg-cont-body {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .shell-msg-cont-ts {
+    width: fit-content;
+    max-width: 100%;
+    padding: 0;
+    text-align: left;
   }
 }
 

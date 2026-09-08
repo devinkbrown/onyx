@@ -4,12 +4,12 @@
 .commercial-onyx-brand {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 7px;
-  min-height: 48px;
-  padding: 7px 6px 9px;
+  min-height: 56px;
+  padding: 0;
   color: var(--paper, #f3f6f5);
-  font: 700 0.92rem/1 var(--font-sans, sans-serif);
+  font: 700 1.02rem/1 var(--font-display, "Anton", var(--font-sans, sans-serif));
   letter-spacing: -0.02em;
 }
 
@@ -18,7 +18,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  color: var(--lapis-bright, #8ac5d5);
+  color: var(--lapis-bright, #65adf5);
 }
 
 .commercial-onyx-mark svg {
@@ -34,9 +34,9 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid color-mix(in oklab, var(--lapis-bright, #8ac5d5) 70%, transparent);
+  border: 1px solid color-mix(in oklab, var(--lapis-bright, #65adf5) 70%, transparent);
   border-radius: 50%;
-  color: var(--lapis-bright, #8ac5d5);
+  color: var(--lapis-bright, #65adf5);
   font: 700 0.78rem/1 var(--font-sans, sans-serif);
 }
 
@@ -54,8 +54,7 @@
 }
 
 .shell-primary-nav-btn { min-width: 0; }
-.shell-primary-nav-btn > :last-child,
-.shell-mobile-nav-btn > :last-child {
+.shell-primary-nav-btn > :last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,27 +79,28 @@
 }
 
 .shell-primary-nav-btn:hover,
-.shell-mobile-nav-btn:hover { transform: translateY(-1px); }
+.shell-mobile-nav-btn:hover { transform: none; }
 
 @media (max-width: 900px) {
-  .shell-mobile-nav-btn { flex: 1 1 20%; min-width: 0; }
+  .shell-mobile-nav-btn { flex: 1 1 20%; min-width: max(44px, var(--target-min, 44px)); }
   .shell-mobile-nav-icon { min-width: 1.5rem; }
 }
 
-/* At short high zoom, keep the five destinations as an intrinsic rail so the
-   final You action can be focus-revealed without shrinking below a thumb
-   target. Ordinary mobile viewports retain equal fifths above. */
-@media (max-width: 42rem) and (max-height: 30rem) {
+/* Raw mobile labels are anonymous flex items, so the button itself owns the
+   intrinsic width at narrow text zoom; the existing nav is the scroll rail. */
+@media (max-width: 42rem) and (max-height: 30rem), (max-width: 360px) {
   .shell-mobile-nav-btn {
     flex: 0 0 auto;
-    min-width: max(44px, max-content);
+    width: max-content;
+    min-width: 44px;
+    white-space: nowrap;
   }
 }
 
 .shell-primary-nav-btn:focus-visible,
 .shell-mobile-nav-btn:focus-visible,
 .commercial-onyx-brand:focus-visible {
-  outline: 2px solid var(--lapis-bright, #8ac5d5);
+  outline: 2px solid var(--lapis-bright, #65adf5);
   outline-offset: 2px;
 }
 

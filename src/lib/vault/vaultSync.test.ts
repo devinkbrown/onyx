@@ -283,6 +283,10 @@ describe('vaultSync', () => {
 
     store.setState({ channels: new Map() });
     expect(_vaultSyncCacheSizesForTests()).toEqual({ hydrated: 0, persisted: 0, pending: 0 });
+    // The watermark above claims an in-flight write, not a committed IDB row.
+    // Closing releases cache keys immediately; the captured write must still save.
+    await until(async () => (await loadOwnedRecent('#closed'))
+      .some((message) => message.id === 'remembered'));
     expect((await loadOwnedRecent('#closed')).map((message) => message.id)).toEqual(['remembered']);
   });
 

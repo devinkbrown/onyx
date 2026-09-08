@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Source locks for the 390-wide harbor phone cut: five-tab nav, conversation
- * as the bright plane, no operator leftovers on the default path.
+ * Source locks for the 390-wide phone cut: five-tab nav, opaque conversation,
+ * and no operator leftovers on the default path.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,6 +21,7 @@ describe('Harbor phone — connected client', () => {
   const nav = read('shell/PrimaryNavigation.tsx');
   const sidebar = read('shell/ChannelSidebar.tsx');
   const ribbon = read('shell/PresenceRibbon.tsx');
+  const presenceRibbon = read('shell/PresenceRibbon.css');
   const composer = read('shell/Composer.tsx');
   const connect = read('app/connect.css');
 
@@ -38,20 +39,20 @@ describe('Harbor phone — connected client', () => {
     expect(phone).toMatch(/flex:\s*1 0 20%/);
   });
 
-  it('reads at 17px with 44px hits and recedes chrome around the conversation', () => {
-    expect(phone).toMatch(/--harbor-phone-body:\s*var\(--text-lg, 1\.0625rem\)/);
+  it('reads at 16px with 44px hits and recedes chrome around the conversation', () => {
+    expect(phone).toMatch(/--harbor-phone-body:\s*1rem/);
     expect(phone).toMatch(/\.shell-msg-text[\s\S]*font-size:\s*var\(--harbor-phone-body\)/);
     expect(phone).toMatch(/\.shell-composer-textarea[\s\S]*min-height:\s*44px/);
     expect(phone).toMatch(/\.shell-composer-send[\s\S]*min-width:\s*44px/);
-    expect(phone).toMatch(/\.shell\s*\{[\s\S]*?background:\s*transparent;/);
-    expect(phone).toMatch(/\.shell-conversation[\s\S]*background:\s*color-mix\(in oklab, var\(--harbor-phone-plane\)/);
+    expect(phone).toMatch(/\.shell\s*\{[\s\S]*?background:\s*var\(--ink\)/);
+    expect(phone).toMatch(/\.shell-conversation[\s\S]*background:\s*var\(--harbor-phone-plane\)/);
     expect(phone).toMatch(/\.shell-ribbon::after[\s\S]*display:\s*none/);
     expect(phone).toMatch(/backdrop-filter:\s*none/);
   });
 
-  it('uses Fraunces once on the transcript and mono only for timestamps', () => {
-    expect(phone).toMatch(/\.shell-day-divider-label[\s\S]*font-family:\s*var\(--font-serif\)/);
-    expect(phone).toMatch(/\.shell-msg-ts[\s\S]*font-family:\s*var\(--font-mono\)/);
+  it('uses display face for headings and readable sans for everyday timestamps', () => {
+    expect(phone).toMatch(/\.shell-feed-empty-title[\s\S]*font-family:\s*var\(--font-display/);
+    expect(phone).toMatch(/\.shell-msg-ts[\s\S]*font-family:\s*var\(--font-sans\)/);
     expect(phone).toMatch(/\.shell-msg-text[\s\S]*font-family:\s*var\(--font-sans\)/);
     expect(phone).toMatch(/\.shell-msg-author[\s\S]*font-family:\s*var\(--font-sans\)/);
   });
@@ -68,25 +69,29 @@ describe('Harbor phone — connected client', () => {
     expect(phone).toMatch(/\.shell-notify-controls[\s\S]*display:\s*none/);
     expect(phone).toMatch(/\.stage-panel\[data-active='false'\][\s\S]*display:\s*none/);
     expect(phone).toMatch(/\.shell-topic-filter[\s\S]*display:\s*none/);
-    expect(connect).toMatch(/\.conn-status-phase[\s\S]*text-transform:\s*none/);
-    expect(connect).toMatch(/\.conn-title[\s\S]*font-family:\s*var\(--font-serif\)/);
+    expect(connect).toMatch(/\.conn-status\s*\{[\s\S]*font:\s*0\.8rem\/1\.45\s*var\(--font-sans\)/);
+    expect(connect).toMatch(/\.conn-title\s*\{[\s\S]*font-family:\s*var\(--font-display\)[\s\S]*font-weight:\s*400;/);
     expect(connect).toMatch(/\.conn-sub[\s\S]*font-family:\s*var\(--font-sans\)/);
     expect(phone).toMatch(/\.onyx-modal \.onyx-modal__kicker[\s\S]*display:\s*none/);
     expect(phone).toMatch(/\.ap-panel \.ap-panel-label[\s\S]*text-transform:\s*none/);
     expect(phone).toMatch(/\.shell-members \.shell-members-group-label[\s\S]*text-transform:\s*none/);
     expect(phone).toMatch(/\.acct \.onyx-field__label[\s\S]*text-transform:\s*none/);
-    expect(phone).not.toMatch(/Anton|#[456][0-5][0-9a-f]{3}ff|#5865F2/i);
+    expect(phone).not.toMatch(/#[456][0-5][0-9a-f]{3}ff|#5865F2/i);
   });
 
-  it('uses lapis only when something is alive', () => {
-    expect(phone).toMatch(/\.shell-composer-send:not\(:disabled\)[\s\S]*background:\s*var\(--lapis\)/);
+  it('uses cobalt for selection and coral for primary action', () => {
+    expect(phone).toMatch(/\.shell-composer-send:not\(:disabled\)[\s\S]*background:\s*var\(--commercial-action-primary, #ff987d\)/);
     expect(phone).toMatch(/\.shell-mobile-nav-btn--active \.shell-mobile-nav-icon[\s\S]*background:\s*var\(--lapis\)/);
     expect(phone).not.toMatch(/linear-gradient\(135deg/);
   });
 
   it('names the People door instead of leaving a bare count on phones', () => {
     expect(phone).toMatch(/\.shell-ribbon-members[\s\S]*width:\s*auto/);
+    expect(phone).toMatch(/\.shell-ribbon-members[\s\S]*max-width:\s*max-content/);
     expect(phone).toMatch(/\.shell-ribbon-members \.shell-ribbon-action-label[\s\S]*display:\s*inline/);
+    expect(presenceRibbon).toMatch(
+      /\.presence-ribbon-surface \.shell-ribbon-identity\s*\{[\s\S]*flex:\s*0 1 auto;[\s\S]*min-width:\s*max-content;/,
+    );
   });
 });
 
@@ -94,7 +99,6 @@ describe('Harbor phone — public site', () => {
   const landing = read('routes/landing.css');
   const home = read('routes/home.css');
   const about = read('routes/about.css');
-  const guides = read('routes/guides.css');
   const download = read('routes/download.css');
   const frame = read('ui/public/public-frame.css');
 
@@ -107,17 +111,26 @@ describe('Harbor phone — public site', () => {
     expect(frame).toMatch(/\.public-frame__footer a:not\(\.public-frame__footer-brand\)[\s\S]*min-height:\s*44px/);
   });
 
-  it('uses one Fraunces title per public phone screen', () => {
-    expect(home).toMatch(/\.r-landing\.home \.home-h1[\s\S]*font-family:\s*var\(--mn-serif\)/);
-    expect(about).toMatch(/\.ab-hero h1[\s\S]*font-family:\s*var\(--font-serif\)/);
-    expect(guides).toMatch(/\.guides-page \.data-hero h1[\s\S]*font-family:\s*var\(--font-serif\)/);
-    expect(download).toMatch(/\.dl-hero h1[\s\S]*font-family:\s*var\(--font-serif\)/);
+  it('uses the display face for public invitation and About headings', () => {
+    expect(home).toMatch(/\.r-landing\.home \.home-h1[\s\S]*font-family:\s*var\(--home-display\)/);
+    expect(about).toMatch(/\.ab-hero h1[\s\S]*font:\s*400[^;]*var\(--font-display\)/);
+    expect(landing).toMatch(/\.data-hero h1[\s\S]*font-family:\s*var\(--font-display\)/);
+  });
+
+  it('keeps the functional Download heading bold sans through responsive sizing', () => {
+    const heroRules = [...download.matchAll(/\.dl-page \.dl-hero h1\s*\{([^}]*)\}/g)]
+      .map((match) => match[1] ?? '');
+    expect(heroRules.length).toBeGreaterThan(0);
+    expect(heroRules[0]).toMatch(/font:\s*700\s+clamp\([^;]+\)\/1\.08\s+var\(--font-sans\);/);
+    // Responsive size adjustments must not silently reset the face or weight.
+    for (const rule of heroRules.slice(1)) {
+      expect(rule).not.toMatch(/(?:^|;)\s*font(?:-family|-weight)?\s*:/);
+    }
   });
 
   it('turns the 390-wide preview into a phone shell, not a squeezed desk', () => {
-    expect(home).toMatch(/@media \(max-width:\s*480px\)[\s\S]*product-preview__window[\s\S]*grid-template-columns:\s*1fr/);
-    expect(home).toMatch(/@media \(max-width:\s*480px\)[\s\S]*product-preview__proof[\s\S]*display:\s*none/);
-    expect(home).toMatch(/@media \(max-width:\s*480px\)[\s\S]*product-preview__rail span b[\s\S]*display:\s*inline-grid/);
+    expect(home).toMatch(/@media \(max-width:\s*44rem\)[\s\S]*product-preview__scene-layout\s*\{\s*display:\s*block;/);
+    expect(home).toMatch(/@media \(max-width:\s*44rem\)[\s\S]*product-preview__people\s*\{\s*display:\s*none;/);
     expect(home).toMatch(/\.home-cta-primary[\s\S]*min-height:\s*48px/);
   });
 });

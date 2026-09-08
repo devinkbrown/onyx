@@ -29,8 +29,12 @@ for (const route of routes) {
     await expect(frame.locator('main#public-main')).toHaveCount(1);
     await expect(frame.locator('header.public-frame__header')).toHaveCount(1);
     await expect(frame.locator('footer.public-frame__footer')).toHaveCount(1);
-    await expect(main.locator('main, header, footer, nav')).toHaveCount(0);
+    // The new guide index is intentionally a navigation landmark inside the
+    // document main; only nested document-frame landmarks are prohibited.
+    await expect(main.locator('main, header, footer')).toHaveCount(0);
+    await expect(main.getByRole('navigation', { name: 'Guide tasks' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeVisible();
+    await expect(main.locator('#together > p')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Join a room' })).toBeVisible();
     await expect(page.getByText(/legacy client/i)).toHaveCount(0);
 
@@ -87,7 +91,7 @@ for (const route of routes) {
         toggle: bounds(document.querySelector<HTMLElement>('.public-frame__menu-toggle')!),
         surfaces: Array.from(document.querySelectorAll<HTMLElement>(
           '.public-frame, .public-frame__header, .public-frame__main, .public-frame__footer,'
-          + ' .ui-root.data-page, .data-hero, .r-section, .data-card',
+          + ' .ui-root.data-page, .guides-hero, .guides-body, .guides-index, .guides-content, .guides-card',
         )).map((element) => ({
           className: element.className,
           clientWidth: element.clientWidth,
@@ -107,10 +111,10 @@ for (const route of routes) {
           .filter(({ left, right }) => left < -1 || right > viewportWidth + 1)
           .slice(0, 12),
         heroFontSize: Number.parseFloat(getComputedStyle(
-          document.querySelector<HTMLElement>('.data-hero h1')!,
+          document.querySelector<HTMLElement>('#guides-heading')!,
         ).fontSize),
         cardCopyFontSize: Number.parseFloat(getComputedStyle(
-          document.querySelector<HTMLElement>('.data-card p')!,
+          document.querySelector<HTMLElement>('#together > p')!,
         ).fontSize),
         controls: Array.from(document.querySelectorAll<HTMLElement>(
           '.public-frame__header a, .public-frame__header button, .public-frame__footer a',

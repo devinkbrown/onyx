@@ -21,12 +21,14 @@
  */
 
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
   createUniqueId,
   For,
   onCleanup,
+  onMount,
   Show,
   splitProps,
   type JSX,
@@ -40,9 +42,12 @@ import {
   MEMBER_MOBILE_WINDOW_METRICS,
   MEMBER_WINDOW_METRICS,
   memberPrefixHeight,
+  memberRowKey,
+  rebaseMemberOffset,
   memberWindowSectionsEqual,
   sectionMemberWindow,
   type MemberWindowSection,
+  type MemberWindowMetrics,
 } from './memberWindow';
 import type { ModerationActionDraft } from '@/lib/moderation/actionModel';
 import { applyMemberModeration } from '@/lib/moderation/applyMemberModeration';
@@ -51,6 +56,7 @@ import { ModerationActionReview } from './moderation/ModerationActionReview';
 import { PeopleProfileCard } from './PeopleProfileCard';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import './participant-presence.css';
+import './collection-navigation.css';
 
 // Role resolution, grouping, and identity-stable reconciliation live in
 // `@/lib/memberGroups` (unit-tested there). See that module for why entry/group
@@ -164,13 +170,14 @@ function MemberRow(props: MemberRowProps): JSX.Element {
       ref={itemRef}
       class="shell-members-group-item"
       data-member-focus-key={props.user.nick.toLowerCase()}
+      data-member-measure-key={`member:${props.role.key}:${props.user.nick.toLowerCase()}`}
     >
       <Popover
         panelLabel={`Member details for ${props.user.nick}`}
         disabled={props.hidden}
         trigger={
           <div
-            class={`shell-member-row${props.user.away ? ' shell-member-row--away' : ''}`}
+            class={`shell-member-row shell-member-row--collection${props.user.away ? ' shell-member-row--away' : ''}`}
             onDblClick={(e) => {
               // Double-click is a classic IRC comfort: open DM without the card.
               e.preventDefault();
@@ -333,9 +340,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
   });
 
   const [scrollTop, setScrollTop] = createSignal(0);
-  const windowMetrics = createMemo(() => (
-    local.modal ? MEMBER_MOBILE_WINDOW_METRICS : MEMBER_WINDOW_METRICS
-  ));
+  const [windowMetrics, setWindowMetrics] = createSignal<MemberWindowMetrics>(MEMBER_WINDOW_METRICS);
   const flatRows = createMemo(() => flattenMemberRows(visibleGroups()));
   const memberWindow = createMemo(() => computeMemberWindow(
     flatRows(),
@@ -360,8 +365,122 @@ export function MemberList(props: MemberListProps): JSX.Element {
       - memberPrefixHeight(rows, memberWindow().end, metrics);
   });
 
+  // A keyed group shell keeps overlapping member controls mounted while the
+  // window moves. Measurement-only updates must not close a focused Popover.
+  const windowedGroupKeys = createMemo(() => windowedSections().map((group) => group.key));
+  let frame: number | undefined;
+  let observer: ResizeObserver | undefined;
+  let observed = new Set<HTMLElement>();
+  let layoutKey = '';
+  let paddingTop = 0;
+
+  function scheduleMeasurement(): void {
+    if (frame === undefined) frame = requestAnimationFrame(measureWindow);
+  }
+
+  function measureWindow(): void {
+    frame = undefined;
+    const scroll = memberScrollRef;
+    if (!scroll || local.hidden || scroll.clientWidth === 0) return;
+    const elements = Array.from(scroll.querySelectorAll<HTMLElement>('[data-member-measure-key]'));
+    const current = new Set(elements);
+    for (const element of observed) if (!current.has(element)) observer?.unobserve(element);
+    for (const element of current) if (!observed.has(element)) observer?.observe(element);
+    observed = current;
+
+    const nick = scroll.querySelector<HTMLElement>('.shell-member-nick');
+    const row = scroll.querySelector<HTMLElement>('.shell-member-row');
+    const heading = scroll.querySelector<HTMLElement>('.shell-members-group-label');
+    if (!nick || !row || !heading) return;
+    const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const nickStyle = getComputedStyle(nick);
+    const rowStyle = getComputedStyle(row);
+    const headingStyle = getComputedStyle(heading);
+    // Presence changes the individual nick's font-style. It is not a global
+    // layout change: sampling its shorthand would evict all visited heights
+    // whenever the first virtual row changed between away and here.
+    const nextLayoutKey = [scroll.clientWidth, rootSize, local.modal,
+      nickStyle.fontFamily, nickStyle.fontSize, nickStyle.fontWeight,
+      nickStyle.lineHeight, nickStyle.letterSpacing,
+      rowStyle.minHeight, rowStyle.padding, headingStyle.font, headingStyle.padding,
+    ].join('|');
+    const changedLayout = nextLayoutKey !== layoutKey;
+    const before = windowMetrics();
+    const rows = flatRows();
+    const validKeys = new Set(rows.map(memberRowKey));
+    const heights = new Map(changedLayout ? [] : before.heights);
+    let changed = changedLayout;
+    for (const key of heights.keys()) if (!validKeys.has(key)) {
+      heights.delete(key);
+      changed = true;
+    }
+    const samples = { group: [] as number[], member: [] as number[] };
+    for (const element of elements) {
+      const key = element.dataset.memberMeasureKey!;
+      const height = element.getBoundingClientRect().height;
+      // Hidden continuation headings have no physical height and are already
+      // represented in the prefix. Hidden drawers never poison the cache.
+      if (!validKeys.has(key) || height <= 0) continue;
+      samples[key.startsWith('group:') ? 'group' : 'member'].push(height);
+      if (Math.abs((heights.get(key) ?? 0) - height) > 0.25) {
+        heights.set(key, height);
+        changed = true;
+      }
+    }
+    layoutKey = nextLayoutKey;
+    const previousPadding = paddingTop;
+    paddingTop = parseFloat(getComputedStyle(scroll).paddingTop) || 0;
+    if (!changed) return;
+    const fallback = local.modal ? MEMBER_MOBILE_WINDOW_METRICS : MEMBER_WINDOW_METRICS;
+    const after: MemberWindowMetrics = {
+      groupRowPx: changedLayout
+        ? (samples.group.length ? Math.min(...samples.group) : fallback.groupRowPx * rootSize / 16)
+        : before.groupRowPx,
+      userRowPx: changedLayout
+        ? (samples.member.length ? Math.min(...samples.member) : fallback.userRowPx * rootSize / 16)
+        : before.userRowPx,
+      heights,
+    };
+    const rawOffset = scroll.scrollTop;
+    const offset = rebaseMemberOffset(rows, Math.max(0, rawOffset - previousPadding), before, after);
+    batch(() => {
+      setWindowMetrics(after);
+      setScrollTop(offset);
+    });
+    // Keep browser anchoring disabled (shared scroll CSS). We own precisely one
+    // correction after spacers update; at the top preserve scrollTop === 0.
+    scroll.scrollTop = rawOffset === 0 ? 0 : offset + paddingTop;
+  }
+
+  const invalidateMeasurements = () => {
+    layoutKey = '';
+    scheduleMeasurement();
+  };
+  onMount(() => {
+    observer = new ResizeObserver(scheduleMeasurement);
+    if (memberScrollRef) observer.observe(memberScrollRef);
+    observer.observe(document.documentElement);
+    document.fonts?.addEventListener('loadingdone', invalidateMeasurements);
+    window.addEventListener('resize', scheduleMeasurement);
+    scheduleMeasurement();
+  });
+  onCleanup(() => {
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    observer?.disconnect();
+    document.fonts?.removeEventListener('loadingdone', invalidateMeasurements);
+    window.removeEventListener('resize', scheduleMeasurement);
+  });
   createEffect(() => {
-    void activeChannel()?.name;
+    void windowedSections();
+    void flatRows();
+    void local.hidden;
+    void local.modal;
+    scheduleMeasurement();
+  });
+
+  const activeChannelName = createMemo(() => activeChannel()?.name);
+  createEffect(() => {
+    void activeChannelName();
     void memberFilter();
     setScrollTop(0);
     if (memberScrollRef) memberScrollRef.scrollTop = 0;
@@ -397,7 +516,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
   return (
     <aside
       ref={memberListRef}
-      class={`shell-members${local.hidden ? ' shell-members--hidden' : ''}`}
+      class={`shell-members shell-collection-people${local.hidden ? ' shell-members--hidden' : ''}`}
       /* Non-modal roster is a complementary landmark; modal drawer is a dialog.
          Keep role explicit so dense/high-zoom reflow never loses the landmark
          name when the native <aside> mapping is overridden by CSS containment. */
@@ -494,7 +613,7 @@ export function MemberList(props: MemberListProps): JSX.Element {
         role="region"
         aria-label={rosterLabel()}
         ref={memberScrollRef}
-        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+        onScroll={(event) => setScrollTop(Math.max(0, event.currentTarget.scrollTop - paddingTop))}
       >
         <Show
           when={!isLoadingRoster() && groups().length > 0}
@@ -530,9 +649,10 @@ export function MemberList(props: MemberListProps): JSX.Element {
             }
           >
             <div class="shell-members-window-pad" style={{ height: `${padBefore()}px` }} aria-hidden="true" />
-            <For each={windowedSections()}>
-              {(group) => {
-                const groupLabelId = `members-group-${instanceId}-${group.key}`;
+            <For each={windowedGroupKeys()}>
+              {(key) => {
+                const group = () => windowedSections().find((section) => section.key === key)!;
+                const groupLabelId = `members-group-${instanceId}-${key}`;
                 return (
                   <section aria-labelledby={groupLabelId}>
                     <p
@@ -540,11 +660,13 @@ export function MemberList(props: MemberListProps): JSX.Element {
                       id={groupLabelId}
                       role="heading"
                       aria-level={3}
+                      data-member-measure-key={`group:${key}`}
+                      style={{ display: group().continuation ? 'none' : undefined }}
                     >
-                      {group.label} — {group.count}
+                      {group().label} — {group().count}
                     </p>
                     <ul class="shell-members-group-list" role="list" aria-labelledby={groupLabelId}>
-                      <For each={group.members}>
+                      <For each={group().members}>
                         {(entry) => (
                           <MemberRow
                             user={entry.user}

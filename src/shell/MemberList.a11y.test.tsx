@@ -21,6 +21,64 @@ import type { Channel, ChannelUser } from '@/lib/irc/types';
 import { MemberList } from './MemberList';
 
 const initialState = store.getInitialState();
+const initialRootFontSize = document.documentElement.style.fontSize;
+
+/** jsdom has no layout: deliver explicit border boxes through the same observer
+ * and animation-frame path the browser uses. Never measure unmounted members. */
+function mockRosterLayout() {
+  const geometry = { width: 260, member: 54, group: 38, long: 118 };
+  const targets = new Set<Element>();
+  const callbacks = new Set<ResizeObserverCallback>();
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: ResizeObserverCallback) { callbacks.add(callback); }
+    observe(target: Element) { targets.add(target); }
+    unobserve(target: Element) { targets.delete(target); }
+    disconnect() { targets.clear(); callbacks.clear(); }
+  });
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(function (this: Element) {
+    return this.matches('.shell-members-scroll') ? geometry.width : 0;
+  });
+  const height = (element: HTMLElement) => {
+    const key = element.dataset.memberMeasureKey;
+    if (!key || element.style.display === 'none') return 0;
+    return key.startsWith('group:') ? geometry.group
+      : key.includes('-long-name') ? geometry.long : geometry.member;
+  };
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return new DOMRect(0, 0, geometry.width, height(this));
+  });
+  const flush = () => {
+    for (let attempt = 0; frames.size && attempt < 10; attempt += 1) {
+      const pending = [...frames.values()];
+      frames.clear();
+      for (const callback of pending) callback(0);
+    }
+    expect(frames.size).toBe(0);
+  };
+  return {
+    geometry, targets, frames, flush,
+    resize() {
+      for (const callback of callbacks) callback([], {} as ResizeObserver);
+      flush();
+    },
+    topWithinScroll(scroll: HTMLElement, nick: string) {
+      let top = parseFloat(scroll.style.paddingTop) || 0;
+      top += parseFloat(scroll.querySelector<HTMLElement>('.shell-members-window-pad')!.style.height);
+      for (const row of scroll.querySelectorAll<HTMLElement>('[data-member-measure-key]')) {
+        if (row.dataset.memberFocusKey === nick) return top - scroll.scrollTop;
+        top += height(row);
+      }
+      throw new Error(`Member ${nick} is not mounted`);
+    },
+  };
+}
 
 function makeClient() {
   return {
@@ -76,6 +134,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  document.documentElement.style.fontSize = initialRootFontSize;
 });
 
 describe('MemberList accessibility', () => {
@@ -373,6 +434,150 @@ describe('MemberList accessibility', () => {
     expect(triggers.length).toBeLessThan(160);
     expect(screen.getByLabelText('220 members')).toHaveTextContent('220');
     expect(screen.getByRole('heading', { name: /Members — 219/ })).toBeInTheDocument();
+  });
+
+  it.each([false, true])('anchors wrapped 3k rows through measurement, width and text changes (modal=%s)', (modal) => {
+    const layout = mockRosterLayout();
+    if (modal) Object.assign(layout.geometry, { width: 350, member: 56, group: 32 });
+    const users = Array.from({ length: 3000 }, (_, i) => makeUser(
+      `nick${String(i).padStart(4, '0')}${i === 115 ? '-long-name-that-wraps-across-lines' : ''}`,
+    ));
+    seedChannel(users);
+    const { container, unmount } = render(() => <MemberList modal={modal} />);
+    const scroll = screen.getByRole('region', { name: 'People in #general' });
+    scroll.style.paddingTop = '8px';
+    layout.flush();
+
+    const initialOffset = 8 + layout.geometry.group + 120 * layout.geometry.member + 9;
+    scroll.scrollTop = initialOffset;
+    fireEvent.scroll(scroll);
+    const trigger = screen.getByRole('button', { name: /Open member details for nick0120,/ });
+    trigger.focus();
+    layout.flush();
+    expect(scroll.scrollTop).toBe(initialOffset + layout.geometry.long - layout.geometry.member);
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-9);
+    expect(trigger).toHaveFocus();
+    expect(container.querySelector('.shell-member-nick')?.textContent).toBeTruthy();
+    expect(screen.getByText('nick0115-long-name-that-wraps-across-lines')).toBeInTheDocument();
+    expect(scroll.querySelector('.shell-members-group-label')).toHaveStyle({ display: 'none' });
+    expect(screen.getByRole('list', { name: 'Members — 3000' })).toBeInTheDocument();
+
+    // One row of forward and reverse scrolling retains the same DOM control.
+    scroll.scrollTop += layout.geometry.member;
+    fireEvent.scroll(scroll);
+    layout.flush();
+    expect(screen.getByRole('button', { name: /Open member details for nick0120,/ })).toBe(trigger);
+    expect(trigger).toHaveFocus();
+    scroll.scrollTop -= layout.geometry.member;
+    fireEvent.scroll(scroll);
+    layout.flush();
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-9);
+
+    Object.assign(layout.geometry, { width: 190, member: 64, long: 156 });
+    layout.resize();
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-9);
+    document.documentElement.style.fontSize = '32px';
+    Object.assign(layout.geometry, { member: 128, group: 76, long: 312 });
+    layout.resize();
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-9);
+    expect(trigger).toHaveFocus();
+    const settledOffset = scroll.scrollTop;
+    layout.resize();
+    expect(scroll.scrollTop).toBe(settledOffset);
+    expect(scroll.querySelectorAll('.shell-members-group-item').length).toBeLessThanOrEqual(96);
+    expect(layout.targets.size).toBeLessThanOrEqual(100);
+
+    // Presence/roster reconciliation must not reset the scroll position.
+    store.getState()._handleMessage(parseIRCMessage(':nick0125!user@example AWAY :Back soon'));
+    layout.flush();
+    expect(screen.getByRole('button', { name: /nick0125, Member, away/ })).toBeInTheDocument();
+    expect(scroll.scrollTop).toBe(settledOffset);
+    expect(trigger).toHaveFocus();
+    unmount();
+    expect(layout.targets.size).toBe(0);
+    expect(layout.frames.size).toBe(0);
+  });
+
+  it('ignores zero-sized hidden drawers and remeasures on reopening without losing position', () => {
+    const layout = mockRosterLayout();
+    seedChannel(Array.from({ length: 3000 }, (_, i) => makeUser(`nick${String(i).padStart(4, '0')}`)));
+    const [hidden, setHidden] = createSignal(false);
+    render(() => <MemberList modal hidden={hidden()} />);
+    const scroll = screen.getByRole('region', { name: 'People in #general' });
+    layout.flush();
+    scroll.scrollTop = 38 + 120 * 54 + 7;
+    fireEvent.scroll(scroll);
+    layout.flush();
+    const offset = scroll.scrollTop;
+    setHidden(true);
+    layout.geometry.width = 0;
+    layout.resize();
+    expect(scroll.scrollTop).toBe(offset);
+    expect(screen.queryByRole('region', { name: 'People in #general' })).toBeNull();
+    Object.assign(layout.geometry, { width: 300, member: 80 });
+    setHidden(false);
+    layout.resize();
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-7);
+    expect(scroll.querySelectorAll('.shell-members-group-item').length).toBeLessThanOrEqual(96);
+  });
+
+  it('keeps visited heights when the first window row changes between away italic and normal', () => {
+    const layout = mockRosterLayout();
+    const computedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      const style = computedStyle(element, pseudo);
+      if (!element.matches('.shell-member-nick')) return style;
+      return new Proxy(style, {
+        get(target, property) {
+          if (property === 'font') return `${element.classList.contains('shell-member-nick--away') ? 'italic ' : ''}600 13px sans-serif`;
+          return Reflect.get(target, property, target);
+        },
+      });
+    });
+    seedChannel(Array.from({ length: 3000 }, (_, i) => makeUser(
+      `nick${String(i).padStart(4, '0')}${i === 20 || i === 115 ? '-long-name' : ''}`,
+      [], { away: i % 5 === 0 },
+    )));
+    render(() => <MemberList />);
+    const scroll = screen.getByRole('region', { name: 'People in #general' });
+    const totalHeight = () => Array.from(scroll.querySelectorAll<HTMLElement>(
+      '[data-member-measure-key], .shell-members-window-pad',
+    )).reduce((sum, element) => sum + (element.classList.contains('shell-members-window-pad')
+      ? parseFloat(element.style.height) : element.getBoundingClientRect().height), 0);
+    layout.flush();
+    const initialHeight = totalHeight();
+    const newWrappedHeight = layout.geometry.long - layout.geometry.member;
+    scroll.scrollTop = 38 + 120 * 54 + newWrappedHeight + 7;
+    fireEvent.scroll(scroll);
+    layout.flush();
+    // Discovering nick0115 adds one long row; nick0020 remains in the cache
+    // even though it is no longer mounted and the first row is no longer away.
+    expect(totalHeight()).toBe(initialHeight + newWrappedHeight);
+    for (const delta of [54, 54, -54, -54]) {
+      scroll.scrollTop += delta;
+      fireEvent.scroll(scroll);
+      layout.flush();
+      expect(totalHeight()).toBe(initialHeight + newWrappedHeight);
+    }
+    expect(layout.topWithinScroll(scroll, 'nick0120')).toBe(-7);
+    expect(layout.targets.size).toBeLessThanOrEqual(100);
+  });
+
+  it('measures group boundaries without adding continuation height and reaches the tail', () => {
+    const layout = mockRosterLayout();
+    seedChannel(Array.from({ length: 3000 }, (_, i) => makeUser(
+      `nick${String(i).padStart(4, '0')}`, i < 1500 ? ['o'] : [],
+    )));
+    render(() => <MemberList />);
+    const scroll = screen.getByRole('region', { name: 'People in #general' });
+    layout.flush();
+    for (const index of [1495, 1500, 2990, 50]) {
+      scroll.scrollTop = (index < 1500 ? 38 : 76) + index * 54 + 7;
+      fireEvent.scroll(scroll);
+      layout.flush();
+      expect(layout.topWithinScroll(scroll, `nick${String(index).padStart(4, '0')}`)).toBe(-7);
+      expect(scroll.querySelectorAll('.shell-members-group-item').length).toBeLessThanOrEqual(96);
+    }
   });
 
   it('returns focus to the stable roster when the focused member leaves', async () => {

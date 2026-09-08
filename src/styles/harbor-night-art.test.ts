@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Source locks for the quiet-harbor night cut: mineral tokens, one ribbon,
+ * Source locks for the Astra graphite-arcade cut: matte tokens, one ribbon,
  * conversation as the brightest plane, no glass / shouty kickers on the
  * default path.
  */
@@ -25,13 +25,20 @@ function rule(css: string, selector: string): string {
 
 describe('Harbor-night tokens', () => {
   const tokens = read('src/styles/tokens.css');
+  const commercial = read('src/styles/commercial-foundation.css');
 
   it('keeps the ocean identity and reading measure', () => {
-    expect(tokens).toMatch(/--ink:\s*#05070a/);
-    expect(tokens).toMatch(/--stone:\s*#0c1016/);
-    expect(tokens).toMatch(/--lapis:\s*#5ba3c9/);
-    expect(tokens).toMatch(/--paper:\s*#e6e8ec/);
-    expect(tokens).toMatch(/--paper-mute:\s*#848c96/);
+    expect(tokens).toMatch(/--ink:\s*#202429/);
+    expect(tokens).toMatch(/--stone:\s*#2d333a/);
+    expect(tokens).toMatch(/--lapis:\s*#65adf5/);
+    expect(tokens).toMatch(/--paper:\s*#f5f7f8/);
+    expect(tokens).toMatch(/--paper-mute:\s*#b4bfca/);
+    expect(tokens).toMatch(/--font-display:\s*'Anton'/);
+    expect(tokens).toMatch(/--font-sans:\s*'Instrument Sans Variable'/);
+    expect(commercial).toMatch(
+      /--commercial-action-primary:\s*var\(--brand-action,\s*var\(--commercial-tide\)\)/,
+    );
+    expect(commercial).toMatch(/--commercial-font-display:\s*var\(--font-display\)/);
     expect(tokens).toMatch(/--text-2xs:\s*0\.75rem/);
     expect(tokens).toMatch(/--text-md:\s*0\.9375rem/);
     expect(tokens).toMatch(/--leading-body:\s*1\.5/);
@@ -60,8 +67,8 @@ describe('Harbor-night default chrome', () => {
     expect(rule(globalCss, ':focus-visible')).toMatch(/outline-offset:\s*var\(--focus-offset/);
     expect(rule(globalCss, ':focus-visible')).toMatch(/box-shadow:\s*none/);
     expect(rule(shell, '.shell-composer-inner')).toMatch(/border-radius:\s*var\(--composer-radius/);
-    expect(rule(shell, '.shell-msg-group')).toMatch(/margin-top:\s*var\(--space-4\)/);
-    expect(rule(shell, '.shell-msg-cont')).toMatch(/padding:\s*2px var\(--space-5\)/);
+    expect(rule(shell, '.shell-msg-group')).toMatch(/margin-top:\s*0\.75rem/);
+    expect(rule(shell, '.shell-msg-cont')).toMatch(/padding:\s*2px var\(--space-4\)/);
     expect(rule(shell, '.shell-msg-text')).toMatch(/font-size:\s*var\(--text-md\)/);
     expect(rule(shell, '.shell-msg-text')).toMatch(/line-height:\s*var\(--leading-body\)/);
     expect(rule(shell, '.shell-msg-ts')).toMatch(/font-size:\s*var\(--text-2xs\)/);
@@ -86,12 +93,10 @@ describe('Harbor-night default chrome', () => {
   });
 
   it('quiets first-run and landing kickers', () => {
-    expect(rule(connect, '.conn-eyebrow')).toMatch(/font-family:\s*var\(--font-sans\)/);
-    expect(rule(connect, '.conn-eyebrow')).toMatch(/text-transform:\s*none/);
+    expect(connect).toMatch(/\.conn-invite-eyebrow,\s*\n\.conn-resume-eyebrow\s*\{[^}]*font:\s*700 0\.9rem\/1\.2 var\(--font-sans\)/s);
     expect(connect).toMatch(/\.conn \.onyx-field__label[\s\S]*?text-transform:\s*none/);
     expect(rule(connect, '.conn .onyx-button')).toMatch(/text-transform:\s*none/);
-    expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/font-family:\s*var\(--mn-sans\)/);
-    expect(rule(home, '.r-landing.home .home-kicker')).toMatch(/text-transform:\s*none/);
+    expect(home).not.toMatch(/\.r-landing\.home\s+\.home-kicker\b/);
     expect(typography).toMatch(/--ui-tracking-kicker:\s*var\(--tracking-kicker, 0\.06em\)/);
   });
 });

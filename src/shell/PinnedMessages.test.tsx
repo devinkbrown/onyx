@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
 import { store } from '@/lib/store/store';
-import { derivePinIds, PinnedMessages, sameStringArray } from './PinnedMessages';
+import {
+  derivePinIds,
+  pinnedMessageDisplayText,
+  pinnedMessageDisplayState,
+  pinnedMessageStateLabel,
+  PinnedMessages,
+  sameStringArray,
+} from './PinnedMessages';
 
 const initialState = store.getInitialState();
 
-function message(id: string, from: string, text: string): ChatMessage {
+function message(id: string, from: string, text: string, overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id,
     from,
@@ -16,6 +23,7 @@ function message(id: string, from: string, text: string): ChatMessage {
     target: '#room',
     time: new Date('2026-07-09T03:00:00Z'),
     type: 'msg',
+    ...overrides,
   };
 }
 
@@ -67,6 +75,8 @@ describe('PinnedMessages accessibility', () => {
 
     expect(screen.getByRole('dialog', { name: 'Pinned messages' })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Pinned messages in #room' })).toBeInTheDocument();
+    expect(screen.getByTestId('pins-context')).toHaveTextContent('Shared in #room');
+    expect(screen.getByLabelText(/Pinned messages provenance: This server/i)).toBeInTheDocument();
     expect(screen.getByTestId('pins-channel-ledger')).toHaveAttribute(
       'href',
       '/stats/?room=%23room',
@@ -115,6 +125,85 @@ describe('PinnedMessages accessibility', () => {
 
     expect(request).toHaveBeenCalledWith('#room', 'missing-1');
     expect(store.getState().showPinnedMessages).toBe(true);
+    expect(screen.getByTestId('pins-load-feedback')).toHaveTextContent(
+      'Pinned message could not be loaded from history. Try again.',
+    );
+  });
+
+  it('uses safe deleted, redacted, locked, decrypted, and action previews everywhere', () => {
+    const deletedText = 'withdrawn secret should never render';
+    const redactedText = 'redacted secret should never render';
+    const ciphertext = 'ONYXDM1 ciphertext must never render';
+    const messages = [
+      message('deleted', 'alice', deletedText, { deleted: true }),
+      message('redacted', 'bob', redactedText, { redacted: true }),
+      message('locked', 'carol', ciphertext, { encrypted: true }),
+      message('decrypted', 'dana', ciphertext, { encrypted: true, plaintext: 'Readable plaintext' }),
+      message('action', 'erin', ciphertext, { type: 'action', encrypted: true, plaintext: 'waves' }),
+    ];
+    store.setState({
+      ...initialState,
+      showPinnedMessages: true,
+      activeView: { kind: 'channel', channel: '#room' },
+      ourNick: 'me',
+      channels: new Map([['#room', channel(messages)]]),
+      channelProps: new Map([['#room', { PINS: messages.map((item) => item.id).join(',') }]]),
+    }, true);
+
+    render(() => <PinnedMessages />);
+
+    expect(screen.getAllByText('[message deleted]')).toHaveLength(2);
+    expect(screen.getByText('🔒 Encrypted message (sent to another device)')).toBeInTheDocument();
+    expect(screen.getByText('Readable plaintext')).toBeInTheDocument();
+    expect(screen.getByText('* erin waves')).toBeInTheDocument();
+    expect(screen.getAllByText('Deleted')).toHaveLength(2);
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(screen.getAllByText('Loaded locally')).toHaveLength(2);
+    expect(screen.queryByText(deletedText)).toBeNull();
+    expect(screen.queryByText(redactedText)).toBeNull();
+    expect(screen.queryByText(ciphertext)).toBeNull();
+    expect(screen.getByRole('button', { name: /alice.*\[message deleted\]/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /bob.*\[message deleted\]/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /carol.*Encrypted message/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dana.*Readable plaintext/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /erin.*\* erin waves/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: new RegExp(ciphertext) })).toBeNull();
+  });
+
+  it('distinguishes an unloaded pin from a withdrawn message', () => {
+    const withdrawn = message('deleted', 'alice', 'withdrawn', { deleted: true });
+    store.setState({
+      ...initialState,
+      showPinnedMessages: true,
+      activeView: { kind: 'channel', channel: '#room' },
+      channels: new Map([['#room', channel([withdrawn])]]),
+      channelProps: new Map([['#room', { PINS: 'deleted,missing' }]]),
+    }, true);
+
+    render(() => <PinnedMessages />);
+
+    expect(screen.getByText('[message deleted]')).toBeInTheDocument();
+    expect(screen.getByText('Pinned message — load it from history to jump there.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load pinned message missing' })).toBeInTheDocument();
+    expect(screen.queryByText(/missing.*deleted/i)).toBeNull();
+  });
+});
+
+describe('PinnedMessages display rules', () => {
+  it('matches the transcript precedence and never falls back to ciphertext', () => {
+    const locked = message('locked', 'alice', 'ONYXDM1 opaque', { encrypted: true });
+    const deleted = message('deleted', 'alice', 'private text', { deleted: true, encrypted: true, plaintext: 'also private' });
+    const action = message('action', 'alice', 'ONYXDM1 opaque', { type: 'action', encrypted: true, plaintext: 'waves' });
+
+    expect(pinnedMessageDisplayText(locked)).toBe('🔒 Encrypted message (sent to another device)');
+    expect(pinnedMessageDisplayState(locked)).toBe('locked');
+    expect(pinnedMessageDisplayText(deleted)).toBe('[message deleted]');
+    expect(pinnedMessageDisplayState(deleted)).toBe('deleted');
+    expect(pinnedMessageDisplayText(action)).toBe('* alice waves');
+    expect(pinnedMessageDisplayText(action)).not.toContain('ONYXDM1');
+    expect(pinnedMessageStateLabel(locked)).toBe('Locked');
+    expect(pinnedMessageStateLabel(deleted)).toBe('Deleted');
+    expect(pinnedMessageStateLabel(action)).toBe('Loaded locally');
   });
 });
 

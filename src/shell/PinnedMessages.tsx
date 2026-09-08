@@ -7,7 +7,7 @@
  * resolves each pinned msgid against the loaded channel buffer; a pin whose
  * message isn't loaded shows a placeholder with a jump that requests history.
  */
-import { createMemo, For, Show, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js';
 import { Sheet } from '@/primitives';
 import {
   useStore,
@@ -17,7 +17,12 @@ import {
   type OnyxState,
 } from '@/lib/store';
 import type { ChatMessage } from '@/lib/irc/types';
+import {
+  hasEncryptedMessageBoundary,
+  lockedPlaceholderForText,
+} from '@/lib/e2ee/replyPrivacy';
 import { PinIcon } from '@/shell/message/icons';
+import { ProvenanceBadge } from '@/shell/ProvenanceBadge';
 import { statsRoomHref } from '@/lib/stats/channelDetail';
 import './pinned-messages.css';
 
@@ -47,6 +52,40 @@ export function sameStringArray(a: readonly string[], b: readonly string[]): boo
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+/**
+ * Render a pinned message with the same withdrawal and encryption boundaries as
+ * the transcript. Pinned rows are still a transcript surface: ciphertext,
+ * withdrawn text, and action-message fallbacks must never get a second path to
+ * the screen or an accessible name.
+ */
+export function pinnedMessageDisplayText(message: ChatMessage): string {
+  if (message.deleted || message.redacted) return '[message deleted]';
+
+  const encrypted = hasEncryptedMessageBoundary(message);
+  if (encrypted && message.plaintext === undefined) {
+    return lockedPlaceholderForText(message.text);
+  }
+
+  const body = encrypted
+    ? (message.plaintext ?? lockedPlaceholderForText(message.text))
+    : message.text;
+  return message.type === 'action' ? `* ${message.from} ${body}` : body;
+}
+
+export function pinnedMessageDisplayState(message: ChatMessage): 'deleted' | 'locked' | 'visible' {
+  if (message.deleted || message.redacted) return 'deleted';
+  return hasEncryptedMessageBoundary(message) && message.plaintext === undefined
+    ? 'locked'
+    : 'visible';
+}
+
+export function pinnedMessageStateLabel(message: ChatMessage): 'Deleted' | 'Locked' | 'Loaded locally' {
+  const state = pinnedMessageDisplayState(message);
+  if (state === 'deleted') return 'Deleted';
+  if (state === 'locked') return 'Locked';
+  return 'Loaded locally';
 }
 
 export function PinnedMessages(): JSX.Element {
@@ -93,28 +132,36 @@ export function PinnedMessages(): JSX.Element {
 
   const resolvePin = (id: string): ChatMessage | null => messageById().get(id) ?? null;
 
-  // Recompute display text safely (encrypted DMs never reach a channel pin).
-  const bodyOf = (m: ChatMessage): string =>
-    m.type === 'action' ? `* ${m.from} ${m.text}` : m.text;
+  const [loadFeedback, setLoadFeedback] = createSignal('');
+  createEffect(() => {
+    // A failed request belongs to the current open/channel context only.
+    void open();
+    void channel();
+    setLoadFeedback('');
+  });
 
   const clip = (text: string): string =>
     text.length > 80 ? `${text.slice(0, 77)}...` : text;
 
   const pinActionLabel = (id: string, msg: ChatMessage | null): string =>
     msg
-      ? `Jump to pinned message from ${msg.from}: ${clip(bodyOf(msg))}`
+      ? `Jump to pinned message from ${msg.from}: ${clip(pinnedMessageDisplayText(msg))}`
       : `Load pinned message ${id}`;
 
   function jumpTo(id: string, msg: ChatMessage | null): void {
     const ch = channel();
     if (!ch) return;
     if (msg) {
+      setLoadFeedback('');
       // Reuse the landing highlight machinery (feed scrolls + pulses).
       getState().focusMessage(id);
     } else {
       // Not loaded — ask the server for the exact pin and focus it only after
       // the authoritative CHATHISTORY batch has merged.
-      if (!getState().requestPinnedMessage(ch, id)) return;
+      if (!getState().requestPinnedMessage(ch, id)) {
+        setLoadFeedback('Pinned message could not be loaded from history. Try again.');
+        return;
+      }
     }
     getState().closePinnedMessages();
   }
@@ -136,6 +183,18 @@ export function PinnedMessages(): JSX.Element {
       closeLabel="Close pinned messages"
     >
       <div class="pins-panel" data-testid="pinned-messages">
+        <Show when={channel()}>
+          {(target) => (
+            <div class="pins-context" data-testid="pins-context">
+              <div class="pins-context-copy">
+                <span class="pins-context-kicker">Shared in</span>
+                {' '}
+                <strong dir="auto">{target()}</strong>
+              </div>
+              <ProvenanceBadge scope="server" subject="Pinned messages" />
+            </div>
+          )}
+        </Show>
         <Show when={channelLedger()}>
           {(ledger) => (
             <a
@@ -146,6 +205,18 @@ export function PinnedMessages(): JSX.Element {
             >
               Room ledger
             </a>
+          )}
+        </Show>
+        <Show when={loadFeedback()}>
+          {(feedback) => (
+            <p
+              class="pins-load-feedback"
+              role="alert"
+              aria-live="assertive"
+              data-testid="pins-load-feedback"
+            >
+              {feedback()}
+            </p>
           )}
         </Show>
         <Show
@@ -190,8 +261,22 @@ export function PinnedMessages(): JSX.Element {
                             <span class="pins-item-meta">
                               <strong class="pins-item-from">{m().from}</strong>
                               <span class="pins-item-when">{fmtTime(m().time)}</span>
+                              <span
+                                class="pins-item-state"
+                                data-state={pinnedMessageDisplayState(m())}
+                              >
+                                {pinnedMessageStateLabel(m())}
+                              </span>
                             </span>
-                            <span class="pins-item-body">{bodyOf(m())}</span>
+                            <span
+                              class="pins-item-body"
+                              classList={{
+                                'pins-item-body--deleted': pinnedMessageDisplayState(m()) === 'deleted',
+                                'pins-item-body--locked': pinnedMessageDisplayState(m()) === 'locked',
+                              }}
+                            >
+                              {pinnedMessageDisplayText(m())}
+                            </span>
                           </span>
                         )}
                       </Show>

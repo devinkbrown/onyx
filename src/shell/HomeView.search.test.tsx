@@ -71,9 +71,10 @@ describe('Home Search Center integration', () => {
   it('opens all-device search from Home, refocuses on repeated Cmd/Ctrl-F, and restores focus', async () => {
     render(() => <AppShell />);
 
-    const homeTrigger = screen.getByTestId('ribbon-search');
+    const homeTrigger = within(screen.getByRole('main', { name: 'Home' }))
+      .getByRole('button', { name: 'Browse rooms' });
     homeTrigger.focus();
-    fireEvent.click(homeTrigger);
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
     const input = await screen.findByRole('searchbox', { name: 'Search messages' });
     expect(input).toHaveAttribute(
       'placeholder',
@@ -86,8 +87,7 @@ describe('Home Search Center integration', () => {
     expect(screen.queryByRole('searchbox', { name: 'Search messages' })).not.toBeInTheDocument();
     expect(document.activeElement).toBe(homeTrigger);
 
-    const browse = within(screen.getByRole('main', { name: 'Home' }))
-      .getByRole('button', { name: 'Browse rooms' });
+    const browse = homeTrigger;
     browse.focus();
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
     const reopenedInput = await screen.findByRole('searchbox', { name: 'Search messages' });

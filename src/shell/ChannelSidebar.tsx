@@ -40,6 +40,7 @@ import { NotificationControls } from './NotificationControls';
 import { PrimaryNavigation, type PrimaryCurrentSection, type PrimarySection } from './PrimaryNavigation';
 import { openRoomInviteShare } from './roomInviteShareState';
 import { preferences } from '@/lib/prefs/preferences';
+import './collection-navigation.css';
 
 export type ChannelSidebarProps = {
   /** Called when mobile close is triggered */
@@ -541,6 +542,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             tabindex={rovingKey() === channelKey(ch) ? 0 : -1}
             class={[
               'shell-channel-item',
+              'shell-channel-item--room',
               active() ? 'shell-channel-item--active' : '',
               hasUnread() && !active() ? 'shell-channel-item--unread' : '',
               hasHighlight() ? 'shell-channel-item--highlight' : '',
@@ -550,7 +552,12 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
             onClick={() => handleChannelClick(ch)}
           >
             <span class="shell-channel-sigil" aria-hidden="true">{channelSigil()}</span>
-            <span class="shell-channel-name">{channelName()}</span>
+            <span class="shell-channel-copy">
+              <span class="shell-channel-name">{channelName()}</span>
+              <Show when={ch.topic.trim()}>
+                <span class="shell-channel-topic" aria-hidden="true">{ch.topic.trim()}</span>
+              </Show>
+            </span>
             <Show when={activityStamp(ch.name) && ch.unread === 0 && ch.highlights === 0}>
               <span class="shell-channel-time" aria-hidden="true">
                 {activityStamp(ch.name)}
@@ -586,7 +593,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
   }
 
   return (
-    <aside class="shell-sidebar" aria-label="Room navigation">
+    <aside class="shell-sidebar shell-collection-sidebar" aria-label="Room navigation">
       {/* Header */}
       <div class="shell-sidebar-head" aria-hidden="false">
         <span class="shell-sidebar-network">
@@ -621,7 +628,11 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         onToggle={(e) => setFilterOpen(e.currentTarget.open)}
       >
         <summary class="shell-sidebar-filter-summary">
+          <span class="shell-sidebar-filter-summary-icon" aria-hidden="true">⌕</span>
           <span>Filter</span>
+          <span class="shell-sidebar-filter-summary-hint" aria-hidden="true">
+            {sidebarMode() === 'messages' ? 'Find a conversation' : 'Find a room'}
+          </span>
           <Show when={filterActive()}>
             <span class="shell-sidebar-filter-summary-on" aria-hidden="true">on</span>
           </Show>
@@ -698,7 +709,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
       >
         <div class="shell-conversation-spine" data-testid="conversation-spine">
           <div class="shell-conversation-spine-head">
-            <p class="shell-conversation-spine-label">Conversations</p>
+            <p class="shell-conversation-spine-label shell-conversation-spine-label--context" aria-hidden="true">Conversations</p>
             <p class="shell-sidebar-collection-heading" id="sidebar-collection-heading" role="heading" aria-level="2">
               {collectionHeading()}
             </p>
@@ -720,7 +731,10 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                   onClick={handleStatusClick}
                 >
                   <span class="shell-channel-sigil" aria-hidden="true">✦</span>
-                  <span class="shell-channel-name">Activity</span>
+                  <span class="shell-channel-copy">
+                    <span class="shell-channel-name">Activity</span>
+                    <span class="shell-channel-topic" aria-hidden="true">Network updates</span>
+                  </span>
                 </button>
               </li>
             </ul>
@@ -790,15 +804,14 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                     </button>
                   }
                 >
-                  <p class="shell-sidebar-section-label" id="sidebar-channels-label">
+                  <p class="shell-sidebar-section-label shell-sidebar-section-label--collection" id="sidebar-channels-label">
                     Rooms
                   </p>
-                </Show>
+                  </Show>
                 <ul
                   class="shell-channel-list"
                   role="list"
-                  aria-labelledby={isUncategorized() ? 'sidebar-channels-label' : undefined}
-                  aria-label={isUncategorized() ? undefined : group.folder!.name}
+                  aria-label={isUncategorized() ? 'Joined rooms' : group.folder!.name}
                 >
                   <Show
                     when={group.channels.length > 0}
@@ -849,7 +862,7 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
         <Show when={showMessages()}>
           <div class="shell-sidebar-section">
             <div class="shell-sidebar-section-heading">
-              <p class="shell-sidebar-section-label" id="sidebar-dms-label">Messages</p>
+              <p class="shell-sidebar-section-label shell-sidebar-section-label--collection" id="sidebar-dms-label">Messages</p>
               <Show when={local.onOpenNewConversation}>
                 <button type="button" class="shell-new-conversation-button" data-testid="new-conversation"
                   aria-label="New conversation" onClick={() => local.onOpenNewConversation?.()}>
@@ -909,31 +922,33 @@ export function ChannelSidebar(props: ChannelSidebarProps): JSX.Element {
                             )}
                           </Show>
                         </span>
-                        <Show when={keyChanged()}>
-                          <span
-                            class="shell-dm-keywarn"
-                            data-testid="sidebar-dm-keywarn"
-                            title="Device key changed"
-                            aria-hidden="true"
-                          >
-                            ⚠
-                          </span>
-                        </Show>
-                        <Show when={offlineCount() > 0}>
-                          <span class="shell-channel-offline" aria-hidden="true">
-                            {offlineMemoStamp(offlineCount())}
-                          </span>
-                        </Show>
-                        <Show when={dm.highlights > 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {dm.highlights}
-                          </span>
-                        </Show>
-                        <Show when={dm.unread > 0 && dm.highlights === 0}>
-                          <span class="shell-channel-badge" aria-hidden="true">
-                            {dm.unread > 99 ? '99+' : dm.unread}
-                          </span>
-                        </Show>
+                        <span class="shell-dm-meta">
+                          <Show when={keyChanged()}>
+                            <span
+                              class="shell-dm-keywarn"
+                              data-testid="sidebar-dm-keywarn"
+                              title="Device key changed"
+                              aria-hidden="true"
+                            >
+                              ⚠
+                            </span>
+                          </Show>
+                          <Show when={offlineCount() > 0}>
+                            <span class="shell-channel-offline" aria-hidden="true">
+                              {offlineMemoStamp(offlineCount())}
+                            </span>
+                          </Show>
+                          <Show when={dm.highlights > 0}>
+                            <span class="shell-channel-badge" aria-hidden="true">
+                              {dm.highlights}
+                            </span>
+                          </Show>
+                          <Show when={dm.unread > 0 && dm.highlights === 0}>
+                            <span class="shell-channel-badge" aria-hidden="true">
+                              {dm.unread > 99 ? '99+' : dm.unread}
+                            </span>
+                          </Show>
+                        </span>
                       </button>
                     </li>
                   );

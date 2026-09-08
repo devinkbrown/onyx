@@ -131,6 +131,55 @@ function openCallMore(getByTestId: (id: string) => HTMLElement): void {
   fireEvent.click(getByTestId('call-more-button'));
 }
 
+const RECORDING_BLOB = new Blob(['saved-audio'], { type: 'audio/webm;codecs=opus' });
+
+async function installVoiceBarRecording(opts: { deferred?: boolean } = {}) {
+  const g = globalThis as unknown as { MediaRecorder?: unknown };
+  const previousRecorder = g.MediaRecorder;
+  g.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+  };
+
+  let settleStop = (_blob: Blob | null) => {};
+  const startRecording = vi.fn().mockReturnValue({ started: true });
+  const stopRecording = opts.deferred
+    ? vi.fn().mockImplementation(() => new Promise<Blob | null>((resolve) => {
+      settleStop = resolve;
+    }))
+    : vi.fn().mockResolvedValue(RECORDING_BLOB);
+
+  const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+  setMountedCadenceMediaEngine({
+    startRecording,
+    stopRecording,
+    getLocalStream: vi.fn().mockReturnValue({ getTracks: () => [] } as unknown as MediaStream),
+    leaveRoom: vi.fn(),
+    hangup: vi.fn(),
+  } as never);
+
+  const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:onyx-recording');
+  const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+  return {
+    startRecording,
+    stopRecording,
+    createObjectURL,
+    resolveStop(blob: Blob | null = RECORDING_BLOB) {
+      settleStop(blob);
+    },
+    restore() {
+      setMountedCadenceMediaEngine(null);
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+      if (previousRecorder === undefined) {
+        Reflect.deleteProperty(globalThis, 'MediaRecorder');
+      } else {
+        g.MediaRecorder = previousRecorder;
+      }
+    },
+  };
+}
+
 function setDisplayCapture(method?: MediaDevices['getDisplayMedia']): void {
   if (method) {
     Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', {
@@ -820,10 +869,11 @@ describe('VoiceBar', () => {
     // Arrange — store is at initialState (callState: 'idle')
 
     // Act
-    const { queryByTestId } = render(() => <VoiceBar />);
+    const { queryByTestId, getByTestId } = render(() => <VoiceBar />);
 
     // Assert — bar is hidden
     expect(queryByTestId('voice-bar')).toBeNull();
+    expect(getByTestId('voice-bar-owner')).toHaveAttribute('data-voice-bar-active', 'false');
   });
 
   it('renders the bar when callState is in_call', () => {
@@ -835,6 +885,63 @@ describe('VoiceBar', () => {
 
     // Assert
     expect(getByTestId('voice-bar')).toBeDefined();
+  });
+
+  it('keeps one recording VoiceBar mounted while the primary surface changes', async () => {
+    const g = globalThis as unknown as { MediaRecorder?: unknown };
+    const previousRecorder = g.MediaRecorder;
+    g.MediaRecorder = class {
+      static isTypeSupported() { return true; }
+    };
+
+    const startRecording = vi.fn().mockReturnValue({ started: true });
+    const stopRecording = vi.fn().mockResolvedValue(
+      new Blob(['persistent-audio'], { type: 'audio/webm;codecs=opus' }),
+    );
+    const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+    setMountedCadenceMediaEngine({
+      startRecording,
+      stopRecording,
+      getLocalStream: vi.fn().mockReturnValue({ getTracks: () => [] } as unknown as MediaStream),
+    } as never);
+
+    try {
+      seedVoiceStore([]);
+      const [surface, setSurface] = createSignal<'rooms' | 'calls'>('rooms');
+      const { getByTestId } = render(() => (
+        <>
+          <div data-testid="primary-surface">{surface()}</div>
+          <VoiceBar />
+        </>
+      ));
+      const bar = getByTestId('voice-bar');
+      openCallMore(getByTestId);
+      const record = getByTestId('record-button');
+
+      fireEvent.click(record);
+      expect(startRecording).toHaveBeenCalledOnce();
+      expect(getByTestId('record-status')).toHaveTextContent('Recording local audio');
+
+      setSurface('calls');
+      expect(getByTestId('primary-surface')).toHaveTextContent('calls');
+      expect(getByTestId('voice-bar')).toBe(bar);
+      expect(getByTestId('record-status')).toHaveTextContent('Recording local audio');
+      expect(stopRecording).not.toHaveBeenCalled();
+
+      setSurface('rooms');
+      expect(getByTestId('voice-bar')).toBe(bar);
+      expect(getByTestId('record-button')).toHaveAttribute('aria-pressed', 'true');
+
+      fireEvent.click(getByTestId('record-button'));
+      await waitFor(() => expect(stopRecording).toHaveBeenCalledOnce());
+    } finally {
+      setMountedCadenceMediaEngine(null);
+      if (previousRecorder === undefined) {
+        Reflect.deleteProperty(globalThis, 'MediaRecorder');
+      } else {
+        g.MediaRecorder = previousRecorder;
+      }
+    }
   });
 
   it('shows a hop-protected security chip with shield language, never a padlock', () => {
@@ -1346,7 +1453,7 @@ describe('VoiceBar', () => {
       static isTypeSupported() { return true; }
     };
 
-    const startRecording = vi.fn();
+    const startRecording = vi.fn().mockReturnValue({ started: true });
     const stopRecording = vi.fn().mockResolvedValue(
       new Blob(['fake-audio'], { type: 'audio/webm;codecs=opus' }),
     );
@@ -1407,6 +1514,167 @@ describe('VoiceBar', () => {
       } else {
         g.MediaRecorder = prevRecorder;
       }
+    }
+  });
+
+  it.each([
+    ['failed', 'Could not start recording. Try again.'],
+    ['finalizing', 'Previous recording is still saving. Try again when it finishes.'],
+    ['no-media', 'No local media to record'],
+    ['unavailable', 'Recording unavailable'],
+    ['already-recording', 'A recording is already running'],
+  ] as const)('keeps Record unpressed and releases ownership when start is refused: %s', async (reason, status) => {
+    const harness = await installVoiceBarRecording();
+    const held = vi.fn();
+    try {
+      harness.startRecording.mockReturnValue({ started: false, reason });
+      seedVoiceStore([]);
+      const { getByTestId, unmount } = render(() => <VoiceBar onRecordingOwnerHeld={held} />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+      expect(getByTestId('record-button')).toHaveAttribute('aria-pressed', 'false');
+      expect(getByTestId('record-button')).toHaveAttribute('aria-label', 'Record local audio');
+      expect(getByTestId('record-status')).toHaveTextContent(status);
+      expect(held).not.toHaveBeenCalledWith(true);
+      unmount();
+      expect(harness.stopRecording).not.toHaveBeenCalled();
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it.each(['throw', 'missing-result'] as const)('does not claim recording when start returns %s', async (failure) => {
+    const harness = await installVoiceBarRecording();
+    try {
+      harness.startRecording.mockImplementation(() => {
+        if (failure === 'throw') throw new Error('Start failed');
+        return undefined; // An old mock/engine without explicit acceptance must fail closed.
+      });
+      seedVoiceStore([]);
+      const { getByTestId, unmount } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      expect(getByTestId('record-button')).toHaveAttribute('aria-pressed', 'false');
+      expect(getByTestId('record-status')).toHaveTextContent('Could not start recording. Try again.');
+      unmount();
+      expect(harness.stopRecording).not.toHaveBeenCalled();
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('allows retry after a finalization refusal and holds ownership only after acceptance', async () => {
+    const harness = await installVoiceBarRecording();
+    const held = vi.fn();
+    try {
+      harness.startRecording.mockReturnValueOnce({ started: false, reason: 'finalizing' });
+      seedVoiceStore([]);
+      const { getByTestId } = render(() => <VoiceBar onRecordingOwnerHeld={held} />);
+      openCallMore(getByTestId);
+      const button = getByTestId('record-button');
+      fireEvent.click(button);
+      expect(held).not.toHaveBeenCalledWith(true);
+      fireEvent.click(button);
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(held).toHaveBeenLastCalledWith(true);
+      expect(getByTestId('record-status')).toHaveTextContent('Recording local audio');
+      fireEvent.click(button);
+      await waitFor(() => expect(held).toHaveBeenLastCalledWith(false));
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(harness.createObjectURL).toHaveBeenCalledOnce();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('saves the recording when Leave ends the call while recording', async () => {
+    const harness = await installVoiceBarRecording();
+    try {
+      seedVoiceStore([]);
+      const { getByTestId, queryByTestId } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+
+      fireEvent.click(getByTestId('leave-button'));
+      await waitFor(() => expect(harness.stopRecording).toHaveBeenCalledOnce());
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      expect(queryByTestId('voice-bar')).toBeNull();
+      expect(getByTestId('voice-bar-owner')).toHaveAttribute('data-voice-bar-active', 'false');
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('saves a deferred recording blob when Stop races with Leave', async () => {
+    const harness = await installVoiceBarRecording({ deferred: true });
+    try {
+      seedVoiceStore([]);
+      const { getByTestId, queryByTestId } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      fireEvent.click(getByTestId('record-button'));
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+
+      fireEvent.click(getByTestId('leave-button'));
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(queryByTestId('voice-bar')).toBeNull();
+      expect(getByTestId('voice-bar-owner')).toHaveAttribute('data-voice-bar-active', 'false');
+
+      harness.resolveStop();
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('saves a deferred recording blob when the owner unmounts during Stop', async () => {
+    const harness = await installVoiceBarRecording({ deferred: true });
+    try {
+      seedVoiceStore([]);
+      const { getByTestId, unmount } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      fireEvent.click(getByTestId('record-button'));
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+
+      unmount();
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+
+      harness.resolveStop();
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('stops recording resources on genuine unmount without starting media', async () => {
+    const harness = await installVoiceBarRecording({ deferred: true });
+    try {
+      seedVoiceStore([]);
+      const { getByTestId, unmount } = render(() => <VoiceBar />);
+      openCallMore(getByTestId);
+      fireEvent.click(getByTestId('record-button'));
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+      expect(harness.stopRecording).not.toHaveBeenCalled();
+
+      unmount();
+      await waitFor(() => expect(harness.stopRecording).toHaveBeenCalledOnce());
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+
+      harness.resolveStop();
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+    } finally {
+      harness.restore();
     }
   });
 

@@ -98,7 +98,7 @@ describe.each(PAGES)('PublicInfo /$page/', (route) => {
     render(() => <PublicInfo page={route.page} />);
 
     expect(screen.getByRole('heading', { level: 1, name: route.title })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: route.title })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'The statement' })).toBeInTheDocument();
     expect(screen.getByText('public contract')).toBeInTheDocument();
     expect(screen.getAllByText('Public contract')).toHaveLength(1);
     expect(screen.getByText('Onyx · public statement')).toBeInTheDocument();
@@ -135,11 +135,17 @@ describe.each(PAGES)('PublicInfo /$page/', (route) => {
 });
 
 describe('PublicInfo route family', () => {
-  it('admits exactly the four explicit support route paths', () => {
+  it('admits canonical and slashless variants of the four explicit support routes', () => {
     expect(['/accessibility/', '/glossary/', '/integrations/', '/agents/'].map(resolvePublicInfoPage))
       .toEqual(['accessibility', 'glossary', 'integrations', 'agents']);
-    expect(() => resolvePublicInfoPage('/agents')).toThrow(/allowlisted/);
-    expect(() => resolvePublicInfoPage('/unknown/')).toThrow(/allowlisted/);
+    expect(['/accessibility', '/glossary', '/integrations', '/agents'].map(resolvePublicInfoPage))
+      .toEqual(['accessibility', 'glossary', 'integrations', 'agents']);
+  });
+
+  it('rejects unknown paths and non-route suffixes', () => {
+    for (const path of ['/unknown', '/unknown/', '/agents/extra']) {
+      expect(() => resolvePublicInfoPage(path)).toThrow(/allowlisted/);
+    }
   });
 
   it('derives currentPath and main label from the page alone', () => {

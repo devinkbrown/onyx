@@ -9,6 +9,8 @@ async function openConnect(page: Page, width: number, height: number): Promise<v
 
 async function guestGeometry(page: Page) {
   return page.evaluate(() => {
+    const stage = document.querySelector<HTMLElement>('.conn-stage[role="main"]')!;
+    const context = stage.querySelector<HTMLElement>('.conn-context')!;
     const card = document.querySelector<HTMLElement>('.conn-card')!;
     const body = document.querySelector<HTMLElement>('.conn-body')!;
     const submit = document.querySelector<HTMLElement>('[data-testid="conn-submit"]')!;
@@ -17,18 +19,25 @@ async function guestGeometry(page: Page) {
     const signIn = document.querySelector<HTMLElement>('[data-testid="conn-mode-signin"]')!;
     const register = document.querySelector<HTMLElement>('[data-testid="conn-mode-register"]')!;
     const cardBox = card.getBoundingClientRect();
+    const stageBox = stage.getBoundingClientRect();
     const submitBox = submit.getBoundingClientRect();
     const nameBox = name.getBoundingClientRect();
     const roomBox = room.getBoundingClientRect();
+    const bodyStyle = getComputedStyle(body);
     return {
       viewportHeight: window.innerHeight,
       viewportWidth: window.innerWidth,
+      mainCount: document.querySelectorAll('[role="main"]').length,
+      stageLeft: stageBox.left,
+      stageRight: stageBox.right,
+      destinationBeforeForm: Boolean(context.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING),
       documentHeight: document.documentElement.scrollHeight,
       documentWidth: document.documentElement.scrollWidth,
       cardTop: cardBox.top,
       cardBottom: cardBox.bottom,
       cardLeft: cardBox.left,
       cardRight: cardBox.right,
+      cardMinHeight: getComputedStyle(card).minHeight,
       submitTop: submitBox.top,
       submitBottom: submitBox.bottom,
       submitHeight: submitBox.height,
@@ -38,6 +47,9 @@ async function guestGeometry(page: Page) {
       roomBottom: roomBox.bottom,
       signInVisible: signIn.getBoundingClientRect().height > 0,
       registerVisible: register.getBoundingClientRect().height > 0,
+      bodyOverflowY: bodyStyle.overflowY,
+      bodyPaddingTop: Number.parseFloat(bodyStyle.paddingTop),
+      bodyPaddingBottom: Number.parseFloat(bodyStyle.paddingBottom),
       bodyClientHeight: body.clientHeight,
       bodyScrollHeight: body.scrollHeight,
       bodyClientWidth: body.clientWidth,
@@ -53,7 +65,12 @@ test.describe('Connect viewport geometry', () => {
     const geometry = await guestGeometry(page);
 
     expect(geometry.copy).not.toMatch(/claim path|nearest node|handshake|tonight on the water/i);
-    expect(geometry.documentHeight).toBe(geometry.viewportHeight);
+    expect(geometry.mainCount).toBe(1);
+    expect(geometry.destinationBeforeForm).toBe(true);
+    expect(geometry.documentHeight).toBeGreaterThanOrEqual(geometry.viewportHeight);
+    expect(geometry.documentWidth).toBe(geometry.viewportWidth);
+    expect(geometry.stageLeft).toBeGreaterThanOrEqual(0);
+    expect(geometry.stageRight).toBeLessThanOrEqual(geometry.viewportWidth);
     expect(geometry.cardTop).toBeGreaterThanOrEqual(0);
     expect(geometry.cardBottom).toBeLessThanOrEqual(geometry.viewportHeight);
     expect(geometry.nameTop).toBeGreaterThanOrEqual(0);
@@ -70,7 +87,10 @@ test.describe('Connect viewport geometry', () => {
     await openConnect(page, 1366, 768);
     const geometry = await guestGeometry(page);
 
-    expect(geometry.documentHeight).toBe(geometry.viewportHeight);
+    expect(geometry.mainCount).toBe(1);
+    expect(geometry.destinationBeforeForm).toBe(true);
+    expect(geometry.documentHeight).toBeGreaterThanOrEqual(geometry.viewportHeight);
+    expect(geometry.documentWidth).toBe(geometry.viewportWidth);
     expect(geometry.nameBottom).toBeLessThanOrEqual(geometry.viewportHeight);
     expect(geometry.roomBottom).toBeLessThanOrEqual(geometry.viewportHeight);
     expect(geometry.submitBottom).toBeLessThanOrEqual(geometry.viewportHeight);
@@ -82,30 +102,17 @@ test.describe('Connect viewport geometry', () => {
   test('preserves the full-width 390px mobile front door with a reachable join action', async ({ page }) => {
     await openConnect(page, 390, 844);
 
-    const beforeScroll = await page.evaluate(() => {
-      const card = document.querySelector<HTMLElement>('.conn-card')!;
-      const body = document.querySelector<HTMLElement>('.conn-body')!;
-      const cardBox = card.getBoundingClientRect();
-      const bodyStyle = getComputedStyle(body);
-      return {
-        viewportHeight: window.innerHeight,
-        viewportWidth: window.innerWidth,
-        documentHeight: document.documentElement.scrollHeight,
-        documentWidth: document.documentElement.scrollWidth,
-        cardLeft: cardBox.left,
-        cardRight: cardBox.right,
-        cardMinHeight: getComputedStyle(card).minHeight,
-        bodyOverflowY: bodyStyle.overflowY,
-        bodyPaddingTop: Number.parseFloat(bodyStyle.paddingTop),
-        bodyPaddingBottom: Number.parseFloat(bodyStyle.paddingBottom),
-      };
-    });
+    const beforeScroll = await guestGeometry(page);
 
+    expect(beforeScroll.mainCount).toBe(1);
+    expect(beforeScroll.destinationBeforeForm).toBe(true);
+    expect(beforeScroll.documentHeight).toBeGreaterThanOrEqual(beforeScroll.viewportHeight);
     expect(beforeScroll.documentWidth).toBe(beforeScroll.viewportWidth);
     expect(beforeScroll.cardLeft).toBeCloseTo(0, 1);
     expect(beforeScroll.cardRight).toBeCloseTo(beforeScroll.viewportWidth, 1);
-    expect(beforeScroll.cardMinHeight).toBe(`${beforeScroll.viewportHeight}px`);
-    expect(beforeScroll.bodyOverflowY).not.toBe('auto');
+    expect(beforeScroll.cardMinHeight).toBe('0px');
+    expect(beforeScroll.bodyOverflowY).toBe('visible');
+    expect(beforeScroll.bodyScrollWidth).toBe(beforeScroll.bodyClientWidth);
     expect(beforeScroll.bodyPaddingTop).toBeGreaterThanOrEqual(20);
     expect(beforeScroll.bodyPaddingBottom).toBeGreaterThanOrEqual(14);
 
@@ -125,6 +132,11 @@ test.describe('Connect viewport geometry', () => {
 
   test('keeps the join action reachable on a short 390x667 phone', async ({ page }) => {
     await openConnect(page, 390, 667);
+    const geometry = await guestGeometry(page);
+    expect(geometry.mainCount).toBe(1);
+    expect(geometry.destinationBeforeForm).toBe(true);
+    expect(geometry.cardMinHeight).toBe('0px');
+    expect(geometry.bodyOverflowY).toBe('visible');
     const submit = page.getByTestId('conn-submit');
     await submit.scrollIntoViewIfNeeded();
     const box = await submit.boundingBox();

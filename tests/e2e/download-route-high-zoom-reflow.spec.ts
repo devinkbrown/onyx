@@ -35,17 +35,23 @@ test('keeps the PublicFrame Download route usable at 400% zoom', async ({ page }
   await expect(primaryAction).toBeVisible();
   await expect(menuToggle).toBeVisible();
   await expect(menuToggle).toHaveAccessibleName('Open navigation menu');
-  await menuToggle.click();
+  // Exercise keyboard focus visibility, not the browser's pointer-focus heuristic.
+  await primaryAction.focus();
+  await page.keyboard.press('Tab');
+  await expect(menuToggle).toBeFocused();
+  await page.keyboard.press('Space');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(menuToggle).toHaveAccessibleName('Close navigation menu');
   await expect(header.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(menuToggle).toBeFocused();
+  await expect(menuToggle).not.toHaveCSS('outline-style', 'none');
 
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
-  await primaryAction.focus();
+  await menuToggle.focus();
+  await page.keyboard.press('Shift+Tab');
   await expect(primaryAction).toBeFocused();
 
   const geometry = await page.evaluate(() => {

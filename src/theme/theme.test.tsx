@@ -102,6 +102,20 @@ describe('applyThemeToDom', () => {
     }
   });
 
+  it('owns the normal coral action only on ocean and clears it on theme switch', () => {
+    applyThemeToDom('ocean');
+    expect(getVar('--brand-action')).toBe('#ff987d');
+
+    for (const id of THEME_IDS.filter((themeId) => themeId !== 'ocean')) {
+      expect(THEMES[id].tokens['--brand-action'], `${id} must not own brand action`).toBeUndefined();
+    }
+
+    applyThemeToDom('pearl');
+    expect(getVar('--brand-action')).toBe('');
+    applyThemeToDom('frost');
+    expect(getVar('--brand-action')).toBe('');
+  });
+
   it('derives readable semantic inks and an accent alias for every theme', () => {
     for (const id of THEME_IDS) {
       applyThemeToDom(id);
@@ -592,6 +606,40 @@ describe('Palette quality (all built-in themes)', () => {
     }
   });
 
+  it('pins Astra ocean identity values and keeps coral action distinct from danger', () => {
+    const ocean = THEMES.ocean.tokens;
+    const expected: Readonly<Record<string, string>> = {
+      '--ink': '#202429',
+      '--stone': '#2d333a',
+      '--paper': '#f5f7f8',
+      '--paper-dim': '#b4bfca',
+      '--lapis': '#65adf5',
+      '--lapis-bright': '#65adf5',
+      '--brand-action': '#ff987d',
+    };
+
+    for (const [token, value] of Object.entries(expected)) {
+      expect(ocean[token], token).toBe(value);
+    }
+    expect(ocean['--danger']).toBe('var(--shu)');
+    expect(ocean['--shu']).not.toBe(ocean['--brand-action']);
+
+    const ink = parseHex(ocean['--ink']!);
+    const paper = parseHex(ocean['--paper']!);
+    const muted = parseHex(ocean['--paper-dim']!);
+    const cobalt = parseHex(ocean['--lapis']!);
+    const action = parseHex(ocean['--brand-action']!);
+    expect(ink).not.toBeNull();
+    expect(paper).not.toBeNull();
+    expect(muted).not.toBeNull();
+    expect(cobalt).not.toBeNull();
+    expect(action).not.toBeNull();
+    expect(contrastRatio(paper!, ink!)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(muted!, ink!)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(cobalt!, ink!)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(action!, ink!)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('no chromatic accent sits in the banned purple/indigo band (258–342°)', () => {
     for (const id of THEME_IDS) {
       for (const token of ACCENT_TOKENS) {
@@ -891,14 +939,19 @@ describe('Sapphire theme', () => {
     }
   });
 
-  it('is cut monochrome — bluer and more indigo than the flagship ocean current', () => {
+  it('keeps its royal-blue cut distinct while ocean uses the approved cobalt', () => {
     const sapphire = hexToOklch(THEMES.sapphire.tokens['--lapis']!)!;
     const ocean = hexToOklch(THEMES.ocean.tokens['--lapis']!)!;
-    // Sapphire's primary sits at a higher (more indigo) hue than ocean's azure.
-    expect(sapphire.h).toBeGreaterThan(ocean.h);
-    // The second accent stays in the royal family — no cyan glacier contrast.
+    // The approved ocean cobalt is close to the safe royal-blue boundary; both
+    // cuts must remain in the non-banned blue range.
+    for (const [label, colour] of [['sapphire', sapphire], ['ocean', ocean]] as const) {
+      expect(colour.h, `${label} should read blue`).toBeGreaterThan(215);
+      expect(colour.h, `${label} must stay below the banned floor`).toBeLessThan(258);
+    }
+    // The second accent stays in Sapphire's royal family — no cyan glacier contrast.
     const sapphireGold = hexToOklch(THEMES.sapphire.tokens['--gold']!)!;
-    expect(sapphireGold.h).toBeGreaterThan(ocean.h);
+    expect(sapphireGold.h).toBeGreaterThan(215);
+    expect(sapphireGold.h).toBeLessThan(258);
   });
 });
 
@@ -935,7 +988,11 @@ describe('Ocean family', () => {
   });
 
   it('each sub-variant defines the same token slots as the flagship', () => {
-    const oceanKeys = Object.keys(THEMES.ocean.tokens).sort();
+    // --brand-action is intentionally ocean-only: all other themes fall back
+    // through commercial-action-primary to their existing --lapis signal.
+    const oceanKeys = Object.keys(THEMES.ocean.tokens)
+      .filter((key) => key !== '--brand-action')
+      .sort();
     for (const id of ['tide', 'abyss', 'reef'] as ThemeId[]) {
       const variantKeys = Object.keys(THEMES[id].tokens).sort();
       expect(variantKeys).toEqual(oceanKeys);

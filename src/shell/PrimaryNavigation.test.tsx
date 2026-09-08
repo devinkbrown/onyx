@@ -171,7 +171,13 @@ describe('PrimaryNavigation', () => {
 
   it('preserves an intrinsic 44px mobile rail at short high zoom', () => {
     expect(commercialNavigationCss).toMatch(
-      /@media \(max-width: 42rem\) and \(max-height: 30rem\)[\s\S]*?\.shell-mobile-nav-btn\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?min-width:\s*max\(44px, max-content\);/,
+      /@media \(max-width: 42rem\) and \(max-height: 30rem\)[\s\S]*?\.shell-mobile-nav-btn\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?width:\s*max-content;[\s\S]*?min-width:\s*44px;/,
+    );
+  });
+
+  it('keeps raw narrow phone labels intrinsic instead of clipping them into adjacent tabs', () => {
+    expect(commercialNavigationCss).toMatch(
+      /@media \(max-width: 42rem\) and \(max-height: 30rem\), \(max-width: 360px\)[\s\S]*?width:\s*max-content;[\s\S]*?white-space:\s*nowrap;/,
     );
   });
 });

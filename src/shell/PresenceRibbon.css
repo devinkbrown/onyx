@@ -9,7 +9,35 @@
 
 @media (max-width: 600px) {
   .presence-ribbon-surface { padding-inline: var(--space-2, 0.5rem); }
-  .presence-ribbon-surface .shell-ribbon-action-label { max-width: 5.5rem; }
+  .presence-ribbon-surface .shell-ribbon-identity {
+    flex: 0 1 auto;
+    min-width: max-content;
+  }
+  .presence-ribbon-surface .shell-ribbon-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .presence-ribbon-surface .shell-ribbon-group { flex: none; }
+  .presence-ribbon-surface .shell-ribbon-action,
+  .presence-ribbon-surface .shell-ribbon-more-trigger {
+    flex: none;
+    width: max-content;
+    min-width: 44px;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+  .presence-ribbon-surface .shell-ribbon-group .onyx-popover__trigger {
+    flex: none;
+    width: max-content;
+    min-width: 44px;
+  }
+  .presence-ribbon-surface .shell-ribbon-action-label {
+    display: inline;
+    max-width: none;
+    white-space: nowrap;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

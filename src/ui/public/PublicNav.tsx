@@ -52,34 +52,38 @@ export function PublicNav(props: { currentPath?: string; items?: readonly Public
 
   return (
     <div ref={clusterRef} class="public-frame__nav-cluster">
-      <nav
-        ref={navRef}
-        id="public-primary-navigation"
-        class="public-frame__nav"
-        classList={{ 'is-open': open() }}
-        aria-label="Primary navigation"
-      >
-        <For each={props.items ?? PUBLIC_NAV_ITEMS}>
-          {(item) => (
-            <a href={item.href} aria-current={normalisePublicRoutePath(item.href) === normalisePublicRoutePath(props.currentPath) ? 'page' : undefined} onClick={() => setOpen(false)}>
-              {item.label}
-            </a>
-          )}
-        </For>
-      </nav>
-      <a class="public-frame__open" href="/app/">Open Onyx</a>
-      <button
-        ref={toggleRef}
-        class="public-frame__menu-toggle"
-        type="button"
-        aria-expanded={open()}
-        aria-controls="public-primary-navigation"
-        aria-label={open() ? 'Close navigation menu' : 'Open navigation menu'}
-        onClick={onToggle}
-      >
-        <span aria-hidden="true" />
-        <span aria-hidden="true" />
-      </button>
+      <div class="public-frame__nav-links">
+        <nav
+          ref={navRef}
+          id="public-primary-navigation"
+          class="public-frame__nav"
+          classList={{ 'is-open': open() }}
+          aria-label="Primary navigation"
+        >
+          <For each={props.items ?? PUBLIC_NAV_ITEMS}>
+            {(item) => (
+              <a href={item.href} aria-current={normalisePublicRoutePath(item.href) === normalisePublicRoutePath(props.currentPath) ? 'page' : undefined} onClick={() => setOpen(false)}>
+                {item.label}
+              </a>
+            )}
+          </For>
+        </nav>
+      </div>
+      <div class="public-frame__nav-actions">
+        <a class="public-frame__open" href="/app/">Open Onyx</a>
+        <button
+          ref={toggleRef}
+          class="public-frame__menu-toggle"
+          type="button"
+          aria-expanded={open()}
+          aria-controls="public-primary-navigation"
+          aria-label={open() ? 'Close navigation menu' : 'Open navigation menu'}
+          onClick={onToggle}
+        >
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }

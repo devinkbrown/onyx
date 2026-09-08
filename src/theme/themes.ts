@@ -66,38 +66,40 @@ export type ThemeId =
   | 'frost';
 
 // ---------------------------------------------------------------------------
-// Flagship: ocean — quiet threshold (mineral night × quiet cyan signal).
-// Formalises what lives in tokens.css as the default :root.
-// Six-hue core: #05070A #0C1016 #1A222C #E6E8EC #8B939E #5BA3C9.
-// Matte strata, restrained signal, no neon/glow spectacle, no Anton display.
+// Flagship: ocean — Astra's graphite arcade (matte surfaces × cobalt focus × coral action).
+// Formalises what lives in tokens.css as the default :root.  The normal brand
+// action is deliberately separate from --shu/--danger, which remain destructive.
+// Identity: graphite #202429, raised slate #2D333A, paper #F5F7F8,
+// muted #B4BFCA, cobalt #65ADF5, brand coral #FF987D.
 // ---------------------------------------------------------------------------
 const oceanTokens: TokenMap = {
-  // Ground — mineral night void → face → edge
-  '--ink':        '#05070a',
-  '--ink-2':      '#080b10',
-  '--stone':      '#0c1016',
-  '--stone-2':    '#121820',
-  '--stone-3':    '#1a222c',
-  '--stone-line': '#222c38',
+  // Ground — graphite void → raised slate → edge planes.
+  '--ink':        '#202429',
+  '--ink-2':      '#262c32',
+  '--stone':      '#2d333a',
+  '--stone-2':    '#343b43',
+  '--stone-3':    '#3a424b',
+  '--stone-line': '#49535e',
 
-  // Quiet cyan signal (primary)
-  '--lapis':       '#5ba3c9',
-  '--lapis-bright':'#8bc4d9',
-  '--lapis-deep':  '#2e5f7a',
+  // Cobalt — selection, links, and visible keyboard focus.
+  '--lapis':       '#65adf5',
+  '--lapis-bright':'#65adf5',
+  '--lapis-deep':  '#397db8',
 
-  // Mineral second accent — cool steel (not neon glacier)
-  '--gold':       '#7a9aab',
-  '--gold-bright':'#a8c0cc',
-  '--gold-deep':  '#4a6570',
+  // Neutral secondary accent — the Astra identity has no competing hue.
+  '--gold':       '#b4bfca',
+  '--gold-bright':'#f5f7f8',
+  '--gold-deep':  '#71808e',
 
-  // Coral — the single hot accent (danger / badges)
+  // Coral — normal product action.  Destructive semantics stay on --shu.
+  '--brand-action':'#ff987d',
   '--shu':        '#ff6f61',
   '--shu-bright': '#ff9484',
 
-  // Text — cool paper over mineral night
-  '--paper':      '#e6e8ec',
-  '--paper-dim':  '#8b939e',
-  '--paper-mute': '#848c96',
+  // Text — paper and muted slate over graphite.
+  '--paper':      '#f5f7f8',
+  '--paper-dim':  '#b4bfca',
+  '--paper-mute': '#b4bfca',
 
   // Status
   '--ok':      '#5bc78e',
@@ -120,9 +122,9 @@ const oceanTokens: TokenMap = {
   '--ease': 'cubic-bezier(0.16, 1, 0.3, 1)',
   '--dur':  '220ms',
 
-  // Typography — Instrument Sans display (no Anton on default ocean)
+  // Typography — Anton display, Instrument Sans UI/messages, technical mono.
   '--font-mono':    "'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
-  '--font-display': "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  '--font-display': "'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif",
   '--font-sans':    "'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif':   "'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
 };

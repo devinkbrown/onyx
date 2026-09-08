@@ -59,6 +59,13 @@ describe('AppShell room current', () => {
     expect(current).toHaveAttribute('data-shell-current-kind', 'room');
     expect(current.textContent).toContain('Room current');
     expect(current.textContent).not.toMatch(/encrypt|secure|protect/i);
+
+    const trigger = screen.getByRole('button', { name: 'Context' });
+    expect(trigger).toHaveAttribute('data-testid', 'ribbon-context');
+    expect(trigger).toHaveAttribute('aria-controls', 'shell-context-rail');
+    expect(trigger).toHaveAttribute('aria-describedby', 'shell-room-current');
+    expect(trigger.closest('.shell-ribbon-right')).not.toBeNull();
+    expect(trigger.closest('.shell-room-current')).toBeNull();
   });
 
   it('returns focus to the Context trigger when the rail closes', async () => {

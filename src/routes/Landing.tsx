@@ -25,12 +25,12 @@ const TRUST_CLAIMS = [
 ] as const;
 
 /**
- * Onyx public homepage — quiet harbor, community door.
+ * Onyx public homepage — a social front door for rooms, messages, and calls.
  * Contract: docs/PUBLIC_COMPANY_SITE.md
  */
 export default function Landing() {
   setPageMeta(
-    'Onyx — a room for your people',
+    'Onyx — good company. Great nights.',
     PUBLIC_HOME_DESCRIPTION,
     '/',
   );
@@ -41,101 +41,67 @@ export default function Landing() {
       mainLabel="Onyx home"
     >
       <div class="ui-root ui-commercial r r-landing home">
-      <div class="r-ground home-ground" aria-hidden="true" />
-      <div class="r-grain home-grain" aria-hidden="true" />
+        <div class="r-ground home-ground" aria-hidden="true" />
+        <div class="r-grain home-grain" aria-hidden="true" />
 
-      <section class="r-wrap home-hero" aria-labelledby="hero-heading">
-        <div class="home-hero-grid">
-          <div class="home-hero-copy">
-            <p class="home-kicker">A room for your people</p>
-            <h1 id="hero-heading" class="home-h1">Come for the conversation. Return to the room.</h1>
-            <p class="home-lede">
-              Onyx is a calm place for rooms, private conversations, and calls that remember where you stopped.
-            </p>
-            <div class="home-cta-row">
-              <a class="home-cta-primary" href={`${publicRouteById('invite').href}?join=%23root`}>Start in the public room</a>
-              <a class="home-secondary-link" href="/app/">Open the app</a>
-              <a class="home-local-link" href={publicRouteById('download').href}>Try Onyx locally</a>
+        <section class="r-wrap home-hero" aria-labelledby="hero-heading">
+          <div class="home-hero-grid">
+            <div class="home-hero-copy">
+              <h1 id="hero-heading" class="home-h1">
+                <span>Good company.</span>
+                {' '}
+                <span>Great nights.</span>
+              </h1>
+              <p class="home-lede">
+                A place for your friends to talk, play, and catch up. Open a room in your browser.
+              </p>
+              <div class="home-cta-row">
+                <a class="home-cta-primary" href="/app/">Open Onyx</a>
+                <a class="home-secondary-link" href={`${publicRouteById('invite').href}?join=%23root`}>See the public room</a>
+              </div>
+              <p class="home-device-note home-desktop-note">
+                Browser first. Keep it on this device from a supporting browser — <a class="home-local-link" href={publicRouteById('download').href}>see device options</a>.
+              </p>
             </div>
-            <p class="home-desktop-note">
-              Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
-            </p>
-            <div class="home-mascot-scene" aria-hidden="true">
-              <span class="home-mascot-wake" aria-hidden="true" />
-              <img
-                class="home-mascot"
-                src="/brand/mascot-transparent.png"
-                width="220"
-                height="220"
-                alt=""
-                decoding="async"
-              />
+
+            <div class="home-hero-scene">
+              <ProductPreview />
             </div>
           </div>
+        </section>
 
-          <ProductPreview />
+        <section class="r-wrap home-trust" aria-labelledby="trust-heading">
+          <h2 id="trust-heading" class="home-visually-hidden">What you can count on</h2>
+          <dl class="home-trust-list" data-home-trust>
+            <For each={TRUST_CLAIMS}>
+              {(claim) => (
+                <div>
+                  <dt>{claim[0]}</dt>
+                  <dd>{claim[1]}</dd>
+                </div>
+              )}
+            </For>
+          </dl>
+          <p class="home-trust-detail">Read <a href={publicRouteById('privacy').href}>the privacy details</a>.</p>
+        </section>
+
+        <div class="r-wrap home-community">
+          <HomeRoomBoard />
         </div>
-      </section>
 
-      <section class="r-wrap home-room-board-wrap" aria-label="First-room switchboard">
-        <HomeRoomBoard />
-      </section>
-
-      <section class="r-wrap home-trust" aria-labelledby="trust-heading">
-        <h2 id="trust-heading" class="home-visually-hidden">Why people stay</h2>
-        <ul class="home-trust-strip" data-home-trust>
-          <For each={TRUST_CLAIMS}>
-            {(claim) => (
-              <li>
-                <strong>{claim[0]}</strong>
-                <span>{claim[1]}</span>
-              </li>
-            )}
-          </For>
-        </ul>
-      </section>
-
-      <section class="r-wrap home-capability" aria-labelledby="capability-heading">
-        <h2 id="capability-heading" class="home-visually-hidden">Life in the rooms</h2>
-        <ul class="home-current" data-home-current>
-          <li class="home-current-beat is-msg">
-            <span class="mark mark-msg" aria-hidden="true" />
-            <span>Rooms for friends, clubs, class groups, and public-interest hangouts</span>
-          </li>
-          <li class="home-current-beat is-call">
-            <span class="mark mark-call" aria-hidden="true" />
-            <span>Talk in text, then start a call when the night wants one</span>
-          </li>
-          <li class="home-current-beat is-cont">
-            <span class="mark mark-cont" aria-hidden="true" />
-            <span>Come back later — the room and your place in it stay with you</span>
-          </li>
-          <li class="home-current-beat is-protect">
-            <span class="mark mark-protect" aria-hidden="true" />
-            <span>Private DMs when a conversation should stay between people</span>
-          </li>
-        </ul>
-        <div class="home-capability-chapters" aria-label="More ways in">
-          <a href={`${publicRouteById('invite').href}?join=%23root`}><strong>Invite someone</strong><span>Send a room link to a friend</span></a>
-          <a href={publicRouteById('download').href}><strong>Keep it here</strong><span>Browser first. Packages stay further down.</span></a>
-          <a href={publicRouteById('about').href}><strong>How the rooms work</strong><span>A short, plain walkthrough</span></a>
-        </div>
-      </section>
-
-      <nav
-        id="extras"
-        class="r-wrap home-shelf"
-        data-home-shelf
-        aria-label="Also here"
-      >
-        <p class="home-shelf-label">Also here</p>
-        <ul class="home-shelf-list">
-          <For each={LANDING_SHELF_ITEMS}>
-            {(item) => <li><a href={item[0]}>{item[1]}</a></li>}
-          </For>
-        </ul>
-      </nav>
-
+        <nav
+          id="extras"
+          class="r-wrap home-shelf"
+          data-home-shelf
+          aria-label="Also here"
+        >
+          <p class="home-shelf-label">More to explore</p>
+          <ul class="home-shelf-list">
+            <For each={LANDING_SHELF_ITEMS}>
+              {(item) => <li><a href={item[0]}>{item[1]}</a></li>}
+            </For>
+          </ul>
+        </nav>
       </div>
     </PublicFrame>
   );

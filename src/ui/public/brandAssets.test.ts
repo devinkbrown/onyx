@@ -54,7 +54,7 @@ describe('locked public identity assets', () => {
     expect(apple[25], 'apple-touch must be opaque RGB, not alpha').toBe(2);
     expect(apple.equals(readFileSync(join(root, 'public/favicon-32.png')))).toBe(false);
 
-    const home = read('src/routes/Landing.tsx');
+    const home = `${read('src/routes/Landing.tsx')}\n${read('src/routes/ProductPreview.tsx')}`;
     const entry = read('index.html');
     expect(home).not.toMatch(/Pebble/);
     expect(home).toContain('/brand/mascot-transparent.png');
@@ -95,19 +95,18 @@ describe('locked public identity assets', () => {
   });
 
   it('uses the mascot at most once on each public page and never in chat chrome', () => {
-    const home = read('src/routes/Landing.tsx');
+    const home = `${read('src/routes/Landing.tsx')}\n${read('src/routes/ProductPreview.tsx')}`;
     const about = read('src/routes/About.tsx');
     const invite = read('src/routes/Invite.tsx');
     expect(home.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-transparent.png']);
     expect(about.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-still.png']);
-    expect(invite.match(/\/brand\/mascot[^"]*/g)).toEqual(['/brand/mascot-wave.png']);
+    expect(invite.match(/\/brand\/mascot[^"]*/g)).toBeNull();
     expect(about).not.toMatch(/Pebble/);
     expect(invite).not.toMatch(/Pebble/);
 
     const shell = [
       'src/shell/AppShell.tsx',
-      'src/shell/Connect.tsx',
-      'src/routes/ProductPreview.tsx',
+      'src/app/Connect.tsx',
     ];
     for (const path of shell) {
       if (!existsSync(join(root, path))) continue;

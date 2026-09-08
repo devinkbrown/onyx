@@ -2,8 +2,9 @@
 /**
  * Account.tsx — Onyx account panel (deep-water dark-luxury).
  *
- * The in-app home for a signed-in identity. Where Connect is the front door,
- * this is the room you manage your account from once inside:
+ * The in-app home for a signed-in identity. You opens task categories; this
+ * panel is the account category. Where Connect is the front door, this is
+ * the room you manage your account from once inside:
  *
  *   • Identity card — account name, email, flags, secure / enforce, registration.
  *   • Email         — ACCOUNTSET email (password-verified).
@@ -159,6 +160,10 @@ function PasswordField(props: PasswordFieldProps): JSX.Element {
 interface SectionProps {
   title: string;
   hint?: string;
+  /** Optional section index target used by the responsive account layout. */
+  navSection?: string;
+  /** Visual grouping only — does not change command behavior. */
+  tone?: 'security' | 'danger';
   children: JSX.Element;
 }
 
@@ -166,12 +171,46 @@ function sectionId(title: string, suffix: string): string {
   return `acct-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${suffix}`;
 }
 
+/** Scroll only the modal body, and only when the restored control is out of view. */
+function revealInNearestModalScroller(control: HTMLElement): void {
+  if (!control.isConnected) return;
+  const scroller = control.closest<HTMLElement>('.onyx-modal__body');
+  if (!scroller?.isConnected) return;
+
+  const scrollerRect = scroller.getBoundingClientRect();
+  const controlRect = control.getBoundingClientRect();
+  if (scrollerRect.height <= 0) return;
+
+  let delta = 0;
+  if (controlRect.top < scrollerRect.top) {
+    delta = controlRect.top - scrollerRect.top;
+  } else if (controlRect.bottom > scrollerRect.bottom) {
+    delta = controlRect.bottom - scrollerRect.bottom;
+  }
+  if (delta === 0) return;
+
+  if (typeof scroller.scrollBy === 'function') {
+    scroller.scrollBy({ top: delta, left: 0, behavior: 'auto' });
+    return;
+  }
+  scroller.scrollTop += delta;
+}
+
 function Section(props: SectionProps): JSX.Element {
-  const [local] = splitProps(props, ['title', 'hint', 'children']);
+  const [local] = splitProps(props, ['title', 'hint', 'navSection', 'tone', 'children']);
   const titleId = () => sectionId(local.title, 'title');
   const hintId = () => (local.hint ? sectionId(local.title, 'hint') : undefined);
   return (
-    <section class="acct-section" aria-labelledby={titleId()} aria-describedby={hintId()}>
+    <section
+      class="acct-section"
+      classList={{
+        'acct-section--security': local.tone === 'security',
+        'acct-section--danger': local.tone === 'danger',
+      }}
+      data-account-nav-section={local.navSection}
+      aria-labelledby={titleId()}
+      aria-describedby={hintId()}
+    >
       <div class="acct-section-head">
         <h3 class="acct-section-title" id={titleId()}>{local.title}</h3>
         <Show when={local.hint}>
@@ -187,22 +226,30 @@ type AccountSectionId =
   | 'acct-identity'
   | 'acct-email-title'
   | 'acct-password-title'
+  | 'acct-two-factor-authentication-title'
   | 'acct-sessions-title'
   | 'acct-recovery-title'
   | 'acct-passkeys-title'
-  | 'acct-download-store-title';
+  | 'acct-download-store-title'
+  | 'acct-session-title';
 
-const ACCOUNT_SECTION_NAV: readonly { id: AccountSectionId; label: string }[] = [
-  { id: 'acct-identity', label: 'Overview' },
-  { id: 'acct-email-title', label: 'Email' },
-  { id: 'acct-password-title', label: 'Password' },
-  { id: 'acct-sessions-title', label: 'Devices' },
-  { id: 'acct-recovery-title', label: 'Recovery' },
-  { id: 'acct-passkeys-title', label: 'Passkeys' },
-  { id: 'acct-download-store-title', label: 'Data' },
+const ACCOUNT_SECTION_NAV: readonly { id: AccountSectionId; label: string; summary: string }[] = [
+  { id: 'acct-identity', label: 'Overview', summary: 'Name and account facts' },
+  { id: 'acct-email-title', label: 'Email', summary: 'Recovery address' },
+  { id: 'acct-password-title', label: 'Password', summary: 'Change sign-in password' },
+  { id: 'acct-two-factor-authentication-title', label: 'Security', summary: 'Authenticator app' },
+  { id: 'acct-sessions-title', label: 'Devices', summary: 'Signed-in browsers' },
+  { id: 'acct-recovery-title', label: 'Recovery', summary: 'Offline recovery codes' },
+  { id: 'acct-passkeys-title', label: 'Passkeys', summary: 'Passwordless sign-in' },
+  { id: 'acct-download-store-title', label: 'Data', summary: 'Download or delete' },
+  { id: 'acct-session-title', label: 'Session', summary: 'Sign out of this connection' },
 ];
 
-function AccountSectionNav(): JSX.Element {
+interface AccountSectionNavProps {
+  onSelect?: (id: AccountSectionId) => void;
+}
+
+function AccountSectionNav(props: AccountSectionNavProps): JSX.Element {
   const [activeId, setActiveId] = createSignal<AccountSectionId>('acct-identity');
   let navRef: HTMLElement | undefined;
 
@@ -235,6 +282,7 @@ function AccountSectionNav(): JSX.Element {
     const target = document.getElementById(id);
     if (!target) return;
     setActiveId(id);
+    props.onSelect?.(id);
     target.scrollIntoView({
       block: 'start',
       behavior: prefersReducedMotionForInteraction() ? 'auto' : 'smooth',
@@ -243,19 +291,23 @@ function AccountSectionNav(): JSX.Element {
 
   return (
     <nav ref={navRef} class="acct-section-nav" aria-label="Account sections" data-testid="account-section-nav">
-      <span class="acct-section-nav__label">On this page</span>
+      <p class="acct-section-nav__label">Account</p>
       <div class="acct-section-nav__items">
         <For each={ACCOUNT_SECTION_NAV}>
           {(item) => (
             <button
               type="button"
               class="acct-section-nav__item"
+              id={`acct-nav-${item.id}`}
+              data-account-section-button={item.id}
               classList={{ 'is-active': activeId() === item.id }}
+              aria-label={item.label}
               aria-current={activeId() === item.id ? 'location' : undefined}
               aria-controls={item.id}
               onClick={() => jumpTo(item.id)}
             >
-              {item.label}
+              <span class="acct-section-nav__item-label">{item.label}</span>
+              <span class="acct-section-nav__item-summary">{item.summary}</span>
             </button>
           )}
         </For>
@@ -287,6 +339,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
   const personaOffers = useStore((s) => s.personaOffers);
 
   const isGuest = createMemo(() => !account());
+  const [mobileAccountSection, setMobileAccountSection] = createSignal<AccountSectionId | null>(null);
 
   // ── local form state ──
   const [emailValue, setEmailValue] = createSignal('');
@@ -388,6 +441,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     setCopiedField(null);
     setCopyingField(null);
     setCopyFeedback(null);
+    setMobileAccountSection(null);
   };
 
   let accountBoundaryInitialized = false;
@@ -574,6 +628,27 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
     });
   }
 
+  function backToAccountSections(): void {
+    const previousSection = mobileAccountSection();
+    setMobileAccountSection(null);
+    if (!previousSection) return;
+    queueMicrotask(() => {
+      const trigger = document.getElementById(`acct-nav-${previousSection}`);
+      if (!trigger) return;
+      trigger.focus({ preventScroll: true });
+      revealInNearestModalScroller(trigger);
+    });
+  }
+
+  function openAccountSection(id: AccountSectionId): void {
+    setMobileAccountSection(id);
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    if (!window.matchMedia('(max-width: 42rem)').matches) return;
+    queueMicrotask(() => {
+      document.getElementById('account-mobile-back')?.focus({ preventScroll: true });
+    });
+  }
+
   return (
     <ModalShell
       open={local.open}
@@ -593,18 +668,6 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
                 <h2 class="acct-surface-intro__title">Account controls</h2>
                 <p class="acct-surface-intro__body">Identity, sign-in, recovery, and account data. These choices travel with your account.</p>
               </div>
-              <p class="acct-context-cue" role="note">
-                <span>Next</span>
-                <Show
-                  when={isGuest()}
-                  fallback="Review account protection and recovery on this device. Device keys remain separate from sign-in safeguards."
-                >
-                  Keep this name if you want to protect it without disconnecting.
-                </Show>
-              </p>
-        <Show when={!isGuest()}>
-          <AccountSectionNav />
-        </Show>
         {/* ── Guest state ── */}
         <Show when={isGuest()}>
           <div class="acct-guest" data-testid="account-guest">
@@ -638,14 +701,37 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
         {/* ── Signed-in state ── */}
         <Show when={!isGuest()}>
+          <div
+            class="acct-account-layout"
+            data-account-mobile-detail={mobileAccountSection() ? 'true' : 'false'}
+            data-account-mobile-section={mobileAccountSection() ?? undefined}
+          >
+            <AccountSectionNav onSelect={openAccountSection} />
+            <div class="acct-account-detail">
+              <button
+                type="button"
+                class="acct-account-mobile-back"
+                id="account-mobile-back"
+                data-testid="account-mobile-back"
+                onClick={backToAccountSections}
+              >
+                <span aria-hidden="true">←</span>
+                <span>Back to account sections</span>
+              </button>
+
           {/* Identity card */}
-          <section id="acct-identity" class="acct-identity" aria-label="Account summary">
+          <section
+            id="acct-identity"
+            class="acct-identity"
+            data-account-nav-section="acct-identity"
+            aria-label="Account summary"
+          >
             <div class="acct-identity-avatar" aria-hidden="true">
               {(account() ?? '?').slice(0, 2).toUpperCase()}
             </div>
             <div class="acct-identity-meta">
-              <span class="acct-identity-eyebrow">signed in</span>
               <span class="acct-identity-name">{account()}</span>
+              <p class="acct-identity-status">Signed in on this connection.</p>
               <Show when={infoPending()}>
                 <span class="acct-identity-loading">
                   <Spinner size="sm" label="Loading account details" />
@@ -672,6 +758,21 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
             </div>
           </section>
 
+          <p
+            class="acct-save-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-testid="account-save-status"
+            data-state={actionError() ? 'error' : infoPending() ? 'pending' : 'idle'}
+          >
+            {actionError()
+              ? ''
+              : infoPending()
+                ? 'Updating account details…'
+                : ''}
+          </p>
+
           {/* Last action error */}
           <Show when={actionError()}>
             {(err) => (
@@ -685,7 +786,11 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Show>
 
           {/* Email */}
-          <Section title="Email" hint="Used for account recovery. Changing it requires your password.">
+          <Section
+            title="Email"
+            navSection="acct-email-title"
+            hint="Used for account recovery. Changing it requires your password."
+          >
             <form onSubmit={submitEmail} noValidate aria-label="Change email">
               <FormField
                 id="acct-email"
@@ -718,7 +823,11 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Password */}
-          <Section title="Password" hint="Choose a new password. You'll need your current one to confirm.">
+          <Section
+            title="Password"
+            navSection="acct-password-title"
+            hint="Choose a new password. You'll need your current one to confirm."
+          >
             <form onSubmit={submitPassword} noValidate aria-label="Change password">
               <PasswordField
                 id="acct-new-password"
@@ -766,7 +875,12 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Two-factor authentication */}
-          <Section title="Two-factor authentication" hint="A six-digit code from your authenticator app, required at every login.">
+          <Section
+            title="Two-factor authentication"
+            navSection="acct-two-factor-authentication-title"
+            tone="security"
+            hint="A six-digit code from your authenticator app, required at every login."
+          >
             <div class="acct-totp">
               <p class="acct-totp-status" data-status={totp().status}>
                 <span class="acct-totp-dot" aria-hidden="true" />
@@ -872,16 +986,26 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
           </Section>
 
           {/* Sessions & devices — current browser + Era 2 (B8) remote list skeleton */}
-          <SessionsDevicesSection account={account()} />
+          <div class="acct-account-nav-section" data-account-nav-section="acct-sessions-title">
+            <SessionsDevicesSection account={account()} />
+          </div>
 
           {/* Offline recovery codes — B8 remainder */}
-          <RecoveryCodesSection account={account()} />
+          <div class="acct-account-nav-section" data-account-nav-section="acct-recovery-title">
+            <RecoveryCodesSection account={account()} />
+          </div>
 
           {/* Passkeys — WebAuthn passwordless login: register, list, rename, remove */}
-          <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
+          <div class="acct-account-nav-section" data-account-nav-section="acct-passkeys-title">
+            <PasskeysSection account={account()} owner={memoryOwner()} active={local.open} />
+          </div>
 
           {/* Sign out stays on the default account path */}
-          <Section title="Session" hint="Log out of this account on this connection.">
+          <Section
+            title="Session"
+            navSection="acct-session-title"
+            hint="Log out of this account on this connection."
+          >
             <Button type="button" variant="ghost" size="md" onClick={signOut} data-testid="account-signout">
               Sign out
             </Button>
@@ -889,13 +1013,17 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           <Show when={account()}>
             {(acct) => (
-              <AccountDataVerbs
-                account={acct()}
-                active={local.open}
-                onDeleted={() => local.onOpenChange(false)}
-              />
+              <div class="acct-account-nav-section" data-account-nav-section="acct-download-store-title">
+                <AccountDataVerbs
+                  account={acct()}
+                  active={local.open}
+                  onDeleted={() => local.onOpenChange(false)}
+                />
+              </div>
             )}
           </Show>
+            </div>
+          </div>
         </Show>
             </>
           )}
@@ -988,6 +1116,7 @@ export function AccountPanel(props: AccountPanelProps): JSX.Element {
 
           <Section
             title="Device encryption keys"
+            tone="security"
             hint="Multi-device DM E2EE (Era 3 C2): publish this browser's public key so other devices on your account can encrypt to you. List KEYTRANS entries from every device you use. Group E2EE is a later slice."
           >
             <div class="acct-cert-actions">

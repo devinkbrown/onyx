@@ -201,8 +201,8 @@ describe('Connect screen rendering', () => {
   it('defaults to guest join', () => {
     render(() => <Connect />);
     expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'guest');
-    expect(visibleCopy()).toMatch(/join free/i);
-    expect(visibleCopy()).toMatch(/send a message/i);
+    expect(visibleCopy()).toMatch(/choose a display name/i);
+    expect(visibleCopy()).toMatch(/leave the room blank|start on home/i);
   });
 
   it('renders the display name field', () => {
@@ -1381,5 +1381,73 @@ describe('optional room to join (no autojoin)', () => {
     expect(screen.getByRole('textbox', { name: /^(display name|name|account name)$/i })).toHaveValue('');
     expect(screen.getByRole('note', { name: /invite preview/i })).toHaveTextContent('Join #general');
     expect(screen.queryByRole('textbox', { name: 'Room' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Destination-first entry composition', () => {
+  it('puts the destination beside a guest join form with account alternatives below', () => {
+    const { container } = render(() => <Connect />);
+    const context = container.querySelector('.conn-context');
+    const card = container.querySelector<HTMLElement>('.conn-card');
+    const submit = screen.getByTestId('conn-submit');
+    const modes = screen.getByTestId('conn-modes');
+
+    expect(context).not.toBeNull();
+    expect(card).not.toBeNull();
+    expect(context!.compareDocumentPosition(card!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const main = screen.getByRole('main');
+    expect(container.querySelectorAll('[role="main"]')).toHaveLength(1);
+    expect(main).toContainElement(card);
+    expect(within(main).getByRole('heading', { level: 1, name: 'Join a room' })).toBeInTheDocument();
+    expect(submit).toHaveTextContent(/^join$/i);
+    expect(submit.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(modes).getByTestId('conn-mode-signin')).toHaveTextContent(/sign in/i);
+    expect(within(modes).getByTestId('conn-mode-register')).toHaveTextContent(/create account/i);
+    expect(container.querySelector('.conn-context__list')).toBeNull();
+    expect(container.querySelector('.conn-identities-count')).toBeNull();
+    expect(container.querySelector('.conn-crest')).toBeNull();
+    expect(screen.getByTestId('connect-screen').textContent).not.toMatch(
+      /bring the night with you|online now|members in this room|join free/i,
+    );
+  });
+
+  it('keeps entered values when moving between guest and account paths', () => {
+    render(() => <Connect />);
+    fireEvent.input(nickField(), { target: { value: 'River' } });
+    fireEvent.input(screen.getByRole('textbox', { name: 'Room' }), { target: { value: '#lounge' } });
+
+    clickMode(/sign in/i);
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'signin');
+    expect(nickField()).toHaveValue('River');
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+
+    clickMode(/guest/i);
+    expect(screen.getByTestId('connect-screen')).toHaveAttribute('data-mode', 'guest');
+    expect(nickField()).toHaveValue('River');
+    expect(screen.getByRole('textbox', { name: 'Room' })).toHaveValue('#lounge');
+  });
+
+  it('names the invited room in destination context and keeps the access boundary honest', () => {
+    window.history.pushState({}, '', '/app/?join=%23general&topic=release%20train');
+    render(() => <Connect />);
+
+    const preview = screen.getByRole('note', { name: /invite preview/i });
+    expect(preview).toHaveTextContent('Join #general');
+    expect(preview).toHaveTextContent('release train');
+    expect(screen.getByRole('heading', { level: 1, name: '#general' })).toBeInTheDocument();
+    expect(screen.getByText(/the room still applies its own access rules/i)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Room' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('conn-submit')).toHaveTextContent(/^join$/i);
+  });
+
+  it('does not echo unknown-room topic metadata from a malformed invite', () => {
+    window.history.pushState({}, '', '/app/?join=%23bad%2Cevil&topic=secret-topic');
+    render(() => <Connect />);
+
+    expect(screen.queryByRole('note', { name: /invite preview/i })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByRole('heading', { level: 1, name: 'Join a room' })).toBeInTheDocument();
+    expect(screen.queryByText(/secret-topic/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Room' })).toBeInTheDocument();
   });
 });

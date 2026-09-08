@@ -79,6 +79,7 @@ describe('InviteRoute', () => {
     expect(screen.getByText('Choose a display name to walk in.')).toBeInTheDocument();
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('Join #general on Onyx');
     expect(screen.getByRole('note', { name: 'Invite preview' })).toHaveTextContent('release train');
+    expect(screen.getByText(/the room still applies its own access rules/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Display name')).toHaveValue('yuki');
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'Join' })).toHaveAttribute(
       'href',
@@ -222,6 +223,8 @@ describe('InviteRoute', () => {
     expect(copy).toBeDisabled();
     expect(copy).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByText('Invite link copied to clipboard.')).not.toBeInTheDocument();
+    expect(document.querySelector('.invite-copy-status')).toHaveAttribute('role', 'status');
+    expect(document.querySelector('.invite-copy-status')).toHaveTextContent('');
     resolveCopy(true);
     expect(await screen.findByText('Invite link copied to clipboard.')).toHaveAttribute('role', 'status');
     expect(screen.getByRole('button', { name: 'Copied link' })).not.toBeDisabled();
@@ -252,5 +255,36 @@ describe('InviteRoute', () => {
     await Promise.resolve();
 
     expect(screen.queryByText('Invite link copied to clipboard.')).not.toBeInTheDocument();
+  });
+});
+
+describe('Invite destination-to-join composition', () => {
+  it('explains the destination before the join form and keeps Join as the guest lead', () => {
+    window.history.pushState({}, '', '/invite/?join=%23lounge');
+    const { container } = render(() => <InviteRoute />);
+    const destination = container.querySelector('.invite-destination');
+    const form = container.querySelector('.invite-form-panel');
+
+    expect(destination).not.toBeNull();
+    expect(form).not.toBeNull();
+    expect(destination!.compareDocumentPosition(form!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.invite-mascot')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: '#lounge' })).toBeInTheDocument();
+    expect(within(form as HTMLElement).getByTestId('invite-join')).toHaveTextContent('Join');
+    expect(within(form as HTMLElement).getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/app/?join=%23lounge&signin=1',
+    );
+    expect(container.querySelector('.invite-copy-status')).toHaveAttribute('role', 'status');
+  });
+
+  it('keeps a malformed room unknown instead of reflecting it into the destination', () => {
+    window.history.pushState({}, '', '/invite/?join=%23bad%2Cevil&topic=secret');
+    render(() => <InviteRoute />);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Join Onyx' })).toBeInTheDocument();
+    expect(screen.getByText(/This link does not name a room/)).toBeInTheDocument();
+    expect(screen.queryByText(/evil/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/secret/i)).not.toBeInTheDocument();
   });
 });

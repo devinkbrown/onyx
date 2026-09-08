@@ -2,8 +2,9 @@
 /**
  * AppShell.tsx — the layout spine for Onyx's connected state.
  *
- * CSS Grid: [ ServerRail | ChannelSidebar | ConversationColumn | MemberList ]
- * PresenceRibbon spans the top of the conversation column.
+ * CSS Grid: [ CollectionSidebar | ConversationColumn | OptionalPeoplePanel ]
+ * The ServerRail owns the global top bar; PresenceRibbon owns room context
+ * inside the conversation column.
  * <Background> is mounted fixed behind everything (z-index: -1).
  *
  * Reads from store:
@@ -15,7 +16,8 @@
  *   - mobileSidebarOpen — mobile sidebar toggle
  *
  * Per redesign blueprint (#16):
- *   - ServerRail collapses/hides when fewer than 3 servers
+ *   - ServerRail is the 56px global product bar
+ *   - ChannelSidebar is the single 256px collection column
  *   - Thread sidebar is a Sheet panel (not a modal)
  *   - Presence ribbon across the top of the conversation column
  *   - Member list collapsible
@@ -427,6 +429,9 @@ export function AppShell(props: AppShellProps): JSX.Element {
     const cs = voice().callState;
     return cs !== 'idle' && cs !== 'ringing_in' && cs !== 'ringing_out';
   });
+  // VoiceBar reports this while a local recording is still saving so Leave
+  // cannot unmount the owner before the blob download finishes.
+  const [recordingOwnerHeld, setRecordingOwnerHeld] = createSignal(false);
   const viewingCall = createMemo(() => {
     const v = activeView();
     if (!inCall() || v.kind !== 'channel') return false;
@@ -689,6 +694,18 @@ export function AppShell(props: AppShellProps): JSX.Element {
   // right-hand drawer on mobile that must default CLOSED and open only on tap —
   // so on narrow viewports it gets its own open state.
   const [isMobile, setIsMobile] = createSignal(false);
+  // People is an intentional secondary panel in the commercial shell. The
+  // store keeps its historical default for other surfaces, so the shell only
+  // reveals that default after the user has asked for People (or a keyboard
+  // shortcut changes the store after first paint). This keeps one source of
+  // truth for the toggle without making the panel part of the first view.
+  const [desktopMembersTouched, setDesktopMembersTouched] = createSignal(false);
+  let observedInitialMemberList = false;
+  createEffect(() => {
+    const open = showMemberList();
+    if (observedInitialMemberList && open) setDesktopMembersTouched(true);
+    observedInitialMemberList = true;
+  });
   const [mobileMembersOpen, setMobileMembersOpen] = createSignal(false);
   const [mobileMoreOpen, setMobileMoreOpen] = createSignal(false);
   const [mobileMoreView, setMobileMoreView] = createSignal<'destinations' | 'room-controls'>('destinations');
@@ -914,10 +931,17 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
       // button the user just pressed, violating WCAG SC 3.2.1 On Focus).
       if (contextRailOpen()) {
         setContextRailOpen(false);
+        setDesktopMembersTouched(true);
         if (!showMemberList()) getState().toggleMemberList();
         return;
       }
-      getState().toggleMemberList();
+      const next = !membersVisible();
+      // Read the current visibility before marking the desktop control as
+      // touched. The first click must open the historical true default; after
+      // the signal update, membersVisible() would otherwise become true and
+      // invert the result back to closed.
+      setDesktopMembersTouched(true);
+      if (showMemberList() !== next) getState().toggleMemberList();
     }
   }
 
@@ -933,6 +957,10 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
   // that silently reappears with a stale roster on the next channel view.
   createEffect(() => {
     const view = activeView();
+    const surface = primarySurface();
+    if (surface !== 'conversation' && contextRailOpen()) {
+      setContextRailOpen(false);
+    }
     if (view.kind !== 'channel' && view.kind !== 'dm') {
       if (contextRailOpen()) closeContextRail();
     }
@@ -1143,9 +1171,15 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
     selectSidebarMode('rooms');
   }
 
-  function returnToCall(channel: string): void {
+  function returnToCall(target: string): void {
+    const call = voice();
+    const channel = call.callChannel?.trim();
+    const peer = call.callWith.trim();
+    if (call.callState !== 'in_call' || target !== (channel || peer)) return;
     setPrimarySurface('conversation');
-    getState().navigate({ kind: 'channel', channel });
+    getState().navigate(channel
+      ? { kind: 'channel', channel }
+      : { kind: 'dm', nick: peer });
   }
 
   function openMemberDm(nick: string): void {
@@ -1213,7 +1247,9 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
 
   // ── is the member surface visible (column on desktop, drawer on mobile)? ──
   const membersVisible = createMemo(() =>
-    hasMemberRoster() && (isMobile() ? mobileMembersOpen() : showMemberList()),
+    primarySurface() === 'conversation'
+    && hasMemberRoster()
+    && (isMobile() ? mobileMembersOpen() : desktopMembersTouched() && showMemberList()),
   );
 
   // ── single-occupant column-4 slot ──
@@ -1334,6 +1370,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         class={shellClass()}
         data-testid="app-shell"
         data-room-identity={roomIdentity()?.target}
+        data-shell-surface={primarySurface()}
         data-shell-aside={asideOccupant()}
         style={roomIdentityVars()}
       >
@@ -1369,50 +1406,38 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         </RoomSwitcherSheet>
 
         {/* ── Conversation Column ── */}
-        {/* Always grid-column 3 (CSS). The rail track stays in the grid at 0px
-            when hidden, so the conversation keeps the 1fr track either way. */}
+        {/* The collection sidebar and this column fill the second grid row;
+            the optional People/Context surface occupies the third column. */}
         <div class="shell-conversation">
           {/* Disconnected banner */}
           <ReconnectStatusBanner />
           {/* Automatic session-resume status (sessionReclaim.ts) */}
           <SessionReclaimBanner />
 
-          {/* Presence ribbon */}
-          <PresenceRibbon
-            selfNick={displayNick()}
-            contextActionsOnly={isMobile()}
-            onToggleMembers={handleToggleMembers}
-            membersOpen={asideOccupant() === 'members'}
-            showJoinVoice={canJoinVoice()}
-            onJoinVoice={joinVoice}
-            onOpenRoomDesk={
-              isMobile() && preferences().experienceMode !== 'standard'
-                ? openMobileRoomDeskFromRibbon
-                : undefined
-            }
-            onOpenDm={openMemberDm}
-            onOpenWhois={openMemberWhois}
-          />
-          <div
-            class="shell-room-current"
-            data-shell-current-kind={roomCurrent().kind}
-            role="note"
-            aria-label={`Room current: ${roomCurrent().label}, ${roomCurrent().detail}`}
-          >
-            <span class="shell-room-current__kicker sr-only">Room current</span>
-            <span class="shell-room-current__label sr-only">{roomCurrent().label}</span>
-            <span class="shell-room-current__detail sr-only">{roomCurrent().detail}</span>
-            <button
-              ref={(element) => { contextTriggerRef = element; }}
-              type="button"
-              class="shell-room-current__context"
-              aria-expanded={contextRailOpen()}
-              aria-controls="shell-context-rail"
-              onClick={toggleContextRail}
-            >
-              Context
-            </button>
-          </div>
+          {/* Home and Calls own their page headers. A room ribbon is only
+              rendered for conversation/status surfaces, so it cannot become
+              a stale toolbar when the pathname stays unchanged. */}
+          <Show when={primarySurface() === 'conversation' && activeView().kind !== 'home'}>
+            <PresenceRibbon
+              selfNick={displayNick()}
+              roomCurrent={roomCurrent()}
+              contextOpen={contextRailOpen()}
+              contextTriggerRef={(element) => { contextTriggerRef = element; }}
+              onToggleContext={toggleContextRail}
+              contextActionsOnly={isMobile()}
+              onToggleMembers={handleToggleMembers}
+              membersOpen={asideOccupant() === 'members'}
+              showJoinVoice={canJoinVoice()}
+              onJoinVoice={joinVoice}
+              onOpenRoomDesk={
+                isMobile() && preferences().experienceMode !== 'standard'
+                  ? openMobileRoomDeskFromRibbon
+                  : undefined
+              }
+              onOpenDm={openMemberDm}
+              onOpenWhois={openMemberWhois}
+            />
+          </Show>
           <Show
             when={primarySurface() === 'calls'}
             fallback={(
@@ -1466,11 +1491,6 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
                   fallback={<HomeView />}
                 >
                   <MessageView selfNick={displayNick()} />
-                  <Show when={inCall()}>
-                    <Suspense fallback={null}>
-                      <VoiceBar />
-                    </Suspense>
-                  </Show>
                   <TypingIndicator />
                   <Composer />
                 </Show>
@@ -1502,6 +1522,15 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
               />
             </LazySurface>
           </Show>
+          {/* One shell-owned call-control bar. It stays mounted while the
+              visible surface changes to Home or Calls, and through local
+              recording finalization after the call goes idle, so cleanup
+              cannot drop the save. VoiceBar hides the toolbar while idle. */}
+          <Show when={inCall() || recordingOwnerHeld()}>
+            <Suspense fallback={null}>
+              <VoiceBar onRecordingOwnerHeld={setRecordingOwnerHeld} />
+            </Suspense>
+          </Show>
         </div>
 
         {/* ── Member List (right drawer on mobile) ── */}
@@ -1525,7 +1554,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
         {/* Keep one stable DOM identity for aria-controls and breakpoint
             transitions. ContextRail owns the desktop slot only while open;
             on mobile the same node becomes the modal edge sheet. */}
-        <Show when={hasConversation()}>
+        <Show when={primarySurface() === 'conversation' && hasConversation()}>
           <ContextRail open={contextRailOpen()} modal={isMobile()} onClose={closeContextRail} />
         </Show>
       </div>
@@ -1684,7 +1713,7 @@ function focusMobileMembersDrawer(root: HTMLElement | null | undefined): void {
             open={showVoiceSettings()}
             onOpenChange={(open: boolean) => (open ? getState().openVoiceSettings() : getState().closeVoiceSettings())}
           />
-          <VoicePip />
+          <VoicePip activeSurface={primarySurface()} />
           <IncomingCallOverlay />
           <OutgoingCallOverlay />
           <CaptionsOverlay />

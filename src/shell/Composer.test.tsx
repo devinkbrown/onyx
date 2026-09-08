@@ -21,8 +21,10 @@ import { createRoot } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useKeyboardShortcuts } from '@/lib/keyboard/useKeyboardShortcuts';
+import { parseIRCMessage } from '@/lib/irc/parser';
 import { store } from '@/lib/store/store';
 import { LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
+import { persistedReplyPreviewText } from '@/lib/e2ee/replyPrivacy';
 import { _resetVaultForTests, queueOutbox } from '@/lib/vault/historyVault';
 import { Composer } from './Composer';
 import {
@@ -330,6 +332,82 @@ describe('Composer accessibility', () => {
 
     expect(getByRole('status')).toHaveTextContent(LOCKED_PLACEHOLDER);
     expect(queryByText(/ONYXDM1 locked-envelope/)).toBeNull();
+  });
+
+  it('keeps retained plaintext out of a withdrawn reply banner live region', async () => {
+    seedActiveChannel();
+    store.setState({
+      replyingTo: {
+        id: 'redacted-parent',
+        from: 'alice',
+        text: '[Message deleted]',
+        plaintext: 'retained parent secret',
+        encrypted: true,
+        redacted: true,
+        time: new Date(),
+        type: 'msg',
+        target: '#room',
+      },
+    });
+
+    const { getByRole } = render(() => <Composer />);
+
+    const banner = getByRole('status');
+    expect(banner).toHaveTextContent('Replying to alice');
+    expect(banner).toHaveTextContent('[message deleted]');
+    expect(banner).not.toHaveTextContent('retained parent secret');
+    expect(banner).not.toHaveTextContent('ONYXDM1');
+  });
+
+  it('re-resolves an armed reply after inbound REDACT replaces its loaded message', async () => {
+    seedActiveChannel();
+    const armedParent = {
+      id: 'redacted-parent',
+      from: 'alice',
+      text: 'retained parent secret',
+      plaintext: 'retained parent secret',
+      encrypted: true,
+      time: new Date(),
+      type: 'msg' as const,
+      target: '#room',
+    };
+    store.setState({
+      channels: new Map([[
+        '#room',
+        {
+          name: '#room',
+          topic: '',
+          topicSetBy: '',
+          topicSetAt: null,
+          users: [],
+          messages: [armedParent],
+        } as never,
+      ]]),
+      replyingTo: armedParent,
+    });
+
+    const { getByRole } = render(() => <Composer />);
+    expect(getByRole('status')).toHaveTextContent('retained parent secret');
+
+    store.getState()._handleMessage(
+      parseIRCMessage(':server REDACT #room redacted-parent :Deleted'),
+    );
+
+    await waitFor(() => {
+      const banner = getByRole('status');
+      expect(banner).toHaveTextContent('[message deleted]');
+      expect(banner).not.toHaveTextContent('retained parent secret');
+    });
+
+    const current = store.getState().channels.get('#room')?.messages[0];
+    expect(current).toMatchObject({
+      id: 'redacted-parent',
+      redacted: true,
+      text: '[Message deleted]',
+      plaintext: 'retained parent secret',
+    });
+    expect(store.getState().replyingTo).toBe(current);
+    expect(persistedReplyPreviewText(store.getState().replyingTo!)).toBe('[message deleted]');
   });
 
   it('clears a legacy encrypted edit context instead of exposing or submitting it', async () => {

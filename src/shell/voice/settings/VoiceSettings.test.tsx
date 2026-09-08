@@ -48,11 +48,17 @@ describe('VoiceSettings', () => {
     // Prefer testids / labels over many role-tree walks — a11y queries on this
     // surface are expensive under jsdom and the suite is already long.
     expect(screen.getByTestId('voice-settings')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Devices', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Processing', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Push to talk', level: 3 })).toBeInTheDocument();
     expect(await screen.findByRole('option', { name: 'Studio Mic' }, { timeout: 8_000 })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Headset Out' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Desk Camera' })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText('Input'), { target: { value: 'mic-1' } });
+    expect(screen.getByLabelText('Microphone')).toBeInTheDocument();
+    expect(screen.getByLabelText('Speakers')).toBeInTheDocument();
+    expect(screen.getByLabelText('Camera')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Microphone'), { target: { value: 'mic-1' } });
 
     expect(store.getState().voice.inputDeviceId).toBe('mic-1');
 
@@ -157,7 +163,7 @@ describe('VoiceSettings', () => {
 
     expect(await screen.findByRole('option', { name: 'Headset Out' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Choose speaker…' })).toBeNull();
-    fireEvent.change(screen.getByLabelText('Output'), { target: { value: 'speaker-1' } });
+    fireEvent.change(screen.getByLabelText('Speakers'), { target: { value: 'speaker-1' } });
     expect(store.getState().voice.outputDeviceId).toBe('speaker-1');
   });
 

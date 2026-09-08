@@ -15,6 +15,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSignal } from 'solid-js';
 import { AccountPanel } from './Account';
 import { store, getState, MAX_PERSONA_HOST_LENGTH, type Server } from '@/lib/store';
@@ -62,6 +65,20 @@ function renderPanel(opts?: { account?: string | null }) {
 
 function openYouAdvanced(): void {
   fireEvent.click(screen.getByTestId('you-advanced').querySelector('summary')!);
+}
+
+function stubBox(el: Element, box: { top: number; bottom: number; height: number }): void {
+  vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+    x: 0,
+    y: box.top,
+    top: box.top,
+    left: 0,
+    right: 320,
+    width: 320,
+    bottom: box.bottom,
+    height: box.height,
+    toJSON() { return {}; },
+  });
 }
 
 beforeEach(() => {
@@ -363,7 +380,7 @@ describe('Account panel — signed in', () => {
     expect(screen.getByRole('region', { name: 'Device encryption keys' })).toBeInTheDocument();
   });
 
-  it('provides an account section map that scrolls to existing regions', () => {
+  it('provides an account section map that scrolls to existing regions', async () => {
     renderPanel({ account: 'alice' });
 
     const nav = screen.getByRole('navigation', { name: 'Account sections' });
@@ -386,6 +403,95 @@ describe('Account panel — signed in', () => {
     expect(email).toHaveAttribute('aria-current', 'location');
     expect(email).toHaveClass('is-active');
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
+    const layout = screen.getByTestId('account-section-nav').parentElement;
+    expect(layout).toHaveAttribute('data-account-mobile-detail', 'true');
+    expect(screen.getByTestId('account-mobile-back')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('account-mobile-back'));
+    await waitFor(() => expect(email).toHaveFocus());
+    expect(layout).toHaveAttribute('data-account-mobile-detail', 'false');
+  });
+
+  it('keeps one selected account section at a time and restores that category on back', async () => {
+    renderPanel({ account: 'alice' });
+
+    const layout = screen.getByTestId('account-section-nav').parentElement;
+    const email = screen.getByRole('button', { name: 'Email' });
+    const security = screen.getByRole('button', { name: 'Security' });
+
+    fireEvent.click(email);
+    expect(layout).toHaveAttribute('data-account-mobile-detail', 'true');
+    expect(layout).toHaveAttribute('data-account-mobile-section', 'acct-email-title');
+
+    fireEvent.click(security);
+    expect(layout).toHaveAttribute('data-account-mobile-section', 'acct-two-factor-authentication-title');
+    expect(layout).not.toHaveAttribute('data-account-mobile-section', 'acct-email-title');
+
+    fireEvent.click(screen.getByTestId('account-mobile-back'));
+    await waitFor(() => expect(security).toHaveFocus());
+    expect(layout).toHaveAttribute('data-account-mobile-detail', 'false');
+  });
+
+  it('scrolls the modal body to the restored Session category only when it is below the scroller', async () => {
+    renderPanel({ account: 'alice' });
+    const session = screen.getByRole('button', { name: 'Session' });
+    fireEvent.click(session);
+
+    const scroller = session.closest('.onyx-modal__body');
+    if (!(scroller instanceof HTMLElement)) throw new Error('Account panel is not in the modal scroller');
+    const scrollBy = vi.fn();
+    Object.defineProperty(scroller, 'scrollBy', { configurable: true, value: scrollBy });
+    stubBox(scroller, { top: 80, bottom: 480, height: 400 });
+    stubBox(session, { top: 560, bottom: 620, height: 60 });
+
+    fireEvent.click(screen.getByTestId('account-mobile-back'));
+    await waitFor(() => expect(session).toHaveFocus());
+    expect(scrollBy).toHaveBeenCalledWith({ top: 140, left: 0, behavior: 'auto' });
+  });
+
+  it('does not move the modal scroller when the restored category is already visible', async () => {
+    renderPanel({ account: 'alice' });
+    const overview = screen.getByRole('button', { name: 'Overview' });
+    fireEvent.click(overview);
+
+    const scroller = overview.closest('.onyx-modal__body');
+    if (!(scroller instanceof HTMLElement)) throw new Error('Account panel is not in the modal scroller');
+    const scrollBy = vi.fn();
+    Object.defineProperty(scroller, 'scrollBy', { configurable: true, value: scrollBy });
+    stubBox(scroller, { top: 80, bottom: 480, height: 400 });
+    stubBox(overview, { top: 120, bottom: 180, height: 60 });
+
+    fireEvent.click(screen.getByTestId('account-mobile-back'));
+    await waitFor(() => expect(overview).toHaveFocus());
+    expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it('hides only indexed phone sections so the selected reveal can win', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'account.css'), 'utf8');
+    const phoneBlock = css.split('@media (max-width: 42rem)')[1];
+    expect(phoneBlock).toBeTruthy();
+    const phone = phoneBlock ?? '';
+
+    expect(phone).not.toMatch(/\.acct-account-detail\s*>\s*\*:not\(/);
+    expect(phone).toMatch(
+      /\.acct-account-detail\s*>\s*\[data-account-nav-section\][\s\S]*?display:\s*none/,
+    );
+
+    const indexed = [
+      'acct-identity',
+      'acct-email-title',
+      'acct-password-title',
+      'acct-two-factor-authentication-title',
+      'acct-sessions-title',
+      'acct-recovery-title',
+      'acct-passkeys-title',
+      'acct-download-store-title',
+      'acct-session-title',
+    ];
+    for (const id of indexed) {
+      expect(phone).toContain(`[data-account-mobile-section='${id}']`);
+      expect(phone).toContain(`[data-account-nav-section='${id}']`);
+    }
   });
 
   it('exposes a You settings list into Appearance', async () => {
@@ -662,6 +768,31 @@ describe('Account panel — signed in', () => {
     const err = screen.getByTestId('account-error');
     expect(err).toHaveTextContent(/ACCOUNTSET/);
     expect(err).toHaveTextContent(/Bad value/);
+    expect(screen.getByTestId('account-save-status')).toHaveAttribute('data-state', 'error');
+  });
+
+  it('reports pending account details in a live region without claiming they saved', () => {
+    renderPanel({ account: 'alice' });
+    const status = screen.getByTestId('account-save-status');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).not.toHaveTextContent(/saved/i);
+
+    store.setState({ accountInfoPending: true });
+    expect(status).toHaveTextContent('Updating account details…');
+    expect(status).toHaveAttribute('data-state', 'pending');
+    expect(screen.queryByText('Saved on this device.')).not.toBeInTheDocument();
+  });
+
+  it('keeps account section names while showing readable row summaries', () => {
+    renderPanel({ account: 'alice' });
+
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveAccessibleName('Overview');
+    expect(screen.getByRole('button', { name: 'Email' })).toHaveAccessibleName('Email');
+    expect(screen.getByRole('button', { name: 'Security' })).toHaveTextContent('Authenticator app');
+    expect(screen.getByRole('button', { name: 'Data' })).toHaveTextContent('Download or delete');
+    expect(screen.getByText('Signed in on this connection.')).toBeInTheDocument();
+    expect(screen.queryByText('signed in')).not.toBeInTheDocument();
   });
 });
 

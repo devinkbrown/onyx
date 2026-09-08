@@ -115,21 +115,16 @@ describe('shell grid contract (column-4 single-occupant slot)', () => {
     expect(shellCss).not.toMatch(/min-width: (?:900|902)px/);
   });
 
-  it('keeps the reduced-transparency veil override after the translucent default', () => {
-    // The chat veil is deliberately translucent so the page-layer Background
-    // scene shows through the message column. a11y-media.css force-solids the
-    // same surfaces under prefers-reduced-transparency, but at equal 0,1,0
-    // specificity — and shell.css loads AFTER it, so without an override in
-    // THIS file the translucent value wins on source order and silently
-    // cancels the accessibility guarantee. That regression is invisible in
-    // jsdom (no layout, no var() resolution) and invisible on a machine that
-    // does not set the preference, so it is pinned here as source order.
+  it('keeps the opaque chat veil and reduced-transparency override contract', () => {
+    // The default chat surface is opaque by design. The reduced-transparency
+    // branch remains pinned so later shell work cannot reintroduce a scene wash
+    // or transparent chrome into the reading plane.
     const declarations = [...shellCss.matchAll(/--shell-chat-veil:\s*([^;]+);/g)];
     expect(declarations.length).toBeGreaterThanOrEqual(2);
 
     const base = declarations.find((m) => enclosingMediaQuery(shellCss, m.index) === null);
     expect(base, 'unconditional --shell-chat-veil default').toBeDefined();
-    expect(base![1]).toContain('transparent');
+    expect(base![1]).toContain('var(--ink)');
 
     const reduced = declarations.find(
       (m) => enclosingMediaQuery(shellCss, m.index) === '(prefers-reduced-transparency: reduce)',
@@ -137,8 +132,8 @@ describe('shell grid contract (column-4 single-occupant slot)', () => {
     expect(reduced, 'reduced-transparency --shell-chat-veil override').toBeDefined();
     expect(reduced![1]).not.toContain('transparent');
 
-    // Source order is the entire mechanism: an override declared before the
-    // default would lose to it and the guarantee would be dead again.
+    // Source order keeps the accessibility branch authoritative if the base
+    // values are refined later.
     expect(reduced!.index).toBeGreaterThan(base!.index);
   });
 
@@ -148,9 +143,7 @@ describe('shell grid contract (column-4 single-occupant slot)', () => {
     const block = reduceBlockRe.exec(shellCss);
     expect(block, 'prefers-reduced-transparency block in shell.css').not.toBeNull();
 
-    // The ribbon/composer chrome shares the veil system, and `.shell` itself
-    // carries a translucent canvas wash — both are declared in this file and
-    // so both need the same source-order override, not just the message column.
+    // Ribbon/composer chrome shares the veil system; both remain solid here.
     expect(block![1]).toContain('--shell-chat-chrome-veil:');
     expect(block![1]).toMatch(/background:\s*var\(--ink\)/);
     expect(block![1]).not.toContain('transparent');

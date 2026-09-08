@@ -267,7 +267,6 @@ export function revealStatsInspector(target: HTMLElement | null = document.getEl
 function ChannelRow(props: {
   channel: StatsChannel;
   nowMs: number;
-  rank: number;
   selected: boolean;
   inspectorId: string;
   comparisonId: string;
@@ -281,7 +280,6 @@ function ChannelRow(props: {
   const maxSpark = createMemo(() => Math.max(0, ...c().spark));
   return (
     <article class="data-row data-room-row" data-selected={props.selected ? 'true' : undefined}>
-      <span class="data-room-rank" aria-label={`Rank ${props.rank}`}>{String(props.rank).padStart(2, '0')}</span>
       <div class="data-room-copy">
         <div class="data-room-heading">
           <strong>{c().channel}</strong>
@@ -554,7 +552,7 @@ export default function StatsRoute() {
 
         <section class="r-wrap data-hero stats-hero" aria-labelledby="stats-heading">
         <p class="r-kicker">Rooms</p>
-        <h1 id="stats-heading">The rooms <br /><span class="stats-title-accent">in motion</span></h1>
+        <h1 id="stats-heading">The rooms <span class="stats-title-accent">in motion</span></h1>
         <p class="sub">
           See where people are talking, follow the network’s rhythm, and step
           directly into a public conversation. No member rankings. No message text.
@@ -634,16 +632,15 @@ export default function StatsRoute() {
         >
           <div class="stats-feed-timeline-head">
             <div>
-              <span class="label">signal path</span>
+              <span class="label">Signal path</span>
               <h2 id="stats-feed-timeline-heading">Three checks before a claim</h2>
             </div>
             <p class="stats-feed-cadence"><span aria-hidden="true">↻</span> auto-check · 30 sec</p>
           </div>
           <ol class="stats-feed-timeline-list" aria-label="Public stats feed checks">
             <For each={feedTimeline()}>
-              {(step, index) => (
+              {(step) => (
                 <li class="stats-feed-step" data-step={step.id} data-step-state={step.state}>
-                  <span class="stats-feed-step__index" aria-hidden="true">{String(index() + 1).padStart(2, '0')}</span>
                   <div class="stats-feed-step__body">
                     <div class="stats-feed-step__heading">
                       <span>{step.label}</span>
@@ -660,10 +657,10 @@ export default function StatsRoute() {
       </section>
 
       <nav class="r-wrap stats-view-nav" aria-label="Stats sections">
-        <a href="#network-overview"><span>01</span> Network pulse</a>
-        <a href={`#${STATS_INSPECTOR_ID}`}><span>02</span> Room inspector</a>
-        <a href="#room-comparison"><span>03</span> Compare rooms</a>
-        <a href="#rooms"><span>04</span> All rooms</a>
+        <a href="#network-overview">Network pulse</a>
+        <a href={`#${STATS_INSPECTOR_ID}`}>Room inspector</a>
+        <a href="#room-comparison">Compare rooms</a>
+        <a href="#rooms">All rooms</a>
       </nav>
 
       <section id="network-overview" class="r-wrap r-section data-grid stats-overview" aria-label="Activity detail">
@@ -995,7 +992,7 @@ export default function StatsRoute() {
       />
 
       <section id="rooms" class="r-wrap r-section stats-rooms-section" aria-labelledby="rooms-heading">
-        <span class="r-eyebrow">public room directory</span>
+        <span class="r-eyebrow">Public room directory</span>
         <h2 class="r-title" id="rooms-heading">Find the conversation</h2>
         <p class="stats-section-note">Search by room or topic, see who is present, and open the room at its latest recorded moment. The 14-day pulse shows activity without exposing what anyone said.</p>
         <div class="stats-room-controls" aria-label="Room list controls">
@@ -1026,11 +1023,10 @@ export default function StatsRoute() {
         <div class="data-list">
           <Show when={visibleChannels().length > 0} fallback={<div class="data-empty">No rooms match this view. Switch back to all rooms to see the full public index.</div>}>
             <For each={visibleChannels()}>
-              {(channel, index) => (
+              {(channel) => (
                 <ChannelRow
                   channel={channel}
                   nowMs={nowMs()}
-                  rank={index() + 1}
                   selected={inspectedChannel().toLowerCase() === channel.channel.toLowerCase()}
                   inspectorId={STATS_INSPECTOR_ID}
                   comparisonId="room-comparison"

@@ -182,7 +182,7 @@ describe('HomeView — catch-up inbox', () => {
     render(() => <HomeView />);
 
     expect(screen.getByRole('heading', { name: 'The room is quiet.' })).toBeInTheDocument();
-    expect(screen.queryByText(/Welcome, me|Current ledger|Needs you|Room ledger|oper|JOIN|NICK/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Welcome, me|Current ledger|Room ledger|\boper\b|\bJOIN\b|\bNICK\b/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse rooms' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start a room' })).toBeInTheDocument();
   });

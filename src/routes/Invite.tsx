@@ -147,38 +147,40 @@ export default function InviteRoute() {
       <div class="r-grain" aria-hidden="true" />
 
       <section class="invite-door" aria-labelledby="invite-heading">
-        <img
-          class="invite-mascot"
-          src="/brand/mascot-wave.png"
-          width="160"
-          height="160"
-          alt=""
-          decoding="async"
-        />
-        <p class="invite-eyebrow">A friend invited you</p>
-        <h1 id="invite-heading">
-          {card().channel === '#root' ? `Join ${card().channel}` : headline()}
-        </h1>
-        <p class="invite-lede">{welcome()}</p>
-        <Show when={!hasRoom()}>
-          <p class="invite-recovery" role="note">
-            This link does not name a room. Open Onyx and choose one there, or ask your friend for a new room invite.
-          </p>
-        </Show>
-
-        <div class="invite-preview" role="note" aria-label="Invite preview">
-          <span class="invite-preview-eyebrow">Invite</span>
-          <h2 class="invite-preview-title">{title()}</h2>
-          <p class="invite-preview-desc">{description()}</p>
-          <Show when={card().topic}>
-            {(topic) => (
-              <p class="invite-preview-topic">
-                {topic()}
-              </p>
-            )}
+        <aside class="invite-destination">
+          <div class="invite-identity">
+            <span class="invite-room-mark" aria-hidden="true">{(card().channel ?? '#').slice(0, 1)}</span>
+            <div class="invite-identity-copy">
+              <h1 id="invite-heading">
+                {card().channel === '#root' ? `Join ${card().channel}` : headline()}
+              </h1>
+              <p class="invite-lede">{welcome()}</p>
+            </div>
+          </div>
+          <Show when={!hasRoom()}>
+            <p class="invite-recovery" role="note">
+              This link does not name a room. Open Onyx and choose one there, or ask your friend for a new room invite.
+            </p>
           </Show>
-        </div>
+          <Show when={hasRoom()}>
+            <div class="invite-preview" role="note" aria-label="Invite preview">
+              <p class="invite-preview-title">{title()}</p>
+              <p class="invite-preview-desc">{description()}</p>
+              <Show when={card().topic}>
+                {(topic) => (
+                  <p class="invite-preview-topic">
+                    {topic()}
+                  </p>
+                )}
+              </Show>
+            </div>
+          </Show>
+          <p class="invite-access-note" role="note">
+            This link points to a destination. The room still applies its own access rules when you join.
+          </p>
+        </aside>
 
+        <div class="invite-form-panel">
         <form
           class="invite-join"
           onSubmit={(event) => {
@@ -223,12 +225,19 @@ export default function InviteRoute() {
           <a href="/about/">How Onyx works</a>
         </p>
 
-        <Show when={copyState() === 'copied'}>
-          <p class="invite-copy-status" role="status">Invite link copied to clipboard.</p>
-        </Show>
-        <Show when={copyState() === 'failed'}>
-          <p class="invite-copy-status" role="alert">Copy failed. You can still join below.</p>
-        </Show>
+        <p
+          class="invite-copy-status"
+          role={copyState() === 'failed' ? 'alert' : 'status'}
+          aria-live={copyState() === 'failed' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+        >
+          {copyState() === 'copied'
+            ? 'Invite link copied to clipboard.'
+            : copyState() === 'failed'
+              ? 'Copy failed. You can still join below.'
+              : ''}
+        </p>
+        </div>
       </section>
       </div>
     </PublicFrame>

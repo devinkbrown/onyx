@@ -1,38 +1,42 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
-/* Calls hub — quiet-threshold product frame (truthful idle, no auto-join). */
+/* Calls hub — concise, truthful call state (never auto-joins). */
 
 .shell-calls-hub {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: clamp(24px, 5.5vw, 72px);
+  padding: clamp(24px, 4vw, 48px) clamp(20px, 5vw, 64px);
   color: var(--paper);
-  /* Matte mineral field — no radial glow wash */
   background: var(--surface-void, var(--ink));
+}
+
+.shell-calls-header {
+  max-width: 72ch;
 }
 
 .shell-calls-kicker {
   width: fit-content;
-  margin-bottom: 12px;
-  padding: 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--lapis) 28%, var(--line));
-  border-radius: var(--r-sm);
+  margin-bottom: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   color: var(--paper-dim);
-  font: 600 var(--text-xs, 0.6875rem)/1 var(--font-mono);
-  letter-spacing: var(--tracking-kicker, 0.06em);
-  text-transform: uppercase;
-  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 40%, transparent);
+  font: 650 var(--text-sm, 0.8125rem)/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  background: transparent;
 }
 
 .shell-calls-status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 18px;
-  padding: 6px 12px 6px 10px;
-  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
-  border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
+  margin: 0 0 14px;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--paper-dim);
   font: 600 0.78rem/1.2 var(--font-mono);
   letter-spacing: 0.04em;
@@ -89,29 +93,31 @@
 }
 
 .shell-calls-hub h1 {
-  max-width: 720px;
+  max-width: 28ch;
   margin: 0;
   color: var(--paper);
-  font: 600 clamp(1.7rem, 3.2vw, 2.55rem)/var(--leading-tight, 1.15) var(--font-sans);
-  letter-spacing: var(--tracking-title, -0.02em);
+  font: 700 clamp(1.9rem, 1.35rem + 2.1vw, 3.1rem)/1.08 var(--font-sans);
+  letter-spacing: -0.02em;
+  text-transform: none;
 }
 
 .shell-calls-intro {
   max-width: 52ch;
   margin: 18px 0 0;
-  color: color-mix(in oklab, var(--paper) 86%, var(--paper-dim));
-  font: 400 clamp(1rem, 1.3vw, 1.1rem)/var(--leading-body, 1.55) var(--font-serif, var(--font-sans));
+  color: var(--paper-dim);
+  font: 400 clamp(1rem, 1.3vw, 1.1rem)/1.5 var(--font-sans, "Instrument Sans", system-ui, sans-serif);
 }
 
 .shell-calls-truth {
   display: grid;
   gap: 4px;
   max-width: 58ch;
-  margin: 18px 0 0;
-  padding: 14px 16px;
-  border-left: 3px solid var(--lapis);
+  margin: 16px 0 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--line);
+  border-left: 0;
   color: var(--paper-dim);
-  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 48%, transparent);
+  background: transparent;
   font-size: .9rem;
   line-height: 1.45;
 }
@@ -121,16 +127,16 @@
 .shell-calls-primary {
   min-height: var(--target-min, 44px);
   min-width: var(--target-min, 44px);
-  margin-top: 24px;
+  margin-top: 20px;
   padding: 11px 18px;
-  border: 1px solid color-mix(in oklab, var(--lapis) 75%, var(--stone-line));
-  border-radius: var(--r-md);
-  background: var(--lapis);
-  color: var(--on-accent, var(--ink));
+  border: 1px solid var(--commercial-action-primary, #ff987d);
+  border-radius: 0;
+  background: var(--commercial-action-primary, #ff987d);
+  color: var(--ink, #202429);
   font: 650 var(--text-md, 0.9375rem)/1 var(--font-sans);
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--paper) 8%, transparent) inset;
+  box-shadow: none;
   transition:
     background var(--dur-fast, 160ms) var(--ease),
     border-color var(--dur-fast, 160ms) var(--ease),
@@ -139,13 +145,14 @@
 }
 
 .shell-calls-primary:hover {
-  background: color-mix(in oklab, var(--lapis) 88%, white);
-  border-color: color-mix(in oklab, var(--lapis) 90%, white);
+  background: var(--surface-raised, var(--stone-2));
+  border-color: var(--commercial-action-primary, #ff987d);
+  color: var(--paper);
 }
 
 .shell-calls-primary:active {
   transform: translateY(1px);
-  box-shadow: var(--elev-press, inset 0 1px 0 color-mix(in oklab, var(--ink) 18%, transparent));
+  box-shadow: none;
 }
 
 .shell-calls-primary:focus-visible {
@@ -153,32 +160,49 @@
   outline-offset: var(--focus-offset, 3px);
 }
 
+.shell-calls-action-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  max-width: 72ch;
+  margin: 14px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.shell-calls-action-note > span {
+  color: var(--commercial-action-primary, #ff987d);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
 .shell-calls-proof {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   max-width: 880px;
-  margin-top: clamp(40px, 7vw, 80px);
+  margin-top: clamp(32px, 5vw, 56px);
 }
 
 .shell-calls-proof article {
   min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: color-mix(in oklab, var(--surface-raised, var(--stone-2)) 55%, transparent);
-  box-shadow: var(--elev-1, none);
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .shell-calls-proof article > span {
   color: var(--paper-dim);
-  font: 600 var(--text-2xs, 0.625rem)/1 var(--font-mono);
-  letter-spacing: var(--tracking-kicker, 0.06em);
-  text-transform: uppercase;
+  font: 650 var(--text-sm, 0.8125rem)/1.2 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .shell-calls-proof h2 {
-  margin: 14px 0 6px;
+  margin: 10px 0 6px;
   color: var(--paper);
   font: 600 var(--text-md, 0.9375rem)/var(--leading-snug, 1.35) var(--font-sans);
 }
@@ -227,6 +251,10 @@
     justify-content: center;
   }
 
+  .shell-calls-action-note {
+    margin-top: 14px;
+  }
+
   .shell-calls-proof {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -234,21 +262,8 @@
   }
 
   .shell-calls-proof article {
-    padding: 16px;
-    border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--line));
+    padding: 12px 0 0;
   }
-
-  .shell-calls-proof article:nth-child(2) {
-    border-left-color: color-mix(in oklab, var(--ok) 68%, var(--line));
-  }
-
-  .shell-calls-proof article:nth-child(3) {
-    border-left-color: color-mix(in oklab, var(--gold) 68%, var(--line));
-  }
-
-  .shell-calls-proof article:nth-child(1) > span { color: var(--lapis-bright); }
-  .shell-calls-proof article:nth-child(2) > span { color: var(--ok); }
-  .shell-calls-proof article:nth-child(3) > span { color: var(--gold); }
 
   .shell-calls-proof h2 {
     margin-top: 12px;

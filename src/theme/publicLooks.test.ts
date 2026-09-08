@@ -10,7 +10,10 @@ describe('public appearance faces', () => {
     expect(PUBLIC_THEME_IDS).toEqual(['ocean', 'pearl']);
     expect(THEMES.ocean.scheme).toBe('dark');
     expect(THEMES.pearl.scheme).toBe('light');
-    expect(THEMES.ocean.tokens['--font-display']).not.toMatch(/Anton/);
+    expect(THEMES.ocean.tokens['--font-display']).toMatch(/Anton/);
+    expect(THEMES.ocean.tokens['--font-sans']).toMatch(/Instrument Sans/);
+    expect(THEMES.ocean.tokens['--font-mono']).toMatch(/JetBrains Mono/);
+    expect(THEMES.ocean.tokens['--brand-action']).toBe('#ff987d');
     expect(THEMES.pearl.tokens['--font-display']).toBeUndefined();
   });
 

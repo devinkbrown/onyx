@@ -6,7 +6,7 @@ import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@solidjs/testing-library';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,9 +15,22 @@ import { store } from '@/lib/store/store';
 
 import { AppShell, _setMediaModuleLoaderForTests } from './AppShell';
 
+const voiceBarHarness = vi.hoisted(() => ({ real: false }));
+
 vi.mock('@/media/useCadenceMedia', () => ({ mountMedia: vi.fn() }));
 vi.mock('./voice/VoiceStage', () => ({ VoiceStage: () => null }));
-vi.mock('./voice/VoiceBar', () => ({ VoiceBar: () => null }));
+vi.mock('./voice/VoiceBar', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./voice/VoiceBar')>();
+  const { createComponent } = await import('solid-js');
+  return {
+    ...actual,
+    VoiceBar: (props: object) => (
+      voiceBarHarness.real
+        ? createComponent(actual.VoiceBar, props)
+        : null
+    ),
+  };
+});
 vi.mock('./voice/VoicePip', () => ({ VoicePip: () => null }));
 vi.mock('./voice/settings/VoiceSettings', () => ({ VoiceSettings: () => null }));
 vi.mock('./voice/overlays/IncomingCallOverlay', () => ({ IncomingCallOverlay: () => null }));
@@ -70,6 +83,7 @@ afterEach(() => {
   cleanup();
   _setMediaModuleLoaderForTests();
   vi.unstubAllGlobals();
+  voiceBarHarness.real = false;
 });
 
 describe('AppShell standalone CallsHub integration', () => {
@@ -133,5 +147,158 @@ describe('AppShell standalone CallsHub integration', () => {
     expect(hub).toHaveAttribute('data-call-presentation', 'established');
     expect(within(hub).getByRole('heading', { name: 'Your call is still here.' })).toBeInTheDocument();
     expect(hub.textContent).not.toMatch(/end-to-end|encrypted|secure call|protected call/iu);
+  });
+
+  it.each([null, 1_700_000_000_000])('returns to an existing DM call with start time %s without initiating media', async (callStartedAt) => {
+    const startCall = vi.spyOn(store.getState(), 'startDmCall').mockImplementation(() => {});
+    const joinVoice = vi.spyOn(store.getState(), 'joinVoiceChannel').mockImplementation(async () => {});
+    const acceptCall = vi.spyOn(store.getState(), 'acceptDmCall').mockImplementation(() => {});
+    try {
+      const hub = await mountCallsHub({
+        callState: 'in_call', callChannel: null, callWith: 'alice', callStartedAt,
+      });
+      const callBefore = store.getState().voice;
+      expect(store.getState().activeView).toEqual({ kind: 'home' });
+      expect(hub).toHaveAttribute('data-call-presentation', callStartedAt === null ? 'provisional' : 'established');
+      fireEvent.click(within(hub).getByRole('button', { name: 'Return to call' }));
+      expect(store.getState().activeView).toEqual({ kind: 'dm', nick: 'alice' });
+      expect(store.getState().voice).toBe(callBefore);
+      expect(startCall).not.toHaveBeenCalled();
+      expect(joinVoice).not.toHaveBeenCalled();
+      expect(acceptCall).not.toHaveBeenCalled();
+    } finally {
+      startCall.mockRestore();
+      joinVoice.mockRestore();
+      acceptCall.mockRestore();
+    }
+  });
+});
+
+const RECORDING_BLOB = new Blob(['saved-audio'], { type: 'audio/webm;codecs=opus' });
+
+async function installAppShellRecording(opts: { deferred?: boolean } = {}) {
+  const g = globalThis as unknown as { MediaRecorder?: unknown };
+  const previousRecorder = g.MediaRecorder;
+  g.MediaRecorder = class {
+    static isTypeSupported() { return true; }
+  };
+
+  let settleStop = (_blob: Blob | null) => {};
+  const startRecording = vi.fn().mockReturnValue({ started: true });
+  const stopRecording = opts.deferred
+    ? vi.fn().mockImplementation(() => new Promise<Blob | null>((resolve) => {
+      settleStop = resolve;
+    }))
+    : vi.fn().mockResolvedValue(RECORDING_BLOB);
+
+  const { setMountedCadenceMediaEngine } = await import('@/lib/cadence-media/MediaEngine');
+  setMountedCadenceMediaEngine({
+    startRecording,
+    stopRecording,
+    getLocalStream: vi.fn().mockReturnValue({ getTracks: () => [] } as unknown as MediaStream),
+    leaveRoom: vi.fn(),
+    hangup: vi.fn(),
+  } as never);
+
+  const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:onyx-recording');
+  const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+  return {
+    startRecording,
+    stopRecording,
+    createObjectURL,
+    resolveStop(blob: Blob | null = RECORDING_BLOB) {
+      settleStop(blob);
+    },
+    restore() {
+      setMountedCadenceMediaEngine(null);
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+      if (previousRecorder === undefined) {
+        Reflect.deleteProperty(globalThis, 'MediaRecorder');
+      } else {
+        g.MediaRecorder = previousRecorder;
+      }
+    },
+  };
+}
+
+describe('AppShell VoiceBar recording ownership', () => {
+  beforeEach(() => {
+    voiceBarHarness.real = true;
+  });
+
+  it('keeps the recording owner mounted through Record then Leave and still saves', async () => {
+    const harness = await installAppShellRecording({ deferred: true });
+    try {
+      store.setState({
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        ourNick: 'self',
+        voice: {
+          ...store.getState().voice,
+          callState: 'in_call',
+          callChannel: '#lounge',
+          callStartedAt: Date.now(),
+        },
+      });
+      render(() => <AppShell />);
+      await screen.findByTestId('voice-bar');
+      fireEvent.click(screen.getByTestId('call-more-button'));
+      fireEvent.click(screen.getByTestId('record-button'));
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+
+      fireEvent.click(screen.getByTestId('leave-button'));
+      expect(screen.queryByTestId('voice-bar')).toBeNull();
+      expect(screen.getByTestId('voice-bar-owner')).toHaveAttribute('data-voice-bar-active', 'false');
+      expect(screen.getAllByTestId('voice-bar-owner')).toHaveLength(1);
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+
+      await waitFor(() => expect(harness.stopRecording).toHaveBeenCalledOnce());
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+
+      harness.resolveStop();
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      await waitFor(() => expect(screen.queryByTestId('voice-bar-owner')).toBeNull());
+    } finally {
+      harness.restore();
+    }
+  });
+
+  it('keeps the owner mounted through deferred-blob Stop then Leave and still saves once', async () => {
+    const harness = await installAppShellRecording({ deferred: true });
+    try {
+      store.setState({
+        activeView: { kind: 'home' },
+        connectionStatus: 'connected',
+        ourNick: 'self',
+        voice: {
+          ...store.getState().voice,
+          callState: 'in_call',
+          callChannel: '#lounge',
+          callStartedAt: Date.now(),
+        },
+      });
+      render(() => <AppShell />);
+      await screen.findByTestId('voice-bar');
+      fireEvent.click(screen.getByTestId('call-more-button'));
+      fireEvent.click(screen.getByTestId('record-button'));
+      fireEvent.click(screen.getByTestId('record-button'));
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(harness.createObjectURL).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('leave-button'));
+      expect(screen.queryByTestId('voice-bar')).toBeNull();
+      expect(screen.getByTestId('voice-bar-owner')).toBeInTheDocument();
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      expect(harness.startRecording).toHaveBeenCalledOnce();
+
+      harness.resolveStop();
+      await waitFor(() => expect(harness.createObjectURL).toHaveBeenCalledOnce());
+      expect(harness.stopRecording).toHaveBeenCalledOnce();
+      await waitFor(() => expect(screen.queryByTestId('voice-bar-owner')).toBeNull());
+    } finally {
+      harness.restore();
+    }
   });
 });

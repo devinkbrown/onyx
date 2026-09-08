@@ -301,7 +301,7 @@ function VoiceSettingsContent() {
         <div class="voice-settings__grid">
           <DeviceSelect
             id="voice-input-device"
-            label="Input"
+            label="Microphone"
             description="Microphone used for calls and rooms."
             value={voice().inputDeviceId}
             devices={inputs()}
@@ -311,7 +311,7 @@ function VoiceSettingsContent() {
           <div class="voice-settings__output-choice">
             <DeviceSelect
               id="voice-output-device"
-              label="Output"
+              label="Speakers"
               description="Speaker or headset for remote audio."
               value={voice().outputDeviceId}
               devices={outputs()}

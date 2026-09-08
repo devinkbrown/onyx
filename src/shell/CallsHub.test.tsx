@@ -144,7 +144,31 @@ describe('CallsHub', () => {
     expect(onOpenRooms).not.toHaveBeenCalled();
   });
 
-  it('provisional without a channel falls back to Choose a room (no invent join)', () => {
+  it.each([null, 1_700_000_000_000])('returns to a DM call with start time %s using its peer', (callStartedAt) => {
+    const { onOpenRooms, onReturnToCall } = renderHub({
+      callState: 'in_call', callChannel: null, callWith: ' alice ', callStartedAt,
+    });
+    expect(screen.getByRole('main')).toHaveAttribute('data-call-presentation',
+      callStartedAt === null ? 'provisional' : 'established');
+    expect(screen.getByTestId('calls-hub-status')).toHaveTextContent('alice');
+    expect(screen.queryByRole('button', { name: 'Choose a room' })).toBeNull();
+    expect(onReturnToCall).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Return to call' }));
+    expect(onReturnToCall).toHaveBeenCalledExactlyOnceWith('alice');
+    expect(onOpenRooms).not.toHaveBeenCalled();
+  });
+
+  it.each(['ringing_in', 'ringing_out'] as const)('keeps a DM %s with a stale start time in ringing presentation', (callState) => {
+    const { onReturnToCall, onOpenRooms } = renderHub({
+      callState, callChannel: null, callWith: 'alice', callStartedAt: 1_700_000_000_000,
+    });
+    expect(screen.getByRole('main')).toHaveAttribute('data-call-presentation', callState);
+    expect(screen.queryByRole('button', { name: /return|accept|join|start/i })).toBeNull();
+    expect(onReturnToCall).not.toHaveBeenCalled();
+    expect(onOpenRooms).not.toHaveBeenCalled();
+  });
+
+  it('provisional without a channel or peer falls back to Choose a room (no invent join)', () => {
     const { onOpenRooms, onReturnToCall } = renderHub({
       callState: 'in_call',
       callChannel: null,
@@ -183,6 +207,6 @@ describe('CallsHub', () => {
   it('explains that the hub is not a media surface', () => {
     renderHub();
     expect(screen.getByRole('note')).toHaveTextContent(/does not join or start a call/i);
-    expect(screen.getByText(/Controls belong to the room/i)).toBeInTheDocument();
+    expect(screen.getByText(/Choose a room to see its call controls and live status/i)).toBeInTheDocument();
   });
 });

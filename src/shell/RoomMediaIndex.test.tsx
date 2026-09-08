@@ -3,11 +3,12 @@ import 'fake-indexeddb/auto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChatMessage } from '@/lib/irc/types';
+import { resetPreferences, setPreference } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { RoomMediaIndex } from './RoomMediaIndex';
 
@@ -55,12 +56,14 @@ function seedRoom(messages: ChatMessage[]): void {
 describe('RoomMediaIndex', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    resetPreferences();
     loadRecentMock.mockReset();
     loadRecentMock.mockResolvedValue({ messages: [], status: 'complete' });
   });
 
   afterEach(() => {
     cleanup();
+    resetPreferences();
     vi.restoreAllMocks();
   });
 
@@ -86,8 +89,21 @@ describe('RoomMediaIndex', () => {
     ));
 
     expect(screen.getByRole('dialog', { name: 'Pictures, files, and links' })).toBeInTheDocument();
+    expect(screen.getByTestId('room-media-index-context')).toHaveTextContent('Conversation media #harbour');
+    expect(screen.getByLabelText(/Conversation media index provenance: This device/i)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Pictures' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByRole('button', { name: 'Jump to picture harbour.png' })).toBeInTheDocument();
+    const item = screen.getByRole('button', { name: 'Load external picture from cdn.example' }).closest('li')!;
+    expect(item.querySelector('img')).toBeNull();
+    expect(item.querySelector('[src]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Jump to picture harbour.png' })).toBeInTheDocument();
+    expect(item.querySelector('button')?.parentElement?.closest('button')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load external picture from cdn.example' }));
+    const picture = item.querySelector('img')!;
+    expect(picture).toHaveAttribute('src', 'https://cdn.example/harbour.png');
+    expect(picture).toHaveAttribute('referrerpolicy', 'no-referrer');
+    fireEvent.error(picture);
+    expect(screen.getByText('Preview unavailable')).toBeInTheDocument();
     expect(screen.queryByText(/ledger/i)).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
@@ -100,6 +116,36 @@ describe('RoomMediaIndex', () => {
     );
     expect(screen.getByText('news.example')).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps same-origin pictures automatic while keeping Jump outside the preview control', () => {
+    const href = new URL('/uploads/harbour.png', window.location.href).toString();
+    seedRoom([chat({ id: 'local-picture', text: `[file: harbour.png] 120 KB ${href}` })]);
+
+    render(() => <RoomMediaIndex target="#harbour" open={true} onOpenChange={() => {}} />);
+
+    const item = screen.getByRole('button', { name: 'Jump to picture harbour.png' }).closest('li')!;
+    expect(item.querySelector('img')).toHaveAttribute('src', href);
+    expect(item.querySelector('img')).toHaveAttribute('referrerpolicy', 'no-referrer');
+    expect(screen.queryByRole('button', { name: /Load external picture/i })).toBeNull();
+    expect(item.querySelectorAll('button')).toHaveLength(1);
+  });
+
+  it.each([
+    ['disabled link previews', 'https://cdn.example.test/disabled.png', () => setPreference('linkPreviews', false)],
+    ['blocked hosts', 'https://cdn.example.test/blocked.png', () => setPreference('blockedHosts', ['cdn.example.test'])],
+    ['http disallowed by policy', 'http://cdn.example.test/insecure.png', () => setPreference('httpsOnly', true)],
+  ] as const)('keeps %s pictures inert without a resource or consent control', (_caseName, href, configure) => {
+    configure();
+    seedRoom([chat({ id: 'policy-picture', text: href })]);
+
+    render(() => <RoomMediaIndex target="#harbour" open={true} onOpenChange={() => {}} />);
+
+    const item = screen.getByRole('button', { name: 'Jump to picture Picture' }).closest('li')!;
+    expect(item.querySelector('img')).toBeNull();
+    expect(item.querySelector('[src]')).toBeNull();
+    expect(item.querySelector('.room-media-index-picture-load')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Jump to picture Picture' })).toBeInTheDocument();
   });
 
   it('uses tab-scoped empty copy and does not paint a ledger', async () => {
@@ -249,6 +295,72 @@ describe('RoomMediaIndex', () => {
     expect(screen.getByRole('tab', { name: 'Links' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('does not paint stale owner history after the device-memory owner changes', async () => {
+    let resolveAlice: (result: { messages: ChatMessage[]; status: 'complete' }) => void = () => {};
+    const aliceRead = new Promise<{ messages: ChatMessage[]; status: 'complete' }>((resolve) => {
+      resolveAlice = resolve;
+    });
+    loadRecentMock.mockImplementation((_target: string, _limit: number, owner?: { identity: string }) => (
+      owner?.identity === 'alice'
+        ? aliceRead
+        : Promise.resolve({
+          messages: [chat({ id: 'bob-picture', text: '[file: bob.png] 1 KB https://bob.example/picture.png' })],
+          status: 'complete' as const,
+        })
+    ));
+    seedRoom([]);
+    store.setState({
+      ourNick: 'alice',
+      server: {
+        id: 'room-media-alice',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://room-media-alice.example',
+        icon: '',
+        nick: 'alice',
+        account: 'alice',
+        connected: true,
+      },
+    });
+
+    render(() => <RoomMediaIndex target="#harbour" open={true} onOpenChange={() => {}} />);
+    expect(loadRecentMock).toHaveBeenCalledWith(
+      '#harbour',
+      expect.any(Number),
+      { serverUrl: 'wss://room-media-alice.example', identity: 'alice' },
+    );
+
+    store.setState({
+      ourNick: 'bob',
+      server: {
+        id: 'room-media-bob',
+        name: 'Onyx',
+        network: 'Onyx',
+        url: 'wss://room-media-bob.example',
+        icon: '',
+        nick: 'bob',
+        account: 'bob',
+        connected: true,
+      },
+    });
+
+    expect(await screen.findByRole('button', { name: 'Jump to picture bob.png' })).toBeInTheDocument();
+    expect(loadRecentMock).toHaveBeenLastCalledWith(
+      '#harbour',
+      expect.any(Number),
+      { serverUrl: 'wss://room-media-bob.example', identity: 'bob' },
+    );
+    resolveAlice({
+      messages: [chat({ id: 'alice-picture', text: '[file: alice.png] 1 KB https://alice.example/picture.png' })],
+      status: 'complete',
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Jump to picture alice.png' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Jump to picture bob.png' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Load external picture from alice.example' })).toBeNull();
+    });
+  });
+
   it('does not import unfurl or gallery write APIs', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const sources = [
@@ -256,7 +368,7 @@ describe('RoomMediaIndex', () => {
       readFileSync(join(here, '../lib/upload/roomMediaIndex.ts'), 'utf8'),
     ].join('\n');
     expect(sources).not.toMatch(
-      /from\s+['"][^'"]*(?:linkPreview|saveMedia)['"]|fetchLinkPreview|saveMediaFromUserGesture/iu,
+      /from\s+['"][^'"]*saveMedia['"]|fetchLinkPreview|saveMediaFromUserGesture/iu,
     );
   });
 });

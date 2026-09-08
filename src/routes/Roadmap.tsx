@@ -88,16 +88,13 @@ export function RoadmapBridge() {
           </p>
           <div class="roadmap-legend" role="group" aria-label="Roadmap state legend">
             <For each={ROADMAP_ITEMS}>
-              {(item, index) => (
+              {(item) => (
                 <a
                   href={`#roadmap-${item.state}`}
                   data-state={item.state}
                   aria-current={activePriority() === item.state ? 'location' : undefined}
                   onClick={(event) => selectPriority(event, item.state)}
                 >
-                  <span class="roadmap-legend__marker" aria-hidden="true">
-                    {String(index() + 1).padStart(2, '0')}
-                  </span>
                   <span>{item.label}</span>
                 </a>
               )}

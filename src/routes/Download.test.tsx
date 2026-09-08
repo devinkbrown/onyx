@@ -147,6 +147,8 @@ describe('Download page', () => {
     expect(container.querySelectorAll('main')).toHaveLength(1);
     expect(container.querySelector('main main, main header, main footer')).toBeNull();
     expect(container.querySelector('.ui-root.dl-page')).toBeTruthy();
+    expect(container.querySelector('.dl-browser-grid')).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Native download artifacts' })).toBeInTheDocument();
     expect(container.querySelector('.public-frame__context')).toHaveTextContent(/This device.*Browser first/);
     expect(within(screen.getByRole('navigation', { name: 'Primary navigation' }))
       .getByRole('link', { name: 'Download' })).toHaveAttribute('aria-current', 'page');
@@ -391,5 +393,15 @@ describe('Download page — source structure', () => {
     expect(css).toContain('forced-colors');
     expect(css).toContain('@media (max-width: 42rem) and (max-height: 30rem)');
     expect(css).not.toContain('backdrop-filter');
+  });
+
+  it('keeps browser guidance before the artifact-led availability list', () => {
+    expect(src).toContain('class="dl-browser-grid"');
+    expect(src).toContain('class="dl-grid dl-artifact-list" role="list"');
+    expect(src.indexOf('id="keep-here"')).toBeLessThan(src.indexOf('dl-artifact-list'));
+    expect(src).toContain('Desktop packages are optional and unsigned.');
+    expect(src).not.toContain('They stay further down this page, unsigned and honest.');
+    expect(css).toContain('.dl-artifact-details');
+    expect(css).toContain('.dl-catalog-receipt');
   });
 });

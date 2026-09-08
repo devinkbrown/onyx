@@ -116,7 +116,8 @@ function LaneCard(props: {
 
   return (
     <article
-      class="dl-card data-card"
+      class="dl-card dl-artifact"
+      role="listitem"
       data-testid={`dl-card-${props.card.lane}`}
       data-state={availability()}
     >
@@ -131,153 +132,157 @@ function LaneCard(props: {
           {availabilityLabel()}
         </span>
       </div>
-      <h3>{props.card.title}</h3>
-      <p>{props.card.summary}</p>
-      <ul class="dl-facts">
-        <li>
-          <strong>
-            {props.card.runtimeIncluded
-              ? 'Runtime included'
-              : props.card.hasInstallScript
-                ? 'Runtime (auto via install.sh)'
-                : 'Runtime requirement'}
-          </strong>
-          {' '}
-          {props.card.primaryPackages.join(' + ')}
-        </li>
-        <li>
-          <strong>Layout</strong>
-          {' '}
-          <Show when={props.card.lane === 'windows'}>
-            package root bin/onyx.exe + WebView2Loader.dll + resources
-          </Show>
-          <Show when={props.card.lane === 'linux'}>
-            package root bin/onyx + resources/dist
-          </Show>
-          <Show when={props.card.hasInstallScript}>
-            PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)
-          </Show>
-        </li>
-        <li>
-          <strong>Signing</strong>
-          {' '}
-          {signingLabel(props.card.archiveExt)}
-        </li>
-      </ul>
-      <div class="dl-actions">
-        <Show
-          when={availability() === 'available'}
-          fallback={(
-            <p class="dl-checksum-missing" role="status">
-              {availability() === 'loading'
-                ? 'Checking the staged catalog before showing download controls.'
-                : availability() === 'unavailable'
-                  ? 'This native artifact is not published for this lane. Archive, notice, and checksum links are withheld.'
-                  : 'Artifact availability could not be confirmed. Download controls are withheld until the catalog is available.'}
-            </p>
-          )}
-        >
-          <a
-            class="r-btn primary"
-            data-testid={`dl-download-${props.card.lane}`}
-            href={props.card.archiveUrl}
-            download={props.card.archiveName}
-          >
-            {archiveButtonLabel(props.card.archiveExt)}
-          </a>
-          <a
-            class="r-btn ghost"
-            data-testid={`dl-notice-${props.card.lane}`}
-            href={props.card.noticeUrl}
-          >
-            Honesty notice
-          </a>
-          <a
-            class="r-btn ghost"
-            data-testid={`dl-sha256-${props.card.lane}`}
-            href={props.card.sha256Url}
-          >
-            SHA-256 file
-          </a>
-        </Show>
+      <div class="dl-artifact-summary">
+        <h3>{props.card.title}</h3>
+        <p>{props.card.summary}</p>
+        <ul class="dl-facts">
+          <li>
+            <strong>
+              {props.card.runtimeIncluded
+                ? 'Runtime included'
+                : props.card.hasInstallScript
+                  ? 'Runtime (auto via install.sh)'
+                  : 'Runtime requirement'}
+            </strong>
+            {' '}
+            {props.card.primaryPackages.join(' + ')}
+          </li>
+          <li>
+            <strong>Layout</strong>
+            {' '}
+            <Show when={props.card.lane === 'windows'}>
+              package root bin/onyx.exe + WebView2Loader.dll + resources
+            </Show>
+            <Show when={props.card.lane === 'linux'}>
+              package root bin/onyx + resources/dist
+            </Show>
+            <Show when={props.card.hasInstallScript}>
+              PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)
+            </Show>
+          </li>
+          <li>
+            <strong>Signing</strong>
+            {' '}
+            {signingLabel(props.card.archiveExt)}
+          </li>
+        </ul>
       </div>
-      <div class="dl-checksum" data-testid={`dl-checksum-${props.card.lane}`}>
-        <span class="dl-checksum-label">SHA-256</span>
-        <Show when={availability() === 'available'} fallback={(
-          <p class="dl-checksum-missing">
-            {availability() === 'loading'
-              ? 'Checksum will be checked after artifact availability is resolved.'
-              : availability() === 'unavailable'
-                ? 'No checksum is published because this artifact is unavailable.'
-                : 'Checksum is unavailable because artifact availability could not be confirmed.'}
-          </p>
-        )}>
+      <div class="dl-artifact-details">
+        <div class="dl-actions">
           <Show
-            when={hash()}
+            when={availability() === 'available'}
             fallback={(
-              <p class="dl-checksum-missing">
-                {shaFromFile.state === 'pending' || shaFromFile.state === 'refreshing'
-                  ? 'Loading the published SHA-256 sidecar.'
-                  : 'The archive is published, but its SHA-256 sidecar is not currently available.'}
+              <p class="dl-checksum-missing" role="status">
+                {availability() === 'loading'
+                  ? 'Checking the staged catalog before showing download controls.'
+                  : availability() === 'unavailable'
+                    ? 'This native artifact is not published for this lane. Archive, notice, and checksum links are withheld.'
+                    : 'Artifact availability could not be confirmed. Download controls are withheld until the catalog is available.'}
               </p>
             )}
           >
-            {(h) => (
-              <div class="dl-checksum-row">
-                <code class="dl-hash" data-testid={`dl-hash-${props.card.lane}`}>{h()}</code>
-                <CopyButton
-                  label="Copy"
-                  value={h()}
-                  testId={`dl-copy-hash-${props.card.lane}`}
-                />
-              </div>
-            )}
+            <a
+              class="r-btn primary"
+              data-testid={`dl-download-${props.card.lane}`}
+              href={props.card.archiveUrl}
+              download={props.card.archiveName}
+            >
+              {archiveButtonLabel(props.card.archiveExt)}
+            </a>
+            <a
+              class="r-btn ghost"
+              data-testid={`dl-notice-${props.card.lane}`}
+              href={props.card.noticeUrl}
+            >
+              Honesty notice
+            </a>
+            <a
+              class="r-btn ghost"
+              data-testid={`dl-sha256-${props.card.lane}`}
+              href={props.card.sha256Url}
+            >
+              SHA-256 file
+            </a>
           </Show>
-        </Show>
-      </div>
-      <div class="dl-install">
-        <h4>
-          {props.card.hasInstallScript
-            ? `Install on ${props.card.osLabel}`
-            : `Use on ${props.card.osLabel}`}
-        </h4>
-        <pre class="dl-pre" data-testid={`dl-install-${props.card.lane}`}>{steps()}</pre>
-        <CopyButton
-          label={props.card.hasInstallScript ? 'Copy install steps' : 'Copy steps'}
-          value={steps()}
-          testId={`dl-copy-install-${props.card.lane}`}
-        />
-        <Show
-          when={props.card.hasInstallScript}
-          fallback={(
-            <p class="dl-note">
-              This package is
-              {' '}
-              <strong>unsigned</strong>
-              . Extract and run from the package tree. Onyx does not claim
-              codesign, notarization, virus-free status, or GUI launch verification for this lane.
+        </div>
+        <div class="dl-checksum" data-testid={`dl-checksum-${props.card.lane}`}>
+          <span class="dl-checksum-label">SHA-256</span>
+          <Show when={availability() === 'available'} fallback={(
+            <p class="dl-checksum-missing">
+              {availability() === 'loading'
+                ? 'Checksum will be checked after artifact availability is resolved.'
+                : availability() === 'unavailable'
+                  ? 'No checksum is published because this artifact is unavailable.'
+                  : 'Checksum is unavailable because artifact availability could not be confirmed.'}
             </p>
-          )}
-        >
-          <p class="dl-note">
-            Root and network are required only when
-            {' '}
-            <code>install.sh</code>
-            {' '}
-            auto-installs system packages via
-            {' '}
-            {props.card.packageManager}
-            . Use
-            {' '}
-            <code>--prefix</code>
-            {' '}
-            and
-            {' '}
-            <code>--no-deps</code>
-            {' '}
-            for a non-root tree. The script never curl-pipes remote code.
-          </p>
-        </Show>
+          )}>
+            <Show
+              when={hash()}
+              fallback={(
+                <p class="dl-checksum-missing">
+                  {shaFromFile.state === 'pending' || shaFromFile.state === 'refreshing'
+                    ? 'Loading the published SHA-256 sidecar.'
+                    : 'The archive is published, but its SHA-256 sidecar is not currently available.'}
+                </p>
+              )}
+            >
+              {(h) => (
+                <div class="dl-checksum-row">
+                  <code class="dl-hash" data-testid={`dl-hash-${props.card.lane}`}>{h()}</code>
+                  <CopyButton
+                    label="Copy"
+                    value={h()}
+                    testId={`dl-copy-hash-${props.card.lane}`}
+                  />
+                </div>
+              )}
+            </Show>
+          </Show>
+        </div>
+        <div class="dl-install">
+          <h4>
+            {props.card.hasInstallScript
+              ? `Install on ${props.card.osLabel}`
+              : `Use on ${props.card.osLabel}`}
+          </h4>
+          <pre class="dl-pre" data-testid={`dl-install-${props.card.lane}`}>{steps()}</pre>
+          <CopyButton
+            label={props.card.hasInstallScript ? 'Copy install steps' : 'Copy steps'}
+            value={steps()}
+            testId={`dl-copy-install-${props.card.lane}`}
+          />
+          <Show
+            when={props.card.hasInstallScript}
+            fallback={(
+              <p class="dl-note">
+                This package is
+                {' '}
+                <strong>unsigned</strong>
+                . Extract and run from the package tree. Onyx does not claim
+                codesign, notarization, virus-free status, or GUI launch verification for this lane.
+              </p>
+            )}
+          >
+            <p class="dl-note">
+              Root and network are required only when
+              {' '}
+              <code>install.sh</code>
+              {' '}
+              auto-installs system packages via
+              {' '}
+              {props.card.packageManager}
+              . Use
+              {' '}
+              <code>--prefix</code>
+              {' '}
+              and
+              {' '}
+              <code>--no-deps</code>
+              {' '}
+              for a non-root tree. The script never curl-pipes remote code.
+            </p>
+          </Show>
+        </div>
       </div>
     </article>
   );
@@ -291,7 +296,8 @@ function MacosComingSoonCard(): JSX.Element {
   const mac = MACOS_COMING_SOON;
   return (
     <article
-      class="dl-card data-card dl-card--soon"
+      class="dl-card dl-artifact dl-card--soon"
+      role="listitem"
       data-testid="dl-card-macos"
       data-state="coming-soon"
     >
@@ -299,50 +305,54 @@ function MacosComingSoonCard(): JSX.Element {
         <span class="label">{mac.osLabel}</span>
         <span class="dl-status" data-testid="dl-macos-status">{mac.statusLabel}</span>
       </div>
-      <h3>{mac.title}</h3>
-      <p>{mac.summary}</p>
-      <ul class="dl-facts">
-        <li>
-          <strong>Runtime (planned)</strong>
-          {' '}
-          {mac.runtime}
-        </li>
-        <li>
-          <strong>Package (planned)</strong>
-          {' '}
-          {mac.plannedPackage}
-        </li>
-        <li>
-          <strong>Status</strong>
-          {' '}
-          No public DMG, SHA-256 sidecar, or honesty notice is linked until genuine Darwin builds ship.
-        </li>
-      </ul>
-      <ul class="dl-soon-arches" data-testid="dl-macos-arches" aria-label="Planned macOS architectures">
-        <For each={[...mac.arches]}>
-          {(arch) => (
-            <li class="dl-soon-arch" data-testid={`dl-macos-arch-${arch.arch}`}>
-              <strong>{arch.label}</strong>
-              <span>{arch.note}</span>
-            </li>
-          )}
-        </For>
-      </ul>
-      <div class="dl-actions">
-        <a
-          class="r-btn ghost"
-          data-testid="dl-macos-open-app"
-          href="/app/"
-        >
-          Open Onyx in browser
-        </a>
+      <div class="dl-artifact-summary">
+        <h3>{mac.title}</h3>
+        <p>{mac.summary}</p>
+        <ul class="dl-facts">
+          <li>
+            <strong>Runtime (planned)</strong>
+            {' '}
+            {mac.runtime}
+          </li>
+          <li>
+            <strong>Package (planned)</strong>
+            {' '}
+            {mac.plannedPackage}
+          </li>
+          <li>
+            <strong>Status</strong>
+            {' '}
+            No public DMG, SHA-256 sidecar, or honesty notice is linked until genuine Darwin builds ship.
+          </li>
+        </ul>
       </div>
-      <p class="dl-note" data-testid="dl-macos-honesty">
-        {mac.honesty}
-        {' '}
-        Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
-        Same rooms, messages, and calls without a native package.
-      </p>
+      <div class="dl-artifact-details">
+        <ul class="dl-soon-arches" data-testid="dl-macos-arches" aria-label="Planned macOS architectures">
+          <For each={[...mac.arches]}>
+            {(arch) => (
+              <li class="dl-soon-arch" data-testid={`dl-macos-arch-${arch.arch}`}>
+                <strong>{arch.label}</strong>
+                <span>{arch.note}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+        <div class="dl-actions">
+          <a
+            class="r-btn ghost"
+            data-testid="dl-macos-open-app"
+            href="/app/"
+          >
+            Open Onyx in browser
+          </a>
+        </div>
+        <p class="dl-note" data-testid="dl-macos-honesty">
+          {mac.honesty}
+          {' '}
+          Supporting browsers can put Onyx on the Home Screen or in its own window. No store.
+          Same rooms, messages, and calls without a native package.
+        </p>
+      </div>
     </article>
   );
 }
@@ -388,17 +398,13 @@ export default function Download(): JSX.Element {
       )}
     >
       <div class="ui-root r data-page dl-page" data-testid="download-page">
-        <div class="r-ground" aria-hidden="true" />
-        <div class="r-grain" aria-hidden="true" />
-
         <section class="r-wrap data-hero dl-hero" aria-labelledby="download-heading">
           <p class="dl-kicker">{installGuide ? 'Same page as Download' : 'This device'}</p>
           <h1 id="download-heading">Get Onyx on this device</h1>
           <p class="dl-lede">Open it in the browser. That is the main door.</p>
           <p class="sub">
             Supporting browsers can keep Onyx here as an installed app — same rooms,
-            messages, and calls. Desktop packages exist if you want them. They stay
-            further down this page, unsigned and honest.
+            messages, and calls. Desktop packages exist if you want them. Desktop packages are optional and unsigned.
           </p>
           <div class="dl-cta">
             <a class="r-btn primary" href="/app/" data-testid="dl-open-browser">
@@ -410,82 +416,85 @@ export default function Download(): JSX.Element {
           </div>
         </section>
 
-        <div class="r-wrap"><div class="r-divider" aria-hidden="true" /></div>
-
-        <section id="keep-here" class="r-wrap r-section" aria-labelledby="browser-heading">
-          <h2 id="browser-heading" class="dl-section-title">Keep Onyx on this device</h2>
-          <div class="dl-browser data-card">
-            <p>
-              Open Onyx, then use your browser&apos;s
-              {' '}
-              <strong>Install app</strong>
-              {' '}
-              or
-              {' '}
-              <strong>Add to Home Screen</strong>
-              {' '}
-              control. You get the same rooms, people, and calls — no store badge required.
-            </p>
-            <p>
-              Safari on iPhone uses Add to Home Screen. Chrome, Edge, and other
-              supporting browsers offer an install prompt once the app is open.
-            </p>
-            <a class="r-btn primary" href="/app/">Join in the browser</a>
+        <section id="keep-here" class="r-wrap r-section dl-browser-section" aria-labelledby="browser-heading">
+          <div class="dl-section-intro">
+            <p class="dl-kicker">Browser first</p>
+            <h2 id="browser-heading" class="dl-section-title">Keep Onyx on this device</h2>
+          </div>
+          <div class="dl-browser-grid">
+            <div class="dl-browser">
+              <p>
+                Open Onyx, then use your browser&apos;s
+                {' '}
+                <strong>Install app</strong>
+                {' '}
+                or
+                {' '}
+                <strong>Add to Home Screen</strong>
+                {' '}
+                control. You get the same rooms, people, and calls — no store badge required.
+              </p>
+              <p>
+                Safari on iPhone uses Add to Home Screen. Chrome, Edge, and other
+                supporting browsers offer an install prompt once the app is open.
+              </p>
+              <a class="r-btn primary" href="/app/">Join in the browser</a>
+            </div>
+            <aside class="dl-honesty" aria-labelledby="honesty-heading">
+              <h2 id="honesty-heading" class="dl-section-title">What this is — and is not</h2>
+              <ul>
+                <li>
+                  <strong>Is:</strong>
+                  {' '}
+                  unsigned zip/tar.gz packages with SHA-256 sidecars and honesty notices
+                  (Windows Native SDK zip; Linux Native SDK tar.gz; FreeBSD/OpenBSD Zig-native hosts
+                  with install.sh).
+                </li>
+                <li>
+                  <strong>Is not:</strong>
+                  {' '}
+                  codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
+                  multi-platform installer suite. macOS DMGs are not published yet — no fake download
+                  buttons.
+                </li>
+                <li>
+                  <strong>Runtime / GUI launch</strong>
+                  {' '}
+                  is not claimed from the Linux release host — package layout and checksums only.
+                  Windows runtime is not verified on real Windows here.
+                </li>
+                <li>
+                  <strong>macOS:</strong>
+                  {' '}
+                  Intel x86_64 and Apple Silicon arm64 native WKWebView packages are planned as separate
+                  arch lanes, produced only on genuine matching-arch Darwin. Until they ship, there is
+                  no DMG, sidecar, or install path on this page.
+                </li>
+                <li>
+                  <strong>Browser first:</strong>
+                  {' '}
+                  most people should
+                  {' '}
+                  <a href="/app/">open the browser app</a>
+                  {' '}
+                  — including on Mac today. Supporting browsers can put Onyx on the
+                  Home Screen or in its own window. No store.
+                </li>
+              </ul>
+            </aside>
           </div>
         </section>
 
-        <section class="r-wrap r-section" aria-labelledby="honesty-heading">
-          <h2 id="honesty-heading" class="dl-section-title">What this is — and is not</h2>
-          <div class="dl-honesty data-card">
-            <ul>
-              <li>
-                <strong>Is:</strong>
-                {' '}
-                unsigned zip/tar.gz packages with SHA-256 sidecars and honesty notices
-                (Windows Native SDK zip; Linux Native SDK tar.gz; FreeBSD/OpenBSD Zig-native hosts
-                with install.sh).
-              </li>
-              <li>
-                <strong>Is not:</strong>
-                {' '}
-                codesigned, notarized, virus-scanned, store-packaged, auto-updating, or a signed
-                multi-platform installer suite. macOS DMGs are not published yet — no fake download
-                buttons.
-              </li>
-              <li>
-                <strong>Runtime / GUI launch</strong>
-                {' '}
-                is not claimed from the Linux release host — package layout and checksums only.
-                Windows runtime is not verified on real Windows here.
-              </li>
-              <li>
-                <strong>macOS:</strong>
-                {' '}
-                Intel x86_64 and Apple Silicon arm64 native WKWebView packages are planned as separate
-                arch lanes, produced only on genuine matching-arch Darwin. Until they ship, there is
-                no DMG, sidecar, or install path on this page.
-              </li>
-              <li>
-                <strong>Browser first:</strong>
-                {' '}
-                most people should
-                {' '}
-                <a href="/app/">open the browser app</a>
-                {' '}
-                — including on Mac today. Supporting browsers can put Onyx on the
-                Home Screen or in its own window. No store.
-              </li>
-            </ul>
+        <section class="r-wrap r-section dl-artifacts-section" aria-labelledby="download-lanes-heading">
+          <div class="dl-section-intro">
+            <p class="dl-kicker">Native artifacts</p>
+            <h2 id="download-lanes-heading" class="dl-section-title">Desktop packages</h2>
+            <p class="dl-below-fold">
+              Optional native builds for Windows, Linux, FreeBSD, and OpenBSD.
+              Every published artifact is unsigned. macOS Intel and Apple Silicon
+              packages are coming soon — built on real Macs only, never fabricated here.
+            </p>
           </div>
-        </section>
-
-        <section class="r-wrap r-section" aria-labelledby="download-lanes-heading">
-          <h2 id="download-lanes-heading" class="dl-section-title">Desktop packages</h2>
-          <p class="dl-below-fold">
-            Optional native builds for Windows, Linux, FreeBSD, and OpenBSD.
-            Every published artifact is unsigned. macOS Intel and Apple Silicon
-            packages are coming soon — built on real Macs only, never fabricated here.
-          </p>
           <div
             class="dl-catalog-receipt"
             data-catalog-state={catalogState()}
@@ -497,7 +506,7 @@ export default function Download(): JSX.Element {
             <span class="dl-catalog-receipt__marker" aria-hidden="true" />
             <span>{catalogReceipt()}</span>
           </div>
-          <div class="dl-grid" aria-label="Native download cards">
+          <div class="dl-grid dl-artifact-list" role="list" aria-label="Native download artifacts">
             <For each={[...DOWNLOAD_CARDS]}>
               {(card) => (
                 <LaneCard card={card} catalog={catalogValue} catalogState={catalogState} />
@@ -508,7 +517,7 @@ export default function Download(): JSX.Element {
         </section>
 
         <section class="r-wrap r-section" aria-labelledby="verify-heading">
-          <div class="dl-verify data-card">
+          <div class="dl-verify">
             <h2 id="verify-heading">Verify a download</h2>
             <pre class="dl-pre">{`# after download (example: FreeBSD)
 sha256 -c onyx-${DOWNLOAD_PRODUCT_VERSION}-freebsd-x86_64-ReleaseFast-unsigned.sha256

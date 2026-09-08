@@ -35,17 +35,23 @@ test('keeps the PublicFrame Roadmap route usable at 400% zoom', async ({ page })
   await expect(primaryAction).toBeVisible();
   await expect(menuToggle).toBeVisible();
   await expect(menuToggle).toHaveAccessibleName('Open navigation menu');
-  await menuToggle.click();
+  // Exercise keyboard focus visibility, not the browser's pointer-focus heuristic.
+  await primaryAction.focus();
+  await page.keyboard.press('Tab');
+  await expect(menuToggle).toBeFocused();
+  await page.keyboard.press('Space');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(menuToggle).toHaveAccessibleName('Close navigation menu');
   await expect(header.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(menuToggle).toBeFocused();
+  await expect(menuToggle).not.toHaveCSS('outline-style', 'none');
 
   await footer.scrollIntoViewIfNeeded();
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
-  await primaryAction.focus();
+  await menuToggle.focus();
+  await page.keyboard.press('Shift+Tab');
   await expect(primaryAction).toBeFocused();
 
   const geometry = await page.evaluate(() => {
@@ -76,12 +82,12 @@ test('keeps the PublicFrame Roadmap route usable at 400% zoom', async ({ page })
       controls: Array.from(document.querySelectorAll<HTMLElement>(
         '.public-frame__header a, .public-frame__header button, .public-frame__footer a',
       )).filter(visible).map(bounds),
-      stateColors: Array.from(document.querySelectorAll<HTMLElement>('.roadmap-legend [data-state]'))
+      stateMarkers: Array.from(document.querySelectorAll<HTMLElement>('.roadmap-legend [data-state]'))
         .map((element) => ({
           state: element.dataset.state,
-          color: getComputedStyle(element).color,
-          borderColor: getComputedStyle(element).borderColor,
-          backgroundColor: getComputedStyle(element).backgroundColor,
+          label: element.textContent?.trim(),
+          borderStyle: getComputedStyle(element).borderBottomStyle,
+          borderWidth: Number.parseFloat(getComputedStyle(element).borderBottomWidth),
         })),
       overflowContributors: Array.from(document.querySelectorAll<HTMLElement>('.public-frame *'))
         .filter(visible)
@@ -111,7 +117,17 @@ test('keeps the PublicFrame Roadmap route usable at 400% zoom', async ({ page })
   }
   expect(geometry.focusOutlineStyle).not.toBe('none');
   expect(geometry.focusOutlineWidth).toBeGreaterThanOrEqual(2);
-  expect(geometry.stateColors).toHaveLength(3);
-  expect(new Set(geometry.stateColors.map((state) => `${state.color}/${state.backgroundColor}`)).size)
-    .toBe(3);
+  // Forced-color palettes may merge system colors. The text and border
+  // patterns must still distinguish all three priorities without color.
+  expect(geometry.stateMarkers).toEqual([
+    { state: 'now', label: 'Now', borderStyle: 'solid', borderWidth: 3 },
+    { state: 'next', label: 'Next', borderStyle: 'dashed', borderWidth: 3 },
+    { state: 'later', label: 'Later', borderStyle: 'dotted', borderWidth: 3 },
+  ]);
+  const next = main.getByRole('link', { name: 'Next', exact: true });
+  await next.focus();
+  await page.keyboard.press('Enter');
+  await expect(next).toHaveAttribute('aria-current', 'location');
+  await expect(main.locator('#roadmap-next')).toBeFocused();
+  await expect(main.locator('#roadmap-next')).toHaveAttribute('data-current', 'true');
 });

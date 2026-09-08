@@ -134,7 +134,9 @@ describe('raw colour is confined to the Room Current fallback palette', () => {
 
   it('keeps the typography ladder ascending and the three voices distinct', () => {
     const typography = layerSource.get('typography.css')!;
-    expect(typography).toMatch(/--ui-font-display:[\s\S]*--font-serif/);
+    expect(typography).toMatch(/--ui-font-display:[\s\S]*--font-display/);
+    expect(typography).not.toMatch(/--ui-font-display:[\s\S]*--font-serif/);
+    expect(typography).not.toMatch(/--ui-font-display:[\s\S]*Fraunces/);
     expect(typography).toMatch(/--ui-font-interface:[\s\S]*--font-sans/);
     expect(typography).toMatch(/--ui-font-evidence:[\s\S]*--font-mono/);
     expect(typography).toMatch(/--ui-type-2xs:[^;]*0\.6875rem/);
@@ -439,16 +441,13 @@ describe('public --public-* spine aliases canonical tokens.css', () => {
     ['--public-void', '--ink'],
     ['--public-surface', '--stone'],
     ['--public-raised', '--stone-2'],
-    ['--public-seam', '--stone-3'],
+    ['--public-seam', '--line'],
     ['--public-paper', '--paper'],
     ['--public-muted', '--paper-dim'],
     ['--public-current', '--lapis'],
-    ['--public-on-signal', '--on-accent'],
-    ['--public-ember', '--shu'],
     ['--public-ok', '--ok'],
     ['--public-line', '--line'],
     ['--public-sans', '--font-sans'],
-    ['--public-serif', '--font-serif'],
     ['--public-mono', '--font-mono'],
   ];
 
@@ -464,18 +463,18 @@ describe('public --public-* spine aliases canonical tokens.css', () => {
     });
   }
 
-  it('home.css --mn-* aliases are hex-free', () => {
+  it('home.css --home-* aliases are hex-free', () => {
     const homeRule = parseRules(home).find((rule) => rule.selector === '.r-landing.home');
     expect(homeRule, '.r-landing.home token block is missing').toBeDefined();
     const aliasesOnly = parseDeclarations(`x{${homeRule!.body}}`).filter((declaration) =>
-      declaration.property.startsWith('--mn-'),
+      declaration.property.startsWith('--home-'),
     );
     expect(aliasesOnly.length).toBeGreaterThan(0);
     expect(findColorLiteralViolations(`x{${aliasesOnly.map((d) => `${d.property}:${d.value};`).join('')}}`, [])).toEqual(
       [],
     );
     for (const declaration of aliasesOnly) {
-      expect(declaration.value.trim()).toMatch(/^var\(\s*--public-/);
+      expect(declaration.value.trim()).toMatch(/^var\(\s*--(?:route-|commercial-action-primary|on-accent|font-)/);
     }
   });
 });

@@ -1,12 +1,14 @@
 /* ─────────────────────────────────────────────────────────────
-   Onyx — design tokens.  Flagship theme: "ocean" (quiet threshold).
+   Onyx — design tokens.  Flagship theme: "ocean" (Astra graphite arcade).
 
-   Identity = mineral night × quiet cyan signal:
-   · void / face / edge — #05070A #0C1016 #1A222C (matte strata, no neon depth)
-   · paper / mute       — #E6E8EC #848C96 (calm reading contrast)
-   · signal             — #5BA3C9 (quiet cyan; no electric glow spectacle)
-   Type: Instrument Sans body, restrained Fraunces for lede/soul, JetBrains Mono
-   for status — no Anton marketing display on the default cut.
+   Identity = graphite × raised slate × cobalt focus × coral action:
+   · graphite / slate — #202429 #2D333A #3A424B (matte strata)
+   · paper / muted    — #F5F7F8 #B4BFCA (reading contrast)
+   · cobalt / coral   — #65ADF5 #FF987D (focus/selection, normal action)
+   Type: Anton display, Instrument Sans UI/messages, JetBrains technical mono.
+   --shu / --danger remain destructive; --brand-action is ocean-only and is
+   written by ThemeProvider; themes whose resolved map omits it safely fall
+   back to tide.
    Surfaces are matte and finely bordered; motion stays unhurried.
 
    The :root declaration is the canonical default (quiet-threshold flagship).
@@ -20,26 +22,26 @@
 [data-theme='ocean'] {
   color-scheme: dark;
 
-  /* Ground — mineral night void → face → edge (quiet-threshold six-hue core). */
-  --ink: #05070a;        /* void */
-  --ink-2: #080b10;
-  --stone: #0c1016;      /* face */
-  --stone-2: #121820;    /* raised matte surface */
-  --stone-3: #1a222c;    /* edge plane */
-  --stone-line: #222c38; /* fine border line (one step above edge) */
+  /* Ground — graphite void → raised slate → edge planes. */
+  --ink: #202429;        /* graphite */
+  --ink-2: #262c32;
+  --stone: #2d333a;      /* raised slate */
+  --stone-2: #343b43;    /* raised matte surface */
+  --stone-3: #3a424b;    /* edge plane */
+  --stone-line: #49535e; /* fine border line */
 
-  /* Quiet cyan signal (primary) — restrained, not electric. */
-  --lapis: #5ba3c9;
-  --lapis-bright: #8bc4d9;
-  --lapis-deep: #2e5f7a;
+  /* Cobalt — selection, links, and visible keyboard focus. */
+  --lapis: #65adf5;
+  --lapis-bright: #65adf5;
+  --lapis-deep: #397db8;
   --accent: var(--lapis);
 
-  /* Mineral second accent — cool steel, never neon glacier. */
-  --gold: #7a9aab;
-  --gold-bright: #a8c0cc;
-  --gold-deep: #4a6570;
+  /* Neutral secondary accent — no competing hue in the default identity. */
+  --gold: #b4bfca;
+  --gold-bright: #f5f7f8;
+  --gold-deep: #71808e;
 
-  /* Coral — the single hot accent (danger / badges, sparingly) */
+  /* Coral — normal product action is separate from destructive --shu. */
   --shu: #ff6f61;
   --shu-bright: #ff9484;
 
@@ -47,21 +49,18 @@
      Use these for text sitting on --lapis / --lapis-bright / --gold-bright
      CTAs and on --shu / --danger badges instead of hand-picking a hex per
      component, so the ink tracks the theme's accent.
-     Ocean (canonical) contrast: paper #e6e8ec on ink #05070a ~16.4 : 1 (AAA).
-     --on-accent ~7.2 : 1 vs --lapis, ~10 : 1 vs --lapis-bright;
-     --on-danger 7.06 : 1 vs --shu (AAA).
-     Lapis #5ba3c9 on ink is WCAG 7.23:1 but APCA Lc ≈ −48 — signal only
-     (bar, ring, armed Send), never body or small labels. Use --signal-text
-     (--lapis-bright) or type at --text-lg and up. Unread = weight 600 + paper. */
+     Ocean (canonical) contrast: paper #F5F7F8 on graphite #202429 is > 14:1.
+     Cobalt #65ADF5 and coral action #FF987D are filled-control accents;
+     semantic on-* inks are re-solved by ThemeProvider for every theme. */
   --on-accent: #061018;
   --on-secondary: #061018;
   --on-danger: #1c0906;
   --signal-text: var(--lapis-bright);
 
-  /* Text — cool paper over mineral night */
-  --paper: #e6e8ec;
-  --paper-dim: #8b939e;
-  --paper-mute: #848c96; /* metadata — lifted so timestamps/labels stay readable */
+  /* Text — paper over graphite, with muted slate for secondary copy. */
+  --paper: #f5f7f8;
+  --paper-dim: #b4bfca;
+  --paper-mute: #b4bfca;
 
   /* Functional status (kept in-palette where possible) */
   --ok: #5bc78e;
@@ -158,12 +157,12 @@
      narrower columns simply fill their width. */
   --shell-measure: 1180px;
 
-  /* Type — Instrument Sans body, restrained display (no Anton on default),
-     mono status, Fraunces soul. Non-default themes may still set Anton. */
+  /* Type — Anton display, Instrument Sans UI/messages, technical mono.
+     --font-serif remains an explicit editorial/custom choice; no default
+     display alias points at it. */
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo,
     Consolas, monospace;
-  --font-display: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
-    'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Anton', 'Arial Narrow', 'Helvetica Neue', sans-serif;
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;

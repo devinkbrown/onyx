@@ -5,14 +5,18 @@
  * and invitations stay immediate. Server echoes remain the source of truth.
  * Temporary client-side bans are not exposed here.
  */
-import { createMemo, createSignal, createUniqueId, For, Show, splitProps, type JSX } from 'solid-js';
+import { createEffect, createMemo, createSignal, createUniqueId, For, on, Show, splitProps, type JSX } from 'solid-js';
 import {
+  captureDeviceMemoryContext,
   getState,
+  isDeviceMemoryContextCurrent,
   selectChannelModeState,
   selectIsChannelOp,
   selectLastRoomUpdateAt,
   selectRoomModerationLog,
   useStore,
+  type DeviceMemoryContext,
+  type OnyxState,
 } from '@/lib/store';
 import {
   memberModerationKindsForMode,
@@ -46,6 +50,57 @@ const MEMBER_ACTIONS = [
   { kind: 'devoice', label: 'Remove speak' },
 ] as const;
 
+type ModerationReviewAuthority = {
+  account: string | null;
+  serverId: string | null;
+  serverUrl: string | null;
+  client: OnyxState['client'];
+  deviceMemory: DeviceMemoryContext | null;
+};
+
+function captureModerationReviewAuthority(state: OnyxState): ModerationReviewAuthority {
+  return {
+    account: state.server?.account ?? null,
+    serverId: state.server?.id ?? null,
+    serverUrl: state.server?.url ?? null,
+    client: state.client,
+    deviceMemory: captureDeviceMemoryContext(state),
+  };
+}
+
+function moderationReviewAuthorityIsCurrent(
+  captured: ModerationReviewAuthority,
+  state: OnyxState,
+): boolean {
+  const currentDeviceMemory = captureDeviceMemoryContext(state);
+  return captured.account === (state.server?.account ?? null)
+    && captured.serverId === (state.server?.id ?? null)
+    && captured.serverUrl === (state.server?.url ?? null)
+    && captured.client === state.client
+    && (captured.deviceMemory === null
+      ? currentDeviceMemory === null
+      : currentDeviceMemory !== null && isDeviceMemoryContextCurrent(captured.deviceMemory, state));
+}
+
+function moderationReviewAuthorityEqual(
+  left: ModerationReviewAuthority,
+  right: ModerationReviewAuthority,
+): boolean {
+  const leftDeviceMemory = left.deviceMemory;
+  const rightDeviceMemory = right.deviceMemory;
+  return left.account === right.account
+    && left.serverId === right.serverId
+    && left.serverUrl === right.serverUrl
+    && left.client === right.client
+    && ((leftDeviceMemory === null && rightDeviceMemory === null)
+      || (leftDeviceMemory !== null
+        && rightDeviceMemory !== null
+        && leftDeviceMemory.generation === rightDeviceMemory.generation
+        && leftDeviceMemory.client === rightDeviceMemory.client
+        && leftDeviceMemory.owner.serverUrl === rightDeviceMemory.owner.serverUrl
+        && leftDeviceMemory.owner.identity === rightDeviceMemory.owner.identity));
+}
+
 export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   const [local] = splitProps(props, ['channel']);
   const instanceId = createUniqueId();
@@ -70,7 +125,9 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   const [memberAction, setMemberAction] = createSignal<(typeof MEMBER_ACTIONS)[number]['kind']>('kick');
   const [memberReason, setMemberReason] = createSignal('');
   const [pending, setPending] = createSignal<ModerationActionDraft | null>(null);
+  const [reviewAuthority, setReviewAuthority] = createSignal<ModerationReviewAuthority | null>(null);
   const [returnFocus, setReturnFocus] = createSignal<HTMLElement | null>(null);
+  const liveReviewAuthority = useStore(captureModerationReviewAuthority, moderationReviewAuthorityEqual);
   const connected = createMemo(() => connectionStatus() === 'connected' && serverConnected());
   const memberActions = createMemo(() => {
     const allowed = new Set(memberModerationKindsForMode(preferences().experienceMode));
@@ -79,6 +136,28 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
   const candidates = createMemo(() => [...members().values()]
     .filter((member) => member.nick.trim() && member.nick.toLowerCase() !== ourNick().toLowerCase())
     .slice(0, 12));
+
+  createEffect(on(
+    liveReviewAuthority,
+    (authority, previous) => {
+      if (previous !== undefined && !moderationReviewAuthorityEqual(authority, previous)) {
+        setPending(null);
+        setReviewAuthority(null);
+        setReturnFocus(null);
+      }
+    },
+  ));
+
+  createEffect(on(
+    () => local.channel,
+    (channel, previous) => {
+      if (previous !== undefined && channel !== previous) {
+        setPending(null);
+        setReviewAuthority(null);
+        setReturnFocus(null);
+      }
+    },
+  ));
 
   function toggleMode(letter: string): void {
     if (!canModerate() || !connected()) return;
@@ -98,11 +177,27 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
     if (!canModerate() || !connected()) return;
     const submitter = event.submitter;
     setReturnFocus(submitter instanceof HTMLElement ? submitter : null);
+    setReviewAuthority(captureModerationReviewAuthority(getState()));
     setPending(draft);
   }
 
   function applyReviewed(action: NormalizedModerationAction): void {
     const state = getState();
+    const currentConnected = state.connectionStatus === 'connected' && !!state.server?.connected;
+    const currentCanModerate = selectIsChannelOp(local.channel)(state);
+    const capturedAuthority = reviewAuthority();
+    if (
+      action.channel.trim().toLowerCase() !== local.channel.trim().toLowerCase()
+      || !currentCanModerate
+      || !currentConnected
+      || !capturedAuthority
+      || !moderationReviewAuthorityIsCurrent(capturedAuthority, state)
+    ) {
+      setPending(null);
+      setReviewAuthority(null);
+      setReturnFocus(null);
+      return;
+    }
     switch (action.kind) {
       case 'kick':
         state.kickMember(action.channel, action.target, action.reason);
@@ -132,6 +227,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
       }
     }
     setPending(null);
+    setReviewAuthority(null);
   }
 
   const lastUpdateLabel = createMemo(() => {
@@ -151,6 +247,7 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
           <p class="moderation-cockpit__eyebrow">Room safety</p>
           <h3 id={titleId}>Room desk</h3>
         </div>
+        <p class="moderation-cockpit__room" aria-label="Current room">{local.channel}</p>
       </div>
 
       <div class="moderation-desk__boundary" role="note">
@@ -298,7 +395,10 @@ export function ModerationCockpit(props: ModerationCockpitProps): JSX.Element {
         canModerate={canModerate()}
         returnFocus={returnFocus()}
         onConfirm={applyReviewed}
-        onCancel={() => setPending(null)}
+        onCancel={() => {
+          setPending(null);
+          setReviewAuthority(null);
+        }}
       />
     </section>
   );

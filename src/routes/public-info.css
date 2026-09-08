@@ -1,66 +1,125 @@
-/* Supporting public routes use the same Room Current threshold as the
-   narrative pages while keeping their short, contractual copy intact. */
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Short public statements use an article measure, not a repeated data card. */
+
 .public-info-page {
-  --info-current: var(--public-current);
-  --info-paper: var(--public-text);
-  --info-muted: var(--public-muted);
+  --info-current: var(--route-cobalt-strong);
+  width: 100%;
+  min-width: 0;
+  color: var(--route-text);
 }
 
-.public-info-page .data-hero {
-  position: relative;
-  padding-block-end: clamp(2rem, 5vw, 4rem);
-  border-bottom: 1px solid var(--public-line);
+.public-info-page .r-wrap { position: relative; z-index: 1; min-width: 0; max-width: 76rem; }
+.public-info-page .r-ground,
+.public-info-page .r-flecks { display: none; }
+
+.public-info-article {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(20rem, 1.28fr);
+  gap: clamp(2rem, 7vw, 7rem);
+  align-items: start;
+  padding-block: clamp(3rem, 7vw, 6.5rem) clamp(2.5rem, 5vw, 4.5rem);
 }
 
-.public-info-page .data-hero::after {
-  content: '';
-  position: absolute;
-  inset: auto auto -1px 0;
-  width: min(8rem, 30%);
-  height: 2px;
-  background: var(--info-current);
+.public-info-article__header { min-width: 0; }
+.public-info-article__header .r-kicker { color: var(--info-current); }
+.public-info-article__header h1 {
+  max-width: 16ch;
+  margin: 0.7rem 0 0;
+  color: var(--route-text);
+  font: 650 clamp(2.35rem, 4.8vw, 4.5rem)/1 var(--font-sans);
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.public-info-article__header .sub {
+  max-width: 42ch;
+  margin: 0.8rem 0 0;
+  color: var(--route-muted);
+  font: clamp(1rem, 0.93rem + 0.25vw, 1.14rem)/1.62 var(--font-sans);
+  text-wrap: pretty;
 }
 
-.public-info-page .data-hero .r-kicker,
-.public-info-page .public-info-card .label {
+.public-info-statement {
+  max-width: 66ch;
+  align-self: center;
+  padding-block: 1.25rem 1.5rem;
+  border-block: 1px solid var(--route-line);
+}
+.public-info-statement .label,
+.public-info-card .label {
   color: var(--info-current);
-}
-
-.public-info-page .data-hero .r-kicker {
-  font-family: var(--font-sans);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font: 700 0.9rem/1.25 var(--font-sans);
+  letter-spacing: 0;
   text-transform: none;
 }
-
-.public-info-page .data-hero h1 {
-  font-family: var(--font-sans);
-  font-weight: 650;
-  text-transform: none;
+.public-info-statement h2 {
+  margin: 0.75rem 0 0;
+  color: var(--route-text);
+  font: 650 clamp(1.65rem, 2.7vw, 2.4rem)/1.08 var(--font-sans);
+  letter-spacing: -0.035em;
 }
+.public-info-statement > p:last-child {
+  max-width: 66ch;
+  margin: 0.85rem 0 0;
+  color: var(--route-muted);
+  font: 1rem/1.7 var(--font-sans);
+}
+
+/* TrustPages keeps this class for its longer, route-specific articles. */
+.public-info-card {
+  max-width: 68ch;
+  border: 0;
+  border-block: 1px solid var(--route-line);
+  border-radius: 0;
+  background: transparent;
+}
+.public-info-card p {
+  max-width: 68ch;
+  color: var(--route-muted);
+  font: 1rem/1.7 var(--font-sans);
+}
+.public-info-card p + p { margin-top: 1rem; }
+.public-info-card a { color: var(--route-cobalt-strong); text-underline-offset: 0.2em; }
 
 .trust-rules {
-  margin: 0 0 1.25rem;
-  padding-left: 1.25rem;
+  max-width: 68ch;
+  margin: 0 0 1.5rem;
+  padding-left: 1.3rem;
+  color: var(--route-muted);
+  font: 1rem/1.65 var(--font-sans);
+}
+.trust-rules li + li { margin-top: 0.65rem; }
+.trust-rules li::marker { color: var(--route-cobalt); font-family: var(--font-mono); }
+
+@media (max-width: 52rem) {
+  .public-info-article { grid-template-columns: 1fr; gap: 1.5rem; }
+  .public-info-statement { align-self: start; }
 }
 
-.trust-rules li {
-  margin: 0 0 0.65rem;
-  font-family: var(--font-sans);
-  line-height: 1.5;
+@media (max-width: 42rem) {
+  .public-info-article { padding-block: 2.5rem 2rem; }
+  .public-info-statement > p:last-child,
+  .public-info-card p,
+  .trust-rules { font-size: 1.0625rem; }
 }
 
-.public-info-page .public-info-card {
-  border-color: color-mix(in oklab, var(--info-current) 32%, var(--public-line));
-  background: color-mix(in oklab, var(--info-current) 6%, var(--public-raised));
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .public-info-page,
+  .public-info-page .r-wrap,
+  .public-info-article,
+  .public-info-statement,
+  .public-info-card { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .public-info-article__header h1 { max-width: 100%; font-size: min(2.75rem, 20vw); }
+  .public-info-statement > p:last-child { font-size: min(1.0625rem, 7.5vw); }
 }
 
-.public-info-page .public-info-card h2 { color: var(--info-paper); }
-.public-info-page .public-info-card p { color: var(--info-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .public-info-page a { transition: none; }
+}
 
 @media (forced-colors: active) {
-  .public-info-page .data-hero,
-  .public-info-page .public-info-card { border-color: CanvasText; background: Canvas; }
-  .public-info-page .data-hero::after { background: Highlight; }
+  .public-info-statement,
+  .public-info-card { border-color: CanvasText; background: Canvas; }
+  .public-info-statement .label,
+  .public-info-card .label,
+  .public-info-card a { color: LinkText; }
 }

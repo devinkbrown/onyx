@@ -76,6 +76,7 @@ describe('persistence', () => {
   it('accepts only the finite safe grammar used by palette tokens', () => {
     expect(parseCustomThemeTokenMap({
       '--lapis': '#78d5ff',
+      '--brand-action': '#ff987d',
       '--paper': 'oklch(92% 0.02 220)',
       '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
       '--r-sm': '8px',
@@ -84,6 +85,7 @@ describe('persistence', () => {
       '--font-mono': "'JetBrains Mono Variable', ui-monospace, monospace",
     })).toEqual({
       '--lapis': '#78d5ff',
+      '--brand-action': '#ff987d',
       '--paper': 'oklch(92% 0.02 220)',
       '--seam': 'color-mix(in oklab, var(--lapis) 38%, transparent)',
       '--r-sm': '8px',
@@ -97,6 +99,7 @@ describe('persistence', () => {
     for (const theme of Object.values(THEMES)) {
       expect(parseCustomThemeTokenMap(theme.tokens)).toEqual(theme.tokens);
     }
+    expect(parseCustomThemeTokenMap(THEMES.ocean.tokens)?.['--brand-action']).toBe('#ff987d');
   });
 
   it.each([
@@ -107,6 +110,9 @@ describe('persistence', () => {
     ['rule breakout', '--stone', '#fff} body { color: red'],
     ['unknown variable', '--stone', 'var(--attacker-controlled)'],
     ['fallback indirection', '--stone', 'var(--lapis, url(https://attacker.example/pixel))'],
+    ['brand action resource URL', '--brand-action', 'url(https://attacker.example/pixel)'],
+    ['brand action unknown variable', '--brand-action', 'var(--attacker-controlled)'],
+    ['brand action URL fallback', '--brand-action', 'var(--brand-action, url(https://attacker.example/pixel))'],
     ['gradient in a color token', '--stone', 'linear-gradient(#fff, #000)'],
     ['unknown token', '--external-image', '#fff'],
   ])('rejects %s before it can reach CSSOM', (_label, property, value) => {

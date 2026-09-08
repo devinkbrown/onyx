@@ -82,15 +82,15 @@ export function TrustPage(props: { page: TrustPageId }) {
     >
       <div class={`ui-root r data-page public-info-page trust-page trust-page--${props.page}`}>
         <div class="r-ground" aria-hidden="true" />
-        <section class="r-wrap data-hero">
+        <section class="r-wrap data-hero trust-hero" aria-labelledby={`trust-${props.page}-heading`}>
           <p class="r-kicker">{meta().kicker}</p>
-          <h1>{meta().heading}</h1>
+          <h1 id={`trust-${props.page}-heading`}>{meta().heading}</h1>
           <p class="sub">{meta().lede}</p>
         </section>
-        <section class="r-wrap r-section">
+        <section class="r-wrap r-section trust-reading" aria-labelledby={`trust-${props.page}-body-heading`}>
           <Show when={props.page === 'guidelines'}>
-            <article class="data-card public-info-card">
-              <div class="label">Rooms</div>
+            <article class="data-card public-info-card trust-article">
+              <h2 class="trust-article-heading" id="trust-guidelines-body-heading">Rooms</h2>
               <ol class="trust-rules">
                 <For each={HOUSE_RULES}>
                   {(rule) => <li>{rule}</li>}
@@ -104,8 +104,8 @@ export function TrustPage(props: { page: TrustPageId }) {
             </article>
           </Show>
           <Show when={props.page === 'privacy'}>
-            <article class="data-card public-info-card">
-              <div class="label">This device and the server</div>
+            <article class="data-card public-info-card trust-article">
+              <h2 class="trust-article-heading" id="trust-privacy-body-heading">This device and the server</h2>
               <p>
                 If you register, the server stores the account name and the email
                 you give it. Room messages stay with the room so it can stay open.
@@ -139,8 +139,8 @@ export function TrustPage(props: { page: TrustPageId }) {
             </article>
           </Show>
           <Show when={props.page === 'contact'}>
-            <article class="data-card public-info-card">
-              <div class="label">How to reach us</div>
+            <article class="data-card public-info-card trust-article">
+              <h2 class="trust-article-heading" id="trust-contact-body-heading">How to reach us</h2>
               <p>
                 Ordinary product questions belong on GitHub issues for
                 {' '}

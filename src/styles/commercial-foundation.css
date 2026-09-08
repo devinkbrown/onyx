@@ -27,7 +27,7 @@
   --commercial-protection-review: var(--shu-bright);
   --commercial-protection-unavailable: var(--commercial-coral);
   --commercial-font-body: var(--font-sans);
-  --commercial-font-display: var(--font-serif);
+  --commercial-font-display: var(--font-display);
   --commercial-leading-body: 1.5;
 
   --commercial-surface-canvas: var(--commercial-ink);
@@ -35,7 +35,9 @@
   --commercial-surface-paper: var(--commercial-paper);
   --commercial-text-primary: var(--commercial-paper);
   --commercial-text-secondary: var(--commercial-mist);
-  --commercial-action-primary: var(--commercial-tide);
+  /* Ocean writes --brand-action inline. Any resolved theme map that omits it
+     safely falls back to its existing tide signal. */
+  --commercial-action-primary: var(--brand-action, var(--commercial-tide));
   --commercial-status-danger: var(--commercial-coral);
   --commercial-border-subtle: var(--line);
   --commercial-border-strong: var(--stone-3);

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Narrow CSS contract: shared public controls (About / Status / Stats /
- * Download / Invite / PublicInfo / Roadmap) match Home's mineral-night
- * language — flat quiet-cyan signal, dark on-accent ink, matte seams,
+ * Download / Invite / PublicInfo / Roadmap) use theme-semantic action roles,
+ * matte seams,
  * no electric blue gradients or coral glow blooms.
  */
 import { readFileSync } from 'node:fs';
@@ -24,16 +24,16 @@ function ruleBlock(css: string, selector: string): string {
 }
 
 describe('public shared controls — mineral-night contract', () => {
-  it('tokens pin quiet cyan signal and dark on-accent ink', () => {
-    expect(tokens).toMatch(/--lapis:\s*#5ba3c9/i);
+  it('tokens pin the current lapis signal and semantic on-accent ink', () => {
+    expect(tokens).toMatch(/--lapis:\s*#65adf5/i);
     expect(tokens).toMatch(/--on-accent:\s*#061018/i);
     expect(tokens).toMatch(/--target-min:\s*44px/);
   });
 
-  it('shared .r-btn.primary is flat quiet-cyan with on-accent ink (no electric gradient)', () => {
+  it('shared .r-btn.primary uses the semantic action pair (no electric gradient)', () => {
     const primary = ruleBlock(landing, '.r-btn.primary');
-    expect(primary).toMatch(/color:\s*var\(--on-accent\)/);
-    expect(primary).toMatch(/background:\s*var\(--lapis\)/);
+    expect(primary).toMatch(/color:\s*var\(--route-on-action\)/);
+    expect(primary).toMatch(/background:\s*var\(--route-action\)/);
     expect(primary).not.toMatch(/linear-gradient/);
     expect(primary).not.toMatch(/--shu/);
     expect(primary).not.toMatch(/0\s+0\s+28px/);
@@ -46,10 +46,10 @@ describe('public shared controls — mineral-night contract', () => {
     expect(btn).toMatch(/text-transform:\s*none/);
   });
 
-  it('header .enter matches the same flat mineral primary language', () => {
+  it('header .enter matches the same semantic primary language', () => {
     const enter = ruleBlock(landing, '.r-status .enter');
-    expect(enter).toMatch(/color:\s*var\(--on-accent\)/);
-    expect(enter).toMatch(/background:\s*var\(--lapis\)/);
+    expect(enter).toMatch(/color:\s*var\(--route-on-action\)/);
+    expect(enter).toMatch(/background:\s*var\(--route-action\)/);
     expect(enter).not.toMatch(/linear-gradient/);
     expect(enter).toMatch(/min-height:\s*var\(--target-min,\s*44px\)/);
   });
@@ -67,7 +67,7 @@ describe('public shared controls — mineral-night contract', () => {
   });
 
   it('ghost buttons stay matte (no glass blur / no bright electric hover fill)', () => {
-    const ghost = ruleBlock(landing, '.r-btn.ghost');
+    const ghost = ruleBlock(landing, '.r-btn');
     expect(ghost).not.toMatch(/backdrop-filter/);
     expect(ghost).not.toMatch(/linear-gradient/);
     const ghostHover = ruleBlock(landing, '.r-btn.ghost:hover,\n.r-btn.ghost:focus-visible');
@@ -78,6 +78,7 @@ describe('public shared controls — mineral-night contract', () => {
         ? landing.slice(landing.indexOf('.r-btn.ghost:hover'), landing.indexOf('.r-btn.ghost:hover') + 280)
         : '');
     expect(hoverSrc).not.toMatch(/linear-gradient\(135deg,\s*var\(--lapis/);
+    expect(hoverSrc).toMatch(/background:\s*var\(--route-surface\)/);
   });
 
   it('data-page pressed actions use on-accent ink on quiet-cyan fill', () => {

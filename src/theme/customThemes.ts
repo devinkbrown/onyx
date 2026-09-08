@@ -49,6 +49,7 @@ const COLOR_TOKEN_KEYS: ReadonlySet<string> = new Set([
   '--gold',
   '--gold-bright',
   '--gold-deep',
+  '--brand-action',
   '--shu',
   '--shu-bright',
   '--paper',

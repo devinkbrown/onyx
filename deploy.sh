@@ -53,6 +53,7 @@ cd "${ROOT}"
 
 LANDING="${ONYX_LANDING:-/home/kain/landing}"
 DRY_RUN="${DEPLOY_DRY_RUN:-0}"
+AUTHORITATIVE_PUBLIC_TITLE='Onyx — good company. Great nights.'
 
 # Explicit allowlist of legacy support paths that may be staged from landing/dist.
 # Missing entries are skipped; present entries must be regular files or directories
@@ -541,18 +542,26 @@ prove_snapshot_restored() {
   return 0
 }
 
-# Post-sync live verification. Args: live_out version expected_title_substr
+# Shared pre-deploy/post-sync guard: metadata or body copy cannot stand in for
+# the authoritative document title. Treat punctuation literally, not as regex.
+verify_public_title() {
+  local html="$1"
+  local expected_title="${2:-${AUTHORITATIVE_PUBLIC_TITLE}}"
+  grep -Fq -- "<title>${expected_title}</title>" "${html}"
+}
+
+# Post-sync live verification. Args: live_out version expected_title
 verify_live_out() {
   local live_out="$1"
   local version="$2"
-  local title_needle="${3:-Onyx — a room for your people}"
+  local title_needle="${3:-${AUTHORITATIVE_PUBLIC_TITLE}}"
 
   if [[ ! -f "${live_out}/index.html" ]]; then
     echo "FAIL: live index.html missing after sync" >&2
     return 1
   fi
-  if ! grep -q "${title_needle}" "${live_out}/index.html"; then
-    echo "FAIL: live index.html does not contain expected public title/metadata:" >&2
+  if ! verify_public_title "${live_out}/index.html" "${title_needle}"; then
+    echo "FAIL: live index.html does not contain expected public document title:" >&2
     echo "      needle: ${title_needle}" >&2
     echo "      file:   ${live_out}/index.html" >&2
     return 1
@@ -736,7 +745,7 @@ deploy_main() {
   test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
 
   # Guard: Vite root must still be the Solid Landing after build.
-  grep -q "Onyx — a room for your people" dist/index.html \
+  verify_public_title dist/index.html \
     || { echo "FAIL: dist/index.html missing authoritative public title — refusing deploy"; exit 1; }
 
   # SPA route entrypoints. solid-router is client-routed but the build emits only

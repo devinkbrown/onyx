@@ -1,0 +1,447 @@
+/* L2 presentation deltas for the owned collection surfaces. Shared shell and
+   phone rules remain the baseline; this file only changes their reading order. */
+
+.shell-collection-sidebar {
+  --collection-mark-size: 2.25rem;
+}
+
+/* Filter is a real affordance, not a bare section label. */
+.shell-collection-sidebar .shell-sidebar-filter-summary {
+  min-height: var(--target-min, 44px);
+  margin: var(--space-2) var(--space-2) 0;
+  padding-inline: var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--paper) 12%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--stone-2) 54%, var(--ink));
+  font-size: var(--text-sm, 0.8125rem);
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-summary:hover,
+.shell-collection-sidebar .shell-sidebar-filter-disclosure[open] > .shell-sidebar-filter-summary {
+  border-color: color-mix(in oklab, var(--lapis) 42%, var(--line));
+  background: color-mix(in oklab, var(--lapis-deep) 18%, var(--stone-2));
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-summary-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid color-mix(in oklab, var(--paper) 18%, transparent);
+  border-radius: 50%;
+  color: var(--lapis-bright);
+  line-height: 1;
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-summary-hint {
+  margin-left: auto;
+  color: var(--paper-mute);
+  font-size: var(--text-xs, 0.6875rem);
+  font-weight: 500;
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-summary::after {
+  content: '⌄';
+  color: var(--paper-mute);
+  font-size: var(--text-md, 0.9375rem);
+  line-height: 1;
+  transition: transform var(--dur-fast, 160ms) var(--ease);
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-disclosure[open] .shell-sidebar-filter-summary::after {
+  transform: rotate(180deg);
+}
+
+.shell-collection-sidebar .shell-sidebar-filter {
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+}
+
+.shell-collection-sidebar .shell-sidebar-filter-input,
+.shell-collection-sidebar .shell-sidebar-filter-unread,
+.shell-collection-sidebar .shell-sidebar-filter-clear {
+  min-height: var(--target-min, 44px);
+  border-radius: var(--r-md);
+}
+
+/* One visible heading owns the collection. Keep the hidden labels available to
+   aria-labelledby consumers without rendering the old Conversations > Rooms
+   tree a second time. */
+.shell-collection-sidebar .shell-conversation-spine-label--context {
+  display: none;
+}
+
+.shell-collection-sidebar .shell-sidebar-section-label--collection {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.shell-collection-sidebar .shell-conversation-spine-content {
+  margin-left: 0;
+  border-left: 0;
+  padding-left: 0;
+}
+
+.shell-collection-sidebar .shell-conversation-spine-content > .shell-sidebar-section::before {
+  display: none;
+}
+
+.shell-collection-sidebar .shell-sidebar-section {
+  padding-inline: var(--space-1);
+}
+
+.shell-collection-sidebar .shell-channel-list,
+.shell-collection-sidebar .shell-dm-list {
+  gap: var(--space-1);
+}
+
+/* Identity rows: mark, copy, then a quiet count/badge column. */
+.shell-collection-sidebar .shell-channel-item {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  grid-template-areas: 'mark copy meta';
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  min-height: 3.25rem;
+  padding: var(--space-2);
+  border-radius: var(--r-md);
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.shell-collection-sidebar .shell-channel-item:hover {
+  background: color-mix(in oklab, var(--stone-3) 42%, var(--stone));
+}
+
+.shell-collection-sidebar .shell-channel-item--active {
+  background: color-mix(in oklab, var(--lapis-deep) 26%, var(--stone-2));
+  border-color: color-mix(in oklab, var(--lapis) 42%, var(--seam));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 7%, transparent);
+}
+
+.shell-collection-sidebar .shell-channel-item--unread:not(.shell-channel-item--active) {
+  background: color-mix(in oklab, var(--lapis-deep) 10%, var(--stone));
+}
+
+.shell-collection-sidebar .shell-channel-item--highlight:not(.shell-channel-item--active) {
+  box-shadow: inset 3px 0 0 var(--shu-bright);
+}
+
+.shell-collection-sidebar .shell-channel-sigil,
+.shell-collection-sidebar .shell-dm-avatar {
+  grid-area: mark;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.shell-collection-sidebar .shell-channel-sigil {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--paper) 14%, transparent);
+  border-radius: 28%;
+  background: color-mix(in oklab, var(--stone-3) 70%, var(--ink));
+  color: var(--paper-dim);
+  font-family: var(--font-sans);
+  font-size: var(--text-md, 0.9375rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.shell-collection-sidebar .shell-channel-item--active .shell-channel-sigil {
+  border-color: color-mix(in oklab, var(--lapis) 50%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 46%, var(--stone-3));
+  color: var(--paper);
+}
+
+.shell-collection-sidebar .shell-dm-avatar {
+  border: 1px solid color-mix(in oklab, var(--paper) 12%, transparent);
+  background: color-mix(in oklab, var(--lapis-deep) 42%, var(--stone-3));
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 700;
+}
+
+.shell-collection-sidebar .shell-channel-copy,
+.shell-collection-sidebar .shell-dm-copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.shell-collection-sidebar .shell-channel-copy {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.shell-collection-sidebar .shell-dm-copy {
+  gap: 3px;
+}
+
+.shell-collection-sidebar .shell-channel-name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-family: var(--font-sans);
+  font-size: var(--text-md, 0.9375rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.shell-collection-sidebar .shell-channel-topic {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--paper-mute);
+  font-size: var(--text-xs, 0.6875rem);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell-collection-sidebar .shell-dm-preview {
+  font-size: var(--text-xs, 0.6875rem);
+  line-height: 1.25;
+}
+
+.shell-collection-sidebar .shell-channel-item--active .shell-channel-topic,
+.shell-collection-sidebar .shell-channel-item--active .shell-dm-preview {
+  color: var(--paper-dim);
+}
+
+.shell-collection-sidebar .shell-channel-item > .shell-channel-time,
+.shell-collection-sidebar .shell-channel-item > .shell-channel-badge,
+.shell-collection-sidebar .shell-dm-meta {
+  grid-area: meta;
+  margin-left: 0;
+  align-self: start;
+}
+
+.shell-collection-sidebar .shell-dm-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 0;
+}
+
+.shell-collection-sidebar .shell-channel-badge {
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding-inline: 0.35rem;
+  border-radius: var(--r-md);
+  font-size: var(--text-xs, 0.6875rem);
+}
+
+.shell-collection-sidebar .shell-dm-keywarn,
+.shell-collection-sidebar .shell-dm-meta .shell-channel-offline,
+.shell-collection-sidebar .shell-dm-meta .shell-channel-badge {
+  margin: 0;
+}
+
+/* People is optional and remains closed by the owner. When mounted, make its
+   real role/away text read as identity metadata instead of operator chrome. */
+.shell-collection-people .shell-members-head,
+.shell-collection-people .shell-members-group-label {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.shell-collection-people .shell-members-title {
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: var(--text-md, 0.9375rem);
+  font-weight: 700;
+}
+
+.shell-collection-people .shell-members-count {
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs, 0.6875rem);
+  letter-spacing: 0;
+}
+
+.shell-collection-people .shell-members-filter-input {
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+}
+
+.shell-collection-people .shell-member-row {
+  box-sizing: border-box;
+  min-height: 3.25rem;
+  margin-inline: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--r-md);
+}
+
+.shell-collection-people .shell-members-group-label {
+  height: auto;
+  margin: 0;
+}
+
+.shell-collection-people .shell-members-group-item {
+  content-visibility: visible;
+}
+
+.shell-collection-people .shell-members-scroll {
+  container-type: inline-size;
+}
+
+.shell-collection-people .shell-member-avatar .onyx-avatar--sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+}
+
+.shell-collection-people .shell-member-identity {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.shell-collection-people .shell-member-nick {
+  flex: none;
+  width: 100%;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  color: var(--paper);
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.shell-collection-people .shell-member-meta {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs, 0.6875rem);
+  line-height: 1.2;
+}
+
+.shell-collection-people .shell-role-badge {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--r-md);
+  font-size: var(--text-xs, 0.6875rem);
+}
+
+/* Text enlargement can leave only 1px between the avatar and role badge.
+   Reflow identity below them using the actual column width, not viewport width. */
+@container (max-width: 12rem) {
+  .shell-collection-people .shell-member-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .shell-collection-people .shell-member-avatar { justify-self: start; }
+  .shell-collection-people .shell-member-identity { grid-area: 2 / 1 / 3 / 3; }
+  .shell-collection-people .shell-role-badge { grid-area: 1 / 2; }
+}
+
+.shell-people-card--readable .shell-people-card-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  color: var(--paper-dim);
+  font-size: var(--text-sm, 0.8125rem);
+  font-weight: 600;
+}
+
+.shell-people-card--readable .shell-people-card-presence-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.shell-people-card--readable .shell-people-card-presence-dot--away {
+  background: var(--paper-mute);
+}
+
+.shell-people-card--readable .shell-people-card-presence-separator {
+  color: var(--paper-mute);
+}
+
+.shell-people-card--readable .shell-people-card-actions--primary {
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in oklab, var(--paper) 10%, transparent);
+}
+
+.shell-people-card--readable .shell-people-card-actions--primary .onyx-button,
+.shell-people-card--readable .shell-people-card-advanced-toggle {
+  min-height: var(--target-min, 44px);
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (max-width: 600px) {
+  .shell-collection-sidebar {
+    --collection-mark-size: 2rem;
+  }
+
+  .shell-collection-sidebar .shell-channel-item {
+    grid-template-columns: var(--collection-mark-size) minmax(0, 1fr) auto;
+    min-height: 3.125rem;
+  }
+
+  .shell-collection-sidebar .shell-channel-sigil,
+  .shell-collection-sidebar .shell-dm-avatar {
+    width: var(--collection-mark-size);
+    height: var(--collection-mark-size);
+    min-width: var(--collection-mark-size);
+    min-height: var(--collection-mark-size);
+  }
+
+  .shell-collection-people .shell-member-row {
+    min-height: 3.5rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .shell-collection-sidebar .shell-channel-item[aria-current='location'],
+  .shell-collection-sidebar .shell-channel-item[aria-current='page'] {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+    box-shadow: none;
+  }
+
+  .shell-collection-sidebar .shell-channel-item[aria-current='location'] .shell-channel-sigil,
+  .shell-collection-sidebar .shell-channel-item[aria-current='page'] .shell-channel-sigil {
+    color: HighlightText;
+    background: Highlight;
+    border-color: HighlightText;
+  }
+
+  .shell-collection-sidebar .shell-channel-sigil,
+  .shell-collection-sidebar .shell-dm-avatar,
+  .shell-collection-people .shell-members-count {
+    border-color: ButtonText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-collection-sidebar .shell-sidebar-filter-summary::after,
+  .shell-collection-sidebar .shell-channel-item {
+    transition: none;
+  }
+}

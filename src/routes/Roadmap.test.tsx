@@ -38,10 +38,12 @@ describe('RoadmapRoute — community copy', () => {
     expect(src).not.toMatch(/href="\/stats\/"/);
   });
 
-  it('keeps quiet-harbor type: Instrument Sans, Fraunces once, no Anton or glass', () => {
+  it('uses the shared public type roles without glass', () => {
     expect(css).toContain('var(--font-sans)');
-    expect((css.match(/var\(--font-serif\)/g) ?? []).length).toBe(1);
-    expect(cssNoComments).not.toMatch(/Anton|Inter|purple|blurple|#5865[Ff]2/i);
+    expect(cssNoComments).not.toContain('var(--font-display)');
+    expect(css).toContain('border-block');
+    expect(cssNoComments).not.toContain('var(--font-serif)');
+    expect(cssNoComments).not.toMatch(/\bInter\b|purple|blurple|#5865[Ff]2/i);
     expect(cssNoComments).not.toContain('backdrop-filter');
     expect(cssNoComments).not.toMatch(/text-transform:\s*uppercase/);
     expect(css).toContain('var(--target-min, 44px)');
@@ -178,5 +180,13 @@ describe('RoadmapRoute', () => {
     expect(css).toContain(".roadmap-legend a[aria-current='location']");
     expect(css).toContain(".roadmap-card[data-current='true']");
     expect(css).toContain('@media (forced-colors: active)');
+  });
+
+  it('keeps the three roadmap states visually distinct in forced colors', () => {
+    const forcedColors = css.slice(css.indexOf('@media (forced-colors: active)'));
+    for (const [state, pattern] of [['now', 'solid'], ['next', 'dashed'], ['later', 'dotted']]) {
+      expect(forcedColors).toContain(`.roadmap-legend a[data-state='${state}'],`);
+      expect(forcedColors).toContain(`.roadmap-card[data-state='${state}'] .roadmap-state { border-bottom: 3px ${pattern} currentColor; }`);
+    }
   });
 });

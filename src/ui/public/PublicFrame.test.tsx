@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@solidjs/testing-library';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PublicFrame } from './PublicFrame';
 import { PublicSkipLink } from './PublicSkipLink';
+
+const publicFrameCss = readFileSync(resolve(__dirname, 'public-frame.css'), 'utf8');
 
 vi.mock('@/backgrounds/SceneAtmosphere', () => ({
   SceneAtmosphere: () => (
@@ -16,6 +20,47 @@ afterEach(() => {
 });
 
 describe('PublicFrame', () => {
+  it('keeps supporting public routes matte while retaining the semantic scene host', () => {
+    expect(publicFrameCss).toMatch(
+      /\.public-frame\s*\{[\s\S]*?background:\s*var\(--public-void\)/,
+    );
+    expect(publicFrameCss).toMatch(
+      /\.public-atmosphere\s*\{[\s\S]*?display:\s*none/,
+    );
+  });
+
+  it('keeps action links paired with semantic fills in every interaction state', () => {
+    expect(publicFrameCss).toContain(
+      '--public-action-text: var(--on-accent, var(--public-text));',
+    );
+    expect(publicFrameCss).toContain(
+      '--public-on-paper: var(--ink, var(--public-action-text));',
+    );
+    expect(publicFrameCss).toMatch(
+      /\.public-frame\s+:where\(a\)\s*\{\s*color:\s*inherit;\s*\}/,
+    );
+    expect(publicFrameCss).toMatch(
+      /\.public-frame__skip\s*\{[\s\S]*?color:\s*var\(--public-action-text\)[\s\S]*?background:\s*var\(--public-action\)/,
+    );
+    expect(publicFrameCss).toMatch(
+      /\.public-frame__open\s*\{[\s\S]*?color:\s*var\(--public-action-text\)[\s\S]*?background:\s*var\(--public-action\)/,
+    );
+    expect(publicFrameCss).toMatch(
+      /\.public-frame__open:hover,\s*\.public-frame__open:focus-visible\s*\{[\s\S]*?color:\s*var\(--public-on-paper\)[\s\S]*?background:\s*var\(--public-text\)/,
+    );
+    expect(publicFrameCss).not.toContain('--commercial-text-inverse');
+  });
+
+  it('keeps the shared brand legible and footer destinations quietly grouped', () => {
+    const { container } = render(() => <PublicFrame>Content</PublicFrame>);
+    expect(container.querySelector('.public-frame__brand-visual')).toBeTruthy();
+    expect(container.querySelector('.public-frame__footer-identity')).toHaveTextContent(
+      'Rooms, messages, and calls for friends, clubs, and creators.',
+    );
+    expect(container.querySelector('.public-frame__footer-links')).toBeTruthy();
+    expect(container.querySelector('.public-frame__footer-title')).toHaveTextContent('Explore Onyx');
+  });
+
   it('retires the bootstrap skip link while the route-specific frame is mounted', () => {
     const bootstrapSkip = document.createElement('a');
     bootstrapSkip.className = 'html-shell-skip';

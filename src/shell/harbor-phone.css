@@ -2,28 +2,24 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    Harbor phone — 390-wide is the product.
 
-   Quiet harbor at night. Chrome recedes into ink. Conversation is the only
-   bright plane. Instrument Sans UI, Fraunces once per screen, JetBrains Mono
-   only for timestamps. Lapis only when something is alive (Join, Send,
-   you-are-here). No glass, glow, Discord purple, or operator letter chips.
+   Matte arcade social phone surface. Instrument Sans UI, Anton display, and
+   technical mono only for timestamps. No glass, glow, waves, or purple.
    ───────────────────────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
   .shell {
-    --harbor-phone-body: var(--text-lg, 1.0625rem);
-    --harbor-phone-plane: var(--stone);
+    --harbor-phone-body: 1rem;
+    --harbor-phone-plane: var(--ink);
     --mnav-h: max(56px, 2.25rem);
     color: var(--paper);
-    /* Atmosphere from the phone-harbor lane: the page-layer scene stays visible.
-       Ribbon, composer, and the tab rail still recede into ink below. */
-    background: transparent;
+    background: var(--ink);
   }
 
-  /* Conversation is the lifted plane; keep it stone without burying the harbor. */
+  /* The transcript is one opaque reading surface at every phone width. */
   .shell-conversation {
-    background: color-mix(in oklab, var(--harbor-phone-plane) 72%, transparent);
-    border-radius: 18px 18px 0 0;
-    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--paper) 6%, transparent);
+    background: var(--harbor-phone-plane);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .shell-conversation::before {
@@ -32,11 +28,11 @@
 
   /* ── Ribbon: identity only. Recede Call / People / Search chrome. ── */
   .shell-ribbon {
-    height: 52px;
-    min-height: 52px;
+    height: 56px;
+    min-height: 56px;
     padding: 0 12px;
-    background: var(--ink);
-    border-bottom: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+    background: var(--stone);
+    border-bottom: 1px solid var(--seam);
     box-shadow: none;
   }
 
@@ -46,13 +42,13 @@
   }
 
   .shell[data-room-identity] .shell-ribbon {
-    background: var(--ink);
-    border-bottom-color: color-mix(in oklab, var(--paper) 8%, transparent);
+    background: var(--stone);
+    border-bottom-color: var(--seam);
     box-shadow: none;
   }
 
   .shell-ribbon-inner {
-    min-height: 52px;
+    min-height: 56px;
     gap: 8px;
   }
 
@@ -121,7 +117,7 @@
   .shell-ribbon-members {
     width: auto;
     min-width: 74px;
-    max-width: 92px;
+    max-width: max-content;
     padding: 0 10px;
     gap: 6px;
     border-color: color-mix(in oklab, var(--lapis) 24%, var(--seam-faint));
@@ -140,24 +136,24 @@
     font-size: 0.68rem;
   }
 
-  /* ── Transcript: air, 17px, people as circles. ── */
+  /* ── Transcript: 16px / 24px, compact author groups. ── */
   .shell-feed {
-    padding: 10px 0 8px;
-    background: transparent;
+    padding: 8px 0 8px;
+    background: var(--ink);
   }
 
   .shell-msg-group {
     grid-template-columns: 36px minmax(0, 1fr);
     gap: 0 10px;
-    margin-top: 14px;
-    padding: 10px 14px 6px;
-    border-radius: 12px;
+    margin-top: 8px;
+    padding: 8px 12px 6px;
+    border-radius: 0;
   }
 
   .shell-msg-cont {
     grid-template-columns: 36px minmax(0, 1fr);
     gap: 0 10px;
-    padding: 2px 14px;
+    padding: 2px 12px;
   }
 
   .shell-msg-group--system,
@@ -176,14 +172,14 @@
 
   .shell-msg-author {
     font-family: var(--font-sans);
-    font-size: 0.88rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    color: var(--paper-dim);
+    color: var(--paper);
   }
 
   .shell-msg-ts,
   .shell-msg-cont-ts {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-size: var(--text-2xs);
     letter-spacing: 0.01em;
     color: var(--paper-mute);
@@ -198,26 +194,26 @@
   }
 
   .shell-day-divider-label {
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-size: 0.92rem;
-    font-weight: 450;
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-size: 0.75rem;
+    font-weight: 650;
     letter-spacing: 0;
     text-transform: none;
     color: var(--paper-mute);
   }
 
   .shell-feed-empty-title {
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-size: 1.25rem;
+    font-family: var(--font-display, "Anton", var(--font-sans));
+    font-style: normal;
+    font-size: 1.5rem;
   }
 
   /* ── Composer: Message field + lapis Send when armed. ── */
   .shell-composer {
     padding: 8px 10px 8px;
-    background: var(--ink);
-    border-top: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+    background: var(--stone);
+    border-top: 1px solid var(--seam);
   }
 
   .shell-composer-brief {
@@ -255,15 +251,15 @@
 
   .shell-composer-send:not(:disabled) {
     color: var(--on-accent);
-    background: var(--lapis);
+    background: var(--commercial-action-primary, #ff987d);
     border-color: transparent;
   }
 
   /* ── Bottom nav: Home / Rooms / Messages / Calls / You ── */
   .shell-mobile-nav {
     --mnav-h: max(56px, 2.25rem);
-    background: var(--ink);
-    border-top: 1px solid color-mix(in oklab, var(--paper) 8%, transparent);
+    background: var(--stone);
+    border-top: 1px solid var(--seam);
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -363,8 +359,8 @@
 
   /* People is a phone surface, not a squeezed desktop nick column. */
   .shell-members {
-    background: color-mix(in oklab, var(--ink) 97%, var(--stone));
-    box-shadow: -12px 0 36px color-mix(in oklab, #000 34%, transparent);
+    background: var(--surface-raised, var(--stone-2));
+    box-shadow: none;
   }
 
   .shell-members-head {
@@ -382,7 +378,7 @@
 
   .shell-members-title {
     color: var(--paper);
-    font-family: var(--font-serif);
+    font-family: var(--font-display, "Anton", var(--font-sans));
     font-size: 1.35rem;
     font-weight: 520;
     line-height: 1.05;
@@ -646,7 +642,7 @@
   }
 
   .shell-msg-text {
-    font-size: 17px;
+    font-size: 16px;
   }
 }
 

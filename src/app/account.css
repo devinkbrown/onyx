@@ -1,110 +1,169 @@
 /**
- * account.css — Onyx account panel (quiet threshold).
+ * account.css — You / account panel interior.
  *
  * Rendered inside the shared ModalShell (`.onyx-modal__*`), so this sheet only
- * styles the panel's interior: the identity card, the section rhythm, the
- * protection switches, the certificate list, and the danger zone. Matte mineral
- * surfaces, fine borders, Instrument Sans hierarchy, quiet cyan marks — no
- * decorative glow. Tokens only; motion freezes under prefers-reduced-motion.
+ * styles the panel interior: task categories, identity, save/error feedback,
+ * and the destructive boundary. Theme-aware semantic colors; no decorative glow.
  */
 
 .acct {
+  --acct-text: var(--ui-text-primary, var(--paper));
+  --acct-muted: var(--ui-text-secondary, var(--paper-dim));
+  --acct-faint: var(--ui-text-muted, var(--paper-mute));
+  --acct-line: var(--ui-surface-line, var(--line));
+  --acct-line-faint: var(--ui-surface-line-faint, var(--seam-faint));
+  --acct-raised: var(--ui-surface-raised, var(--stone-2));
+  --acct-sunken: var(--ui-surface-sunken, var(--ink));
+  --acct-action: var(--ui-action-primary, var(--lapis));
+  --acct-action-ink: var(--ui-text-on-action, var(--on-accent));
+  --acct-danger: var(--ui-status-danger, var(--danger));
+  --acct-success: var(--ui-status-success, var(--ok, var(--lapis-bright)));
+  --acct-warning: var(--ui-status-warning, var(--warn));
+  --acct-focus: var(--ui-border-focus, var(--lapis-bright));
   display: flex;
   flex-direction: column;
   gap: var(--gap-section);
+  color: var(--acct-text);
+  font-family: var(--font-sans);
 }
 
 .acct-surface-intro {
-  padding: 2px 4px 0;
+  padding: 0;
 }
 .acct-surface-intro__title {
   margin: 0;
-  color: var(--paper);
-  font: 650 1rem/1.3 var(--font-sans);
+  color: var(--acct-text);
+  font: 400 1.5rem/1.2 var(--font-sans);
 }
 .acct-surface-intro__body {
   max-width: 58ch;
-  margin: 4px 0 0;
-  color: var(--paper-dim);
-  font-size: 0.8rem;
-  line-height: 1.45;
+  margin: 0.35rem 0 0;
+  color: var(--acct-muted);
+  font-size: 1rem;
+  line-height: 1.5;
 }
 
-/* The account surface is intentionally long: keep a quiet map in reach while
-   the modal body scrolls. It behaves like a section index, not a second
-   navigation destination, so every item points at an existing named region. */
+/* The account surface is intentionally long: desktop keeps a readable
+   category column beside the form detail, while phones switch to one bounded
+   category/detail view. Each item still points at the existing named region. */
+.acct-account-layout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(var(--space-4), 4vw, var(--space-7));
+  min-width: 0;
+}
+
+.acct-account-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  min-width: 0;
+}
+
+.acct-account-detail .acct-section-body form {
+  width: min(100%, 42rem);
+}
+
+.acct-account-mobile-back {
+  display: none;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--acct-line-faint);
+  border-radius: var(--r-sm);
+  color: var(--acct-muted);
+  background: transparent;
+  cursor: pointer;
+  font: 650 1rem/1.2 var(--font-sans);
+}
+
+.acct-account-mobile-back:hover {
+  color: var(--acct-text);
+  border-color: var(--acct-line);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--acct-action) 10%, transparent));
+}
+
+.acct-account-mobile-back:focus-visible {
+  outline: 2px solid var(--acct-focus);
+  outline-offset: 2px;
+}
+
+.acct-account-nav-section {
+  min-width: 0;
+}
+
 .acct-section-nav {
   position: sticky;
   top: 0;
   z-index: 4;
-  display: flex;
-  align-items: center;
+  display: grid;
+  align-content: start;
   gap: var(--space-2);
   min-width: 0;
-  max-width: 100%;
-  margin: 0 0 var(--space-2);
-  padding: 4px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: none;
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--stone-2) 94%, var(--ink));
-}
-
-.acct-section-nav::-webkit-scrollbar {
-  display: none;
+  max-width: 14rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .acct-section-nav__label {
-  flex: none;
-  padding: 0 6px;
-  color: var(--paper-mute);
-  font: 700 0.62rem/1 var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  margin: 0 0 0.25rem;
+  padding: 0;
+  color: var(--acct-text);
+  font: 650 1.05rem/1.25 var(--font-sans);
 }
 
 .acct-section-nav__items {
-  display: flex;
-  flex: 1 0 auto;
-  gap: 3px;
-  min-width: max-content;
+  display: grid;
+  gap: 0;
+  min-width: 0;
 }
 
 .acct-section-nav__item {
-  flex: none;
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
   min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: var(--paper-mute);
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: var(--acct-muted);
   background: transparent;
   cursor: pointer;
-  font: 650 0.75rem/1.2 var(--font-sans);
-  white-space: nowrap;
-  transition:
-    color var(--dur, 200ms) var(--ease),
-    border-color var(--dur, 200ms) var(--ease),
-    background-color var(--dur, 200ms) var(--ease);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .acct-section-nav__item:hover {
-  color: var(--paper);
-  background: color-mix(in oklab, var(--lapis-deep) 18%, transparent);
+  color: var(--acct-text);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--acct-action) 10%, transparent));
 }
 
 .acct-section-nav__item.is-active,
 .acct-section-nav__item[aria-current='location'] {
-  color: var(--paper);
-  border-color: var(--seam);
-  background: color-mix(in oklab, var(--lapis-deep) 30%, transparent);
-  box-shadow: inset 0 2px 0 var(--lapis-bright);
+  color: var(--acct-text);
+  border-inline-start-color: var(--acct-action);
+  background: var(--ui-surface-selected, color-mix(in oklab, var(--acct-action) 16%, transparent));
 }
 
 .acct-section-nav__item:focus-visible {
-  outline: 2px solid var(--accent, var(--lapis));
-  outline-offset: 1px;
+  outline: 2px solid var(--acct-focus);
+  outline-offset: 2px;
+}
+
+.acct-section-nav__item-label {
+  font: 650 1rem/1.25 var(--font-sans);
+}
+
+.acct-section-nav__item-summary {
+  color: var(--acct-faint);
+  font: 400 0.8125rem/1.35 var(--font-sans);
 }
 
 .acct-identity,
@@ -112,72 +171,52 @@
   scroll-margin-top: 5.5rem;
 }
 
-.acct-advanced {
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 40%, transparent);
-}
-
-.acct-advanced-summary {
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-3);
-  color: var(--paper);
-}
-
-.acct-advanced-summary::-webkit-details-marker {
-  display: none;
-}
-
-.acct-advanced-title {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
-}
-
-.acct-advanced-hint {
-  font-size: 0.78rem;
-  color: var(--paper-dim);
-  line-height: 1.4;
-}
-
-.acct-advanced[open] > .acct-advanced-summary {
-  border-bottom: 1px solid var(--seam-faint);
-}
-
-.acct-advanced-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-section);
-  padding: var(--space-3);
-}
-
 .you-settings {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1.5rem;
 }
 
-.you-settings .acct-context-cue {
-  margin: 2px 4px 6px;
+.you-settings-lede {
+  margin: 0;
   max-width: 52ch;
-  color: var(--paper-dim);
-  font-size: 0.8rem;
+  color: var(--acct-muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.you-settings-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.you-settings-group__title {
+  margin: 0 0 0.2rem;
+  color: var(--acct-text);
+  font: 650 1.25rem/1.25 var(--font-sans);
+}
+
+.you-settings-group__hint {
+  margin: 0 0 0.65rem;
+  max-width: 52ch;
+  color: var(--acct-muted);
+  font-size: 1rem;
   line-height: 1.45;
 }
 
 .you-settings-item,
 .you-settings-link {
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 40%, transparent);
-  color: var(--paper);
+  border: 0;
+  border-block-start: 1px solid var(--acct-line-faint);
+  border-radius: 0;
+  background: transparent;
+  color: var(--acct-text);
+}
+
+.you-settings-group > .you-settings-item:first-of-type,
+.you-settings-group > .you-settings-link:first-of-type {
+  border-block-start: 0;
 }
 
 .you-settings-item > summary,
@@ -185,14 +224,15 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  justify-content: center;
+  gap: 0.15rem;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 0.65rem 0.15rem;
   cursor: pointer;
   list-style: none;
   text-align: left;
   text-decoration: none;
-  font: 650 0.95rem var(--font-sans);
+  font: 650 1rem/1.3 var(--font-sans);
 }
 
 .you-settings-item > summary::-webkit-details-marker {
@@ -201,19 +241,18 @@
 
 .you-settings-item > summary small,
 .you-settings-link small {
-  font: 400 0.78rem var(--font-sans);
-  color: var(--paper-dim);
+  font: 400 0.875rem/1.4 var(--font-sans);
+  color: var(--acct-muted);
 }
 
 .you-settings-link {
   width: 100%;
   appearance: none;
-  border-color: var(--seam-faint);
 }
 
 .you-settings-link:hover,
 .you-settings-item > summary:hover {
-  background: color-mix(in oklab, var(--lapis-deep) 16%, transparent);
+  background: var(--ui-surface-hover, color-mix(in oklab, var(--acct-action) 8%, transparent));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -229,6 +268,11 @@
     border: 1px solid ButtonText;
     background: Canvas;
     color: CanvasText;
+  }
+  .you-settings-choice.on {
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
   }
   .you-settings-item > summary:focus-visible,
   .you-settings-link:focus-visible,
@@ -246,7 +290,7 @@
 .you-settings-select:focus-visible,
 .you-keywords-add-btn:focus-visible,
 .you-keywords-remove:focus-visible {
-  outline: 2px solid var(--accent, var(--lapis));
+  outline: 2px solid var(--acct-focus);
   outline-offset: 2px;
 }
 
@@ -254,14 +298,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 0 12px 12px;
+  padding: 0.25rem 0 1rem;
 }
 
 .you-settings-hint {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
-  color: var(--paper-dim);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--acct-muted);
 }
 
 .you-settings-switch,
@@ -271,11 +315,11 @@
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
-  color: var(--paper);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--acct-line-faint);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--acct-text);
   cursor: pointer;
   text-align: left;
 }
@@ -289,12 +333,12 @@
 
 .you-settings-switch strong,
 .you-settings-link strong {
-  font: 650 0.9rem var(--font-sans);
+  font: 650 1rem var(--font-sans);
 }
 
 .you-settings-switch b {
-  font: 650 0.75rem var(--font-sans);
-  color: var(--paper-dim);
+  font: 650 0.875rem var(--font-sans);
+  color: var(--acct-muted);
 }
 
 .you-settings-choices {
@@ -304,18 +348,19 @@
 }
 
 .you-settings-choice.on {
-  border-color: var(--lapis);
-  background: color-mix(in oklab, var(--lapis-deep) 22%, transparent);
+  border-color: var(--acct-action);
+  color: var(--acct-action-ink);
+  background: var(--acct-action);
 }
 
 .you-settings-select {
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
-  color: var(--paper);
-  font: 600 0.9rem var(--font-sans);
+  background: transparent;
+  color: var(--acct-text);
+  font: 600 1rem var(--font-sans);
 }
 
 .you-settings-support {
@@ -328,9 +373,9 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  color: var(--lapis);
+  color: var(--ui-text-link, var(--acct-action));
   text-decoration: none;
-  font: 650 0.9rem var(--font-sans);
+  font: 650 1rem var(--font-sans);
 }
 
 .you-settings-item--advanced > summary {
@@ -345,8 +390,8 @@
 
 .you-keywords-title {
   margin: 0;
-  font: 650 0.85rem var(--font-sans);
-  color: var(--paper);
+  font: 650 1rem var(--font-sans);
+  color: var(--acct-text);
 }
 
 .you-keywords-add {
@@ -370,12 +415,12 @@
   appearance: none;
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
-  color: var(--paper);
+  background: transparent;
+  color: var(--acct-text);
   cursor: pointer;
-  font: 650 0.85rem var(--font-sans);
+  font: 650 1rem var(--font-sans);
 }
 
 .you-keywords-list {
@@ -394,49 +439,24 @@
   gap: 12px;
   min-height: 44px;
   padding: 6px 10px;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: 4px;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
+  background: transparent;
 }
 
 .you-keywords-word {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font: 600 0.9rem var(--font-mono);
-  color: var(--paper);
+  font: 600 1rem var(--font-sans);
+  color: var(--acct-text);
 }
 
 .you-keywords-remove {
   flex-shrink: 0;
-  min-height: 2rem;
+  min-height: 44px;
   padding: 4px 8px;
-  font-size: 0.8rem;
-}
-
-/* Shared sheet cue: explains the immediate task without competing with the
-   panel title or claiming that account security enables message encryption. */
-.acct-context-cue {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-left: 2px solid color-mix(in oklab, var(--lapis) 72%, var(--seam));
-  background: color-mix(in oklab, var(--lapis) 7%, transparent);
-  color: var(--paper-dim);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
-.acct-context-cue > span {
-  flex: none;
-  color: var(--lapis-bright);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
 }
 
 /* ── Guest state ─────────────────────────────────────────────────────────── */
@@ -447,16 +467,15 @@
   align-items: flex-start;
   text-align: left;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--stone) 28%, transparent);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .acct-guest-glyph {
   font-size: 2.4rem;
   line-height: 1;
-  color: var(--lapis);
+  color: var(--acct-action);
   filter: none;
 }
 
@@ -464,17 +483,17 @@
   margin: 0;
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 1.12rem;
+  font-size: 1.25rem;
   letter-spacing: -0.01em;
-  color: var(--paper);
+  color: var(--acct-text);
 }
 
 .acct-guest-body {
   margin: 0;
-  max-width: 34ch;
-  font-size: 0.86rem;
+  max-width: 46ch;
+  font-size: 1rem;
   line-height: 1.55;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
 }
 
 .acct-guest-steps {
@@ -490,12 +509,12 @@
 .acct-guest-steps li {
   position: relative;
   padding: var(--space-2) var(--space-3) var(--space-2) 1.9rem;
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: var(--r-sm);
-  color: var(--paper-dim);
-  font-size: 0.78rem;
+  color: var(--acct-muted);
+  font-size: 1rem;
   line-height: 1.4;
-  background: color-mix(in oklab, var(--ink) 34%, transparent);
+  background: transparent;
 }
 
 .acct-guest-steps li::before {
@@ -506,7 +525,7 @@
   width: 0.48rem;
   height: 0.48rem;
   border-radius: var(--r-pill);
-  background: var(--lapis);
+  background: var(--acct-action);
   box-shadow: none;
 }
 
@@ -516,10 +535,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--seam-faint);
-  border-radius: 4px;
-  background: color-mix(in oklab, var(--stone) 32%, transparent);
+  padding: 0 0 1rem;
+  border: 0;
+  border-block-end: 1px solid var(--acct-line-faint);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -529,13 +548,13 @@
   height: 2.5rem;
   display: grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: 50%;
   font-family: var(--font-sans);
   font-weight: 650;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
-  color: var(--on-accent, var(--ink));
-  background: var(--lapis);
+  color: var(--acct-action-ink);
+  background: var(--acct-action);
   box-shadow: none;
 }
 
@@ -546,22 +565,21 @@
   min-width: 0;
 }
 
-.acct-identity-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
-}
-
 .acct-identity-name {
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   line-height: 1.15;
   letter-spacing: -0.015em;
-  color: var(--paper);
+  color: var(--acct-text);
   word-break: break-word;
+}
+
+.acct-identity-status {
+  margin: 0;
+  color: var(--acct-muted);
+  font-size: 1rem;
+  line-height: 1.4;
 }
 
 .acct-identity-loading {
@@ -582,33 +600,51 @@
 }
 
 .acct-fact dt {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--acct-faint);
 }
 
 .acct-fact dd {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--paper-dim);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  color: var(--acct-muted);
   word-break: break-all;
 }
 
 /* ── Last-action error ───────────────────────────────────────────────────── */
+
+.acct-save-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--acct-muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.acct-save-status[data-state='pending'] {
+  color: var(--acct-warning);
+}
+
+.acct-save-status[data-state='error'] {
+  color: var(--acct-danger);
+}
+
+.acct-save-status:empty {
+  display: none;
+}
 
 .acct-error {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid color-mix(in oklab, var(--shu) 50%, transparent);
+  border: 1px solid color-mix(in oklab, var(--acct-danger) 50%, transparent);
   border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--shu) 12%, transparent);
-  color: var(--shu-bright);
-  font-size: 0.82rem;
+  background: color-mix(in oklab, var(--acct-danger) 12%, transparent);
+  color: var(--acct-danger);
+  font-size: 1rem;
 }
 
 .acct-error span:first-child { flex: none; }
@@ -620,7 +656,7 @@
   flex-direction: column;
   gap: var(--space-3);
   padding-top: var(--space-5);
-  border-top: 1px solid var(--seam-faint);
+  border-top: 1px solid var(--acct-line-faint);
 }
 
 .acct-section-head {
@@ -632,17 +668,17 @@
 .acct-section-title {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 0.96rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--paper);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  color: var(--acct-text);
 }
 
 .acct-section-hint {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 1rem;
   line-height: 1.5;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
 }
 
 .acct-section-body {
@@ -678,27 +714,23 @@
 .acct-password-toggle {
   appearance: none;
   flex: none;
+  min-height: 44px;
   padding: 0 var(--space-4);
   border-radius: var(--r-sm);
-  border: 1px solid var(--seam-faint);
-  background: color-mix(in oklab, var(--stone) 32%, transparent);
-  color: var(--paper-dim);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  border: 1px solid var(--acct-line-faint);
+  background: transparent;
+  color: var(--acct-muted);
+  font-family: var(--font-sans);
+  font-size: 1rem;
   cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease),
-    background var(--dur) var(--ease);
 }
 
 .acct-password-toggle:hover:not(:disabled) {
-  color: var(--paper);
-  border-color: var(--seam);
-  background: color-mix(in oklab, var(--stone-2) 38%, transparent);
+  color: var(--acct-text);
+  border-color: var(--acct-line);
 }
 
-.acct-password-toggle:focus-visible { outline: 2px solid var(--lapis-bright); outline-offset: 2px; }
+.acct-password-toggle:focus-visible { outline: 2px solid var(--acct-focus); outline-offset: 2px; }
 .acct-password-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .acct-password.onyx-field,
@@ -713,9 +745,9 @@
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone) 30%, transparent);
+  background: transparent;
 }
 
 .acct-toggle-body {
@@ -726,16 +758,16 @@
 }
 
 .acct-toggle-label {
-  font-size: 0.86rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: var(--paper);
+  color: var(--acct-text);
 }
 
 .acct-toggle-desc {
   margin: 0;
-  font-size: 0.74rem;
+  font-size: 0.875rem;
   line-height: 1.45;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
 }
 
 .acct-switch {
@@ -766,13 +798,13 @@
 }
 
 .acct-switch input:checked + .acct-switch-track {
-  background: color-mix(in oklab, var(--lapis) 55%, var(--stone));
-  border-color: var(--lapis);
+  background: var(--acct-action);
+  border-color: var(--acct-action);
   box-shadow: none;
 }
 
 .acct-switch input:focus-visible + .acct-switch-track {
-  outline: 2px solid var(--lapis-bright);
+  outline: 2px solid var(--acct-focus);
   outline-offset: 2px;
 }
 
@@ -790,7 +822,7 @@
 
 .acct-switch input:checked ~ .acct-switch-thumb {
   transform: translateX(20px);
-  background: var(--paper);
+  background: var(--acct-action-ink);
   box-shadow: none;
 }
 
@@ -811,23 +843,34 @@
 
 .acct-cert-item {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--seam-faint);
+  border: 1px solid var(--acct-line-faint);
   border-radius: var(--r-sm);
-  background: color-mix(in oklab, var(--stone) 28%, transparent);
+  background: transparent;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
   word-break: break-all;
 }
 
 /* ── Danger zone ─────────────────────────────────────────────────────────── */
 
 .acct-danger {
-  border-top-color: color-mix(in oklab, var(--shu) 40%, transparent);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--acct-danger) 45%, var(--acct-line));
+  border-radius: var(--r-sm);
+  background: color-mix(in oklab, var(--acct-danger) 8%, transparent);
+}
+
+.acct-section--security {
+  border-top-color: color-mix(in oklab, var(--acct-action) 40%, var(--acct-line-faint));
+}
+
+.acct-section--danger {
+  border-top-color: color-mix(in oklab, var(--acct-danger) 50%, var(--acct-line-faint));
 }
 
 .acct-danger-title {
-  color: var(--shu-bright);
+  color: var(--acct-danger);
 }
 
 .acct-danger-actions {
@@ -860,7 +903,7 @@
 
 .acct-section[data-state='error'] .acct-section-hint,
 .acct-section[data-state='unavailable'] .acct-section-hint {
-  color: var(--paper);
+  color: var(--acct-text);
 }
 
 .acct-section[data-state='unavailable'] .acct-section-body,
@@ -876,8 +919,8 @@
   content: 'No passwords, tokens, or private keys are shown here.';
   display: block;
   margin-top: var(--space-2);
-  color: var(--paper-mute);
-  font-size: 0.7rem;
+  color: var(--acct-faint);
+  font-size: 0.875rem;
   line-height: 1.45;
 }
 
@@ -887,7 +930,7 @@
 
 .acct-data-verbs .acct-danger .acct-section-head::after {
   content: 'This is permanent for the account. Review the scope before continuing.';
-  color: var(--shu-bright);
+  color: var(--acct-danger);
 }
 
 .acct-section .onyx-button,
@@ -912,6 +955,76 @@
   }
   .acct-passkey-row { align-items: flex-start; flex-wrap: wrap; }
   .acct-passkey-actions { width: 100%; }
+}
+
+/* On a phone, show the section categories first and replace them with one
+   selected detail view. The detail selector is data-driven so form controls
+   remain mounted and retain their existing values/focus behavior. */
+@media (max-width: 42rem) {
+  .acct-account-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .acct-section-nav {
+    position: static;
+    max-width: none;
+  }
+
+  .acct-account-detail {
+    display: none;
+  }
+
+  .acct-account-layout[data-account-mobile-detail='true'] .acct-section-nav {
+    display: none;
+  }
+
+  .acct-account-layout[data-account-mobile-detail='true'] .acct-account-detail {
+    display: flex;
+  }
+
+  /* Indexed sections stay mounted. Hide them by default; the selected
+     section selector below is more specific so it can reveal one. Back,
+     save status, and the last-action error are not indexed and stay visible. */
+  .acct-account-layout[data-account-mobile-detail='true']
+    .acct-account-detail > [data-account-nav-section] {
+    display: none;
+    flex-direction: column;
+  }
+
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-identity']
+    .acct-account-detail > [data-account-nav-section='acct-identity'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-email-title']
+    .acct-account-detail > [data-account-nav-section='acct-email-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-password-title']
+    .acct-account-detail > [data-account-nav-section='acct-password-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-two-factor-authentication-title']
+    .acct-account-detail > [data-account-nav-section='acct-two-factor-authentication-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-sessions-title']
+    .acct-account-detail > [data-account-nav-section='acct-sessions-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-recovery-title']
+    .acct-account-detail > [data-account-nav-section='acct-recovery-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-passkeys-title']
+    .acct-account-detail > [data-account-nav-section='acct-passkeys-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-download-store-title']
+    .acct-account-detail > [data-account-nav-section='acct-download-store-title'],
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-session-title']
+    .acct-account-detail > [data-account-nav-section='acct-session-title'] {
+    display: flex;
+  }
+
+  .acct-account-layout[data-account-mobile-detail='true'][data-account-mobile-section='acct-identity']
+    .acct-account-detail > [data-account-nav-section='acct-identity'] {
+    flex-direction: row;
+  }
+
+  .acct-account-mobile-back {
+    display: inline-flex;
+  }
+
+  .acct-account-detail .acct-section-body form {
+    max-width: none;
+  }
 }
 
 [data-acct-sheet='delete'] .onyx-sheet__kicker {
@@ -954,7 +1067,7 @@
     border-color: Highlight;
     background: Highlight;
     color: HighlightText;
-    box-shadow: inset 0 2px 0 HighlightText;
+    border-inline-start-color: HighlightText;
   }
 
   .acct-section-nav__item:focus-visible {
@@ -972,6 +1085,7 @@
 
   .acct-danger { border-top-color: LinkText; }
   .acct-error { border-color: LinkText; color: CanvasText; }
+  .acct-save-status { color: CanvasText; }
 }
 
 /* ── Two-factor authentication ─────────────────────────────────────────── */
@@ -981,23 +1095,23 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--paper-dim);
+  font-size: 1rem;
+  color: var(--acct-muted);
 }
-.acct-totp-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--paper-mute); flex: none; }
-.acct-totp-status[data-status='active'] .acct-totp-dot { background: var(--lapis); box-shadow: none; }
-.acct-totp-status[data-status='pending'] .acct-totp-dot { background: var(--gold); }
+.acct-totp-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--acct-faint); flex: none; }
+.acct-totp-status[data-status='active'] .acct-totp-dot { background: var(--acct-success); box-shadow: none; }
+.acct-totp-status[data-status='pending'] .acct-totp-dot { background: var(--acct-warning); }
 .acct-totp-enroll {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
+  border: 1px solid color-mix(in oklab, var(--acct-warning) 35%, var(--acct-line));
   border-radius: 10px;
-  background: color-mix(in oklab, var(--gold) 7%, transparent);
+  background: color-mix(in oklab, var(--acct-warning) 8%, transparent);
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.acct-totp-note { margin: 0; font-size: 0.78rem; color: var(--paper-dim); }
+.acct-totp-note { margin: 0; font-size: 1rem; color: var(--acct-muted); }
 .acct-totp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .acct-totp-secret {
   min-width: 0;
@@ -1006,9 +1120,9 @@
   font-size: 0.85rem;
   letter-spacing: 0.12em;
   overflow-wrap: anywhere;
-  color: var(--gold-bright);
-  background: var(--ink);
-  border: 1px solid var(--line);
+  color: var(--acct-text);
+  background: var(--acct-sunken);
+  border: 1px solid var(--acct-line);
   border-radius: 6px;
   padding: 4px 10px;
   user-select: all;
@@ -1017,7 +1131,7 @@
 
 /* ── Personas (Guise wardrobe) ─────────────────────────────────────────── */
 .acct-personas { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
-.acct-personas-empty { margin: 0; font-size: 0.82rem; color: var(--paper-mute); font-style: italic; }
+.acct-personas-empty { margin: 0; font-size: 1rem; color: var(--acct-muted); }
 .acct-persona-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .acct-persona-row {
   display: flex;
@@ -1029,34 +1143,31 @@
   background: color-mix(in oklab, var(--stone-2) 55%, transparent);
 }
 .acct-persona-id { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; }
-.acct-persona-id strong { color: var(--paper); font-size: 0.85rem; }
+.acct-persona-id strong { color: var(--acct-text); font-size: 1rem; }
 .acct-persona-id code {
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--lapis-bright);
+  color: var(--ui-text-accent, var(--acct-action));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .acct-persona-src {
   margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--acct-faint);
 }
 .acct-persona-offers { width: 100%; display: flex; flex-direction: column; gap: 8px; }
 .acct-persona-offers-label {
   margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--acct-muted);
 }
 .acct-persona-offers ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.acct-persona-offer { display: flex; gap: 10px; align-items: baseline; font-size: 0.8rem; color: var(--paper-dim); }
+.acct-persona-offer { display: flex; gap: 10px; align-items: baseline; font-size: 1rem; color: var(--acct-muted); }
 .acct-persona-offer code { font-family: var(--font-mono); color: var(--gold-bright); font-size: 0.78rem; }
 .acct-persona-claim { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 
@@ -1073,19 +1184,19 @@
   padding: var(--space-3);
   border: 1px dashed var(--line);
   border-radius: 10px;
-  background: color-mix(in oklab, var(--stone-2) 40%, transparent);
-  color: var(--paper-dim);
-  font-size: 0.82rem;
+  background: transparent;
+  color: var(--acct-muted);
+  font-size: 1rem;
   line-height: 1.5;
 }
 
 .acct-passkey-msg {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   line-height: 1.45;
 }
-.acct-passkey-msg.is-ok { color: var(--jade-bright, var(--lapis-bright)); }
-.acct-passkey-msg.is-err { color: var(--shu-bright); }
+.acct-passkey-msg.is-ok { color: var(--acct-success); }
+.acct-passkey-msg.is-err { color: var(--acct-danger); }
 
 .acct-passkey-list-wrap {
   display: flex;
@@ -1102,11 +1213,10 @@
 
 .acct-passkey-list-title {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--paper-dim);
-  text-transform: uppercase;
+  color: var(--acct-muted);
 }
 
 .acct-passkey-loading {
@@ -1114,8 +1224,8 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  color: var(--paper-dim);
-  font-size: 0.82rem;
+  color: var(--acct-muted);
+  font-size: 1rem;
 }
 
 .acct-passkey-empty {
@@ -1123,8 +1233,8 @@
   padding: var(--space-3);
   border: 1px dashed var(--line);
   border-radius: 10px;
-  color: var(--paper-dim);
-  font-size: 0.82rem;
+  color: var(--acct-muted);
+  font-size: 1rem;
   text-align: center;
 }
 
@@ -1238,29 +1348,27 @@
 }
 
 .acct-session-name {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: var(--paper);
+  color: var(--acct-text);
 }
 
 .acct-session-badge {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  border: 1px solid color-mix(in oklab, var(--jade, var(--lapis)) 40%, var(--line));
-  color: var(--jade-bright, var(--lapis-bright));
-  background: color-mix(in oklab, var(--jade, var(--lapis)) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--acct-success) 40%, var(--acct-line));
+  color: var(--acct-success);
+  background: color-mix(in oklab, var(--acct-success) 12%, transparent);
 }
 
 .acct-session-meta {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.875rem;
   line-height: 1.45;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
 }
 
 .acct-session-placeholder {
@@ -1272,16 +1380,15 @@
 
 .acct-session-placeholder-title {
   margin: 0 0 6px;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--paper-mute);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--acct-muted);
 }
 
 .acct-session-placeholder-body {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 1rem;
   line-height: 1.5;
-  color: var(--paper-dim);
+  color: var(--acct-muted);
 }

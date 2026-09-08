@@ -1460,3 +1460,81 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* G3b trust pages are long-form reading surfaces. Keep this scoped so the
+   frozen G3a download/guides surfaces retain their existing contracts. */
+.trust-page .trust-hero {
+  padding-block: clamp(3rem, 7vw, 6.5rem) clamp(2.5rem, 5vw, 4rem);
+  border-bottom: 1px solid var(--route-line);
+}
+.trust-page .trust-hero h1 {
+  max-width: 18ch;
+  margin-top: 0.7rem;
+  color: var(--route-text);
+  font: 650 clamp(2.35rem, 4.8vw, 4.5rem)/1 var(--font-sans);
+  letter-spacing: -0.045em;
+  text-transform: none;
+}
+.trust-page .trust-hero .sub {
+  max-width: 44ch;
+  margin-top: 0.8rem;
+  color: var(--route-muted);
+  font: clamp(1rem, 0.93rem + 0.25vw, 1.14rem)/1.62 var(--font-sans);
+}
+.trust-page .trust-reading {
+  padding-block: clamp(2.5rem, 6vw, 5.5rem);
+}
+.trust-page .trust-article {
+  max-width: 72ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.trust-page .trust-article-heading {
+  max-width: 24ch;
+  margin: 0 0 1.4rem;
+  color: var(--route-text);
+  font: 650 clamp(1.7rem, 3vw, 2.7rem)/1.08 var(--font-sans);
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+.trust-page .trust-article > p {
+  max-width: 68ch;
+  margin: 1rem 0 0;
+  color: var(--route-muted);
+  font: 1rem/1.72 var(--font-sans);
+}
+.trust-page .trust-article > p:first-of-type { margin-top: 0; }
+.trust-page .trust-article a {
+  color: var(--route-cobalt-strong);
+  text-underline-offset: 0.2em;
+}
+.trust-page .trust-rules {
+  max-width: 68ch;
+  margin: 0 0 1.6rem;
+  padding-left: 1.3rem;
+  color: var(--route-muted);
+  font: 1rem/1.7 var(--font-sans);
+}
+.trust-page .trust-rules li + li { margin-top: 0.65rem; }
+.trust-page .trust-rules li::marker { color: var(--route-cobalt); font-family: var(--font-sans); }
+
+@media (max-width: 42rem) {
+  .trust-page .trust-hero { padding-block: 2.5rem 2rem; }
+  .trust-page .trust-hero h1 { max-width: 100%; font-size: clamp(2.35rem, 11vw, 3.8rem); }
+  .trust-page .trust-article > p,
+  .trust-page .trust-rules { font-size: 1.0625rem; }
+}
+
+@media (max-width: 42rem) and (max-height: 30rem) {
+  .trust-page,
+  .trust-page .r-wrap,
+  .trust-page .trust-article { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+  .trust-page .trust-hero h1 { font-size: 2.75rem; }
+}
+
+@media (forced-colors: active) {
+  .trust-page .trust-hero,
+  .trust-page .trust-article { border-color: CanvasText; background: Canvas; }
+  .trust-page .trust-article a { color: LinkText; }
+}

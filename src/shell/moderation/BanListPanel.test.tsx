@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
+import { cleanup, fireEvent, render, screen, waitFor } from '@solidjs/testing-library';
+import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Channel } from '@/lib/irc/types';
-import { store } from '@/lib/store/store';
+import { selectIsChannelOp, store } from '@/lib/store/store';
 import { BanListPanel } from './BanListPanel';
 
 const initial = store.getInitialState();
@@ -134,5 +135,75 @@ describe('BanListPanel', () => {
     expect(sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '-b', 'bad!*@*');
     fireEvent.click(screen.getByTestId('moderation-review-confirm'));
     expect(sendRaw).toHaveBeenCalledWith('MODE', '#garden', '-b', 'bad!*@*');
+  });
+
+  it('invalidates a pending lift when its room prop changes', async () => {
+    const sendRaw = seed();
+    const garden = store.getState().channels.get('#garden');
+    expect(garden).toBeDefined();
+    store.setState({
+      channels: new Map(store.getState().channels).set('#other', { ...garden!, name: '#other' }),
+      banList: new Map([['#garden', [{ mask: 'bad!*@*' }]]]),
+      banListMeta: new Map([['#garden', {
+        status: 'ready',
+        updatedAt: Date.now(),
+        error: null,
+        generation: 1,
+        epoch: 0,
+      }]]),
+    });
+    const [channel, setChannel] = createSignal('#garden');
+    render(() => <BanListPanel channel={channel()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review lifting the block on bad!*@*' }));
+    expect(screen.getByTestId('moderation-action-review')).toBeInTheDocument();
+
+    sendRaw.mockClear();
+    setChannel('#other');
+
+    await waitFor(() => expect(screen.queryByTestId('moderation-action-review')).toBeNull());
+    expect(sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '-b', 'bad!*@*');
+  });
+
+  it('rejects a stale lift after a same-room owner and client replacement, then accepts a fresh review', async () => {
+    const sendRawA = seed();
+    const mask = 'bad!*@*';
+    store.setState({
+      banList: new Map([['#garden', [{ mask }]]]),
+      banListMeta: new Map([['#garden', {
+        status: 'ready',
+        updatedAt: Date.now(),
+        error: null,
+        generation: 1,
+        epoch: 0,
+      }]]),
+    });
+    render(() => <BanListPanel channel="#garden" />);
+    fireEvent.click(screen.getByRole('button', { name: `Review lifting the block on ${mask}` }));
+    const staleConfirm = screen.getByTestId('moderation-review-confirm');
+    sendRawA.mockClear();
+
+    const clientB = { sendRaw: vi.fn(() => true) };
+    const currentServer = store.getState().server;
+    expect(currentServer).toBeDefined();
+    store.setState({
+      client: clientB as never,
+      server: currentServer ? {
+        ...currentServer,
+        id: 'ban-ui-replacement',
+        url: 'wss://ban-ui-replacement.test',
+        account: 'replacement-account',
+      } : null,
+    });
+    expect(selectIsChannelOp('#garden')(store.getState())).toBe(true);
+
+    await waitFor(() => expect(screen.queryByTestId('moderation-action-review')).toBeNull());
+    fireEvent.click(staleConfirm);
+    expect(sendRawA).not.toHaveBeenCalledWith('MODE', '#garden', '-b', mask);
+    expect(clientB.sendRaw).not.toHaveBeenCalledWith('MODE', '#garden', '-b', mask);
+
+    fireEvent.click(screen.getByRole('button', { name: `Review lifting the block on ${mask}` }));
+    fireEvent.click(screen.getByTestId('moderation-review-confirm'));
+    expect(clientB.sendRaw).toHaveBeenCalledWith('MODE', '#garden', '-b', mask);
   });
 });

@@ -206,6 +206,7 @@ export type HomeController = {
   firstHourTip: () => ReturnType<typeof firstHourCoachTip>;
   formationStrip: () => FormationStrip | null;
   isJoined: (name: string) => boolean;
+  joinedRooms: () => readonly string[];
   caughtUpPlan: () => CaughtUpPlan;
   actions: HomeBriefingActions;
 };
@@ -647,6 +648,12 @@ export function createHomeController(): HomeController {
     (stats.latest?.channels ?? []).reduce((sum, c) => sum + c.messages, 0),
   );
   const isJoined = (name: string) => channels().has(name.toLowerCase());
+  const joinedRooms = createMemo<readonly string[]>(() =>
+    [...channels().values()]
+      .map((channel) => channel.name)
+      .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
+      .slice(0, 12),
+  );
 
   const roomRhythm = createMemo<HomeRhythmItem[]>(() => {
     const data = stats.latest;
@@ -1027,6 +1034,7 @@ export function createHomeController(): HomeController {
     firstHourTip,
     formationStrip,
     isJoined,
+    joinedRooms,
     caughtUpPlan,
     actions,
   };

@@ -20,6 +20,8 @@ import type { CallState } from '@/lib/cadence-media/types';
 import { PresenceRibbon } from './PresenceRibbon';
 import { HarborConfirmHost } from './HarborConfirmSheet';
 import { closeRoomVerbConfirm } from './roomVerbConfirm';
+import { MessageSearch } from './search/MessageSearch';
+import { closeMessageSearch } from './search/useMessageSearch';
 
 function validPeerKey(): string {
   const raw = new Uint8Array(65);
@@ -40,6 +42,10 @@ vi.mock('./Facepile', () => ({
 }));
 
 const initialState = store.getInitialState();
+const presenceRibbonCss = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), 'PresenceRibbon.css'),
+  'utf8',
+);
 
 function makeUser(nick: string): ChannelUser {
   return { nick, modes: new Set() };
@@ -99,13 +105,49 @@ function setRoomVoice(
 describe('PresenceRibbon commercial room header', () => {
   beforeEach(() => {
     store.setState(initialState, true);
+    closeMessageSearch();
   });
 
   afterEach(() => {
     cleanup();
+    closeMessageSearch();
     closeRoomVerbConfirm();
     store.setState(initialState, true);
     vi.restoreAllMocks();
+  });
+
+  it('keeps Context in the ribbon action flow with disclosure semantics', () => {
+    const onToggleContext = vi.fn();
+    seedChannel();
+    render(() => (
+      <PresenceRibbon
+        roomCurrent={{ kind: 'room', label: '#general', detail: 'caught up' }}
+        contextOpen={false}
+        contextTriggerRef={() => {}}
+        onToggleContext={onToggleContext}
+      />
+    ));
+
+    const context = screen.getByRole('button', { name: 'Context' });
+    expect(context.closest('.shell-ribbon-right')).not.toBeNull();
+    expect(context).toHaveAttribute('aria-controls', 'shell-context-rail');
+    expect(context).toHaveAttribute('aria-expanded', 'false');
+    expect(context).toHaveAttribute('aria-describedby', 'shell-room-current');
+
+    fireEvent.click(context);
+    expect(onToggleContext).toHaveBeenCalledOnce();
+  });
+
+  it('keeps narrow header labels readable in a scrollable secondary rail', () => {
+    expect(presenceRibbonCss).toMatch(
+      /\.presence-ribbon-surface \.shell-ribbon-right\s*\{[\s\S]*?overflow-x:\s*auto;/,
+    );
+    expect(presenceRibbonCss).toMatch(
+      /\.presence-ribbon-surface \.shell-ribbon-action,[\s\S]*?width:\s*max-content;[\s\S]*?min-width:\s*44px;/,
+    );
+    expect(presenceRibbonCss).toMatch(
+      /\.presence-ribbon-surface \.shell-ribbon-action-label\s*\{[\s\S]*?display:\s*inline;[\s\S]*?white-space:\s*nowrap;/,
+    );
   });
 
   it('exposes Search, More and People on the primary strip; demotes pins and Jump to date into More', () => {
@@ -153,6 +195,56 @@ describe('PresenceRibbon commercial room header', () => {
     expect(screen.queryByTestId('ribbon-appearance')).toBeNull();
     expect(screen.queryByTestId('ribbon-preferences')).toBeNull();
     expect(screen.queryByTestId('ribbon-account-chip')).toBeNull();
+  });
+
+  it.each(['connected', 'disconnected'] as const)(
+    'opens phone room Search while %s and returns Escape focus to Room actions',
+    async (connectionStatus) => {
+      seedChannel();
+      const sendRaw = vi.fn();
+      store.setState({ connectionStatus, client: { sendRaw, isupport: {} } as never });
+      render(() => <><PresenceRibbon contextActionsOnly /><MessageSearch /></>);
+      const trigger = screen.getByRole('button', { name: 'Room actions' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const searchItem = screen.getByRole('menuitem', { name: 'Search messages' });
+      await waitFor(() => expect(searchItem).toHaveFocus());
+      fireEvent.keyDown(searchItem, { key: 'ArrowDown' });
+      expect(screen.getByTestId('ribbon-invite-friends')).toHaveFocus();
+      fireEvent.keyDown(screen.getByTestId('ribbon-invite-friends'), { key: 'Home' });
+      expect(searchItem).toHaveFocus();
+      fireEvent.click(searchItem);
+
+      const input = await screen.findByRole('searchbox', { name: 'Search messages' });
+      await waitFor(() => expect(input).toHaveFocus());
+      expect(input).toBeEnabled();
+      expect(input).toHaveAttribute('placeholder', 'Find messages in #general');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(searchItem).not.toBeInTheDocument();
+      expect(sendRaw).not.toHaveBeenCalled();
+      fireEvent.keyDown(input, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveFocus());
+      expect(screen.queryByRole('search')).not.toBeInTheDocument();
+    },
+  );
+
+  it('offers the same phone Search handoff and focus return for a DM', async () => {
+    store.setState({
+      activeView: { kind: 'dm', nick: 'alice' },
+      dms: new Map([['alice', { nick: 'alice', account: null, unread: 0, highlights: 0, messages: [] }]]),
+    });
+    render(() => <><PresenceRibbon contextActionsOnly /><MessageSearch /></>);
+    const trigger = screen.getByRole('button', { name: 'Conversation actions' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Search messages' }));
+    const input = await screen.findByRole('searchbox', { name: 'Search messages' });
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveAttribute('placeholder', 'Find messages in @alice');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
 
   it.each([

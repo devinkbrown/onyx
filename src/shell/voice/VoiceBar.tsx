@@ -734,7 +734,12 @@ function CallTimer(props: { active: boolean; startedAt: number | null }) {
 
 // ── VoiceBar ──────────────────────────────────────────────────────────────────
 
-export function VoiceBar() {
+export type VoiceBarProps = {
+  /** AppShell keeps this owner mounted while a local recording is still saving. */
+  onRecordingOwnerHeld?: (held: boolean) => void;
+};
+
+export function VoiceBar(props: VoiceBarProps) {
   const voice = useStore(s => s.voice);
   const ourNick = useStore(s => s.ourNick);
   const showSettings = useStore(s => s.showVoiceSettings);
@@ -886,14 +891,18 @@ export function VoiceBar() {
   onCleanup(() => {
     disposed = true;
     screenshareOperationEpoch += 1;
-    recordingOperationEpoch += 1;
     setSpatialDragging(false);
-    // Best-effort stop without download if the whole bar is torn down mid-record
-    // (route leave). Call-end path uses the effect below and still downloads.
-    if (recording()) {
+    props.onRecordingOwnerHeld?.(false);
+    // Do not bump recordingOperationEpoch: that races an in-flight blob save.
+    // Genuine unmount still stops the recorder; the download is safe DOM work
+    // and must not touch signals after dispose.
+    if (recording() && !recordingPending()) {
       const engine = getMountedCadenceMediaEngine();
-      void engine?.stopRecording().catch(() => null);
-      setRecording(false);
+      void engine?.stopRecording()
+        .then((blob) => {
+          if (blob && blob.size > 0) downloadLocalRecording(blob);
+        })
+        .catch(() => null);
     }
     screenWakeLock.dispose();
     callMediaSession.dispose();
@@ -1097,15 +1106,22 @@ export function VoiceBar() {
 
   /** Stop the local MediaRecorder, optionally download the blob, clear UI state. */
   const finalizeRecording = async (opts: { download: boolean }): Promise<void> => {
-    if (!recording() && !recordingPending()) return;
+    // Coalesce: an in-flight stop (pending, recording already false) must not
+    // bump the epoch and drop the blob when Leave races with Stop.
+    if (recordingPending()) return;
+    if (!recording()) return;
     const epoch = ++recordingOperationEpoch;
     const engine = getMountedCadenceMediaEngine();
-    setRecordingPending(true);
-    setRecording(false);
-    if (opts.download) setRecordingStatus('Saving recording');
+    if (!disposed) {
+      setRecordingPending(true);
+      setRecording(false);
+      if (opts.download) setRecordingStatus('Saving recording');
+    }
     try {
       const blob = await engine?.stopRecording() ?? null;
-      if (disposed || epoch !== recordingOperationEpoch) return;
+      if (epoch !== recordingOperationEpoch) return;
+      if (opts.download && blob && blob.size > 0) downloadLocalRecording(blob);
+      if (disposed) return;
       if (!opts.download) {
         setRecordingStatus('');
         return;
@@ -1114,10 +1130,9 @@ export function VoiceBar() {
         setRecordingStatus('Recording was empty');
         return;
       }
-      downloadLocalRecording(blob);
       setRecordingStatus('Recording saved');
     } catch {
-      if (disposed || epoch !== recordingOperationEpoch) return;
+      if (epoch !== recordingOperationEpoch || disposed) return;
       setRecordingStatus(opts.download ? 'Could not save recording' : '');
     } finally {
       if (!disposed && epoch === recordingOperationEpoch) setRecordingPending(false);
@@ -1125,7 +1140,7 @@ export function VoiceBar() {
   };
 
   const handleToggleRecording = (): void => {
-    if (recordingPending()) return;
+    if (disposed || recordingPending()) return;
     if (recording()) {
       void finalizeRecording({ download: true });
       return;
@@ -1141,7 +1156,25 @@ export function VoiceBar() {
       return;
     }
     recordingOperationEpoch += 1;
-    engine.startRecording();
+    try {
+      const result = engine.startRecording();
+      if (!result?.started) {
+        const reason = result?.reason;
+        setRecordingStatus(reason === 'finalizing'
+          ? 'Previous recording is still saving. Try again when it finishes.'
+          : reason === 'no-media'
+            ? 'No local media to record'
+            : reason === 'unavailable'
+              ? 'Recording unavailable'
+              : reason === 'already-recording'
+                ? 'A recording is already running'
+                : 'Could not start recording. Try again.');
+        return;
+      }
+    } catch {
+      setRecordingStatus('Could not start recording. Try again.');
+      return;
+    }
     setRecording(true);
     setRecordingStatus('Recording local audio');
   };
@@ -1149,8 +1182,12 @@ export function VoiceBar() {
   // If the call ends while recording, stop and download so the user still gets the file.
   createEffect(() => {
     if (isActive()) return;
-    if (!untrack(() => recording() || recordingPending())) return;
+    if (!untrack(() => recording())) return;
     void finalizeRecording({ download: true });
+  });
+
+  createEffect(() => {
+    props.onRecordingOwnerHeld?.(recording() || recordingPending());
   });
 
   const handleLeave = () => {
@@ -1308,6 +1345,12 @@ export function VoiceBar() {
   };
 
   return (
+    <>
+      <span
+        hidden
+        data-testid="voice-bar-owner"
+        data-voice-bar-active={isActive() ? 'true' : 'false'}
+      />
     <Show when={isActive()}>
       <div
         class="voice-bar"
@@ -1849,5 +1892,6 @@ export function VoiceBar() {
         mediaE2eeDegraded={voice().mediaE2eeDegraded}
       />
     </Show>
+    </>
   );
 }

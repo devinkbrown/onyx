@@ -161,9 +161,9 @@ describe('YouNotifications', () => {
 
     expect(screen.getByTestId('you-notifications')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Notifications, current page/i })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Mentions')).toBeInTheDocument();
-    expect(screen.getByText('DMs')).toBeInTheDocument();
-    expect(screen.getByText('Calls')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mentions', level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'DMs', level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Calls', level: 4 })).toBeInTheDocument();
     expect(screen.getByText(/effective alerts have three layers/i)).toBeInTheDocument();
     expect(screen.getByText(/All: room messages may create inbox entries, unread\/badge activity/i)).toBeInTheDocument();
     expect(screen.getByText(/starts a call in a room you are in/i)).toBeInTheDocument();

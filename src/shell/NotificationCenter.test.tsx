@@ -100,7 +100,7 @@ describe('<NotificationCenter>', () => {
     expect(screen.getByRole('button', { name: 'Inbox — 3 unread notifications' })).toBeInTheDocument();
   });
 
-  it('summarizes unread attention and filters the inbox without changing notification order', () => {
+  it('summarizes unread notification history and filters without changing order', () => {
     store.setState({
       notifications: [
         note({ id: 'system', type: 'system', text: 'connected' }),
@@ -113,7 +113,7 @@ describe('<NotificationCenter>', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Inbox — 1 unread notification' }));
     const dialog = screen.getByRole('dialog', { name: 'Notification inbox' });
-    expect(within(dialog).getByText('1 unread')).toBeInTheDocument();
+    expect(within(dialog).getByText('2 unread notifications')).toBeInTheDocument();
 
     const filters = within(dialog).getByRole('group', { name: 'Filter notification inbox' });
     const all = within(filters).getByRole('button', { name: 'All' });
@@ -135,6 +135,11 @@ describe('<NotificationCenter>', () => {
     expect(within(dialog).getAllByRole('listitem')).toHaveLength(1);
     expect(within(dialog).getByText('connected')).toBeInTheDocument();
     expect(within(dialog).queryByText('ping')).toBeNull();
+
+    fireEvent.click(all);
+    expect(within(dialog).getByText('System')).toBeInTheDocument();
+    expect(within(dialog).getByText('Mention')).toBeInTheDocument();
+    expect(within(dialog).getByText('Direct message')).toBeInTheDocument();
   });
 
   it('clicking a mention marks it read and navigates to the channel', () => {
@@ -216,8 +221,25 @@ describe('<NotificationCenter>', () => {
     // The list renders newest-first, so the first dismiss removes 'y'.
     fireEvent.click(getAllByLabelText('Dismiss notification from trev in #root: oi')[0]!);
     expect(store.getState().notifications.map((n) => n.id)).toEqual(['x']);
-    fireEvent.click(getByText('Mark all read'));
+    fireEvent.click(getByText('Mark notifications read'));
     expect(store.getState().readNotificationIds.has('x')).toBe(true);
+  });
+
+  it('marks unread history even when the only unread item is not attention-worthy', () => {
+    store.setState({
+      notifications: [note({ id: 'system', type: 'system', text: 'connected' })],
+    });
+    render(() => <NotificationCenter />);
+    fireEvent.click(screen.getByRole('button', { name: 'Inbox' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Notification inbox' });
+    expect(within(dialog).getByText('1 unread notification')).toBeInTheDocument();
+    const markRead = within(dialog).getByRole('button', { name: 'Mark notifications read' });
+    fireEvent.click(markRead);
+
+    expect(store.getState().readNotificationIds.has('system')).toBe(true);
+    expect(within(dialog).getByText('No unread notifications')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Mark notifications read' })).toBeNull();
   });
 
   it('moves focus to the next row after dismissing the focused middle row', async () => {
@@ -300,7 +322,7 @@ describe('<NotificationCenter>', () => {
     });
     render(() => <NotificationCenter />);
     fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all read' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark notifications read' })).toHaveFocus());
     const row = screen.getByRole('button', { name: /Open notification from mizu/i });
     row.focus();
     expect(row).toHaveFocus();
@@ -318,7 +340,7 @@ describe('<NotificationCenter>', () => {
     });
     render(() => <NotificationCenter />);
     fireEvent.click(screen.getByRole('button', { name: /Inbox — 1 unread/i }));
-    const first = screen.getByRole('button', { name: 'Mark all read' });
+    const first = screen.getByRole('button', { name: 'Mark notifications read' });
     await waitFor(() => expect(first).toHaveFocus());
     const last = screen.getByRole('button', { name: /Dismiss notification from mizu/i });
 
@@ -338,7 +360,7 @@ describe('<NotificationCenter>', () => {
     const trigger = screen.getByRole('button', { name: /Inbox — 1 unread/i });
     fireEvent.click(trigger);
     const close = screen.getByRole('button', { name: 'Close notification inbox' });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all read' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Mark notifications read' })).toHaveFocus());
 
     fireEvent.keyDown(close, { key: 'Escape' });
 

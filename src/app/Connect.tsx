@@ -48,7 +48,6 @@ import { isPasskeySupported } from '@/lib/webauthn/passkey';
 import { Button } from '@/primitives/index';
 import { FormField } from '@/primitives/index';
 import { Spinner } from '@/primitives/index';
-import { Mascot } from '@/components/brand/Mascot';
 import {
   listRememberedIdentities,
   removeCredentials,
@@ -112,7 +111,7 @@ type Mode = 'guest' | 'signin' | 'register';
 const MODE_COPY: Record<Mode, { title: string; body: string }> = {
   guest: {
     title: 'Join a room',
-    body: 'Join free — send a message in about a minute.',
+    body: 'Choose a display name, then join.',
   },
   signin: {
     title: 'Sign in',
@@ -1062,12 +1061,6 @@ export function Connect(props: ConnectProps): JSX.Element {
   const showReclaim = createMemo(() => formPhase() === 'error' && nickInUse());
   const inVerifyStep = createMemo(() => registerPhase() === 'verifying');
   const headingCopy = createMemo(() => {
-    if (mode() === 'guest' && inviteCard?.channel) {
-      return {
-        title: `Join ${inviteCard.channel}`,
-        body: 'Choose a display name to enter this room.',
-      };
-    }
     return MODE_COPY[mode()];
   });
   const inviteOnlyName = createMemo(() => mode() === 'guest' && !!inviteCard?.channel);
@@ -1091,37 +1084,50 @@ export function Connect(props: ConnectProps): JSX.Element {
         <div class="conn" data-testid="connect-screen" data-mode={mode()}>
           <Atmosphere />
 
-          <div class="conn-stage">
-          <div class="conn-card" role="main">
-            <div class="conn-crest" aria-hidden="true" />
-
-            <div class="conn-body">
-              <header class="conn-header">
-                <span class="conn-brand" aria-hidden="true">
-                  <Mascot variant="mark" class="conn-brand-mark" />
-                </span>
-                <span class="conn-eyebrow">Onyx</span>
-                <h1 class="conn-title">{headingCopy().title}</h1>
-                <p class="conn-sub">{headingCopy().body}</p>
-              </header>
-
-              <Show when={inviteCard} keyed>
+          <div class="conn-stage" role="main">
+            <aside class="conn-context" aria-label="Destination">
+              <div class="conn-destination">
+                <span class="conn-room-mark" aria-hidden="true">{(inviteCard?.channel ?? '#').slice(0, 1)}</span>
+              <Show when={inviteCard?.channel ? inviteCard : undefined} keyed>
                 {(card) => (
                   <div class="conn-invite" role="note" aria-label="Invite preview">
-                    <span class="conn-invite-eyebrow">Invite</span>
-                    <h2 class="conn-invite-title">{inviteTitle(card)}</h2>
+                    <h1 class="conn-title">{card.channel === '#root' ? `Join ${card.channel}` : (card.channel ?? MODE_COPY.guest.title)}</h1>
+                    <p class="conn-sub">{inviteTitle(card)}</p>
                     <p class="conn-invite-desc">{inviteDescription(card)}</p>
-                    <Show when={card.topic}>
+                    <Show when={card.channel && card.topic}>
                       {(topic) => (
-                        <ul class="conn-invite-meta">
-                          <li>
-                            Topic: <span class="mono">{topic()}</span>
-                          </li>
-                        </ul>
+                        <p class="conn-invite-meta">
+                          <span class="mono">{topic()}</span>
+                        </p>
                       )}
                     </Show>
                   </div>
                 )}
+              </Show>
+              <Show when={!inviteCard?.channel}>
+                <div class="conn-destination-copy">
+                  <h1 class="conn-title">{MODE_COPY.guest.title}</h1>
+                  <p class="conn-sub">
+                    Choose a display name, then join. Leave the room blank to start on Home.
+                  </p>
+                </div>
+              </Show>
+              </div>
+              <Show when={inviteCard?.channel}>
+              <p class="conn-context__note">
+                An invite link names a destination. The room still applies its own
+                access rules when you join.
+              </p>
+              </Show>
+            </aside>
+
+            <div class="conn-card">
+            <div class="conn-body">
+              <Show when={mode() !== 'guest'}>
+              <header class="conn-header">
+                <h2 class="conn-form-title">{headingCopy().title}</h2>
+                <p class="conn-form-lede">{headingCopy().body}</p>
+              </header>
               </Show>
 
               {/* Remembered identities — secret-free metadata + guarded actions */}
@@ -1134,9 +1140,6 @@ export function Connect(props: ConnectProps): JSX.Element {
                         Continue where you left off
                       </h2>
                     </div>
-                    <span class="conn-identities-count" aria-label={`${rememberedIdentities().length} remembered identities`}>
-                      {rememberedIdentities().length}
-                    </span>
                   </div>
 
                   <div class="conn-identities-list" role="list">
@@ -1240,7 +1243,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                   <Show
                     when={!registerPending()}
                     fallback={
-                      <div class="conn-submit" style={{ display: 'flex', 'align-items': 'center', gap: '10px' }}>
+                      <div class="conn-submit conn-submit--busy">
                         <Spinner size="sm" label="Verifying" />
                       </div>
                     }
@@ -1477,7 +1480,7 @@ export function Connect(props: ConnectProps): JSX.Element {
 
                   {/* Explicit continuity choice for guest or password sign-in. */}
                   <Show when={showStaySignedIn()}>
-                    <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
+                    <div class="conn-seam" aria-hidden="true" />
                     <div class="conn-toggle">
                       <div class="conn-toggle-body">
                         <label class="conn-toggle-label" for="conn-stay-signed-in">
@@ -1504,7 +1507,7 @@ export function Connect(props: ConnectProps): JSX.Element {
                     </div>
                   </Show>
 
-                  <div class="conn-seam" style={{ margin: '20px 0' }} aria-hidden="true" />
+                  <div class="conn-seam" aria-hidden="true" />
 
                   {/* Status feedback */}
                   <div
@@ -1652,7 +1655,7 @@ export function Connect(props: ConnectProps): JSX.Element {
             <footer class="conn-foot">
               <span>Rooms, calls, and private messages — no ads.</span>
             </footer>
-          </div>
+            </div>
           </div>
         </div>
       }

@@ -28,48 +28,76 @@ describe('Landing', () => {
     expect(container.querySelector('[data-testid="public-atmosphere"]')).toBeTruthy();
   });
 
-  it('keeps leftover ground nodes from painting over the shared scene', () => {
+  it('keeps the shared scene host transparent while the home surface is opaque', () => {
     const landingCss = readFileSync(resolve(__dirname, 'landing.css'), 'utf8');
     const homeCss = readFileSync(resolve(__dirname, 'home.css'), 'utf8');
     expect(landingCss).toMatch(/\.r \{[^}]*background: transparent/);
-    expect(landingCss).toMatch(/\.r-ground \{[^}]*background: transparent/);
-    expect(homeCss).toMatch(/\.r-landing\.home \.r-ground\.home-ground \{\s*background: transparent;/);
+    expect(landingCss).toMatch(/\.r-ground,\s*\.r-flecks,\s*\.r-veins,\s*\.r-grain \{[\s\S]*background: transparent/);
+    expect(homeCss).toMatch(/\.r-landing\.home[\s\S]*background: var\(--home-void\)/);
+    expect(homeCss).toMatch(/\.public-frame__main:has\(> \.r-landing\.home\)[\s\S]*width: 100%[\s\S]*max-width: none/);
   });
 
-  it('opens with a community invitation and a single header Open Onyx', () => {
-    const { getAllByRole, getByRole, container } = render(() => <Landing />);
-    const openOnyx = getAllByRole('link', { name: 'Open Onyx' });
-    expect(openOnyx).toHaveLength(1);
-    expect(openOnyx[0]).toHaveAttribute('href', '/app/');
-    expect(openOnyx[0]).toHaveClass('public-frame__open');
-    expect(getByRole('heading', { level: 1 })).toHaveTextContent('Come for the conversation. Return to the room.');
-    expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(container.querySelector('a.home-cta-primary')).toHaveTextContent('Start in the public room');
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/app/');
-    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('Open the app');
-    expect(container.textContent).toMatch(/calm place for rooms, private conversations, and calls/);
-    expect(container.querySelector('.home-desktop-note')?.textContent).toMatch(
-      /Supporting browsers can put Onyx on the Home Screen or in its own window\. No store\./,
+  it('opens with the ULTRA invitation and consistent header and hero handoffs', () => {
+    const { getByRole, container } = render(() => <Landing />);
+    const headerOpenOnyx = container.querySelector('a.public-frame__open')!;
+    const heroOpenOnyx = container.querySelector('a.home-cta-primary')!;
+    expect(headerOpenOnyx).toHaveTextContent('Open Onyx');
+    expect(headerOpenOnyx).toHaveAttribute('href', '/app/');
+    expect(heroOpenOnyx).toHaveTextContent('Open Onyx');
+    expect(heroOpenOnyx).toHaveAttribute('href', '/app/');
+    expect(container.querySelectorAll('a.home-cta-primary')).toHaveLength(1);
+    expect(getByRole('heading', { level: 1 })).toHaveTextContent('Good company. Great nights.');
+    expect(container.querySelector('.home-hero-grid')).toBeTruthy();
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
+    expect(container.querySelector('a.home-secondary-link')).toHaveTextContent('See the public room');
+    expect(container).toHaveTextContent('A place for your friends to talk, play, and catch up. Open a room in your browser.');
+    expect(container.querySelector('.home-device-note')?.textContent).toMatch(
+      /Browser first\. Keep it on this device from a supporting browser/,
     );
-    expect(container.textContent).not.toMatch(/install Onyx as a PWA/i);
-    expect(container.textContent).not.toMatch(/app store|play store|beforeinstallprompt|iOS push/i);
   });
 
-  it('opts into the commercial foundation without changing the public frame contract', () => {
+  it('keeps the hero scene, trust, and community passage in argument order', () => {
     const { container } = render(() => <Landing />);
-    expect(container.querySelector('.ui-root.ui-commercial')).toBeTruthy();
-    expect(container.querySelector('.commercial-visually-hidden')).toBeNull();
+    const hero = container.querySelector('.home-hero')!;
+    const trust = container.querySelector('[data-home-trust]')!;
+    const community = container.querySelector('[data-home-room-board]')!;
+    expect(hero.contains(container.querySelector('[data-product-preview]'))).toBe(true);
+    expect(hero.compareDocumentPosition(trust) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(trust.compareDocumentPosition(community) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('.home-current, .home-modes, .home-room-board__map')).toBeNull();
+  });
+
+  it('keeps the room preview static, social, and keyboard-operable', async () => {
+    const { getByRole, getByText, container } = render(() => <Landing />);
+    const preview = container.querySelector('[data-product-preview]')!;
+    expect(preview).toHaveAttribute('data-preview-state', 'room');
+    expect(getByText('Fictional game-night preview')).toBeInTheDocument();
+    expect(preview).toHaveTextContent('Not a live room');
+    expect(preview).toHaveTextContent('One more round?');
+    expect(preview).toHaveTextContent('Give me five minutes.');
+    expect(preview).toHaveTextContent('I’ll meet you in voice.');
+    expect(preview.querySelector('.home-mascot-scene')).toBeInTheDocument();
+    expect(preview.querySelectorAll('img.home-mascot')).toHaveLength(1);
+
+    const roomTab = getByRole('tab', { name: 'Room' });
+    roomTab.focus();
+    fireEvent.keyDown(roomTab, { key: 'ArrowRight' });
+    await waitFor(() => expect(getByRole('tab', { name: 'Home' })).toHaveFocus());
+    expect(preview).toHaveAttribute('data-preview-state', 'home');
+    expect(getByRole('tab', { name: 'Home' })).toHaveAttribute('aria-selected', 'true');
+    expect(preview).not.toHaveTextContent(/12,482|CONNECT|Room is open/);
   });
 
   it('derives public destination links from manifest hrefs', () => {
     const { container, getByRole } = render(() => <Landing />);
-    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/app/');
-    expect(container.querySelector('a.home-local-link')).toHaveAttribute('href', '/download/');
-    expect(getByRole('link', { name: /keep it here/i })).toHaveAttribute('href', '/download/');
-    expect(getByRole('link', { name: /how the rooms work/i })).toHaveAttribute('href', '/about/');
+    expect(container.querySelector('a.home-cta-primary')).toHaveAttribute('href', '/app/');
+    expect(container.querySelector('a.home-secondary-link')).toHaveAttribute('href', '/invite/?join=%23root');
+    expect(getByRole('link', { name: /see device options/i })).toHaveAttribute('href', '/download/');
+    expect(getByRole('link', { name: 'the privacy details' })).toHaveAttribute('href', '/privacy/');
+    expect(getByRole('link', { name: 'Getting started' })).toHaveAttribute('href', '/guides/');
   });
 
-  it('keeps hosting extras below the fold in manifest destination order', () => {
+  it('keeps extras below the scene in manifest destination order', () => {
     const { getByRole } = render(() => <Landing />);
     const shelf = getByRole('navigation', { name: 'Also here' });
     expect([...shelf.querySelectorAll('a')].map((link) => ({
@@ -85,87 +113,29 @@ describe('Landing', () => {
     ]);
   });
 
-  it('keeps the room preview static, stateful, and free of fabricated live activity', () => {
-    const { getByRole, getByText, container } = render(() => <Landing />);
-    const preview = container.querySelector('[data-product-preview]');
-    expect(preview).toHaveAttribute('data-preview-state', 'room');
-    expect(getByText('Preview')).toBeInTheDocument();
-    expect(preview!.textContent).toMatch(/labeled conversation/i);
-    expect(preview!.querySelector('.product-preview__roombar')?.textContent).toMatch(/Weekend plans/);
-    expect(preview!.textContent).toMatch(/dinner/);
-    const roomTab = getByRole('tab', { name: 'Room' });
-    roomTab.focus();
-    fireEvent.keyDown(roomTab, { key: 'ArrowRight' });
-    expect(preview).toHaveAttribute('data-preview-state', 'home');
-    const homeTab = getByRole('tab', { name: 'Home' });
-    expect(homeTab).toHaveAttribute('aria-selected', 'true');
-    expect(preview!.textContent).not.toMatch(/mira|Room is open|12,482|CONNECT/i);
-  });
-
-  it('keeps preview tabs at a usable target size with visible focus and forced-color selection', async () => {
-    const homeCss = readFileSync(resolve(__dirname, 'home.css'), 'utf8');
-    const { getByRole } = render(() => <Landing />);
-    const roomTab = getByRole('tab', { name: 'Room' });
-    roomTab.focus();
-    fireEvent.keyDown(roomTab, { key: 'ArrowRight' });
-
-    await waitFor(() => expect(getByRole('tab', { name: 'Home' })).toHaveFocus());
-    expect(homeCss).toContain('min-height: var(--target-min, 44px)');
-    expect(homeCss).toContain('.product-preview__tabs button:focus-visible');
-    expect(homeCss).toContain(".product-preview__tabs button[aria-selected='true']");
-  });
-
-  it('uses an honest, keyboard-operable first-room switchboard', async () => {
-    const { container, getByRole } = render(() => <Landing />);
-    const board = container.querySelector('[data-home-room-board]');
-    expect(board).toHaveAttribute('data-room-intent', 'public-room');
-    expect(getByRole('link', { name: 'Open the public room' })).toHaveAttribute('href', '/invite/?join=%23root');
-    expect(board).toHaveTextContent(/not a live list of who is online/i);
-
-    const publicRoom = getByRole('tab', { name: 'Meet people' });
-    publicRoom.focus();
-    fireEvent.keyDown(publicRoom, { key: 'ArrowRight' });
-    await waitFor(() => expect(getByRole('tab', { name: 'Bring people' })).toHaveFocus());
-    expect(board).toHaveAttribute('data-room-intent', 'bring-people');
-    expect(board?.querySelector('a.home-room-board__action')).toHaveAttribute('href', '/app/');
-
-    fireEvent.keyDown(getByRole('tab', { name: 'Bring people' }), { key: 'ArrowRight' });
-    await waitFor(() => expect(getByRole('tab', { name: 'Get oriented' })).toHaveFocus());
-    expect(getByRole('link', { name: 'Read the first-room guide' })).toHaveAttribute('href', '/guides/');
-
-    fireEvent.keyDown(getByRole('tab', { name: 'Get oriented' }), { key: 'Home' });
-    await waitFor(() => expect(getByRole('tab', { name: 'Meet people' })).toHaveFocus());
-    expect(board).toHaveAttribute('data-room-intent', 'public-room');
-
-    fireEvent.keyDown(getByRole('tab', { name: 'Meet people' }), { key: 'End' });
-    await waitFor(() => expect(getByRole('tab', { name: 'Get oriented' })).toHaveFocus());
-    expect(board).toHaveAttribute('data-room-intent', 'learn');
-  });
-
   it('states only trust claims the rooms can stand behind', () => {
     const { container } = render(() => <Landing />);
-    const trust = container.querySelector('[data-home-trust]');
+    const trust = container.querySelector('[data-home-trust]')!;
     expect(trust).toHaveTextContent('No ads');
     expect(trust).toHaveTextContent('No third-party trackers');
     expect(trust).toHaveTextContent('Private DMs');
     expect(trust).toHaveTextContent('History on this device');
-    expect(container.textContent).not.toMatch(/fully encrypted|group E2EE|passkey|Discord-killer|nobody.s product|cloud history/i);
+    expect(container.textContent).not.toMatch(/fully encrypted|group E2EE|passkey|Discord-killer|cloud history/i);
   });
 
-  it('uses the locked mark and mascot without naming the seal', () => {
+  it('uses the locked mark and integrates the mascot into the scene once', () => {
     const { container } = render(() => <Landing />);
     expect(container.querySelector('.public-frame__mark')?.getAttribute('src')).toBe('/brand/mark.png');
     expect(container.querySelector('.public-frame__lockup')?.getAttribute('src')).toBe('/brand/lockup.png');
     expect(container.querySelector('.public-frame__wordmark')?.getAttribute('src')).toBe('/brand/wordmark.png');
-    expect(container.querySelector('img.home-mascot')?.getAttribute('src')).toBe('/brand/mascot-transparent.png');
     expect(container.querySelector('.home-mascot-scene img.home-mascot')).toBeInTheDocument();
-    expect(container.querySelector('.home-mascot-wake')).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelector('.home-mascot-scene')).toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelectorAll('img.home-mascot')).toHaveLength(1);
-    expect(container.textContent).not.toMatch(/Pebble/i);
-    expect(container.textContent).not.toMatch(/Meet Pebble/i);
+    expect(container.querySelector('.home-hero-mark')).toBeNull();
+    expect(container.textContent).not.toMatch(/Pebble|Meet Pebble/i);
   });
 
-  it('does not put an operator evidence desk or unavailable telemetry on Home', () => {
+  it('does not put operator evidence or unavailable telemetry on Home', () => {
     const { container, queryByRole } = render(() => <Landing />);
     expect(container.querySelector('[data-home-evidence]')).toBeNull();
     expect(container.querySelector('[data-ui="proof-receipt"]')).toBeNull();

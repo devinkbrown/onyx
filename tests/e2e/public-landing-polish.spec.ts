@@ -10,14 +10,36 @@ for (const viewport of [
 
     const primary = page.locator('.public-frame__open');
     const preview = page.locator('[data-product-preview]');
-    const current = page.locator('[data-home-current]');
     const trust = page.locator('[data-home-trust]');
+    const tabs = preview.getByRole('tab');
     await expect(primary).toBeVisible();
     await expect(preview).toBeVisible();
-    await expect(preview.getByText('Preview', { exact: true }).first()).toBeVisible();
+    await expect(preview.locator('.product-preview__label')).toHaveText('Fictional game-night preview');
+    await expect(preview.locator('.product-preview__disclaimer')).toHaveText(
+      'Not a live room. The controls below only change this example.',
+    );
+    await expect(tabs).toHaveCount(3);
     await expect(trust).toBeVisible();
-    await expect(current.locator('li')).toHaveCount(4);
+    await expect(trust.locator('div')).toHaveCount(4);
     await expect(page.locator('[data-home-evidence]')).toHaveCount(0);
+
+    const tabGeometry = await tabs.evaluateAll((elements) => elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }));
+    for (const tab of tabGeometry) {
+      expect(tab.width).toBeGreaterThanOrEqual(44);
+      expect(tab.height).toBeGreaterThanOrEqual(44);
+    }
+
+    const roomTab = preview.getByRole('tab', { name: 'Room', exact: true });
+    const homeTab = preview.getByRole('tab', { name: 'Home', exact: true });
+    await roomTab.focus();
+    await expect(roomTab).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(homeTab).toBeFocused();
+    await expect(homeTab).toHaveAttribute('aria-selected', 'true');
+    await expect(preview).toHaveAttribute('data-preview-state', 'home');
 
     const geometry = await page.evaluate(() => {
       const cta = document.querySelector<HTMLElement>('.public-frame__open')!;
@@ -53,6 +75,9 @@ for (const viewport of [
 test('desktop keeps the promise and product preview in a balanced first view', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
+  await expect(page.locator('.home-hero-copy #hero-heading')).toBeVisible();
+  await expect(page.locator('[data-product-preview]')).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
 
   const geometry = await page.evaluate(() => {
     const copy = document.querySelector<HTMLElement>('.home-hero-copy')!.getBoundingClientRect();

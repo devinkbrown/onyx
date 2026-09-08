@@ -2,8 +2,9 @@
 /**
  * YouSettings — the default You / Settings list.
  *
- * About a dozen consumer controls. Theme Studio, protocol options, and operator
- * tools stay in Advanced. Reuses existing preference and store actions.
+ * Task categories for You. Account, this device, help, and Advanced stay
+ * reachable from one list. Theme Studio, protocol options, and operator tools
+ * stay in Advanced. Reuses existing preference and store actions.
  */
 import { For, Show, type JSX } from 'solid-js';
 
@@ -50,19 +51,32 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
 
   return (
     <nav class="you-settings" aria-label="You settings" data-testid="you-settings">
-      <p class="acct-context-cue" role="note">
+      <p class="you-settings-lede" role="note">
         <Show when={props.guest} fallback="Your account travels with you. Everything else here changes this device only.">
           Keep this name if you want to protect it without disconnecting.
         </Show>
       </p>
 
+      <section class="you-settings-group" aria-labelledby="you-group-account-title">
+        <h3 id="you-group-account-title" class="you-settings-group__title">Account</h3>
+        <p class="you-settings-group__hint">Sign-in, recovery, and account data. These choices travel with the account.</p>
       <details class="you-settings-item" open data-testid="you-account">
-        <summary>Account</summary>
+        <summary>
+          <span>Account</span>
+          <small>Identity, protection, and account data</small>
+        </summary>
         <div class="you-settings-item__body">{props.account}</div>
       </details>
+      </section>
 
+      <section class="you-settings-group" aria-labelledby="you-group-device-title">
+        <h3 id="you-group-device-title" class="you-settings-group__title">This device</h3>
+        <p class="you-settings-group__hint">Notifications, privacy, reading, and hardware on this browser.</p>
       <details class="you-settings-item" data-testid="you-notifications">
-        <summary>Notifications</summary>
+        <summary>
+          <span>Notifications</span>
+          <small>Mentions and extra ping words</small>
+        </summary>
         <div class="you-settings-item__body">
           <p class="you-settings-hint">How this device tells you about mentions and messages.</p>
           <CalmModeControl />
@@ -71,7 +85,10 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-privacy">
-        <summary>Privacy on this device</summary>
+        <summary>
+          <span>Privacy on this device</span>
+          <small>Private messages and safer link previews</small>
+        </summary>
         <div class="you-settings-item__body">
           <button
             type="button"
@@ -103,7 +120,10 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-blocked">
-        <summary>Blocked users on this device</summary>
+        <summary>
+          <span>Blocked users on this device</span>
+          <small>Hidden here, not told</small>
+        </summary>
         <div class="you-settings-item__body">
           <p class="you-settings-hint">You will not see them on this device. They are not told.</p>
           <IgnoredUsersControl />
@@ -125,7 +145,10 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </button>
 
       <details class="you-settings-item" data-testid="you-text-size">
-        <summary>Reading comfort</summary>
+        <summary>
+          <span>Reading comfort</span>
+          <small>Text size and density</small>
+        </summary>
         <div class="you-settings-item__body">
           <div class="you-settings-choices" role="radiogroup" aria-label="Text size">
             <For each={FONT_SCALES}>
@@ -167,7 +190,10 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </details>
 
       <details class="you-settings-item" data-testid="you-motion">
-        <summary>Motion and data</summary>
+        <summary>
+          <span>Motion and data</span>
+          <small>Animation on this device</small>
+        </summary>
         <div class="you-settings-item__body">
           <button
             type="button"
@@ -190,8 +216,8 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
             onClick={() => setSceneMotion(sceneMotion() === 'off' ? 'adaptive' : 'off')}
           >
             <span>
-              <strong>Use less data</strong>
-              <small>Turn animated backgrounds off.</small>
+              <strong>Reduce background motion</strong>
+              <small>Turn animated backgrounds off. Message and network data are unchanged.</small>
             </span>
             <b>{sceneMotion() === 'off' ? 'On' : 'Off'}</b>
           </button>
@@ -212,7 +238,10 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
       </button>
 
       <details class="you-settings-item" data-testid="you-language">
-        <summary>Language tools</summary>
+        <summary>
+          <span>Language tools</span>
+          <small>On-device captions and translation</small>
+        </summary>
         <div class="you-settings-item__body">
           <label class="you-settings-hint" for="you-language-select">Language used by on-device captions and translation.</label>
           <select
@@ -227,15 +256,24 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
           </select>
         </div>
       </details>
+      </section>
 
+      <section class="you-settings-group" aria-labelledby="you-group-help-title">
+        <h3 id="you-group-help-title" class="you-settings-group__title">Help</h3>
       <details class="you-settings-item" data-testid="you-support">
-        <summary>Help and status</summary>
+        <summary>
+          <span>Help and status</span>
+          <small>About Onyx and network status</small>
+        </summary>
         <div class="you-settings-item__body you-settings-support">
           <a href="/about/">About Onyx</a>
           <a href="/status/">Network status</a>
         </div>
       </details>
+      </section>
 
+      <section class="you-settings-group you-settings-group--advanced" aria-labelledby="you-group-advanced-title">
+        <h3 id="you-group-advanced-title" class="you-settings-group__title">More</h3>
       <details class="you-settings-item you-settings-item--advanced" data-testid="you-advanced">
         <summary>
           <span>Advanced</span>
@@ -263,6 +301,7 @@ export function YouSettings(props: YouSettingsProps): JSX.Element {
           {props.advanced}
         </div>
       </details>
+      </section>
     </nav>
   );
 }

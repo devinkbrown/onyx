@@ -30,7 +30,11 @@ test('keeps the PublicFrame About route compact and navigable at 400% zoom', asy
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(primaryAction).toBeVisible();
 
-  await toggle.click();
+  // Exercise keyboard focus visibility, not the browser's pointer-focus heuristic.
+  await primaryAction.focus();
+  await page.keyboard.press('Tab');
+  await expect(toggle).toBeFocused();
+  await page.keyboard.press('Space');
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(toggle).toHaveAccessibleName('Close navigation menu');
 
@@ -45,6 +49,7 @@ test('keeps the PublicFrame About route compact and navigable at 400% zoom', asy
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toBeFocused();
   await expect(toggle).toHaveAccessibleName('Open navigation menu');
+  await expect(toggle).not.toHaveCSS('outline-style', 'none');
 
   const topics = frame.getByRole('navigation', { name: 'About topics' });
   await topics.scrollIntoViewIfNeeded();
@@ -54,7 +59,8 @@ test('keeps the PublicFrame About route compact and navigable at 400% zoom', asy
   await expect(footer.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible();
 
   await primaryAction.scrollIntoViewIfNeeded();
-  await primaryAction.focus();
+  await toggle.focus();
+  await page.keyboard.press('Shift+Tab');
   await expect(primaryAction).toBeFocused();
 
   const geometry = await page.evaluate(() => {

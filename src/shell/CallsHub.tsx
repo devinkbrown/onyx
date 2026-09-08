@@ -6,7 +6,7 @@
  * Live call surfaces still begin only from explicit Join / accept controls
  * elsewhere (room ribbon, ring overlays). This hub only navigates:
  *   - Choose a room → parent opens the Rooms collection
- *   - Return to call → parent navigates to the call channel (in_call only)
+ *   - Return to call → parent navigates to the call conversation (in_call only)
  *
  * Presentation is truthful about voice lifecycle:
  *   idle | ringing_in | ringing_out | provisional in_call | established in_call
@@ -33,8 +33,8 @@ export type CallsHubProps = {
    */
   callStartedAt: number | null;
   onOpenRooms: () => void;
-  /** Navigate back to the call channel — never joins or mutates voice state. */
-  onReturnToCall: (channel: string) => void;
+  /** Navigate to the call channel or DM peer without mutating voice state. */
+  onReturnToCall: (target: string) => void;
 };
 
 export type CallsHubPresentation =
@@ -102,8 +102,8 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
           : 'Joining the call. Media is not established yet — connection status stays honest while the session starts.';
       case 'established':
         return where
-          ? `Return to ${where} without losing your place in the room.`
-          : 'Return to your live call without losing your place in the room.';
+          ? `Return to ${where} without losing your place in the conversation.`
+          : 'Return to your live call without losing your place in the conversation.';
       default:
         return 'Voice and video begin inside a room, so people arrive with the same context before, during, and after the call.';
     }
@@ -126,7 +126,7 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
 
   const canReturn = createMemo(() => {
     const p = presentation();
-    return (p === 'provisional' || p === 'established') && Boolean(props.callChannel?.trim());
+    return (p === 'provisional' || p === 'established') && Boolean(roomLabel());
   });
 
   return (
@@ -135,24 +135,26 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
       data-call-presentation={presentation()}
       aria-labelledby="shell-calls-title"
     >
-      <div class="shell-calls-kicker">Calls</div>
-      <p class="shell-calls-status" data-testid="calls-hub-status" aria-live="polite">
-        <span class="shell-calls-status-pip" data-state={presentation()} aria-hidden="true" />
-        <span>{statusLabel()}</span>
-        <Show when={roomLabel()}>
-          {(label) => <span class="shell-calls-status-where">{label()}</span>}
-        </Show>
-      </p>
-      <h1 id="shell-calls-title">{title()}</h1>
-      <p class="shell-calls-intro">{intro()}</p>
+      <header class="shell-calls-header">
+        <div class="shell-calls-kicker">Calls</div>
+        <p class="shell-calls-status" data-testid="calls-hub-status" aria-live="polite">
+          <span class="shell-calls-status-pip" data-state={presentation()} aria-hidden="true" />
+          <span>{statusLabel()}</span>
+          <Show when={roomLabel()}>
+            {(label) => <span class="shell-calls-status-where">{label()}</span>}
+          </Show>
+        </p>
+        <h1 id="shell-calls-title">{title()}</h1>
+        <p class="shell-calls-intro">{intro()}</p>
+      </header>
 
       <p class="shell-calls-truth" role="note">
         <strong>What happens next</strong>
         <span>
           {presentation() === 'established'
-            ? ' Your call is active; use the room controls for microphone, camera, and captions.'
+            ? ' Your call is active; use the call controls for microphone, camera, and captions.'
             : presentation() === 'provisional'
-              ? ' The session is connecting. Media controls appear when the room confirms a connection.'
+              ? ' The session is connecting. Media controls appear when the call confirms a connection.'
               : ' This page is a starting point. Choosing a room does not join or start a call.'}
         </span>
       </p>
@@ -173,31 +175,22 @@ export function CallsHub(props: CallsHubProps): JSX.Element {
           type="button"
           class="shell-calls-primary"
           onClick={() => {
-            const channel = props.callChannel?.trim();
-            if (channel) props.onReturnToCall(channel);
+            const target = roomLabel();
+            if (canReturn() && target) props.onReturnToCall(target);
           }}
         >
           Return to call
         </button>
       </Show>
 
-      <div class="shell-calls-proof" aria-label="Call details">
-        <article>
-          <span aria-hidden="true">Media</span>
-          <h2>Voice and video</h2>
-          <p>Controls belong to the room, where joining is explicit.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">Access</span>
-          <h2>Live captions</h2>
-          <p>Use captions when the live room makes them available.</p>
-        </article>
-        <article>
-          <span aria-hidden="true">Status</span>
-          <h2>Honest state</h2>
-          <p>Onyx shows connection and protection status instead of hiding uncertainty.</p>
-        </article>
-      </div>
+      <p class="shell-calls-action-note">
+        <span aria-hidden="true">●</span>
+        {presentation() === 'established'
+          ? 'Microphone, camera, sharing, and captions stay available in the call bar.'
+          : canReturn()
+            ? 'Return to the conversation while the call connects.'
+            : 'Choose a room to see its call controls and live status.'}
+      </p>
     </main>
   );
 }

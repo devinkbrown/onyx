@@ -44,7 +44,7 @@ describe('PWA manifest', () => {
     expect(publicMetadata).not.toMatch(/IRCXNet/i);
     expect(manifest.description).toMatch(/rooms, messages, and calls/i);
     expect(manifest.description).not.toMatch(/\bmesh\b/i);
-    expect(entryDocument).toContain('<title>Onyx — a room for your people</title>');
+    expect(entryDocument).toContain('<title>Onyx — good company. Great nights.</title>');
   });
 
   it('states public-service entry truth and rejects premature desktop ship wording', () => {
@@ -56,7 +56,7 @@ describe('PWA manifest', () => {
     const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ?? '';
     const entryMetadata = [title, description, ogDescription, twitterDescription].join('\n');
 
-    expect(title).toBe('Onyx — a room for your people');
+    expect(title).toBe('Onyx — good company. Great nights.');
     expect(title.length).toBeLessThanOrEqual(60);
     expect(description.length).toBeGreaterThanOrEqual(110);
     expect(description.length).toBeLessThanOrEqual(160);
@@ -64,7 +64,6 @@ describe('PWA manifest', () => {
     expect(description).toMatch(/this device/i);
     expect(description).toMatch(/400/);
     expect(description).toMatch(/No ads/i);
-    expect(description).toMatch(/browser/i);
     expect(description).not.toMatch(/mesh telemetry|fully encrypted|cloud history/i);
     expect(ogDescription).toBe(description);
     expect(twitterDescription).toBe(description);

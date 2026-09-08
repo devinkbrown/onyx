@@ -234,7 +234,7 @@ describe('SPA route entrypoint materializer', () => {
       expect(document.querySelector('meta[property="og:image:height"]')?.getAttribute('content'), route)
         .toBe('630');
       expect(document.querySelector('meta[property="og:image:alt"]')?.getAttribute('content'), route)
-        .toMatch(/quiet harbor/i);
+        .toBe('Onyx — a social room for game nights, messages, and calls.');
       expect(document.querySelector('meta[name="twitter:card"]')?.getAttribute('content'), route)
         .toBe('summary_large_image');
       expect(document.querySelector('meta[name="twitter:title"]')?.getAttribute('content'), route)
@@ -244,7 +244,7 @@ describe('SPA route entrypoint materializer', () => {
       expect(document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'), route)
         .toBe('https://eshmaki.me/og.png');
       expect(document.querySelector('meta[name="twitter:image:alt"]')?.getAttribute('content'), route)
-        .toMatch(/quiet harbor/i);
+        .toBe('Onyx — a social room for game nights, messages, and calls.');
       expect(document.querySelector('link[rel="icon"]')?.getAttribute('href'), route)
         .toBe('/favicon.ico');
       expect(document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href'), route)

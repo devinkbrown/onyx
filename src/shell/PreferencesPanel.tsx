@@ -3049,6 +3049,13 @@ function PreferenceSection(props: { title: string; description: string }): JSX.E
   );
 }
 
+function preferencePersistenceCopy(state: ReturnType<typeof preferencePersistenceState>): string {
+  if (state === 'unknown') return 'Storage not yet verified; change a preference to test saving.';
+  if (state === 'pending') return 'Changes pending…';
+  if (state === 'saved') return 'Saved on this device.';
+  return 'Device storage unavailable; changes apply for this session.';
+}
+
 /** Reveal a rail item without letting scrollIntoView move vertical ancestors. */
 function revealInHorizontalScroller(
   scroller: HTMLElement | undefined,
@@ -3165,7 +3172,6 @@ function PreferenceCategoryNavigation(props: {
   return (
     <div class="pref-category-nav">
       <nav class="pref-category-nav__landmark" aria-label="Preference categories">
-        <p class="pref-category-nav__eyebrow">Browse</p>
         <div
           ref={categoryTabsRef}
           class="pref-category-tabs"
@@ -3210,7 +3216,13 @@ function PreferenceCategoryNavigation(props: {
         <span class="pref-reset-all__full">Reset to defaults</span>
         <span class="pref-reset-all__compact" aria-hidden="true">Reset</span>
       </button>
-      <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      <span
+        class="sr-only"
+        role="status"
+        aria-label="Reset confirmation"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {resetAnnouncement()}
       </span>
     </div>
@@ -3301,7 +3313,7 @@ function TransferToolWorkspace(): JSX.Element {
   return (
     <div class="pref-transfer-workspace">
       <nav class="pref-transfer-tools" aria-label="Import and export tools">
-        <p class="pref-transfer-tools__eyebrow">Choose a route</p>
+        <p class="pref-transfer-tools__title">Choose a route</p>
         <div ref={toolsListRef} class="pref-transfer-tools__list">
           <For each={TRANSFER_TOOLS}>
             {(tool, index) => {
@@ -3410,10 +3422,6 @@ function AppearanceLauncher(): JSX.Element {
 
 export function PreferencesPanel(): JSX.Element {
   const [activeCategory, setActiveCategory] = createSignal<PreferenceCategory>('display');
-  const activeCategoryMeta = createMemo(() =>
-    PREFERENCE_CATEGORIES.find((category) => category.id === activeCategory())
-      ?? PREFERENCE_CATEGORIES[0],
-  );
   let panelRef: HTMLDivElement | undefined;
 
   function revealFocusedPreference(event: FocusEvent): void {
@@ -3484,22 +3492,20 @@ export function PreferencesPanel(): JSX.Element {
         data-testid="preferences-panel"
         onFocusIn={revealFocusedPreference}
       >
-        <p class="pref-context-cue" role="note">
-          <span>{activeCategoryMeta().label}</span>
-          {activeCategoryMeta().summary} ·{' '}
-          <span aria-live="polite">
-            {preferencePersistenceState() === 'unknown'
-              ? 'Storage not yet verified; change a preference to test saving.'
-              : preferencePersistenceState() === 'pending'
-              ? 'Changes pending…'
-              : preferencePersistenceState() === 'saved'
-                ? 'Saved on this device.'
-                : 'Device storage unavailable; changes apply for this session.'}
-          </span>
+        <p
+          class="pref-save-status"
+          role="status"
+          aria-label="Preference storage"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="preferences-save-status"
+          data-state={preferencePersistenceState()}
+        >
+          {preferencePersistenceCopy(preferencePersistenceState())}
         </p>
         <PreferenceCategoryNavigation active={activeCategory} onSelect={selectCategory} />
 
-        <div class="pref-category-content">
+        <div class="pref-category-content" data-layout="category-detail">
           <section
             class="pref-category-panel"
             id="pref-category-panel-display"

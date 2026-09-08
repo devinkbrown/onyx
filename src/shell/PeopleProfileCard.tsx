@@ -24,6 +24,7 @@ import { statsRoomHref } from '@/lib/stats/channelDetail';
 import { blockedDmComposeCopy, personUnblockToast } from '@/lib/people/personSafety';
 import { Avatar, Button } from '@/primitives/index';
 import { openPersonBlockConfirm, openPersonReport } from './people/personSafetyState';
+import './collection-navigation.css';
 
 export const PEOPLE_PROFILE_ADVANCED_TESTID = 'people-profile-advanced-toggle';
 
@@ -267,7 +268,7 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
 
   return (
     <div
-      class="shell-member-card shell-people-card"
+      class="shell-member-card shell-people-card shell-people-card--readable"
       role="region"
       aria-labelledby={`${cardId()}-name`}
       aria-describedby={descriptionId()}
@@ -303,8 +304,23 @@ export function PeopleProfileCard(props: PeopleProfileCardProps): JSX.Element {
         </div>
       </div>
 
+      <div
+        class="shell-people-card-presence"
+        aria-label={`${role().label}${away() ? ', away' : ''}`}
+      >
+        <span
+          class={`shell-people-card-presence-dot${away() ? ' shell-people-card-presence-dot--away' : ''}`}
+          aria-hidden="true"
+        />
+        <span>{role().label}</span>
+        <Show when={away()}>
+          <span class="shell-people-card-presence-separator" aria-hidden="true">·</span>
+          <span>Away</span>
+        </Show>
+      </div>
+
       <Show when={!isSelf()}>
-        <div class="shell-member-card-actions shell-people-card-actions" role="group" aria-label={`Actions for ${local.nick}`}>
+        <div class="shell-member-card-actions shell-people-card-actions shell-people-card-actions--primary" role="group" aria-label={`Actions for ${local.nick}`}>
           <Button
             variant="primary"
             size="sm"

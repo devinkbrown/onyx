@@ -1,13 +1,15 @@
 /* MessageView owns the reading plane. Keep this layer local so shell chrome
    can evolve without changing transcript rhythm or state semantics. */
 .shell-messages {
-  --reader-max: 54rem;
-  --reader-gutter: clamp(0.75rem, 3vw, 2.5rem);
+  --reader-max: 78ch;
+  --reader-gutter: clamp(0.75rem, 3vw, 2rem);
   --reader-ink: var(--paper, #f5f7fb);
   --reader-muted: var(--paper-dim, #aeb8c7);
-  --reader-line: color-mix(in oklab, var(--paper, #f5f7fb) 12%, transparent);
+  --reader-line: var(--line, rgba(245, 247, 248, 0.12));
   position: relative;
   isolation: isolate;
+  min-width: 0;
+  background: var(--surface-void, var(--ink, #202429));
 }
 
 .message-view-status-banner {
@@ -18,7 +20,7 @@
   min-height: 2.5rem;
   padding: 0.5rem var(--reader-gutter);
   color: var(--reader-muted);
-  background: color-mix(in oklab, var(--ink, #10141c) 92%, var(--paper, #f5f7fb));
+  background: var(--surface-raised, var(--stone-2, #2d333a));
   border-bottom: 1px solid var(--reader-line);
   font-size: 0.8125rem;
   text-align: center;
@@ -36,6 +38,7 @@
 .shell-feed {
   padding: clamp(0.75rem, 2vw, 1.5rem) var(--reader-gutter) 4.5rem;
   scroll-padding-block: 1rem;
+  min-width: 0;
 }
 .shell-msg-group,
 .shell-msg-cont,
@@ -45,23 +48,96 @@
   box-sizing: border-box;
 }
 .shell-msg-group {
-  margin-top: 1.25rem;
+  margin-top: 0.4rem;
   padding-inline: 0;
   border-radius: 0.65rem;
+  min-width: 0;
 }
-.shell-msg-cont { padding-inline: 0; border-radius: 0.45rem; }
+.shell-msg-cont {
+  min-width: 0;
+  padding-inline: 0;
+  border-radius: 0.45rem;
+}
 .shell-msg-group:hover,
 .shell-msg-group:focus-visible,
 .shell-msg-cont:hover,
-.shell-msg-cont:focus-visible { background: color-mix(in oklab, var(--lapis-deep) 10%, transparent); }
-.shell-msg-text { color: var(--reader-ink); line-height: 1.55; }
-.shell-msg-meta { min-height: 1.75rem; }
-.shell-msg-author { font-weight: 700; }
+.shell-msg-cont:focus-visible { background: var(--surface-raised, var(--stone-2)); }
+.shell-msg-text {
+  min-width: 0;
+  color: var(--reader-ink);
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.shell-msg-meta {
+  min-width: 0;
+  min-height: 1.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  row-gap: 0.2rem;
+  line-height: 1.3;
+}
+.shell-msg-author {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+.shell-msg-ts,
+.shell-msg-cont-ts,
+.shell-thread-msg-meta time {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.shell-msg-cont-ts {
+  opacity: 0.72;
+  text-align: start;
+}
+.shell-msg-reply,
+.shell-thread-msg,
+.shell-thread-msg-meta,
+.shell-thread-msg-text { min-width: 0; }
+.shell-thread-msg-text { overflow-wrap: anywhere; }
 .shell-msg-reply {
   margin-block: 0.35rem 0.45rem;
   padding: 0.45rem 0.65rem;
   border-inline-start: 3px solid var(--lapis, #73b8ff);
-  background: color-mix(in oklab, var(--lapis-deep) 12%, transparent);
+  background: var(--surface-raised, var(--stone-2));
+}
+.shell-thread-state {
+  max-width: 60ch;
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--line, rgba(245, 247, 248, 0.12));
+  background: var(--surface-raised, var(--stone-2));
+  color: var(--paper-dim, #b4bfca);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.shell-thread-state--missing {
+  border-inline-start: 3px solid var(--warning, #e4ad54);
+}
+.shell-thread-reply {
+  min-width: 44px;
+  min-height: 44px;
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line, rgba(245, 247, 248, 0.12));
+  background: var(--surface, var(--stone));
+  color: var(--lapis, #65adf5);
+  font: 650 0.8125rem/1 var(--font-sans, "Instrument Sans", system-ui, sans-serif);
+  cursor: pointer;
+}
+.shell-thread-reply:hover {
+  background: var(--surface-raised, var(--stone-2));
+}
+.shell-thread-reply:focus-visible {
+  outline: var(--focus-ring, 2px solid var(--lapis, #65adf5));
+  outline-offset: var(--focus-offset, 3px);
 }
 .shell-unread-divider { margin-block: 1.25rem; font-weight: 750; }
 .shell-unread-divider-label { padding: 0.35rem 0.8rem; }

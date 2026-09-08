@@ -141,6 +141,9 @@ describe('About page — source structure', () => {
   it('keeps accessibility after the community story', () => {
     expect(srcContains('AccessibilityStatement')).toBe(true);
     expect(srcContains('id="accessibility"')).toBe(true);
+    expect(srcContains('<details class="ab-a11y-disclosure">')).toBe(true);
+    expect(srcContains('<summary>Read the full accessibility statement</summary>')).toBe(true);
+    expect(srcContains('Onyx aims to make time-native chat usable without requiring a mouse')).toBe(true);
     expect(src.indexOf('id="join"')).toBeLessThan(src.indexOf('id="accessibility"'));
   });
 });
@@ -154,15 +157,31 @@ describe('About page — CSS source', () => {
     expect(css.includes('.ab-pillars')).toBe(true);
     expect(css.includes('.ab-quiet-note')).toBe(true);
     expect(css.includes('.ab-mascot')).toBe(true);
+    expect(css.includes('.ab-a11y-disclosure')).toBe(true);
   });
 
-  it('uses Instrument Sans for UI and Fraunces once on the hero, never Anton or gold', () => {
+  it('uses Instrument Sans for UI and the shared display voice for the hero, never gold', () => {
     expect(css.includes('var(--font-sans)')).toBe(true);
-    expect(css).toMatch(/\.ab-hero h1\s*\{[^}]*font-family:\s*var\(--font-serif\)/s);
-    expect(css.replace(/\/\*[\s\S]*?\*\//g, '').includes('Anton')).toBe(false);
+    expect(css).toMatch(/\.ab-hero h1\s*\{[^}]*var\(--font-display\)/s);
     const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(cssNoComments).not.toContain('var(--font-serif)');
     expect(cssNoComments.includes('var(--gold)')).toBe(false);
     expect(/\bpurple\b|\bindigo\b/.test(cssNoComments)).toBe(false);
+  });
+
+  it('uses one explanatory product scene and reading-width supporting sections', () => {
+    expect((src.match(/<figure class="ab-scene"/g) ?? []).length).toBe(1);
+    expect(srcContains('This is an explanation, not a live room.')).toBe(true);
+    expect(css).toContain('.ab-section__body');
+    expect(css).toMatch(/\.ab-title\s*\{[\s\S]*?var\(--font-sans\)/s);
+  });
+
+  it('stacks the product scene at narrow high zoom without suppressing its explanation', () => {
+    expect(css).toMatch(/@media \(max-width: 42rem\) and \(max-height: 30rem\) \{[\s\S]*?\.ab-scene__body\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/s);
+    expect(css).toContain('width: min(100%, 4rem);');
+    expect(css).toContain('.ab-scene__conversation,');
+    expect(css).toContain('overflow-wrap: anywhere;');
+    expect(srcContains('Calls are there when voice or a face is easier than typing.')).toBe(true);
   });
 
   it('keeps 44px targets, reduced motion, and no glass', () => {

@@ -24,9 +24,11 @@ describe('ModerationActionReview', () => {
     ));
 
     expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Remove from room' })).toBeInTheDocument();
     expect(screen.getByText('Room moderator')).toBeInTheDocument();
     expect(screen.getByText('#garden')).toBeInTheDocument();
     expect(screen.getByText(/Local draft until confirmed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove from room' })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('moderation-review-confirm'));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     const action = onConfirm.mock.calls[0]?.[0] as NormalizedModerationAction;

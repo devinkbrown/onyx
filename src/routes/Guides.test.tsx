@@ -37,12 +37,13 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
 
     expect(container.querySelectorAll('header')).toHaveLength(1);
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(container.querySelectorAll('nav')).toHaveLength(2); // primary + footer
+    expect(container.querySelectorAll('nav')).toHaveLength(3); // primary + guide index + footer
     expect(container.querySelectorAll('footer')).toHaveLength(1);
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     expect(container.querySelectorAll('main#public-main')).toHaveLength(1);
-    expect(container.querySelector('main main, main header, main footer, main nav')).toBeNull();
+    expect(container.querySelector('main main, main header, main footer')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Guide tasks' })).toBeInTheDocument();
 
     const skip = screen.getAllByRole('link', { name: 'Skip to content' });
     expect(skip).toHaveLength(1);
@@ -79,11 +80,21 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(screen.queryByRole('heading', { name: /WeeChat|irssi|mIRC|IRCv3|\bIRC\b/i })).toBeNull();
   });
 
+  it('keeps a compact local task index and removes decorative step numbers', () => {
+    const { container } = render(() => <Guides surface={surface} />);
+    const index = screen.getByRole('navigation', { name: 'Guide tasks' });
+    expect(within(index).getByRole('link', { name: 'Join a room' })).toHaveAttribute('href', '#join');
+    expect(within(index).getByRole('link', { name: 'Keep it on this device' })).toHaveAttribute('href', '#this-device');
+    expect(within(index).getByRole('link', { name: 'Another client, or your own server' })).toHaveAttribute('href', '#another-client');
+    expect(container.querySelector('.guides-route__number')).toBeNull();
+  });
+
   it('keeps the how-tos in newcomer order with another client last', () => {
     render(() => <Guides surface={surface} />);
 
     const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
     expect(headings).toEqual([
+      'Guide tasks',
       'One small step at a time',
       'Be kind, then talk',
       ...GUIDE_HOWTOS.map((howto) => howto.title),
@@ -169,7 +180,7 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
     expect(route.querySelector('[aria-current="step"]')).toHaveAttribute('href', '#join');
     expect(route.querySelector('[data-state="later"]')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Privacy and safety, at a glance' })).toBeInTheDocument();
-    expect(screen.getByText('Calls are opt-in and are not recorded.')).toBeInTheDocument();
+    expect(screen.getAllByText('Calls are opt-in. Onyx does not automatically record calls. Participants can choose local recording of their own audio when supported.')).toHaveLength(2);
 
     const join = screen.getByRole('button', { name: 'Mark Join a room complete' });
     fireEvent.click(join);
@@ -204,6 +215,24 @@ describe.each(SURFACES)('Guides /$surface/', (surface) => {
         .toHaveTextContent('First-room plan copied. It was created here and nothing was sent.');
     });
     expect(localStorage.getItem(GUIDE_PROGRESS_STORAGE_KEY)).toBeNull();
+  });
+
+  it('distinguishes optional local recording in the guide, copied plan, and download', async () => {
+    const writeClipboardText = vi.spyOn(clipboard, 'writeClipboardText').mockResolvedValue(true);
+    const { container } = render(() => <Guides surface={surface} />);
+    const recordingNote = 'Calls are opt-in. Onyx does not automatically record calls. Participants can choose local recording of their own audio when supported.';
+    const snapshot = container.querySelector('.guides-snapshot')!;
+    const calls = container.querySelector('#calls')!;
+    expect(snapshot).toHaveTextContent(recordingNote);
+    expect(calls).toHaveTextContent(recordingNote);
+    expect(container).not.toHaveTextContent(/Calls are (?:opt-in and are )?not recorded\./);
+
+    const href = screen.getByRole('link', { name: 'Download text' }).getAttribute('href')!;
+    const downloadedPlan = decodeURIComponent(href.slice(href.indexOf(',') + 1));
+    expect(downloadedPlan).toContain(recordingNote);
+    expect(downloadedPlan).not.toMatch(/Calls are (?:opt-in and are )?not recorded\./);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy first-room plan' }));
+    await waitFor(() => expect(writeClipboardText).toHaveBeenCalledWith(downloadedPlan));
   });
 
   it('keeps the local boundary explicit when copying cannot complete', async () => {

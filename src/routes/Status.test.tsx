@@ -63,10 +63,12 @@ describe('StatusRoute — community copy', () => {
     expect(src).toContain('refetchStatus()');
   });
 
-  it('keeps quiet-harbor type: Instrument Sans, Fraunces once, no Anton or glass', () => {
+  it('uses the shared public type roles without glass', () => {
     expect(css).toContain('var(--font-sans)');
-    expect((css.match(/var\(--font-serif\)/g) ?? []).length).toBe(1);
-    expect(cssNoComments).not.toMatch(/Anton|Inter|purple|blurple|#5865[Ff]2/i);
+    expect(cssNoComments).not.toContain('var(--font-display)');
+    expect(css).toContain('grid-template-areas');
+    expect(cssNoComments).not.toContain('var(--font-serif)');
+    expect(cssNoComments).not.toMatch(/\bInter\b|purple|blurple|#5865[Ff]2/i);
     expect(cssNoComments).not.toContain('backdrop-filter');
     expect(cssNoComments).not.toMatch(/text-transform:\s*uppercase/);
     expect(css).toContain('var(--target-min, 44px)');

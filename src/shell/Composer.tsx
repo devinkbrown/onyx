@@ -65,6 +65,7 @@ import {
 import {
   activeReplyPreviewText,
   hasEncryptedMessageBoundary,
+  isWithdrawnMessage,
 } from '@/lib/e2ee/replyPrivacy';
 import { DM_ATTACHMENT_BLOCKED } from '@/lib/e2ee/dmPrivacyChrome';
 import { subscribeVaultDmSearchPrivacy } from '@/lib/vault/dmSearchPrivacy';
@@ -159,6 +160,7 @@ export function Composer(props: ComposerProps): JSX.Element {
   const peerDmKeys = useStore((s) => s.peerDmKeys);
   const peerDmDeviceKeys = useStore((s) => s.peerDmDeviceKeys);
   const peerKeyChanges = useStore((s) => s.peerKeyChanges);
+  const channels = useStore((s) => s.channels);
   const dms = useStore((s) => s.dms);
 
   // Device-local outbox journal — same substrate Home reads. Metadata only in
@@ -288,7 +290,29 @@ export function Composer(props: ComposerProps): JSX.Element {
 
   // Reply banner is target-scoped the same way edit is: a reply armed in one
   // room must not paint (or send as) a reply while the composer is elsewhere.
-  const activeReply = createMemo(() => activeReplyForTarget(replyingTo(), target()));
+  const activeReply = createMemo(() => {
+    const armed = activeReplyForTarget(replyingTo(), target());
+    if (!armed) return null;
+
+    // REDACT replaces the message object in the live conversation buffer but
+    // intentionally does not mutate the global composer pointer. Re-resolve
+    // the armed id so a reply that was open before REDACT cannot keep painting
+    // retained plaintext or persist it through the stale pointer.
+    const key = armed.target.toLowerCase();
+    const messages = channels().get(key)?.messages ?? dms().get(key)?.messages;
+    const current = messages?.find((message) => message.id === armed.id);
+    return current && isWithdrawnMessage(current) ? current : armed;
+  });
+
+  createEffect(() => {
+    const current = activeReply();
+    const armed = replyingTo();
+    if (current && armed && current !== armed && isWithdrawnMessage(current)) {
+      // Keep the store's send-time reply snapshot on the withdrawn object too;
+      // persistedReplyPreviewText then fails closed for the optimistic row.
+      getState().setReplyingTo(current);
+    }
+  });
 
   createEffect(() => {
     const edit = editingMessage();

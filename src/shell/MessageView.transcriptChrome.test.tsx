@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen } from '@solidjs/testing-library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Channel, ChannelUser, ChatMessage } from '@/lib/irc/types';
+import { ENVELOPE_PREFIX, LOCKED_PLACEHOLDER } from '@/lib/e2ee/dmCipher';
 import { resetPreferences } from '@/lib/prefs/preferences';
 import { store } from '@/lib/store/store';
 import { MessageView } from './MessageView';
@@ -100,6 +101,10 @@ describe('MessageView consumer transcript chrome', () => {
     expect(third).toHaveClass('shell-msg-group');
     expect(first?.querySelector('.shell-msg-author')?.textContent).toBe('bob');
     expect(second?.querySelector('.shell-msg-author')).toBeNull();
+    expect(second?.querySelector('.shell-msg-cont-ts')).toHaveAttribute(
+      'datetime',
+      makeMessage('m2', 'bob', 'second', 1).time.toISOString(),
+    );
     expect(document.querySelectorAll('.shell-day-divider')).toHaveLength(1);
   });
 
@@ -142,6 +147,20 @@ describe('MessageView consumer transcript chrome', () => {
       'offline',
     );
     expect(screen.getByRole('article', { name: /saved here/ })).toBeInTheDocument();
+  });
+
+  it('locks a legacy envelope row in both visible text and its accessible name', () => {
+    seed([
+      makeMessage('m-legacy-envelope', 'bob', `${ENVELOPE_PREFIX}legacy-ciphertext`, 0),
+    ]);
+
+    render(() => <MessageView />);
+
+    const row = screen.getByRole('article', { name: /bob at .*Encrypted message/ });
+    expect(row).toHaveAccessibleName(/Encrypted message/);
+    expect(row).toHaveTextContent(LOCKED_PLACEHOLDER);
+    expect(row.textContent).not.toContain(ENVELOPE_PREFIX);
+    expect(row.textContent).not.toContain('legacy-ciphertext');
   });
 
   it('exposes React, Reply, and More on every live row — not Edit/Delete chips', () => {

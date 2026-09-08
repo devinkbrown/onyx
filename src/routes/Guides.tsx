@@ -59,6 +59,14 @@ export const GUIDE_PAGE_META = {
   contextLabel: string;
 }>;
 
+const CALL_RECORDING_NOTE = 'Calls are opt-in. Onyx does not automatically record calls. Participants can choose local recording of their own audio when supported.';
+// Keep the visible guide and its exported plan consistent while the shared
+// room-starter helper remains outside this route's copy-maintenance scope.
+const LEGACY_CALL_RECORDING_NOTE = 'Calls are opt-in and are not recorded.';
+const GUIDE_SAFETY_NOTES = ROOM_STARTER_SAFETY_NOTES.map((note) =>
+  note === LEGACY_CALL_RECORDING_NOTE ? CALL_RECORDING_NOTE : note,
+);
+
 export const GUIDE_HOWTOS = [
   {
     id: 'join',
@@ -102,7 +110,8 @@ export const GUIDE_HOWTOS = [
     optional: false,
     body: [
       'In a room, start a call when you want one — voice, video, or your screen. Joining is a choice; a call does not pull you in.',
-      'Calls are not recorded. You can see whether the call is protected while you are in it.',
+      CALL_RECORDING_NOTE,
+      'You can see whether the call is protected while you are in it.',
     ],
     links: [],
   },
@@ -148,7 +157,10 @@ export function Guides(props: { surface: GuidesSurface }) {
   const [completed, setCompleted] = createSignal<ReadonlySet<string>>(new Set());
   const progress = createMemo(() => guideProgressSummary(REQUIRED_GUIDE_IDS, completed()));
   const roomStarterRoute = createMemo(() => buildRoomStarterRoute(REQUIRED_GUIDE_STEPS, completed()));
-  const roomStarterExport = createMemo(() => buildRoomStarterExport(REQUIRED_GUIDE_STEPS, completed()));
+  const roomStarterExport = createMemo(() =>
+    buildRoomStarterExport(REQUIRED_GUIDE_STEPS, completed())
+      .replace(LEGACY_CALL_RECORDING_NOTE, CALL_RECORDING_NOTE),
+  );
   const roomStarterDownload = createMemo(
     () => `data:text/plain;charset=utf-8,${encodeURIComponent(roomStarterExport())}`,
   );
@@ -215,11 +227,9 @@ export function Guides(props: { surface: GuidesSurface }) {
       )}
     >
       <div class={`ui-root r data-page public-info-page guides-page guides-page--${props.surface}`}>
-        <div class="r-ground" aria-hidden="true" />
-        <div class="r-flecks" aria-hidden="true" />
-        <section class="r-wrap data-hero">
-          <p class="r-kicker">{meta().kicker}</p>
-          <h1>Getting started</h1>
+        <section class="r-wrap data-hero guides-hero" aria-labelledby="guides-heading">
+          <p class="guides-kicker">{meta().kicker}</p>
+          <h1 id="guides-heading">Getting started</h1>
           <p class="sub">
             Friends, clubs, rooms. Open Onyx in your browser, join a room, and talk.
             These short how-tos are for the official app — not another chat program.
@@ -228,175 +238,188 @@ export function Guides(props: { surface: GuidesSurface }) {
             <a class="guides-action" href="/app/">Join a room</a>
           </p>
         </section>
-        <section class="r-wrap r-section guides-body">
-          <section class="guides-progress" aria-labelledby="guides-progress-title">
-            <div class="guides-progress__head">
-              <div>
-                <p class="guides-progress__eyebrow">Your first room plan</p>
-                <h2 id="guides-progress-title">One small step at a time</h2>
-              </div>
-              <span class="guides-progress__count">{progress().complete} of {progress().total}</span>
-            </div>
-            <progress
-              class="guides-progress__meter"
-              aria-label="Guide plan progress"
-              max={progress().total}
-              value={progress().complete}
-              aria-describedby="guides-progress-status"
-            >
-              {progress().complete} of {progress().total}
-            </progress>
-            <p class="guides-progress__status" id="guides-progress-status" role="status">
-              <Show
-                when={progress().done}
-                fallback={<>Your progress stays in this browser. Next: {guideTitle(progress().nextId ?? '')}.</>}
-              >
-                You have your bearings. Start a conversation when you are ready.
-              </Show>
-            </p>
-            <section class="guides-route-map" aria-labelledby="guides-route-title">
-              <div class="guides-route-map__head">
-                <p class="guides-route-map__eyebrow">Room starter</p>
-                <h3 id="guides-route-title">A route for the first room</h3>
-              </div>
-              <ol class="guides-route" aria-label="First room route">
-                <For each={roomStarterRoute()}>
-                  {(step) => (
-                    <li class="guides-route__item" data-state={step.state}>
-                      <a
-                        class="guides-route__card"
-                        href={`#${step.id}`}
-                        aria-current={step.state === 'current' ? 'step' : undefined}
-                      >
-                        <span class="guides-route__number" aria-hidden="true">{step.number}</span>
-                        <span class="guides-route__copy">
-                          <span class="guides-route__state">{step.stateLabel}</span>
-                          <span class="guides-route__title">{step.title}</span>
-                        </span>
-                      </a>
-                    </li>
-                  )}
+        <section class="r-wrap r-section guides-body" aria-label="Getting started tasks">
+          <aside class="guides-index" aria-labelledby="guides-index-title">
+            <p class="guides-index__eyebrow">Start with a task</p>
+            <h2 id="guides-index-title">Guide tasks</h2>
+            <nav aria-label="Guide tasks">
+              <ol class="guides-index__list">
+                <li><a class="guides-index__link" href="#together">How we treat each other</a></li>
+                <For each={GUIDE_HOWTOS}>
+                  {(howto) => <li><a class="guides-index__link" href={`#${howto.id}`}>{howto.title}</a></li>}
                 </For>
               </ol>
-            </section>
-            <div class="guides-starter-details">
-              <section class="guides-snapshot" aria-labelledby="guides-snapshot-title">
-                <p class="guides-snapshot__eyebrow">Before you enter</p>
-                <h3 id="guides-snapshot-title">Privacy and safety, at a glance</h3>
-                <ul>
-                  <For each={ROOM_STARTER_SAFETY_NOTES}>
-                    {(note) => <li>{note}</li>}
-                  </For>
-                </ul>
-              </section>
-              <section class="guides-share" aria-labelledby="guides-share-title">
-                <p class="guides-share__eyebrow">Your handoff slip</p>
-                <h3 id="guides-share-title">Share this plan locally</h3>
-                <p>Copy or download this small text plan. Onyx does not send it anywhere.</p>
-                <div class="guides-share__actions">
-                  <button
-                    class="guides-copy"
-                    type="button"
-                    aria-label="Copy first-room plan"
-                    aria-describedby="guides-share-status"
-                    disabled={shareState() === 'copying'}
-                    onClick={copyRoomStarterPlan}
-                  >
-                    <Show when={shareState() === 'copying'} fallback="Copy plan">Copying plan…</Show>
-                  </button>
-                  <a
-                    class="guides-download"
-                    href={roomStarterDownload()}
-                    download={ROOM_STARTER_EXPORT_FILENAME}
-                  >
-                    Download text
-                  </a>
+            </nav>
+          </aside>
+          <div class="guides-content">
+            <section class="guides-progress" aria-labelledby="guides-progress-title">
+              <div class="guides-progress__head">
+                <div>
+                  <p class="guides-progress__eyebrow">Your first room plan</p>
+                  <h2 id="guides-progress-title">One small step at a time</h2>
                 </div>
-                <p
-                  class="guides-share__status"
-                  id="guides-share-status"
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  aria-label="Plan share status"
-                >
-                  <Show when={shareState() === 'copying'}>
-                    Creating your local plan…
-                  </Show>
-                  <Show when={shareState() === 'copied'}>
-                    First-room plan copied. It was created here and nothing was sent.
-                  </Show>
-                  <Show when={shareState() === 'failed'}>
-                    Copy did not complete. Download the text instead; nothing was sent.
-                  </Show>
-                </p>
-              </section>
-            </div>
-            <div class="guides-progress__actions">
-              <Show when={progress().nextId}>
-                {(nextId) => <a class="guides-action" href={`#${nextId()}`}>Go to: {guideTitle(nextId())}</a>}
-              </Show>
-              <Show when={progress().complete > 0}>
-                <button class="guides-reset" type="button" onClick={resetPlan}>Reset plan</button>
-              </Show>
-            </div>
-          </section>
-          <article class="data-card public-info-card guides-card" id="together">
-            <div class="label">How we treat each other</div>
-            <h2>Be kind, then talk</h2>
-            <p>
-              Welcome people. Argue about ideas, not people. Do not harass anyone,
-              do not share someone else&apos;s private information, and do not spam.
-              A room can be stricter than that. If a room is not for you, leave.
-            </p>
-          </article>
-          <For each={GUIDE_HOWTOS}>
-            {(howto) => (
-              <article
-                class="data-card public-info-card guides-card"
-                classList={{
-                  'guides-card--optional': howto.optional,
-                  'guides-card--complete': !howto.optional && completed().has(howto.id),
-                }}
-                id={howto.id}
+                <span class="guides-progress__count">{progress().complete} of {progress().total}</span>
+              </div>
+              <progress
+                class="guides-progress__meter"
+                aria-label="Guide plan progress"
+                max={progress().total}
+                value={progress().complete}
+                aria-describedby="guides-progress-status"
               >
-                <div class="guides-card__meta">
-                  <div class="label">{howto.optional ? 'Optional' : 'How-to'}</div>
-                  <Show when={!howto.optional}>
-                    <button
-                      class="guides-step-toggle"
-                      type="button"
-                      aria-pressed={completed().has(howto.id)}
-                      aria-label={`Mark ${howto.title} ${completed().has(howto.id) ? 'not complete' : 'complete'}`}
-                      onClick={() => toggleStep(howto.id)}
-                    >
-                      {completed().has(howto.id) ? 'Done' : 'Mark done'}
-                    </button>
-                  </Show>
-                </div>
-                <h2>{howto.title}</h2>
-                <For each={howto.body}>
-                  {(paragraph) => <p>{paragraph}</p>}
-                </For>
-                <Show when={howto.links.length > 0}>
-                  <p class="guides-card-actions">
-                    <For each={howto.links}>
-                      {(link) => (
-                        <a
-                          class="guides-action"
-                          href={link.href}
-                          rel={link.href.startsWith('http') ? 'noreferrer noopener' : undefined}
-                          target={link.href.startsWith('http') ? '_blank' : undefined}
-                        >
-                          {link.label}
-                        </a>
-                      )}
-                    </For>
-                  </p>
+                {progress().complete} of {progress().total}
+              </progress>
+              <p class="guides-progress__status" id="guides-progress-status" role="status">
+                <Show
+                  when={progress().done}
+                  fallback={<>Your progress stays in this browser. Next: {guideTitle(progress().nextId ?? '')}.</>}
+                >
+                  You have your bearings. Start a conversation when you are ready.
                 </Show>
-              </article>
-            )}
-          </For>
+              </p>
+              <section class="guides-route-map" aria-labelledby="guides-route-title">
+                <div class="guides-route-map__head">
+                  <p class="guides-route-map__eyebrow">Room starter</p>
+                  <h3 id="guides-route-title">A route for the first room</h3>
+                </div>
+                <ol class="guides-route" aria-label="First room route">
+                  <For each={roomStarterRoute()}>
+                    {(step) => (
+                      <li class="guides-route__item" data-state={step.state}>
+                        <a
+                          class="guides-route__card"
+                          href={`#${step.id}`}
+                          aria-current={step.state === 'current' ? 'step' : undefined}
+                        >
+                          <span class="guides-route__copy">
+                            <span class="guides-route__state">{step.stateLabel}</span>
+                            <span class="guides-route__title">{step.title}</span>
+                          </span>
+                        </a>
+                      </li>
+                    )}
+                  </For>
+                </ol>
+              </section>
+              <div class="guides-starter-details">
+                <section class="guides-snapshot" aria-labelledby="guides-snapshot-title">
+                  <p class="guides-snapshot__eyebrow">Before you enter</p>
+                  <h3 id="guides-snapshot-title">Privacy and safety, at a glance</h3>
+                  <ul>
+                    <For each={GUIDE_SAFETY_NOTES}>
+                      {(note) => <li>{note}</li>}
+                    </For>
+                  </ul>
+                </section>
+                <section class="guides-share" aria-labelledby="guides-share-title">
+                  <p class="guides-share__eyebrow">Your handoff slip</p>
+                  <h3 id="guides-share-title">Share this plan locally</h3>
+                  <p>Copy or download this small text plan. Onyx does not send it anywhere.</p>
+                  <div class="guides-share__actions">
+                    <button
+                      class="guides-copy"
+                      type="button"
+                      aria-label="Copy first-room plan"
+                      aria-describedby="guides-share-status"
+                      disabled={shareState() === 'copying'}
+                      onClick={copyRoomStarterPlan}
+                    >
+                      <Show when={shareState() === 'copying'} fallback="Copy plan">Copying plan…</Show>
+                    </button>
+                    <a
+                      class="guides-download"
+                      href={roomStarterDownload()}
+                      download={ROOM_STARTER_EXPORT_FILENAME}
+                    >
+                      Download text
+                    </a>
+                  </div>
+                  <p
+                    class="guides-share__status"
+                    id="guides-share-status"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    aria-label="Plan share status"
+                  >
+                    <Show when={shareState() === 'copying'}>
+                      Creating your local plan…
+                    </Show>
+                    <Show when={shareState() === 'copied'}>
+                      First-room plan copied. It was created here and nothing was sent.
+                    </Show>
+                    <Show when={shareState() === 'failed'}>
+                      Copy did not complete. Download the text instead; nothing was sent.
+                    </Show>
+                  </p>
+                </section>
+              </div>
+              <div class="guides-progress__actions">
+                <Show when={progress().nextId}>
+                  {(nextId) => <a class="guides-action" href={`#${nextId()}`}>Go to: {guideTitle(nextId())}</a>}
+                </Show>
+                <Show when={progress().complete > 0}>
+                  <button class="guides-reset" type="button" onClick={resetPlan}>Reset plan</button>
+                </Show>
+              </div>
+            </section>
+            <article class="guides-card guides-card--principles" id="together">
+              <div class="label">How we treat each other</div>
+              <h2>Be kind, then talk</h2>
+              <p>
+                Welcome people. Argue about ideas, not people. Do not harass anyone,
+                do not share someone else&apos;s private information, and do not spam.
+                A room can be stricter than that. If a room is not for you, leave.
+              </p>
+            </article>
+            <For each={GUIDE_HOWTOS}>
+              {(howto) => (
+                <article
+                  class="guides-card guides-step"
+                  classList={{
+                    'guides-card--optional': howto.optional,
+                    'guides-card--complete': !howto.optional && completed().has(howto.id),
+                  }}
+                  id={howto.id}
+                >
+                  <div class="guides-card__meta">
+                    <div class="label">{howto.optional ? 'Optional' : 'How-to'}</div>
+                    <Show when={!howto.optional}>
+                      <button
+                        class="guides-step-toggle"
+                        type="button"
+                        aria-pressed={completed().has(howto.id)}
+                        aria-label={`Mark ${howto.title} ${completed().has(howto.id) ? 'not complete' : 'complete'}`}
+                        onClick={() => toggleStep(howto.id)}
+                      >
+                        {completed().has(howto.id) ? 'Done' : 'Mark done'}
+                      </button>
+                    </Show>
+                  </div>
+                  <h2>{howto.title}</h2>
+                  <For each={howto.body}>
+                    {(paragraph) => <p>{paragraph}</p>}
+                  </For>
+                  <Show when={howto.links.length > 0}>
+                    <p class="guides-card-actions">
+                      <For each={howto.links}>
+                        {(link) => (
+                          <a
+                            class="guides-action"
+                            href={link.href}
+                            rel={link.href.startsWith('http') ? 'noreferrer noopener' : undefined}
+                            target={link.href.startsWith('http') ? '_blank' : undefined}
+                          >
+                            {link.label}
+                          </a>
+                        )}
+                      </For>
+                    </p>
+                  </Show>
+                </article>
+              )}
+            </For>
+          </div>
         </section>
       </div>
     </PublicFrame>

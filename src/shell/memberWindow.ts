@@ -12,13 +12,15 @@ import { computeMessageWindow, type MessageWindow } from './messageWindow';
 
 export const MEMBER_WINDOW_SIZE = 96;
 export const MEMBER_GROUP_ROW_PX = 28;
-export const MEMBER_USER_ROW_PX = 36;
+export const MEMBER_USER_ROW_PX = 52;
 export const MEMBER_MOBILE_GROUP_ROW_PX = 32;
 export const MEMBER_MOBILE_USER_ROW_PX = 56;
 
 export type MemberWindowMetrics = {
   groupRowPx: number;
   userRowPx: number;
+  /** Border-box heights of mounted rows, keyed by identity, not window index. */
+  heights?: ReadonlyMap<string, number>;
 };
 
 export const MEMBER_WINDOW_METRICS: MemberWindowMetrics = {
@@ -34,6 +36,11 @@ export const MEMBER_MOBILE_WINDOW_METRICS: MemberWindowMetrics = {
 export type MemberFlatRow =
   | { kind: 'group'; key: string; label: string; count: number }
   | { kind: 'member'; groupKey: string; entry: MemberEntry };
+
+export function memberRowKey(row: MemberFlatRow): string {
+  return row.kind === 'group' ? `group:${row.key}`
+    : `member:${row.groupKey}:${row.entry.user.nick.toLowerCase()}`;
+}
 
 export function flattenMemberRows(groups: readonly GroupEntry[]): MemberFlatRow[] {
   const rows: MemberFlatRow[] = [];
@@ -55,7 +62,26 @@ export function memberRowHeight(
   row: MemberFlatRow,
   metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
 ): number {
+  const measured = metrics.heights?.get(memberRowKey(row));
+  if (measured !== undefined && Number.isFinite(measured) && measured > 0) return measured;
   return row.kind === 'group' ? metrics.groupRowPx : metrics.userRowPx;
+}
+
+/** Keep the same row and intra-row position when estimates are replaced by
+ * measurements (or invalidated by width/font changes). */
+export function rebaseMemberOffset(
+  rows: readonly MemberFlatRow[],
+  offset: number,
+  before: MemberWindowMetrics,
+  after: MemberWindowMetrics,
+): number {
+  const index = memberIndexAtOffset(rows, offset, before);
+  const row = rows[index];
+  const within = row ? Math.min(
+    Math.max(0, offset - memberPrefixHeight(rows, index, before)),
+    Math.max(0, memberRowHeight(row, after) - 1),
+  ) : 0;
+  return memberPrefixHeight(rows, index, after) + within;
 }
 
 export function memberIndexAtOffset(
@@ -90,10 +116,15 @@ export function computeMemberWindow(
   windowSize = MEMBER_WINDOW_SIZE,
   metrics: MemberWindowMetrics = MEMBER_WINDOW_METRICS,
 ): MessageWindow {
+  const capacity = Number.isFinite(windowSize)
+    ? Math.max(1, Math.min(MEMBER_WINDOW_SIZE, Math.floor(windowSize)))
+    : MEMBER_WINDOW_SIZE;
   return computeMessageWindow({
     total: rows.length,
-    windowSize,
-    pageStart: memberIndexAtOffset(rows, scrollTopPx, metrics),
+    windowSize: capacity,
+    // Measured overscan above the viewport prevents small reverse scrolls from
+    // immediately replacing the first visible control.
+    pageStart: Math.max(0, memberIndexAtOffset(rows, scrollTopPx, metrics) - Math.min(12, capacity - 1)),
   });
 }
 

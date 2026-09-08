@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountPanel } from './Account';
 import { store, getState, type Server } from '@/lib/store';
 import { preferences, resetPreferences } from '@/lib/prefs/preferences';
+import { sceneMotion } from '@/lib/prefs/sceneMotion';
 import { resetGuestClaimSheetState } from '@/shell/guestClaimState';
 
 const initialState = store.getInitialState();
@@ -115,6 +116,20 @@ describe('You settings list', () => {
     expect(JSON.parse(localStorage.getItem('onyx:preferences') ?? '{}').fontScale).toBe('lg');
   });
 
+  it('labels the background-only motion switch without implying a data-saver mode', () => {
+    renderYou();
+    fireEvent.click(screen.getByTestId('you-motion').querySelector('summary')!);
+
+    expect(screen.getByText('Reduce background motion')).toBeInTheDocument();
+    expect(screen.getByText(/Message and network data are unchanged/)).toBeInTheDocument();
+    expect(screen.queryByText('Use less data')).toBeNull();
+
+    const switchButton = screen.getByText('Reduce background motion').closest('button');
+    if (!switchButton) throw new Error('Background motion switch was not rendered');
+    fireEvent.click(switchButton);
+    expect(sceneMotion()).toBe('off');
+  });
+
   it('opens voice devices through the existing store action', async () => {
     const openVoice = vi.spyOn(getState(), 'openVoiceSettings');
     const closeSpy = vi.fn();
@@ -129,5 +144,34 @@ describe('You settings list', () => {
     await waitFor(() => {
       expect(openVoice).toHaveBeenCalled();
     });
+  });
+
+  it('groups You into task categories with readable rows', () => {
+    renderYou();
+
+    expect(screen.getByRole('heading', { name: 'This device' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Help' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'More' })).toBeInTheDocument();
+    expect(screen.getByTestId('you-account').querySelector('summary')).toHaveTextContent(
+      'Identity, protection, and account data',
+    );
+    expect(screen.getByTestId('you-notifications').querySelector('summary')).toHaveTextContent(
+      'Mentions and extra ping words',
+    );
+    expect(screen.getByRole('button', { name: 'Open appearance settings' })).toHaveAccessibleName(
+      'Open appearance settings',
+    );
+  });
+
+  it('keeps guest claim as the account task and hides signed-in sections', () => {
+    renderYou(null);
+
+    expect(screen.getByTestId('you-settings')).toHaveTextContent(
+      'Keep this name if you want to protect it without disconnecting.',
+    );
+    expect(screen.getByTestId('account-guest')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /keep this name/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('account-section-nav')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Overview' })).not.toBeInTheDocument();
   });
 });

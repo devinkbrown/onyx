@@ -15,18 +15,33 @@ describe('ProductPreview', () => {
     expect(screen.getByRole('tab', { name: 'Messages' })).toHaveAttribute('aria-selected', 'true');
     await Promise.resolve();
     expect(screen.getByRole('tab', { name: 'Messages' })).toHaveFocus();
-    expect(preview).toHaveTextContent('Preview');
-    expect(preview).toHaveTextContent(/labeled conversation|side conversation|quiet list/i);
+    expect(preview).toHaveTextContent('Fictional game-night preview');
+    expect(preview).toHaveTextContent('Not a live room');
+    expect(preview).toHaveTextContent('A quieter side conversation.');
   });
 
-  it('renders a mineral-night mini-shell with a room conversation, not grey skeleton bars', () => {
+  it('renders a readable fictional social scene instead of a miniature shell', () => {
     const { container } = render(() => <ProductPreview />);
-    const window = container.querySelector('.product-preview__window')!;
-    expect(window.querySelector('.product-preview__rail')?.textContent).toMatch(/Weekend plans|Studio hours/);
-    expect(window.querySelector('.product-preview__roombar')?.textContent).toMatch(/Weekend plans/);
-    expect(window.querySelector('.product-preview__msg')).toBeTruthy();
-    expect(window.querySelector('.product-preview__composer')).toBeTruthy();
-    expect(window.querySelector('.product-preview__stage')).toBeTruthy();
-    expect(container.querySelector('[data-product-preview]')!.textContent).not.toMatch(/mira|Room is open|CONNECT|Join a room/i);
+    const preview = container.querySelector('[data-product-preview]')!;
+    const scene = container.querySelector('[data-preview-scene]')!;
+    expect(scene).toHaveTextContent('Friday co-op');
+    expect(scene).toHaveTextContent('One more round?');
+    expect(scene).toHaveTextContent('Give me five minutes.');
+    expect(scene).toHaveTextContent('I’ll meet you in voice.');
+    expect(scene.querySelectorAll('.product-preview__message')).toHaveLength(3);
+    expect(scene.querySelectorAll('button, input, textarea, select')).toHaveLength(0);
+    expect(scene.querySelector('.home-mascot-scene')).toHaveAttribute('aria-hidden', 'true');
+    expect(preview).toHaveTextContent(/static example/i);
+    expect(preview).not.toHaveTextContent(/CONNECT|Join a room|live count/i);
+  });
+
+  it('keeps the Home tab as a local example with readable return language', () => {
+    const { container } = render(() => <ProductPreview />);
+    const preview = container.querySelector('[data-product-preview]')!;
+    fireEvent.click(screen.getByRole('tab', { name: 'Home' }));
+    expect(preview).toHaveAttribute('data-preview-state', 'home');
+    expect(preview).toHaveTextContent('Pick up where you left off.');
+    expect(preview).toHaveTextContent('Rooms you already share');
+    expect(preview).toHaveTextContent('on device');
   });
 });

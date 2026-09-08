@@ -5,9 +5,8 @@
    Three voices, each with one job. The discipline is in the RESTRAINT: a
    surface that uses all three at once is usually a surface with no hierarchy.
 
-     display    Fraunces          Restrained. Page title, a single hero lede,
-                                  an empty-state line. Not for section headers,
-                                  never for UI chrome, never below ~20px.
+     display    Anton             Distinctive display face for page titles,
+                                  section headers, and intentional identity marks.
      interface  Instrument Sans   Body copy, labels, controls, everything the
                                   user reads to operate the product.
      evidence   JetBrains Mono    Evidence ONLY — verbatim protocol text, IDs,
@@ -18,23 +17,21 @@
                                   decoration devalues that claim everywhere
                                   else in the app.
 
-   Aliases the existing theme font stacks (--font-serif / --font-sans /
+   Aliases the existing theme font stacks (--font-display / --font-sans /
    --font-mono) so a theme that reassigns a family is respected. Note the
-   deliberate mapping: Onyx's `--font-display` is Instrument Sans, while THIS
-   system's display voice is Fraunces — so `--ui-font-display` rides
-   `--font-serif`, which is where Fraunces actually lives.
+   deliberate mapping: `--ui-font-display` rides `--font-display`; the
+   optional `--font-serif` token remains available only to explicit editorial
+   or saved-theme choices.
    ───────────────────────────────────────────────────────────────────────────── */
 
 :root {
   /* ── Families ──────────────────────────────────────────────────────────── */
   --ui-font-display: var(
-    --font-serif,
-    'Fraunces Variable',
-    'Fraunces',
-    'Iowan Old Style',
-    Georgia,
-    'Times New Roman',
-    serif
+    --font-display,
+    'Anton',
+    'Arial Narrow',
+    'Helvetica Neue',
+    sans-serif
   );
   --ui-font-interface: var(
     --font-sans,
@@ -82,12 +79,12 @@
   --ui-display-lg: clamp(2.25rem, 1.6rem + 3.2vw, 3.5rem);
 
   /* ── Weight ────────────────────────────────────────────────────────────────
-     Fraunces is a variable face; the display voice stays under 600 so it reads
-     as considered rather than shouted. */
+     Anton is intentionally compact; use its real regular face rather than
+     synthesising a 500 weight that the family does not provide. */
   --ui-weight-regular: 400;
   --ui-weight-medium: 500;
   --ui-weight-semibold: 600;
-  --ui-weight-display: 500;
+  --ui-weight-display: 400;
 
   /* ── Leading ───────────────────────────────────────────────────────────── */
   --ui-leading-tight: var(--leading-tight, 1.15);

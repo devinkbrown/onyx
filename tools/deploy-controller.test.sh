@@ -265,7 +265,7 @@ assert_eq "backup hardlink snapshot exists" "old-content" \
 
 mkdir -p "${TMP}/verify/app"
 cat >"${TMP}/verify/index.html" <<'HTML'
-<title>Onyx — a room for your people</title>
+<title>Onyx — good company. Great nights.</title>
 HTML
 echo "app" >"${TMP}/verify/app/index.html"
 cat >"${TMP}/verify/404.html" <<'HTML'
@@ -275,6 +275,29 @@ HTML
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
 assert_ok "verify_live_out accepts good tree" \
   verify_live_out "${TMP}/verify" "vtest"
+assert_ok "pre-deploy title guard accepts current source title" \
+  verify_public_title "${ROOT}/index.html"
+for wrong_title in \
+  'Onyx — a room for your people' \
+  'Onyx — unrelated page' \
+  'Onyx — good company! Great nights!' \
+  'Onyx — good company. Great nights. extra'; do
+  printf '<title>%s</title>\n' "${wrong_title}" >"${TMP}/verify/index.html"
+  assert_fail "pre-deploy guard rejects ${wrong_title}" \
+    verify_public_title "${TMP}/verify/index.html"
+  assert_fail "post-sync verifier rejects ${wrong_title}" \
+    verify_live_out "${TMP}/verify" "vtest"
+done
+cat >"${TMP}/verify/index.html" <<'HTML'
+<title>Onyx — a room for your people</title>
+<meta property="og:title" content="Onyx — good company. Great nights." />
+HTML
+assert_fail "pre-deploy guard rejects correct metadata with legacy document title" \
+  verify_public_title "${TMP}/verify/index.html"
+assert_fail "post-sync verifier rejects correct metadata with legacy document title" \
+  verify_live_out "${TMP}/verify" "vtest"
+assert_fail "pre-deploy guard rejects missing document" \
+  verify_public_title "${TMP}/verify/missing.html"
 assert_fail "verify_live_out rejects bad title" \
   verify_live_out "${TMP}/live/out" "vtest"
 
@@ -337,7 +360,7 @@ echo "-- forced verify fail path (ONYX_DEPLOY_FORCE_VERIFY_FAIL)"
 # Staged tree that WOULD pass verify if not forced
 mkdir -p "${TMP}/staged-good/app" "${TMP}/live3/out/app"
 cat >"${TMP}/staged-good/index.html" <<'HTML'
-<title>Onyx — a room for your people</title>
+<title>Onyx — good company. Great nights.</title>
 HTML
 echo "app-new" >"${TMP}/staged-good/app/index.html"
 cat >"${TMP}/staged-good/404.html" <<'HTML'
@@ -385,7 +408,7 @@ echo "const CACHE_NAME = 'onyx-shell-oldcompat';" >"${TMP}/live-compat/out/sw.js
 echo 'LIVE-RUNTIME-STATUS' >"${TMP}/live-compat/out/onyxOS/status.json"
 
 cat >"${TMP}/staged-compat/index.html" <<'HTML'
-<title>Onyx — a room for your people</title>
+<title>Onyx — good company. Great nights.</title>
 HTML
 echo "app-compat-new" >"${TMP}/staged-compat/app/index.html"
 cat >"${TMP}/staged-compat/404.html" <<'HTML'
@@ -433,7 +456,7 @@ echo "const CACHE_NAME = 'onyx-shell-preroll';" >"${TMP}/live-roll-assets/out/sw
 echo "pre-roll-stale" >"${TMP}/live-roll-assets/out/will-change.html"
 
 cat >"${TMP}/staged-roll-assets/index.html" <<'HTML'
-<title>Onyx — a room for your people</title>
+<title>Onyx — good company. Great nights.</title>
 HTML
 echo "post-roll-app" >"${TMP}/staged-roll-assets/app/index.html"
 echo "const CACHE_NAME = 'onyx-shell-postroll';" >"${TMP}/staged-roll-assets/sw.js"
