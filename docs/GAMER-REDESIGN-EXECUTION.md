@@ -4,8 +4,9 @@ Checkpoint: 2026-09-08. Repository: `/home/kain/onyx`.
 
 **DEPLOYED. BOUNDED PRODUCTION ACCEPTANCE GREEN.**
 HTTPS bytes, real public two-peer UI smoke and public landing checks at
-1440/390/320px verified. **NOT COMMITTED / NOT PUSHED. Git publication remains
-pending.** This ledger is frozen for Main's staging.
+1440/390/320px verified. **SOURCE RELEASE PUBLICATION COMPLETE** on default
+branch `onyx-solid`: `9382b8d2626eaaa507fbe8658b16f87616f24d9f`.
+This final documentation receipt awaits its own commit/push and is frozen for Main.
 
 This ledger records implementation handoffs and bounded evidence, not release
 clearance. Main may append newer receipts below. A source implementation, a
@@ -53,8 +54,11 @@ UI connections at 1440px/390px, two bidirectional messages rendered on both,
 no overflow and zero page errors; contexts closed. No fixture or store seed;
 only a synthetic fresh QA room. **Bounded production acceptance is GREEN** on
 the same frozen source hash and final built assets. This does not prove hardware,
-account authentication or peer media. **Git is not committed or pushed**;
-publication remains pending. Recovery snapshot and exact hashes are appended.
+account authentication or peer media. **Source release commit
+`9382b8d2626eaaa507fbe8658b16f87616f24d9f` is pushed and independently confirmed
+at the remote default branch `onyx-solid` by Main.** Integration was directly
+to that branch; no PR or `main` merge is claimed. This final documentation
+receipt is not yet committed/pushed. Recovery snapshot and exact hashes are appended.
 
 Earlier browser receipts remain historical: Chromium finished **13/14 PASS** and
 WebKit contextual **5/6 PASS**, each failing only the gallery scroll-row race.
@@ -73,8 +77,9 @@ recorded above; this historical red checkpoint remains intact, not relabeled.
 Landing budget
 `32055` passes at **36.66 KiB gzip across three eager files**.
 Predeploy gates, Astra clearance, deployment and HTTPS-byte verification are
-complete per Main, as is bounded public two-peer smoke acceptance. Only Git
-publication remains pending in this recorded release sequence.
+complete per Main, as are bounded public two-peer smoke acceptance and source
+release publication. Only this final documentation receipt's commit/push remains
+pending; its future commit hash is not yet known or claimed.
 Exact bounded receipts are appended at the end of this ledger.
 
 ## Candidate identity and precedence
@@ -908,3 +913,21 @@ test/deployment execution or Git operations.
 
 Only this ledger changed. No source/E2E edits or test, deploy or Git execution
 by this writer. Historical receipts remain preserved.
+
+### Main receipt — source release publication CONFIRMED — 2026-09-08
+
+- **Source release commit:**
+  `9382b8d2626eaaa507fbe8658b16f87616f24d9f`, **168 files**.
+- Main reports `git push github HEAD:refs/heads/onyx-solid` **exit 0**, run
+  **`17853`**, and independent `git ls-remote` confirmation of exact remote SHA
+  **`9382b8d2626eaaa507fbe8658b16f87616f24d9f`**.
+- **Source release publication COMPLETE** on the current default branch
+  **`onyx-solid`**, integrated directly. **No PR or `main` merge is claimed.**
+  App source is unchanged; this receipt follows the recorded deployment and
+  bounded production acceptance.
+- **This final documentation receipt still awaits its own commit/push.**
+  No unknown self-hash or already-published claim is made for this update.
+
+Only this ledger changed; historical pending/publication-stage receipts remain
+intact. No new audits, gates, source/E2E changes or Git execution by this writer.
+**Ledger refrozen for Main's documentation commit.**

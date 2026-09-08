@@ -1,6 +1,6 @@
 # Gamer redesign — final review ledger
 
-Updated: 2026-09-08. Reviewer: Astra ULTRA. **CURRENT: DEPLOYED; bounded production acceptance GREEN on Main's receipts. Final predeploy review CLEARED; frozen-source continuity confirmed. Git publication PENDING.**
+Updated: 2026-09-08. Reviewer: Astra ULTRA. **CURRENT: DEPLOYED; bounded production acceptance GREEN on Main's receipts; source release publication COMPLETE. Final predeploy review CLEARED; frozen-source continuity confirmed. The final docs receipt commit is still forthcoming.**
 
 ## Current production receipt and document freeze
 
@@ -12,7 +12,9 @@ Main reports actual deployment session `7747`, exit 0, stamp `onyx-shell-2026090
 
 **Verdict: bounded deployed acceptance GREEN.** This establishes the reported deployed artifact identity and tested public guest-chat journey, not hardware capture, account-authentication journeys, peer media, every application function, or universal commercial quality. Astra did not deploy or independently execute these production checks. Earlier source reviews and screenshot inspections remain separately classified below.
 
-**Git publication remains pending. This review document is frozen for Main to stage after this update; no further reviewer writes are planned before staging.** No Git operation was performed by Astra. Earlier HOLD/pending states below are retained historical checkpoints, not the current verdict.
+**Source release publication COMPLETE (R):** Main reports source release commit `9382b8d2626eaaa507fbe8658b16f87616f24d9f` (168 files), integrated directly on default branch `onyx-solid`. Push to remote `github`, `HEAD:refs/heads/onyx-solid`, session `17853`, exited 0. Main independently ran `git ls-remote` and confirmed that exact remote SHA. No PR or merge into a separate `main` branch is claimed. Main reports application source unchanged.
+
+**Final docs receipt commit remains forthcoming:** this ledger update is not claimed committed or pushed, and its future commit hash is not yet known. This review document is frozen again for Main to stage after this update; no further reviewer writes are planned before staging. No Git operation was performed by Astra. Earlier HOLD/pending states below are retained historical checkpoints, not the current verdict.
 
 This is an evidence ledger and bounded predeploy review, not a roadmap or independent authorization to execute deployment. Main reports the user's deployment authorization; this reviewer executes no deployment or Git operations. This document is the reviewer's only authorized write path. Application/source inspection is read-only; the reviewer has not run tests, builds, deployment, model CLIs, or agents. Existing entries must not disappear when later receipts arrive: update their status and retain the reason/evidence.
 
@@ -127,7 +129,7 @@ Main reports the full-unit failure was `read []` versus remembered content: an o
 - Dry-run staging is R-closed by session `66046`. Actual deployment is R-complete by session `7747`, with bounded public acceptance GREEN as recorded at the top; this reviewer performed neither.
 - Main/Mill: no known remaining browser failures are reported after scoped reruns. Preserve prior batch evidence at `/tmp/onyx-connected-evidence.7kJLLz/final-chromium` and `final-webkit-contextual` alongside the fresh passes; do not rewrite earlier failing batches as all-pass.
 - L4c corrective source is frozen and S-closed; post-correction permission-loss browser acceptance is now reported for Chromium/WebKit. No additional implementation requested by this review.
-- Final predeploy review is cleared and bounded production acceptance is now GREEN for the recorded deployment. Git publication is the remaining Main-owned workflow step, after production acceptance. No full commercial-quality, hardware-media, or all-functions claim.
+- Final predeploy review is cleared and bounded production acceptance is GREEN for the recorded deployment. Source release publication is R-complete at `9382b8d2626eaaa507fbe8658b16f87616f24d9f`, after production acceptance. Only the forthcoming final docs receipt commit/publication remains Main-owned; this ledger does not claim that future step complete. No full commercial-quality, hardware-media, or all-functions claim.
 
 ## Closed findings / bounded acceptance
 
