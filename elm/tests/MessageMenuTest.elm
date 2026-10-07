@@ -8,9 +8,8 @@ motion, delete confirmation) need the popover UI and stay out of
 scope for this pure layer.
 -}
 
-import App
+import App exposing (..)
 import Expect
-import MessageMenu exposing (..)
 import Test exposing (Test, describe, test)
 
 

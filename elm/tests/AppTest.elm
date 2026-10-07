@@ -2917,6 +2917,36 @@ suite =
                     , \_ -> Expect.equal Nothing (parseCtcpReplyBody "plain hello")
                     ]
                     ()
+        , test "topic start focuses the label and arms the reply" <|
+            \_ ->
+                let
+                    live =
+                        { blank | ourNick = "me" }
+
+                    ( m1, _ ) =
+                        feed (joinFirst live "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :Release blockers for mobile onboarding today"
+
+                    ( started, out ) =
+                        update (MessageStartTopic { target = "#c", msgid = "m1" }) m1
+
+                    ( blank_, out_ ) =
+                        update (MessageStartTopic { target = "#c", msgid = "m1" })
+                            (Tuple.first (feed (joinFirst live "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :https://example.test"))
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just "Release blockers for mobile onboarding today")
+                            (Dict.get "#c" started.activeChannelTopics)
+                    , \_ ->
+                        Expect.equal (Just { target = "#c", msgid = "m1", from = "alice", preview = "Release blockers for mobile onboarding today" })
+                            started.replyingTo
+                    , \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal Dict.empty blank_.activeChannelTopics
+                    , \_ -> Expect.equal Nothing blank_.replyingTo
+                    , \_ -> Expect.equal [ "Topic not started" ] (List.map .title blank_.toasts)
+                    , \_ -> Expect.equal [] out_
+                    ]
+                    ()
         , test "vault query schedules a debounced scan" <|
             \_ ->
                 let
