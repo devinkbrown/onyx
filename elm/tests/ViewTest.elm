@@ -2674,6 +2674,37 @@ suite =
                                     ]
                         ]
                         ()
+            , test "day dividers label Today, Yesterday, and older days" <|
+                \_ ->
+                    let
+                        days =
+                            { blank | nowMs = 1705233600000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :old")
+                                |> (\m -> feed { m | nowMs = 1705320000000 } ":alice!u@h PRIVMSG #c :mid")
+                                |> (\m -> feed { m | nowMs = 1705406400000 } ":bob!u@h PRIVMSG #c :new")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        q =
+                            query days
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.findAll [ Selector.class "onyx-day-divider" ] q
+                                |> Query.count (Expect.equal 3)
+                        , \_ ->
+                            Query.has
+                                [ Selector.text "Sunday, January 14"
+                                , Selector.text "Yesterday"
+                                , Selector.text "Today"
+                                ]
+                                q
+                        , \_ ->
+                            Query.findAll [ Selector.class "onyx-continuation" ] q
+                                |> Query.count (Expect.equal 0)
+                        ]
+                        ()
             , test "no facepile without channel members" <|
                 \_ ->
                     query blank

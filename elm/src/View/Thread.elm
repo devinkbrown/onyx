@@ -15,6 +15,7 @@ import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
 import Prefs
+import Time
 import Translate
 import Upload
 
@@ -58,6 +59,11 @@ thread model =
 
                                 dividerId =
                                     Dict.get (String.toLower channel.name) model.viewUnreadDividerId
+
+                                dayLabels =
+                                    dayDividerLabels model chronological
+                                        |> List.drop win.start
+                                        |> List.take win.rendered
                             in
                             div []
                                 [ facepileRow channel
@@ -85,8 +91,11 @@ thread model =
                                     text ""
                                 , ul [ class "onyx-thread" ]
                                     (List.concatMap
-                                        (\( prev, m ) -> [ dividerAbove dividerId m, messageRow model channel.name prev m ])
-                                        (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
+                                        (\( ( prev, m ), label ) -> [ dividerAbove dividerId label m, messageRow model channel.name prev m ])
+                                        (List.map2 Tuple.pair
+                                            (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
+                                            dayLabels
+                                        )
                                     )
                                 , case App.typingLine model channel.name of
                                     Nothing ->
@@ -192,24 +201,206 @@ notCollapsed model m =
         not (Set.member (String.toLower (String.trim m.from)) model.collapsedNicks)
 
 
-dividerAbove : Maybe Int -> App.ChatMessage -> Html Msg
-dividerAbove dividerId m =
-    case dividerId of
-        Just boundary ->
-            if m.id == boundary then
-                div
-                    [ class "onyx-unread-divider"
-                    , attribute "role" "separator"
-                    , attribute "aria-label" "New messages"
-                    , attribute "tabindex" "-1"
-                    ]
-                    [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
-
-            else
+dividerAbove : Maybe Int -> Maybe String -> App.ChatMessage -> Html Msg
+dividerAbove dividerId dayLabel m =
+    div []
+        [ case dayLabel of
+            Nothing ->
                 text ""
 
-        Nothing ->
-            text ""
+            Just label ->
+                div
+                    [ class "onyx-day-divider"
+                    , attribute "role" "separator"
+                    , attribute "aria-label" label
+                    ]
+                    [ span [ class "onyx-day-divider-label" ] [ text label ] ]
+        , case dividerId of
+            Just boundary ->
+                if m.id == boundary then
+                    div
+                        [ class "onyx-unread-divider"
+                        , attribute "role" "separator"
+                        , attribute "aria-label" "New messages"
+                        , attribute "tabindex" "-1"
+                        ]
+                        [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
+
+                else
+                    text ""
+
+            Nothing ->
+                text ""
+        ]
+
+
+{-| Calendar day in the message clock zone (mirroring the
+`toDateString` day buckets the oracle boundaries compare).
+-}
+dayKeyFor : Time.Zone -> Int -> ( Int, Int, Int )
+dayKeyFor zone at =
+    let
+        posix =
+            Time.millisToPosix at
+    in
+    ( Time.toYear zone posix, monthNumber (Time.toMonth zone posix), Time.toDay zone posix )
+
+
+monthNumber : Time.Month -> Int
+monthNumber month =
+    case month of
+        Time.Jan ->
+            1
+
+        Time.Feb ->
+            2
+
+        Time.Mar ->
+            3
+
+        Time.Apr ->
+            4
+
+        Time.May ->
+            5
+
+        Time.Jun ->
+            6
+
+        Time.Jul ->
+            7
+
+        Time.Aug ->
+            8
+
+        Time.Sep ->
+            9
+
+        Time.Oct ->
+            10
+
+        Time.Nov ->
+            11
+
+        Time.Dec ->
+            12
+
+
+monthName : Time.Month -> String
+monthName month =
+    case month of
+        Time.Jan ->
+            "January"
+
+        Time.Feb ->
+            "February"
+
+        Time.Mar ->
+            "March"
+
+        Time.Apr ->
+            "April"
+
+        Time.May ->
+            "May"
+
+        Time.Jun ->
+            "June"
+
+        Time.Jul ->
+            "July"
+
+        Time.Aug ->
+            "August"
+
+        Time.Sep ->
+            "September"
+
+        Time.Oct ->
+            "October"
+
+        Time.Nov ->
+            "November"
+
+        Time.Dec ->
+            "December"
+
+
+weekdayName : Time.Weekday -> String
+weekdayName day =
+    case day of
+        Time.Mon ->
+            "Monday"
+
+        Time.Tue ->
+            "Tuesday"
+
+        Time.Wed ->
+            "Wednesday"
+
+        Time.Thu ->
+            "Thursday"
+
+        Time.Fri ->
+            "Friday"
+
+        Time.Sat ->
+            "Saturday"
+
+        Time.Sun ->
+            "Sunday"
+
+
+{-| Human day label (mirroring `dayLabel`: Today / Yesterday /
+otherwise the long weekday + month + day; the oracle
+locale-renders that last shape, Elm renders fixed English —
+the same documented narrowing as the 12-hour clock).
+-}
+dayLabelFor : Model -> Int -> String
+dayLabelFor model at =
+    let
+        zone =
+            model.zone
+
+        posix =
+            Time.millisToPosix at
+    in
+    -- Calendar-day comparison against today and yesterday (the
+    -- oracle compares local days; `model.zone` is that zone).
+    if dayKeyFor zone at == dayKeyFor zone (round model.nowMs) then
+        "Today"
+
+    else if dayKeyFor zone at == dayKeyFor zone (round model.nowMs - 86400000) then
+        "Yesterday"
+
+    else
+        weekdayName (Time.toWeekday zone posix)
+            ++ ", "
+            ++ monthName (Time.toMonth zone posix)
+            ++ " "
+            ++ String.fromInt (Time.toDay zone posix)
+
+
+{-| Per-row day-divider labels over the full chronological feed
+(mirroring the `dayBoundaryFlags` pass: positional, first row
+always labelled, a label wherever the day changes; the caller
+slices the window exactly like the rows).
+-}
+dayDividerLabels : Model -> List App.ChatMessage -> List (Maybe String)
+dayDividerLabels model messages =
+    let
+        step m ( prevDay, labels ) =
+            let
+                day =
+                    dayKeyFor model.zone m.at
+            in
+            if prevDay == Just day then
+                ( Just day, Nothing :: labels )
+
+            else
+                ( Just day, Just (dayLabelFor model m.at) :: labels )
+    in
+    List.reverse (Tuple.second (List.foldl step ( Nothing, [] ) messages))
 
 
 {-| System event rows render without an identity avatar

@@ -54,6 +54,11 @@
 
 .onyx-system { color: var(--onyx-dim); font-size: 12px; letter-spacing: 0.03em; }
 
+/* Elegant date boundary: hairline with a floating day chip. */
+
+.onyx-day-divider { display: flex; align-items: center; gap: 8px; color: var(--onyx-dim); font-size: 12px; }
+.onyx-day-divider-label { padding: 0 8px; }
+
 /* Conversation facepile: overlapping avatar stack + overflow chip. */
 
 .onyx-facepile { display: inline-flex; align-items: center; padding: 4px 0 4px 4px; }
