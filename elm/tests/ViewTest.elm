@@ -1909,8 +1909,9 @@ suite =
 
                     q =
                         query
-                            (feed { channelModel | isupport = statusSupport }
-                                ":alice!u@h PRIVMSG @#c :ops hello"
+                            ({ channelModel | isupport = statusSupport }
+                                |> (\m -> feed m ":bob!u@h PRIVMSG #c :hey")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG @#c :ops hello")
                             )
 
                     badge =
@@ -2501,6 +2502,80 @@ suite =
                             query messaged
                                 |> Query.find [ Selector.tag "strong", Selector.containing [ Selector.text "alice" ] ]
                                 |> Query.has [ Selector.style "color" "hsl(200 74% 74%)" ]
+                        ]
+                        ()
+            , test "consecutive same-author rows group into continuations" <|
+                \_ ->
+                    let
+                        grouped =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :two")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        q =
+                            query grouped
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.findAll [ Selector.class "onyx-continuation" ] q
+                                |> Query.count (Expect.equal 1)
+                        , \_ ->
+                            Query.findAll [ Selector.class "onyx-row-avatar" ] q
+                                |> Query.count (Expect.equal 1)
+                        , \_ ->
+                            Query.find [ Selector.class "onyx-continuation" ] q
+                                |> Query.has [ Selector.text "two" ]
+                        , \_ ->
+                            Query.find [ Selector.class "onyx-continuation" ] q
+                                |> Query.hasNot [ Selector.class "onyx-sender" ]
+                        ]
+                        ()
+            , test "grouping breaks on author change, five-minute gaps, and system rows" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":bob!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        authors =
+                            base
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed m ":bob!u@h PRIVMSG #c :two")
+
+                        gapped =
+                            base
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed { m | nowMs = 1000000 + 5 * 60 * 1000 } ":alice!u@h PRIVMSG #c :two")
+
+                        interrupted =
+                            base
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed m ":carol!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :two")
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query authors
+                                |> Query.findAll [ Selector.class "onyx-continuation" ]
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
+                            query gapped
+                                |> Query.findAll [ Selector.class "onyx-continuation" ]
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
+                            query gapped
+                                |> Query.findAll [ Selector.class "onyx-row-avatar" ]
+                                |> Query.count (Expect.equal 2)
+                        , \_ ->
+                            query interrupted
+                                |> Query.findAll [ Selector.class "onyx-continuation" ]
+                                |> Query.count (Expect.equal 0)
                         ]
                         ()
             , test "roster rows render small hidden avatars" <|

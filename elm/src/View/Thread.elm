@@ -82,8 +82,8 @@ thread model =
                                     text ""
                                 , ul [ class "onyx-thread" ]
                                     (List.concatMap
-                                        (\m -> [ dividerAbove dividerId m, messageRow model channel.name m ])
-                                        rows
+                                        (\( prev, m ) -> [ dividerAbove dividerId m, messageRow model channel.name prev m ])
+                                        (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
                                     )
                                 , case App.typingLine model channel.name of
                                     Nothing ->
@@ -149,8 +149,18 @@ isSystemRow m =
     List.member m.msgType [ "join", "part", "quit", "kick", "mode", "topic", "nick", "system", "error" ]
 
 
-messageRow : Model -> String -> App.ChatMessage -> Html Msg
-messageRow model target m =
+{-| Continuation grouping (mirroring `sameAuthorGroup`: the
+previous visible row from the same author, neither row systemic,
+within five minutes — continuation rows keep only the
+timestamp, body, and row actions).
+-}
+isContinuation : App.ChatMessage -> App.ChatMessage -> Bool
+isContinuation prev m =
+    prev.from == m.from && not (isSystemRow prev) && not (isSystemRow m) && abs (m.at - prev.at) < 5 * 60 * 1000
+
+
+messageRow : Model -> String -> Maybe App.ChatMessage -> App.ChatMessage -> Html Msg
+messageRow model target prev m =
     let
         uncertainDelivery =
             case m.outboxId of
@@ -162,10 +172,19 @@ messageRow model target m =
 
         withdrawn =
             m.deleted || m.redacted
+
+        cont =
+            case prev of
+                Just p ->
+                    isContinuation p m
+
+                Nothing ->
+                    False
     in
     li
         [ classList
             [ ( "onyx-message", True )
+            , ( "onyx-continuation", cont )
             , ( "onyx-whisper", m.whisper )
             , ( "onyx-locked", App.messageLocked m )
             , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
@@ -177,7 +196,7 @@ messageRow model target m =
         , attribute "role" "article"
         , attribute "aria-label" (App.messageAccessibleLabel m)
         ]
-        [ (if isSystemRow m then
+        [ (if cont || isSystemRow m then
             text ""
 
          else
@@ -195,17 +214,27 @@ messageRow model target m =
                     }
                 ]
         )
-        , strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
-        , case m.audience of
-            Nothing ->
-                text ""
+        , (if cont then
+            text ""
 
-            Just _ ->
-                span
-                    [ class "onyx-audience"
-                    , attribute "title" (App.audienceTitle m.audience)
-                    ]
-                    [ text (App.audienceLabel m.audience) ]
+           else
+            strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
+          )
+        , (if cont then
+            text ""
+
+           else
+            case m.audience of
+                Nothing ->
+                    text ""
+
+                Just _ ->
+                    span
+                        [ class "onyx-audience"
+                        , attribute "title" (App.audienceTitle m.audience)
+                        ]
+                        [ text (App.audienceLabel m.audience) ]
+          )
         , if m.at <= 0 then
             text ""
 
