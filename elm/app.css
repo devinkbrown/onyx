@@ -1350,6 +1350,14 @@ html, body {
   padding: 4px;
 }
 .onyx-react-choice:hover { background: var(--onyx-panel); }
+.onyx-react-empty {
+  color: var(--onyx-dim);
+  font-size: 12px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px;
+  text-align: center;
+}
 .onyx-msg-menu-delete-confirm { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
 .onyx-msg-menu-delete-confirm-title { font-weight: 700; font-size: 13px; margin: 0; }
 .onyx-msg-menu-delete-confirm-copy { color: var(--onyx-dim); font-size: 12px; margin: 0; }

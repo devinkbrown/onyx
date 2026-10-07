@@ -1076,6 +1076,22 @@ suite =
                     , \_ ->
                         query picked
                             |> Query.hasNot [ Selector.class "onyx-msg-menu" ]
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.class "onyx-react-grid" ]
+                            |> Query.hasNot [ Selector.text "no matches" ]
+                    , \_ ->
+                        let
+                            missed =
+                                Tuple.first (update (ReactionPickerSearch "missing_key") picked)
+                        in
+                        query missed
+                            |> Query.find [ Selector.class "onyx-react-grid" ]
+                            |> Query.has [ Selector.text "no matches" ]
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "React to message from alice with rocket") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "role" "option") ]
                     ]
                     ()
         , test "menu translation item, section, and unavailable note" <|

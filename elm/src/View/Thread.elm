@@ -725,7 +725,9 @@ deleteConfirm actionTarget target msgid =
 
 {-| The open reaction picker for one row (mirroring the
 oracle react popover: a search field over the curated set plus a
-grid of choices labelled "React to {target} with {shortcode}";
+listbox grid of option choices labelled "React to {target} with
+{shortcode}" (with the oracle "no matches" note when the query
+matches nothing);
 choosing emits through the shared react send path and closes the
 picker, Escape and the light-dismiss backdrop close it without
 choosing). -}
@@ -769,16 +771,24 @@ reactionPickerPanel model target m =
                                     , class "onyx-react-search"
                                     , placeholder "Search emoji"
                                     , attribute "aria-label" "Search emoji"
+                                    , attribute "autocomplete" "off"
                                     , value open.query
                                     , onInput App.ReactionPickerSearch
                                     ]
                                     []
                                 , div
                                     [ class "onyx-react-grid"
-                                    , attribute "role" "radiogroup"
+                                    , attribute "role" "listbox"
                                     , attribute "aria-label" "Emoji results"
                                     ]
-                                    (List.map (reactionChoice actionTarget) results)
+                                    (List.map (reactionChoice actionTarget) results
+                                        ++ (if List.isEmpty results then
+                                                [ p [ class "onyx-react-empty" ] [ text "no matches" ] ]
+
+                                            else
+                                                []
+                                           )
+                                    )
                                 ]
                             ]
 
@@ -790,8 +800,7 @@ reactionChoice actionTarget entry =
     button
         [ type_ "button"
         , class "onyx-react-choice"
-        , attribute "role" "radio"
-        , attribute "aria-checked" "false"
+        , attribute "role" "option"
         , attribute "aria-label" ("React to " ++ actionTarget ++ " with " ++ entry.shortcode)
         , attribute "title" entry.shortcode
         , onClick (App.ReactionPickerChoose entry.emoji)
