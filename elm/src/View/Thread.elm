@@ -6,9 +6,10 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, a, audio, button, div, h2, img, li, p, section, small, span, strong, text, time, ul, video)
-import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, preload, rel, src, tabindex, target, type_)
-import Html.Events exposing (on, onClick)
+import Emoji
+import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, section, small, span, strong, text, time, ul, video)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, tabindex, target, type_, value)
+import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
 import Prefs
@@ -199,6 +200,7 @@ messageRow model target m =
         , boostBar model target m
         , messageMenuButton model target m
         , messageMenuPanel model target m
+        , reactionPickerPanel model target m
         ]
 
 
@@ -258,11 +260,12 @@ menuInput model target m =
     }
 
 
-{-| Whether any menu item applies (react and translate stay
-later slices). -}
+{-| Whether any menu item applies (translate stays a later
+slice). -}
 menuHasActions : Model -> String -> App.Capabilities -> Bool
 menuHasActions model target caps =
     caps.canReply
+        || caps.canReact
         || caps.canCopy
         || caps.canQuote
         || caps.canCopyMoment
@@ -286,7 +289,7 @@ menuCanPin model target =
 copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
 Pin, Ignore, Collapse, then Delete behind its inline confirm
 step; tiers are flattened into one menu with a light-dismiss
-backdrop, and react/translate stay later slices). -}
+backdrop, and translate stays a later slice). -}
 messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuPanel model target m =
     case m.msgid of
@@ -328,6 +331,15 @@ messageMenuPanel model target m =
                                         (menuItem ("Reply to " ++ m.from)
                                             "Reply"
                                             (App.ReplyArm { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canReact then
+                                    Just
+                                        (menuItem ("Choose reaction for " ++ actionTarget)
+                                            "React"
+                                            (App.ReactionPickerOpen { target = target, msgid = msgid })
                                         )
 
                                   else
@@ -711,6 +723,82 @@ deleteConfirm actionTarget target msgid =
         ]
 
 
+{-| The open reaction picker for one row (mirroring the
+oracle react popover: a search field over the curated set plus a
+grid of choices labelled "React to {target} with {shortcode}";
+choosing emits through the shared react send path and closes the
+picker, Escape and the light-dismiss backdrop close it without
+choosing). -}
+reactionPickerPanel : Model -> String -> App.ChatMessage -> Html Msg
+reactionPickerPanel model target m =
+    case m.msgid of
+        Nothing ->
+            text ""
+
+        Just msgid ->
+            case model.reactionPicker of
+                Nothing ->
+                    text ""
+
+                Just open ->
+                    if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
+                        text ""
+
+                    else
+                        let
+                            actionTarget =
+                                "message from " ++ m.from
+
+                            results =
+                                Emoji.searchEmojis open.query 48
+                        in
+                        div [ class "onyx-react-pop" ]
+                            [ div
+                                [ class "onyx-react-backdrop"
+                                , onClick App.ReactionPickerClose
+                                ]
+                                []
+                            , div
+                                [ class "onyx-react-picker"
+                                , attribute "role" "dialog"
+                                , attribute "aria-label" ("Choose reaction for " ++ actionTarget)
+                                , on "keydown" (pickerEscapeDecoder model)
+                                ]
+                                [ input
+                                    [ type_ "text"
+                                    , class "onyx-react-search"
+                                    , placeholder "Search emoji"
+                                    , attribute "aria-label" "Search emoji"
+                                    , value open.query
+                                    , onInput App.ReactionPickerSearch
+                                    ]
+                                    []
+                                , div
+                                    [ class "onyx-react-grid"
+                                    , attribute "role" "radiogroup"
+                                    , attribute "aria-label" "Emoji results"
+                                    ]
+                                    (List.map (reactionChoice actionTarget) results)
+                                ]
+                            ]
+
+
+{-| One reaction grid choice (the unicode glyph as its visible
+label, like the oracle trigger buttons). -}
+reactionChoice : String -> Emoji.EmojiEntry -> Html Msg
+reactionChoice actionTarget entry =
+    button
+        [ type_ "button"
+        , class "onyx-react-choice"
+        , attribute "role" "radio"
+        , attribute "aria-checked" "false"
+        , attribute "aria-label" ("React to " ++ actionTarget ++ " with " ++ entry.shortcode)
+        , attribute "title" entry.shortcode
+        , onClick (App.ReactionPickerChoose entry.emoji)
+        ]
+        [ text entry.emoji ]
+
+
 {-| Escape dismisses the open menu (mirroring the oracle menu
 keydown; IME-claimed events yield to the IME). -}
 menuEscapeDecoder : Model -> Decode.Decoder Msg
@@ -727,6 +815,29 @@ menuEscapeDecoder _ =
                             (\key ->
                                 if key == "Escape" then
                                     Decode.succeed App.MessageMenuClose
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
+
+
+{-| Escape dismisses the open reaction picker (same IME-yielding
+shape as the menu decoder). -}
+pickerEscapeDecoder : Model -> Decode.Decoder Msg
+pickerEscapeDecoder _ =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.ReactionPickerClose
 
                                 else
                                     Decode.fail "not-escape"

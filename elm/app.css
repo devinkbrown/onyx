@@ -1317,6 +1317,39 @@ html, body {
   text-align: left;
 }
 .onyx-msg-menu-item:hover { background: var(--onyx-panel); }
+.onyx-react-picker {
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 4px 16px;
+  max-width: 280px;
+  padding: 6px;
+}
+.onyx-react-search {
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font-size: 13px;
+  padding: 6px 10px;
+}
+.onyx-react-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+}
+.onyx-react-choice {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px;
+}
+.onyx-react-choice:hover { background: var(--onyx-panel); }
 .onyx-msg-menu-delete-confirm { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
 .onyx-msg-menu-delete-confirm-title { font-weight: 700; font-size: 13px; margin: 0; }
 .onyx-msg-menu-delete-confirm-copy { color: var(--onyx-dim); font-size: 12px; margin: 0; }

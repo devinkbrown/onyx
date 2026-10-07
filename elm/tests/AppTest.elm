@@ -3125,6 +3125,66 @@ suite =
                     , \_ -> Expect.equal [ "Copy failed" ] (List.map .title copyFailed.toasts)
                     ]
                     ()
+                , test "reaction picker opens, searches, chooses, and excludes the menu" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me" }
+
+                    ( m1, _ ) =
+                        feed (joinFirst base "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :theirs"
+
+                    ( picked, _ ) =
+                        update (ReactionPickerOpen { target = "#c", msgid = "m1" }) m1
+
+                    ( toggled, _ ) =
+                        update (ReactionPickerOpen { target = "#c", msgid = "m1" }) picked
+
+                    ( unknown, _ ) =
+                        update (ReactionPickerOpen { target = "#c", msgid = "nope" }) m1
+
+                    ( searched, _ ) =
+                        update (ReactionPickerSearch "heart") picked
+
+                    ( searchClosed, _ ) =
+                        update (ReactionPickerSearch "heart") m1
+
+                    ( closed, _ ) =
+                        update ReactionPickerClose picked
+
+                    ( closeIdle, _ ) =
+                        update ReactionPickerClose m1
+
+                    ( menuOpened, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "m1" }) picked
+
+                    ( pickerOpened, _ ) =
+                        update (ReactionPickerOpen { target = "#c", msgid = "m1" }) (Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) m1))
+
+                    ( chosen, chooseOut ) =
+                        update (ReactionPickerChoose "💙") picked
+
+                    ( chooseIdle, chooseIdleOut ) =
+                        update (ReactionPickerChoose "💙") m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just { target = "#c", msgid = "m1", query = "" }) picked.reactionPicker
+                    , \_ -> Expect.equal Nothing toggled.reactionPicker
+                    , \_ -> Expect.equal Nothing unknown.reactionPicker
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m1", query = "heart" }) searched.reactionPicker
+                    , \_ -> Expect.equal Nothing searchClosed.reactionPicker
+                    , \_ -> Expect.equal Nothing closed.reactionPicker
+                    , \_ -> Expect.equal Nothing closeIdle.reactionPicker
+                    , \_ -> Expect.equal Nothing menuOpened.reactionPicker
+                    , \_ -> Expect.notEqual Nothing menuOpened.messageMenu
+                    , \_ -> Expect.equal Nothing pickerOpened.messageMenu
+                    , \_ -> Expect.notEqual Nothing pickerOpened.reactionPicker
+                    , \_ -> Expect.equal Nothing chosen.reactionPicker
+                    , \_ -> Expect.equal [] chooseOut
+                    , \_ -> Expect.equal Nothing chooseIdle.reactionPicker
+                    , \_ -> Expect.equal [] chooseIdleOut
+                    ]
+                    ()
         , test "menu pin, ignore, and collapse toggles" <|
             \_ ->
                 let

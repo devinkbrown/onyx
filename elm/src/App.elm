@@ -308,6 +308,7 @@ type alias Model =
     , editingMessage : Maybe { target : String, msgid : String, draft : String }
     , composerDrafts : Dict.Dict String String
     , messageMenu : Maybe { target : String, msgid : String, confirmDelete : Bool }
+    , reactionPicker : Maybe { target : String, msgid : String, query : String }
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -2640,6 +2641,10 @@ type Msg
     | MessageStartTopic { target : String, msgid : String }
     | MessageMenuOpen { target : String, msgid : String }
     | MessageMenuClose
+    | ReactionPickerOpen { target : String, msgid : String }
+    | ReactionPickerClose
+    | ReactionPickerSearch String
+    | ReactionPickerChoose String
     | MessageMenuDeleteAsk
     | MessageMenuCopy { target : String, msgid : String }
     | MessageSearchText { text : String }
@@ -2892,6 +2897,7 @@ init nick url =
     , composer = ""
     , composerDrafts = Dict.empty
     , messageMenu = Nothing
+    , reactionPicker = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -3329,6 +3335,7 @@ blank =
     , composer = ""
     , composerDrafts = Dict.empty
     , messageMenu = Nothing
+    , reactionPicker = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -8685,6 +8692,7 @@ quarantineOwnerChange model =
             , composer = ""
             , composerDrafts = Dict.empty
             , messageMenu = Nothing
+            , reactionPicker = Nothing
             , composerError = Nothing
             , composerAudience = Nothing
     , attachments = []
@@ -34908,10 +34916,10 @@ update msg model =
                                 ( { model | messageMenu = Nothing, translations = Dict.remove msgid model.translations }, [] )
 
                             else
-                                ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False }, translations = Dict.remove msgid model.translations }, [] )
+                                ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False }, reactionPicker = Nothing, translations = Dict.remove msgid model.translations }, [] )
 
                         Nothing ->
-                            ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False }, translations = Dict.remove msgid model.translations }, [] )
+                            ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False }, reactionPicker = Nothing, translations = Dict.remove msgid model.translations }, [] )
 
         MessageMenuClose ->
             case model.messageMenu of
@@ -34920,6 +34928,55 @@ update msg model =
 
                 Just open ->
                     ( { model | messageMenu = Nothing, translations = Dict.remove open.msgid model.translations }, [] )
+
+        ReactionPickerOpen { target, msgid } ->
+            -- The reaction picker opens on its own row and is
+            -- mutually exclusive with the overflow menu
+            -- (mirroring the oracle popover open state): an
+            -- unknown row never opens it, and opening one layer
+            -- closes the other.
+            case reactionRow model target msgid of
+                Nothing ->
+                    ( model, [] )
+
+                Just _ ->
+                    case model.reactionPicker of
+                        Just open ->
+                            if String.toLower open.target == String.toLower target && open.msgid == msgid then
+                                ( { model | reactionPicker = Nothing }, [] )
+
+                            else
+                                ( { model | reactionPicker = Just { target = String.toLower target, msgid = msgid, query = "" }, messageMenu = Nothing }, [] )
+
+                        Nothing ->
+                            ( { model | reactionPicker = Just { target = String.toLower target, msgid = msgid, query = "" }, messageMenu = Nothing }, [] )
+
+        ReactionPickerClose ->
+            case model.reactionPicker of
+                Nothing ->
+                    ( model, [] )
+
+                Just _ ->
+                    ( { model | reactionPicker = Nothing }, [] )
+
+        ReactionPickerSearch text ->
+            case model.reactionPicker of
+                Nothing ->
+                    ( model, [] )
+
+                Just open ->
+                    ( { model | reactionPicker = Just { open | query = text } }, [] )
+
+        ReactionPickerChoose emoji ->
+            -- Choosing emits the bounded react through the
+            -- shared send path (mirroring the oracle react
+            -- popover choose) and closes the picker.
+            case model.reactionPicker of
+                Nothing ->
+                    ( model, [] )
+
+                Just open ->
+                    Tuple.mapFirst (\m -> { m | reactionPicker = Nothing }) (sendReaction model open.target open.msgid emoji)
 
         MessageMenuDeleteAsk ->
             -- The destructive action arms a confirm step first
@@ -35266,7 +35323,7 @@ update msg model =
         ChannelSelect name ->
             -- A context switch dismisses the message menu and its
             -- translation with it.
-            Tuple.mapFirst (\m -> { m | messageMenu = Nothing, translations = Dict.empty }) (selectChannel model name)
+            Tuple.mapFirst (\m -> { m | messageMenu = Nothing, reactionPicker = Nothing, translations = Dict.empty }) (selectChannel model name)
 
         ChannelTopicSelect { channel, topic } ->
             -- Named-conversation selection (mirrors

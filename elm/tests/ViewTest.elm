@@ -990,6 +990,94 @@ suite =
                             |> Query.hasNot [ Selector.text "hello there" ]
                     ]
                     ()
+                , test "reaction picker panel searches and chooses" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    opened =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) base)
+
+                    picked =
+                        Tuple.first (update (ReactionPickerOpen { target = "#c", msgid = "m1" }) base)
+
+                    searched =
+                        Tuple.first (update (ReactionPickerSearch "heart") picked)
+                in
+                Expect.all
+                    [ \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has [ Selector.text "React" ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Choose reaction for message from alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (ReactionPickerOpen { target = "#c", msgid = "m1" })
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.class "onyx-react-picker" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Choose reaction for message from alice") ]
+                    , \_ ->
+                        query picked
+                            |> Query.find
+                                [ Selector.tag "input"
+                                , Selector.attribute (Attr.attribute "aria-label" "Search emoji")
+                                ]
+                            |> Query.has [ Selector.attribute (Attr.placeholder "Search emoji") ]
+                    , \_ ->
+                        query picked
+                            |> Query.find
+                                [ Selector.tag "input"
+                                , Selector.attribute (Attr.attribute "aria-label" "Search emoji")
+                                ]
+                            |> Event.simulate (Event.input "rocket")
+                            |> Event.expect (ReactionPickerSearch "rocket")
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.class "onyx-react-grid" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Emoji results") ]
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "React to message from alice with rocket") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (ReactionPickerChoose "🚀")
+                    , \_ ->
+                        query searched
+                            |> Query.find [ Selector.class "onyx-react-grid" ]
+                            |> Query.has [ Selector.text "💙" ]
+                    , \_ ->
+                        query searched
+                            |> Query.find [ Selector.class "onyx-react-grid" ]
+                            |> Query.hasNot [ Selector.text "😀" ]
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.class "onyx-react-picker" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect ReactionPickerClose
+                    , \_ ->
+                        query picked
+                            |> Query.find [ Selector.class "onyx-react-backdrop" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ReactionPickerClose
+                    , \_ ->
+                        query picked
+                            |> Query.hasNot [ Selector.class "onyx-msg-menu" ]
+                    ]
+                    ()
         , test "menu translation item, section, and unavailable note" <|
             \_ ->
                 let
