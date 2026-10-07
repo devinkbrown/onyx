@@ -16547,6 +16547,41 @@ suite =
                         , \_ -> Expect.equal 1 (List.length (ownedScheduledMessages added))
                         ]
                         ()
+            , test "scheduled admission stops typing when it clears the draft" <|
+                \_ ->
+                    let
+                        row =
+                            { id = "s1"
+                            , channel = "#c"
+                            , text = "later"
+                            , sendAt = 5000
+                            , owner = Nothing
+                            , claim = Nothing
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        base =
+                            { blank
+                                | caps = [ "draft/typing" ]
+                                , activeChannel = Just "#c"
+                                , composer = "later"
+                                , schedulePending = [ { channel = "#c", text = "later", sendAt = 5000 } ]
+                            }
+
+                        ( admitted, out ) =
+                            admitSchedulePending base row
+
+                        ( moved, movedOut ) =
+                            admitSchedulePending { base | activeChannel = Just "#d" } row
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" admitted.composer
+                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] out
+                        , \_ -> Expect.equal "later" moved.composer
+                        , \_ -> Expect.equal [] movedOut
+                        ]
+                        ()
             , test "fence and add refusals drop silently" <|
                 \_ ->
                     let
