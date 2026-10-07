@@ -306,9 +306,17 @@ all prefixes a member holds.
 - **Param-always (B):** `k` key.
 - **Param-on-set (C):** `l` limit, `f` forward (target channel), `j` join-throttle.
 - **Flag (D):** `i` invite-only, `m` moderated, `n` no-external, `s` secret,
-  `t` topic-ops-only, `C` no-CTCP, `T` no-TAGMSG?, `N` …, `M` reg-moderated,
-  `S` TLS-only, `g` …, `W` NOWHISPER, `O` oper-only, `A` admin-only,
+  `t` topic-ops-only, `C` no-CTCP, `T` no-notice (drops channel NOTICE from
+  non-ops), `N` no-nick (blocks nick changes by non-ops while joined),
+  `M` reg-moderated, `S` TLS-only, `g` free-invite (any member may INVITE
+  while `+i`), `W` news-wire (in-channel news fantasy commands),
+  `O` oper-only, `A` admin-only,
   `V` NOCOMICDATA, `U` OPMODERATE, `F` FREETARGET, `D` DISFORWARD.
+  NOWHISPER is the lowercase IRCX ext flag `w` (`923 ERR_NOWHISPER`), not
+  `+W`. Further live-but-unadvertised IRCX ext flags: `p` PRIVATE,
+  `h` HIDDEN, `u` KNOCK, `a` AUTHONLY, `f` NOFORMAT, `d` CLONEABLE,
+  `E` CLONE, `r` REGISTERED, `z` SERVICE, `x` AUDITORIUM.
+  Source: `docs/reference/protocol/modes.md` (drawn from live source).
 - `MODE #chan` query → `324 RPL_CHANNELMODEIS` (hides `+k`/`+l` values from
   non-members). Set → `MODE` broadcast.
 - **`MODEX <#chan> [+NAMEDMODE …]`** — IRCX named-mode front end (`+AUTHONLY` etc.);
@@ -322,10 +330,18 @@ all prefixes a member holds.
 `+b/+e/+I/+Z` masks.
 
 ### 8.5 User modes
-`+B` bot (advertised `BOT=B`, surfaced in WHOIS), `+R` registered-only PMs
-(blocks unauthenticated senders → `477`), `+z` oper-set gag, plus standard
-`+i/+w/+o` style flags. `MODE <ownnick>` → `221 RPL_UMODEIS`. Changing another
-user's mode → `502`.
+Client-writable (self `MODE <ownnick>` only): `i` invisible, `B` bot
+(advertised `BOT=B`, surfaced in WHOIS), `D` deaf, `g` callerid (DMs need
+ACCEPT), `C` no-ctcp, `R` regonly-pm (rejects unauthenticated senders),
+`p` hide-chans, `Q` no-forward, `H` hide-oper, `P` media-presence-private,
+`j` override (privilege-gated). Server-managed (read-only to clients):
+`o` operator (derived from SASL elevation), `r` registered, `x` cloaked,
+`z` secure-tls (opers may use cross-user `+z` as GAG), `M` media-tx-deny,
+`a` admin. There is **no `+w`** (wallops/snomask do not use user modes;
+operator notifications ride the Event Spine as raw `EVENT` lines).
+`MODE <ownnick>` → `221 RPL_UMODEIS`. Changing another user's mode →
+`502` (except the oper `+z` GAG and `+M`/`+P` media paths).
+Source: `docs/reference/protocol/modes.md` (drawn from live source).
 
 ---
 
