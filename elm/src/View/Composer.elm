@@ -93,6 +93,74 @@ composer model =
                       else
                         text ""
                     ]
+        , attachments model
+        ]
+
+
+{-| Attachment staging (mirroring the composer attach surface:
+the button refuses in protected DMs with the draft kept, staged
+files list with per-file status, and failures surface the send
+copy). -}
+attachments : Model -> Html Msg
+attachments model =
+    let
+        protected =
+            case model.activeChannel of
+                Just target ->
+                    App.dmDesignated model target
+
+                Nothing ->
+                    False
+
+        hint =
+            if protected then
+                App.dmAttachmentBlocked
+
+            else
+                "Attach files (up to 5, 25 MB each)"
+    in
+    div [ class "onyx-attachments" ]
+        ([ button
+            [ type_ "button"
+            , class "onyx-attach-open"
+            , disabled protected
+            , title hint
+            , attribute "aria-label" "Attach files"
+            , onClick AttachPick
+            ]
+            [ text "Attach" ]
+         ]
+            ++ List.map stagedRow model.attachments
+        )
+
+
+stagedRow : App.StagedAttachment -> Html Msg
+stagedRow item =
+    let
+        statusText =
+            case item.status of
+                App.StagedReady ->
+                    "ready"
+
+                App.StagedUploading ->
+                    "uploading…"
+
+                App.StagedUploaded _ ->
+                    "uploaded"
+
+                App.StagedFailed ->
+                    "failed — " ++ "Couldn't send. Try again."
+    in
+    div [ class "onyx-attach-row" ]
+        [ span [ class "onyx-attach-name" ] [ text item.name ]
+        , span [ class "onyx-attach-status" ] [ text statusText ]
+        , button
+            [ type_ "button"
+            , class "onyx-attach-remove"
+            , attribute "aria-label" ("Remove " ++ item.name)
+            , onClick (AttachRemove item.id)
+            ]
+            [ text "Remove" ]
         ]
 
 

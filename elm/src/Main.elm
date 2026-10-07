@@ -132,6 +132,18 @@ port probeNodes : { nodes : List { id : String, host : String, wss : String }, p
 port nodesProbed : ({ wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float } -> msg) -> Sub msg
 
 
+port uploadPick : { key : String, accept : String, multiple : Bool } -> Cmd msg
+
+
+port uploadPicked : ({ key : String, files : List { name : String, size : Float, mime : String } } -> msg) -> Sub msg
+
+
+port uploadSend : { key : String, endpoint : String, fieldName : String, index : Int } -> Cmd msg
+
+
+port uploadDone : ({ key : String, index : Int, ok : Bool, status : Int, body : String, contentType : Maybe String } -> msg) -> Sub msg
+
+
 port wsClose : () -> Cmd msg
 
 
@@ -835,6 +847,7 @@ init rawFlags url key =
                     Schedule.parseScheduledMessages
                         (Maybe.withDefault "" (decodeField "scheduledMessages" Decode.string rawFlags))
                 , origin = Maybe.withDefault "" (decodeField "origin" Decode.string rawFlags)
+                , mediaUrl = decodeField "mediaUrl" Decode.string rawFlags
                 , nowMs = Maybe.withDefault 0 (decodeField "nowMs" Decode.float rawFlags)
                 , sessionTokens =
                     { sessionToken = decodeField "sessionToken" Decode.string rawFlags
@@ -925,6 +938,12 @@ perform key outbound =
 
         App.WsConnect req ->
             wsConnect req
+
+        App.UploadPick req ->
+            uploadPick req
+
+        App.UploadSend req ->
+            uploadSend req
 
         App.WsDisconnect ->
             wsClose ()
@@ -1316,6 +1335,8 @@ subscriptions model =
             )
         , wsLines App.WsBatchReceived
         , nodesProbed App.NodesProbed
+        , uploadPicked App.UploadPicked
+        , uploadDone App.UploadDone
         , wsOpened App.WsOpened
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged

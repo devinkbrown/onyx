@@ -2071,6 +2071,109 @@ suite =
                             out
                 in
                 Expect.equal [ [ "ONYXDM1 xyz" ] ] bodies
+        , test "AttachPick requests the picker with a fresh key" <|
+            \_ ->
+                let
+                    ( m1, out ) =
+                        update AttachPick blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ UploadPick { key = "att-0", accept = "", multiple = True } ] out
+                    , \_ -> Expect.equal 1 m1.attachmentSeq
+                    ]
+                    ()
+        , test "UploadPicked stages under the caps" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update AttachPick blank
+
+                    ( m2, _ ) =
+                        update
+                            (UploadPicked
+                                { key = "att-0"
+                                , files =
+                                    [ { name = "ok.png", size = 10, mime = "image/png" }
+                                    , { name = "big.bin", size = 30000000, mime = "application/octet-stream" }
+                                    ]
+                                }
+                            )
+                            m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length m2.attachments)
+                    , \_ -> Expect.equal (Just "ok.png") (Maybe.map .name (List.head m2.attachments))
+                    , \_ -> Expect.equal (Just "big.bin is larger than 25 MB.") m2.composerError
+                    ]
+                    ()
+        , test "UploadPicked refuses protected DMs with the draft kept" <|
+            \_ ->
+                let
+                    proved =
+                        foldVaultDmPrivacy blank "dave" "encrypted"
+
+                    base =
+                        { proved | activeChannel = Just "dave", composer = "draft" }
+
+                    ( m1, out ) =
+                        update (UploadPicked { key = "att-0", files = [ { name = "a.png", size = 10, mime = "image/png" } ] }) base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] m1.attachments
+                    , \_ -> Expect.equal (Just dmAttachmentBlocked) m1.composerError
+                    , \_ -> Expect.equal "draft" m1.composer
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
+        , test "ComposerSend with attachments uploads then sends receipts" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, activeChannel = Just "#c", composer = "hi" }
+
+                    ( m1, _ ) =
+                        update AttachPick live
+
+                    ( m2, _ ) =
+                        update (UploadPicked { key = "att-0", files = [ { name = "a.png", size = 10, mime = "image/png" } ] }) m1
+
+                    ( m3, sendOut ) =
+                        update ComposerSend m2
+
+                    ( m4, doneOut ) =
+                        update (UploadDone { key = "att-0", index = 0, ok = True, status = 201, body = "{\"path\":\"/uploads/a.png\"}", contentType = Just "application/json" }) m3
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ UploadSend { key = "att-0", endpoint = "/upload", fieldName = "file", index = 0 } ] sendOut
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :hi[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
+                    , \_ -> Expect.equal [] m4.attachments
+                    , \_ -> Expect.equal "" m4.composer
+                    ]
+                    ()
+        , test "UploadDone failure aborts with the draft kept" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, activeChannel = Just "#c", composer = "hi" }
+
+                    ( m1, _ ) =
+                        update AttachPick live
+
+                    ( m2, _ ) =
+                        update (UploadPicked { key = "att-0", files = [ { name = "a.png", size = 10, mime = "image/png" } ] }) m1
+
+                    ( m3, _ ) =
+                        update ComposerSend m2
+
+                    ( m4, out ) =
+                        update (UploadDone { key = "att-0", index = 0, ok = False, status = 413, body = "", contentType = Nothing }) m3
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "Couldn't send. Try again.") m4.composerError
+                    , \_ -> Expect.equal "hi" m4.composer
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let

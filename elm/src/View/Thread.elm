@@ -6,10 +6,11 @@ channel, newest last.
 
 import App exposing (Model, Msg)
 import Dict
-import Html exposing (Html, button, div, h2, li, section, span, strong, text, time, ul)
-import Html.Attributes exposing (attribute, class, classList, datetime)
+import Html exposing (Html, a, button, div, h2, img, li, section, span, strong, text, time, ul)
+import Html.Attributes exposing (attribute, class, classList, datetime, href, src)
 import Html.Events exposing (onClick)
 import Prefs
+import Upload
 
 
 thread : Model -> Html Msg
@@ -165,7 +166,7 @@ messageRow model target m =
           else
             time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
                 [ text (App.formatClockUtc m.at) ]
-        , span [ class "onyx-body" ] [ text (App.displayBody m) ]
+        , span [ class "onyx-body" ] (messageBody m)
         , if m.outboxId == Nothing && not m.pending then
             text ""
 
@@ -255,3 +256,40 @@ boostChip model target m groups chip =
 
         _ ->
             span [ class "boost-pill", attribute "title" title ] kids
+
+
+{-| Row body: the caption as text plus one card per `[file]`
+receipt (images render a thumbnail; every card links the
+sanitized URL, so no `javascript:` href can reach the DOM). -}
+messageBody : App.ChatMessage -> List (Html Msg)
+messageBody m =
+    let
+        presented =
+            Upload.extractAttachmentPresentation (App.displayBody m)
+    in
+    [ text presented.caption ]
+        ++ List.map attachmentCard presented.attachments
+
+
+attachmentCard : Upload.ParsedAttachment -> Html Msg
+attachmentCard attachment =
+    let
+        label =
+            Maybe.withDefault "file" attachment.name
+                ++ (case attachment.sizeLabel of
+                        Just size ->
+                            " (" ++ size ++ ")"
+
+                        Nothing ->
+                            ""
+                   )
+    in
+    div [ class "onyx-attachment" ]
+        [ case attachment.kind of
+            Upload.KindImage ->
+                img [ src attachment.url, class "onyx-attachment-thumb" ] []
+
+            _ ->
+                text ""
+        , a [ href attachment.url, class "onyx-attachment-link" ] [ text label ]
+        ]

@@ -222,6 +222,36 @@ suite =
             \_ ->
                 query channelModel
                     |> Query.has [ Selector.text "hello world" ]
+        , test "composer attach button and staged rows render" <|
+            \_ ->
+                let
+                    staged =
+                        { channelModel
+                            | attachments =
+                                [ { id = 0, key = "att-0", position = 0, name = "a.png", size = 10, mime = "image/png", status = StagedUploading }
+                                ]
+                        }
+                in
+                Expect.all
+                    [ \_ ->
+                        query staged
+                            |> Query.find [ Selector.class "onyx-attach-open" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Attach files") ]
+                    , \_ ->
+                        query staged
+                            |> Query.has [ Selector.text "uploading…" ]
+                    ]
+                    ()
+        , test "thread renders attachment cards with links" <|
+            \_ ->
+                let
+                    withFile =
+                        channelModel
+                            |> (\m -> feed m ":alice!u@h PRIVMSG #c :see this\n[file: a.png] 2.0 KB https://cdn.example.test/a.png")
+                in
+                query withFile
+                    |> Query.find [ Selector.class "onyx-attachment-link" ]
+                    |> Query.has [ Selector.text "a.png (2.0 KB)" ]
         , test "thread marks queued placeholders pending" <|
             \_ ->
                 let
