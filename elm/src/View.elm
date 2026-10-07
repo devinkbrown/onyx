@@ -48,6 +48,7 @@ import View.Browser exposing (browser)
 import View.GuestClaim exposing (guestClaim)
 import View.Account exposing (accountPanel)
 import View.Pins exposing (pinsDrawer)
+import View.Profile exposing (profileSheet)
 import View.Thread exposing (thread)
 import View.Toast exposing (toaster)
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
@@ -212,5 +213,6 @@ shell model =
                , scheduledSheet model
                , accountPanel model
                , pinsDrawer model
+               , profileSheet model
                ]
         )

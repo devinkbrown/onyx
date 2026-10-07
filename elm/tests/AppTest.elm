@@ -8646,6 +8646,25 @@ suite =
                     , \_ -> Expect.equal 1 m1.whoisTimerGen
                     ]
                     ()
+        , test "WhoisClose clears the sheet target and keeps the cache" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        update (WhoisRequest "alice") blank
+
+                    ( closed, _ ) =
+                        update WhoisClose opened
+
+                    ( idle, _ ) =
+                        update WhoisClose blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "alice") opened.whoisTarget
+                    , \_ -> Expect.equal Nothing closed.whoisTarget
+                    , \_ -> Expect.equal opened.whois closed.whois
+                    , \_ -> Expect.equal Nothing idle.whoisTarget
+                    ]
+                    ()
         , test "381 sets oper state with the admin badge" <|
             \_ ->
                 let

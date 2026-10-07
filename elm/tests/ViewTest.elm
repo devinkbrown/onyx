@@ -1094,6 +1094,137 @@ suite =
                             |> Query.has [ Selector.attribute (Attr.attribute "role" "option") ]
                     ]
                     ()
+                , test "whois sheet renders the folded network identity" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    rosterBase =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    loading =
+                        Tuple.first (update (WhoisRequest "alice") blank)
+
+                    full =
+                        loading
+                            |> (\m -> feed m ":s 330 me alice alice-account :logged in as")
+                            |> (\m -> feed m ":s 311 me alice auser ahost * :Alice Example")
+                            |> (\m -> feed m ":s 312 me alice irc.example :Example edge")
+                            |> (\m -> feed m ":s 313 me alice :is a Network Administrator")
+                            |> (\m -> feed m ":s 317 me alice 125 1700000000 :seconds idle")
+                            |> (\m -> feed m ":s 319 me alice :#root #other")
+                            |> (\m -> feed m ":s 301 me alice :Writing tests")
+                            |> (\m -> feed m ":s 671 me alice :is using a secure connection (TLS_AES_128_GCM_SHA256)")
+                            |> (\m -> feed m ":s 276 me alice :has client certificate fingerprint SHA256:abc")
+                            |> (\m -> feed m ":s 335 me alice :is a bot")
+                            |> (\m -> feed m ":s 320 me alice :Uses a secure connection")
+
+                    settled =
+                        Tuple.first (update (WhoisRequest "quiet") blank)
+                            |> (\m -> feed m ":s 318 me quiet :End of WHOIS")
+
+                    offline =
+                        Tuple.first (update (WhoisRequest "off") { blank | connection = Offline })
+
+                    departed =
+                        Tuple.first (update (WhoisRequest "ghost") blank)
+                            |> (\m -> feed m ":server 401 me ghost :No such nick")
+
+                    timedOut =
+                        Tuple.first (update (WhoisTimeoutElapsed { nick = "alice", gen = 1 }) loading)
+                in
+                Expect.all
+                    [ \_ ->
+                        query rosterBase
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View network profile for alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (WhoisRequest "alice")
+                    , \_ ->
+                        query loading
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Profile: alice") ]
+                    , \_ ->
+                        query loading
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "role" "status") ]
+                            |> Query.has [ Selector.text "Asking the network" ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.has
+                                [ Selector.text "~alice-account"
+                                , Selector.text "auser@ahost"
+                                , Selector.text "Alice Example"
+                                , Selector.text "Network Administrator"
+                                , Selector.text "Bot account"
+                                , Selector.text "Writing tests"
+                                , Selector.text "2 minutes"
+                                , Selector.text "TLS_AES_128_GCM_SHA256"
+                                , Selector.text "SHA256:abc"
+                                , Selector.text "Uses a secure connection"
+                                ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Rooms shared with alice") ]
+                            |> Query.has [ Selector.tag "ul" ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Room ledger for #root") ]
+                            |> Query.has [ Selector.attribute (Attr.href "/stats/?room=%23root") ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Network notes for alice") ]
+                            |> Query.has [ Selector.tag "ul" ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.find [ Selector.tag "time" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "datetime" (App.millisToIso 1700000000000)) ]
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Close member profile") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect WhoisClose
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.class "onyx-profile-backdrop" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect WhoisClose
+                    , \_ ->
+                        query full
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect WhoisClose
+                    , \_ ->
+                        query settled
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.has [ Selector.text "The network returned no additional profile details." ]
+                    , \_ ->
+                        query offline
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "role" "alert") ]
+                            |> Query.has [ Selector.text "Reconnect to request profile details." ]
+                    , \_ ->
+                        query departed
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "role" "alert") ]
+                            |> Query.has [ Selector.text "No profile was found for ghost." ]
+                    , \_ ->
+                        query timedOut
+                            |> Query.find [ Selector.class "onyx-profile-sheet" ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "role" "alert") ]
+                            |> Query.has [ Selector.text "did not answer in time" ]
+                    ]
+                    ()
         , test "menu translation item, section, and unavailable note" <|
             \_ ->
                 let

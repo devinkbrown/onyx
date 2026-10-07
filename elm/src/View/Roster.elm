@@ -7,10 +7,11 @@ PREFIX declaration order first (mirroring `memberGroups.ts`), so an
 exotic server letter ranks instead of dropping.
 -}
 
-import App exposing (Channel, Member, Model, Msg)
+import App exposing (Channel, Member, Model, Msg(..))
 import Dict
-import Html exposing (Html, div, h2, li, section, span, text, ul)
-import Html.Attributes exposing (class, classList)
+import Html exposing (Html, button, div, h2, li, section, span, text, ul)
+import Html.Attributes exposing (attribute, class, classList)
+import Html.Events exposing (onClick)
 import Modes
 import View.Stewardship exposing (roomCareButton)
 
@@ -75,4 +76,11 @@ rosterRow role member =
         ]
         [ span [ class "onyx-member-prefix" ] [ text role.symbol ]
         , span [] [ text member.nick ]
+        , button
+            [ attribute "type" "button"
+            , class "onyx-member-profile"
+            , attribute "aria-label" ("View network profile for " ++ member.nick)
+            , onClick (App.WhoisRequest member.nick)
+            ]
+            [ text "Profile" ]
         ]
