@@ -23,6 +23,7 @@ function harness() {
   globalThis.document = dom.window.document;
   let request = null;
   let loaded = null;
+  let save = null;
   const ports = {
     wsConnect: stub(),
     wsSend: stub(),
@@ -51,10 +52,12 @@ function harness() {
     personReportReceiptSave: stub(),
     identityOverridesRequest: { subscribe(fn) { request = fn; } },
     identityOverridesLoaded: { send(payload) { loaded = payload; } },
+    identityOverridesSave: { subscribe(fn) { save = fn; } },
   };
   wire({ ports });
   assert.equal(typeof request, "function");
-  return { dom, request, getLoaded: () => loaded };
+  assert.equal(typeof save, "function");
+  return { dom, request, getLoaded: () => loaded, getSave: () => save };
 }
 
 function cleanup(h) {
@@ -125,6 +128,69 @@ test("null keys stay empty without touching storage", () => {
     h.request({ softIgnoreKey: null, nickColorsKey: null, displayNamesKey: null });
     assert.deepEqual(h.getLoaded(), { softIgnore: [], nickColors: {}, displayNames: {} });
     assert.equal(h.dom.window.localStorage.length, 0);
+  } finally {
+    cleanup(h);
+  }
+});
+
+test("saves provided journals and purges legacy keys", () => {
+  const h = harness();
+  try {
+    const store = h.dom.window.localStorage;
+    store.setItem("onyx:soft-ignore", JSON.stringify(["legacy"]));
+    h.getSave()({
+      softIgnoreKey: SOFT,
+      softIgnore: JSON.stringify(["trev"]),
+      nickColorsKey: COLORS,
+      nickColors: JSON.stringify({ trev: "#aabbcc" }),
+      displayNamesKey: NAMES,
+      displayNames: JSON.stringify({ trev: "Trusted teammate" }),
+    });
+    assert.equal(store.getItem(SOFT), JSON.stringify(["trev"]));
+    assert.equal(store.getItem(COLORS), JSON.stringify({ trev: "#aabbcc" }));
+    assert.equal(store.getItem(NAMES), JSON.stringify({ trev: "Trusted teammate" }));
+    assert.equal(store.getItem("onyx:soft-ignore"), null);
+  } finally {
+    cleanup(h);
+  }
+});
+
+test("emptied journals remove their keys and untouched slots stay", () => {
+  const h = harness();
+  try {
+    const store = h.dom.window.localStorage;
+    store.setItem(SOFT, JSON.stringify(["trev"]));
+    store.setItem(COLORS, JSON.stringify({ trev: "#aabbcc" }));
+    h.getSave()({
+      softIgnoreKey: SOFT,
+      softIgnore: "[]",
+      nickColorsKey: null,
+      nickColors: null,
+      displayNamesKey: null,
+      displayNames: null,
+    });
+    assert.equal(store.getItem(SOFT), null);
+    assert.equal(store.getItem(COLORS), JSON.stringify({ trev: "#aabbcc" }));
+  } finally {
+    cleanup(h);
+  }
+});
+
+test("save drops over-cap and non-string journals", () => {
+  const h = harness();
+  try {
+    const store = h.dom.window.localStorage;
+    store.setItem(SOFT, JSON.stringify(["trev"]));
+    h.getSave()({
+      softIgnoreKey: SOFT,
+      softIgnore: "x".repeat(256 * 1024 + 1),
+      nickColorsKey: COLORS,
+      nickColors: null,
+      displayNamesKey: null,
+      displayNames: null,
+    });
+    assert.equal(store.getItem(SOFT), JSON.stringify(["trev"]));
+    assert.equal(store.getItem(COLORS), null);
   } finally {
     cleanup(h);
   }

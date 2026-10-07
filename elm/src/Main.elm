@@ -287,6 +287,8 @@ port guidesProgressStore : List String -> Cmd msg
 
 port identityOverridesRequest : { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String } -> Cmd msg
 
+port identityOverridesSave : { softIgnoreKey : Maybe String, softIgnore : Maybe String, nickColorsKey : Maybe String, nickColors : Maybe String, displayNamesKey : Maybe String, displayNames : Maybe String } -> Cmd msg
+
 port identityOverridesLoaded : (Decode.Value -> msg) -> Sub msg
 
 port personReportReceiptSave : { key : String, nick : String, reason : String, draft : String } -> Cmd msg
@@ -1219,6 +1221,9 @@ perform key outbound =
 
         App.IdentityOverridesRequest req ->
             identityOverridesRequest req
+
+        App.IdentityOverridesSave req ->
+            identityOverridesSave req
 
         App.PersonReportReceiptSave req ->
             personReportReceiptSave req

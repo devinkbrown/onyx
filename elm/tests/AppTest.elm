@@ -13664,6 +13664,149 @@ suite =
                         , \_ -> Expect.equal [] voicedToggleOut
                         ]
                         ()
+            , test "identity override writes gate on owner and save normalized journals" <|
+                \_ ->
+                    let
+                        owned =
+                            { blank
+                                | ourNick = "alice"
+                                , endpoint = Just "wss://harbor.test/ws"
+                                , accountName = Just "alice"
+                            }
+
+                        softKey =
+                            "onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+
+                        colorKey =
+                            "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+
+                        nameKey =
+                            "onyx:display-names:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+
+                        ( ownerlessToggle, ownerlessToggleOut ) =
+                            update (OverrideToggleSoftIgnore "trev") blank
+
+                        ( ownerlessColor, ownerlessColorOut ) =
+                            update (OverrideSetNickColor { nick = "trev", color = "#AABBCC" }) blank
+
+                        ( ownerlessName, ownerlessNameOut ) =
+                            update (OverrideSetDisplayName { nick = "trev", name = "Trev" }) blank
+
+                        ( ignored, ignoreOut ) =
+                            update (OverrideToggleSoftIgnore "  TrEv  ") owned
+
+                        ( unignored, unignoreOut ) =
+                            update (OverrideToggleSoftIgnore "TREV") ignored
+
+                        ( colored, colorOut ) =
+                            update (OverrideSetNickColor { nick = "TrEv", color = "#AABBCC" }) owned
+
+                        ( badColor, badColorOut ) =
+                            update (OverrideSetNickColor { nick = "unsafe", color = "red; background: url(https://example.test)" }) owned
+
+                        ( named, nameOut ) =
+                            update (OverrideSetDisplayName { nick = "TrEv", name = "  Trusted teammate  " }) owned
+
+                        ( badName, badNameOut ) =
+                            update (OverrideSetDisplayName { nick = "bad nick", name = "Must not persist" }) owned
+
+                        ( clearedColor, clearColorOut ) =
+                            update (OverrideClearNickColor "TREV") colored
+
+                        ( clearedName, clearNameOut ) =
+                            update (OverrideClearDisplayName "TREV") named
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Set.empty ownerlessToggle.softIgnoreList
+                        , \_ -> Expect.equal [] ownerlessToggleOut
+                        , \_ -> Expect.equal Dict.empty ownerlessColor.nickColorOverrides
+                        , \_ -> Expect.equal [] ownerlessColorOut
+                        , \_ -> Expect.equal Dict.empty ownerlessName.displayNameOverrides
+                        , \_ -> Expect.equal [] ownerlessNameOut
+                        , \_ -> Expect.equal (Set.singleton "trev") ignored.softIgnoreList
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Just softKey
+                                    , softIgnore = Just "[\"trev\"]"
+                                    , nickColorsKey = Nothing
+                                    , nickColors = Nothing
+                                    , displayNamesKey = Nothing
+                                    , displayNames = Nothing
+                                    }
+                                ]
+                                ignoreOut
+                        , \_ -> Expect.equal Set.empty unignored.softIgnoreList
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Just softKey
+                                    , softIgnore = Just "[]"
+                                    , nickColorsKey = Nothing
+                                    , nickColors = Nothing
+                                    , displayNamesKey = Nothing
+                                    , displayNames = Nothing
+                                    }
+                                ]
+                                unignoreOut
+                        , \_ -> Expect.equal (Dict.singleton "trev" "#aabbcc") colored.nickColorOverrides
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Nothing
+                                    , softIgnore = Nothing
+                                    , nickColorsKey = Just colorKey
+                                    , nickColors = Just "{\"trev\":\"#aabbcc\"}"
+                                    , displayNamesKey = Nothing
+                                    , displayNames = Nothing
+                                    }
+                                ]
+                                colorOut
+                        , \_ -> Expect.equal Dict.empty badColor.nickColorOverrides
+                        , \_ -> Expect.equal [] badColorOut
+                        , \_ -> Expect.equal (Dict.singleton "trev" "Trusted teammate") named.displayNameOverrides
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Nothing
+                                    , softIgnore = Nothing
+                                    , nickColorsKey = Nothing
+                                    , nickColors = Nothing
+                                    , displayNamesKey = Just nameKey
+                                    , displayNames = Just "{\"trev\":\"Trusted teammate\"}"
+                                    }
+                                ]
+                                nameOut
+                        , \_ -> Expect.equal Dict.empty badName.displayNameOverrides
+                        , \_ -> Expect.equal [] badNameOut
+                        , \_ -> Expect.equal Dict.empty clearedColor.nickColorOverrides
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Nothing
+                                    , softIgnore = Nothing
+                                    , nickColorsKey = Just colorKey
+                                    , nickColors = Just "{}"
+                                    , displayNamesKey = Nothing
+                                    , displayNames = Nothing
+                                    }
+                                ]
+                                clearColorOut
+                        , \_ -> Expect.equal Dict.empty clearedName.displayNameOverrides
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesSave
+                                    { softIgnoreKey = Nothing
+                                    , softIgnore = Nothing
+                                    , nickColorsKey = Nothing
+                                    , nickColors = Nothing
+                                    , displayNamesKey = Just nameKey
+                                    , displayNames = Just "{}"
+                                    }
+                                ]
+                                clearNameOut
+                        ]
+                        ()
             , test "person safety stages, confirms, and drafts reports" <|
                 \_ ->
                     let

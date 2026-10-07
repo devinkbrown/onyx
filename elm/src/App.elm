@@ -881,6 +881,7 @@ type Outbound
     | GroupWelcomeOpen { key : String, room : String, fromAccount : String, fromDevice : String, toAccount : String, toDevice : String, epoch : Int, commitIdB64 : String, membershipB64 : String, commitmentB64 : String, welcomeB64 : String }
     | ClipboardCopy { text : String, tag : String }
     | IdentityOverridesRequest { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String }
+    | IdentityOverridesSave { softIgnoreKey : Maybe String, softIgnore : Maybe String, nickColorsKey : Maybe String, nickColors : Maybe String, displayNamesKey : Maybe String, displayNames : Maybe String }
     | PersonReportReceiptSave { key : String, nick : String, reason : String, draft : String }
     | TranslateRequest { msgid : String, lang : String, source : String, text : String, targetLang : String }
     | TranslationTargetSave { target : String }
@@ -2631,6 +2632,11 @@ type Msg
     | ModerationDeskInvite String
     | ModerationDeskSubmitInvite String
     | ModerationDeskToggleMode String String
+    | OverrideToggleSoftIgnore String
+    | OverrideSetNickColor { nick : String, color : String }
+    | OverrideClearNickColor String
+    | OverrideSetDisplayName { nick : String, name : String }
+    | OverrideClearDisplayName String
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -10069,6 +10075,26 @@ identityOverridesKeys model =
 
         Just owner ->
             identityOverridesKeysForOwner owner
+
+
+{-| Save outbound carrying one changed overrides journal (the
+other two ride as `Nothing` so the bridge leaves their slots
+untouched — mirroring the per-journal `save*` actions).
+-}
+identityOverridesSaveOut :
+    { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String }
+    -> { softIgnore : Maybe String, nickColors : Maybe String, displayNames : Maybe String }
+    -> List Outbound
+identityOverridesSaveOut keys journals =
+    [ IdentityOverridesSave
+        { softIgnoreKey = Maybe.andThen (\_ -> keys.softIgnoreKey) journals.softIgnore
+        , softIgnore = journals.softIgnore
+        , nickColorsKey = Maybe.andThen (\_ -> keys.nickColorsKey) journals.nickColors
+        , nickColors = journals.nickColors
+        , displayNamesKey = Maybe.andThen (\_ -> keys.displayNamesKey) journals.displayNames
+        , displayNames = journals.displayNames
+        }
+    ]
 
 
 {-| Owner-scoped keys for one known owner. -}
@@ -37843,6 +37869,135 @@ update msg model =
 
                     _ ->
                         ( model, [] )
+
+        OverrideToggleSoftIgnore nick ->
+            -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
+            -- owner-gated, nick-normalized, field toggled, journal
+            -- saved; without an owner nothing moves).
+            case IdentityOverrides.normalizeOverrideNick nick of
+                Nothing ->
+                    ( model, [] )
+
+                Just key ->
+                    case (identityOverridesKeys model).softIgnoreKey of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just _ ->
+                            let
+                                next =
+                                    if Set.member key model.softIgnoreList then
+                                        Set.remove key model.softIgnoreList
+
+                                    else
+                                        Set.insert key model.softIgnoreList
+                            in
+                            ( { model | softIgnoreList = next }
+                            , identityOverridesSaveOut (identityOverridesKeys model)
+                                { softIgnore = Just (IdentityOverrides.encodeSoftIgnore next)
+                                , nickColors = Nothing
+                                , displayNames = Nothing
+                                }
+                            )
+
+        OverrideSetNickColor { nick, color } ->
+            -- Nick-color set (mirroring `setNickColorOverride`:
+            -- owner-gated, nick- and color-normalized).
+            case ( IdentityOverrides.normalizeOverrideNick nick, IdentityOverrides.normalizeNickColor color ) of
+                ( Just key, Just normalized ) ->
+                    case (identityOverridesKeys model).nickColorsKey of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just _ ->
+                            let
+                                next =
+                                    Dict.insert key normalized model.nickColorOverrides
+                            in
+                            ( { model | nickColorOverrides = next }
+                            , identityOverridesSaveOut (identityOverridesKeys model)
+                                { softIgnore = Nothing
+                                , nickColors = Just (IdentityOverrides.encodeStringMap next)
+                                , displayNames = Nothing
+                                }
+                            )
+
+                _ ->
+                    ( model, [] )
+
+        OverrideClearNickColor nick ->
+            -- Nick-color clear (mirroring `clearNickColorOverride`).
+            case IdentityOverrides.normalizeOverrideNick nick of
+                Nothing ->
+                    ( model, [] )
+
+                Just key ->
+                    case (identityOverridesKeys model).nickColorsKey of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just _ ->
+                            let
+                                next =
+                                    Dict.remove key model.nickColorOverrides
+                            in
+                            ( { model | nickColorOverrides = next }
+                            , identityOverridesSaveOut (identityOverridesKeys model)
+                                { softIgnore = Nothing
+                                , nickColors = Just (IdentityOverrides.encodeStringMap next)
+                                , displayNames = Nothing
+                                }
+                            )
+
+        OverrideSetDisplayName { nick, name } ->
+            -- Display-name set (mirroring `setDisplayNameOverride`:
+            -- owner-gated, nick- and name-normalized).
+            case ( IdentityOverrides.normalizeOverrideNick nick, IdentityOverrides.normalizeDisplayName name ) of
+                ( Just key, Just normalized ) ->
+                    case (identityOverridesKeys model).displayNamesKey of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just _ ->
+                            let
+                                next =
+                                    Dict.insert key normalized model.displayNameOverrides
+                            in
+                            ( { model | displayNameOverrides = next }
+                            , identityOverridesSaveOut (identityOverridesKeys model)
+                                { softIgnore = Nothing
+                                , nickColors = Nothing
+                                , displayNames = Just (IdentityOverrides.encodeStringMap next)
+                                }
+                            )
+
+                _ ->
+                    ( model, [] )
+
+        OverrideClearDisplayName nick ->
+            -- Display-name clear (mirroring
+            -- `clearDisplayNameOverride`).
+            case IdentityOverrides.normalizeOverrideNick nick of
+                Nothing ->
+                    ( model, [] )
+
+                Just key ->
+                    case (identityOverridesKeys model).displayNamesKey of
+                        Nothing ->
+                            ( model, [] )
+
+                        Just _ ->
+                            let
+                                next =
+                                    Dict.remove key model.displayNameOverrides
+                            in
+                            ( { model | displayNameOverrides = next }
+                            , identityOverridesSaveOut (identityOverridesKeys model)
+                                { softIgnore = Nothing
+                                , nickColors = Nothing
+                                , displayNames = Just (IdentityOverrides.encodeStringMap next)
+                                }
+                            )
 
         ModerationConfirm ->
             -- Confirm re-validates and invalidates on disconnect or

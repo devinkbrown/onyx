@@ -4876,6 +4876,36 @@ function fetchPublicFeed(url) {
         }
       });
     }
+    /* Private identity journal saves (mirroring the `save*List` actions:
+       Elm owns normalization/encoding, so the bridge only writes the
+       provided journal slots — untouched journals ride as missing and
+       stay stored — purges the legacy ownerless journals first, drops
+       over-cap payloads, and removes (rather than stores) emptied
+       journals, exactly like the oracle empty-save path. A failed
+       write leaves storage untouched; Elm already holds the new
+       state, matching every other fire-and-forget journal save. */
+    if (app.ports.identityOverridesSave) {
+      app.ports.identityOverridesSave.subscribe(function (req) {
+        try {
+          var store = (typeof window !== "undefined" && window.localStorage) ? window.localStorage : null;
+          if (store) purgeLegacyIdentityOverridesJs(store);
+          if (!store || !req) return;
+          var pairs = [
+            [req.softIgnoreKey, req.softIgnore],
+            [req.nickColorsKey, req.nickColors],
+            [req.displayNamesKey, req.displayNames],
+          ];
+          for (var i = 0; i < pairs.length; i++) {
+            var key = pairs[i][0];
+            var journal = pairs[i][1];
+            if (typeof key !== "string" || !key) continue;
+            if (typeof journal !== "string" || journal.length > IDENTITY_OVERRIDE_CHARS) continue;
+            if (journal === "[]" || journal === "{}") store.removeItem(key);
+            else store.setItem(key, journal);
+          }
+        } catch (err) { /* private browsing or quota policy — non-fatal */ }
+      });
+    }
     if (app.ports.personReportReceiptSave) {
       app.ports.personReportReceiptSave.subscribe(function (req) {
         try {
