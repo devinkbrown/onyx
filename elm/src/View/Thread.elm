@@ -353,8 +353,8 @@ mediaUnfurl model privacy attached href =
 {-| Shared `MediaUnfurl` element (mirrors the oracle `MediaUnfurl`:
 credential-free same-origin or public http(s) hosts may load;
 cross-origin stays behind consent; errors swap to the fallback
-link; images open the lightbox dialog). Narrowing: no focus trap
-or return-focus on the dialog (Escape and backdrop close it). -}
+link; images open the lightbox dialog, whose focus trap and
+return-focus live ports-side). -}
 mediaElement : Model -> Upload.AttachmentKind -> String -> Html Msg
 mediaElement model kind href =
     div [ class "shell-msg-media" ]
@@ -489,8 +489,10 @@ mediaFallback kind url =
 
 {-| Image lightbox dialog (mirrors `MessageImageLightbox`: modal
 dialog with backdrop-click and Save/Close actions; Escape closes it
-via the top-level subscription). Narrowing: no focus trap or
-return-focus. -}
+via the top-level subscription; the ports bridge traps Tab inside
+the dialog while mounted, moves focus in on open, and returns
+focus to the opener on close — mirroring `createDialogFocus` minus
+scroll lock and background isolation, which stay narrowings). -}
 mediaLightboxDialog : Model -> Html Msg
 mediaLightboxDialog model =
     case model.mediaLightbox of

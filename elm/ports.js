@@ -4244,6 +4244,93 @@ function fetchPublicFeed(url) {
         try { app.ports.searchHotkey.send(null); } catch (err) { /* best-effort */ }
       });
     }
+    /* Image lightbox dialog focus (mirroring `createDialogFocus` for
+       `MessageImageLightbox`: while the lightbox dialog is mounted Tab
+       cycles inside it, opening moves focus into the dialog, and closing
+       returns focus to the opener. Scroll lock and background isolation
+       stay later slices. A document stamp keeps re-wiring idempotent. */
+    (function installLightboxFocus() {
+      if (typeof document === "undefined" || !document) return;
+      try {
+        if (document.__onyxLightboxFocus) return;
+        document.__onyxLightboxFocus = true;
+      } catch (err) { return; }
+      var Mutation =
+        (typeof MutationObserver !== "undefined" && MutationObserver)
+        || (typeof window !== "undefined" && window && window.MutationObserver)
+        || null;
+      var dialogSelector = ".shell-msg-lightbox-dialog";
+      var returnFocus = null;
+      function panel() {
+        try { return document.querySelector(dialogSelector); } catch (err) { return null; }
+      }
+      function focusables(root) {
+        var nodes = [];
+        try {
+          nodes = root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        } catch (err) { return []; }
+        return Array.prototype.filter.call(nodes, function (el) {
+          try {
+            return !el.disabled && el.getAttribute("aria-hidden") !== "true" && el.tabIndex >= 0;
+          } catch (err) { return false; }
+        });
+      }
+      function trapTab(e) {
+        var root = panel();
+        if (!root) return;
+        if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+        if (e.key !== "Tab") return;
+        var scope = root.parentNode || root;
+        try {
+          if (e.target !== root && !(scope.contains && scope.contains(e.target))) return;
+        } catch (err) { return; }
+        var items = focusables(root);
+        if (items.length === 0) {
+          try { e.preventDefault(); } catch (err) { /* best-effort */ }
+          return;
+        }
+        var first = items[0];
+        var last = items[items.length - 1];
+        var active = null;
+        try { active = document.activeElement; } catch (err) { active = null; }
+        var onFirst = active === first || active === root;
+        try {
+          if (e.shiftKey && (onFirst || !(scope.contains && scope.contains(active)))) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && active === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        } catch (err) { /* best-effort */ }
+      }
+      try {
+        document.addEventListener("keydown", trapTab);
+      } catch (err) { /* no DOM events */ }
+      if (!Mutation) return;
+      function settle() {
+        var root = panel();
+        if (root && !root.__onyxFocusReady) {
+          try { root.__onyxFocusReady = true; } catch (err) { /* best-effort */ }
+          try { returnFocus = document.activeElement || null; } catch (err) { returnFocus = null; }
+          try { root.focus({ preventScroll: true }); } catch (err) {
+            try { root.focus(); } catch (ignored) { /* best-effort */ }
+          }
+        } else if (!root && returnFocus) {
+          var back = returnFocus;
+          returnFocus = null;
+          try {
+            if (back.isConnected) back.focus({ preventScroll: true });
+          } catch (err) {
+            try { if (back.isConnected) back.focus(); } catch (ignored) { /* best-effort */ }
+          }
+        }
+      }
+      try {
+        var observer = new Mutation(function () { settle(); });
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      } catch (err) { /* observation unavailable */ }
+    })();
     /* Device vault retention policy (mirroring `readRetentionPolicy` /
        `writeRetentionPolicy` + `applyRetentionPolicy`: the stored JSON
        is the source of truth — `trimTarget` re-reads it on every
