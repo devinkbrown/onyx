@@ -2341,6 +2341,95 @@
     }
   }
 
+  /* Upload + link-preview bridge — mirrors `src/lib/upload/upload.ts`
+     (multipart POST of the `file` field, bounded response) and the
+     fetch half of `src/lib/preview/linkPreview.ts` (same-origin
+     `/linkpreview` endpoint only). File bytes never cross into Elm:
+     the picker holds them keyed by upload key; Elm validates caps
+     off the reported meta and parses response bodies with
+     `Upload.parseUploadResponse`. Elm gates preview targets with
+     `isPreviewableUrl` first — defense in depth; the same-origin
+     endpoint is the real SSRF boundary. */
+  var UPLOAD_BRIDGE_MAX_BYTES = 64 * 1024;
+
+  function readBoundedBridgeText(response, cap) {
+    var rawLength = null;
+    try {
+      rawLength = response.headers ? response.headers.get("content-length") : null;
+    } catch (err) { rawLength = null; }
+    if (rawLength !== null) {
+      var length = Number(rawLength);
+      if (isFinite(length) && length > cap) {
+        return Promise.resolve(null);
+      }
+    }
+    return Promise.resolve()
+      .then(function () { return response.text(); })
+      .then(function (text) {
+        var body = typeof text === "string" ? text : "";
+        if (body.length > cap) return null;
+        return body;
+      })
+      .catch(function () { return null; });
+  }
+
+  function uploadSendFile(file, endpoint, fieldName, fetchFn) {
+    var impl = fetchFn || ((typeof fetch === "function") ? fetch : null);
+    if (!impl || !file) {
+      return Promise.resolve({ ok: false, status: 0, body: "", contentType: null });
+    }
+    var form = new FormData();
+    form.append(fieldName || "file", file);
+    return Promise.resolve()
+      .then(function () { return impl(endpoint, { method: "POST", body: form }); })
+      .then(function (response) {
+        if (!response || response.status < 200 || response.status >= 300) {
+          return { ok: false, status: response ? response.status : 0, body: "", contentType: null };
+        }
+        var contentType = null;
+        try {
+          contentType = response.headers ? response.headers.get("content-type") : null;
+        } catch (err) { contentType = null; }
+        return readBoundedBridgeText(response, UPLOAD_BRIDGE_MAX_BYTES).then(function (body) {
+          if (body === null) return { ok: false, status: response.status, body: "", contentType: null };
+          return { ok: true, status: response.status, body: body, contentType: contentType };
+        });
+      })
+      .catch(function () { return { ok: false, status: 0, body: "", contentType: null }; });
+  }
+
+  function previewEndpointAllowed(endpoint, origin) {
+    try {
+      var parsed = new URL(endpoint, origin || "http://localhost");
+      if (!origin) return parsed.protocol === "http:" || parsed.protocol === "https:";
+      return parsed.origin === origin;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function previewGet(endpoint, targetUrl, fetchFn, origin) {
+    var impl = fetchFn || ((typeof fetch === "function") ? fetch : null);
+    var base = origin || ((typeof location !== "undefined" && location.origin) ? location.origin : null);
+    if (!impl || !previewEndpointAllowed(endpoint, base)) {
+      return Promise.resolve({ ok: false, status: 0, body: "" });
+    }
+    var separator = (endpoint.indexOf("?") >= 0) ? "&" : "?";
+    var full = endpoint + separator + "url=" + encodeURIComponent(targetUrl);
+    return Promise.resolve()
+      .then(function () { return impl(full, { headers: { Accept: "application/json" } }); })
+      .then(function (response) {
+        if (!response || !response.ok) {
+          return { ok: false, status: response ? response.status : 0, body: "" };
+        }
+        return readBoundedBridgeText(response, UPLOAD_BRIDGE_MAX_BYTES).then(function (body) {
+          if (body === null) return { ok: false, status: response.status, body: "" };
+          return { ok: true, status: response.status, body: body };
+        });
+      })
+      .catch(function () { return { ok: false, status: 0, body: "" }; });
+  }
+
   /* Cadence binary media bridge — mirrors the oracle socket's binary
      plane (`client.ts` `_onMessage` / `sendBinary`): binary frames are
      media datagrams, never IRC lines. `text.ircv3.net` is control-only
@@ -4716,6 +4805,70 @@ function fetchPublicFeed(url) {
           };
           picker.click();
         } catch (err) { /* no DOM file picker here */ }
+      });
+    }
+
+    /* Upload picker + send wiring (bridge functions live at top
+       level beside the node probe so smokes can drive them). */
+    var pendingUploadFiles = {};
+
+    if (app.ports.uploadPick) {
+      app.ports.uploadPick.subscribe(function (req) {
+        try {
+          var picker = document.createElement("input");
+          picker.type = "file";
+          if (req && typeof req.accept === "string" && req.accept) picker.accept = req.accept;
+          if (req && req.multiple === true) picker.multiple = true;
+          picker.onchange = function () {
+            var files = [];
+            var held = [];
+            var list = picker.files || [];
+            for (var i = 0; i < list.length; i += 1) {
+              var file = list[i];
+              files.push({ name: file.name || "", size: file.size || 0, mime: file.type || "" });
+              held.push(file);
+            }
+            pendingUploadFiles[req && req.key] = held;
+            try {
+              app.ports.uploadPicked.send({ key: (req && req.key) || "", files: files });
+            } catch (err) { /* port gone */ }
+          };
+          picker.click();
+        } catch (err) { /* no DOM file picker here */ }
+      });
+    }
+
+    if (app.ports.uploadSend) {
+      app.ports.uploadSend.subscribe(function (req) {
+        var held = (req && pendingUploadFiles[req.key]) || [];
+        var file = held[req ? req.index : 0];
+        uploadSendFile(file, req ? req.endpoint : "", req ? req.fieldName : "file").then(function (outcome) {
+          try {
+            app.ports.uploadDone.send({
+              key: (req && req.key) || "",
+              index: (req && typeof req.index === "number") ? req.index : 0,
+              ok: outcome.ok,
+              status: outcome.status,
+              body: outcome.body,
+              contentType: outcome.contentType
+            });
+          } catch (err) { /* port gone */ }
+        });
+      });
+    }
+
+    if (app.ports.previewFetch) {
+      app.ports.previewFetch.subscribe(function (req) {
+        previewGet(req ? req.endpoint : "", req ? req.url : "").then(function (outcome) {
+          try {
+            app.ports.previewDone.send({
+              key: (req && req.key) || "",
+              ok: outcome.ok,
+              status: outcome.status,
+              body: outcome.body
+            });
+          } catch (err) { /* port gone */ }
+        });
       });
     }
 
@@ -7440,6 +7593,11 @@ function fetchPublicFeed(url) {
       random: randomNode,
       timeoutMs: NODES_PROBE_TIMEOUT_MS,
       maxConcurrency: NODES_MAX_CONCURRENCY
+    },
+    uploadBridge: {
+      send: uploadSendFile,
+      preview: previewGet,
+      maxBytes: UPLOAD_BRIDGE_MAX_BYTES
     },
     publicFeed: {
       fetch: fetchPublicFeed,
