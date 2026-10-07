@@ -866,6 +866,99 @@ suite =
                             |> Event.expect EditCancel
                     ]
                     ()
+        , test "thread rows offer a capability-gated message menu" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> feed m "@msgid=m9 :me!u@h PRIVMSG #c :mine here")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    opened =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) base)
+
+                    owned =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m9" }) { base | caps = [ "draft/message-editing", "draft/message-redaction" ] })
+
+                    asked =
+                        Tuple.first (update MessageMenuDeleteAsk owned)
+                in
+                Expect.all
+                    [ \_ ->
+                        query base
+                            |> Query.find
+                                [ Selector.class "onyx-msg-menu-trigger"
+                                , Selector.attribute (Attr.attribute "aria-label" "Message actions for message from alice")
+                                ]
+                            |> Query.has [ Selector.text "⋯" ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "More actions for message from alice") ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has
+                                [ Selector.text "Reply"
+                                , Selector.text "Copy"
+                                , Selector.text "Quote in composer"
+                                , Selector.text "Copy moment link"
+                                , Selector.text "Search this text"
+                                , Selector.text "Start topic from here"
+                                ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.hasNot [ Selector.text "Edit", Selector.text "Delete for everyone" ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Reply to alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (ReplyArm { target = "#c", msgid = "m1" })
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect MessageMenuClose
+                    , \_ ->
+                        query owned
+                            |> Query.find [ Selector.class "onyx-msg-menu" ]
+                            |> Query.has [ Selector.text "Edit", Selector.text "Delete for everyone" ]
+                    , \_ ->
+                        query owned
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Delete message from me for everyone") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MessageMenuDeleteAsk
+                    , \_ ->
+                        query asked
+                            |> Query.find [ Selector.class "onyx-msg-menu-delete-confirm" ]
+                            |> Query.has [ Selector.text "Delete for everyone?", Selector.text "Keep message" ]
+                    , \_ ->
+                        query asked
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Keep message from me") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MessageMenuClose
+                    , \_ ->
+                        query asked
+                            |> Query.find
+                                [ Selector.tag "button"
+                                , Selector.attribute (Attr.attribute "aria-label" "Confirm deleting message from me for everyone")
+                                ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageDeleteRequested "#c" "m9")
+                    ]
+                    ()
         , test "thread renders inbound reply context" <|
             \_ ->
                 let

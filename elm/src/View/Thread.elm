@@ -6,7 +6,7 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, a, audio, button, div, h2, img, li, section, small, span, strong, text, time, ul, video)
+import Html exposing (Html, a, audio, button, div, h2, img, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, href, preload, rel, src, tabindex, target, type_)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
@@ -184,7 +184,265 @@ messageRow model target m =
           else
             text ""
         , boostBar model target m
+        , messageMenuButton model target m
+        , messageMenuPanel model target m
         ]
+
+
+{-| Per-message actions entry (mirrors the message menu trigger:
+offered only for rows with a server msgid, and only when at least
+one menu action applies; the Elm shell uses text buttons where the
+oracle uses icon buttons, with the same accessible names). -}
+messageMenuButton : Model -> String -> App.ChatMessage -> Html Msg
+messageMenuButton model target m =
+    case m.msgid of
+        Nothing ->
+            text ""
+
+        Just msgid ->
+            let
+                caps =
+                    App.capabilities (menuInput model target m)
+            in
+            if not (menuHasActions caps) then
+                text ""
+
+            else
+                let
+                    isOpen =
+                        case model.messageMenu of
+                            Just open ->
+                                String.toLower open.target == String.toLower target && open.msgid == msgid
+
+                            Nothing ->
+                                False
+                in
+                button
+                    [ type_ "button"
+                    , class "onyx-msg-menu-trigger"
+                    , attribute "aria-label" ("Message actions for message from " ++ m.from)
+                    , attribute "aria-expanded"
+                        (if isOpen then
+                            "true"
+
+                         else
+                            "false"
+                        )
+                    , onClick (App.MessageMenuOpen { target = target, msgid = msgid })
+                    ]
+                    [ text "⋯" ]
+
+
+{-| Capability input for one thread row (server caps gate edit and
+delete like the oracle `canEditMessages` / `canRedactMessages`). -}
+menuInput : Model -> String -> App.ChatMessage -> App.CapabilityInput
+menuInput model target m =
+    { msg = m
+    , selfNick = model.ourNick
+    , editingEnabled = List.member "draft/message-editing" model.caps
+    , deleteSupported = List.member "draft/message-redaction" model.caps
+    , channelTarget = App.isChannelName model target
+    }
+
+
+{-| Whether any menu item from this slice applies (react, pin,
+translate, ignore, and collapse stay later slices). -}
+menuHasActions : App.Capabilities -> Bool
+menuHasActions caps =
+    caps.canReply
+        || caps.canCopy
+        || caps.canQuote
+        || caps.canCopyMoment
+        || caps.canSearchText
+        || caps.canStartTopic
+        || caps.canEdit
+        || caps.canDelete
+
+
+{-| The open menu for one row (mirrors the oracle menu order and
+copy: Reply, Copy, Quote, Moment, Search, Topic, Edit, then Delete
+behind its inline confirm step; tiers are flattened into one menu
+and react/pin/translate/ignore/collapse stay later slices). -}
+messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
+messageMenuPanel model target m =
+    case m.msgid of
+        Nothing ->
+            text ""
+
+        Just msgid ->
+            case model.messageMenu of
+                Nothing ->
+                    text ""
+
+                Just open ->
+                    if not (String.toLower open.target == String.toLower target && open.msgid == msgid) then
+                        text ""
+
+                    else
+                        let
+                            caps =
+                                App.capabilities (menuInput model target m)
+
+                            actionTarget =
+                                "message from " ++ m.from
+                        in
+                        div
+                            [ class "onyx-msg-menu"
+                            , attribute "role" "menu"
+                            , attribute "aria-label" ("More actions for " ++ actionTarget)
+                            , on "keydown" (menuEscapeDecoder model)
+                            ]
+                            (List.filterMap identity
+                                [ if caps.canReply then
+                                    Just
+                                        (menuItem ("Reply to " ++ m.from)
+                                            "Reply"
+                                            (App.ReplyArm { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canCopy then
+                                    Just
+                                        (menuItem ("Copy text from " ++ actionTarget)
+                                            "Copy"
+                                            (App.MessageMenuCopy { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canQuote then
+                                    Just
+                                        (menuItem ("Quote " ++ actionTarget ++ " in composer")
+                                            "Quote in composer"
+                                            (App.MessageQuote { target = target, from = m.from, body = m.body })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canCopyMoment then
+                                    Just
+                                        (menuItem ("Copy moment link for " ++ actionTarget)
+                                            "Copy moment link"
+                                            (App.MessageCopyMoment { target = target, at = m.at })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canSearchText then
+                                    Just
+                                        (case App.loadedActionText m of
+                                            Nothing ->
+                                                text ""
+
+                                            Just query ->
+                                                menuItem ("Search text from " ++ actionTarget)
+                                                    "Search this text"
+                                                    (App.MessageSearchText { text = query })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canStartTopic then
+                                    Just
+                                        (menuItem ("Start topic from " ++ actionTarget)
+                                            "Start topic from here"
+                                            (App.MessageStartTopic { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canEdit then
+                                    Just
+                                        (menuItem ("Edit " ++ actionTarget)
+                                            "Edit"
+                                            (App.EditArm { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canDelete then
+                                    Just
+                                        (if open.confirmDelete then
+                                            deleteConfirm actionTarget target msgid
+
+                                         else
+                                            menuItem ("Delete " ++ actionTarget ++ " for everyone")
+                                                "Delete for everyone"
+                                                App.MessageMenuDeleteAsk
+                                        )
+
+                                  else
+                                    Nothing
+                                ]
+                            )
+
+
+{-| One menu item (text button with the oracle accessible name). -}
+menuItem : String -> String -> Msg -> Html Msg
+menuItem label visible msg =
+    button
+        [ type_ "button"
+        , class "onyx-msg-menu-item"
+        , attribute "role" "menuitem"
+        , attribute "aria-label" label
+        , onClick msg
+        ]
+        [ text visible ]
+
+
+{-| The inline delete confirmation (mirrors the oracle confirm
+step copy verbatim). -}
+deleteConfirm : String -> String -> String -> Html Msg
+deleteConfirm actionTarget target msgid =
+    div
+        [ class "onyx-msg-menu-delete-confirm"
+        , attribute "role" "group"
+        , attribute "aria-label" ("Confirm deleting " ++ actionTarget ++ " for everyone")
+        ]
+        [ p [ class "onyx-msg-menu-delete-confirm-title" ] [ text "Delete for everyone?" ]
+        , p [ class "onyx-msg-menu-delete-confirm-copy" ]
+            [ text "This removes the message from the conversation and cannot be undone." ]
+        , div [ class "onyx-msg-menu-delete-confirm-actions" ]
+            [ button
+                [ type_ "button"
+                , class "onyx-msg-menu-delete-confirm-cancel"
+                , attribute "aria-label" ("Keep " ++ actionTarget)
+                , onClick App.MessageMenuClose
+                ]
+                [ text "Keep message" ]
+            , button
+                [ type_ "button"
+                , class "onyx-msg-menu-delete-confirm-delete"
+                , attribute "aria-label" ("Confirm deleting " ++ actionTarget ++ " for everyone")
+                , onClick (App.MessageDeleteRequested target msgid)
+                ]
+                [ text "Delete for everyone" ]
+            ]
+        ]
+
+
+{-| Escape dismisses the open menu (mirroring the oracle menu
+keydown; IME-claimed events yield to the IME). -}
+menuEscapeDecoder : Model -> Decode.Decoder Msg
+menuEscapeDecoder _ =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.MessageMenuClose
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
 
 
 editTitle : Model -> App.ChatMessage -> String

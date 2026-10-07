@@ -3043,6 +3043,88 @@ suite =
                     , \_ -> Expect.equal armed.replyingTo refused.replyingTo
                     ]
                     ()
+        , test "message menu opens, toggles, and actions dismiss it" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me", caps = [ "draft/message-editing", "draft/message-redaction" ] }
+
+                    ( m1, _ ) =
+                        feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( m2, _ ) =
+                        feed m1 "@msgid=m1 :alice!u@h PRIVMSG #c :theirs"
+
+                    ( opened, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "m1" }) m2
+
+                    ( toggled, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "m1" }) opened
+
+                    ( switched, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "m9" }) opened
+
+                    ( unknown, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "nope" }) m2
+
+                    ( replied, _ ) =
+                        update (ReplyArm { target = "#c", msgid = "m1" }) opened
+
+                    ( edited, _ ) =
+                        update (EditArm { target = "#c", msgid = "m9" }) opened
+
+                    ( quoted, _ ) =
+                        update (MessageQuote { target = "#c", from = "alice", body = "theirs" }) opened
+
+                    ( deleteAsked, _ ) =
+                        update (MessageMenuOpen { target = "#c", msgid = "m9" }) m2
+                            |> Tuple.first
+                            |> (\m -> update MessageMenuDeleteAsk m)
+
+                    ( deleted, deleteOut ) =
+                        update (MessageDeleteRequested "#c" "m9") deleteAsked
+
+                    ( copied, copyOut ) =
+                        update (MessageMenuCopy { target = "#c", msgid = "m1" }) opened
+
+                    ( copyGone, copyGoneOut ) =
+                        update (MessageMenuCopy { target = "#c", msgid = "nope" }) opened
+
+                    ( searched, _ ) =
+                        update (MessageSearchText { text = "theirs" }) opened
+
+                    ( navigated, _ ) =
+                        update (ChannelSelect "#b") opened
+
+                    ( copyOk, _ ) =
+                        update (ClipboardResult { tag = "message-copy", ok = True }) m2
+
+                    ( copyFailed, _ ) =
+                        update (ClipboardResult { tag = "message-copy", ok = False }) m2
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just { target = "#c", msgid = "m1", confirmDelete = False }) opened.messageMenu
+                    , \_ -> Expect.equal Nothing toggled.messageMenu
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = False }) switched.messageMenu
+                    , \_ -> Expect.equal Nothing unknown.messageMenu
+                    , \_ -> Expect.equal Nothing replied.messageMenu
+                    , \_ -> Expect.equal Nothing edited.messageMenu
+                    , \_ -> Expect.equal Nothing quoted.messageMenu
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", confirmDelete = True }) deleteAsked.messageMenu
+                    , \_ -> Expect.equal Nothing deleted.messageMenu
+                    , \_ -> Expect.equal [ SendLine "REDACT #c m9 Deleted\r\n" ] deleteOut
+                    , \_ -> Expect.equal [ ClipboardCopy { text = "theirs", tag = "message-copy" } ] copyOut
+                    , \_ -> Expect.equal Nothing copied.messageMenu
+                    , \_ -> Expect.equal [] copyGoneOut
+                    , \_ -> Expect.equal Nothing copyGone.messageMenu
+                    , \_ -> Expect.equal True searched.searchOpen
+                    , \_ -> Expect.equal "theirs" searched.searchQuery
+                    , \_ -> Expect.equal Nothing searched.messageMenu
+                    , \_ -> Expect.equal Nothing navigated.messageMenu
+                    , \_ -> Expect.equal [ "Message copied" ] (List.map .title copyOk.toasts)
+                    , \_ -> Expect.equal [ "Copy failed" ] (List.map .title copyFailed.toasts)
+                    ]
+                    ()
         , test "inbound reply tag resolves the live parent" <|
             \_ ->
                 let

@@ -306,6 +306,7 @@ type alias Model =
     , replyingTo : Maybe ReplyParent
     , editingMessage : Maybe { target : String, msgid : String, draft : String }
     , composerDrafts : Dict.Dict String String
+    , messageMenu : Maybe { target : String, msgid : String, confirmDelete : Bool }
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -2628,6 +2629,11 @@ type Msg
     | ReplyArm { target : String, msgid : String }
     | ReplyCancel
     | MessageStartTopic { target : String, msgid : String }
+    | MessageMenuOpen { target : String, msgid : String }
+    | MessageMenuClose
+    | MessageMenuDeleteAsk
+    | MessageMenuCopy { target : String, msgid : String }
+    | MessageSearchText { text : String }
     | EditArm { target : String, msgid : String }
     | EditCancel
     | ZoneReceived Time.Zone
@@ -2868,6 +2874,7 @@ init nick url =
     , caps = []
     , composer = ""
     , composerDrafts = Dict.empty
+    , messageMenu = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -3298,6 +3305,7 @@ blank =
     , caps = []
     , composer = ""
     , composerDrafts = Dict.empty
+    , messageMenu = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -8589,6 +8597,7 @@ quarantineOwnerChange model =
             , viewUnreadDividerId = Dict.empty
             , composer = ""
             , composerDrafts = Dict.empty
+            , messageMenu = Nothing
             , composerError = Nothing
             , composerAudience = Nothing
     , attachments = []
@@ -34711,6 +34720,7 @@ update msg model =
                         { current
                             | composer = merged
                             , composerDrafts = Dict.insert (String.toLower target) merged current.composerDrafts
+                            , messageMenu = Nothing
                         }
                     , []
                     )
@@ -34730,12 +34740,13 @@ update msg model =
 
         ReplyArm { target, msgid } ->
             -- Edit wins over reply and vice versa (mirroring the
-            -- mutual-exclusivity rule in both setters).
+            -- mutual-exclusivity rule in both setters); either arm
+            -- dismisses the message menu that offered it.
             let
                 armed =
                     armReply model target msgid
             in
-            ( { armed | editingMessage = Nothing }, [] )
+            ( { armed | editingMessage = Nothing, messageMenu = Nothing }, [] )
 
         ReplyCancel ->
             -- Backing out of a reply stops the typing signal
@@ -34758,7 +34769,7 @@ update msg model =
                                 -- cancel can restore it (mirroring the
                                 -- oracle per-target draft restore within
                                 -- the single-draft Elm composer).
-                                ( { model | editingMessage = Just { target = String.toLower target, msgid = msgid, draft = model.composer }, replyingTo = Nothing, composer = row.body }, [] )
+                                ( { model | editingMessage = Just { target = String.toLower target, msgid = msgid, draft = model.composer }, replyingTo = Nothing, composer = row.body, messageMenu = Nothing }, [] )
 
             else
                 ( model, [] )
@@ -34788,6 +34799,62 @@ update msg model =
                     in
                     sendTyping { model | editingMessage = Nothing, composer = restored } (Maybe.withDefault "" model.activeChannel) False
 
+        MessageMenuOpen { target, msgid } ->
+            -- The per-message menu toggles on its own row (mirroring
+            -- the oracle popover open state); unknown rows never open
+            -- it, and opening one row closes any other.
+            case reactionRow model target msgid of
+                Nothing ->
+                    ( model, [] )
+
+                Just _ ->
+                    case model.messageMenu of
+                        Just open ->
+                            if String.toLower open.target == String.toLower target && open.msgid == msgid then
+                                ( { model | messageMenu = Nothing }, [] )
+
+                            else
+                                ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False } }, [] )
+
+                        Nothing ->
+                            ( { model | messageMenu = Just { target = String.toLower target, msgid = msgid, confirmDelete = False } }, [] )
+
+        MessageMenuClose ->
+            ( { model | messageMenu = Nothing }, [] )
+
+        MessageMenuDeleteAsk ->
+            -- The destructive action arms a confirm step first
+            -- (mirroring the oracle inline delete confirmation).
+            case model.messageMenu of
+                Nothing ->
+                    ( model, [] )
+
+                Just open ->
+                    ( { model | messageMenu = Just { open | confirmDelete = True } }, [] )
+
+        MessageMenuCopy { target, msgid } ->
+            -- Menu text copy resolves the live row (never retained
+            -- text) and reports through the tagged clipboard result
+            -- with the oracle copy; a gone row just closes the menu.
+            case reactionRow model target msgid of
+                Nothing ->
+                    ( { model | messageMenu = Nothing }, [] )
+
+                Just row ->
+                    case loadedActionText row of
+                        Nothing ->
+                            ( { model | messageMenu = Nothing }, [] )
+
+                        Just text ->
+                            ( { model | messageMenu = Nothing }
+                            , [ ClipboardCopy { text = text, tag = "message-copy" } ]
+                            )
+
+        MessageSearchText { text } ->
+            -- Menu search opens the panel carrying the message text
+            -- (mirroring the oracle search-this-text action).
+            ( scheduleVaultSearch { model | messageMenu = Nothing, searchOpen = True, searchQuery = Search.boundQueryInput text, searchIndex = 0 }, [] )
+
         MessageStartTopic { target, msgid } ->
             -- Mirror the menu topic-start: a usable label focuses the
             -- conversation on it and arms the message as the reply;
@@ -34813,7 +34880,7 @@ update msg model =
                                         , undo = Nothing
                                         }
                                         model.nowMs
-                                        model
+                                        { model | messageMenu = Nothing }
                                     , []
                                     )
 
@@ -34824,6 +34891,7 @@ update msg model =
                                     in
                                     ( { armed
                                         | activeChannelTopics = Dict.insert (String.toLower target) topic model.activeChannelTopics
+                                        , messageMenu = Nothing
                                       }
                                     , []
                                     )
@@ -34831,7 +34899,7 @@ update msg model =
         MessageCopyMoment { target, at } ->
             case Invite.buildMomentLink model.origin target (toFloat at) of
                 Just link ->
-                    ( model, [ ClipboardCopy { text = link, tag = "moment" } ] )
+                    ( { model | messageMenu = Nothing }, [ ClipboardCopy { text = link, tag = "moment" } ] )
 
                 Nothing ->
                     ( addToast
@@ -34843,7 +34911,7 @@ update msg model =
                         , undo = Nothing
                         }
                         model.nowMs
-                        model
+                        { model | messageMenu = Nothing }
                     , []
                     )
 
@@ -34953,7 +35021,8 @@ update msg model =
                                                 sendComposerText sending target
 
         ChannelSelect name ->
-            selectChannel model name
+            -- A context switch dismisses the message menu.
+            Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (selectChannel model name)
 
         ChannelTopicSelect { channel, topic } ->
             -- Named-conversation selection (mirrors
@@ -35496,6 +35565,36 @@ update msg model =
                         { variant = ToastSuccess
                         , title = "Moment copied"
                         , description = Just "Moment link copied."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
+                else
+                    ( addToast
+                        { variant = ToastError
+                        , title = "Copy failed"
+                        , description = Just "Allow clipboard access in this browser and try again."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
+            else if tag == "message-copy" then
+                -- Mirrors the menu's message-text report copy verbatim.
+                if ok then
+                    ( addToast
+                        { variant = ToastSuccess
+                        , title = "Message copied"
+                        , description = Just "Message text copied."
                         , duration = Nothing
                         , groupKey = Nothing
                         , undo = Nothing
@@ -36711,7 +36810,7 @@ update msg model =
             requestEdit model target messageId newText
 
         MessageDeleteRequested target messageId ->
-            requestDelete model target messageId
+            Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (requestDelete model target messageId)
 
         OwnMetadataSet key value ->
             setOwnMetadata model key value
