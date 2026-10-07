@@ -82,15 +82,23 @@
 
   /* Coerce one stored row to the wire shape. Legacy rows without a
      stamp read back as `at: 0` (unknown time, ordered by clock
-     distance like everything else — the oracle has no special case). */
+     distance like everything else — the oracle has no special case);
+     legacy rows without a type read back as `msg` so the Elm record
+     decoder stays total over pre-type stores. */
+  var VAULT_ROW_TYPES = {
+    msg: 1, action: 1, notice: 1, join: 1, part: 1, quit: 1, kick: 1,
+    mode: 1, topic: 1, nick: 1, system: 1, error: 1, whisper: 1
+  };
   function vaultPlainRow(value) {
     var row = value || {};
+    var rowType = typeof row.rowType === "string" ? row.rowType : "";
     return {
       id: String(row.id || ""),
       target: String(row.target || ""),
       from: String(row.from || ""),
       body: String(row.body || ""),
-      at: vaultRowAt(row.at)
+      at: vaultRowAt(row.at),
+      rowType: VAULT_ROW_TYPES[rowType] ? rowType : "msg"
     };
   }
 
@@ -708,12 +716,12 @@
         order.push(row.target);
       }
       if (byTarget[row.target].length >= VAULT_EXPORT_MAX_PER_TARGET) continue;
-      byTarget[row.target].push({ id: row.id, from: row.from, body: row.body, at: row.at });
+      byTarget[row.target].push({ id: row.id, from: row.from, text: row.body, type: row.rowType, time: row.at, target: row.target });
       total += 1;
     }
     var targets = order.map(function (target) {
       var messages = byTarget[target].sort(function (a, b) {
-        if (a.at !== b.at) return a.at - b.at;
+        if (a.time !== b.time) return a.time - b.time;
         if (a.id < b.id) return -1;
         if (a.id > b.id) return 1;
         return 0;

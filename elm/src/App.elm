@@ -150,6 +150,7 @@ type alias ChatMessage =
     , deleted : Bool
     , redacted : Bool
     , topic : String
+    , msgType : String
     }
 
 
@@ -902,6 +903,7 @@ type alias VaultRow =
     , from : String
     , body : String
     , at : Int
+    , rowType : String
     }
 
 
@@ -1068,6 +1070,7 @@ importVaultRow message =
     , from = message.from
     , body = message.body
     , at = floor message.atMs
+    , rowType = message.msgType
     }
 
 
@@ -6889,7 +6892,7 @@ foldAccess model message =
             case message.params of
                 _ :: channel :: _ ->
                     if Dict.member (String.toLower channel) model.channels then
-                        ( appendChat model channel kind text False False, [] )
+                        ( appendChat model channel kind text False False "system", [] )
 
                     else
                         ( model, [] )
@@ -6905,7 +6908,7 @@ foldWhisper model message =
             ( model, [] )
 
         Ircx.WhisperReceived { channel, from, body } ->
-            ( appendChat model channel from body True True, [] )
+            ( appendChat model channel from body True True "whisper", [] )
 
 
 {-| Raw `EVENT` lines re-dispatch MEDIA and WEBAUTHN. The MEDIA
@@ -18264,6 +18267,7 @@ deliverOfflineMemo model message memoFrom memoText =
                 , deleted = False
                 , redacted = False
                 , topic = ""
+                , msgType = "msg"
                 }
 
             stored =
@@ -20234,8 +20238,8 @@ deliveryFate model target from =
         DeliverNormal
 
 
-appendChat : Model -> String -> String -> String -> Bool -> Bool -> Model
-appendChat model target from body whisper countUnread =
+appendChat : Model -> String -> String -> String -> Bool -> Bool -> String -> Model
+appendChat model target from body whisper countUnread msgType =
     -- History merges store verbatim (mirroring `mergeHistory`, which
     -- bypasses delivery): drops/placeholders are live-delivery only.
     case
@@ -20295,6 +20299,7 @@ appendChat model target from body whisper countUnread =
                                                  , deleted = False
                                                  , redacted = False
                                                  , topic = ""
+                                                 , msgType = msgType
                                                  }
                                                     :: c.messages
                                                 )
@@ -20827,6 +20832,7 @@ appendLiveRow model channel body message =
                          , deleted = False
                          , redacted = False
                          , topic = ""
+                          , msgType = "system"
                          }
                             :: c.messages
                         )
@@ -25820,6 +25826,7 @@ foldMode model message =
                             , deleted = False
                             , redacted = False
                             , topic = ""
+                            , msgType = "mode"
                             }
 
                         folded =
@@ -28804,6 +28811,7 @@ mergeReplayEvents model target events =
                             , deleted = False
                             , redacted = False
                             , topic = ""
+                            , msgType = "system"
                             }
                         )
                         events
@@ -30826,6 +30834,7 @@ renderOptimisticSend model target texts outgoing label audience =
                     , deleted = False
                     , redacted = False
                     , topic = Maybe.withDefault "" (activeChannelTopic rendered target)
+                    , msgType = "msg"
                     }
 
                 vaultRow =
@@ -30834,6 +30843,7 @@ renderOptimisticSend model target texts outgoing label audience =
                     , from = rendered.ourNick
                     , body = text
                     , at = floor rendered.nowMs
+                    , rowType = "msg"
                     }
             in
             ( updateChannel { rendered | messageSeq = messageId + 1 } target
@@ -31235,6 +31245,12 @@ foldChat model message isNotice =
                                                                                  , deleted = False
                                                                                  , redacted = False
                                                                                  , topic = Maybe.withDefault "" (parseMessageTopic message.tags)
+                                                                                 , msgType =
+                                                                                    if isNotice then
+                                                                                        "notice"
+
+                                                                                    else
+                                                                                        "msg"
                                                                                  }
                                                                                     :: c.messages
                                                                                 )
@@ -32588,6 +32604,7 @@ update msg model =
                         , deleted = False
                         , redacted = False
                         , topic = ""
+                        , msgType = "msg"
                         }
 
                     withRow =
@@ -35548,6 +35565,7 @@ update msg model =
                                         , from = model.ourNick
                                         , body = envelope
                                         , at = floor model.nowMs
+                                        , rowType = "msg"
                                         }
 
                                     filed =
@@ -35573,6 +35591,7 @@ update msg model =
                                                              , deleted = False
                                                              , redacted = False
                                                              , topic = ""
+                                                             , msgType = "msg"
                                                              }
                                                                 :: c.messages
                                                             )
@@ -35703,6 +35722,7 @@ update msg model =
                             , from = model.ourNick
                             , body = envelope
                             , at = floor model.nowMs
+                            , rowType = "msg"
                             }
 
                         filed =
@@ -35728,6 +35748,7 @@ update msg model =
                                                  , deleted = False
                                                  , redacted = False
                                                  , topic = ""
+                                                 , msgType = "msg"
                                                  }
                                                     :: c.messages
                                                 )
@@ -36067,6 +36088,15 @@ persistChatRow model parsed =
                     , from = Maybe.withDefault "" parsed.nick
                     , body = body
                     , at = rowTime model parsed
+                    , rowType =
+                        if parsed.command == "NOTICE" then
+                            "notice"
+
+                        else if parsed.command == "WHISPER" then
+                            "whisper"
+
+                        else
+                            "msg"
                     }
             in
             if Dict.member key model.channels then
@@ -36115,6 +36145,7 @@ mergeVaultRows model target rows =
                         , deleted = False
                         , redacted = False
                         , topic = ""
+                        , msgType = row.rowType
                         }
 
                     stored =
@@ -36307,7 +36338,8 @@ base36Loop n digits acc =
 
 
 {-| Project one buffer row to its vault row (`target:seq` id, raw
-body — ciphertext for unopened envelopes, never plaintext). -}
+body — ciphertext for unopened envelopes, never plaintext — plus
+the row type the export/import round-trip requires). -}
 chatToVaultRow : String -> ChatMessage -> VaultRow
 chatToVaultRow target message =
     { id = target ++ ":" ++ String.fromInt message.id
@@ -36315,6 +36347,7 @@ chatToVaultRow target message =
     , from = message.from
     , body = message.body
     , at = message.at
+    , rowType = message.msgType
     }
 
 
@@ -36457,6 +36490,7 @@ mergeVaultAround model target anchor rows =
                         , deleted = False
                         , redacted = False
                         , topic = ""
+                        , msgType = row.rowType
                         }
 
                     freshChats =

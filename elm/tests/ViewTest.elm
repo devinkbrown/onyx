@@ -159,6 +159,7 @@ bigModel =
                     , deleted = False
                     , redacted = False
                     , topic = ""
+                    , msgType = "msg"
                     }
                 )
                 (List.reverse (List.range 1 150))

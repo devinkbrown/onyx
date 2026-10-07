@@ -276,6 +276,7 @@ vaultTestRow id body reactions =
     , deleted = False
     , redacted = False
     , topic = ""
+    , msgType = "msg"
     }
 
 
@@ -392,6 +393,7 @@ shellOf name unread lastAt =
               , deleted = False
               , redacted = False
               , topic = ""
+              , msgType = "msg"
               }
             ]
     , lastSeen = Nothing
@@ -428,6 +430,7 @@ bigShell name n =
                 , deleted = False
                 , redacted = False
                 , topic = ""
+                , msgType = "msg"
                 }
             )
             (List.reverse (List.range 1 n))
@@ -770,7 +773,7 @@ suite =
                             [ SendLine "PRIVMSG #c hello\r\n"
                             , VaultPersist
                                 { target = "#c"
-                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0 } ]
+                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0, rowType = "msg" } ]
                                 }
                             ]
                             out
@@ -800,8 +803,8 @@ suite =
                     , VaultPersist
                         { target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0 }
-                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0 }
+                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0, rowType = "msg" }
+                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0, rowType = "msg" }
                             ]
                         }
                     ]
@@ -821,7 +824,7 @@ suite =
                     [ SendLine "PRIVMSG #c onetwo\r\n"
                     , VaultPersist
                         { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0 } ]
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0, rowType = "msg" } ]
                         }
                     ]
                     out
@@ -2541,7 +2544,7 @@ suite =
             \_ ->
                 let
                     window =
-                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000 } ]
+                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000, rowType = "msg" } ]
 
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
@@ -2637,8 +2640,8 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000 }
-                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000 }
+                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000, rowType = "msg" }
+                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000, rowType = "msg" }
                         ]
 
                     ( scheduled, _ ) =
@@ -2657,9 +2660,9 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000 }
-                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000 }
-                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000 }
+                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000, rowType = "msg" }
+                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000, rowType = "msg" }
+                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000, rowType = "msg" }
                         ]
 
                     ( scheduled, _ ) =
@@ -5128,7 +5131,7 @@ suite =
                     [ VaultPersist
                         { target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0 } ]
+                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0, rowType = "msg" } ]
                         }
                     ]
                     outbound
@@ -5181,7 +5184,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0 } ]
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "msg" } ]
                                 , status = "ok"
                                 }
                             )
@@ -5208,7 +5211,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0 } ]
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0, rowType = "msg" } ]
                                 , status = "ok"
                                 }
                             )
@@ -5235,7 +5238,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#a"
                                 , rows =
-                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0 } ]
+                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0, rowType = "msg" } ]
                                 , status = "ok"
                                 }
                             )
@@ -5394,8 +5397,8 @@ suite =
                         feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
 
                     window =
-                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000 }
-                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100 }
+                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000, rowType = "msg" }
+                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100, rowType = "msg" }
                         ]
 
                     ( m2, _ ) =
@@ -5420,8 +5423,8 @@ suite =
                         feed blank ":me!u@h JOIN #c"
 
                     window =
-                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300 }
-                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400 }
+                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300, rowType = "msg" }
+                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg" }
                         ]
 
                     ( m2, _ ) =
@@ -5482,8 +5485,8 @@ suite =
                             [ VaultPersist
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000 }
-                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000 }
+                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000, rowType = "msg" }
+                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000, rowType = "notice" }
                                     ]
                                 }
                             ]
@@ -7970,7 +7973,7 @@ suite =
                             [ DmOpenRequested { peer = "dave", presentedKey = peerKey, messageId = 0, envelope = envelopeBody, owner = Nothing }
                             , VaultPersist
                                 { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0 } ]
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg" } ]
                                 }
                             ]
                             outbound
@@ -7988,7 +7991,7 @@ suite =
                         Expect.equal
                             [ VaultPersist
                                 { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0 } ]
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg" } ]
                                 }
                             ]
                             outbound
@@ -8080,7 +8083,7 @@ suite =
                     [ SendLine "PRIVMSG bob hello\r\n"
                     , VaultPersist
                         { target = "bob"
-                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0 } ]
+                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0, rowType = "msg" } ]
                         }
                     ]
                     outbound
@@ -9341,6 +9344,7 @@ suite =
                                       , from = m3.ourNick
                                       , body = envelopeBody
                                       , at = floor m3.nowMs
+                                      , rowType = "msg"
                                       }
                                     ]
                                 }
@@ -9716,7 +9720,7 @@ suite =
                     [ SendLine "PRIVMSG #c :hi room\r\n"
                     , VaultPersist
                         { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0 } ]
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0, rowType = "msg" } ]
                         }
                     ]
                     outbound
@@ -9737,7 +9741,7 @@ suite =
                     , \_ -> Expect.equal (Just roomEnvelopeBody) (Maybe.map .body (List.head stored))
                     , \_ ->
                         Expect.equal [ RoomOpenRequested { room = "#c", messageId = 0, envelope = roomEnvelopeBody } ]
-                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0 } ] }) outbound)
+                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0, rowType = "msg" } ] }) outbound)
                     ]
                     ()
         , test "RoomSealed sends tagged ciphertext and keeps plaintext local" <|
@@ -9767,6 +9771,7 @@ suite =
                                       , from = m4.ourNick
                                       , body = roomEnvelopeBody
                                       , at = floor m4.nowMs
+                                      , rowType = "msg"
                                       }
                                     ]
                                 }
@@ -9808,6 +9813,7 @@ suite =
                                       , from = m3.ourNick
                                       , body = envelopeBody
                                       , at = floor m3.nowMs
+                                      , rowType = "msg"
                                       }
                                     ]
                                 }
@@ -9885,6 +9891,7 @@ suite =
                                       , from = m4.ourNick
                                       , body = roomEnvelopeBody
                                       , at = floor m4.nowMs
+                                      , rowType = "msg"
                                       }
                                     ]
                                 }
@@ -12898,6 +12905,7 @@ suite =
                             , deleted = False
                             , redacted = False
                             , topic = ""
+                            , msgType = "msg"
                             }
 
                         withdrawn =
@@ -20889,6 +20897,103 @@ suite =
                         , \_ -> Expect.equal [ "Named modes" ] (List.map .title bad.toasts)
                         ]
                         ()
+            ]
+        , describe "vault row types"
+            [ test "PRIVMSG persists msg, NOTICE persists notice" <|
+                \_ ->
+                    let
+                        ( m1, out1 ) =
+                            feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :hi"
+
+                        ( _, out2 ) =
+                            feed m1 ":alice!u@h NOTICE #c :hey"
+
+                        types outs =
+                            List.concatMap
+                                (\o ->
+                                    case o of
+                                        VaultPersist persist ->
+                                            List.map .rowType persist.rows
+
+                                        _ ->
+                                            []
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "msg" ] (types out1)
+                        , \_ -> Expect.equal [ "msg", "notice" ] (List.sort (types out2))
+                        ]
+                        ()
+            , test "WHISPER rows carry the whisper type" <|
+                \_ ->
+                    let
+                        ( m, out ) =
+                            feed (joinFirst blank "me" "#c") ":alice!u@h WHISPER #c :psst"
+
+                        persisted =
+                            List.concatMap
+                                (\o ->
+                                    case o of
+                                        VaultPersist persist ->
+                                            List.map .rowType persist.rows
+
+                                        _ ->
+                                            []
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal [ "whisper" ]
+                                (Maybe.withDefault []
+                                    (Maybe.map (List.map .msgType << .messages) (Dict.get "#c" m.channels))
+                                )
+                        , \_ -> Expect.equal [ "whisper" ] persisted
+                        ]
+                        ()
+            , test "merge restores row types onto live rows" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #c"
+
+                        ( loaded, _ ) =
+                            update
+                                (VaultRowsReceived
+                                    { target = "#c"
+                                    , rows =
+                                        [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "notice" } ]
+                                    , status = "ok"
+                                    }
+                                )
+                                joined
+                    in
+                    case Dict.get "#c" loaded.channels of
+                        Just c ->
+                            Expect.equal [ "notice" ] (List.map .msgType c.messages)
+
+                        Nothing ->
+                            Expect.fail "expected #c"
+            , test "optimistic sends persist msg" <|
+                \_ ->
+                    let
+                        ( _, out ) =
+                            labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                        types =
+                            List.concatMap
+                                (\o ->
+                                    case o of
+                                        VaultPersist persist ->
+                                            List.map .rowType persist.rows
+
+                                        _ ->
+                                            []
+                                )
+                                out
+                    in
+                    Expect.equal True (List.member "msg" types)
             ]
         ]
 

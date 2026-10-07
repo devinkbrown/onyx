@@ -52,13 +52,33 @@ test("exportSnapshot mirrors exportVault shape and bounds", () => {
   assert.equal(snap.exportedAt, stamp);
   assert.deepEqual(snap.targets.map((t) => t.target), ["#b", "#c"]);
   assert.deepEqual(snap.targets[1].messages.map((m) => m.id), ["#c:1", "#c:2", "#c:3", "#c:4", "#c:5"]);
-  assert.deepEqual(Object.keys(snap.targets[1].messages[0]).sort(), ["at", "body", "from", "id"]);
+  assert.deepEqual(Object.keys(snap.targets[1].messages[0]).sort(), ["from", "id", "target", "text", "time", "type"]);
+  assert.deepEqual(
+    snap.targets[1].messages.map((m) => [m.text, m.type, m.time]),
+    ROWS.map((r) => [r.body, "msg", r.at]),
+  );
 
   // Per-target cap holds.
   const many = [];
   for (let i = 0; i < 2000; i++) many.push(row("#big:" + i, i));
   const capped = vaultStore.exportSnapshot(many, stamp);
   assert.equal(capped.targets[0].messages.length, 1600);
+});
+
+test("exportSnapshot carries row types; legacy rows default to msg", () => {
+  const stamp = "2026-01-01T00:00:00.000Z";
+  const snap = vaultStore.exportSnapshot(
+    [
+      { id: "#c:1", target: "#c", from: "alice", body: "hi", at: 1000, rowType: "notice" },
+      { id: "#c:2", target: "#c", from: "bob", body: "yo", at: 2000, rowType: "bogus" },
+      row("#c:3", 3000),
+    ],
+    stamp,
+  );
+  assert.deepEqual(
+    snap.targets[0].messages.map((m) => [m.id, m.type]),
+    [["#c:1", "notice"], ["#c:2", "msg"], ["#c:3", "msg"]],
+  );
 });
 
 test("null store fails closed with unavailable/empty results", async () => {

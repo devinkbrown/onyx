@@ -25,12 +25,14 @@ validation (id/from/text/type/time/target bounds), and last-wins id
 dedupe in first-appearance order.
 
 Two documented narrowings follow from the Elm vault's flat row model
-(`VaultRow`: id/target/from/body/at — the same shape `ports.js`
-`exportSnapshot` emits):
+(`VaultRow`: id/target/from/body/at/rowType — the same shape
+`ports.js` `exportSnapshot` emits, in oracle field names):
 
   - Display extras the oracle revives (reactions, replyTo, flags,
     topic) are not carried: they never reject a message in the oracle
-    either, and the flat store cannot persist them.
+    either, and the flat store cannot persist them. Replayed
+    presence lines revive as `system` (the merge drops their
+    join/part/kind upstream).
   - `time` accepts epoch-ms numbers or the strict ISO-8601 subset
     (`SavedSearches.parseIsoMillis`); other `Date.parse`-able forms
     are rejected rather than falling back, and an absent/invalid
@@ -120,13 +122,16 @@ messageTypes =
         ]
 
 
-{-| One revived message projected onto the flat vault row shape. -}
+{-| One revived message projected onto the flat vault row shape
+(the validated `type` rides along so the row the merge writes
+round-trips back through strict import). -}
 type alias VaultImportMessage =
     { id : String
     , target : String
     , from : String
     , body : String
     , atMs : Float
+    , msgType : String
     }
 
 
@@ -284,15 +289,15 @@ reviveMessage raw fallbackTarget =
         Nothing
 
     else
-        case ( raw.body, raw.time ) of
-            ( Just body, Just atMs ) ->
+        case ( raw.body, raw.time, raw.messageType ) of
+            ( Just body, Just atMs, Just messageType ) ->
                 if String.length body > maxMessageTextLength || not typeOk then
                     Nothing
 
                 else
                     case ( normalizeTarget raw.target fallbackTarget, raw.id, raw.from ) of
                         ( Just target, Just id, Just from ) ->
-                            Just { id = id, target = target, from = from, body = body, atMs = atMs }
+                            Just { id = id, target = target, from = from, body = body, atMs = atMs, msgType = messageType }
 
                         _ ->
                             Nothing

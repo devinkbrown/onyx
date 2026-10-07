@@ -112,8 +112,8 @@ suite =
                             Expect.equal
                                 [ { target = "#c"
                                   , messages =
-                                        [ { id = "m1", target = "#c", from = "alice", body = "hello", atMs = 1000 }
-                                        , { id = "m2", target = "#c", from = "", body = "act", atMs = 2000 }
+                                        [ { id = "m1", target = "#c", from = "alice", body = "hello", atMs = 1000, msgType = "msg" }
+                                        , { id = "m2", target = "#c", from = "", body = "act", atMs = 2000, msgType = "action" }
                                         ]
                                   }
                                 ]
@@ -141,6 +141,27 @@ suite =
 
                                 _ ->
                                     Expect.fail "expected one message"
+
+                        Nothing ->
+                            Expect.fail "expected a snapshot"
+            , test "an export-shaped blob round-trips with its types" <|
+                \_ ->
+                    let
+                        value =
+                            snapshot
+                                [ target "#c"
+                                    [ message "m1" "alice" "hi" "msg" 1000
+                                    , message "m2" "alice" "hey" "notice" 2000
+                                    ]
+                                ]
+                    in
+                    case parse value of
+                        Just snap ->
+                            Expect.equal
+                                [ ( "m1", "msg" ), ( "m2", "notice" ) ]
+                                (List.concatMap .messages snap.targets
+                                    |> List.map (\m -> ( m.id, m.msgType ))
+                                )
 
                         Nothing ->
                             Expect.fail "expected a snapshot"
