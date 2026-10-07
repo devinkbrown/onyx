@@ -2919,8 +2919,51 @@ suite =
                     , \_ -> Expect.equal armed.editingMessage emptied.editingMessage
                     , \_ -> Expect.equal [] offlineOut
                     , \_ -> Expect.equal armed.editingMessage offline.editingMessage
+                    , \_ -> Expect.equal "mine" offline.composer
+                    , \_ -> Expect.equal (Just "Edit was refused. Your replacement text is still here.") offline.composerError
                     , \_ -> Expect.equal [] uncapOut
                     , \_ -> Expect.equal armed.editingMessage uncap.editingMessage
+                    , \_ -> Expect.equal (Just "Edit was refused. Your replacement text is still here.") uncap.composerError
+                    ]
+                    ()
+        , test "edit refuses non-message rows even when owned" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( based, _ ) =
+                        update (ChannelSelect "#c") m1
+                            |> Tuple.first
+                            |> (\m -> update (EditArm { target = "#c", msgid = "m9" }) m)
+
+                    ( plain, _ ) =
+                        update (ChannelSelect "#c") m1
+
+                    asMode model =
+                        case Dict.get "#c" model.channels of
+                            Nothing ->
+                                model
+
+                            Just ch ->
+                                { model
+                                    | channels =
+                                        Dict.insert "#c"
+                                            { ch | messages = List.map (\m -> { m | msgType = "mode" }) ch.messages }
+                                            model.channels
+                                }
+
+                    ( modeArm, _ ) =
+                        update (EditArm { target = "#c", msgid = "m9" }) (asMode plain)
+
+                    ( modeSend, modeOut ) =
+                        update ComposerSend (asMode based)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (canEditRow (asMode based) "#c" "m9")
+                    , \_ -> Expect.equal Nothing modeArm.editingMessage
+                    , \_ -> Expect.equal [] modeOut
+                    , \_ -> Expect.equal (Just "Edit was refused. Your replacement text is still here.") modeSend.composerError
                     ]
                     ()
         , test "attaching mid-edit refuses with the draft kept" <|

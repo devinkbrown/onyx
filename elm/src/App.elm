@@ -7035,6 +7035,7 @@ canEditRow model target messageId =
         Just row ->
             not (String.isEmpty row.from)
                 && String.toLower row.from == String.toLower model.ourNick
+                && row.msgType == "msg"
                 && not row.deleted
                 && not row.redacted
                 && not (messageLocked row)
@@ -34681,9 +34682,12 @@ update msg model =
                                 if List.isEmpty out then
                                     -- Refused (cap, transport, or the row
                                     -- changed under us): like the oracle
-                                    -- `editMessage` false-path, the arm and
-                                    -- the draft stay for retry.
-                                    ( edited, [] )
+                                    -- `editMessage` refused path, the arm
+                                    -- and the draft stay for retry and the
+                                    -- refusal copy coaches (Elm has no
+                                    -- admit-uncertain tier — every refusal
+                                    -- here is a pre-send gate).
+                                    ( { edited | composerError = Just "Edit was refused. Your replacement text is still here." }, [] )
 
                                 else
                                     ( { edited | editingMessage = Nothing, composer = "" }, out )
