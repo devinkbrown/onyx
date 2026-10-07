@@ -147,6 +147,7 @@
     node: document.getElementById("app"),
     flags: {
       wsUrl: params.get("ws") || "wss://irc.onyx.example/ws",
+      wsPin: params.get("ws"),
       nick: params.get("nick") || "guest",
       origin: window.location.origin,
       nowMs: Date.now(),

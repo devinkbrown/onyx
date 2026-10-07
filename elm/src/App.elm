@@ -2231,6 +2231,7 @@ type Msg
     | UrlChanged Url.Url
     | WsLineReceived String
     | WsBatchReceived { at : Int, lines : List String }
+    | NodesProbed { wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float }
     | WsOpened { url : String }
     | WsClosed { clean : Bool, reason : String }
     | ReconnectNow
@@ -31068,6 +31069,28 @@ update msg model =
 
         WsLineReceived line ->
             foldParsed model (Wire.parseIrcMessage line)
+
+        NodesProbed { wss, sessionToken, meshToken, meshExpiresAtMs } ->
+            -- Node-probe winner (mirrors `selectBestNode` falling
+            -- through to `initialNode`): connect to the winner and
+            -- adopt its stored resume holdings, but only when the
+            -- flag-provided holdings are empty — live tokens are
+            -- never overwritten by a stale probe response.
+            let
+                holdings =
+                    model.sessionTokens
+
+                adopted =
+                    if holdings.sessionToken == Nothing && holdings.meshToken == Nothing then
+                        { sessionToken = sessionToken
+                        , meshToken = meshToken
+                        , meshTokenExpiresAt = meshExpiresAtMs
+                        }
+
+                    else
+                        holdings
+            in
+            ( { model | sessionTokens = adopted }, [ WsConnect { url = wss } ] )
 
         WsBatchReceived batch ->
             -- The receipt stamp keeps the clock honest between Ticks

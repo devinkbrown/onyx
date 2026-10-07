@@ -18,7 +18,7 @@ WebSocket, IndexedDB, WebAuthn, WebRTC, Http).
 |---|---|---|
 | One IRC message per WS frame, no CRLF; split on `/\r?\n/`, no cross-frame remainder | `lib/irc/client.ts`, `framing.test.ts` | **done** — `Wire.splitWireFrame` |
 | Binary media datagrams (`onBinary`) | `lib/irc/client.ts` | **planned** — `Ports` (WS bytes in via ports) |
-| WS endpoint probing / `VITE_IRC_WS` pin | `app/nodes.ts` | **planned** — `Nodes` + ports |
+| WS endpoint probing / `VITE_IRC_WS` pin | `app/nodes.ts` | **done** — `Nodes` (registry, `envNode` pin rule, `pickFastest`, `boundedTimeout`/`probeConcurrency`; 10 `NodesTest` vectors) + `ports.js` probe (`pingNode` HEAD/`no-cors`/cache-buster/bounded-timeout, worker-pool sweep, pin-wins, random fallback; `nodesProbe.smoke.mjs` 5/5) + `Main` wiring (`?ws=` pin connects directly, else probe-then-`NodesProbed` connects the winner with its stored resume holdings adopted only when flag holdings are empty; 2 `AppTest` vectors) |
 
 ## Registration, CAP, SASL (§2, §4, §5)
 

@@ -6148,6 +6148,56 @@ suite =
                     , \_ -> Expect.equal [] outbound3
                     ]
                     ()
+        , test "probe winner connects and adopts empty holdings" <|
+            \_ ->
+                let
+                    ( m1, out ) =
+                        update
+                            (NodesProbed
+                                { wss = "wss://eshmaki.me:8080"
+                                , sessionToken = Just "tok"
+                                , meshToken = Just "mesh"
+                                , meshExpiresAtMs = Just 99
+                                }
+                            )
+                            blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ WsConnect { url = "wss://eshmaki.me:8080" } ] out
+                    , \_ -> Expect.equal (Just "tok") m1.sessionTokens.sessionToken
+                    , \_ -> Expect.equal (Just "mesh") m1.sessionTokens.meshToken
+                    , \_ -> Expect.equal (Just 99) m1.sessionTokens.meshTokenExpiresAt
+                    ]
+                    ()
+        , test "probe winner never overwrites live holdings" <|
+            \_ ->
+                let
+                    live =
+                        { blank
+                            | sessionTokens =
+                                { sessionToken = Just "live"
+                                , meshToken = Nothing
+                                , meshTokenExpiresAt = Nothing
+                                }
+                        }
+
+                    ( m1, out ) =
+                        update
+                            (NodesProbed
+                                { wss = "wss://ircx.us:8080"
+                                , sessionToken = Just "stale"
+                                , meshToken = Just "stale-mesh"
+                                , meshExpiresAtMs = Just 7
+                                }
+                            )
+                            live
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ WsConnect { url = "wss://ircx.us:8080" } ] out
+                    , \_ -> Expect.equal (Just "live") m1.sessionTokens.sessionToken
+                    , \_ -> Expect.equal Nothing m1.sessionTokens.meshToken
+                    ]
+                    ()
         , test "sasl proof admits session commands before 900" <|
             \_ ->
                 let

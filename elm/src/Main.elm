@@ -116,6 +116,7 @@ import Browser.Events
 import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Nodes
 import Schedule
 import Time
 import Url
@@ -123,6 +124,12 @@ import View
 
 
 port wsConnect : { url : String } -> Cmd msg
+
+
+port probeNodes : { nodes : List { id : String, host : String, wss : String }, pin : Maybe String, nick : String, timeoutMs : Int, maxConcurrency : Int } -> Cmd msg
+
+
+port nodesProbed : ({ wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float } -> msg) -> Sub msg
 
 
 port wsClose : () -> Cmd msg
@@ -699,13 +706,23 @@ decodeField field decoder raw =
 init : Decode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd App.Msg )
 init rawFlags url key =
     let
-        wsUrl =
-            Maybe.withDefault "wss://irc.onyx.example/ws"
-                (decodeField "wsUrl" Decode.string rawFlags)
-
         nick =
             Maybe.withDefault "guest"
                 (decodeField "nick" Decode.string rawFlags)
+
+        -- `?ws=` pin (mirrors `VITE_IRC_WS`): present wins and
+        -- disables probing; absent probes the registry.
+        wsPin =
+            case decodeField "wsPin" Decode.string rawFlags of
+                Just pin ->
+                    if String.isEmpty (String.trim pin) then
+                        Nothing
+
+                    else
+                        Just (String.trim pin)
+
+                Nothing ->
+                    Nothing
 
         -- Oracle `DEFAULT_PREFERENCES.e2eeDms = true`; ports-side reads
         -- `onyx:preferences` so the Elm default only covers a missing
@@ -828,7 +845,22 @@ init rawFlags url key =
       , navKey = key
       }
     , Cmd.batch
-        [ perform key (App.WsConnect { url = wsUrl })
+        [ case wsPin of
+            Just pin ->
+                -- Pinned endpoint connects directly (mirrors the
+                -- `VITE_IRC_WS` leg of `selectBestNode`).
+                perform key (App.WsConnect { url = pin })
+
+            Nothing ->
+                -- No pin: probe the registry ports-side, then
+                -- `NodesProbed` connects to the winner.
+                probeNodes
+                    { nodes = Nodes.nodes
+                    , pin = Nothing
+                    , nick = nick
+                    , timeoutMs = Nodes.defaultProbeTimeoutMs
+                    , maxConcurrency = Nodes.defaultMaxConcurrency
+                    }
         , savedSearchesList ()
         , guidesProgressRequest ()
         , appearanceRequest ()
@@ -1283,6 +1315,7 @@ subscriptions model =
                     )
             )
         , wsLines App.WsBatchReceived
+        , nodesProbed App.NodesProbed
         , wsOpened App.WsOpened
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged

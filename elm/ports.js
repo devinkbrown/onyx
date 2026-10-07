@@ -2232,6 +2232,115 @@
     return { schedule: schedule, observed: observed, clear: clear };
   }
 
+  /* Node probing — mirrors `src/app/nodes.ts` (`pingNode` /
+     `probeNodes` / `selectBestNode`): time a bodyless HTTPS HEAD
+     against each node's web tier (NOT the IRC socket, which would
+     trip flood protection), pick the fastest reachable node, fall
+     back to a random node when probing is inconclusive. A pin always
+     wins and disables probing. Resolves to Infinity on error,
+     timeout, or without fetch. */
+  var NODES_PROBE_TIMEOUT_MS = 4000;
+  var NODES_MAX_CONCURRENCY = 4;
+
+  function boundedProbeTimeout(timeoutMs) {
+    return (typeof timeoutMs === "number" && isFinite(timeoutMs) && timeoutMs >= 0)
+      ? Math.floor(timeoutMs)
+      : NODES_PROBE_TIMEOUT_MS;
+  }
+
+  function probeConcurrency(requested, nodeCount) {
+    var finite = (typeof requested === "number" && isFinite(requested))
+      ? Math.floor(requested)
+      : NODES_MAX_CONCURRENCY;
+    return Math.min(nodeCount, Math.max(1, finite));
+  }
+
+  function pingNode(host, timeoutMs) {
+    if (typeof fetch !== "function" || typeof performance === "undefined" || !host) {
+      return Promise.resolve(Number.POSITIVE_INFINITY);
+    }
+    var bounded = boundedProbeTimeout(timeoutMs);
+    var controller = (typeof AbortController === "function") ? new AbortController() : null;
+    var settled = false;
+    function finish(ms) {
+      if (settled) return ms;
+      settled = true;
+      clearTimeout(timer);
+      return ms;
+    }
+    var timer = setTimeout(function () {
+      try { if (controller) controller.abort(); } catch (err) { /* already settled */ }
+      finish(Number.POSITIVE_INFINITY);
+    }, bounded);
+    var start = performance.now();
+    var options = { method: "HEAD", mode: "no-cors", cache: "no-store" };
+    if (controller) options.signal = controller.signal;
+    var target = "https://" + host + "/?_lat=" + start;
+    return Promise.resolve()
+      .then(function () { return fetch(target, options); })
+      .then(function () { return finish(performance.now() - start); })
+      .catch(function () { return finish(Number.POSITIVE_INFINITY); });
+  }
+
+  function probeNodeList(nodes, timeoutMs, maxConcurrency) {
+    var list = Array.isArray(nodes) ? nodes.slice() : [];
+    var workers = probeConcurrency(maxConcurrency, list.length);
+    var results = new Array(list.length);
+    var nextIndex = 0;
+    function worker() {
+      var index = nextIndex++;
+      var node = list[index];
+      if (!node) return Promise.resolve();
+      return pingNode(node.host, timeoutMs).then(function (ms) {
+        results[index] = { node: node, ms: ms };
+        return worker();
+      });
+    }
+    var pool = [];
+    for (var i = 0; i < workers; i += 1) pool.push(worker());
+    return Promise.all(pool).then(function () {
+      return results.filter(function (r) { return r !== undefined; });
+    });
+  }
+
+  function pickFastestNode(results) {
+    var fastest = null;
+    for (var i = 0; i < results.length; i += 1) {
+      var result = results[i];
+      if (result && isFinite(result.ms) && (!fastest || result.ms < fastest.ms)) {
+        fastest = result;
+      }
+    }
+    return fastest ? fastest.node : null;
+  }
+
+  function randomNode(nodes) {
+    var pool = (Array.isArray(nodes) && nodes.length > 0) ? nodes : [];
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function selectBestNode(nodes, options) {
+    var opts = options || {};
+    var pin = opts.pin;
+    if (typeof pin === "string" && pin.trim() !== "") {
+      var trimmed = pin.trim();
+      var known = (nodes || []).filter(function (n) { return n && n.wss === trimmed; })[0];
+      return Promise.resolve(known || { id: "env", host: "custom", wss: trimmed });
+    }
+    return probeNodeList(nodes, opts.timeoutMs, opts.maxConcurrency).then(function (results) {
+      return pickFastestNode(results) || randomNode(nodes);
+    });
+  }
+
+  function probeWinnerHost(wss) {
+    try {
+      return new URL(wss).host.toLowerCase();
+    } catch (err) {
+      return "";
+    }
+  }
+
   /* Cadence binary media bridge — mirrors the oracle socket's binary
      plane (`client.ts` `_onMessage` / `sendBinary`): binary frames are
      media datagrams, never IRC lines. `text.ircv3.net` is control-only
@@ -2530,6 +2639,37 @@ function fetchPublicFeed(url) {
       keepalive = createPingKeepalive(app, socket);
       keepalive.schedule();
     });
+
+    /* Node selection (mirrors `selectBestNode` falling through to
+       `initialNode`): a pin connects its endpoint with probing
+       disabled; otherwise the registry is HEAD-probed and the
+       winner's stored resume holdings ride along so SESSION RESUME
+       survives node selection. */
+    if (app.ports.probeNodes) {
+      app.ports.probeNodes.subscribe(function (req) {
+        var list = (req && Array.isArray(req.nodes)) ? req.nodes : [];
+        var nick = (req && typeof req.nick === "string") ? req.nick : "guest";
+        selectBestNode(list, {
+          pin: req ? req.pin : null,
+          timeoutMs: req ? req.timeoutMs : null,
+          maxConcurrency: req ? req.maxConcurrency : null
+        }).then(function (winner) {
+          if (!winner || typeof winner.wss !== "string") return;
+          var held = null;
+          try {
+            held = loadResumeTokens(probeWinnerHost(winner.wss), nick) || null;
+          } catch (err) { held = null; }
+          try {
+            app.ports.nodesProbed.send({
+              wss: winner.wss,
+              sessionToken: (held && held.sessionToken) || null,
+              meshToken: (held && held.meshToken) || null,
+              meshExpiresAtMs: (held && typeof held.meshExpiresAtMs === "number") ? held.meshExpiresAtMs : null
+            });
+          } catch (err) { /* port gone */ }
+        });
+      });
+    }
 
     if (app.ports.pingObserved) {
       app.ports.pingObserved.subscribe(function () {
@@ -7292,6 +7432,14 @@ function fetchPublicFeed(url) {
       create: createPingKeepalive,
       idleMs: PING_IDLE_MS,
       timeoutMs: PONG_TIMEOUT_MS
+    },
+    nodeProbe: {
+      selectBest: selectBestNode,
+      ping: pingNode,
+      pickFastest: pickFastestNode,
+      random: randomNode,
+      timeoutMs: NODES_PROBE_TIMEOUT_MS,
+      maxConcurrency: NODES_MAX_CONCURRENCY
     },
     publicFeed: {
       fetch: fetchPublicFeed,
