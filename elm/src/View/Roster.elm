@@ -8,6 +8,7 @@ exotic server letter ranks instead of dropping.
 -}
 
 import App exposing (Channel, Member, Model, Msg(..))
+import Avatar
 import Dict
 import Html exposing (Html, button, div, h2, li, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList)
@@ -74,7 +75,14 @@ rosterRow channel role member =
             , ( "onyx-away", member.away )
             ]
         ]
-        [ span [ class "onyx-member-prefix" ] [ text role.symbol ]
+        [ Avatar.view
+            { name = member.nick
+            , owner = role.key == "owner" || role.key == "founder"
+            , size = Avatar.Sm
+            , extraClass = ""
+            , hidden = True
+            }
+        , span [ class "onyx-member-prefix" ] [ text role.symbol ]
         , button
             [ attribute "type" "button"
             , class "onyx-member-nick"

@@ -2453,6 +2453,56 @@ suite =
                         ]
                         ()
             ]
+        , describe "identity avatars"
+            [ test "member card renders the hashed avatar initials" <|
+                \_ ->
+                    let
+                        carded =
+                            Tuple.first
+                                (update (UserProfileOpened { nick = "alice", channel = "#c" })
+                                    { blank | channels = Dict.singleton "#c" (banChannelWith Set.empty) }
+                                )
+                    in
+                    query carded
+                        |> Query.find [ Selector.class "onyx-avatar" ]
+                        |> Query.has
+                            [ Selector.text "AL"
+                            , Selector.attribute (Attr.attribute "aria-hidden" "true")
+                            , Selector.class "onyx-avatar--md"
+                            ]
+            , test "network sheet renders the labelled avatar" <|
+                \_ ->
+                    query (Tuple.first (update (WhoisRequest "alice") blank))
+                        |> Query.find [ Selector.class "onyx-avatar" ]
+                        |> Query.has
+                            [ Selector.text "AL"
+                            , Selector.attribute (Attr.attribute "aria-label" "alice")
+                            , Selector.class "onyx-avatar--md"
+                            ]
+            , test "roster rows render small hidden avatars" <|
+                \_ ->
+                    let
+                        rostered =
+                            blank
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query rostered
+                                |> Query.findAll [ Selector.class "onyx-avatar--sm" ]
+                                |> Query.count (Expect.equal 2)
+                        , \_ ->
+                            query rostered
+                                |> Query.findAll
+                                    [ Selector.class "onyx-avatar"
+                                    , Selector.attribute (Attr.attribute "aria-hidden" "true")
+                                    ]
+                                |> Query.count (Expect.equal 2)
+                        ]
+                        ()
+            ]
         , describe "notification inbox"
             [ test "bell badges attention unread only" <|
                 \_ ->

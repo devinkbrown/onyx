@@ -6,6 +6,7 @@ summary, live status, and the details list; the sheet opens through
 `WhoisRequest` and closes through `WhoisClose`). -}
 
 import App exposing (Model, Msg(..))
+import Avatar
 import Dict
 import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, input, label, li, p, section, small, span, summary, text, textarea, time, ul)
 import Html.Attributes exposing (attribute, checked, class, datetime, disabled, for, href, id, maxlength, tabindex, type_, value)
@@ -69,11 +70,13 @@ sheetFor model nick =
         ]
 
 
-{-| Summary: display nick, services account, and the bot badge. -}
+{-| Summary: avatar, display nick, services account, and the bot badge. -}
 profileSummary : String -> Maybe Services.WhoisInfo -> Html Msg
 profileSummary shown info =
     div [ class "onyx-profile-summary" ]
-        ([ p [ class "onyx-profile-nick" ] [ text shown ] ]
+        ([ Avatar.view { name = shown, owner = False, size = Avatar.Md, extraClass = "", hidden = False }
+         , p [ class "onyx-profile-nick" ] [ text shown ]
+         ]
             ++ (case Maybe.andThen .account info of
                     Just account ->
                         [ p [ class "onyx-profile-account" ] [ text ("~" ++ account) ] ]
@@ -505,8 +508,7 @@ cardFor model nick channel =
                    )
             )
             [ div [ class "onyx-member-identity" ]
-                [ span [ class "onyx-member-avatar", attribute "aria-hidden" "true" ]
-                    [ text (avatarInitial displayName) ]
+                [ Avatar.view { name = displayName, owner = False, size = Avatar.Md, extraClass = "", hidden = True }
                 , div [ class "onyx-member-copy" ]
                     ([ p [ class "onyx-member-name", attribute "id" (cardId ++ "-name") ] [ text displayName ] ]
                         ++ (if String.toLower displayName /= String.toLower nick then
@@ -733,17 +735,6 @@ slug value =
             )
         |> String.fromList
         |> String.trim
-
-
-{-| Decorative avatar initial. -}
-avatarInitial : String -> String
-avatarInitial name =
-    case String.uncons (String.trim name) of
-        Just ( first, _ ) ->
-            String.fromChar (Char.toUpper first)
-
-        Nothing ->
-            "?"
 
 
 {-| Escape dismisses the member card (same IME-yielding shape

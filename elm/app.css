@@ -13,7 +13,38 @@
   --onyx-accent-ink: #06281a;
   --onyx-warn: #d9a13b;
   --onyx-bad: #e5484d;
+  /* Identity-avatar swatch ground (ocean defaults from
+     src/styles/tokens.css, so the Avatar gradients resolve). */
+  --ink: #000101;
+  --stone: #050709;
+  --stone-2: #0d0f12;
+  --stone-3: #16191c;
+  --lapis-bright: #9cc2ea;
+  --lapis-deep: #385b7e;
+  --paper: #eae8e0;
+  --paper-dim: #a4a19a;
+  --gold: #c9a24a;
+  --gold-bright: #f1d489;
 }
+
+/* Identity avatars (mirrors src/primitives avatar rules). */
+
+.onyx-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--onyx-avatar-fg);
+  background: var(--onyx-avatar-bg);
+  border-radius: 50%;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.onyx-avatar--sm { width: 2rem; height: 2rem; font-size: 0.72rem; }
+.onyx-avatar--md { width: 2.65rem; height: 2.65rem; font-size: 0.86rem; }
+.onyx-avatar--owner { box-shadow: 0 0 0 2px var(--gold); }
+.onyx-avatar--service { background: transparent; }
 
 * { box-sizing: border-box; }
 
