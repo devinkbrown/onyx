@@ -2052,6 +2052,25 @@ suite =
                             out
                 in
                 Expect.equal [ [ 1791115200000 ] ] stamps
+        , test "vault persist of sealed rows stays ciphertext-only" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") ":bob!u@h PRIVMSG #c :ONYXDM1 xyz"
+
+                    bodies =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    VaultPersist { rows } ->
+                                        Just (List.map .body rows)
+
+                                    _ ->
+                                        Nothing
+                            )
+                            out
+                in
+                Expect.equal [ [ "ONYXDM1 xyz" ] ] bodies
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let
