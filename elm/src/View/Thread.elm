@@ -489,10 +489,9 @@ mediaFallback kind url =
 
 {-| Image lightbox dialog (mirrors `MessageImageLightbox`: modal
 dialog with backdrop-click and Save/Close actions; Escape closes it
-via the top-level subscription; the ports bridge traps Tab inside
-the dialog while mounted, moves focus in on open, and returns
-focus to the opener on close — mirroring `createDialogFocus` minus
-scroll lock and background isolation, which stay narrowings). -}
+via the top-level subscription; the ports bridge mirrors
+`createDialogFocus` (background isolation, scroll lock, Tab trap,
+focus-in on open, return-focus on close). -}
 mediaLightboxDialog : Model -> Html Msg
 mediaLightboxDialog model =
     case model.mediaLightbox of

@@ -4245,10 +4245,10 @@ function fetchPublicFeed(url) {
       });
     }
     /* Image lightbox dialog focus (mirroring `createDialogFocus` for
-       `MessageImageLightbox`: while the lightbox dialog is mounted Tab
-       cycles inside it, opening moves focus into the dialog, and closing
-       returns focus to the opener. Scroll lock and background isolation
-       stay later slices. A document stamp keeps re-wiring idempotent. */
+       `MessageImageLightbox`: while the lightbox dialog is mounted the
+       background is isolated and scroll-locked, Tab cycles inside the
+       dialog, opening moves focus into it, and closing returns focus
+       to the opener. A document stamp keeps re-wiring idempotent. */
     (function installLightboxFocus() {
       if (typeof document === "undefined" || !document) return;
       try {
@@ -4308,22 +4308,65 @@ function fetchPublicFeed(url) {
         document.addEventListener("keydown", trapTab);
       } catch (err) { /* no DOM events */ }
       if (!Mutation) return;
+      var lockedOverflow = null;
+      var isolated = [];
+      function isolate() {
+        // Hide the dialog's siblings from assistive tech while it is
+        // mounted (mirroring the oracle background isolation); the
+        // lightbox container itself stays exposed.
+        release();
+        var host = null;
+        try {
+          var root = panel();
+          host = root && (root.parentNode || root);
+        } catch (err) { host = null; }
+        var body = null;
+        try { body = document.body; } catch (err) { body = null; }
+        if (!host || !body) return;
+        try { lockedOverflow = body.style.overflow || ""; } catch (err) { lockedOverflow = ""; }
+        try { body.style.overflow = "hidden"; } catch (err) { /* best-effort */ }
+        Array.prototype.forEach.call(body.children, function (child) {
+          if (child === host || child.contains(host)) return;
+          try {
+            if (child.getAttribute("aria-hidden") !== "true") {
+              isolated.push(child);
+              child.setAttribute("aria-hidden", "true");
+            }
+          } catch (err) { /* best-effort */ }
+        });
+      }
+      function release() {
+        var body = null;
+        try { body = document.body; } catch (err) { body = null; }
+        if (body && lockedOverflow !== null) {
+          try { body.style.overflow = lockedOverflow; } catch (err) { /* best-effort */ }
+          lockedOverflow = null;
+        }
+        while (isolated.length > 0) {
+          var child = isolated.pop();
+          try { child.removeAttribute("aria-hidden"); } catch (err) { /* best-effort */ }
+        }
+      }
       function settle() {
         var root = panel();
         if (root && !root.__onyxFocusReady) {
           try { root.__onyxFocusReady = true; } catch (err) { /* best-effort */ }
           try { returnFocus = document.activeElement || null; } catch (err) { returnFocus = null; }
+          isolate();
           try { root.focus({ preventScroll: true }); } catch (err) {
             try { root.focus(); } catch (ignored) { /* best-effort */ }
           }
         } else if (!root && returnFocus) {
           var back = returnFocus;
           returnFocus = null;
+          release();
           try {
             if (back.isConnected) back.focus({ preventScroll: true });
           } catch (err) {
             try { if (back.isConnected) back.focus(); } catch (ignored) { /* best-effort */ }
           }
+        } else if (!root) {
+          release();
         }
       }
       try {

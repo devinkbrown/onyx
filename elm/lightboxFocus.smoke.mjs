@@ -112,6 +112,24 @@ test("mounting moves focus in and unmounting returns it", async () => {
   }
 });
 
+test("mounting isolates the background and locks scroll", async () => {
+  const dom = harness();
+  try {
+    const document = dom.window.document;
+    const { trigger, box } = mount(dom);
+    await tick();
+    assert.equal(document.body.style.overflow, "hidden");
+    assert.equal(trigger.getAttribute("aria-hidden"), "true");
+    assert.equal(box.getAttribute("aria-hidden"), null);
+    box.remove();
+    await tick();
+    assert.equal(document.body.style.overflow, "");
+    assert.equal(trigger.getAttribute("aria-hidden"), null);
+  } finally {
+    cleanup(dom);
+  }
+});
+
 test("Tab cycles at the dialog edges", async () => {
   const dom = harness();
   try {
