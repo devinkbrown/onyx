@@ -2722,6 +2722,35 @@ suite =
                     , \_ -> Expect.equal [ "Copy failed" ] (List.map .title badModel.toasts)
                     ]
                     ()
+        , test "quote prefixes the active composer and toasts" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update (MessageQuote { target = "#c", from = "alice", body = "hello\nworld" })
+                            { blank | activeChannel = Just "#c", composer = "draft" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "> hello\n> world\n\ndraft" m.composer
+                    , \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal [ "Quoted into composer" ] (List.map .title m.toasts)
+                    , \_ ->
+                        Expect.equal [ "Prefixed a quote from alice." ]
+                            (List.filterMap .description m.toasts)
+                    ]
+                    ()
+        , test "quote for another conversation selects it first" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (MessageQuote { target = "#b", from = "bob", body = "hey" })
+                            { blank | activeChannel = Just "#c" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#b") m.activeChannel
+                    , \_ -> Expect.equal "> hey\n\n" m.composer
+                    , \_ -> Expect.equal [ "Quoted into composer" ] (List.map .title m.toasts)
+                    ]
+                    ()
         , test "vault query schedules a debounced scan" <|
             \_ ->
                 let

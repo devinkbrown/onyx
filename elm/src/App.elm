@@ -20,6 +20,7 @@ import Base64Url
 import Bitwise
 import Browser
 import Cadence
+import ComposerInject
 import Dict exposing (Dict)
 import DmCipher
 import Download
@@ -2617,6 +2618,7 @@ type Msg
     | MediaLightboxClose
     | MediaSave String
     | MessageCopyMoment { target : String, at : Int }
+    | MessageQuote { target : String, from : String, body : String }
     | ZoneReceived Time.Zone
     | ChannelSelect String
     | ThreadShowEarlier
@@ -34009,6 +34011,45 @@ update msg model =
 
         MediaSave url ->
             ( model, [ MediaSaveDownload { href = url, name = Upload.mediaSaveName url Nothing } ] )
+
+        MessageQuote { target, from, body } ->
+            -- The Elm composer holds one draft (no per-target drafts),
+            -- so a quote for another conversation selects it first and
+            -- the merged prefix lands in the draft the send will use.
+            -- Caret/focus motion stays a narrowing (no caret state).
+            let
+                insert =
+                    ComposerInject.formatQuoteInsert from body
+
+                injectInto composer =
+                    (ComposerInject.mergeComposerInsert composer insert ComposerInject.InjectPrefix).text
+
+                toasted current =
+                    ( addToast
+                        { variant = ToastInfo
+                        , title = "Quoted into composer"
+                        , description = Just ("Prefixed a quote from " ++ from ++ ".")
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        { current | composer = injectInto current.composer }
+                    , []
+                    )
+            in
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower target) then
+                toasted model
+
+            else
+                let
+                    ( switched, outs ) =
+                        selectChannel model target
+
+                    ( quoted, _ ) =
+                        toasted switched
+                in
+                ( quoted, outs )
 
         MessageCopyMoment { target, at } ->
             case Invite.buildMomentLink model.origin target (toFloat at) of
