@@ -5,10 +5,11 @@ channel, newest last.
 -}
 
 import App exposing (Model, Msg(..))
+import Avatar
 import Dict
 import Emoji
 import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, section, small, span, strong, text, time, ul, video)
-import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, tabindex, target, type_, value)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
@@ -138,6 +139,16 @@ dividerAbove dividerId m =
             text ""
 
 
+{-| System event rows render without an identity avatar
+(mirroring `isSystemMsg`: join/part/quit/kick/mode/topic/nick/
+system/error carry no author face; the dedicated system-row
+branch itself stays pending).
+-}
+isSystemRow : App.ChatMessage -> Bool
+isSystemRow m =
+    List.member m.msgType [ "join", "part", "quit", "kick", "mode", "topic", "nick", "system", "error" ]
+
+
 messageRow : Model -> String -> App.ChatMessage -> Html Msg
 messageRow model target m =
     let
@@ -166,7 +177,25 @@ messageRow model target m =
         , attribute "role" "article"
         , attribute "aria-label" (App.messageAccessibleLabel m)
         ]
-        [ strong [ class "onyx-sender" ] [ text m.from ]
+        [ (if isSystemRow m then
+            text ""
+
+         else
+            div
+                [ class "onyx-row-avatar"
+                , attribute "aria-hidden" "true"
+                , style "--nick-tint" (Avatar.nickTint m.from)
+                ]
+                [ Avatar.view
+                    { name = m.from
+                    , owner = m.from == model.ourNick
+                    , size = Avatar.Sm
+                    , extraClass = ""
+                    , hidden = True
+                    }
+                ]
+        )
+        , strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
         , case m.audience of
             Nothing ->
                 text ""

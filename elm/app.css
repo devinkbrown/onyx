@@ -46,6 +46,10 @@
 .onyx-avatar--owner { box-shadow: 0 0 0 2px var(--gold); }
 .onyx-avatar--service { background: transparent; }
 
+/* People are circles; the author's nick-tint rings their row avatar. */
+
+.onyx-row-avatar .onyx-avatar { box-shadow: 0 0 0 1px var(--nick-tint); }
+
 * { box-sizing: border-box; }
 
 html, body {

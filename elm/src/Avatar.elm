@@ -6,6 +6,7 @@ module Avatar exposing
     , ariaLabel
     , swatch
     , swatches
+    , nickTint
     , view
     )
 
@@ -92,6 +93,40 @@ initials name =
                     List.foldl (\word _ -> word) first rest
             in
             String.toUpper (String.left 1 first ++ String.left 1 last)
+
+
+{-| Per-nick message tint (mirroring `nickTint` in
+`MessageView.tsx`: the shared unsigned hash walks hue across
+186–231 with 52–77% saturation, returned in the same
+space-separated `hsl()` shape).
+
+The lightness arm uses a *signed* right shift, so names whose
+hash sets the top bit take a negative truncated remainder
+(lightness then lands below 68 — `remainderBy` preserves that
+exactly where `modBy` would not).
+-}
+nickTint : String -> String
+nickTint nick =
+    let
+        hash =
+            hashName nick
+
+        hue =
+            186 + modBy 46 hash
+
+        sat =
+            52 + modBy 26 hash
+
+        light =
+            68 + remainderBy 14 (Bitwise.shiftRightBy 3 hash)
+    in
+    "hsl("
+        ++ String.fromInt hue
+        ++ " "
+        ++ String.fromInt sat
+        ++ "% "
+        ++ String.fromInt light
+        ++ "%)"
 
 
 {-| Exact first-party service identity only (mirroring

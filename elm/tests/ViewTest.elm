@@ -2479,6 +2479,30 @@ suite =
                             , Selector.attribute (Attr.attribute "aria-label" "alice")
                             , Selector.class "onyx-avatar--md"
                             ]
+            , test "message rows carry the tinted avatar and sender" <|
+                \_ ->
+                    let
+                        messaged =
+                            blank
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h PRIVMSG #c :hello world")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query messaged
+                                |> Query.find [ Selector.class "onyx-row-avatar" ]
+                                |> Query.has
+                                    [ Selector.style "--nick-tint" "hsl(200 74% 74%)"
+                                    , Selector.text "AL"
+                                    ]
+                        , \_ ->
+                            query messaged
+                                |> Query.find [ Selector.tag "strong", Selector.containing [ Selector.text "alice" ] ]
+                                |> Query.has [ Selector.style "color" "hsl(200 74% 74%)" ]
+                        ]
+                        ()
             , test "roster rows render small hidden avatars" <|
                 \_ ->
                     let

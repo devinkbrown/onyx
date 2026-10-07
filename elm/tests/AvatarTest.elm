@@ -136,6 +136,18 @@ suite =
                         cases
                     )
                     ()
+        , test "tints walk the cyan-azure band with the signed lightness arm" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal "hsl(200 74% 74%)" (nickTint "alice")
+                    , \_ -> Expect.equal "hsl(189 63% 63%)" (nickTint "Ada Lovelace")
+                    , \_ -> Expect.equal "hsl(216 74% 69%)" (nickTint "me")
+                    , \_ -> Expect.equal "hsl(199 61% 74%)" (nickTint "bob")
+                    , \_ -> Expect.equal "hsl(188 76% 62%)" (nickTint "OnyxOS")
+                    , \_ -> Expect.equal "hsl(214 68% 69%)" (nickTint "x")
+                    , \_ -> Expect.equal (nickTint "alice") (nickTint "alice")
+                    ]
+                    ()
         , test "single words, blanks, and multi-word names initial correctly" <|
             \_ ->
                 Expect.all
