@@ -2751,6 +2751,112 @@ suite =
                     , \_ -> Expect.equal [ "Quoted into composer" ] (List.map .title m.toasts)
                     ]
                     ()
+        , test "reply target gate matches case-insensitively" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal True (messageContextMatchesTarget (Just "#C") "#c")
+                    , \_ -> Expect.equal False (messageContextMatchesTarget (Just "#c") "#b")
+                    , \_ -> Expect.equal False (messageContextMatchesTarget Nothing "#c")
+                    , \_ -> Expect.equal False (messageContextMatchesTarget (Just "") "#c")
+                    , \_ -> Expect.equal False (messageContextMatchesTarget (Just "#c") "")
+                    ]
+                    ()
+        , test "reply preview never duplicates ciphertext or plaintext" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal "[message deleted]"
+                            (persistedReplyPreviewText
+                                { id = 1, from = "a", body = "gone", whisper = False, audience = Nothing, highlight = False, outboxId = Nothing, pending = False, plaintext = Nothing, at = 1, msgid = Nothing, reactions = [], edited = False, deleted = False, redacted = True, topic = "", msgType = "msg" }
+                            )
+                    , \_ ->
+                        Expect.equal DmCipher.lockedPlaceholder
+                            (persistedReplyPreviewText
+                                { id = 1, from = "a", body = "ONYXDM1 sealed", whisper = False, audience = Nothing, highlight = False, outboxId = Nothing, pending = False, plaintext = Nothing, at = 1, msgid = Nothing, reactions = [], edited = False, deleted = False, redacted = False, topic = "", msgType = "msg" }
+                            )
+                    , \_ ->
+                        Expect.equal "plain hello"
+                            (persistedReplyPreviewText
+                                { id = 1, from = "a", body = "plain hello", whisper = False, audience = Nothing, highlight = False, outboxId = Nothing, pending = False, plaintext = Nothing, at = 1, msgid = Nothing, reactions = [], edited = False, deleted = False, redacted = False, topic = "", msgType = "msg" }
+                            )
+                    , \_ -> Expect.equal DmCipher.lockedPlaceholder (sanitizePersistedReplyPreviewText "ONYXDM1 sealed")
+                    , \_ -> Expect.equal "plain hello" (sanitizePersistedReplyPreviewText "plain hello")
+                    ]
+                    ()
+        , test "reply arm snapshots the live row and cancel clears" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :hello"
+
+                    ( armed, _ ) =
+                        update (ReplyArm { target = "#c", msgid = "m1" }) m1
+
+                    ( missing, _ ) =
+                        update (ReplyArm { target = "#c", msgid = "nope" }) m1
+
+                    ( cancelled, _ ) =
+                        update ReplyCancel armed
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { target = "#c", msgid = "m1", from = "alice", preview = "hello" })
+                            armed.replyingTo
+                    , \_ -> Expect.equal Nothing missing.replyingTo
+                    , \_ -> Expect.equal Nothing cancelled.replyingTo
+                    ]
+                    ()
+        , test "reply tags the send and clears, never leaking cross-target" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, ourNick = "me" }
+
+                    ( m1, _ ) =
+                        feed (joinFirst live "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :hello"
+
+                    ( armed, _ ) =
+                        update (ChannelSelect "#c") m1
+                            |> Tuple.first
+                            |> (\m -> update (ReplyArm { target = "#c", msgid = "m1" }) m)
+
+                    ( sent, out ) =
+                        update (ComposerInput "yo") armed
+                            |> Tuple.first
+                            |> (\m -> update ComposerSend m)
+
+                    ( _, otherOut ) =
+                        update (ChannelSelect "#b") armed
+                            |> Tuple.first
+                            |> (\m -> update (ComposerInput "yo") m)
+                            |> Tuple.first
+                            |> (\m -> update ComposerSend m)
+
+                    ( refused, _ ) =
+                        update ComposerSend armed
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "@+draft/reply=m1 PRIVMSG #c yo\r\n") out)
+                    , \_ -> Expect.equal Nothing sent.replyingTo
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.contains "+draft/reply" line
+
+                                        _ ->
+                                            False
+                                )
+                                otherOut
+                            )
+                    , \_ -> Expect.equal armed.replyingTo refused.replyingTo
+                    ]
+                    ()
         , test "vault query schedules a debounced scan" <|
             \_ ->
                 let

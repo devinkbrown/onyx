@@ -43,6 +43,7 @@ composer model =
     form [ class "onyx-composer", onSubmit ComposerSend ]
         [ span [ class "onyx-composer-target" ]
             [ text (Maybe.withDefault "#" model.activeChannel) ]
+        , replyBar model
         , if App.composerAudienceOffered model then
             button
                 [ type_ "button"
@@ -97,6 +98,47 @@ composer model =
         , attachments model
         , conversation model
         ]
+
+
+{-| Armed-reply banner (mirrors the composer reply context: painted
+only for the active target, re-resolved against the live buffer so a
+parent redacted after arming paints the withdrawn placeholder). -}
+replyBar : Model -> Html Msg
+replyBar model =
+    case model.activeChannel of
+        Nothing ->
+            text ""
+
+        Just target ->
+            case App.activeReplyParent model.replyingTo target of
+                Nothing ->
+                    text ""
+
+                Just parent ->
+                    let
+                        shown =
+                            App.resolveReplyDisplay model parent
+                    in
+                    div [ class "shell-composer-context", attribute "role" "status", attribute "aria-live" "polite" ]
+                        [ span [ class "shell-composer-context-label" ] [ text ("Replying to " ++ shown.from) ]
+                        , span [ class "shell-composer-context-text" ] [ text (clippedText shown.preview) ]
+                        , button
+                            [ type_ "button"
+                            , class "shell-composer-context-close"
+                            , attribute "aria-label" "Cancel reply"
+                            , onClick App.ReplyCancel
+                            ]
+                            [ text "×" ]
+                        ]
+
+
+clippedText : String -> String
+clippedText text =
+    if String.length text > 96 then
+        String.left 96 text ++ "..."
+
+    else
+        text
 
 
 {-| Attachment staging (mirroring the composer attach surface:

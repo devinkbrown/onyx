@@ -733,6 +733,42 @@ suite =
                 query stamped
                     |> Query.find [ Selector.tag "time" ]
                     |> Query.has [ Selector.text "2:05 PM" ]
+        , test "composer shows the armed reply with cancel" <|
+            \_ ->
+                let
+                    armed =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                            |> (\m -> Tuple.first (update (ReplyArm { target = "#c", msgid = "m1" }) m))
+
+                    other =
+                        { armed | activeChannel = Just "#d" }
+
+                    withdrawn =
+                        feed armed ":alice!u@h REDACT #c m1 :spam"
+                in
+                Expect.all
+                    [ \_ ->
+                        query armed
+                            |> Query.find [ Selector.class "shell-composer-context" ]
+                            |> Query.has [ Selector.text "Replying to alice", Selector.text "hello there" ]
+                    , \_ ->
+                        query armed
+                            |> Query.find [ Selector.class "shell-composer-context-close" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ReplyCancel
+                    , \_ ->
+                        query other
+                            |> Query.hasNot [ Selector.class "shell-composer-context" ]
+                    , \_ ->
+                        query withdrawn
+                            |> Query.find [ Selector.class "shell-composer-context-text" ]
+                            |> Query.has [ Selector.text "[message deleted]" ]
+                    ]
+                    ()
         , test "thread hides the clock for unstamped rows" <|
             \_ ->
                 query channelModel
