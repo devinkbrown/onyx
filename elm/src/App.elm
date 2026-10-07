@@ -319,6 +319,7 @@ type alias Model =
     , historyTargets : Dict String HistoryTarget
     , historyLoading : Set String
     , historyExhausted : Set String
+    , pendingPins : Dict String String
     , pendingDiscoveries : Dict String HistoryTarget
     , highlightWords : List String
     , channelNotify : Dict String String
@@ -2514,6 +2515,7 @@ type Msg
     | PreviewImageAllow String
     | ChannelSelect String
     | ThreadShowEarlier
+    | PinnedMessageRequest { channel : String, messageId : String }
     | ThreadShowLatest
     | IgnoreUser String
     | UnignoreUser String
@@ -2797,6 +2799,7 @@ init nick url =
     , historyTargets = Dict.empty
     , historyLoading = Set.empty
     , historyExhausted = Set.empty
+    , pendingPins = Dict.empty
     , pendingDiscoveries = Dict.empty
     , highlightWords = []
     , channelNotify = Dict.empty
@@ -3211,6 +3214,7 @@ blank =
     , historyTargets = Dict.empty
     , historyLoading = Set.empty
     , historyExhausted = Set.empty
+    , pendingPins = Dict.empty
     , pendingDiscoveries = Dict.empty
     , highlightWords = []
     , channelNotify = Dict.empty
@@ -7790,6 +7794,7 @@ quarantineOwnerChange model =
             , editHistory = Dict.empty
             , historyLoading = Set.empty
             , historyExhausted = Set.empty
+            , pendingPins = Dict.empty
             , firstUnreadId = Dict.empty
             , lastReadAt = Dict.empty
             , viewUnreadDividerId = Dict.empty
@@ -15429,6 +15434,20 @@ maxOfflineMemoCount =
 {-| Inbound message-text bound (mirroring
 `MAX_VAULT_MESSAGE_TEXT_LENGTH = 64 KiB` with the trailing lone-high-
 surrogate drop). -}
+
+
+-- Vault target bound (mirrors `MAX_VAULT_TARGET_LENGTH`).
+maxVaultTargetLength : Int
+maxVaultTargetLength =
+    512
+
+
+-- Vault message-id bound (mirrors `MAX_VAULT_MESSAGE_ID_LENGTH`).
+maxVaultMessageIdLength : Int
+maxVaultMessageIdLength =
+    512
+
+
 maxVaultMessageTextLength : Int
 maxVaultMessageTextLength =
     64 * 1024
@@ -20583,6 +20602,50 @@ requestRewindHistory model target =
                         ( { model | historyLoading = Set.insert key model.historyLoading }
                         , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "BEFORE", target, historyReferenceRow oldest, String.fromInt historyPageSize ]) ]
                         )
+
+
+{-| Fetch one pinned message's window (mirrors `requestPinnedMessage`.
+The `CHATHISTORY AROUND msgid=` send uses the same single-flight
+guards plus a pending-travel and pending-pin check; a refused send
+leaves no pending pin behind, like the oracle `admitted == false` path.
+-}
+requestPinnedMessage : Model -> String -> String -> ( Model, List Outbound )
+requestPinnedMessage model channel messageId =
+    let
+        target =
+            String.trim channel
+
+        pinId =
+            String.trim messageId
+
+        key =
+            String.toLower target
+
+        pendingTravelKey =
+            Maybe.map .target model.pendingTravel
+    in
+    if String.isEmpty target
+        || not (isChannelName model target)
+        || not (validWireToken target maxVaultTargetLength)
+        || not (Dict.member key model.channels)
+        || String.isEmpty pinId
+        || pinId /= messageId
+        || not (validWireToken pinId maxVaultMessageIdLength)
+        || not (hasChatHistoryCap model)
+        || Set.member key model.historyLoading
+        || historyBatchOpenFor model key
+        || pendingTravelKey == Just key
+        || Dict.member key model.pendingPins
+        || Dict.size model.historyBatches >= maxHistoryBatches then
+        ( model, [] )
+
+    else
+        ( { model
+            | pendingPins = Dict.insert key pinId model.pendingPins
+            , historyLoading = Set.insert key model.historyLoading
+          }
+        , [ SendLine (Wire.formatIrcLine "CHATHISTORY" [ "AROUND", target, "msgid=" ++ pinId, String.fromInt historyPageSize ]) ]
+        )
 
 
 {-| PART names comma-separated channels sharing one reason
@@ -29979,20 +30042,27 @@ closeHistoryTargetsBatch model ref collector =
 
 
 {-| Release a failed CHATHISTORY fetch (mirroring the FAIL arm: a
-channel context clears that target's loading and proves it
-exhausted (Elm runs no pin lookups, so the pin carve-out has no
-counterpart); anything else clears the TARGETS transport so a
-later reconnect can retry, and releases every named discovery
-fetch). -}
+channel context clears that target's loading; a failed AROUND pin
+lookup drops its pending pin but proves nothing about exhaustion,
+so only non-pin failures mark exhausted; anything else clears the
+TARGETS transport so a later reconnect can retry, and releases
+every named discovery fetch). -}
 foldChathistoryFail : Model -> Wire.StandardReply -> ( Model, List Outbound )
 foldChathistoryFail model reply =
     case List.filter (isChannelName model) reply.context of
         channel :: _ ->
-            ( markHistoryExhausted
-                { model | historyLoading = Set.remove (String.toLower channel) model.historyLoading }
-                channel
-            , []
-            )
+            let
+                key =
+                    String.toLower channel
+
+                unloaded =
+                    { model | historyLoading = Set.remove key model.historyLoading }
+            in
+            if Dict.member key model.pendingPins then
+                ( { unloaded | pendingPins = Dict.remove key unloaded.pendingPins }, [] )
+
+            else
+                ( markHistoryExhausted unloaded channel, [] )
 
         [] ->
             let
@@ -31805,6 +31875,8 @@ update msg model =
                         , historyTargetsStartedAt = Nothing
                         , historyLoading = Set.empty
                         , pendingDiscoveries = Dict.empty
+                        , pendingPins = Dict.empty
+                        , pendingTravel = Nothing
                         , historyMerging = False
                         , serverSearchStatus =
                             if model.serverSearchStatus == ServerSearchPending then
@@ -33208,6 +33280,9 @@ update msg model =
 
                         Nothing ->
                             ( { model | activeChannelTopics = Dict.remove key model.activeChannelTopics }, [] )
+
+        PinnedMessageRequest req ->
+            requestPinnedMessage model req.channel req.messageId
 
         ThreadShowEarlier ->
             -- Reveal older rows without losing the live tail

@@ -2351,6 +2351,88 @@ suite =
 
                     _ ->
                         Expect.fail ("expected one BEFORE fetch, got: " ++ String.fromInt (List.length out))
+        , test "pinned request fetches AROUND msgid with single-flight guards" <|
+            \_ ->
+                let
+                    joined =
+                        let
+                            ( j, _ ) =
+                                feed { blank | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+                        in
+                        { j | historyLoading = Set.empty }
+
+                    ( m1, out ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = "abc123" }) joined
+
+                    ( _, outAgain ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = "abc123" }) m1
+
+                    ( _, outUnknown ) =
+                        update (PinnedMessageRequest { channel = "#nope", messageId = "abc123" }) m1
+
+                    ( _, outPadded ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = " abc123" }) joined
+
+                    ( _, outNoCap ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = "abc123" })
+                            { joined | caps = [] }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CHATHISTORY AROUND #c msgid=abc123 50\r\n" ] out
+                    , \_ -> Expect.equal (Dict.fromList [ ( "#c", "abc123" ) ]) m1.pendingPins
+                    , \_ -> Expect.equal [] outAgain
+                    , \_ -> Expect.equal [] outUnknown
+                    , \_ -> Expect.equal [] outPadded
+                    , \_ -> Expect.equal [] outNoCap
+                    ]
+                    ()
+        , test "failed pin lookup drops the pin without exhausting" <|
+            \_ ->
+                let
+                    joined =
+                        let
+                            ( j, _ ) =
+                                feed { blank | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+                        in
+                        { j | historyLoading = Set.empty }
+
+                    ( requested, _ ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = "abc123" }) joined
+
+                    ( failed, _ ) =
+                        feed requested ":irc.example FAIL CHATHISTORY INVALID_TARGET #c :history unavailable"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty failed.pendingPins
+                    , \_ -> Expect.equal False (Set.member "#c" failed.historyLoading)
+                    , \_ -> Expect.equal False (Set.member "#c" failed.historyExhausted)
+                    ]
+                    ()
+        , test "close clears pending pins and travel" <|
+            \_ ->
+                let
+                    joined =
+                        let
+                            ( j, _ ) =
+                                feed { blank | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+                        in
+                        { j | historyLoading = Set.empty }
+
+                    ( requested, _ ) =
+                        update (PinnedMessageRequest { channel = "#c", messageId = "abc123" }) joined
+
+                    traveled =
+                        { requested | pendingTravel = Just { target = "#c", at = 1 } }
+
+                    ( closed, _ ) =
+                        update (WsClosed { clean = False, reason = "x" }) traveled
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty closed.pendingPins
+                    , \_ -> Expect.equal Nothing closed.pendingTravel
+                    , \_ -> Expect.equal True (Set.isEmpty closed.historyLoading)
+                    ]
+                    ()
         , test "topic selection validates against the registry" <|
             \_ ->
                 let
