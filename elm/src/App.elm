@@ -368,6 +368,7 @@ type alias Model =
     , readMarkers : Dict String String
     , lastReadAt : Dict String Int
     , ignoredUsers : Set String
+    , collapsedNicks : Set String
     , mutedDMs : Set String
     , followed : Set String
     , starredChannels : Set String
@@ -2634,6 +2635,8 @@ type Msg
     | MessageMenuDeleteAsk
     | MessageMenuCopy { target : String, msgid : String }
     | MessageSearchText { text : String }
+    | MessagePinToggle { target : String, msgid : String }
+    | MessageCollapseToggle { nick : String }
     | EditArm { target : String, msgid : String }
     | EditCancel
     | ZoneReceived Time.Zone
@@ -2949,6 +2952,7 @@ init nick url =
     , readMarkers = Dict.empty
     , lastReadAt = Dict.empty
     , ignoredUsers = Set.empty
+    , collapsedNicks = Set.empty
     , mutedDMs = Set.empty
     , followed = Set.empty
     , starredChannels = Set.empty
@@ -3380,6 +3384,7 @@ blank =
     , readMarkers = Dict.empty
     , lastReadAt = Dict.empty
     , ignoredUsers = Set.empty
+    , collapsedNicks = Set.empty
     , mutedDMs = Set.empty
     , followed = Set.empty
     , starredChannels = Set.empty
@@ -28394,7 +28399,7 @@ applyBlocklistAction notify model msg =
         IgnoreUser nick ->
             let
                 updated =
-                    { model | ignoredUsers = parseNameBlocklist 512 128 (nick :: Set.toList model.ignoredUsers) }
+                    { model | ignoredUsers = parseNameBlocklist 512 128 (nick :: Set.toList model.ignoredUsers), messageMenu = Nothing }
 
                 toasted =
                     if notify then
@@ -28417,7 +28422,7 @@ applyBlocklistAction notify model msg =
         UnignoreUser nick ->
             let
                 updated =
-                    { model | ignoredUsers = Set.remove (String.toLower (String.trim nick)) model.ignoredUsers }
+                    { model | ignoredUsers = Set.remove (String.toLower (String.trim nick)) model.ignoredUsers, messageMenu = Nothing }
 
                 toasted =
                     if notify then
@@ -34854,6 +34859,57 @@ update msg model =
             -- Menu search opens the panel carrying the message text
             -- (mirroring the oracle search-this-text action).
             ( scheduleVaultSearch { model | messageMenu = Nothing, searchOpen = True, searchQuery = Search.boundQueryInput text, searchIndex = 0 }, [] )
+
+        MessagePinToggle { target, msgid } ->
+            -- Menu pin toggle (mirroring `togglePin`: channel-target
+            -- plus op only; anything else closes silently).
+            if not (isChannelName model target && isChannelOp model target) then
+                ( { model | messageMenu = Nothing }, [] )
+
+            else if List.member msgid (channelPins model target) then
+                Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (unpinMessage model target msgid)
+
+            else
+                Tuple.mapFirst (\m -> { m | messageMenu = Nothing }) (pinMessage model target msgid)
+
+        MessageCollapseToggle { nick } ->
+            -- Per-view flood control (mirroring `toggleNickCollapse`:
+            -- device-local, session-only, with the oracle toasts; an
+            -- empty nick is a no-op).
+            let
+                key =
+                    String.toLower (String.trim nick)
+            in
+            if String.isEmpty key then
+                ( model, [] )
+
+            else if Set.member key model.collapsedNicks then
+                ( addToast
+                    { variant = ToastInfo
+                    , title = "Showing " ++ String.trim nick
+                    , description = Just "Their messages are visible in the feed again."
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    model.nowMs
+                    { model | collapsedNicks = Set.remove key model.collapsedNicks, messageMenu = Nothing }
+                , []
+                )
+
+            else
+                ( addToast
+                    { variant = ToastInfo
+                    , title = "Hiding " ++ String.trim nick
+                    , description = Just "Their lines are hidden in this feed until you expand them. Device-only; not an ignore."
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    model.nowMs
+                    { model | collapsedNicks = Set.insert key model.collapsedNicks, messageMenu = Nothing }
+                , []
+                )
 
         MessageStartTopic { target, msgid } ->
             -- Mirror the menu topic-start: a usable label focuses the

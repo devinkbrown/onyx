@@ -3125,6 +3125,61 @@ suite =
                     , \_ -> Expect.equal [ "Copy failed" ] (List.map .title copyFailed.toasts)
                     ]
                     ()
+        , test "menu pin, ignore, and collapse toggles" <|
+            \_ ->
+                let
+                    oppedBase =
+                        { blank
+                            | ourNick = "me"
+                            , channels =
+                                Dict.singleton "#c"
+                                    (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                        }
+
+                    ( m1, _ ) =
+                        feed oppedBase "@msgid=m1 :alice!u@h PRIVMSG #c :hello"
+
+                    ( pinned, _ ) =
+                        update (MessagePinToggle { target = "#c", msgid = "m1" }) m1
+
+                    ( unpinned, _ ) =
+                        update (MessagePinToggle { target = "#c", msgid = "m1" }) pinned
+
+                    ( refused, _ ) =
+                        update (MessagePinToggle { target = "bob", msgid = "m1" }) m1
+
+                    ( ignored, _ ) =
+                        update (IgnoreUser "alice") m1
+
+                    ( unignored, _ ) =
+                        update (UnignoreUser "alice") ignored
+
+                    ( hidden, _ ) =
+                        update (MessageCollapseToggle { nick = "alice" }) m1
+
+                    ( shown, _ ) =
+                        update (MessageCollapseToggle { nick = "alice" }) hidden
+
+                    ( emptyNick, _ ) =
+                        update (MessageCollapseToggle { nick = "   " }) m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "m1" ] (channelPins pinned "#c")
+                    , \_ -> Expect.equal Nothing pinned.messageMenu
+                    , \_ -> Expect.equal [] (channelPins unpinned "#c")
+                    , \_ -> Expect.equal [] (channelPins refused "#c")
+                    , \_ -> Expect.equal Nothing refused.messageMenu
+                    , \_ -> Expect.equal True (Set.member "alice" ignored.ignoredUsers)
+                    , \_ -> Expect.equal Nothing ignored.messageMenu
+                    , \_ -> Expect.equal False (Set.member "alice" unignored.ignoredUsers)
+                    , \_ -> Expect.equal True (Set.member "alice" hidden.collapsedNicks)
+                    , \_ -> Expect.equal [ "Hiding alice" ] (List.map .title hidden.toasts)
+                    , \_ -> Expect.equal False (Set.member "alice" shown.collapsedNicks)
+                    , \_ -> Expect.equal [ "Showing alice" ] (List.take 1 (List.reverse (List.map .title shown.toasts)))
+                    , \_ -> Expect.equal Nothing shown.messageMenu
+                    , \_ -> Expect.equal m1.collapsedNicks emptyNick.collapsedNicks
+                    ]
+                    ()
         , test "inbound reply tag resolves the live parent" <|
             \_ ->
                 let

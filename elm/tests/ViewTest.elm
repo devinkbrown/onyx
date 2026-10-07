@@ -916,6 +916,8 @@ suite =
                                 , Selector.text "Copy moment link"
                                 , Selector.text "Search this text"
                                 , Selector.text "Start topic from here"
+                                , Selector.text "Ignore alice"
+                                , Selector.text "Hide alice"
                                 ]
                     , \_ ->
                         query opened
@@ -972,6 +974,20 @@ suite =
                                 ]
                             |> Event.simulate Event.click
                             |> Event.expect (MessageDeleteRequested "#c" "m9")
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Ignore alice on this device") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (IgnoreUser "alice")
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Hide messages from alice in this feed") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageCollapseToggle { nick = "alice" })
+                    , \_ ->
+                        Tuple.first (update (MessageCollapseToggle { nick = "alice" }) base)
+                            |> query
+                            |> Query.hasNot [ Selector.text "hello there" ]
                     ]
                     ()
         , test "thread renders inbound reply context" <|

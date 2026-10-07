@@ -44,6 +44,7 @@ thread model =
 
                                 chronological =
                                     App.topicVisibleRows model channel.name (List.reverse channel.messages)
+                                        |> List.filter (notCollapsed model)
 
                                 rows =
                                     chronological
@@ -102,6 +103,17 @@ thread model =
                                 ]
         , mediaLightboxDialog model
         ]
+
+
+{-| Collapsed senders hide their lines in the feed (mirroring the
+oracle collapse filter; nameless service rows never collapse). -}
+notCollapsed : Model -> App.ChatMessage -> Bool
+notCollapsed model m =
+    if String.isEmpty (String.trim m.from) then
+        True
+
+    else
+        not (Set.member (String.toLower (String.trim m.from)) model.collapsedNicks)
 
 
 dividerAbove : Maybe Int -> App.ChatMessage -> Html Msg
@@ -204,7 +216,7 @@ messageMenuButton model target m =
                 caps =
                     App.capabilities (menuInput model target m)
             in
-            if not (menuHasActions caps || App.isChannelName model target) then
+            if not (menuHasActions model target caps || App.isChannelName model target) then
                 text ""
 
             else
@@ -245,10 +257,10 @@ menuInput model target m =
     }
 
 
-{-| Whether any menu item from this slice applies (react, pin,
-translate, ignore, and collapse stay later slices). -}
-menuHasActions : App.Capabilities -> Bool
-menuHasActions caps =
+{-| Whether any menu item applies (react and translate stay
+later slices). -}
+menuHasActions : Model -> String -> App.Capabilities -> Bool
+menuHasActions model target caps =
     caps.canReply
         || caps.canCopy
         || caps.canQuote
@@ -256,14 +268,24 @@ menuHasActions caps =
         || caps.canSearchText
         || caps.canStartTopic
         || caps.canEdit
+        || menuCanPin model target
+        || caps.canIgnore
+        || caps.canCollapse
         || caps.canDelete
+
+
+{-| Pin affordance (mirroring the oracle `canPin`: channel target
+plus op). -}
+menuCanPin : Model -> String -> Bool
+menuCanPin model target =
+    App.isChannelName model target && App.isChannelOp model target
 
 
 {-| The open menu for one row (mirrors the oracle menu order and
 copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
-then Delete behind its inline confirm step; tiers are flattened
-into one menu with a light-dismiss backdrop, and
-react/pin/translate/ignore/collapse stay later slices). -}
+Pin, Ignore, Collapse, then Delete behind its inline confirm
+step; tiers are flattened into one menu with a light-dismiss
+backdrop, and react/translate stay later slices). -}
 messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuPanel model target m =
     case m.msgid of
@@ -378,6 +400,98 @@ messageMenuPanel model target m =
                                         (menuItem ("Edit " ++ actionTarget)
                                             "Edit"
                                             (App.EditArm { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if menuCanPin model target then
+                                    let
+                                        pinned =
+                                            List.member msgid (App.channelPins model target)
+                                    in
+                                    Just
+                                        (menuItem
+                                            ((if pinned then
+                                                "Unpin "
+
+                                              else
+                                                "Pin "
+                                             )
+                                                ++ actionTarget
+                                            )
+                                            (if pinned then
+                                                "Unpin message"
+
+                                             else
+                                                "Pin message"
+                                            )
+                                            (App.MessagePinToggle { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canIgnore then
+                                    let
+                                        nick =
+                                            String.trim m.from
+
+                                        ignored =
+                                            Set.member (String.toLower nick) model.ignoredUsers
+                                    in
+                                    Just
+                                        (menuItem
+                                            ((if ignored then
+                                                "Stop ignoring "
+
+                                              else
+                                                "Ignore "
+                                             )
+                                                ++ m.from
+                                                ++ " on this device"
+                                            )
+                                            ((if ignored then
+                                                "Unignore "
+
+                                              else
+                                                "Ignore "
+                                             )
+                                                ++ m.from
+                                            )
+                                            (if ignored then
+                                                App.UnignoreUser nick
+
+                                             else
+                                                App.IgnoreUser nick
+                                            )
+                                        )
+
+                                  else
+                                    Nothing
+                                , if caps.canCollapse then
+                                    let
+                                        nick =
+                                            String.trim m.from
+
+                                        collapsed =
+                                            Set.member (String.toLower nick) model.collapsedNicks
+                                    in
+                                    Just
+                                        (menuItem
+                                            (if collapsed then
+                                                "Show messages from " ++ m.from
+
+                                             else
+                                                "Hide messages from " ++ m.from ++ " in this feed"
+                                            )
+                                            ((if collapsed then
+                                                "Show "
+
+                                              else
+                                                "Hide "
+                                             )
+                                                ++ m.from
+                                            )
+                                            (App.MessageCollapseToggle { nick = nick })
                                         )
 
                                   else
