@@ -38,6 +38,7 @@ topbar model =
             , onClick SearchOpen
             ]
             [ text "Search" ]
+        , pinsToggle model
         , div
             [ classList
                 [ ( "onyx-conn", True )
@@ -50,6 +51,44 @@ topbar model =
             ]
         , identityChip model
         ]
+
+
+{-| Pinned-messages toggle (the ribbon overflow entry in the
+oracle: channel-gated, labeled with the live pin count). -}
+pinsToggle : Model -> Html Msg
+pinsToggle model =
+    let
+        count =
+            case model.activeChannel of
+                Nothing ->
+                    0
+
+                Just channel ->
+                    List.length (App.channelPins model channel)
+
+        label =
+            if count > 0 then
+                String.fromInt count ++ " pinned message" ++ (if count == 1 then "" else "s")
+
+            else
+                "Pinned messages"
+    in
+    button
+        [ class "onyx-pins-toggle"
+        , classList [ ( "onyx-pins-toggle-open", model.showPinnedMessages ) ]
+        , attribute "aria-pressed"
+            (if model.showPinnedMessages then
+                "true"
+
+             else
+                "false"
+            )
+        , attribute "aria-label" label
+        , attribute "data-testid" "ribbon-pins"
+        , disabled (model.activeChannel == Nothing)
+        , onClick PinnedMessagesOpen
+        ]
+        [ text "Pins" ]
 
 
 {-| Own identity chip: the current nick, an `alias` badge while the

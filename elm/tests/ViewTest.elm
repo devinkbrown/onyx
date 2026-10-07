@@ -264,6 +264,60 @@ suite =
                             |> Query.hasNot [ Selector.class "shell-msg-preview" ]
                     ]
                     ()
+        , test "pins drawer lists newest-first with jump and op unpin" <|
+            \_ ->
+                let
+                    withPins =
+                        feed channelModel ":s 818 me #c PINS :m1,m2"
+
+                    withMsg =
+                        feed withPins "@msgid=m2 :alice!u@h PRIVMSG #c :hello"
+
+                    open =
+                        { withMsg | showPinnedMessages = True, isOper = True }
+                in
+                Expect.all
+                    [ \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "pinned-messages") ]
+                            |> Query.has [ Selector.text "hello" ]
+                    , \_ ->
+                        query open
+                            |> Query.has [ Selector.text "Pinned message — load it from history to jump there." ]
+                    , \_ ->
+                        query open
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Unpin message m1") ]
+                    , \_ ->
+                        query { open | isOper = False }
+                            |> Query.hasNot [ Selector.text "Unpin message" ]
+                    , \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-pins") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "2 pinned messages") ]
+                    ]
+                    ()
+        , test "pins drawer empty and feedback states" <|
+            \_ ->
+                let
+                    open =
+                        { channelModel | showPinnedMessages = True }
+
+                    failed =
+                        { open | pinsLoadFeedback = "Pinned message could not be loaded from history. Try again." }
+                in
+                Expect.all
+                    [ \_ ->
+                        query open
+                            |> Query.has [ Selector.text "Ops can pin important messages here." ]
+                    , \_ ->
+                        query failed
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "pins-load-feedback") ]
+                            |> Query.has [ Selector.text "Pinned message could not be loaded from history. Try again." ]
+                    , \_ ->
+                        query channelModel
+                            |> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "pinned-messages") ]
+                    ]
+                    ()
         , test "same-origin preview thumbnails load without consent" <|
             \_ ->
                 let

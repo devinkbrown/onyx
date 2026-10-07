@@ -238,6 +238,26 @@ previewFetches outs =
         outs
 
 
+isPropSet : Outbound -> Bool
+isPropSet outbound =
+    case outbound of
+        SendLine line ->
+            String.startsWith "PROP " line
+
+        _ ->
+            False
+
+
+isChatHistory : Outbound -> Bool
+isChatHistory outbound =
+    case outbound of
+        SendLine line ->
+            String.startsWith "CHATHISTORY " line
+
+        _ ->
+            False
+
+
 {-| Live-traffic base: self-JOIN first. The oracle's `_addChannelMessage`
 drops channel traffic without a room shell, so fixtures asserting on
 folded live rows must establish membership before the traffic. -}
@@ -7434,6 +7454,86 @@ suite =
                     (Maybe.withDefault []
                         (Maybe.map (List.map .from << .messages) (Dict.get "#c" m1.channels))
                     )
+        , test "PINS prop parses, pins, unpins, and jumps" <|
+            \_ ->
+                let
+                    base =
+                        Isupport.defaultSupport
+
+                    live =
+                        { blank | caps = [ "chathistory" ], ourNick = "me", isupport = { base | ircx = True } }
+
+                    ( joined, _ ) =
+                        feed live ":me!u@h JOIN #c"
+
+                    ( pinned, _ ) =
+                        feed joined ":s 818 me #c PINS :m1,m2,, m3 "
+
+                    ( m1, outPin ) =
+                        update (PinnedMessagePin { channel = "#c", messageId = "m4" }) pinned
+
+                    ( m2, outDup ) =
+                        update (PinnedMessagePin { channel = "#c", messageId = "m1" }) m1
+
+                    ( m3, outUnpin ) =
+                        update (PinnedMessageUnpin { channel = "#c", messageId = "m2" }) m2
+
+                    ( m4, _ ) =
+                        feed m3 ":alice!u@h PRIVMSG #c :hello"
+
+                    ( jumped, jumpOut ) =
+                        update PinnedMessagesOpen m4
+
+                    ( closed, _ ) =
+                        update PinnedMessagesClose jumped
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "m1", "m2", "m3" ] (channelPins pinned "#c")
+                    , \_ -> Expect.equal [ "m1", "m2", "m3", "m4" ] (channelPins m1 "#c")
+                    , \_ -> Expect.equal [] outDup
+                    , \_ -> Expect.equal [ "m1", "m3", "m4" ] (channelPins m3 "#c")
+                    , \_ -> Expect.equal [ SendLine "PROP #c PINS m1,m2,m3,m4\r\n" ] outPin
+                    , \_ -> Expect.equal [ SendLine "PROP #c PINS m1,m3,m4\r\n" ] outUnpin
+                    , \_ -> Expect.equal True jumped.showPinnedMessages
+                    , \_ -> Expect.equal False closed.showPinnedMessages
+                    , \_ -> Expect.equal [] (channelPins m4 "#nope")
+                    ]
+                    ()
+        , test "pin jump focuses loaded rows and requests unloaded ones" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                    ( joined, _ ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( withMsg, _ ) =
+                        feed { joined | historyLoading = Set.empty } "@msgid=pin1 :alice!u@h PRIVMSG #c :hello"
+
+                    ( focused, focusOut ) =
+                        update (PinnedMessageJump { channel = "#c", messageId = "pin1" }) withMsg
+
+                    ( requested, requestOut ) =
+                        update (PinnedMessageJump { channel = "#c", messageId = "missing" }) withMsg
+
+                    ( refused, refusedOut ) =
+                        update (PinnedMessageJump { channel = "#nope", messageId = "x" }) withMsg
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "pin1") focused.historyLanding
+                    , \_ -> Expect.equal False focused.showPinnedMessages
+                    , \_ -> Expect.equal [] focusOut
+                    , \_ ->
+                        Expect.equal [ SendLine "CHATHISTORY AROUND #c msgid=missing 50\r\n" ]
+                            (List.filter isChatHistory requestOut)
+                    , \_ -> Expect.equal False requested.showPinnedMessages
+                    , \_ -> Expect.equal [] refusedOut
+                    , \_ ->
+                        Expect.equal "Pinned message could not be loaded from history. Try again."
+                            refused.pinsLoadFeedback
+                    ]
+                    ()
         , test "818 stores props and 819 marks sync" <|
             \_ ->
                 let
