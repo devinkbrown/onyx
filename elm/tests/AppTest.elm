@@ -12440,6 +12440,89 @@ suite =
                                 queuedOut
                         ]
                         ()
+            , test "composer drafts are per-target across switches" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( sa, _ ) =
+                            update (ChannelSelect "#a") base
+                                |> Tuple.first
+                                |> (\m -> update (ComposerInput "draft-a") m)
+
+                        ( sb, _ ) =
+                            update (ChannelSelect "#b") sa
+
+                        ( tb, _ ) =
+                            update (ComposerInput "draft-b") sb
+
+                        ( sa2, _ ) =
+                            update (ChannelSelect "#a") tb
+
+                        ( sb2, _ ) =
+                            update (ChannelSelect "#b") sa2
+
+                        ( sent, _ ) =
+                            update ComposerSend sa2
+
+                        ( away, _ ) =
+                            update (ChannelSelect "#b") sent
+
+                        ( returned, _ ) =
+                            update (ChannelSelect "#a") away
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" sb.composer
+                        , \_ -> Expect.equal "draft-a" sa2.composer
+                        , \_ -> Expect.equal "draft-b" sb2.composer
+                        , \_ -> Expect.equal "" sent.composer
+                        , \_ -> Expect.equal "" returned.composer
+                        , \_ -> Expect.equal "draft-b" away.composer
+                        ]
+                        ()
+            , test "switching preserves an armed edit and restores its text" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#a") "@msgid=a1 :me!u@h PRIVMSG #a :in-a"
+
+                        ( sa, _ ) =
+                            update (ChannelSelect "#a") m1
+                                |> Tuple.first
+                                |> (\m -> update (ComposerInput "pre-edit") m)
+
+                        ( armed, _ ) =
+                            update (EditArm { target = "#a", msgid = "a1" }) sa
+
+                        ( away, _ ) =
+                            update (ChannelSelect "#b") armed
+
+                        ( tb, _ ) =
+                            update (ComposerInput "draft-b") away
+
+                        ( back, _ ) =
+                            update (ChannelSelect "#a") tb
+
+                        ( cancelledAway, _ ) =
+                            update EditCancel tb
+
+                        ( cancelledHome, _ ) =
+                            update EditCancel back
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "in-a" armed.composer
+                        , \_ -> Expect.equal "" away.composer
+                        , \_ -> Expect.equal "in-a" back.composer
+                        , \_ -> Expect.equal "draft-b" cancelledAway.composer
+                        , \_ -> Expect.equal Nothing cancelledAway.editingMessage
+                        , \_ -> Expect.equal "pre-edit" cancelledHome.composer
+                        , \_ -> Expect.equal Nothing cancelledHome.editingMessage
+                        ]
+                        ()
             , test "self-join subscribes and self-part unsubscribes" <|
                 \_ ->
                     let

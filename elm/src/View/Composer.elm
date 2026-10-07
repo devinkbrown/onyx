@@ -171,17 +171,7 @@ editBar model =
         Just edit ->
             let
                 original =
-                    case Dict.get edit.target model.channels of
-                        Nothing ->
-                            "Message unavailable"
-
-                        Just channel ->
-                            case List.filter (\m -> m.msgid == Just edit.msgid) channel.messages |> List.head of
-                                Nothing ->
-                                    "Message unavailable"
-
-                                Just row ->
-                                    row.body
+                    Maybe.withDefault "Message unavailable" (App.editRowBody model edit.target edit.msgid)
             in
             div [ class "shell-composer-context shell-composer-context--edit", attribute "role" "status", attribute "aria-live" "polite" ]
                 [ span [ class "shell-composer-context-label" ] [ text "Editing" ]
