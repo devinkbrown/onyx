@@ -13485,7 +13485,7 @@ suite =
                             Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) opped)
 
                         ( proposed, _ ) =
-                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" }) carded
+                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing }) carded
 
                         ( confirmed, confirmOut ) =
                             update ModerationConfirm proposed
@@ -13505,12 +13505,12 @@ suite =
                                 }
 
                         ( _, selfedOut ) =
-                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "me" }) carded
+                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = Just "me", mask = Nothing, reason = Nothing }) carded
                                 |> Tuple.first
                                 |> (\m -> update ModerationConfirm m)
 
                         banned =
-                            Tuple.first (update (ModerationPropose { kind = Moderation.Ban, channel = "#c", target = "alice" }) carded)
+                            Tuple.first (update (ModerationPropose { kind = Moderation.Ban, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing }) carded)
                                 |> (\m -> update ModerationConfirm m)
                     in
                     Expect.all
@@ -13533,6 +13533,64 @@ suite =
                         , \_ -> Expect.notEqual Nothing deopped.moderationDraft
                         , \_ -> Expect.equal [] selfedOut
                         , \_ -> Expect.equal [ SendLine "MODE #c +b alice!*@*\r\n" ] (Tuple.second banned)
+                        ]
+                        ()
+            , test "moderation desk stages reason-carrying and mask drafts" <|
+                \_ ->
+                    let
+                        prefs =
+                            blank.prefs
+
+                        opped =
+                            { blank
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = ExperienceAdvanced }
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.fromList [ ( "me", { nick = "me", modes = Set.singleton 'o', away = False } ), ( "alice", { nick = "alice", modes = Set.empty, away = False } ), ( "bob", { nick = "bob", modes = Set.empty, away = False } ) ] })
+                            }
+
+                        ( withMember, _ ) =
+                            update (ModerationDeskMember "alice") opped
+
+                        ( withReason, _ ) =
+                            update (ModerationDeskReason "spam") withMember
+
+                        ( kicked, _ ) =
+                            update (ModerationDeskSubmitMember "#c") withReason
+
+                        ( confirmed, confirmOut ) =
+                            update ModerationConfirm kicked
+
+                        ( withMask, _ ) =
+                            update (ModerationDeskMask "*!*@bad.example") opped
+
+                        ( banned, _ ) =
+                            update (ModerationDeskSubmitBan "#c") withMask
+
+                        ( badAction, _ ) =
+                            update (ModerationDeskAction "owner") opped
+
+                        ( rejected, _ ) =
+                            update (ModerationDeskSubmitMember "#c") badAction
+
+                        ( blanked, _ ) =
+                            update (ModerationDeskSubmitMember "#c") opped
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "alice" withMember.moderationDesk.member
+                        , \_ -> Expect.equal "spam" withReason.moderationDesk.reason
+                        , \_ ->
+                            Expect.equal
+                                (Just { kind = Moderation.Kick, channel = "#c", target = Just "alice", mask = Nothing, reason = Just "spam" })
+                                kicked.moderationDraft
+                        , \_ -> Expect.equal [ SendLine "KICK #c alice spam\r\n" ] confirmOut
+                        , \_ ->
+                            Expect.equal
+                                (Just { kind = Moderation.Ban, channel = "#c", target = Nothing, mask = Just "*!*@bad.example", reason = Nothing })
+                                banned.moderationDraft
+                        , \_ -> Expect.equal Nothing rejected.moderationDraft
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .target blanked.moderationDraft)
                         ]
                         ()
             , test "person safety stages, confirms, and drafts reports" <|

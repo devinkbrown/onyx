@@ -187,6 +187,28 @@ blankBanAdd =
     }
 
 
+{-| Live room-desk moderation forms — the member-action and
+ban-mask inputs inside the moderation cockpit (mirroring the
+`ModerationCockpit` signals; the INVITE and toggle rows arrive with
+their backends in a later slice).
+-}
+type alias ModerationDeskForm =
+    { member : String
+    , action : String
+    , reason : String
+    , mask : String
+    }
+
+
+blankModerationDesk : ModerationDeskForm
+blankModerationDesk =
+    { member = ""
+    , action = "kick"
+    , reason = ""
+    , mask = ""
+    }
+
+
 {-| Structured verdict of the last account-command failure
 (`IDENTIFY` via 464 or terminal `FAIL`/`WARN`), mirroring the oracle
 `accountActionError` — the payload a claim prompt reads to leave its
@@ -330,6 +352,7 @@ type alias Model =
     , userProfiles : Dict String Services.UserProfile
     , userProfileCard : Maybe { nick : String, channel : String }
     , moderationDraft : Maybe Moderation.Draft
+    , moderationDesk : ModerationDeskForm
     , personSafety : Maybe { pending : PersonSafety.SafetyPending, reason : String, note : String }
     , softIgnoreList : Set String
     , nickColorOverrides : Dict String String
@@ -2594,9 +2617,15 @@ type Msg
     | IdentityOverridesLoaded Decode.Value
     | MemberCopyNick String
     | MemberCardWhois String
-    | ModerationPropose { kind : Moderation.ModerationKind, channel : String, target : String }
+    | ModerationPropose { kind : Moderation.ModerationKind, channel : String, target : Maybe String, mask : Maybe String, reason : Maybe String }
     | ModerationConfirm
     | ModerationCancel
+    | ModerationDeskMember String
+    | ModerationDeskAction String
+    | ModerationDeskReason String
+    | ModerationDeskMask String
+    | ModerationDeskSubmitMember String
+    | ModerationDeskSubmitBan String
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -2957,6 +2986,7 @@ init nick url =
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
     , moderationDraft = Nothing
+    , moderationDesk = blankModerationDesk
     , personSafety = Nothing
     , softIgnoreList = Set.empty
     , nickColorOverrides = Dict.empty
@@ -3401,6 +3431,7 @@ blank =
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
     , moderationDraft = Nothing
+    , moderationDesk = blankModerationDesk
     , personSafety = Nothing
     , softIgnoreList = Set.empty
     , nickColorOverrides = Dict.empty
@@ -37631,19 +37662,20 @@ update msg model =
                 Nothing ->
                     ( model, [] )
 
-        ModerationPropose { kind, channel, target } ->
-            -- A card moderation control stages a review draft and
-            -- closes the card (mirroring `requestModeration`); the
-            -- review surface validates it live.
+        ModerationPropose { kind, channel, target, mask, reason } ->
+            -- A moderation control stages a review draft and closes
+            -- the card when one is open (mirroring
+            -- `requestModeration`); the review surface validates it
+            -- live, so reasons and masks ride along unchecked.
             ( { model
                 | userProfileCard = Nothing
                 , moderationDraft =
                     Just
                         { kind = kind
                         , channel = channel
-                        , target = Just target
-                        , mask = Nothing
-                        , reason = Nothing
+                        , target = target
+                        , mask = mask
+                        , reason = reason
                         }
               }
             , []
@@ -37651,6 +37683,95 @@ update msg model =
 
         ModerationCancel ->
             ( { model | moderationDraft = Nothing }, [] )
+
+        ModerationDeskMember nick ->
+            let
+                desk =
+                    model.moderationDesk
+            in
+            ( { model | moderationDesk = { desk | member = nick } }, [] )
+
+        ModerationDeskAction kind ->
+            let
+                desk =
+                    model.moderationDesk
+            in
+            ( { model | moderationDesk = { desk | action = kind } }, [] )
+
+        ModerationDeskReason reason ->
+            let
+                desk =
+                    model.moderationDesk
+            in
+            ( { model | moderationDesk = { desk | reason = reason } }, [] )
+
+        ModerationDeskMask mask ->
+            let
+                desk =
+                    model.moderationDesk
+            in
+            ( { model | moderationDesk = { desk | mask = mask } }, [] )
+
+        ModerationDeskSubmitMember channel ->
+            -- The desk member-action form stages a reason-carrying
+            -- draft into the shared review (mirroring
+            -- `submitMemberAction`); the review re-validates before
+            -- anything sends.
+            case Moderation.kindFromString model.moderationDesk.action of
+                Nothing ->
+                    ( model, [] )
+
+                Just kind ->
+                    ( { model
+                        | userProfileCard = Nothing
+                        , moderationDraft =
+                            Just
+                                { kind = kind
+                                , channel = channel
+                                , target =
+                                    case String.trim model.moderationDesk.member of
+                                        "" ->
+                                            Nothing
+
+                                        nick ->
+                                            Just nick
+                                , mask = Nothing
+                                , reason =
+                                    case String.trim model.moderationDesk.reason of
+                                        "" ->
+                                            Nothing
+
+                                        reason ->
+                                            Just reason
+                                }
+                      }
+                    , []
+                    )
+
+        ModerationDeskSubmitBan channel ->
+            -- The desk ban-mask form stages a mask draft into the
+            -- shared review (mirroring `submitBanMask`); the caller
+            -- scope keeps masks inside the channel, verified server-
+            -- side.
+            ( { model
+                | userProfileCard = Nothing
+                , moderationDraft =
+                    Just
+                        { kind = Moderation.Ban
+                        , channel = channel
+                        , target = Nothing
+                        , mask =
+                            case String.trim model.moderationDesk.mask of
+                                "" ->
+                                    Nothing
+
+                                mask ->
+                                    Just mask
+                        , reason = Nothing
+                        }
+              }
+            , []
+            )
 
         ModerationConfirm ->
             -- Confirm re-validates and invalidates on disconnect or

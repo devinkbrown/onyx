@@ -11,10 +11,13 @@ inline, so non-moderators never see the surface at all).
 -}
 
 import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
+import Dict
 import Html exposing (Html, button, code, div, h4, input, label, li, option, p, section, select, span, text, ul)
 import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
+import Moderation
 import Modes
+import Prefs
 import String
 
 
@@ -48,6 +51,7 @@ banPanel model channel =
                 ++ statusLine view
                 ++ entryList model channel view
                 ++ addForm model channel live
+                ++ deskForms model channel live
                 ++ reviewDialog model channel
             )
 
@@ -283,3 +287,131 @@ reviewDialog model channel =
 isReviewFor : UnbanReview -> String -> Bool
 isReviewFor review channel =
     String.toLower review.channel == String.toLower channel
+
+
+{-| Room-desk moderation forms — the member-action and ban-mask
+inputs (mirroring `ModerationCockpit`; the desk renders only where
+we moderate, and both forms stage a review draft rather than
+sending).
+-}
+deskForms : Model -> String -> Bool -> List (Html Msg)
+deskForms model channel live =
+    deskBanForm model channel live ++ deskMemberForm model channel live
+
+
+deskBanForm : Model -> String -> Bool -> List (Html Msg)
+deskBanForm model channel live =
+    let
+        desk =
+            model.moderationDesk
+    in
+    [ section [ class "moderation-ban-form", attribute "data-testid" "desk-ban-form" ]
+        [ div [ class "moderation-cockpit__head" ]
+            [ h4 [] [ text "Block a mask" ] ]
+        , label [ class "onyx-steward-label", for "desk-ban-mask" ] [ text "Mask" ]
+        , input
+            [ id "desk-ban-mask"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "desk-ban-mask"
+            , placeholder "nick!user@host (e.g. *!*@bad.example)"
+            , value desk.mask
+            , onInput ModerationDeskMask
+            ]
+            []
+        , button
+            [ attribute "data-testid" "desk-ban-submit"
+            , disabled (String.trim desk.mask == "" || not live)
+            , onClick (ModerationDeskSubmitBan channel)
+            ]
+            [ text "Review block" ]
+        ]
+    ]
+
+
+deskMemberForm : Model -> String -> Bool -> List (Html Msg)
+deskMemberForm model channel live =
+    let
+        desk =
+            model.moderationDesk
+
+        kinds =
+            Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)
+
+        candidates =
+            deskCandidates model channel
+
+        showReason =
+            desk.action == "kick" || desk.action == "ban"
+    in
+    [ section [ class "moderation-member-form", attribute "data-testid" "desk-member-form" ]
+        ([ div [ class "moderation-cockpit__head" ]
+            [ h4 [] [ text "Take action" ] ]
+         , label [ class "onyx-steward-label", for "desk-member-select" ] [ text "Person" ]
+         , select
+            [ id "desk-member-select"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "desk-member-select"
+            , onInput ModerationDeskMember
+            , value desk.member
+            ]
+            (option [ value "" ] [ text "Choose a person" ]
+                :: List.map (\nick -> option [ value nick ] [ text nick ]) candidates
+            )
+         , label [ class "onyx-steward-label", for "desk-action-select" ] [ text "Action" ]
+         , select
+            [ id "desk-action-select"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "desk-action-select"
+            , onInput ModerationDeskAction
+            , value desk.action
+            ]
+            (List.map
+                (\kind -> option [ value (Moderation.kindToString kind) ] [ text (Moderation.kindLabel kind) ])
+                kinds
+            )
+         ]
+            ++ (if showReason then
+                    [ label [ class "onyx-steward-label", for "desk-member-reason" ] [ text "Reason" ]
+                    , input
+                        [ id "desk-member-reason"
+                        , class "onyx-steward-field"
+                        , attribute "data-testid" "desk-member-reason"
+                        , type_ "text"
+                        , placeholder "Tell the room why (optional)"
+                        , value desk.reason
+                        , onInput ModerationDeskReason
+                        ]
+                        []
+                    ]
+
+                else
+                    []
+               )
+            ++ [ button
+                    [ attribute "data-testid" "desk-member-submit"
+                    , disabled (String.trim desk.member == "" || not live)
+                    , onClick (ModerationDeskSubmitMember channel)
+                    ]
+                    [ text "Review action" ]
+               ]
+        )
+    ]
+
+
+{-| Desk member candidates (mirroring the cockpit `candidates`:
+everyone present except ourselves, capped at twelve; Elm sorts
+alphabetically where the oracle keeps join order).
+-}
+deskCandidates : Model -> String -> List String
+deskCandidates model channel =
+    case Dict.get (String.toLower channel) model.channels of
+        Nothing ->
+            []
+
+        Just room ->
+            room.members
+                |> Dict.values
+                |> List.map .nick
+                |> List.filter (\nick -> String.trim nick /= "" && String.toLower nick /= String.toLower model.ourNick)
+                |> List.sort
+                |> List.take 12

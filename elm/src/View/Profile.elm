@@ -808,7 +808,7 @@ moderationControls model nick channel member isSelf =
             Maybe.map .modes member |> Maybe.withDefault Set.empty
 
         propose kind =
-            App.ModerationPropose { kind = kind, channel = channel, target = nick }
+            App.ModerationPropose { kind = kind, channel = channel, target = Just nick, mask = Nothing, reason = Nothing }
     in
     if not canModerate || isSelf then
         text ""

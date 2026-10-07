@@ -1389,7 +1389,7 @@ suite =
                         Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) opped)
 
                     reviewing =
-                        Tuple.first (update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" }) carded)
+                        Tuple.first (update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing }) carded)
 
                     offlineReview =
                         { reviewing | connection = Offline }
@@ -1409,7 +1409,7 @@ suite =
                         query carded
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Kick alice from #c") ]
                             |> Event.simulate Event.click
-                            |> Event.expect (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" })
+                            |> Event.expect (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing })
                     , \_ ->
                         query reviewing
                             |> Query.find [ Selector.class "onyx-moderation-review" ]
@@ -2227,6 +2227,111 @@ suite =
                                 |> Event.expect UnbanReviewCancelled
                         ]
                         ()
+            ]
+        , describe "moderation desk forms"
+            [ test "op sees member and mask forms with oracle copy" <|
+                \_ ->
+                    let
+                        prefs =
+                            banOpModel.prefs
+
+                        room =
+                            banChannelWith (Set.singleton 'o')
+
+                        desked =
+                            { banOpModel
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = Prefs.ExperienceAdvanced }
+                                , channels =
+                                    Dict.singleton "#c"
+                                        { room
+                                            | members =
+                                                Dict.fromList
+                                                    [ ( "me", { nick = "me", modes = Set.singleton 'o', away = False } )
+                                                    , ( "alice", { nick = "alice", modes = Set.empty, away = False } )
+                                                    , ( "bob", { nick = "bob", modes = Set.empty, away = False } )
+                                                    ]
+                                        }
+                            }
+
+                        q =
+                            query desked
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-form") ] q
+                                |> Query.has [ Selector.text "Take action" ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-select") ] q
+                                |> Query.has [ Selector.text "alice", Selector.text "bob" ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-action-select") ] q
+                                |> Query.has [ Selector.text "Remove", Selector.text "Block" ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-reason") ] q
+                                |> Query.has [ Selector.attribute (Attr.attribute "placeholder" "Tell the room why (optional)") ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-ban-form") ] q
+                                |> Query.has [ Selector.text "Block a mask" ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-submit") ] q
+                                |> Query.has [ Selector.disabled True ]
+                        ]
+                        ()
+            , test "desk inputs and submits stage review drafts" <|
+                \_ ->
+                    let
+                        prefs =
+                            banOpModel.prefs
+
+                        room =
+                            banChannelWith (Set.singleton 'o')
+
+                        desked =
+                            { banOpModel
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = Prefs.ExperienceAdvanced }
+                                , channels =
+                                    Dict.singleton "#c"
+                                        { room | members = Dict.fromList [ ( "me", { nick = "me", modes = Set.singleton 'o', away = False } ), ( "alice", { nick = "alice", modes = Set.empty, away = False } ) ] }
+                            }
+
+                        q =
+                            query desked
+
+                        reasoned =
+                            query { desked | moderationDesk = { member = "alice", action = "op", reason = "", mask = "" } }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-select") ] q
+                                |> Event.simulate (Event.input "alice")
+                                |> Event.expect (ModerationDeskMember "alice")
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-reason") ] q
+                                |> Event.simulate (Event.input "spam")
+                                |> Event.expect (ModerationDeskReason "spam")
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-ban-mask") ] q
+                                |> Event.simulate (Event.input "*!*@bad.example")
+                                |> Event.expect (ModerationDeskMask "*!*@bad.example")
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-submit") ] q
+                                |> Query.has [ Selector.disabled True ]
+                        , \_ ->
+                            Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "desk-member-reason") ] reasoned
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-ban-form") ] q
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Review block" ] ]
+                                |> Query.has [ Selector.disabled True ]
+                        ]
+                        ()
+            , test "non-moderators see no desk forms" <|
+                \_ ->
+                    query banVoiceModel
+                        |> Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "desk-member-form") ]
+                        |> Query.count (Expect.equal 0)
             ]
         , describe "notification inbox"
             [ test "bell badges attention unread only" <|

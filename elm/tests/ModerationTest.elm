@@ -266,6 +266,17 @@ suite =
                                 Expect.pass
                     , \_ -> Expect.equal False (isModerationKind "tempBan")
                     , \_ -> Expect.equal True (isModerationKind "kick")
+                    , \_ -> Expect.equal (Just Kick) (kindFromString "kick")
+                    , \_ -> Expect.equal (Just Ban) (kindFromString "ban")
+                    , \_ -> Expect.equal (Just Op) (kindFromString "op")
+                    , \_ -> Expect.equal (Just Devoice) (kindFromString "devoice")
+                    , \_ -> Expect.equal Nothing (kindFromString "owner")
+                    , \_ -> Expect.equal "kick" (kindToString Kick)
+                    , \_ -> Expect.equal "devoice" (kindToString Devoice)
+                    , \_ -> Expect.equal "Remove" (kindLabel Kick)
+                    , \_ -> Expect.equal "Block" (kindLabel Ban)
+                    , \_ -> Expect.equal "Give moderator" (kindLabel Op)
+                    , \_ -> Expect.equal "Remove speak" (kindLabel Devoice)
                     ]
                     ()
         , test "builds plain-language review copy for every kind" <|

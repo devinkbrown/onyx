@@ -9,6 +9,9 @@ module Moderation exposing
     , maxMaskLength
     , maxReasonLength
     , isModerationKind
+    , kindFromString
+    , kindToString
+    , kindLabel
     , kindsForMode
     , validateDraft
     , reviewCopy
@@ -89,6 +92,86 @@ type alias Validation =
 isModerationKind : String -> Bool
 isModerationKind value =
     List.member value [ "kick", "ban", "unban", "op", "deop", "voice", "devoice" ]
+
+
+{-| Parse a desk action value back into its kind. -}
+kindFromString : String -> Maybe ModerationKind
+kindFromString value =
+    case value of
+        "kick" ->
+            Just Kick
+
+        "ban" ->
+            Just Ban
+
+        "unban" ->
+            Just Unban
+
+        "op" ->
+            Just Op
+
+        "deop" ->
+            Just Deop
+
+        "voice" ->
+            Just Voice
+
+        "devoice" ->
+            Just Devoice
+
+        _ ->
+            Nothing
+
+
+kindToString : ModerationKind -> String
+kindToString kind =
+    case kind of
+        Kick ->
+            "kick"
+
+        Ban ->
+            "ban"
+
+        Unban ->
+            "unban"
+
+        Op ->
+            "op"
+
+        Deop ->
+            "deop"
+
+        Voice ->
+            "voice"
+
+        Devoice ->
+            "devoice"
+
+
+{-| Desk action labels (mirroring `MEMBER_ACTIONS`). -}
+kindLabel : ModerationKind -> String
+kindLabel kind =
+    case kind of
+        Kick ->
+            "Remove"
+
+        Ban ->
+            "Block"
+
+        Unban ->
+            "Lift block"
+
+        Op ->
+            "Give moderator"
+
+        Deop ->
+            "Remove moderator"
+
+        Voice ->
+            "Give speak"
+
+        Devoice ->
+            "Remove speak"
 
 
 {-| Card moderation controls per experience mode (mirroring
