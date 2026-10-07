@@ -3719,6 +3719,25 @@ foldLine model message =
         "706" ->
             ( logNumeric model message, [] )
 
+        "710" ->
+            -- KNOCK sent (contract §11): neither client tracks
+            -- knock state — the notice text is the whole signal —
+            -- so this stays on the generic numeric log.
+            ( logNumeric model message, [] )
+
+        "711" ->
+            -- KNOCK delivered: same generic-log rule.
+            ( logNumeric model message, [] )
+
+        "713" ->
+            -- KNOCK errors (no such channel / already there):
+            -- same generic-log rule.
+            ( logNumeric model message, [] )
+
+        "714" ->
+            -- KNOCK errors (continued): same generic-log rule.
+            ( logNumeric model message, [] )
+
         "JOIN" ->
             case divertReplayEvent model message of
                 Just replayed ->
@@ -4014,6 +4033,12 @@ foldLine model message =
             -- exactly — including PONGs answering server PINGs. A
             -- PONG echoing the live probe cookie also samples RTT.
             ( foldLatencyPong model (secondOrFirst message.params), [ PingObserved ] )
+
+        "221" ->
+            -- Own umodes (contract §11): the oracle keeps no 221
+            -- fold — the modes surface reads 005/324 instead — so
+            -- this stays on the generic numeric log.
+            ( logNumeric model message, [] )
 
         "251" ->
             foldLusers model message
@@ -4627,6 +4652,25 @@ foldLine model message =
         "276" ->
             foldWhois model message
 
+        "271" ->
+            -- SILENCE list rows (contract §11): neither client keeps
+            -- a silence list — `/ignore` is local-only — so these
+            -- stay on the generic numeric log like the oracle.
+            ( logNumeric model message, [] )
+
+        "272" ->
+            -- End of SILENCE list: same generic-log rule.
+            ( logNumeric model message, [] )
+
+        "281" ->
+            -- ACCEPT list rows: same generic-log rule (no oracle
+            -- path; acceptance is server-side).
+            ( logNumeric model message, [] )
+
+        "282" ->
+            -- End of ACCEPT list: same generic-log rule.
+            ( logNumeric model message, [] )
+
         "401" ->
             fold401 model message
 
@@ -4692,6 +4736,11 @@ foldLine model message =
             -- Registered/account-only room (`+a`/`+R`): the oracle
             -- has no 477 path either (generic numeric log), so
             -- this stays on it rather than inventing a prompt.
+            foldErrorNumeric model message
+
+        "480" ->
+            -- Join throttle (`+j`, contract §11): no oracle path;
+            -- the generic numeric log carries the retry-after text.
             foldErrorNumeric model message
 
         "482" ->
@@ -4807,6 +4856,15 @@ foldLine model message =
 
         "766" ->
             foldMetadata model message True
+
+        "767" ->
+            -- METADATA set errors (contract §11): no oracle path;
+            -- the generic numeric log carries the reason.
+            ( logNumeric model message, [] )
+
+        "769" ->
+            -- METADATA errors (continued): same generic-log rule.
+            ( logNumeric model message, [] )
 
         "METADATA" ->
             foldMetadataCommand model message

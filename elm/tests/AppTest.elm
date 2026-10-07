@@ -6150,6 +6150,21 @@ suite =
                     , \_ ->
                         Expect.equal [ "#c Registered nick required" ]
                             (List.take 1 (feed blank ":srv 477 me #c :Registered nick required" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "+i" ]
+                            (List.take 1 (feed blank ":srv 221 me +i" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "#c You are throttled, retry in 30s" ]
+                            (List.take 1 (feed blank ":srv 480 me #c :You are throttled, retry in 30s" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "#c Knock sent" ]
+                            (List.take 1 (feed blank ":srv 710 me #c :Knock sent" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "alice!*@* 0" ]
+                            (List.take 1 (feed blank ":srv 271 me alice!*@* 0" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "METADATA cannot be set" ]
+                            (List.take 1 (feed blank ":srv 767 me :METADATA cannot be set" |> Tuple.first |> .serviceLog))
                     , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text denied.notifications)
                     , \_ -> Expect.equal (Just BanError) (Maybe.map .status (Dict.get "#c" denied.banListMeta))
                     , \_ -> Expect.equal (Just "You need moderator permission to view this list.") (Maybe.andThen .error (Dict.get "#c" denied.banListMeta))
