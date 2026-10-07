@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isValidTopicLabel, parseMessageTopic, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, messageContextMatchesTarget, persistedReplyPreviewText, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices)
+module App exposing (AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isValidTopicLabel, parseMessageTopic, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, messageContextMatchesTarget, persistedReplyPreviewText, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -304,6 +304,7 @@ type alias Model =
     , mediaLightbox : Maybe String
     , zone : Time.Zone
     , replyingTo : Maybe ReplyParent
+    , editingMessage : Maybe { target : String, msgid : String, draft : String }
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -2626,6 +2627,8 @@ type Msg
     | ReplyArm { target : String, msgid : String }
     | ReplyCancel
     | MessageStartTopic { target : String, msgid : String }
+    | EditArm { target : String, msgid : String }
+    | EditCancel
     | ZoneReceived Time.Zone
     | ChannelSelect String
     | ThreadShowEarlier
@@ -2874,6 +2877,7 @@ init nick url =
     , mediaLightbox = Nothing
     , zone = Time.utc
     , replyingTo = Nothing
+    , editingMessage = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -3302,6 +3306,7 @@ blank =
     , mediaLightbox = Nothing
     , zone = Time.utc
     , replyingTo = Nothing
+    , editingMessage = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -6767,6 +6772,22 @@ armReply model target msgid =
                     }
 
 
+{-| The armed edit only when it targets this conversation
+(mirrors the composer `activeEditing` target scoping). -}
+activeEditFor : Model -> String -> Maybe { target : String, msgid : String, draft : String }
+activeEditFor model target =
+    case model.editingMessage of
+        Nothing ->
+            Nothing
+
+        Just edit ->
+            if messageContextMatchesTarget (Just edit.target) target then
+                Just edit
+
+            else
+                Nothing
+
+
 {-| The `+draft/reply` tag for a send (mirrors the `baseTags` merge:
 only when the armed parent belongs to this target). -}
 replyTagFor : Model -> String -> Dict String String
@@ -8482,6 +8503,7 @@ quarantineOwnerChange model =
     , mediaLightbox = Nothing
     , zone = Time.utc
     , replyingTo = Nothing
+    , editingMessage = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -34440,17 +34462,27 @@ update msg model =
             ( { model | composer = text, composerError = Nothing }, [] )
 
         AttachPick ->
-            pickAttachments model
+            -- Attaching mid-edit refuses with the draft kept
+            -- (mirroring the oracle `addFiles` edit guard).
+            case Maybe.andThen (activeEditFor model) model.activeChannel of
+                Just _ ->
+                    ( { model | composerError = Just "Finish editing before attaching files." }, [] )
+
+                Nothing ->
+                    pickAttachments model
 
         AttachRemove id ->
             ( { model | attachments = List.filter (\a -> a.id /= id) model.attachments }, [] )
 
         UploadPicked { key, files } ->
-            -- Staging mirrors `addFiles`: protected DMs refuse
-            -- before the cap plan runs, with the draft kept.
+            -- Staging mirrors `addFiles`: an armed edit and protected
+            -- DMs refuse before the cap plan runs, with the draft kept.
             case model.activeChannel of
                 Just target ->
-                    if dmDesignated model target then
+                    if activeEditFor model target /= Nothing then
+                        ( { model | composerError = Just "Finish editing before attaching files." }, [] )
+
+                    else if dmDesignated model target then
                         ( { model | composerError = Just dmAttachmentBlocked }, [] )
 
                     else
@@ -34523,10 +34555,45 @@ update msg model =
                 ( quoted, outs )
 
         ReplyArm { target, msgid } ->
-            ( armReply model target msgid, [] )
+            -- Edit wins over reply and vice versa (mirroring the
+            -- mutual-exclusivity rule in both setters).
+            let
+                armed =
+                    armReply model target msgid
+            in
+            ( { armed | editingMessage = Nothing }, [] )
 
         ReplyCancel ->
             ( { model | replyingTo = Nothing }, [] )
+
+        EditArm { target, msgid } ->
+            if canEditRow model target msgid then
+                case Dict.get (String.toLower target) model.channels of
+                    Nothing ->
+                        ( model, [] )
+
+                    Just channel ->
+                        case List.filter (\m -> m.msgid == Just msgid) channel.messages |> List.head of
+                            Nothing ->
+                                ( model, [] )
+
+                            Just row ->
+                                -- The pre-arm draft stashes on the arm so
+                                -- cancel can restore it (mirroring the
+                                -- oracle per-target draft restore within
+                                -- the single-draft Elm composer).
+                                ( { model | editingMessage = Just { target = String.toLower target, msgid = msgid, draft = model.composer }, replyingTo = Nothing, composer = row.body }, [] )
+
+            else
+                ( model, [] )
+
+        EditCancel ->
+            case model.editingMessage of
+                Nothing ->
+                    ( model, [] )
+
+                Just edit ->
+                    ( { model | editingMessage = Nothing, composer = edit.draft }, [] )
 
         MessageStartTopic { target, msgid } ->
             -- Mirror the menu topic-start: a usable label focuses the
@@ -34596,69 +34663,95 @@ update msg model =
                     ( model, [] )
 
                 Just target ->
-                    if not (List.isEmpty model.attachments) then
-                        sendWithAttachments model target
+                    case activeEditFor model target of
+                        Just edit ->
+                            -- Edit mode: send becomes save (mirror the
+                            -- oracle `handleSend` edit branch; edit
+                            -- mode never carries staged attachments —
+                            -- the send button is disabled there, and an
+                            -- empty draft cannot save).
+                            if String.isEmpty (String.trim model.composer) then
+                                ( model, [] )
 
-                    else if String.isEmpty (String.trim model.composer) then
-                        ( model, [] )
+                            else
+                                let
+                                    ( edited, out ) =
+                                        requestEdit model target edit.msgid model.composer
+                                in
+                                if List.isEmpty out then
+                                    -- Refused (cap, transport, or the row
+                                    -- changed under us): like the oracle
+                                    -- `editMessage` false-path, the arm and
+                                    -- the draft stay for retry.
+                                    ( edited, [] )
 
-                    else
-                        let
-                            trimmed =
-                                String.trim model.composer
+                                else
+                                    ( { edited | editingMessage = Nothing, composer = "" }, out )
+
+                        Nothing ->
+                            if not (List.isEmpty model.attachments) then
+                                sendWithAttachments model target
+
+                            else if String.isEmpty (String.trim model.composer) then
+                                ( model, [] )
+
+                            else
+                                let
+                                    trimmed =
+                                        String.trim model.composer
 
                             -- Text-only conveniences (`/shrug` family)
                             -- expand to ordinary text first, mirroring the
                             -- oracle composer (`expandSlashTextCommand`
                             -- over the trimmed draft); anything else
-                            -- passes through byte-identical.
-                            outgoing =
-                                if String.startsWith "/" trimmed then
-                                    expandSlashTextCommand trimmed
+                                -- passes through byte-identical.
+                                    outgoing =
+                                        if String.startsWith "/" trimmed then
+                                            expandSlashTextCommand trimmed
+
+                                        else
+                                            model.composer
+
+                                    sending =
+                                        { model | composer = outgoing }
+                                in
+                                if isBlockedDmTarget sending target then
+                                    -- A DM to a locally blocked nick refuses before
+                                    -- anything else (mirroring the oracle composer
+                                    -- gate): the draft stays for unblock-and-send.
+                                    refuseBlockedDm sending target
+
+                                else if sending.composerAudience /= Nothing && composerSendTarget sending target == Nothing then
+                                    -- A set audience that can no longer be honored
+                                    -- (room left, prefix withdrawn) refuses instead of
+                                    -- widening an ops-only message to everyone.
+                                    ( logService sending "Status audience unavailable here — message not sent.", [] )
+
+                                else if String.startsWith "/" outgoing && sending.connection /= Live then
+                                    -- Real commands never queue from the offline
+                                    -- outbox (mirroring the oracle composer
+                                    -- guard): the draft stays, the inline error
+                                    -- coaches, nothing emits.
+                                    ( { model | composerError = Just "Commands can't be queued. Reconnect to run this command." }, [] )
 
                                 else
-                                    model.composer
+                                    case parseSlashLocal outgoing of
+                                        Just ( verb, nickArg ) ->
+                                            -- Local slash commands never hit the wire
+                                            -- (online or offline, sealed or not —
+                                            -- mirroring the oracle slash dispatch,
+                                            -- which runs ahead of delivery).
+                                            runSlashLocal sending target verb nickArg
 
-                            sending =
-                                { model | composer = outgoing }
-                        in
-                        if isBlockedDmTarget sending target then
-                            -- A DM to a locally blocked nick refuses before
-                            -- anything else (mirroring the oracle composer
-                            -- gate): the draft stays for unblock-and-send.
-                            refuseBlockedDm sending target
+                                        Nothing ->
+                                            if String.startsWith "/" outgoing then
+                                                -- Unhandled verbs go out as raw
+                                                -- uppercase IRC (mirroring the
+                                                -- oracle `sendRaw` fallthrough).
+                                                sendRawSlashCommand sending target outgoing
 
-                        else if sending.composerAudience /= Nothing && composerSendTarget sending target == Nothing then
-                            -- A set audience that can no longer be honored
-                            -- (room left, prefix withdrawn) refuses instead of
-                            -- widening an ops-only message to everyone.
-                            ( logService sending "Status audience unavailable here — message not sent.", [] )
-
-                        else if String.startsWith "/" outgoing && sending.connection /= Live then
-                            -- Real commands never queue from the offline
-                            -- outbox (mirroring the oracle composer
-                            -- guard): the draft stays, the inline error
-                            -- coaches, nothing emits.
-                            ( { model | composerError = Just "Commands can't be queued. Reconnect to run this command." }, [] )
-
-                        else
-                            case parseSlashLocal outgoing of
-                                Just ( verb, nickArg ) ->
-                                    -- Local slash commands never hit the wire
-                                    -- (online or offline, sealed or not —
-                                    -- mirroring the oracle slash dispatch,
-                                    -- which runs ahead of delivery).
-                                    runSlashLocal sending target verb nickArg
-
-                                Nothing ->
-                                    if String.startsWith "/" outgoing then
-                                        -- Unhandled verbs go out as raw
-                                        -- uppercase IRC (mirroring the
-                                        -- oracle `sendRaw` fallthrough).
-                                        sendRawSlashCommand sending target outgoing
-
-                                    else
-                                        sendComposerText sending target
+                                            else
+                                                sendComposerText sending target
 
         ChannelSelect name ->
             selectChannel model name

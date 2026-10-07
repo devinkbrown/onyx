@@ -752,34 +752,41 @@ schedulePresets =
 {-| Whether the composer may offer send-later for this target and
 draft (mirroring `canSchedule`: a present target plus trimmed,
 nonempty, non-slash body — slash commands are never queued since
-replaying a stale command would execute, not send). The oracle also
-blocks while editing or while attachments are staged; the Elm
-composer carries neither state, so those branches are vacuous here. -}
-canScheduleComposer : { target : Maybe String, body : String } -> Bool
+replaying a stale command would execute, not send). Editing and
+staged attachments block first, in the oracle's order. -}
+canScheduleComposer : { target : Maybe String, body : String, editing : Bool, attachmentsStaged : Bool } -> Bool
 canScheduleComposer input =
-    case input.target of
-        Nothing ->
-            False
+    if input.editing || input.attachmentsStaged then
+        False
 
-        Just target ->
-            let
-                body =
-                    String.trim input.body
-            in
-            not (String.isEmpty target)
-                && not (String.isEmpty body)
-                && not (String.startsWith "/" body)
+    else
+        case input.target of
+            Nothing ->
+                False
+
+            Just target ->
+                let
+                    body =
+                        String.trim input.body
+                in
+                not (String.isEmpty target)
+                    && not (String.isEmpty body)
+                    && not (String.startsWith "/" body)
 
 
 {-| Why send-later is unavailable, mirroring
-`scheduleDisabledReason` (same order, same copy). The
-editing/attachments branches have no Elm composer state behind
-them, so the first applicable refusal here is target, then body,
-then slash. -}
-scheduleComposerRefusal : { target : Maybe String, body : String } -> Maybe String
+`scheduleDisabledReason` (same order, same copy): editing, then
+attachments, then target, then body, then slash. -}
+scheduleComposerRefusal : { target : Maybe String, body : String, editing : Bool, attachmentsStaged : Bool } -> Maybe String
 scheduleComposerRefusal input =
     if canScheduleComposer input then
         Nothing
+
+    else if input.editing then
+        Just "Finish editing before scheduling."
+
+    else if input.attachmentsStaged then
+        Just "Remove attachments to schedule plain text."
 
     else
         case input.target of

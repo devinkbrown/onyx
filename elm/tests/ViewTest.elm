@@ -770,6 +770,53 @@ suite =
                             |> Query.has [ Selector.text "[message deleted]" ]
                     ]
                     ()
+        , test "composer shows the armed edit with a save CTA" <|
+            \_ ->
+                let
+                    armed =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m9 :me!u@h PRIVMSG #c :mine here")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                            |> (\m -> Tuple.first (update (EditArm { target = "#c", msgid = "m9" }) m))
+
+                    other =
+                        { armed | activeChannel = Just "#d" }
+
+                    emptied =
+                        { armed | composer = "" }
+                in
+                Expect.all
+                    [ \_ ->
+                        query armed
+                            |> Query.find [ Selector.class "shell-composer-context--edit" ]
+                            |> Query.has [ Selector.text "Editing", Selector.text "mine here" ]
+                    , \_ ->
+                        query armed
+                            |> Query.find [ Selector.class "shell-composer-context-close" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect EditCancel
+                    , \_ ->
+                        query armed
+                            |> Query.find [ Selector.tag "input" ]
+                            |> Query.has [ Selector.attribute (Attr.placeholder "Edit message") ]
+                    , \_ ->
+                        query armed
+                            |> Query.find [ Selector.class "onyx-composer", Selector.tag "button", Selector.attribute (Attr.type_ "submit") ]
+                            |> Query.has
+                                [ Selector.text "Save"
+                                , Selector.attribute (Attr.attribute "aria-label" "Save edit")
+                                , Selector.disabled False
+                                ]
+                    , \_ ->
+                        query emptied
+                            |> Query.find [ Selector.class "onyx-composer", Selector.tag "button", Selector.attribute (Attr.type_ "submit") ]
+                            |> Query.has [ Selector.disabled True ]
+                    , \_ ->
+                        query other
+                            |> Query.hasNot [ Selector.class "shell-composer-context--edit" ]
+                    ]
+                    ()
         , test "thread renders inbound reply context" <|
             \_ ->
                 let

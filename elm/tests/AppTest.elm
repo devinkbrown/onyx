@@ -2810,6 +2810,146 @@ suite =
                     , \_ -> Expect.equal Nothing cancelled.replyingTo
                     ]
                     ()
+        , test "edit arm loads the row, stashes the draft, and cancel restores" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( m2, _ ) =
+                        feed m1 "@msgid=m1 :alice!u@h PRIVMSG #c :theirs"
+
+                    ( drafted, _ ) =
+                        update (ChannelSelect "#c") m2
+                            |> Tuple.first
+                            |> (\m -> update (ComposerInput "unsent") m)
+
+                    ( armed, _ ) =
+                        update (EditArm { target = "#c", msgid = "m9" }) drafted
+
+                    ( foreign, _ ) =
+                        update (EditArm { target = "#c", msgid = "m1" }) drafted
+
+                    ( missing, _ ) =
+                        update (EditArm { target = "#c", msgid = "nope" }) drafted
+
+                    ( cancelled, _ ) =
+                        update EditCancel armed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just { target = "#c", msgid = "m9", draft = "unsent" }) armed.editingMessage
+                    , \_ -> Expect.equal "mine" armed.composer
+                    , \_ -> Expect.equal Nothing armed.replyingTo
+                    , \_ -> Expect.equal Nothing foreign.editingMessage
+                    , \_ -> Expect.equal "unsent" foreign.composer
+                    , \_ -> Expect.equal Nothing missing.editingMessage
+                    , \_ -> Expect.equal Nothing cancelled.editingMessage
+                    , \_ -> Expect.equal "unsent" cancelled.composer
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", draft = "unsent" }) (activeEditFor armed "#c")
+                    , \_ -> Expect.equal Nothing (activeEditFor armed "#b")
+                    ]
+                    ()
+        , test "reply and edit arms clear each other" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( m2, _ ) =
+                        feed m1 "@msgid=m1 :alice!u@h PRIVMSG #c :theirs"
+
+                    ( replied, _ ) =
+                        update (ReplyArm { target = "#c", msgid = "m1" }) m2
+
+                    ( edited, _ ) =
+                        update (EditArm { target = "#c", msgid = "m9" }) replied
+
+                    ( back, _ ) =
+                        update (ReplyArm { target = "#c", msgid = "m1" }) edited
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing edited.replyingTo
+                    , \_ -> Expect.equal (Just { target = "#c", msgid = "m9", draft = "" }) edited.editingMessage
+                    , \_ -> Expect.equal Nothing back.editingMessage
+                    , \_ ->
+                        Expect.equal
+                            (Just { target = "#c", msgid = "m1", from = "alice", preview = "theirs" })
+                            back.replyingTo
+                    ]
+                    ()
+        , test "edit send saves, clears, and refuses empty or refused edits" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, ourNick = "me", caps = [ "draft/message-editing" ] }
+
+                    ( m1, _ ) =
+                        feed (joinFirst live "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( armed, _ ) =
+                        update (ChannelSelect "#c") m1
+                            |> Tuple.first
+                            |> (\m -> update (EditArm { target = "#c", msgid = "m9" }) m)
+
+                    ( saved, savedOut ) =
+                        update (ComposerInput "mine!") armed
+                            |> Tuple.first
+                            |> (\m -> update ComposerSend m)
+
+                    ( emptied, emptyOut ) =
+                        update (ComposerInput "   ") armed
+                            |> Tuple.first
+                            |> (\m -> update ComposerSend m)
+
+                    ( offline, offlineOut ) =
+                        update ComposerSend { armed | connection = Offline }
+
+                    ( uncap, uncapOut ) =
+                        update ComposerSend { armed | caps = [] }
+
+                    bodies model =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "EDIT #c m9 mine!\r\n" ] savedOut
+                    , \_ -> Expect.equal Nothing saved.editingMessage
+                    , \_ -> Expect.equal "" saved.composer
+                    , \_ -> Expect.equal [ "mine!" ] (List.map .body (bodies saved))
+                    , \_ -> Expect.equal [] emptyOut
+                    , \_ -> Expect.equal armed.editingMessage emptied.editingMessage
+                    , \_ -> Expect.equal [] offlineOut
+                    , \_ -> Expect.equal armed.editingMessage offline.editingMessage
+                    , \_ -> Expect.equal [] uncapOut
+                    , \_ -> Expect.equal armed.editingMessage uncap.editingMessage
+                    ]
+                    ()
+        , test "attaching mid-edit refuses with the draft kept" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | ourNick = "me" } "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                    ( armed, _ ) =
+                        update (ChannelSelect "#c") m1
+                            |> Tuple.first
+                            |> (\m -> update (EditArm { target = "#c", msgid = "m9" }) m)
+
+                    ( picked, pickOut ) =
+                        update AttachPick armed
+
+                    ( staged, stageOut ) =
+                        update (UploadPicked { key = "k", files = [ { name = "a.png", size = 1, mime = "image/png" } ] }) armed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] pickOut
+                    , \_ -> Expect.equal (Just "Finish editing before attaching files.") picked.composerError
+                    , \_ -> Expect.equal [] picked.attachments
+                    , \_ -> Expect.equal [] stageOut
+                    , \_ -> Expect.equal (Just "Finish editing before attaching files.") staged.composerError
+                    , \_ -> Expect.equal [] staged.attachments
+                    , \_ -> Expect.equal armed.editingMessage staged.editingMessage
+                    ]
+                    ()
         , test "reply tags the send and clears, never leaking cross-target" <|
             \_ ->
                 let

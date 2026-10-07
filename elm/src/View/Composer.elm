@@ -39,11 +39,28 @@ composer model =
                 , queuedCount = toFloat (List.length model.outbox)
                 , deliveryFailed = model.outboxFailed
                 }
+
+        editingNow =
+            editingFor model
+
+        -- Edit mode turns Send into a guarded Save (mirroring the
+        -- oracle `canSend` edit branch: nonempty draft, no staged
+        -- attachments). The normal path keeps the existing
+        -- ready-only gate; its own guards live in update.
+        canSaveOrSend =
+            case editingNow of
+                Nothing ->
+                    True
+
+                Just _ ->
+                    not (String.isEmpty (String.trim model.composer))
+                        && List.isEmpty model.attachments
     in
     form [ class "onyx-composer", onSubmit ComposerSend ]
         [ span [ class "onyx-composer-target" ]
             [ text (Maybe.withDefault "#" model.activeChannel) ]
         , replyBar model
+        , editBar model
         , if App.composerAudienceOffered model then
             button
                 [ type_ "button"
@@ -63,18 +80,46 @@ composer model =
                 (if not ready then
                     "Select a channel"
 
+                 else if editingNow /= Nothing then
+                    "Edit message"
+
                  else if online then
                     "Message"
 
                  else
                     "Offline — sends queue on this device"
                 )
+            , attribute "aria-label"
+                (if editingNow /= Nothing then
+                    "Edit message"
+
+                 else
+                    "Message"
+                )
             , value model.composer
             , onInput ComposerInput
             , disabled (not ready)
             ]
             []
-        , button [ type_ "submit", disabled (not ready) ] [ text "Send" ]
+        , button
+            [ type_ "submit"
+            , disabled (not ready || not canSaveOrSend)
+            , attribute "aria-label"
+                (if editingNow /= Nothing then
+                    "Save edit"
+
+                 else
+                    "Send message"
+                )
+            ]
+            [ text
+                (if editingNow /= Nothing then
+                    "Save"
+
+                 else
+                    "Send"
+                )
+            ]
         , sendLater model
         , case model.composerError of
             Just err ->
@@ -98,6 +143,57 @@ composer model =
         , attachments model
         , conversation model
         ]
+
+
+{-| The armed edit for the active conversation, if any (mirrors the
+composer `activeEditing` target scoping shared by the bar, the CTA,
+and the schedule gate). -}
+editingFor : Model -> Maybe { target : String, msgid : String, draft : String }
+editingFor model =
+    case model.activeChannel of
+        Nothing ->
+            Nothing
+
+        Just target ->
+            App.activeEditFor model target
+
+
+{-| Armed-edit banner (mirrors the composer edit context: the
+original text re-resolved against the live buffer, painted only
+for the active target; a missing row paints the unavailable
+placeholder instead of crashing). -}
+editBar : Model -> Html Msg
+editBar model =
+    case editingFor model of
+        Nothing ->
+            text ""
+
+        Just edit ->
+            let
+                original =
+                    case Dict.get edit.target model.channels of
+                        Nothing ->
+                            "Message unavailable"
+
+                        Just channel ->
+                            case List.filter (\m -> m.msgid == Just edit.msgid) channel.messages |> List.head of
+                                Nothing ->
+                                    "Message unavailable"
+
+                                Just row ->
+                                    row.body
+            in
+            div [ class "shell-composer-context shell-composer-context--edit", attribute "role" "status", attribute "aria-live" "polite" ]
+                [ span [ class "shell-composer-context-label" ] [ text "Editing" ]
+                , span [ class "shell-composer-context-text" ] [ text (clippedText original) ]
+                , button
+                    [ type_ "button"
+                    , class "shell-composer-context-close"
+                    , attribute "aria-label" "Cancel edit"
+                    , onClick App.EditCancel
+                    ]
+                    [ text "×" ]
+                ]
 
 
 {-| Armed-reply banner (mirrors the composer reply context: painted
@@ -291,7 +387,11 @@ sendLater : Model -> Html Msg
 sendLater model =
     let
         gate =
-            { target = model.activeChannel, body = model.composer }
+            { target = model.activeChannel
+            , body = model.composer
+            , editing = editingFor model /= Nothing
+            , attachmentsStaged = not (List.isEmpty model.attachments)
+            }
 
         able =
             Schedule.canScheduleComposer gate

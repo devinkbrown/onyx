@@ -457,23 +457,28 @@ suite =
             [ test "gate admits plain drafts and refuses empty, missing-target, and slash bodies" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> Expect.equal True (canScheduleComposer { target = Just "#c", body = "later" })
-                        , \_ -> Expect.equal True (canScheduleComposer { target = Just "bob", body = "  later  " })
-                        , \_ -> Expect.equal False (canScheduleComposer { target = Nothing, body = "later" })
-                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "", body = "later" })
-                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "   " })
-                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "/part now" })
-                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "  /me x" })
+                        [ \_ -> Expect.equal True (canScheduleComposer { target = Just "#c", body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal True (canScheduleComposer { target = Just "bob", body = "  later  ", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Nothing, body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "", body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "   ", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "/part now", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "  /me x", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "later", editing = True, attachmentsStaged = False })
+                        , \_ -> Expect.equal False (canScheduleComposer { target = Just "#c", body = "later", editing = False, attachmentsStaged = True })
                         ]
                         ()
             , test "refusal copy names the first applicable reason in oracle order" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> Expect.equal Nothing (scheduleComposerRefusal { target = Just "#c", body = "later" })
-                        , \_ -> Expect.equal (Just "Choose a room or message to schedule.") (scheduleComposerRefusal { target = Nothing, body = "later" })
-                        , \_ -> Expect.equal (Just "Choose a room or message to schedule.") (scheduleComposerRefusal { target = Just "", body = "later" })
-                        , \_ -> Expect.equal (Just "Type a message before scheduling.") (scheduleComposerRefusal { target = Just "#c", body = "  " })
-                        , \_ -> Expect.equal (Just "Slash commands cannot be scheduled.") (scheduleComposerRefusal { target = Just "#c", body = "/join #x" })
+                        [ \_ -> Expect.equal Nothing (scheduleComposerRefusal { target = Just "#c", body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Choose a room or message to schedule.") (scheduleComposerRefusal { target = Nothing, body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Choose a room or message to schedule.") (scheduleComposerRefusal { target = Just "", body = "later", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Type a message before scheduling.") (scheduleComposerRefusal { target = Just "#c", body = "  ", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Slash commands cannot be scheduled.") (scheduleComposerRefusal { target = Just "#c", body = "/join #x", editing = False, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Finish editing before scheduling.") (scheduleComposerRefusal { target = Just "#c", body = "later", editing = True, attachmentsStaged = False })
+                        , \_ -> Expect.equal (Just "Remove attachments to schedule plain text.") (scheduleComposerRefusal { target = Just "#c", body = "later", editing = False, attachmentsStaged = True })
+                        , \_ -> Expect.equal (Just "Finish editing before scheduling.") (scheduleComposerRefusal { target = Nothing, body = "later", editing = True, attachmentsStaged = True })
                         ]
                         ()
             ]
