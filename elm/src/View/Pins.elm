@@ -175,7 +175,7 @@ pinRow model channel id =
                     span [ class "pins-item-main" ]
                         [ span [ class "pins-item-meta" ]
                             [ strong [ class "pins-item-from" ] [ text message.from ]
-                            , span [ class "pins-item-when" ] [ text (App.formatClockUtc message.at) ]
+                            , span [ class "pins-item-when" ] [ text (App.formatRowClock model.zone model.prefs.clock message.at) ]
                             , span
                                 [ class "pins-item-state"
                                 , attribute "data-state" (pinStateName state)

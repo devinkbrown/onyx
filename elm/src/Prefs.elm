@@ -670,5 +670,8 @@ updatePreference prefs key value =
         "reduceMotion" ->
             { prefs | reduceMotion = value == "true" }
 
+        "clock" ->
+            { prefs | clock = clockFromString value |> Maybe.withDefault prefs.clock }
+
         _ ->
             prefs

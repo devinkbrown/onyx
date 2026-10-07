@@ -118,6 +118,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Nodes
 import Schedule
+import Task
 import Time
 import Url
 import View
@@ -907,6 +908,7 @@ init rawFlags url key =
         , guidesProgressRequest ()
         , appearanceRequest ()
         , retentionPolicyRequest ()
+        , Task.perform App.ZoneReceived Time.here
         ]
     )
         |> (\( model, cmds ) ->

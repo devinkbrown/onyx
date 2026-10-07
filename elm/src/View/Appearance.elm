@@ -41,6 +41,11 @@ densityLabels =
     [ ( Prefs.DensityCompact, "Compact" ), ( Prefs.DensityCozy, "Cozy" ), ( Prefs.DensityRoomy, "Roomy" ) ]
 
 
+clockLabels : List ( Prefs.Clock, String )
+clockLabels =
+    [ ( Prefs.Clock24h, "24-hour" ), ( Prefs.Clock12h, "12-hour" ) ]
+
+
 {-| The appearance body. -}
 view : Model -> Html Msg
 view model =
@@ -143,6 +148,39 @@ view model =
                                 [ text label ]
                         )
                         densityLabels
+                    )
+                ]
+            , section [ class "ap-group" ]
+                [ h2 [ class "ap-glabel" ] [ text "Timestamps" ]
+                , div [ class "ap-chips ap-chips--choices", attribute "role" "radiogroup", attribute "aria-label" "Timestamp format" ]
+                    (let
+                        ids =
+                            List.map (\( clock, _ ) -> Prefs.clockToString clock) clockLabels
+
+                        current =
+                            Prefs.clockToString model.prefs.clock
+                     in
+                     List.map
+                        (\( clock, label ) ->
+                            let
+                                value =
+                                    Prefs.clockToString clock
+
+                                isOn =
+                                    model.prefs.clock == clock
+                            in
+                            button
+                                [ Html.Attributes.type_ "button"
+                                , class ("ap-chip" ++ (if isOn then " on" else ""))
+                                , attribute "role" "radio"
+                                , attribute "aria-checked" (if isOn then "true" else "false")
+                                , tabindex (if isOn then 0 else -1)
+                                , on "keydown" (radioKey ids value)
+                                , onClick (AppearanceSetPref { key = "clock", value = value })
+                                ]
+                                [ text label ]
+                        )
+                        clockLabels
                     )
                 ]
             , section [ class "ap-group" ]

@@ -106,7 +106,8 @@ suite =
                     , \_ -> Expect.equal FontMedium (updatePreference defaultPreferences "fontScale" "huge").fontScale
                     , \_ -> Expect.equal DensityRoomy (updatePreference defaultPreferences "density" "roomy").density
                     , \_ -> Expect.equal True (updatePreference defaultPreferences "reduceMotion" "true").reduceMotion
-                    , \_ -> Expect.equal defaultPreferences (updatePreference defaultPreferences "clock" "12h")
+                    , \_ -> Expect.equal Clock12h (updatePreference defaultPreferences "clock" "12h").clock
+                    , \_ -> Expect.equal Clock24h (updatePreference defaultPreferences "clock" "nope").clock
                     ]
                     ()
         ]

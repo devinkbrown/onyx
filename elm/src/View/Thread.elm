@@ -168,7 +168,7 @@ messageRow model target m =
 
           else
             time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
-                [ text (App.formatClockUtc m.at) ]
+                [ text (App.formatRowClock model.zone model.prefs.clock m.at) ]
         , span [ class "onyx-body" ] (messageBody model m)
         , if m.outboxId == Nothing && not m.pending then
             text ""

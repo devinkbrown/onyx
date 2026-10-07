@@ -233,12 +233,12 @@ vaultSection model =
                         [ text ("Mode: " ++ App.vaultSearchModeToString model.vaultSearchMode) ]
                     ]
                 , ul [ class "onyx-message-search__server-list", attribute "role" "list", attribute "aria-label" "Device-memory message results" ]
-                    (List.map vaultRow hits)
+                    (List.map (vaultRow model) hits)
                 ]
 
 
-vaultRow : App.VaultHit -> Html Msg
-vaultRow hit =
+vaultRow : Model -> App.VaultHit -> Html Msg
+vaultRow model hit =
     li []
         [ button
             [ type_ "button"
@@ -251,7 +251,7 @@ vaultRow hit =
                 text ""
 
               else
-                span [ class "onyx-message-search__server-when" ] [ text (App.formatClockUtc hit.at) ]
+                span [ class "onyx-message-search__server-when" ] [ text (App.formatRowClock model.zone model.prefs.clock hit.at) ]
             , strong [] [ text hit.from ]
             , span [ class "onyx-message-search__server-text" ] [ text hit.text ]
             ]
@@ -362,11 +362,11 @@ serverResults model =
 
         hits ->
             ul [ class "onyx-message-search__server-list", attribute "role" "list", attribute "aria-label" "Archived message results" ]
-                (List.map serverRow hits)
+                (List.map (serverRow model) hits)
 
 
-serverRow : App.VaultHit -> Html Msg
-serverRow hit =
+serverRow : Model -> App.VaultHit -> Html Msg
+serverRow model hit =
     li []
         [ button
             [ type_ "button"
@@ -378,7 +378,7 @@ serverRow hit =
                 text ""
 
               else
-                span [ class "onyx-message-search__server-when" ] [ text (App.formatClockUtc hit.at) ]
+                span [ class "onyx-message-search__server-when" ] [ text (App.formatRowClock model.zone model.prefs.clock hit.at) ]
             , strong [] [ text hit.from ]
             , span [ class "onyx-message-search__server-text" ] [ text hit.text ]
             ]

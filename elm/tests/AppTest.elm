@@ -2671,6 +2671,17 @@ suite =
                     , \_ -> Expect.equal "23:59" (formatClockUtc -1000)
                     ]
                     ()
+        , test "row clock honors the 12-hour preference" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal "14:05" (formatRowClock Time.utc Prefs.Clock24h 50700000)
+                    , \_ -> Expect.equal "2:05 PM" (formatRowClock Time.utc Prefs.Clock12h 50700000)
+                    , \_ -> Expect.equal "12:00 AM" (formatRowClock Time.utc Prefs.Clock12h 0)
+                    , \_ -> Expect.equal "12:00 PM" (formatRowClock Time.utc Prefs.Clock12h 43200000)
+                    , \_ -> Expect.equal "00:00" (formatRowClock Time.utc Prefs.Clock24h 0)
+                    , \_ -> Expect.equal Time.utc (.zone (Tuple.first (update (ZoneReceived Time.utc) blank)))
+                    ]
+                    ()
         , test "vault query schedules a debounced scan" <|
             \_ ->
                 let

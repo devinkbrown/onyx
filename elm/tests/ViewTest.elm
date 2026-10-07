@@ -719,6 +719,20 @@ suite =
                                 ]
                     ]
                     ()
+        , test "thread honors the 12-hour clock preference" <|
+            \_ ->
+                let
+                    stamped =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@time=2026-10-04T14:05:00Z :alice!u@h PRIVMSG #c :stamped")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                            |> (\m -> Tuple.first (update (AppearanceSetPref { key = "clock", value = "12h" }) m))
+                in
+                query stamped
+                    |> Query.find [ Selector.tag "time" ]
+                    |> Query.has [ Selector.text "2:05 PM" ]
         , test "thread hides the clock for unstamped rows" <|
             \_ ->
                 query channelModel
@@ -3235,6 +3249,14 @@ suite =
                                     ]
                                 |> Event.simulate Event.click
                                 |> Event.expect (AppearanceSetPref { key = "fontScale", value = "lg" })
+                        , \_ ->
+                            q
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.containing [ Selector.text "12-hour" ]
+                                    ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (AppearanceSetPref { key = "clock", value = "12h" })
                         , \_ ->
                             q
                                 |> Query.find
