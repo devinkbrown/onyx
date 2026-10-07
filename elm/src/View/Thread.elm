@@ -7,11 +7,12 @@ channel, newest last.
 import App exposing (Model, Msg(..))
 import Dict
 import Html exposing (Html, a, audio, button, div, h2, img, li, p, section, small, span, strong, text, time, ul, video)
-import Html.Attributes exposing (attribute, class, classList, controls, datetime, href, preload, rel, src, tabindex, target, type_)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, preload, rel, src, tabindex, target, type_)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 import Set
 import Prefs
+import Translate
 import Upload
 
 
@@ -386,6 +387,33 @@ messageMenuPanel model target m =
 
                                   else
                                     Nothing
+                                , if App.loadedActionText m /= Nothing && model.translationAvailable then
+                                    Just
+                                        (case Dict.get msgid model.translations of
+                                            Just entry ->
+                                                if entry.status == App.TranslationPending then
+                                                    button
+                                                        [ type_ "button"
+                                                        , class "onyx-msg-menu-item"
+                                                        , attribute "role" "menuitem"
+                                                        , attribute "aria-label" ("Translate " ++ actionTarget ++ " on this device")
+                                                        , disabled True
+                                                        ]
+                                                        [ text "Translate on this device" ]
+
+                                                else
+                                                    menuItem ("Translate " ++ actionTarget ++ " on this device")
+                                                        "Translate on this device"
+                                                        (App.MessageTranslate { target = target, msgid = msgid })
+
+                                            Nothing ->
+                                                menuItem ("Translate " ++ actionTarget ++ " on this device")
+                                                    "Translate on this device"
+                                                    (App.MessageTranslate { target = target, msgid = msgid })
+                                        )
+
+                                  else
+                                    Nothing
                                 , if caps.canStartTopic then
                                     Just
                                         (menuItem ("Start topic from " ++ actionTarget)
@@ -510,8 +538,133 @@ messageMenuPanel model target m =
                                   else
                                     Nothing
                                 ]
+                                ++ translationBlocks model open m msgid actionTarget
                             )
                         ]
+
+
+{-| Translation section and unavailable note (mirroring the
+oracle menu translation panel copy verbatim: pending/done/busy
+and failed states, retry/copy/dismiss actions, and the copy
+status line). -}
+translationBlocks : Model -> { target : String, msgid : String, confirmDelete : Bool } -> App.ChatMessage -> String -> String -> List (Html Msg)
+translationBlocks model open m msgid actionTarget =
+    let
+        note =
+            if open.confirmDelete then
+                []
+
+            else if App.loadedActionText m == Nothing || model.translationAvailable then
+                []
+
+            else
+                [ p [ class "onyx-msg-menu-translation-note", attribute "role" "note" ]
+                    [ text "On-device translation is unavailable in this browser." ]
+                ]
+    in
+    case Dict.get msgid model.translations of
+        Nothing ->
+            note
+
+        Just entry ->
+            if open.confirmDelete then
+                []
+
+            else
+                section
+                    [ class "onyx-msg-menu-translation"
+                    , attribute "aria-label" ("On-device translation for " ++ actionTarget)
+                    ]
+                    [ div [ class "onyx-msg-menu-translation-head" ]
+                        [ span [] [ text (Translate.languageLabel entry.lang) ] ]
+                    , p
+                        [ class "onyx-msg-menu-translation-text"
+                        , attribute "role" "status"
+                        , attribute "aria-live" "polite"
+                        , attribute "aria-atomic" "true"
+                        ]
+                        [ text
+                            (case entry.status of
+                                App.TranslationPending ->
+                                    "Translating on this device…"
+
+                                App.TranslationDone ->
+                                    entry.text
+
+                                App.TranslationBusy ->
+                                    "On-device translation is busy. Retry in a moment."
+
+                                App.TranslationFailed ->
+                                    "On-device translation failed. Retry when the local model is ready."
+                            )
+                        ]
+                    , div [ class "onyx-msg-menu-translation-actions" ]
+                        (List.filterMap identity
+                            [ if entry.status == App.TranslationBusy || entry.status == App.TranslationFailed then
+                                Just
+                                    (button
+                                        [ type_ "button"
+                                        , class "onyx-msg-menu-translation-action"
+                                        , attribute "aria-label" ("Retry translating " ++ actionTarget ++ " on this device")
+                                        , onClick (App.MessageTranslate { target = open.target, msgid = msgid })
+                                        ]
+                                        [ text "Retry" ]
+                                    )
+
+                              else
+                                Nothing
+                            , if entry.status == App.TranslationDone then
+                                Just
+                                    (button
+                                        [ type_ "button"
+                                        , class "onyx-msg-menu-translation-action"
+                                        , attribute "aria-label" ("Copy translated text for " ++ actionTarget)
+                                        , attribute "disabled"
+                                            (if entry.copy == App.TranslationCopyPending then
+                                                "true"
+
+                                             else
+                                                "false"
+                                            )
+                                        , onClick (App.MessageTranslationCopy { msgid = msgid })
+                                        ]
+                                        [ text "Copy translation" ]
+                                    )
+
+                              else
+                                Nothing
+                            , if entry.status /= App.TranslationPending then
+                                Just
+                                    (button
+                                        [ type_ "button"
+                                        , class "onyx-msg-menu-translation-action"
+                                        , attribute "aria-label" ("Dismiss translation for " ++ actionTarget)
+                                        , onClick (App.MessageTranslationDismiss { msgid = msgid })
+                                        ]
+                                        [ text "Dismiss" ]
+                                    )
+
+                              else
+                                Nothing
+                            ]
+                        )
+                    , case entry.copy of
+                        App.TranslationCopyIdle ->
+                            text ""
+
+                        App.TranslationCopyPending ->
+                            p [ class "onyx-msg-menu-translation-copy-status", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+                                [ text "Copying translation…" ]
+
+                        App.TranslationCopied ->
+                            p [ class "onyx-msg-menu-translation-copy-status", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+                                [ text "Translation copied." ]
+
+                        App.TranslationCopyFailed ->
+                            p [ class "onyx-msg-menu-translation-copy-status", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
+                                [ text "Could not copy translation. Clipboard access is unavailable." ]
+                    ]
+                    :: note
 
 
 {-| One menu item (text button with the oracle accessible name). -}

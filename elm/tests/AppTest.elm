@@ -3180,6 +3180,106 @@ suite =
                     , \_ -> Expect.equal m1.collapsedNicks emptyNick.collapsedNicks
                     ]
                     ()
+        , test "menu translation requests, lands, copies, and dismisses" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me", translationAvailable = True, translationBrowserLang = "en" }
+
+                    ( m1, _ ) =
+                        feed (joinFirst base "me" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :hola"
+
+                    ( asked, askOut ) =
+                        update (MessageTranslate { target = "#c", msgid = "m1" }) m1
+
+                    ( _, dupOut ) =
+                        update (MessageTranslate { target = "#c", msgid = "m1" }) asked
+
+                    doneResult =
+                        { msgid = "m1", lang = "en", source = "hola", ok = True, text = "hello" }
+
+                    ( landed, _ ) =
+                        update (TranslationResult doneResult) asked
+
+                    ( staleLang, _ ) =
+                        update (TranslationResult { doneResult | lang = "fr" }) asked
+
+                    ( staleSource, _ ) =
+                        update (TranslationResult { doneResult | source = "adios" }) asked
+
+                    ( failed, _ ) =
+                        update (TranslationResult { doneResult | ok = False }) asked
+
+                    ( copied, copyOut ) =
+                        update (MessageTranslationCopy { msgid = "m1" }) landed
+
+                    ( copyDone, _ ) =
+                        update (ClipboardResult { tag = "translation-copy", ok = True }) copied
+
+                    ( copyFailed, _ ) =
+                        update (ClipboardResult { tag = "translation-copy", ok = False }) copied
+
+                    ( dismissed, _ ) =
+                        update (MessageTranslationDismiss { msgid = "m1" }) landed
+
+                    ( unavailable, unavailableOut ) =
+                        update (MessageTranslate { target = "#c", msgid = "m1" }) { m1 | translationAvailable = False }
+
+                    ( configured, _ ) =
+                        update (TranslationConfig { available = True, target = "ja", browserLang = "de-DE" }) m1
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ TranslateRequest { msgid = "m1", lang = "en", source = "hola", text = "hola", targetLang = "en" } ]
+                            askOut
+                    , \_ -> Expect.equal [] dupOut
+                    , \_ -> Expect.equal (Just TranslationPending) (Maybe.map .status (Dict.get "m1" asked.translations))
+                    , \_ -> Expect.equal (Just TranslationDone) (Maybe.map .status (Dict.get "m1" landed.translations))
+                    , \_ -> Expect.equal (Just "hello") (Maybe.map .text (Dict.get "m1" landed.translations))
+                    , \_ -> Expect.equal asked.translations staleLang.translations
+                    , \_ -> Expect.equal asked.translations staleSource.translations
+                    , \_ -> Expect.equal (Just TranslationFailed) (Maybe.map .status (Dict.get "m1" failed.translations))
+                    , \_ -> Expect.equal [ ClipboardCopy { text = "hello", tag = "translation-copy" } ] copyOut
+                    , \_ -> Expect.equal (Just TranslationCopyPending) (Maybe.map .copy (Dict.get "m1" copied.translations))
+                    , \_ -> Expect.equal (Just TranslationCopied) (Maybe.map .copy (Dict.get "m1" copyDone.translations))
+                    , \_ -> Expect.equal (Just TranslationCopyFailed) (Maybe.map .copy (Dict.get "m1" copyFailed.translations))
+                    , \_ -> Expect.equal Nothing copyDone.translationCopyPending
+                    , \_ -> Expect.equal Dict.empty dismissed.translations
+                    , \_ -> Expect.equal [] unavailableOut
+                    , \_ -> Expect.equal Dict.empty unavailable.translations
+                    , \_ -> Expect.equal True configured.translationAvailable
+                    , \_ -> Expect.equal "ja" configured.translationTarget
+                    , \_ -> Expect.equal "de-DE" configured.translationBrowserLang
+                    ]
+                    ()
+        , test "menu translation reports busy past four concurrent requests" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me", translationAvailable = True, translationBrowserLang = "en" }
+
+                    fed =
+                        List.foldl
+                            (\n m -> Tuple.first (feed m ("@msgid=m" ++ String.fromInt n ++ " :alice!u@h PRIVMSG #c :hola " ++ String.fromInt n)))
+                            (joinFirst base "me" "#c")
+                            (List.range 1 5)
+
+                    ask n m =
+                        Tuple.first (update (MessageTranslate { target = "#c", msgid = "m" ++ String.fromInt n }) m)
+
+                    m4 =
+                        ask 4 (ask 3 (ask 2 (ask 1 fed)))
+
+                    ( busy, busyOut ) =
+                        update (MessageTranslate { target = "#c", msgid = "m5" }) m4
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 4 (Dict.size m4.translations)
+                    , \_ -> Expect.equal [] busyOut
+                    , \_ -> Expect.equal (Just TranslationBusy) (Maybe.map .status (Dict.get "m5" busy.translations))
+                    ]
+                    ()
         , test "inbound reply tag resolves the live parent" <|
             \_ ->
                 let

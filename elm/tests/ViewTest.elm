@@ -990,6 +990,79 @@ suite =
                             |> Query.hasNot [ Selector.text "hello there" ]
                     ]
                     ()
+        , test "menu translation item, section, and unavailable note" <|
+            \_ ->
+                let
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hola mundo")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    avail =
+                        { base | translationAvailable = True }
+
+                    opened =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) avail)
+
+                    pending =
+                        Tuple.first (update (MessageTranslate { target = "#c", msgid = "m1" }) opened)
+
+                    done =
+                        Tuple.first
+                            (update (TranslationResult { msgid = "m1", lang = "en", source = "hola mundo", ok = True, text = "hello world" }) pending)
+
+                    failed =
+                        Tuple.first
+                            (update (TranslationResult { msgid = "m1", lang = "en", source = "hola mundo", ok = False, text = "" }) pending)
+
+                    unavail =
+                        Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "m1" }) base)
+                in
+                Expect.all
+                    [ \_ ->
+                        query opened
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Translate message from alice on this device") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageTranslate { target = "#c", msgid = "m1" })
+                    , \_ ->
+                        query pending
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Translate message from alice on this device") ]
+                            |> Query.has [ Selector.disabled True ]
+                    , \_ ->
+                        query done
+                            |> Query.find [ Selector.class "onyx-msg-menu-translation" ]
+                            |> Query.has [ Selector.text "hello world", Selector.text "Copy translation", Selector.text "Dismiss" ]
+                    , \_ ->
+                        query done
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Copy translated text for message from alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageTranslationCopy { msgid = "m1" })
+                    , \_ ->
+                        query done
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Dismiss translation for message from alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageTranslationDismiss { msgid = "m1" })
+                    , \_ ->
+                        query failed
+                            |> Query.find [ Selector.class "onyx-msg-menu-translation" ]
+                            |> Query.has [ Selector.text "On-device translation failed. Retry when the local model is ready.", Selector.text "Retry" ]
+                    , \_ ->
+                        query failed
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Retry translating message from alice on this device") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MessageTranslate { target = "#c", msgid = "m1" })
+                    , \_ ->
+                        query unavail
+                            |> Query.has
+                                [ Selector.text "On-device translation is unavailable in this browser."
+                                ]
+                    , \_ ->
+                        query unavail
+                            |> Query.hasNot [ Selector.text "Translate on this device" ]
+                    ]
+                    ()
         , test "thread renders inbound reply context" <|
             \_ ->
                 let

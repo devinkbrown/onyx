@@ -2854,6 +2854,60 @@ function fetchPublicFeed(url) {
       });
     }
 
+    /* On-device translation (mirroring `BrowserTranslatorAdapter`:
+       the browser Translator API behind the request/result ports;
+       absent API reports unavailable so callers surface it instead
+       of failing silently. Bounds are re-applied here — the Elm
+       layer already shapes them — and the request echoes back for
+       stale-result guards. The stored target uses the `onyx:`
+       prefix like every other localStorage key. Provenance is
+       device scope: message text never leaves this browser. */
+    if (app.ports.translationConfig) {
+      (function sendTranslationConfig() {
+        var available = false;
+        var target = "";
+        var browserLang = "en";
+        try {
+          var api = window.Translator;
+          available = !!(api && (api.availability || api.create));
+        } catch (err) { available = false; }
+        try {
+          var nav = window.navigator || {};
+          var rawLang = nav.language || (nav.languages && nav.languages[0]) || "en";
+          browserLang = String(rawLang || "en");
+        } catch (err) { browserLang = "en"; }
+        try {
+          var stored = window.localStorage ? window.localStorage.getItem("onyx:translation-target") : "";
+          target = String(stored || "").trim().toLowerCase().split(/[-_]/)[0] || "";
+        } catch (err) { target = ""; }
+        try { app.ports.translationConfig.send({ available: available, target: target, browserLang: browserLang }); } catch (err) { /* port gone */ }
+      })();
+    }
+    if (app.ports.translateRequest) {
+      app.ports.translateRequest.subscribe(function (req) {
+        function done(ok, text) {
+          try {
+            app.ports.translateResult.send({
+              msgid: req.msgid,
+              lang: req.lang,
+              source: req.source,
+              ok: !!ok,
+              text: String(text || "")
+            });
+          } catch (err) { /* port gone */ }
+        }
+        try {
+          var translator = window.Translator;
+          if (!translator || !translator.create) { done(false, ""); return; }
+          Promise.resolve(translator.create({ targetLanguage: req.targetLang })).then(function (instance) {
+            return instance.translate(String(req.text).slice(0, 4096));
+          }).then(function (translated) {
+            done(true, String(translated).slice(0, 8192));
+          }, function () { done(false, ""); });
+        } catch (err) { done(false, ""); }
+      });
+    }
+
     /* Appearance slots, mirroring lib/prefs + theme storage: five
        small reads in one snapshot (Elm validates fail-closed), one
        write per change, and one DOM application per state change

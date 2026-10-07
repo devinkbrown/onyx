@@ -273,6 +273,12 @@ port clipboardCopy : { text : String, tag : String } -> Cmd msg
 
 port clipboardResult : ({ tag : String, ok : Bool } -> msg) -> Sub msg
 
+port translateRequest : { msgid : String, lang : String, source : String, text : String, targetLang : String } -> Cmd msg
+
+port translateResult : ({ msgid : String, lang : String, source : String, ok : Bool, text : String } -> msg) -> Sub msg
+
+port translationConfig : ({ available : Bool, target : String, browserLang : String } -> msg) -> Sub msg
+
 port guidesProgressRequest : () -> Cmd msg
 
 port guidesProgressStore : List String -> Cmd msg
@@ -1022,6 +1028,9 @@ perform key outbound =
         App.ClipboardCopy req ->
             clipboardCopy req
 
+        App.TranslateRequest req ->
+            translateRequest req
+
         App.AppearanceRequest ->
             appearanceRequest ()
 
@@ -1426,6 +1435,8 @@ subscriptions model =
         , whoisTimeoutFired (\res -> App.WhoisTimeoutElapsed { nick = res.nick, gen = res.gen })
         , pingDue (\_ -> App.PingDue)
         , clipboardResult (\res -> App.ClipboardResult { tag = res.tag, ok = res.ok })
+        , translateResult (\res -> App.TranslationResult { msgid = res.msgid, lang = res.lang, source = res.source, ok = res.ok, text = res.text })
+        , translationConfig (\res -> App.TranslationConfig { available = res.available, target = res.target, browserLang = res.browserLang })
         , guidesProgressLoaded App.GuidesProgressLoaded
         , appearanceSnapshot App.AppearanceSnapshot
         , appearancePreviewed App.AppearancePreviewed

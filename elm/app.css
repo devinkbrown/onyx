@@ -1332,3 +1332,11 @@ html, body {
 .onyx-msg-menu-delete-confirm-delete { background: transparent; border-color: var(--onyx-bad); color: var(--onyx-bad); }
 .onyx-msg-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
 .onyx-msg-menu { position: relative; z-index: 41; }
+.onyx-msg-menu-translation { border-top: 1px solid var(--onyx-line); display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 8px 10px 4px; }
+.onyx-msg-menu-translation-head { color: var(--onyx-dim); font-size: 12px; }
+.onyx-msg-menu-translation-text { font-size: 13px; margin: 0; }
+.onyx-msg-menu-translation-actions { display: flex; gap: 8px; }
+.onyx-msg-menu-translation-action { background: transparent; border: 1px solid var(--onyx-line); border-radius: 6px; color: var(--onyx-text); cursor: pointer; font-size: 12px; padding: 2px 10px; }
+.onyx-msg-menu-translation-action:disabled { opacity: 0.45; cursor: default; }
+.onyx-msg-menu-translation-note { color: var(--onyx-dim); font-size: 12px; margin: 4px 0 0; padding: 0 10px; }
+.onyx-msg-menu-translation-copy-status { color: var(--onyx-dim); font-size: 12px; margin: 0; }
