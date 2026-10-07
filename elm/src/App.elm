@@ -4552,6 +4552,28 @@ foldLine model message =
             else
                 ( logNumeric model message, [] )
 
+        "902" ->
+            -- RPL_LOGGEDIN (SASL account login): the oracle keeps no
+            -- 902 fold — session state rides 900/901 — so this stays
+            -- on the generic numeric log.
+            ( logNumeric model message, [] )
+
+        "906" ->
+            -- RPL_SASLMECHS (mechanism list): no oracle path; the
+            -- offered mechanisms are capability-driven, so this
+            -- stays on the generic numeric log.
+            ( logNumeric model message, [] )
+
+        "462" ->
+            -- ERR_ALREADYREGISTERED: no oracle path (verified: no
+            -- matches in `src/lib`) — the generic numeric log.
+            ( logNumeric model message, [] )
+
+        "410" ->
+            -- ERR_INVALIDCAP: no oracle path (verified: no matches
+            -- in `src/lib`) — the generic numeric log.
+            ( logNumeric model message, [] )
+
         "305" ->
             ( { model | isAway = False }, [] )
 

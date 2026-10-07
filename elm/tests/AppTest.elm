@@ -6165,6 +6165,18 @@ suite =
                     , \_ ->
                         Expect.equal [ "METADATA cannot be set" ]
                             (List.take 1 (feed blank ":srv 767 me :METADATA cannot be set" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "kai You are logged in" ]
+                            (List.take 1 (feed blank ":srv 902 me kai :You are logged in" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "PLAIN EXTERNAL" ]
+                            (List.take 1 (feed blank ":srv 906 me PLAIN EXTERNAL" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "Unauthorized command" ]
+                            (List.take 1 (feed blank ":srv 462 me :Unauthorized command" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "Invalid capability" ]
+                            (List.take 1 (feed blank ":srv 410 me :Invalid capability" |> Tuple.first |> .serviceLog))
                     , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text denied.notifications)
                     , \_ -> Expect.equal (Just BanError) (Maybe.map .status (Dict.get "#c" denied.banListMeta))
                     , \_ -> Expect.equal (Just "You need moderator permission to view this list.") (Maybe.andThen .error (Dict.get "#c" denied.banListMeta))
