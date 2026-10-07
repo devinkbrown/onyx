@@ -144,6 +144,9 @@ port uploadSend : { key : String, endpoint : String, fieldName : String, index :
 port uploadDone : ({ key : String, index : Int, ok : Bool, status : Int, body : String, contentType : Maybe String } -> msg) -> Sub msg
 
 
+port uploadProgress : ({ key : String, index : Int, loaded : Int, total : Maybe Int } -> msg) -> Sub msg
+
+
 port wsClose : () -> Cmd msg
 
 
@@ -1337,6 +1340,7 @@ subscriptions model =
         , nodesProbed App.NodesProbed
         , uploadPicked App.UploadPicked
         , uploadDone App.UploadDone
+        , uploadProgress App.UploadProgress
         , wsOpened App.WsOpened
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged

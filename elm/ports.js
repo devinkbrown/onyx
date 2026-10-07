@@ -2373,6 +2373,51 @@
       .catch(function () { return null; });
   }
 
+  /* XHR upload with progress events — mirrors `uploadWithXhr` in
+     `src/lib/upload/upload.ts` (used when `onProgress` is set): the
+     percent math matches `progressFromEvent` (null while the total is
+     unknown), and the bounded response parse is shared with the fetch
+     path. Falls back to `uploadSendFile` where XHR is unavailable. */
+  function uploadSendXhr(file, endpoint, fieldName, onProgress) {
+    return new Promise(function (resolve) {
+      if (!file) {
+        resolve({ ok: false, status: 0, body: "", contentType: null });
+        return;
+      }
+      var xhr = new XMLHttpRequest();
+      var form = new FormData();
+      form.append(fieldName || "file", file);
+      xhr.open("POST", endpoint);
+      if (xhr.upload && typeof onProgress === "function") {
+        xhr.upload.onprogress = function (event) {
+          var total = (event && event.lengthComputable) ? event.total : null;
+          onProgress({
+            loaded: (event && event.loaded) || 0,
+            total: total,
+            percent: (total && total > 0) ? Math.round((event.loaded / total) * 100) : null
+          });
+        };
+      }
+      xhr.onerror = function () { resolve({ ok: false, status: 0, body: "", contentType: null }); };
+      xhr.onabort = function () { resolve({ ok: false, status: 0, body: "", contentType: null }); };
+      xhr.onload = function () {
+        if (xhr.status < 200 || xhr.status >= 300) {
+          resolve({ ok: false, status: xhr.status, body: "", contentType: null });
+          return;
+        }
+        var contentType = null;
+        try { contentType = xhr.getResponseHeader("content-type"); } catch (err) { contentType = null; }
+        var text = (typeof xhr.responseText === "string") ? xhr.responseText : "";
+        if (text.length > UPLOAD_BRIDGE_MAX_BYTES) {
+          resolve({ ok: false, status: xhr.status, body: "", contentType: null });
+          return;
+        }
+        resolve({ ok: true, status: xhr.status, body: text, contentType: contentType });
+      };
+      xhr.send(form);
+    });
+  }
+
   function uploadSendFile(file, endpoint, fieldName, fetchFn) {
     var impl = fetchFn || ((typeof fetch === "function") ? fetch : null);
     if (!impl || !file) {
@@ -4842,7 +4887,21 @@ function fetchPublicFeed(url) {
       app.ports.uploadSend.subscribe(function (req) {
         var held = (req && pendingUploadFiles[req.key]) || [];
         var file = held[req ? req.index : 0];
-        uploadSendFile(file, req ? req.endpoint : "", req ? req.fieldName : "file").then(function (outcome) {
+        var key = (req && req.key) || "";
+        var index = (req && typeof req.index === "number") ? req.index : 0;
+        var sender;
+        if (typeof XMLHttpRequest !== "undefined") {
+          sender = uploadSendXhr(file, req ? req.endpoint : "", req ? req.fieldName : "file", function (progress) {
+            try {
+              if (app.ports.uploadProgress) {
+                app.ports.uploadProgress.send({ key: key, index: index, loaded: progress.loaded, total: progress.total });
+              }
+            } catch (err) { /* port gone */ }
+          });
+        } else {
+          sender = uploadSendFile(file, req ? req.endpoint : "", req ? req.fieldName : "file");
+        }
+        sender.then(function (outcome) {
           try {
             app.ports.uploadDone.send({
               key: (req && req.key) || "",

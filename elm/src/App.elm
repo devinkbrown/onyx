@@ -714,6 +714,7 @@ type alias StagedAttachment =
     , size : Float
     , mime : String
     , status : AttachmentStatus
+    , progress : Maybe Int
     }
 
 
@@ -2503,6 +2504,7 @@ type Msg
     | AttachRemove Int
     | UploadPicked { key : String, files : List { name : String, size : Float, mime : String } }
     | UploadDone { key : String, index : Int, ok : Bool, status : Int, body : String, contentType : Maybe String }
+    | UploadProgress { key : String, index : Int, loaded : Int, total : Maybe Int }
     | ChannelSelect String
     | ThreadShowEarlier
     | ThreadShowLatest
@@ -31250,6 +31252,7 @@ stagePicked model key files =
                             , size = file.size
                             , mime = file.mime
                             , status = StagedReady
+                            , progress = Nothing
                             }
 
                     else
@@ -31297,7 +31300,7 @@ sendWithAttachments model target =
                         mark item =
                             case item.status of
                                 StagedReady ->
-                                    { item | status = StagedUploading }
+                                    { item | status = StagedUploading, progress = Just 0 }
 
                                 _ ->
                                     item
@@ -31317,6 +31320,22 @@ sendWithAttachments model target =
                     )
 
 
+{-| Apply one progress event to the matching in-flight row (mirrors
+the oracle composer `onProgress`: only `uploading` rows move, and
+the percent is null while the total is unknown). -}
+applyUploadProgress : List StagedAttachment -> { key : String, index : Int, loaded : Int, total : Maybe Int } -> List StagedAttachment
+applyUploadProgress items prog =
+    List.map
+        (\item ->
+            if item.key == prog.key && item.position == prog.index && item.status == StagedUploading then
+                { item | progress = Upload.progressPercent prog.loaded prog.total }
+
+            else
+                item
+        )
+        items
+
+
 {-| Settle one finished upload (mirrors `uploadPendingAttachments`:
 a failure aborts the send with the draft kept; completion builds
 the captioned receipt message). -}
@@ -31328,15 +31347,15 @@ settleAttachmentUpload model done =
                 (\item ->
                     if item.key == done.key && item.position == done.index then
                         if not done.ok then
-                            { item | status = StagedFailed }
+                            { item | status = StagedFailed, progress = Nothing }
 
                         else
                             case Upload.parseUploadResponse model.attachmentEndpoint done.body (Maybe.withDefault "" done.contentType) of
                                 Ok url ->
-                                    { item | status = StagedUploaded url }
+                                    { item | status = StagedUploaded url, progress = Just 100 }
 
                                 Err _ ->
-                                    { item | status = StagedFailed }
+                                    { item | status = StagedFailed, progress = Nothing }
 
                     else
                         item
@@ -32955,6 +32974,9 @@ update msg model =
 
         UploadDone done ->
             settleAttachmentUpload model done
+
+        UploadProgress prog ->
+            ( { model | attachments = applyUploadProgress model.attachments prog }, [] )
 
         ComposerSend ->
             case model.activeChannel of

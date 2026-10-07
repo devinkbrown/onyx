@@ -16,7 +16,7 @@ a nested form, so Enter in the composer still sends.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, button, div, form, input, label, p, span, text)
+import Html exposing (Html, button, div, form, input, label, p, progress, span, text)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -199,7 +199,12 @@ stagedRow item =
                     "ready"
 
                 App.StagedUploading ->
-                    "uploading…"
+                    case item.progress of
+                        Just pct ->
+                            "Uploading " ++ String.fromInt pct ++ "%"
+
+                        Nothing ->
+                            "Uploading…"
 
                 App.StagedUploaded _ ->
                     "uploaded"
@@ -208,16 +213,32 @@ stagedRow item =
                     "failed — " ++ "Couldn't send. Try again."
     in
     div [ class "onyx-attach-row" ]
-        [ span [ class "onyx-attach-name" ] [ text item.name ]
-        , span [ class "onyx-attach-status" ] [ text statusText ]
-        , button
-            [ type_ "button"
-            , class "onyx-attach-remove"
-            , attribute "aria-label" ("Remove " ++ item.name)
-            , onClick (AttachRemove item.id)
-            ]
-            [ text "Remove" ]
-        ]
+        ([ span [ class "onyx-attach-name" ] [ text item.name ]
+         , span [ class "onyx-attach-status" ] [ text statusText ]
+         ]
+            ++ (case item.status of
+                    App.StagedUploading ->
+                        [ progress
+                            [ class "shell-attachment-progress"
+                            , Attr.max "100"
+                            , value (String.fromInt (Maybe.withDefault 0 item.progress))
+                            , attribute "aria-label" ("Uploading " ++ item.name)
+                            ]
+                            []
+                        ]
+
+                    _ ->
+                        []
+               )
+            ++ [ button
+                    [ type_ "button"
+                    , class "onyx-attach-remove"
+                    , attribute "aria-label" ("Remove " ++ item.name)
+                    , onClick (AttachRemove item.id)
+                    ]
+                    [ text "Remove" ]
+               ]
+        )
 
 
 {-| Send-later entry + picker (mirroring the composer's schedule

@@ -2152,6 +2152,37 @@ suite =
                     , \_ -> Expect.equal "" m4.composer
                     ]
                     ()
+        , test "UploadProgress moves only the uploading row" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, activeChannel = Just "#c", composer = "hi" }
+
+                    ( m1, _ ) =
+                        update AttachPick live
+
+                    ( m2, _ ) =
+                        update (UploadPicked { key = "att-0", files = [ { name = "a.png", size = 10, mime = "image/png" } ] }) m1
+
+                    ( m3, _ ) =
+                        update ComposerSend m2
+
+                    ( m4, _ ) =
+                        update (UploadProgress { key = "att-0", index = 0, loaded = 5, total = Just 10 }) m3
+
+                    ( m5, _ ) =
+                        update (UploadProgress { key = "att-0", index = 0, loaded = 5, total = Nothing }) m4
+
+                    ( m6, _ ) =
+                        update (UploadProgress { key = "other", index = 0, loaded = 9, total = Just 10 }) m5
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ Just 0 ] (List.map .progress m3.attachments)
+                    , \_ -> Expect.equal [ Just 50 ] (List.map .progress m4.attachments)
+                    , \_ -> Expect.equal [ Nothing ] (List.map .progress m5.attachments)
+                    , \_ -> Expect.equal [ Nothing ] (List.map .progress m6.attachments)
+                    ]
+                    ()
         , test "UploadDone failure aborts with the draft kept" <|
             \_ ->
                 let

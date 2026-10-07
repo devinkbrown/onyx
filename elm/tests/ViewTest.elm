@@ -229,7 +229,7 @@ suite =
                     staged =
                         { channelModel
                             | attachments =
-                                [ { id = 0, key = "att-0", position = 0, name = "a.png", size = 10, mime = "image/png", status = StagedUploading }
+                                [ { id = 0, key = "att-0", position = 0, name = "a.png", size = 10, mime = "image/png", status = StagedUploading, progress = Just 42 }
                                 ]
                         }
                 in
@@ -240,7 +240,19 @@ suite =
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Attach files") ]
                     , \_ ->
                         query staged
-                            |> Query.has [ Selector.text "uploading…" ]
+                            |> Query.has [ Selector.text "Uploading 42%" ]
+                    , \_ ->
+                        query staged
+                            |> Query.find [ Selector.class "shell-attachment-progress" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "value" "42") ]
+                    , \_ ->
+                        query
+                            { channelModel
+                                | attachments =
+                                    [ { id = 0, key = "att-0", position = 0, name = "a.png", size = 10, mime = "image/png", status = StagedUploading, progress = Nothing }
+                                    ]
+                            }
+                            |> Query.has [ Selector.text "Uploading…" ]
                     ]
                     ()
         , test "topic picker offers registry conversations" <|
