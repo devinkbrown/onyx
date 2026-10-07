@@ -14,9 +14,14 @@ module Upload exposing
     , classifyAttachmentKind
     , defaultUnfurlPrivacy
     , extractAttachmentPresentation
+    , compactPhotoJpegQuality
+    , compactPhotoMaxEdge
     , formatAttachmentBytes
     , formatFileSize
+    , hasJpegExif
+    , hasPngExif
     , isPhotoFile
+    , photoQualityOptions
     , isPreviewableUrl
     , linkPreviewDescriptionMax
     , linkPreviewHrefScanMax
@@ -38,6 +43,8 @@ module Upload exposing
     , progressPercent
     , resolveUploadUrl
     , sanitizeAttachmentUrl
+    , stripJpegExif
+    , stripPngExif
     , sanitizeFileName
     , unfurlPrivacyFromLinkPreviews
     , uploadResponseMaxBytes
@@ -622,11 +629,296 @@ extractAttachmentPresentation text =
     }
 
 
-{-| Photo check over name + MIME (mirrors `isPhotoFile`; EXIF byte
-scans stay ports-side). -}
+{-| Photo check over name + MIME (mirrors `isPhotoFile`). -}
 isPhotoFile : { name : String, mime : String } -> Bool
 isPhotoFile file =
     Regex.contains photoMime file.mime || Regex.contains photoExt file.name
+
+
+{-| JPEG EXIF magic `Exif\0\0` (mirrors `JPEG_EXIF_MAGIC`). -}
+jpegExifMagic : List Int
+jpegExifMagic =
+    [ 0x45, 0x78, 0x69, 0x66, 0x00, 0x00 ]
+
+
+{-| True when JPEG bytes carry an APP1 EXIF segment (mirrors
+`hasJpegExif` marker walk, including the strict no-fill-byte scan). -}
+hasJpegExif : List Int -> Bool
+hasJpegExif bytes =
+    case bytes of
+        0xFF :: 0xD8 :: rest ->
+            hasJpegExifScan rest
+
+        _ ->
+            False
+
+
+hasJpegExifScan : List Int -> Bool
+hasJpegExifScan bytes =
+    case bytes of
+        markerPrefix :: marker :: _ ->
+            if markerPrefix /= 0xFF then
+                False
+
+            else if marker == 0xDA || marker == 0xD9 then
+                False
+
+            else if marker >= 0xD0 && marker <= 0xD7 then
+                hasJpegExifScan (List.drop 2 bytes)
+
+            else
+                case segmentLength (List.drop 2 bytes) of
+                    Nothing ->
+                        False
+
+                    Just len ->
+                        if len < 2 then
+                            False
+
+                        else if marker == 0xE1 && len >= 8 && exifPayloadAt (List.drop 2 bytes) then
+                            True
+
+                        else
+                            hasJpegExifScan (List.drop (2 + len) bytes)
+
+        _ ->
+            False
+
+
+{-| Big-endian u16 segment length from the two bytes after a marker. -}
+segmentLength : List Int -> Maybe Int
+segmentLength bytes =
+    case bytes of
+        hi :: lo :: _ ->
+            Just (hi * 256 + lo)
+
+        _ ->
+            Nothing
+
+
+exifPayloadAt : List Int -> Bool
+exifPayloadAt bytes =
+    List.take 6 (List.drop 2 bytes) == jpegExifMagic
+
+
+{-| Strip every APP1 segment from JPEG bytes (mirrors `stripJpegExif`,
+including fill-byte tolerance; non-APP1 segments pass through). -}
+stripJpegExif : List Int -> List Int
+stripJpegExif bytes =
+    case bytes of
+        0xFF :: 0xD8 :: imageRest ->
+            0xFF :: 0xD8 :: stripJpegScan imageRest
+
+        _ ->
+            bytes
+
+
+stripJpegScan : List Int -> List Int
+stripJpegScan bytes =
+    case bytes of
+        [] ->
+            []
+
+        0xFF :: _ ->
+            let
+                fillSkipped =
+                    skipFillBytes bytes
+            in
+            case List.drop 1 fillSkipped of
+                marker :: afterMarker ->
+                    let
+                        start =
+                            0xFF :: marker :: afterMarker
+
+                        startLen =
+                            List.length bytes - List.length fillSkipped
+                    in
+                    if marker == 0xD9 then
+                        List.take 2 start
+
+                    else if marker == 0xDA then
+                        start
+
+                    else if marker >= 0xD0 && marker <= 0xD7 then
+                        List.take 2 start ++ stripJpegScan (List.drop (startLen + 2) bytes)
+
+                    else
+                        case segmentLength afterMarker of
+                            Just len ->
+                                let
+                                    end =
+                                        startLen + 2 + len
+                                in
+                                if len < 2 || end > List.length bytes then
+                                    start
+
+                                else if marker == 0xE1 then
+                                    stripJpegScan (List.drop end bytes)
+
+                                else
+                                    List.take end bytes ++ stripJpegScan (List.drop end bytes)
+
+                            Nothing ->
+                                start
+
+                [] ->
+                    []
+
+        _ ->
+            bytes
+
+
+{-| Drop leading `0xFF` fill bytes, keeping one (mirrors the oracle's
+`while (data[markerAt] === 0xff) markerAt += 1` + `start = markerAt - 1`). -}
+skipFillBytes : List Int -> List Int
+skipFillBytes bytes =
+    case bytes of
+        0xFF :: 0xFF :: rest ->
+            skipFillBytes (0xFF :: rest)
+
+        _ ->
+            bytes
+
+
+{-| PNG signature (mirrors `isPng`). -}
+pngSignature : List Int
+pngSignature =
+    [ 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A ]
+
+
+isPngBytes : List Int -> Bool
+isPngBytes bytes =
+    List.take 8 bytes == pngSignature
+
+
+{-| True when PNG bytes carry an `eXIf` chunk (mirrors `hasPngExif`). -}
+hasPngExif : List Int -> Bool
+hasPngExif bytes =
+    if not (isPngBytes bytes) then
+        False
+
+    else
+        hasPngExifScan (List.drop 8 bytes)
+
+
+hasPngExifScan : List Int -> Bool
+hasPngExifScan bytes =
+    case pngChunkAt bytes of
+        Nothing ->
+            False
+
+        Just { chunkType, rest, isIend } ->
+            if chunkType == "eXIf" then
+                True
+
+            else if isIend then
+                False
+
+            else
+                hasPngExifScan rest
+
+
+{-| Strip every `eXIf` chunk from PNG bytes (mirrors `stripPngExif`). -}
+stripPngExif : List Int -> List Int
+stripPngExif bytes =
+    if not (isPngBytes bytes) then
+        bytes
+
+    else
+        pngSignature ++ stripPngScan (List.drop 8 bytes)
+
+
+stripPngScan : List Int -> List Int
+stripPngScan bytes =
+    case pngChunkAt bytes of
+        Nothing ->
+            []
+
+        Just { raw, chunkType, rest, isIend } ->
+            if isIend then
+                raw
+
+            else if chunkType == "eXIf" then
+                stripPngScan rest
+
+            else
+                raw ++ stripPngScan rest
+
+
+type alias PngChunk =
+    { raw : List Int
+    , chunkType : String
+    , rest : List Int
+    , isIend : Bool
+    }
+
+
+{-| Split one PNG chunk: length u32 + 4 type bytes + payload + 4 CRC
+bytes (mirrors the oracle's `12 + length` stride). -}
+pngChunkAt : List Int -> Maybe PngChunk
+pngChunkAt bytes =
+    case bytes of
+        b0 :: b1 :: b2 :: b3 :: t0 :: t1 :: t2 :: t3 :: _ ->
+            let
+                len =
+                    b0 * 16777216 + b1 * 65536 + b2 * 256 + b3
+
+                total =
+                    12 + len
+
+                chunkType =
+                    String.fromList (List.map Char.fromCode [ t0, t1, t2, t3 ])
+            in
+            if total > List.length bytes then
+                Nothing
+
+            else
+                Just
+                    { raw = List.take total bytes
+                    , chunkType = chunkType
+                    , rest = List.drop total bytes
+                    , isIend = chunkType == "IEND"
+                    }
+
+        _ ->
+            Nothing
+
+
+{-| Compact-path long-edge cap (mirrors `compactPhoto` `maxEdge`). -}
+compactPhotoMaxEdge : Int
+compactPhotoMaxEdge =
+    1600
+
+
+{-| Compact-path JPEG quality (mirrors `compactPhoto` `toBlob` quality). -}
+compactPhotoJpegQuality : Float
+compactPhotoJpegQuality =
+    0.72
+
+
+{-| Original/Compact picker labels with honest sizes (mirrors
+`photoQualityOptions`; Compact appears only when recompression
+succeeded — callers must show sizes, never silently swap). -}
+photoQualityOptions : Float -> Maybe Float -> List { quality : String, label : String, bytes : Float }
+photoQualityOptions originalBytes compactBytes =
+    let
+        original =
+            { quality = "original"
+            , label = "Original · " ++ formatAttachmentBytes originalBytes
+            , bytes = originalBytes
+            }
+    in
+    case compactBytes of
+        Nothing ->
+            [ original ]
+
+        Just compact ->
+            [ original
+            , { quality = "compact"
+              , label = "Compact · " ++ formatAttachmentBytes compact
+              , bytes = compact
+              }
+            ]
 
 
 {-| Split absolute URL (mirrors `new URL` for the shapes servers

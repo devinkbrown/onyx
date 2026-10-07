@@ -11,6 +11,44 @@ import Test exposing (Test, describe, test)
 import Upload exposing (..)
 
 
+{-| JPEG with one APP1 EXIF segment (mirrors the oracle fixture). -}
+jpegWithExif : List Int
+jpegWithExif =
+    [ 0xFF, 0xD8
+    , 0xFF, 0xE1, 0x00, 0x10
+    , 0x45, 0x78, 0x69, 0x66, 0x00, 0x00
+    , 0x00, 0x01, 0x00, 0x02, 0x00, 0x03
+    , 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00
+    , 0xFF, 0xD9
+    ]
+
+
+{-| Build one PNG chunk: length u32 + type + payload + CRC (mirrors the
+oracle fixture helper). -}
+pngChunk : String -> List Int -> List Int
+pngChunk chunkType payload =
+    let
+        len =
+            List.length payload
+
+        typeBytes =
+            List.map Char.toCode (String.toList chunkType)
+    in
+    [ len // 16777216, modBy 256 (len // 65536), modBy 256 (len // 256), modBy 256 len ]
+        ++ typeBytes
+        ++ payload
+        ++ [ 0, 0, 0, 0 ]
+
+
+{-| PNG with one `eXIf` chunk (mirrors the oracle fixture). -}
+pngWithExif : List Int
+pngWithExif =
+    [ 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A ]
+        ++ pngChunk "IHDR" [ 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0 ]
+        ++ pngChunk "eXIf" [ 0, 0, 0, 0 ]
+        ++ pngChunk "IEND" []
+
+
 suite : Test
 suite =
     describe "Upload"
@@ -221,6 +259,82 @@ suite =
                         [ \_ -> Expect.equal False (isPreviewableUrl "http://example.test/a" defaultUnfurlPrivacy)
                         , \_ -> Expect.equal False (isPreviewableUrl "https://intranet.corp/x" { linkPreviews = True, httpsOnly = True, blockedHosts = [ "intranet.corp" ] })
                         , \_ -> Expect.equal False (isPreviewableUrl "https://sub.intranet.corp/x" { linkPreviews = True, httpsOnly = True, blockedHosts = [ "intranet.corp" ] })
+                        ]
+                        ()
+            ]
+        , describe "exif"
+            [ test "detects JPEG EXIF and strips the APP1 segment" <|
+                \_ ->
+                    let
+                        stripped =
+                            stripJpegExif jpegWithExif
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (hasJpegExif jpegWithExif)
+                        , \_ -> Expect.equal False (hasJpegExif stripped)
+                        , \_ -> Expect.equal [ 0xFF, 0xD8 ] (List.take 2 stripped)
+                        , \_ -> Expect.equal True (List.length stripped < List.length jpegWithExif)
+                        ]
+                        ()
+            , test "keeps APP0, drops APP1, tolerates fill bytes on strip" <|
+                \_ ->
+                    let
+                        mixed =
+                            [ 0xFF, 0xD8
+                            , 0xFF, 0xE0, 0x00, 0x04, 0xAA, 0xBB
+                            , 0xFF, 0xFF, 0xE1, 0x00, 0x08, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x00, 0x00
+                            , 0xFF, 0xD9
+                            ]
+
+                        expected =
+                            [ 0xFF, 0xD8
+                            , 0xFF, 0xE0, 0x00, 0x04, 0xAA, 0xBB
+                            , 0x00, 0x00, 0xFF, 0xD9
+                            ]
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (hasJpegExif mixed)
+                        , \_ -> Expect.equal expected (stripJpegExif mixed)
+                        , \_ -> Expect.equal False (hasJpegExif (stripJpegExif mixed))
+                        ]
+                        ()
+            , test "keeps EXIF-free JPEG bytes intact" <|
+                \_ ->
+                    let
+                        plain =
+                            [ 0xFF, 0xD8, 0xFF, 0xD9 ]
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (hasJpegExif plain)
+                        , \_ -> Expect.equal plain (stripJpegExif plain)
+                        , \_ -> Expect.equal False (hasJpegExif [ 0x00, 0x01 ])
+                        ]
+                        ()
+            , test "detects PNG eXIf and strips the chunk" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal True (hasPngExif pngWithExif)
+                        , \_ -> Expect.equal False (hasPngExif (stripPngExif pngWithExif))
+                        , \_ -> Expect.equal False (hasPngExif [ 0x00, 0x01 ])
+                        ]
+                        ()
+            , test "labels Original and Compact with honest sizes" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ ( "original", "Original · 2.0 MB" )
+                                , ( "compact", "Compact · 840 KB" )
+                                ]
+                                (List.map (\o -> ( o.quality, o.label )) (photoQualityOptions (2 * 1024 * 1024) (Just (840 * 1024))))
+                        , \_ ->
+                            Expect.equal [ 2 * 1024 * 1024, 840 * 1024 ]
+                                (List.map (\o -> round o.bytes) (photoQualityOptions (2 * 1024 * 1024) (Just (840 * 1024))))
+                        , \_ ->
+                            Expect.equal [ ( "original", "Original · 2.0 KB" ) ]
+                                (List.map (\o -> ( o.quality, o.label )) (photoQualityOptions 2048 Nothing))
+                        , \_ -> Expect.equal 1600 compactPhotoMaxEdge
+                        , \_ -> Expect.within (Expect.Absolute 0.000001) 0.72 compactPhotoJpegQuality
                         ]
                         ()
             ]
