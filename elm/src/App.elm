@@ -31025,9 +31025,15 @@ renderOptimisticSend model target texts outgoing label audience =
 
         ( withRows, vaultRows ) =
             List.foldl step ( model, [] ) texts
+
+        -- Own sends fetch their links' previews too (mirroring the
+        -- oracle render-time fetch, which covers own rows as well as
+        -- inbound ones — the same prefs/media gates apply).
+        ( previewed, previewOuts ) =
+            requestPreviewsForTexts withRows texts
     in
-    ( rememberVaultIds withRows vaultRows
-    , outgoing ++ [ VaultPersist { target = key, rows = vaultRows } ]
+    ( rememberVaultIds previewed vaultRows
+    , outgoing ++ [ VaultPersist { target = key, rows = vaultRows } ] ++ previewOuts
     )
 
 
@@ -32175,6 +32181,22 @@ requestPreviewForBody model body =
                     ( { model | linkPreviewInflight = Set.insert url model.linkPreviewInflight }
                     , [ PreviewFetch { key = url, endpoint = "/linkpreview", url = url } ]
                     )
+
+
+{-| Preview requests for a batch of sent texts (multiline sends fold
+left so one in-flight fetch per URL covers repeats). -}
+requestPreviewsForTexts : Model -> List String -> ( Model, List Outbound )
+requestPreviewsForTexts model texts =
+    List.foldl
+        (\text ( current, outs ) ->
+            let
+                ( next, fx ) =
+                    requestPreviewForBody current text
+            in
+            ( next, outs ++ fx )
+        )
+        ( model, [] )
+        texts
 
 
 {-| Settle one preview fetch (mirrors `fetchLinkPreview` settle:
@@ -35873,8 +35895,12 @@ update msg model =
                                             )
                                             |> (\m -> { m | messageSeq = m.messageSeq + 1 })
                                 in
-                            ( rememberVaultIds filed [ vaultRow ]
-                            , [ SendLine line, VaultPersist { target = String.toLower target, rows = [ vaultRow ] } ]
+                            let
+                                ( previewed, previewOuts ) =
+                                    requestPreviewForBody filed text
+                            in
+                            ( rememberVaultIds previewed [ vaultRow ]
+                            , [ SendLine line, VaultPersist { target = String.toLower target, rows = [ vaultRow ] } ] ++ previewOuts
                             )
 
         DmSealFailed { target, keyChanged, schedId } ->
@@ -36030,8 +36056,13 @@ update msg model =
                                 )
                                 |> (\m -> { m | messageSeq = m.messageSeq + 1 })
                     in
-                    ( rememberVaultIds filed [ vaultRow ]
-                    , [ SendLine line, VaultPersist { target = String.toLower room, rows = [ vaultRow ] } ]
+                    (let
+                        ( previewed, previewOuts ) =
+                            requestPreviewForBody filed text
+                     in
+                     ( rememberVaultIds previewed [ vaultRow ]
+                     , [ SendLine line, VaultPersist { target = String.toLower room, rows = [ vaultRow ] } ] ++ previewOuts
+                     )
                     )
 
         RoomSealFailed { room, recoveryRequired, notProvisioned } ->

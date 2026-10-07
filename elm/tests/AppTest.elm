@@ -2259,6 +2259,55 @@ suite =
                     , \_ -> Expect.equal (Set.fromList [ "https://example.test/story" ]) m1.linkPreviewInflight
                     ]
                     ()
+        , test "own sends fetch their links too" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "read https://example.test/story today"
+
+                    ( _, quiet ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "no links here"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ PreviewFetch { key = "https://example.test/story", endpoint = "/linkpreview", url = "https://example.test/story" } ]
+                            (previewFetches out)
+                    , \_ -> Expect.equal [] (previewFetches quiet)
+                    ]
+                    ()
+        , test "sealed sends fetch their plaintext links" <|
+            \_ ->
+                let
+                    dmBase =
+                        { blank
+                            | ourNick = "me"
+                            , pendingSeals = Dict.singleton "bob" { text = "read https://example.test/dm-story", keys = [] }
+                        }
+
+                    ( _, dmOut ) =
+                        update (DmSealed { target = "bob", envelope = "ENC", schedId = Nothing }) dmBase
+
+                    roomBase =
+                        { blank
+                            | ourNick = "me"
+                            , roomSeals = Dict.singleton "#c" "read https://example.test/room-story"
+                        }
+
+                    ( _, roomOut ) =
+                        update (RoomSealed { room = "#c", envelope = "ENC" }) roomBase
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ PreviewFetch { key = "https://example.test/dm-story", endpoint = "/linkpreview", url = "https://example.test/dm-story" } ]
+                            (previewFetches dmOut)
+                    , \_ ->
+                        Expect.equal
+                            [ PreviewFetch { key = "https://example.test/room-story", endpoint = "/linkpreview", url = "https://example.test/room-story" } ]
+                            (previewFetches roomOut)
+                    ]
+                    ()
         , test "preview fetch respects prefs, cache, and settle" <|
             \_ ->
                 let
