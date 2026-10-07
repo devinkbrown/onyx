@@ -10220,6 +10220,89 @@ suite =
                         , \_ -> Expect.equal Nothing (parseMemoBody "from  :x")
                         ]
                         ()
+            , test "the per-sender count saturates at 9999 with a sticky first id" <|
+                \_ ->
+                    let
+                        base =
+                            { blank
+                                | ourNick = "alice"
+                                , offlineMemo = Dict.singleton "bob" { count = 9999, firstMsgId = 7, order = 3 }
+                                , memoOrder = 3
+                            }
+
+                        ( m, _ ) =
+                            feed base ":s NOTE MEMO :from bob :late"
+                    in
+                    Expect.equal (Just { count = 9999, firstMsgId = 7 })
+                        (offlineMemoFor m "bob")
+            , test "a 257th sender evicts the least recently updated aggregate" <|
+                \_ ->
+                    let
+                        full =
+                            List.foldl
+                                (\i m -> Tuple.first (trackOfflineMemo m ("u" ++ String.fromInt i) i))
+                                blank
+                                (List.range 1 256)
+
+                        touched =
+                            Tuple.first (trackOfflineMemo full "u1" 1000)
+
+                        ( overflowed, _ ) =
+                            trackOfflineMemo touched "u257" 1001
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 256 (Dict.size full.offlineMemo)
+                        , \_ -> Expect.equal 256 (Dict.size overflowed.offlineMemo)
+                        , \_ -> Expect.equal False (Dict.member "u2" overflowed.offlineMemo)
+                        , \_ -> Expect.equal True (Dict.member "u1" overflowed.offlineMemo)
+                        , \_ -> Expect.equal True (Dict.member "u257" overflowed.offlineMemo)
+                        ]
+                        ()
+            , test "ignored senders store a placeholder without counting" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice", ignoredUsers = Set.fromList [ "bob" ] }
+
+                        ( m, _ ) =
+                            feed base ":s NOTE MEMO :from bob :loud hello"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "Message from ignored user")
+                                (List.head (dmMessages m "bob") |> Maybe.map .body)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "bob" m.channels |> Maybe.map .unread)
+                        , \_ ->
+                            Expect.equal (Just { count = 1, firstMsgId = 0 })
+                                (offlineMemoFor m "bob")
+                        ]
+                        ()
+            , test "memos into the open DM clear badges but keep the aggregate" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :one"
+
+                        ( opened, _ ) =
+                            update (ChannelSelect "bob") m1
+
+                        ( m2, _ ) =
+                            feed { opened | activeChannel = Just "bob" } ":s NOTE MEMO :from bob :two"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "bob" m2.channels |> Maybe.map .unread)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "bob" m2.channels |> Maybe.map .highlights)
+                        , \_ ->
+                            Expect.equal (Just { count = 1, firstMsgId = 1 })
+                                (offlineMemoFor m2 "bob")
+                        ]
+                        ()
             ]
         , describe "moderation and audit entries"
             [ test "KICK drops the member and logs event, audit, and moderation" <|
