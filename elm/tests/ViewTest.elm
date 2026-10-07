@@ -3481,6 +3481,13 @@ suite =
                                 |> Query.has [ Selector.text "Reduce motion" ]
                         , \_ ->
                             q
+                                |> Query.has [ Selector.text "Privacy" ]
+                        , \_ ->
+                            q
+                                |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "End-to-end encrypt direct messages") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-checked" "true") ]
+                        , \_ ->
+                            q
                                 |> Query.has [ Selector.text "Use less data" ]
                         , \_ ->
                             q

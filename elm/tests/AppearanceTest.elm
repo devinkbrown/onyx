@@ -139,6 +139,26 @@ suite =
             \_ ->
                 Expect.equal ( seeded, [] )
                     (update (AppearanceSetPref { key = "nope", value = "large" }) seeded)
+        , test "privacy switches store and re-apply" <|
+            \_ ->
+                let
+                    ( off, offOut ) =
+                        update (AppearanceSetPref { key = "e2eeDms", value = "false" }) seeded
+
+                    ( noop, noopOut ) =
+                        update (AppearanceSetPref { key = "linkPreviews", value = "true" }) seeded
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False off.prefs.e2eeDms
+                    , \_ ->
+                        Expect.all
+                            [ \o -> Expect.equal [ AppearanceStorePrefs { json = Prefs.encodePreferences off.prefs } ] (List.take 1 o)
+                            , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
+                            ]
+                            offOut
+                    , \_ -> Expect.equal ( seeded, [] ) ( noop, noopOut )
+                    ]
+                    ()
         , test "invalid preference values keep the current value silently" <|
             \_ ->
                 Expect.equal ( seeded, [] )

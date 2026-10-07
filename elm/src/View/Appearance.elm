@@ -184,6 +184,14 @@ view model =
                     )
                 ]
             , section [ class "ap-group" ]
+                [ h2 [ class "ap-glabel" ] [ text "Privacy" ]
+                , div [ class "ap-choice-toggles" ]
+                    [ privacySwitch "e2eeDms" model.prefs.e2eeDms "End-to-end encrypt direct messages" "When the other person's app supports it, DMs are sealed on your device."
+                    , privacySwitch "linkPreviews" model.prefs.linkPreviews "Preview web links" "Show link details fetched through this server."
+                    , privacySwitch "httpsOnly" model.prefs.httpsOnly "Only unfurl https links" "When on, plain http links never fetch a preview or media unfurl."
+                    ]
+                ]
+            , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Motion and data" ]
                 , div [ class "ap-choice-toggles" ]
                     [ button
@@ -273,6 +281,29 @@ lookChip model ids entry =
         [ span [ class "ap-theme-swatch", attribute "aria-hidden" "true" ]
             (List.map (\color -> span [ style "background" color ] []) entry.swatch)
         , span [ class "ap-theme-name" ] [ text entry.label ]
+        ]
+
+
+{-| A privacy switch (mirrors the PreferencesPanel toggles: the
+same titles, short-form descriptions, and On/Off readout). -}
+privacySwitch : String -> Bool -> String -> String -> Html Msg
+privacySwitch key isOn title hint =
+    button
+        [ Html.Attributes.type_ "button"
+        , class "ap-choice-toggle"
+        , attribute "role" "switch"
+        , attribute "aria-checked"
+            (if isOn then
+                "true"
+
+             else
+                "false"
+            )
+        , attribute "aria-label" title
+        , onClick (AppearanceSetPref { key = key, value = if isOn then "false" else "true" })
+        ]
+        [ span [] [ text title, small [] [ text hint ] ]
+        , b [] [ text (if isOn then "On" else "Off") ]
         ]
 
 

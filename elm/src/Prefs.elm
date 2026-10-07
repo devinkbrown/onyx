@@ -673,5 +673,14 @@ updatePreference prefs key value =
         "clock" ->
             { prefs | clock = clockFromString value |> Maybe.withDefault prefs.clock }
 
+        "e2eeDms" ->
+            { prefs | e2eeDms = value == "true" }
+
+        "linkPreviews" ->
+            { prefs | linkPreviews = value == "true" }
+
+        "httpsOnly" ->
+            { prefs | httpsOnly = value == "true" }
+
         _ ->
             prefs

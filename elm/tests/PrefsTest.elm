@@ -108,6 +108,10 @@ suite =
                     , \_ -> Expect.equal True (updatePreference defaultPreferences "reduceMotion" "true").reduceMotion
                     , \_ -> Expect.equal Clock12h (updatePreference defaultPreferences "clock" "12h").clock
                     , \_ -> Expect.equal Clock24h (updatePreference defaultPreferences "clock" "nope").clock
+                    , \_ -> Expect.equal False (updatePreference defaultPreferences "e2eeDms" "false").e2eeDms
+                    , \_ -> Expect.equal False (updatePreference defaultPreferences "e2eeDms" "yes").e2eeDms
+                    , \_ -> Expect.equal False (updatePreference defaultPreferences "linkPreviews" "false").linkPreviews
+                    , \_ -> Expect.equal False (updatePreference defaultPreferences "httpsOnly" "false").httpsOnly
                     ]
                     ()
         ]
