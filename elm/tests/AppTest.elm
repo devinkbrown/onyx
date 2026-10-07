@@ -12523,6 +12523,39 @@ suite =
                         , \_ -> Expect.equal Nothing cancelledHome.editingMessage
                         ]
                         ()
+            , test "queue commit drops the stored draft without touching newer typing" <|
+                \_ ->
+                    let
+                        queued =
+                            { id = "q1", target = "#c", text = "hi", queuedAt = 0 }
+
+                        base =
+                            { blank
+                                | activeChannel = Just "#c"
+                                , composer = "hi"
+                                , composerDrafts = Dict.fromList [ ( "#c", "hi" ) ]
+                            }
+
+                        ( committed, _ ) =
+                            update (OutboxQueued queued) base
+
+                        ( typedMore, _ ) =
+                            update (OutboxQueued queued)
+                                { base | composer = "hi more", composerDrafts = Dict.fromList [ ( "#c", "hi more" ) ] }
+
+                        ( switched, _ ) =
+                            update (OutboxQueued queued)
+                                { base | activeChannel = Just "#b", composer = "hey-b", composerDrafts = Dict.fromList [ ( "#c", "hi" ), ( "#b", "hey-b" ) ] }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" committed.composer
+                        , \_ -> Expect.equal Dict.empty committed.composerDrafts
+                        , \_ -> Expect.equal "hi more" typedMore.composer
+                        , \_ -> Expect.equal (Dict.fromList [ ( "#c", "hi more" ) ]) typedMore.composerDrafts
+                        , \_ -> Expect.equal "hey-b" switched.composer
+                        , \_ -> Expect.equal (Dict.fromList [ ( "#b", "hey-b" ) ]) switched.composerDrafts
+                        ]
+                        ()
             , test "self-join subscribes and self-part unsubscribes" <|
                 \_ ->
                     let

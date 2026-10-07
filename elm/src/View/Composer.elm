@@ -19,7 +19,8 @@ import Dict
 import Html exposing (Html, button, div, form, input, label, p, progress, span, text)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Json.Decode as Decode
 import Outbox
 import Schedule
 
@@ -98,6 +99,7 @@ composer model =
                 )
             , value model.composer
             , onInput ComposerInput
+            , on "keydown" (escapeDecoder model)
             , disabled (not ready)
             ]
             []
@@ -143,6 +145,42 @@ composer model =
         , attachments model
         , conversation model
         ]
+
+
+{-| Escape backs out of composer context (mirroring the composer
+`handleKeyDown` Escape order: armed edit, then the active reply).
+IME-claimed events and other keys decode to nothing, and with
+neither context armed nothing fires — the schedule popover keeps
+its own focus while open, so it stays ahead of this handler. -}
+escapeDecoder : Model -> Decode.Decoder Msg
+escapeDecoder model =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key /= "Escape" then
+                                    Decode.fail "not-escape"
+
+                                else
+                                    case editingFor model of
+                                        Just _ ->
+                                            Decode.succeed App.EditCancel
+
+                                        Nothing ->
+                                            case Maybe.andThen (App.activeReplyParent model.replyingTo) model.activeChannel of
+                                                Just _ ->
+                                                    Decode.succeed App.ReplyCancel
+
+                                                Nothing ->
+                                                    Decode.fail "nothing-armed"
+                            )
+            )
 
 
 {-| The armed edit for the active conversation, if any (mirrors the

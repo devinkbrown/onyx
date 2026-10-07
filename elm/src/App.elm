@@ -33496,9 +33496,20 @@ update msg model =
                                 }
                             )
                 in
+                -- The commit clears the visible draft when it still
+                -- shows the queued text, and drops the stored
+                -- per-target draft whenever it still holds the queued
+                -- text (a room switch in between must not resurrect
+                -- it; newer typing in either place is kept).
                 ( { withRow
                     | messageSeq = withRow.messageSeq + 1
                     , outbox = { id = entry.id, target = entry.target, text = entry.text, queuedAt = entry.queuedAt } :: withRow.outbox
+                    , composerDrafts =
+                        if Dict.get (String.toLower entry.target) withRow.composerDrafts == Just entry.text then
+                            Dict.remove (String.toLower entry.target) withRow.composerDrafts
+
+                        else
+                            withRow.composerDrafts
                     , composer =
                         if withRow.composer == entry.text then
                             ""

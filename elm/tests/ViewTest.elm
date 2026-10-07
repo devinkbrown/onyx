@@ -817,6 +817,55 @@ suite =
                             |> Query.hasNot [ Selector.class "shell-composer-context--edit" ]
                     ]
                     ()
+        , test "composer Escape cancels the edit, then the reply" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m9 :me!u@h PRIVMSG #c :mine here")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    edited =
+                        Tuple.first (update (EditArm { target = "#c", msgid = "m9" }) base)
+
+                    replied =
+                        Tuple.first (update (ReplyArm { target = "#c", msgid = "m1" }) base)
+
+                    -- Both arms at once is unreachable through update
+                    -- (they clear each other), so the decoder priority
+                    -- is pinned by direct construction.
+                    both =
+                        { replied | editingMessage = Just { target = "#c", msgid = "m9", draft = "" }, composer = "mine here" }
+                in
+                Expect.all
+                    [ \_ ->
+                        query edited
+                            |> Query.find [ Selector.tag "input" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect EditCancel
+                    , \_ ->
+                        query replied
+                            |> Query.find [ Selector.tag "input" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect ReplyCancel
+                    , \_ ->
+                        query both
+                            |> Query.find [ Selector.tag "input" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect EditCancel
+                    ]
+                    ()
         , test "thread renders inbound reply context" <|
             \_ ->
                 let
