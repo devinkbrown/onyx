@@ -12353,6 +12353,93 @@ suite =
                         , \_ -> Expect.equal [] invalidOuts
                         ]
                         ()
+            , test "composer input drives typing start and stop" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me", caps = [ "draft/typing" ], activeChannel = Just "#c" }
+
+                        ( started, startOut ) =
+                            update (ComposerInput "hi") base
+
+                        ( throttled, throttleOut ) =
+                            update (ComposerInput "hi!") started
+
+                        ( emptied, emptyOut ) =
+                            update (ComposerInput "  ") started
+
+                        ( slashed, slashOut ) =
+                            update (ComposerInput "/join #x") started
+
+                        ( nochannel, noOut ) =
+                            update (ComposerInput "hi") { base | activeChannel = Nothing }
+
+                        ( nocap, nocapOut ) =
+                            update (ComposerInput "hi") { base | caps = [] }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "@+typing=active TAGMSG #c\r\n" ] startOut
+                        , \_ -> Expect.equal [] throttleOut
+                        , \_ -> Expect.equal "hi!" throttled.composer
+                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] emptyOut
+                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] slashOut
+                        , \_ -> Expect.equal [] noOut
+                        , \_ -> Expect.equal "hi" nochannel.composer
+                        , \_ -> Expect.equal [] nocapOut
+                        , \_ -> Expect.equal "hi" nocap.composer
+                        ]
+                        ()
+            , test "cancel and dispatch stop typing" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me", caps = [ "draft/typing" ] }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                        ( m2, _ ) =
+                            feed m1 "@msgid=m1 :alice!u@h PRIVMSG #c :theirs"
+
+                        ( selected, _ ) =
+                            update (ChannelSelect "#c") m2
+
+                        ( replied, _ ) =
+                            update (ReplyArm { target = "#c", msgid = "m1" }) selected
+
+                        ( replyCancelled, replyOut ) =
+                            update ReplyCancel replied
+
+                        ( edited, _ ) =
+                            update (EditArm { target = "#c", msgid = "m9" }) selected
+
+                        ( editCancelled, editOut ) =
+                            update EditCancel edited
+
+                        ( typed, _ ) =
+                            update (ComposerInput "hi") selected
+
+                        ( sent, sentOut ) =
+                            update ComposerSend typed
+
+                        ( _, queuedOut ) =
+                            update ComposerSend { typed | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] replyOut
+                        , \_ -> Expect.equal Nothing replyCancelled.replyingTo
+                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] editOut
+                        , \_ -> Expect.equal Nothing editCancelled.editingMessage
+                        , \_ -> Expect.equal (SendLine "@+typing=done TAGMSG #c\r\n") (Maybe.withDefault (SendLine "") (List.head (List.reverse sentOut)))
+                        , \_ -> Expect.equal "" sent.composer
+                        , \_ ->
+                            Expect.equal
+                                [ OutboxQueue { target = "#c", text = "hi" }
+                                , SendLine "@+typing=done TAGMSG #c\r\n"
+                                ]
+                                queuedOut
+                        ]
+                        ()
             , test "self-join subscribes and self-part unsubscribes" <|
                 \_ ->
                     let

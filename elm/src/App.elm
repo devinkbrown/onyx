@@ -7569,13 +7569,19 @@ sendRequiredRoomSeal model target =
     let
         text =
             String.trim model.composer
+
+        sealed =
+            { model
+                | composer = ""
+                , messageSeq = model.messageSeq + 1
+                , roomSeals = Dict.insert (String.toLower target) text model.roomSeals
+            }
+
+        ( stopped, stopOut ) =
+            sendTyping sealed target False
     in
-    ( { model
-        | composer = ""
-        , messageSeq = model.messageSeq + 1
-        , roomSeals = Dict.insert (String.toLower target) text model.roomSeals
-      }
-    , [ RoomSealRequested { room = target, plaintext = text } ]
+    ( stopped
+    , [ RoomSealRequested { room = target, plaintext = text } ] ++ stopOut
     )
 
 
@@ -7752,12 +7758,19 @@ sendDesignatedDm model target =
                 )
 
             else
-                ( { model
-                    | composer = ""
-                    , messageSeq = model.messageSeq + 1
-                    , pendingSeals = Dict.insert key { text = String.trim model.composer, keys = keys } model.pendingSeals
-                  }
-                , [ DmSealRequested { target = target, keys = keys, plaintext = String.trim model.composer, owner = Just owner, schedId = Nothing } ]
+                let
+                    sealed =
+                        { model
+                            | composer = ""
+                            , messageSeq = model.messageSeq + 1
+                            , pendingSeals = Dict.insert key { text = String.trim model.composer, keys = keys } model.pendingSeals
+                        }
+
+                    ( stopped, stopOut ) =
+                        sendTyping sealed target False
+                in
+                ( stopped
+                , [ DmSealRequested { target = target, keys = keys, plaintext = String.trim model.composer, owner = Just owner, schedId = Nothing } ] ++ stopOut
                 )
 
 
@@ -9517,7 +9530,13 @@ sendComposerText model target =
         -- queueOutbox path. Slash commands never queue —
         -- replaying a stale command into a fresh session
         -- is surprising, a message isn't.
-        ( { model | composerError = Nothing }, [ OutboxQueue { target = Maybe.withDefault target (composerSendTarget model target), text = model.composer } ] )
+        let
+            ( stopped, stopOut ) =
+                sendTyping { model | composerError = Nothing } target False
+        in
+        ( stopped
+        , [ OutboxQueue { target = Maybe.withDefault target (composerSendTarget model target), text = model.composer } ] ++ stopOut
+        )
 
     else if not (isChannelName model target) && dmDesignated model target then
         sendDesignatedDm { model | composerError = Nothing } target
@@ -9660,7 +9679,11 @@ sendComposerText model target =
             -- carries the authoritative msgid/tags),
             -- mirroring the oracle's wait-for-echo
             -- path for untagged sends.
-            ( { cleared | messageSeq = model.messageSeq + 1 }, outgoing )
+            let
+                ( stopped, stopOut ) =
+                    sendTyping { cleared | messageSeq = model.messageSeq + 1 } target False
+            in
+            ( stopped, outgoing ++ stopOut )
 
         else
             renderOptimisticSend cleared target texts outgoing Nothing model.composerAudience
@@ -31582,9 +31605,14 @@ renderOptimisticSend model target texts outgoing label audience =
         -- inbound ones — the same prefs/media gates apply).
         ( previewed, previewOuts ) =
             requestPreviewsForTexts withRows texts
+
+        -- A dispatched send stops our typing signal (mirroring
+        -- the oracle `resetAfterSend`).
+        ( stopped, stopOut ) =
+            sendTyping (rememberVaultIds previewed vaultRows) target False
     in
-    ( rememberVaultIds previewed vaultRows
-    , outgoing ++ [ VaultPersist { target = key, rows = vaultRows } ] ++ previewOuts
+    ( stopped
+    , outgoing ++ [ VaultPersist { target = key, rows = vaultRows } ] ++ previewOuts ++ stopOut
     )
 
 
@@ -34458,9 +34486,25 @@ update msg model =
                 ( model, [] )
 
         ComposerInput text ->
-            -- Typing clears a stale composer error, mirroring the
-            -- oracle `handleInput` reset.
-            ( { model | composer = text, composerError = Nothing }, [] )
+            -- Typing clears a stale composer error and drives the
+            -- typing signal (mirroring the oracle `handleInput`
+            -- typing arm: nonempty non-slash input starts the
+            -- signal for the active target, empty or slash input
+            -- stops it).
+            let
+                typed =
+                    { model | composer = text, composerError = Nothing }
+            in
+            case model.activeChannel of
+                Nothing ->
+                    ( typed, [] )
+
+                Just target ->
+                    let
+                        trimmed =
+                            String.trim text
+                    in
+                    sendTyping typed target (not (String.isEmpty trimmed) && not (String.startsWith "/" trimmed))
 
         AttachPick ->
             -- Attaching mid-edit refuses with the draft kept
@@ -34565,7 +34609,9 @@ update msg model =
             ( { armed | editingMessage = Nothing }, [] )
 
         ReplyCancel ->
-            ( { model | replyingTo = Nothing }, [] )
+            -- Backing out of a reply stops the typing signal
+            -- (mirroring the oracle `cancelReply`).
+            sendTyping { model | replyingTo = Nothing } (Maybe.withDefault "" model.activeChannel) False
 
         EditArm { target, msgid } ->
             if canEditRow model target msgid then
@@ -34589,12 +34635,14 @@ update msg model =
                 ( model, [] )
 
         EditCancel ->
+            -- Backing out of an edit stops the typing signal
+            -- (mirroring the oracle `cancelEdit`).
             case model.editingMessage of
                 Nothing ->
                     ( model, [] )
 
                 Just edit ->
-                    ( { model | editingMessage = Nothing, composer = edit.draft }, [] )
+                    sendTyping { model | editingMessage = Nothing, composer = edit.draft } (Maybe.withDefault "" model.activeChannel) False
 
         MessageStartTopic { target, msgid } ->
             -- Mirror the menu topic-start: a usable label focuses the
