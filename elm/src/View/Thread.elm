@@ -13,7 +13,7 @@ import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, sectio
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
-import Set
+import Set exposing (Set)
 import Prefs
 import Time
 import Translate
@@ -60,6 +60,9 @@ thread model =
                                 dividerId =
                                     Dict.get (String.toLower channel.name) model.viewUnreadDividerId
 
+                                parents =
+                                    App.threadParentIds channel.messages
+
                                 dayLabels =
                                     dayDividerLabels model chronological
                                         |> List.drop win.start
@@ -91,7 +94,7 @@ thread model =
                                     text ""
                                 , ul [ class "onyx-thread" ]
                                     (List.concatMap
-                                        (\( ( prev, m ), label ) -> [ dividerAbove dividerId label m, messageRow model channel.name prev m ])
+                                        (\( ( prev, m ), label ) -> [ dividerAbove dividerId label m, messageRow model channel.name prev parents m ])
                                         (List.map2 Tuple.pair
                                             (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
                                             dayLabels
@@ -117,7 +120,183 @@ thread model =
                                     text ""
                                 ]
         , mediaLightboxDialog model
+        , threadPanelDialog model
         ]
+
+
+{-| Replies affordance for messages with children (mirroring
+`ThreadIndicator`: offered wherever the row keeps its actions —
+full and continuation rows alike, never system rows).
+-}
+threadIndicator : String -> Set Int -> App.ChatMessage -> Html Msg
+threadIndicator target parents m =
+    if Set.member m.id parents then
+        button
+            [ type_ "button"
+            , class "onyx-thread-indicator"
+            , attribute "aria-label" ("Open thread for message " ++ String.fromInt m.id)
+            , onClick (App.ThreadOpen { channel = target, parentId = m.id })
+            ]
+            [ span [ attribute "aria-hidden" "true" ] [ text "⌥" ]
+            , text " thread"
+            ]
+
+    else
+        text ""
+
+
+{-| Replies side panel (mirroring the thread `Sheet` +
+`ThreadPanel`: the parent article, the replies log, a Reply arm
+for intact parents with a server msgid, and the missing-parent
+state; Escape and the backdrop light-dismiss like the other
+sheets).
+-}
+threadPanelDialog : Model -> Html Msg
+threadPanelDialog model =
+    case model.threadPanel of
+        Nothing ->
+            text ""
+
+        Just panel ->
+            case Dict.get (String.toLower panel.channel) model.channels of
+                Nothing ->
+                    text ""
+
+                Just channel ->
+                    let
+                        parent =
+                            List.filter (\m -> m.id == panel.parentId) channel.messages
+                                |> List.head
+
+                        parentMsgid =
+                            case parent of
+                                Just p ->
+                                    p.msgid
+
+                                Nothing ->
+                                    Nothing
+
+                        replies =
+                            case parentMsgid of
+                                Just mid ->
+                                    List.filter
+                                        (\m ->
+                                            case m.replyTo of
+                                                Just ref ->
+                                                    ref.id == mid
+
+                                                Nothing ->
+                                                    False
+                                        )
+                                        channel.messages
+
+                                Nothing ->
+                                    []
+                    in
+                    div [ class "onyx-thread-pop" ]
+                        [ div
+                            [ class "onyx-thread-backdrop"
+                            , onClick App.ThreadClose
+                            ]
+                            []
+                        , div
+                            [ class "onyx-thread-sheet"
+                            , attribute "role" "dialog"
+                            , attribute "aria-label" "Thread"
+                            , on "keydown" threadEscapeDecoder
+                            ]
+                            [ div [ class "onyx-thread-head" ]
+                                [ h2 [ class "onyx-thread-title" ] [ text "Thread" ]
+                                , p [ class "onyx-thread-desc" ] [ text "Replies to this message" ]
+                                , button
+                                    [ attribute "type" "button"
+                                    , class "onyx-thread-close"
+                                    , attribute "aria-label" "Close thread"
+                                    , onClick App.ThreadClose
+                                    ]
+                                    [ text "Close" ]
+                                ]
+                            , case parent of
+                                Nothing ->
+                                    p [ class "onyx-thread-state onyx-thread-state--missing", attribute "role" "status" ]
+                                        [ text "Parent message is not loaded in this transcript." ]
+
+                                Just par ->
+                                    div
+                                        [ class "onyx-thread-msg"
+                                        , attribute "aria-label" ("Thread parent: " ++ App.messageAccessibleLabel par)
+                                        ]
+                                        [ div [ class "onyx-thread-msg-meta" ]
+                                            [ span [ class "onyx-thread-msg-from" ] [ text par.from ]
+                                            , time [ datetime (App.millisToIso (toFloat par.at)), attribute "aria-hidden" "true" ]
+                                                [ text (App.formatRowClock model.zone model.prefs.clock par.at) ]
+                                            ]
+                                        , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody par) ]
+                                        , case par.msgid of
+                                            Just _ ->
+                                                if par.deleted || par.redacted then
+                                                    text ""
+
+                                                else
+                                                    button
+                                                        [ type_ "button"
+                                                        , class "onyx-thread-reply"
+                                                        , onClick (App.ThreadReplyParent { channel = panel.channel, parentId = panel.parentId })
+                                                        ]
+                                                        [ text "Reply" ]
+
+                                            Nothing ->
+                                                text ""
+                                        ]
+                            , div [ attribute "role" "log", attribute "aria-label" ("Thread replies to message " ++ String.fromInt panel.parentId) ]
+                                [ if List.isEmpty replies then
+                                    p [ class "onyx-thread-state", attribute "role" "status" ]
+                                        [ text "No replies loaded yet." ]
+
+                                  else
+                                    div []
+                                        (List.map
+                                            (\msg ->
+                                                div
+                                                    [ class "onyx-thread-msg"
+                                                    , attribute "aria-label" ("Thread reply: " ++ App.messageAccessibleLabel msg)
+                                                    ]
+                                                    [ div [ class "onyx-thread-msg-meta" ]
+                                                        [ span [ class "onyx-thread-msg-from" ] [ text msg.from ]
+                                                        , time [ datetime (App.millisToIso (toFloat msg.at)), attribute "aria-hidden" "true" ]
+                                                            [ text (App.formatRowClock model.zone model.prefs.clock msg.at) ]
+                                                        ]
+                                                    , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody msg) ]
+                                                    ]
+                                            )
+                                            replies
+                                        )
+                                ]
+                            ]
+                        ]
+
+
+{-| Escape dismisses the thread panel (same IME-yielding shape
+as the card decoder). -}
+threadEscapeDecoder : Decode.Decoder Msg
+threadEscapeDecoder =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.ThreadClose
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
 
 
 {-| Overlapping avatar stack for the conversation head
@@ -423,8 +602,8 @@ isContinuation prev m =
     prev.from == m.from && not (isSystemRow prev) && not (isSystemRow m) && abs (m.at - prev.at) < 5 * 60 * 1000
 
 
-messageRow : Model -> String -> Maybe App.ChatMessage -> App.ChatMessage -> Html Msg
-messageRow model target prev m =
+messageRow : Model -> String -> Maybe App.ChatMessage -> Set Int -> App.ChatMessage -> Html Msg
+messageRow model target prev parents m =
     let
         uncertainDelivery =
             case m.outboxId of
@@ -531,6 +710,7 @@ messageRow model target prev m =
               else
                 text ""
             , boostBar model target m
+            , threadIndicator target parents m
             , messageMenuButton model target m
             , messageMenuPanel model target m
             , reactionPickerPanel model target m

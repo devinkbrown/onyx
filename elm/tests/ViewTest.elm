@@ -2705,6 +2705,66 @@ suite =
                                 |> Query.count (Expect.equal 0)
                         ]
                         ()
+            , test "replies surface a thread indicator and panel" <|
+                \_ ->
+                    let
+                        threaded =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m "@msgid=aaa :alice!u@h PRIVMSG #c :parent")
+                                |> (\m -> feed m "@msgid=bbb;+draft/reply=aaa :bob!u@h PRIVMSG #c :child")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        parentId =
+                            threaded.channels
+                                |> Dict.get "#c"
+                                |> Maybe.map (.messages >> List.filter (\m -> m.body == "parent") >> List.head >> Maybe.map .id)
+                                |> Maybe.andThen identity
+                                |> Maybe.withDefault -1
+
+                        opened =
+                            Tuple.first (update (ThreadOpen { channel = "#c", parentId = parentId }) threaded)
+
+                        replied =
+                            Tuple.first (update (ThreadReplyParent { channel = "#c", parentId = parentId }) opened)
+
+                        closed =
+                            Tuple.first (update ThreadClose opened)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.findAll [ Selector.class "onyx-thread-indicator" ] (query threaded)
+                                |> Query.count (Expect.equal 1)
+                        , \_ ->
+                            query opened
+                                |> Query.find [ Selector.attribute (Attr.attribute "role" "dialog"), Selector.containing [ Selector.text "Thread" ] ]
+                                |> Query.has [ Selector.text "parent", Selector.text "child" ]
+                        , \_ ->
+                            query opened
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Reply" ] ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (ThreadReplyParent { channel = "#c", parentId = parentId })
+                        , \_ -> Expect.equal Nothing replied.threadPanel
+                        , \_ ->
+                            Expect.equal
+                                (Just { target = "#c", msgid = "aaa", from = "alice", preview = "parent" })
+                                replied.replyingTo
+                        , \_ -> Expect.equal Nothing closed.threadPanel
+                        , \_ ->
+                            query closed
+                                |> Query.findAll [ Selector.attribute (Attr.attribute "role" "dialog") ]
+                                |> Query.count (Expect.equal 0)
+                        ]
+                        ()
+            , test "thread panel reports a missing parent" <|
+                \_ ->
+                    let
+                        opened =
+                            Tuple.first (update (ThreadOpen { channel = "#c", parentId = 999 }) channelModel)
+                    in
+                    query opened
+                        |> Query.has [ Selector.text "Parent message is not loaded in this transcript." ]
             , test "no facepile without channel members" <|
                 \_ ->
                     query blank
