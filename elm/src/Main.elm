@@ -424,6 +424,9 @@ port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
 
 port searchHotkey : (() -> msg) -> Sub msg
 
+
+port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
+
 port appearanceStoreSceneMotion : { value : String } -> Cmd msg
 
 port appearanceStoreTheme : { id : String } -> Cmd msg
@@ -1121,6 +1124,9 @@ perform key outbound =
 
         App.OfflineMemoNotice req ->
             offlineMemoNotice req
+
+        App.TranscriptDownload req ->
+            transcriptDownload req
 
         App.AppearanceStoreSceneMotion req ->
             appearanceStoreSceneMotion req

@@ -8727,9 +8727,10 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 58 (List.length slashCommands)
+                    [ \_ -> Expect.equal 59 (List.length slashCommands)
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
                     , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
+                    , \_ -> Expect.equal (Just "import") (Maybe.map .name (findSlashCommand "import"))
                     , \_ -> Expect.equal (Just "join") (Maybe.map .name (findSlashCommand "j"))
                     , \_ -> Expect.equal (Just "color") (Maybe.map .name (findSlashCommand "colour"))
                     , \_ -> Expect.equal (Just "broadcast") (Maybe.map .name (findSlashCommand "wallops"))
@@ -20975,6 +20976,115 @@ suite =
 
                         Nothing ->
                             Expect.fail "expected #c"
+            , test "transcript export downloads this view as txt" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed { blank | ourNick = "me", nowMs = 1720000000000 } ":me!u@h JOIN #c"
+
+                        ( fed, _ ) =
+                            feed joined ":alice!u@h PRIVMSG #c :hi"
+
+                        ( exported, out ) =
+                            update ComposerSend { fed | activeChannel = Just "#c", composer = "/export" }
+
+                        downloads =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        TranscriptDownload req ->
+                                            Just req
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    case downloads of
+                        [ req ] ->
+                            Expect.all
+                                [ \_ -> Expect.equal True (String.startsWith "onyx-#c-" req.filename)
+                                , \_ -> Expect.equal True (String.endsWith ".txt" req.filename)
+                                , \_ -> Expect.equal "text/plain" req.mime
+                                , \_ -> Expect.equal True (String.contains "local export" req.body)
+                                , \_ -> Expect.equal True (String.contains "<alice> hi" req.body)
+                                , \_ -> Expect.equal [ "Export started" ] (List.map .title exported.toasts)
+                                , \_ ->
+                                    Expect.equal [ "1 message from this device (txt)." ]
+                                        (List.filterMap .description exported.toasts)
+                                ]
+                                ()
+
+                        _ ->
+                            Expect.fail "expected one transcript download"
+            , test "transcript export honors the json format" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed { blank | ourNick = "me", nowMs = 1720000000000 } ":me!u@h JOIN #c"
+
+                        ( fed, _ ) =
+                            feed joined ":alice!u@h PRIVMSG #c :hi"
+
+                        ( _, out ) =
+                            update ComposerSend { fed | activeChannel = Just "#c", composer = "/export json" }
+
+                        downloads =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        TranscriptDownload req ->
+                                            Just req
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    case downloads of
+                        [ req ] ->
+                            Expect.all
+                                [ \_ -> Expect.equal True (String.endsWith ".json" req.filename)
+                                , \_ -> Expect.equal "application/json" req.mime
+                                , \_ -> Expect.equal True (String.contains "onyx.conversation-export" req.body)
+                                ]
+                                ()
+
+                        _ ->
+                            Expect.fail "expected one transcript download"
+            , test "transcript export without a room coaches instead" <|
+                \_ ->
+                    -- Unreachable via ComposerSend (no active room drops
+                    -- the send first), so the defensive arm is driven
+                    -- directly.
+                    let
+                        ( exported, out ) =
+                            runSlashExport { blank | activeChannel = Nothing } "txt"
+
+                        downloads =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        TranscriptDownload req ->
+                                            Just req
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] downloads
+                        , \_ -> Expect.equal [ "Export scrollback" ] (List.map .title exported.toasts)
+                        ]
+                        ()
+            , test "slash import fires the vault file picker" <|
+                \_ ->
+                    let
+                        ( _, out ) =
+                            update ComposerSend { blank | activeChannel = Just "#c", composer = "/import" }
+                    in
+                    Expect.equal [ VaultImportPick ] out
             , test "optimistic sends persist msg" <|
                 \_ ->
                     let

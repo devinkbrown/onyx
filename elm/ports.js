@@ -4670,6 +4670,30 @@ function fetchPublicFeed(url) {
     /* Account record / device history download — same blob-anchor
        shape as the saved-searches download, driven by Elm-built JSON
        (`encodeAccountStoreRecord` / `encodeDeviceHistoryCopy`). */
+    /* Per-view transcript download — same blob-anchor shape, with the
+       caller-chosen MIME allowlisted (mirroring
+       `downloadConversationExport`: `text/plain` or `application/json`
+       only — anything else falls back to plain text, never executes). */
+    if (app.ports.transcriptDownload) {
+      app.ports.transcriptDownload.subscribe(function (req) {
+        try {
+          var mime = req && req.mime === "application/json" ? "application/json" : "text/plain";
+          var blob = new Blob([String(req && req.body ? req.body : "")], { type: mime });
+          var anchor = document.createElement("a");
+          anchor.href = URL.createObjectURL(blob);
+          anchor.download = String(req && req.filename ? req.filename : "onyx-conversation.txt");
+          anchor.rel = "noopener";
+          document.body.appendChild(anchor);
+          anchor.click();
+          setTimeout(function () {
+            try {
+              URL.revokeObjectURL(anchor.href);
+              anchor.remove();
+            } catch (err) { /* best effort cleanup */ }
+          }, 1000);
+        } catch (err) { /* no DOM download here */ }
+      });
+    }
     if (app.ports.accountDownload) {
       app.ports.accountDownload.subscribe(function (req) {
         try {
