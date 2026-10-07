@@ -4189,6 +4189,31 @@ function fetchPublicFeed(url) {
       } catch (e) { /* best-effort */ }
       sendVisibility();
     }
+    /* Ctrl/Cmd+F message-search hotkey (mirroring AppShell
+       handleMessageSearchHotkey guard-for-guard: `f` with ctrl or
+       meta, no shift/alt, not composing, never behind a modal
+       dialog — preventDefault runs synchronously so the browser
+       find bar never opens, then Elm opens the search panel). */
+    function isFindHotkey(e) {
+      if (!e || e.defaultPrevented) return false;
+      if (e.isComposing || e.keyCode === 229) return false;
+      var key = typeof e.key === "string" ? e.key.toLowerCase() : "";
+      if (key !== "f") return false;
+      if (!(e.metaKey || e.ctrlKey)) return false;
+      if (e.shiftKey || e.altKey) return false;
+      try {
+        if (typeof document !== "undefined" && document.querySelector
+          && document.querySelector('[role="dialog"][aria-modal="true"]')) return false;
+      } catch (err) { return false; }
+      return true;
+    }
+    if (app.ports.searchHotkey && typeof window !== "undefined" && window.addEventListener) {
+      window.addEventListener("keydown", function (e) {
+        if (!isFindHotkey(e)) return;
+        try { e.preventDefault(); } catch (err) { /* best-effort */ }
+        try { app.ports.searchHotkey.send(null); } catch (err) { /* best-effort */ }
+      });
+    }
     if (app.ports.appearanceStoreSceneMotion) {
       app.ports.appearanceStoreSceneMotion.subscribe(function (req) {
         if (req && typeof req.value === "string") writeSlot("onyx:scene-motion", req.value);

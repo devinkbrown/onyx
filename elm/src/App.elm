@@ -2348,6 +2348,7 @@ type Msg
     | VaultDmPrivacyClassified { target : String, privacy : String }
     | VaultOpenHit { target : String, at : Int }
     | SearchRunServer
+    | SearchHotkey
     | ServerOpenResult { target : String }
     | VaultExported { targets : Int, messages : Int }
     | VaultStored { target : String, stored : Int }
@@ -34092,6 +34093,16 @@ update msg model =
 
         SearchClose ->
             ( invalidateVaultSearch { model | searchOpen = False }, [] )
+
+        SearchHotkey ->
+            -- Ctrl/Cmd+F (mirroring `handleMessageSearchHotkey` →
+            -- `openMessageSearch`): opens the unified panel bare; an
+            -- already-open panel stays open with its query intact.
+            if model.searchOpen then
+                ( model, [] )
+
+            else
+                ( scheduleVaultSearch { model | searchOpen = True, composer = "" }, [] )
 
         SearchQuery { query } ->
             -- Bounded input with spaces preserved; a new query

@@ -20761,6 +20761,32 @@ suite =
                     in
                     Expect.equal (Just [ "VOICE" ])
                         (Dict.get "#c,bob" closed.modexModes)
+            , test "SearchHotkey opens a closed panel bare" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update SearchHotkey { blank | searchOpen = False, composer = "draft" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True opened.searchOpen
+                        , \_ -> Expect.equal "" opened.composer
+                        ]
+                        ()
+            , test "SearchHotkey leaves an open panel and its query alone" <|
+                \_ ->
+                    let
+                        before =
+                            { blank | searchOpen = True, searchQuery = "needle" }
+
+                        ( kept, out ) =
+                            update SearchHotkey before
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True kept.searchOpen
+                        , \_ -> Expect.equal "needle" kept.searchQuery
+                        , \_ -> Expect.equal [] out
+                        ]
+                        ()
             , test "/modex sends a bare query, defaulting to the room" <|
                 \_ ->
                     let

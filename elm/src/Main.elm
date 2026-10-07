@@ -421,6 +421,9 @@ port notifyPermissionChanged : (String -> msg) -> Sub msg
 
 port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
 
+
+port searchHotkey : (() -> msg) -> Sub msg
+
 port appearanceStoreSceneMotion : { value : String } -> Cmd msg
 
 port appearanceStoreTheme : { id : String } -> Cmd msg
@@ -1355,6 +1358,7 @@ subscriptions model =
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
+        , searchHotkey (\_ -> App.SearchHotkey)
         , vaultRows App.VaultRowsReceived
         , vaultSearched App.VaultSearched
         , vaultDmPrivacyClassified App.VaultDmPrivacyClassified
