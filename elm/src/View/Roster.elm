@@ -60,14 +60,14 @@ rosterGroups model channel =
                     members ->
                         [ div [ class "onyx-roster-group" ]
                             [ h2 [] [ text (Modes.groupLabelFor key ++ " (" ++ String.fromInt (List.length members) ++ ")") ]
-                            , ul [] (List.map (\( role, m ) -> rosterRow role m) members)
+                            , ul [] (List.map (\( role, m ) -> rosterRow channel.name role m) members)
                             ]
                         ]
             )
 
 
-rosterRow : Modes.ResolvedRole -> Member -> Html Msg
-rosterRow role member =
+rosterRow : String -> Modes.ResolvedRole -> Member -> Html Msg
+rosterRow channel role member =
     li
         [ classList
             [ ( "onyx-member", True )
@@ -75,7 +75,13 @@ rosterRow role member =
             ]
         ]
         [ span [ class "onyx-member-prefix" ] [ text role.symbol ]
-        , span [] [ text member.nick ]
+        , button
+            [ attribute "type" "button"
+            , class "onyx-member-nick"
+            , attribute "aria-label" ("View member card for " ++ member.nick)
+            , onClick (App.UserProfileOpened { nick = member.nick, channel = channel })
+            ]
+            [ text member.nick ]
         , button
             [ attribute "type" "button"
             , class "onyx-member-profile"

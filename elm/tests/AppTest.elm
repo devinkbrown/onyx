@@ -13439,18 +13439,68 @@ suite =
                         , \_ -> Expect.equal (Just "BOB") (Maybe.map .nick (Services.getUserProfileFrom cased "bob"))
                         ]
                         ()
-            , test "UserProfileOpened and UserProfileClosed flip the card nick" <|
+            , test "UserProfileOpened and UserProfileClosed flip the card" <|
                 \_ ->
                     let
                         ( m1, _ ) =
-                            update (UserProfileOpened "bob") blank
+                            update (UserProfileOpened { nick = "bob", channel = "#c" }) blank
 
                         ( m2, _ ) =
                             update UserProfileClosed m1
                     in
                     Expect.all
-                        [ \_ -> Expect.equal (Just "bob") m1.userProfileNick
-                        , \_ -> Expect.equal Nothing m2.userProfileNick
+                        [ \_ -> Expect.equal (Just { nick = "bob", channel = "#c" }) m1.userProfileCard
+                        , \_ -> Expect.equal Nothing m2.userProfileCard
+                        ]
+                        ()
+            , test "member mention appends, copies, and hands off to whois" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( mentioned, _ ) =
+                            update (MemberMention { nick = "alice", channel = "#c" }) base
+
+                        ( roomless, _ ) =
+                            update (MemberMention { nick = "alice", channel = "  " }) base
+
+                        ( refused, refusedOut ) =
+                            update (MemberMention { nick = "   ", channel = "#c" }) base
+
+                        ( copied, copyOut ) =
+                            update (MemberCopyNick "alice") base
+
+                        ( copyRefused, copyRefusedOut ) =
+                            update (MemberCopyNick "   ") base
+
+                        ( copyOk, _ ) =
+                            update (ClipboardResult { tag = "member-copy:alice", ok = True }) base
+
+                        ( copyFailed, _ ) =
+                            update (ClipboardResult { tag = "member-copy:alice", ok = False }) base
+
+                        carded =
+                            Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) base)
+
+                        ( handed, handOut ) =
+                            update (MemberCardWhois "alice") carded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "@alice " mentioned.composer
+                        , \_ -> Expect.equal (Just "@alice ") (Dict.get "#c" mentioned.composerDrafts)
+                        , \_ -> Expect.equal [ "Mention alice" ] (List.map .title mentioned.toasts)
+                        , \_ -> Expect.equal "@alice " roomless.composer
+                        , \_ -> Expect.equal [] refusedOut
+                        , \_ -> Expect.equal "" refused.composer
+                        , \_ -> Expect.equal [ ClipboardCopy { text = "alice", tag = "member-copy:alice" } ] copyOut
+                        , \_ -> Expect.equal [] copyRefusedOut
+                        , \_ -> Expect.equal [ "Name copied" ] (List.map .title copyOk.toasts)
+                        , \_ -> Expect.equal [ "alice is on the clipboard." ] (List.filterMap .description copyOk.toasts)
+                        , \_ -> Expect.equal [ "Could not copy name" ] (List.map .title copyFailed.toasts)
+                        , \_ -> Expect.equal Nothing handed.userProfileCard
+                        , \_ -> Expect.equal (Just "alice") handed.whoisTarget
+                        , \_ -> Expect.equal True (List.any (\o -> o == SendLine "WHOIS alice alice\r\n") handOut)
                         ]
                         ()
             ]

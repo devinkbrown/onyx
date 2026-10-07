@@ -325,7 +325,7 @@ type alias Model =
     , whoisTarget : Maybe String
     , whoisTimerGen : Int
     , userProfiles : Dict String Services.UserProfile
-    , userProfileNick : Maybe String
+    , userProfileCard : Maybe { nick : String, channel : String }
     , editHistory : Dict String (List EditRevision)
     , userMetadata : Dict String (Dict String String)
     , typingUsers : Dict String (Dict String Typist)
@@ -2568,8 +2568,11 @@ type Msg
     | TypingStarted String
     | TypingStopped String
     | ReactionSend String String String
-    | UserProfileOpened String
+    | UserProfileOpened { nick : String, channel : String }
     | UserProfileClosed
+    | MemberMention { nick : String, channel : String }
+    | MemberCopyNick String
+    | MemberCardWhois String
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -2928,7 +2931,7 @@ init nick url =
     , whoisTarget = Nothing
     , whoisTimerGen = 0
     , userProfiles = Dict.empty
-    , userProfileNick = Nothing
+    , userProfileCard = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -3366,7 +3369,7 @@ blank =
     , whoisTarget = Nothing
     , whoisTimerGen = 0
     , userProfiles = Dict.empty
-    , userProfileNick = Nothing
+    , userProfileCard = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -35955,6 +35958,40 @@ update msg model =
                     , []
                     )
 
+            else if String.startsWith "member-copy:" tag then
+                -- Mirrors the card's copy-name report copy verbatim.
+                let
+                    copied =
+                        String.dropLeft (String.length "member-copy:") tag
+                in
+                if ok then
+                    ( addToast
+                        { variant = ToastSuccess
+                        , title = "Name copied"
+                        , description = Just (copied ++ " is on the clipboard.")
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
+                else
+                    ( addToast
+                        { variant = ToastWarning
+                        , title = "Could not copy name"
+                        , description = Just "Clipboard access was denied in this browser."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
             else if tag == "stats-compare" then
                 -- A result for a previous selection never announces the
                 -- new one: only the in-flight copy owns its result.
@@ -37142,11 +37179,89 @@ update msg model =
         ReactionSend target messageId emoji ->
             sendReaction model target messageId emoji
 
-        UserProfileOpened nick ->
-            ( { model | userProfileNick = Just nick }, [] )
+        UserProfileOpened { nick, channel } ->
+            ( { model | userProfileCard = Just { nick = nick, channel = channel } }, [] )
 
         UserProfileClosed ->
-            ( { model | userProfileNick = Nothing }, [] )
+            ( { model | userProfileCard = Nothing }, [] )
+
+        MemberMention { nick, channel } ->
+            -- A mention appends to the room composer (mirroring
+            -- `handleMention`): other conversations select first,
+            -- the insert merges in append mode, and the oracle
+            -- toast reports room or roomless. Caret/focus motion
+            -- stays a narrowing (no caret state).
+            let
+                insert =
+                    ComposerInject.formatMentionInsert nick
+            in
+            if String.isEmpty insert then
+                ( model, [] )
+
+            else
+                let
+                    injectInto composer =
+                        (ComposerInject.mergeComposerInsert composer insert ComposerInject.InjectAppend).text
+
+                    toasted current =
+                        let
+                            merged =
+                                injectInto current.composer
+
+                            description =
+                                if String.isEmpty (String.trim channel) then
+                                    "Mention is available in a room."
+
+                                else
+                                    "Inserted into the composer for this room."
+                        in
+                        ( addToast
+                            { variant = ToastInfo
+                            , title = "Mention " ++ nick
+                            , description = Just description
+                            , duration = Nothing
+                            , groupKey = Nothing
+                            , undo = Nothing
+                            }
+                            model.nowMs
+                            { current
+                                | composer = merged
+                                , composerDrafts = Dict.insert (String.toLower channel) merged current.composerDrafts
+                            }
+                        , []
+                        )
+                in
+                if String.isEmpty (String.trim channel) then
+                    toasted model
+
+                else if Maybe.map String.toLower model.activeChannel == Just (String.toLower channel) then
+                    toasted model
+
+                else
+                    let
+                        ( switched, outs ) =
+                            selectChannel model channel
+
+                        ( mentioned, _ ) =
+                            toasted switched
+                    in
+                    ( mentioned, outs )
+
+        MemberCopyNick nick ->
+            -- Member names copy through the tagged clipboard port
+            -- (mirroring `handleCopyNick`); an empty nick copies
+            -- nothing.
+            if String.isEmpty (String.trim nick) then
+                ( model, [] )
+
+            else
+                ( model, [ ClipboardCopy { text = String.trim nick, tag = "member-copy:" ++ String.trim nick } ] )
+
+        MemberCardWhois nick ->
+            -- The card hands off to the network sheet (mirroring
+            -- `handleWhois`): the card closes and the WHOIS request
+            -- opens the sheet.
+            Tuple.mapFirst (\m -> { m | userProfileCard = Nothing }) (requestWhois model nick)
 
         MessageEditRequested target messageId newText ->
             requestEdit model target messageId newText

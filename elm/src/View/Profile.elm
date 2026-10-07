@@ -1,4 +1,4 @@
-module View.Profile exposing (profileSheet)
+module View.Profile exposing ( profileCard, profileSheet )
 
 {-| Member network-identity sheet (mirroring `WhoisSheet`: a thin
 reactive view over the folded WHOIS cache — title, description,
@@ -6,11 +6,14 @@ summary, live status, and the details list; the sheet opens through
 `WhoisRequest` and closes through `WhoisClose`). -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, a, button, code, dd, div, dl, dt, h2, li, p, small, span, text, time, ul)
+import Dict
+import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, li, p, small, span, summary, text, time, ul)
 import Html.Attributes exposing (attribute, class, datetime, href)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
+import Modes
 import Services
+import Set
 
 
 {-| The open WHOIS sheet, or nothing when no sheet is showing. -}
@@ -350,6 +353,386 @@ formatIdle seconds =
 
     else
         String.fromInt (safe // 86400) ++ " days"
+
+
+{-| The member card for the open profile (mirroring
+`PeopleProfileCard`: identity block with display name, pronouns,
+away/about, guest badge, presence line, Mention / Block / Copy
+name actions, and the Advanced disclosure with account, role,
+network role, hostmask, copy, network profile, and ledger rows;
+Message, Report, and moderation stay later slices behind their
+missing backends). -}
+profileCard : Model -> Html Msg
+profileCard model =
+    case model.userProfileCard of
+        Nothing ->
+            text ""
+
+        Just card ->
+            cardFor model card.nick card.channel
+
+
+cardFor : Model -> String -> String -> Html Msg
+cardFor model nick channel =
+    let
+        profile =
+            App.getUserProfile model nick
+
+        info =
+            App.whoisInfoFor model nick
+
+        member =
+            Dict.get (String.toLower channel) model.channels
+                |> Maybe.andThen (\room -> Dict.get (String.toLower nick) room.members)
+
+        role =
+            Modes.resolveRole
+                (Maybe.map .modes member |> Maybe.withDefault Set.empty)
+                model.isupport.prefixOrder
+                model.isupport.modeToPrefix
+
+        isSelf =
+            String.toLower nick == String.toLower model.ourNick
+
+        displayName =
+            case Maybe.andThen .displayName profile of
+                Just published ->
+                    if String.isEmpty (String.trim published) then
+                        nick
+
+                    else
+                        String.trim published
+
+                Nothing ->
+                    nick
+
+        pronouns =
+            Maybe.andThen .pronouns profile
+                |> Maybe.map String.trim
+                |> Maybe.andThen
+                    (\value ->
+                        if String.isEmpty value then
+                            Nothing
+
+                        else
+                            Just value
+                    )
+
+        about =
+            Maybe.andThen .bio profile
+                |> Maybe.map String.trim
+                |> Maybe.andThen
+                    (\value ->
+                        if String.isEmpty value then
+                            Nothing
+
+                        else
+                            Just value
+                    )
+
+        away =
+            Maybe.map .away member |> Maybe.withDefault False
+
+        account =
+            case Maybe.andThen .account profile of
+                Just stored ->
+                    if String.isEmpty (String.trim stored) then
+                        Maybe.andThen .account info
+
+                    else
+                        Just (String.trim stored)
+
+                Nothing ->
+                    Maybe.andThen .account info
+
+        cardId =
+            "people-card-" ++ slug nick ++ "-" ++ slug channel
+
+        described =
+            case ( about, away, pronouns ) of
+                ( Just _, _, _ ) ->
+                    Just (cardId ++ "-about")
+
+                ( Nothing, True, _ ) ->
+                    Just (cardId ++ "-status")
+
+                ( Nothing, False, Just _ ) ->
+                    Just (cardId ++ "-pronouns")
+
+                _ ->
+                    Nothing
+
+        ignored =
+            Set.member (String.toLower (String.trim nick)) model.ignoredUsers
+    in
+    div [ class "onyx-profile-pop" ]
+        [ div
+            [ class "onyx-profile-backdrop"
+            , onClick App.UserProfileClosed
+            ]
+            []
+        , div
+            ([ class "onyx-member-card"
+             , attribute "role" "region"
+             , attribute "aria-labelledby" (cardId ++ "-name")
+             , on "keydown" cardEscapeDecoder
+             ]
+                ++ (case described of
+                        Just target ->
+                            [ attribute "aria-describedby" target ]
+
+                        Nothing ->
+                            []
+                   )
+            )
+            [ div [ class "onyx-member-identity" ]
+                [ span [ class "onyx-member-avatar", attribute "aria-hidden" "true" ]
+                    [ text (avatarInitial displayName) ]
+                , div [ class "onyx-member-copy" ]
+                    ([ p [ class "onyx-member-name", attribute "id" (cardId ++ "-name") ] [ text displayName ] ]
+                        ++ (if String.toLower displayName /= String.toLower nick then
+                                [ p [ class "onyx-member-nickline" ] [ text nick ] ]
+
+                            else
+                                []
+                           )
+                        ++ (case pronouns of
+                                Just value ->
+                                    [ p [ class "onyx-member-pronouns", attribute "id" (cardId ++ "-pronouns") ] [ text value ] ]
+
+                                Nothing ->
+                                    []
+                           )
+                        ++ (if away then
+                                [ p [ class "onyx-member-status", attribute "id" (cardId ++ "-status") ] [ text "Away" ] ]
+
+                            else
+                                []
+                           )
+                        ++ (case about of
+                                Just value ->
+                                    [ p [ class "onyx-member-about", attribute "id" (cardId ++ "-about") ] [ text value ] ]
+
+                                Nothing ->
+                                    []
+                           )
+                        ++ (if not isSelf && account == Nothing then
+                                [ p [ class "onyx-member-guest" ] [ text "Guest" ] ]
+
+                            else
+                                []
+                           )
+                    )
+                ]
+            , div
+                [ class "onyx-member-presence"
+                , attribute "aria-label" (role.label ++ (if away then ", away" else ""))
+                ]
+                [ span [ class "onyx-member-dot", attribute "aria-hidden" "true" ] []
+                , span [] [ text role.label ]
+                ]
+            , if isSelf then
+                text ""
+
+              else
+                div
+                    [ class "onyx-member-actions"
+                    , attribute "role" "group"
+                    , attribute "aria-label" ("Actions for " ++ nick)
+                    ]
+                    [ button
+                        [ attribute "type" "button"
+                        , class "onyx-member-action"
+                        , attribute "aria-label" ("Mention " ++ nick ++ " in the composer")
+                        , onClick (App.MemberMention { nick = nick, channel = channel })
+                        ]
+                        [ text "Mention" ]
+                    , if ignored then
+                        button
+                            [ attribute "type" "button"
+                            , class "onyx-member-action"
+                            , attribute "aria-label" ("Unblock " ++ nick ++ " on this device")
+                            , onClick (App.UnignoreUser (String.trim nick))
+                            ]
+                            [ text "Unblock" ]
+
+                      else
+                        button
+                            [ attribute "type" "button"
+                            , class "onyx-member-action"
+                            , attribute "aria-label" ("Block " ++ nick ++ " on this device")
+                            , onClick (App.IgnoreUser (String.trim nick))
+                            ]
+                            [ text "Block" ]
+                    , button
+                        [ attribute "type" "button"
+                        , class "onyx-member-action"
+                        , attribute "aria-label" ("Close profile for " ++ nick)
+                        , onClick App.UserProfileClosed
+                        ]
+                        [ text "Close" ]
+                    ]
+            , details [ class "onyx-member-advanced" ]
+                (summary [ class "onyx-member-advanced-toggle" ] [ text "Room and network details" ]
+                    :: advancedRows nick channel role account info
+                )
+            ]
+        ]
+
+
+{-| Advanced disclosure rows: account, room role, network role,
+hostmask, then copy / network-profile / ledger actions. -}
+advancedRows : String -> String -> Modes.ResolvedRole -> Maybe String -> Maybe Services.WhoisInfo -> List (Html Msg)
+advancedRows nick channel role account info =
+    let
+        trimmedChannel =
+            String.trim channel
+
+        hostmask =
+            case info of
+                Just current ->
+                    case whoisIdentity current of
+                        Just identity ->
+                            Just identity
+
+                        Nothing ->
+                            current.realHost
+
+                Nothing ->
+                    Nothing
+
+        networkRole =
+            case info of
+                Just current ->
+                    if current.isOper then
+                        Just
+                            (case Maybe.map String.trim current.operRole of
+                                Just detail ->
+                                    if String.isEmpty detail then
+                                        "IRC operator"
+
+                                    else
+                                        detail
+
+                                Nothing ->
+                                    "IRC operator"
+                            )
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+    in
+    (case account of
+        Just value ->
+            [ p [ class "onyx-member-meta" ] [ text ("Account " ++ value) ] ]
+
+        Nothing ->
+            []
+    )
+        ++ (if String.isEmpty trimmedChannel then
+                []
+
+            else
+                [ p [ class "onyx-member-meta" ] [ text (role.label ++ " in " ++ trimmedChannel) ] ]
+           )
+        ++ (case networkRole of
+                Just value ->
+                    [ p [ class "onyx-member-meta" ] [ text (value ++ " on this network") ] ]
+
+                Nothing ->
+                    []
+           )
+        ++ (case hostmask of
+                Just value ->
+                    [ p [ class "onyx-member-hostmask" ] [ text value ] ]
+
+                Nothing ->
+                    []
+           )
+        ++ [ div
+                [ class "onyx-member-advanced-actions"
+                , attribute "role" "group"
+                , attribute "aria-label" ("Details actions for " ++ nick)
+                ]
+                [ button
+                    [ attribute "type" "button"
+                    , class "onyx-member-action"
+                    , attribute "aria-label" ("Copy name " ++ nick)
+                    , onClick (App.MemberCopyNick nick)
+                    ]
+                    [ text "Copy name" ]
+                , button
+                    [ attribute "type" "button"
+                    , class "onyx-member-action"
+                    , attribute "aria-label" ("View profile of " ++ nick)
+                    , onClick (App.MemberCardWhois nick)
+                    ]
+                    [ text "Network profile" ]
+                , if isLedgerChannel trimmedChannel then
+                    a
+                        [ class "onyx-member-ledger"
+                        , href (App.statsRoomHref trimmedChannel)
+                        , attribute "aria-label" ("Room ledger for " ++ trimmedChannel)
+                        ]
+                        [ text "Room ledger" ]
+
+                  else
+                    text ""
+                ]
+           ]
+
+
+{-| URL-safe id slug (mirroring the oracle card-id cleanup). -}
+slug : String -> String
+slug value =
+    String.toLower value
+        |> String.toList
+        |> List.map
+            (\char ->
+                if Char.isAlphaNum char || char == '-' || char == '_' then
+                    char
+
+                else
+                    '-'
+            )
+        |> String.fromList
+        |> String.trim
+
+
+{-| Decorative avatar initial. -}
+avatarInitial : String -> String
+avatarInitial name =
+    case String.uncons (String.trim name) of
+        Just ( first, _ ) ->
+            String.fromChar (Char.toUpper first)
+
+        Nothing ->
+            "?"
+
+
+{-| Escape dismisses the member card (same IME-yielding shape
+as the sheet decoder). -}
+cardEscapeDecoder : Decode.Decoder Msg
+cardEscapeDecoder =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.UserProfileClosed
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
 
 
 {-| Escape dismisses the sheet (same IME-yielding shape as the

@@ -1225,6 +1225,107 @@ suite =
                             |> Query.has [ Selector.text "did not answer in time" ]
                     ]
                     ()
+                , test "member card renders identity, actions, and details" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    rosterBase =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    carded =
+                        Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) rosterBase)
+
+                    enriched =
+                        Tuple.first (update (WhoisRequest "alice") carded)
+                            |> (\m -> feed m ":s 330 me alice alice-account :logged in as")
+                            |> (\m -> feed m ":s 311 me alice auser ahost * :Alice Example")
+                            |> (\m -> feed m ":s 313 me alice :is a Network Administrator")
+
+                    blocked =
+                        Tuple.first (update (IgnoreUser "alice") carded)
+
+                    selfed =
+                        Tuple.first (update (UserProfileOpened { nick = "me", channel = "#c" }) { rosterBase | ourNick = "me" })
+                in
+                Expect.all
+                    [ \_ ->
+                        query rosterBase
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View member card for alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.has
+                                [ Selector.attribute (Attr.attribute "role" "region")
+                                , Selector.text "alice"
+                                , Selector.text "Guest"
+                                , Selector.text "Member"
+                                ]
+                    , \_ ->
+                        query enriched
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.has
+                                [ Selector.text "Account alice-account"
+                                , Selector.text "Member in #c"
+                                , Selector.text "Network Administrator on this network"
+                                , Selector.text "auser@ahost"
+                                ]
+                    , \_ ->
+                        query enriched
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Room ledger for #c") ]
+                            |> Query.has [ Selector.attribute (Attr.href "/stats/?room=%23c") ]
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Mention alice in the composer") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MemberMention { nick = "alice", channel = "#c" })
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Block alice on this device") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (IgnoreUser "alice")
+                    , \_ ->
+                        query blocked
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Unblock alice on this device") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (UnignoreUser "alice")
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Copy name alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MemberCopyNick "alice")
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View profile of alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MemberCardWhois "alice")
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Close profile for alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect UserProfileClosed
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect UserProfileClosed
+                    , \_ ->
+                        query selfed
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.hasNot [ Selector.text "Mention", Selector.text "Guest" ]
+                    ]
+                    ()
         , test "menu translation item, section, and unavailable note" <|
             \_ ->
                 let
