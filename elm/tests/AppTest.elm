@@ -13523,6 +13523,93 @@ suite =
                         , \_ -> Expect.equal [ SendLine "MODE #c +b alice!*@*\r\n" ] (Tuple.second banned)
                         ]
                         ()
+            , test "person safety stages, confirms, and drafts reports" <|
+                \_ ->
+                    let
+                        owned =
+                            { blank
+                                | ourNick = "me"
+                                , endpoint = Just "wss://harbor.test/ws"
+                                , accountName = Just "alice"
+                            }
+
+                        ( opened, _ ) =
+                            update (SafetyOpenBlock { nick = "bob", guest = False }) owned
+
+                        ( blankName, blankOut ) =
+                            update (SafetyOpenReport { nick = "   ", guest = False }) owned
+
+                        ( confirmed, _ ) =
+                            update SafetyConfirmBlock opened
+
+                        ( reported, _ ) =
+                            update (SafetyOpenReport { nick = "eve", guest = True }) owned
+
+                        staged =
+                            Tuple.first (update (SafetyReason "spam") reported)
+                                |> (\m -> Tuple.first (update (SafetyNote "posted links in #lounge") m))
+
+                        ( submitted, submitOut ) =
+                            update SafetySubmitReport staged
+
+                        ( offline, offlineOut ) =
+                            update SafetySubmitReport { staged | connection = Offline }
+
+                        ( badReason, badOut ) =
+                            update SafetySubmitReport
+                                (Tuple.first (update (SafetyReason "trust-center") reported))
+
+                        ( messaged, messageOut ) =
+                            update (MemberMessage "alice") owned
+
+                        ( blockedDm, _ ) =
+                            update (IgnoreUser "alice") owned
+                                |> Tuple.first
+                                |> (\m -> update (MemberMessage "alice") m)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing blankName.personSafety
+                        , \_ -> Expect.equal [] blankOut
+                        , \_ -> Expect.equal True (Set.member "bob" confirmed.ignoredUsers)
+                        , \_ -> Expect.equal [ "Blocked bob" ] (List.map .title confirmed.toasts)
+                        , \_ ->
+                            Expect.equal
+                                [ "You will not see bob on this device. They are not told." ]
+                                (List.filterMap .description confirmed.toasts)
+                        , \_ -> Expect.equal Nothing confirmed.personSafety
+                        , \_ -> Expect.equal True (List.member (SendLine "JOIN #root\r\n") submitOut)
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (\o ->
+                                        case o of
+                                            PersonReportReceiptSave saved ->
+                                                saved.nick == "eve" && saved.reason == "spam"
+
+                                            _ ->
+                                                False
+                                    )
+                                    submitOut
+                                )
+                        , \_ ->
+                            Expect.equal True
+                                (Maybe.withDefault "" (Dict.get "#root" submitted.composerDrafts)
+                                    |> String.contains "About: eve"
+                                )
+                        , \_ -> Expect.equal (Just "#root") submitted.activeChannel
+                        , \_ -> Expect.equal [ "Draft is in #root" ] (List.map .title submitted.toasts)
+                        , \_ -> Expect.equal Nothing submitted.personSafety
+                        , \_ -> Expect.equal [ "Could not open #root" ] (List.map .title offline.toasts)
+                        , \_ -> Expect.equal False (List.member (SendLine "JOIN #root\r\n") offlineOut)
+                        , \_ -> Expect.equal [] badOut
+                        , \_ -> Expect.notEqual Nothing badReason.personSafety
+                        , \_ -> Expect.equal (Just "alice") messaged.activeChannel
+                        , \_ ->
+                            Expect.equal True
+                                (List.member (SendLine "METADATA alice GET ocean.dm-key\r\n") messageOut)
+                        , \_ -> Expect.equal [ "Blocked alice", "You blocked alice" ] (List.map .title blockedDm.toasts)
+                        ]
+                        ()
             , test "member mention appends, copies, and hands off to whois" <|
                 \_ ->
                     let

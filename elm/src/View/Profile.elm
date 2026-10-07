@@ -1,4 +1,4 @@
-module View.Profile exposing ( moderationReview, profileCard, profileSheet )
+module View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 
 {-| Member network-identity sheet (mirroring `WhoisSheet`: a thin
 reactive view over the folded WHOIS cache — title, description,
@@ -7,12 +7,13 @@ summary, live status, and the details list; the sheet opens through
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, li, p, small, span, summary, text, time, ul)
-import Html.Attributes exposing (attribute, class, datetime, disabled, href)
-import Html.Events exposing (on, onClick)
+import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, input, label, li, p, section, small, span, summary, text, textarea, time, ul)
+import Html.Attributes exposing (attribute, checked, class, datetime, disabled, for, href, id, maxlength, tabindex, type_, value)
+import Html.Events exposing (on, onCheck, onClick, onInput)
 import Json.Decode as Decode
 import Modes
 import Moderation
+import PersonSafety
 import Prefs
 import Services
 import Set
@@ -545,6 +546,13 @@ cardFor model nick channel =
                     [ button
                         [ attribute "type" "button"
                         , class "onyx-member-action"
+                        , attribute "aria-label" ("Send DM to " ++ nick)
+                        , onClick (App.MemberMessage nick)
+                        ]
+                        [ text "Message" ]
+                    , button
+                        [ attribute "type" "button"
+                        , class "onyx-member-action"
                         , attribute "aria-label" ("Mention " ++ nick ++ " in the composer")
                         , onClick (App.MemberMention { nick = nick, channel = channel })
                         ]
@@ -563,9 +571,16 @@ cardFor model nick channel =
                             [ attribute "type" "button"
                             , class "onyx-member-action"
                             , attribute "aria-label" ("Block " ++ nick ++ " on this device")
-                            , onClick (App.IgnoreUser (String.trim nick))
+                            , onClick (App.SafetyOpenBlock { nick = nick, guest = account == Nothing })
                             ]
                             [ text "Block" ]
+                    , button
+                        [ attribute "type" "button"
+                        , class "onyx-member-action"
+                        , attribute "aria-label" ("Report " ++ nick)
+                        , onClick (App.SafetyOpenReport { nick = nick, guest = account == Nothing })
+                        ]
+                        [ text "Report" ]
                     , button
                         [ attribute "type" "button"
                         , class "onyx-member-action"
@@ -988,6 +1003,155 @@ reviewEscapeDecoder =
                             (\key ->
                                 if key == "Escape" then
                                     Decode.succeed App.ModerationCancel
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
+
+
+{-| Quiet safety confirm for Block plus the honest #root report
+draft (mirroring `PersonSafetyHost`: block confirms into the
+device ignore; report drafts into shared #root for user review —
+never sent, never a private inbox; focus motion stays a
+narrowing). -}
+personSafetySheet : Model -> Html Msg
+personSafetySheet model =
+    case model.personSafety of
+        Nothing ->
+            text ""
+
+        Just sheet ->
+            case sheet.pending of
+                PersonSafety.SafetyBlock details ->
+                    safetyShell "block"
+                        (PersonSafety.blockTitle details.nick)
+                        (PersonSafety.blockBody details.nick)
+                        details.guest
+                        []
+                        "Never mind"
+                        App.SafetyClose
+                        "Block"
+                        App.SafetyConfirmBlock
+                        "person-block-confirm"
+
+                PersonSafety.SafetyReport details ->
+                    safetyShell "report"
+                        (PersonSafety.reportTitle details.nick)
+                        PersonSafety.reportHonesty
+                        details.guest
+                        [ div
+                            [ class "person-safety__reasons"
+                            , attribute "role" "radiogroup"
+                            , attribute "aria-label" "What happened"
+                            ]
+                            (List.map (safetyReason sheet.reason) PersonSafety.reportReasons)
+                        , label [ class "person-safety__note-label", for "person-report-note" ]
+                            [ text "Optional note" ]
+                        , textarea
+                            [ attribute "id" "person-report-note"
+                            , class "person-safety__note"
+                            , attribute "data-testid" "person-report-note"
+                            , maxlength PersonSafety.maxReportNote
+                            , value sheet.note
+                            , onInput App.SafetyNote
+                            ]
+                            []
+                        ]
+                        "Never mind"
+                        App.SafetyClose
+                        "Draft the note"
+                        App.SafetySubmitReport
+                        "person-report-submit"
+
+
+{-| One report reason radio. -}
+safetyReason : String -> ( PersonSafety.ReportReason, String ) -> Html Msg
+safetyReason current ( reason, labelText ) =
+    let
+        id =
+            PersonSafety.reasonToString reason
+    in
+    label [ class "person-safety__reason" ]
+        [ input
+            [ type_ "radio"
+            , attribute "name" "person-report-reason"
+            , value id
+            , checked (current == id)
+            , onCheck (\_ -> App.SafetyReason id)
+            ]
+            []
+        , text labelText
+        ]
+
+
+{-| Shared safety dialog chrome. -}
+safetyShell : String -> String -> String -> Bool -> List (Html Msg) -> String -> Msg -> String -> Msg -> String -> Html Msg
+safetyShell kind title body guest extra dismissLabel dismissMsg confirmLabel confirmMsg confirmTestId =
+    div [ class "person-safety", attribute "role" "presentation", attribute "data-testid" "person-safety" ]
+        [ div
+            [ class "person-safety__backdrop"
+            , attribute "aria-hidden" "true"
+            , onClick dismissMsg
+            ]
+            []
+        , section
+            [ class "person-safety__panel"
+            , attribute "role" "dialog"
+            , attribute "aria-modal" "true"
+            , attribute "aria-labelledby" "person-safety-title"
+            , attribute "aria-describedby" "person-safety-body"
+            , tabindex -1
+            , attribute "data-kind" kind
+            , on "keydown" safetyEscapeDecoder
+            ]
+            ([ h2 [ attribute "id" "person-safety-title", class "person-safety__title" ] [ text title ]
+             , p [ attribute "id" "person-safety-body", class "person-safety__body" ] [ text body ]
+             ]
+                ++ (if guest then
+                        [ p [ class "person-safety__guest" ] [ text "Guest" ] ]
+
+                    else
+                        []
+                   )
+                ++ extra
+                ++ [ div [ class "person-safety__actions" ]
+                        [ button
+                            [ attribute "type" "button"
+                            , class "onyx-member-action"
+                            , attribute "data-testid" "person-safety-cancel"
+                            , onClick dismissMsg
+                            ]
+                            [ text dismissLabel ]
+                        , button
+                            [ attribute "type" "button"
+                            , class "onyx-member-action onyx-member-confirm"
+                            , attribute "data-testid" confirmTestId
+                            , onClick confirmMsg
+                            ]
+                            [ text confirmLabel ]
+                        ]
+                   ]
+            )
+        ]
+
+
+{-| Escape dismisses the safety sheet (same IME-yielding shape as
+the other decoders). -}
+safetyEscapeDecoder : Decode.Decoder Msg
+safetyEscapeDecoder =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.SafetyClose
 
                                 else
                                     Decode.fail "not-escape"

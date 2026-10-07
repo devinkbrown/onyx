@@ -48,6 +48,7 @@ import Status
 import Media
 import Moderation
 import Modes
+import PersonSafety
 import MessageWindow
 import Multiline
 import Notify
@@ -328,6 +329,7 @@ type alias Model =
     , userProfiles : Dict String Services.UserProfile
     , userProfileCard : Maybe { nick : String, channel : String }
     , moderationDraft : Maybe Moderation.Draft
+    , personSafety : Maybe { pending : PersonSafety.SafetyPending, reason : String, note : String }
     , editHistory : Dict String (List EditRevision)
     , userMetadata : Dict String (Dict String String)
     , typingUsers : Dict String (Dict String Typist)
@@ -848,6 +850,7 @@ type Outbound
     | MediaEngineFrame { bytes : List Int }
     | GroupWelcomeOpen { key : String, room : String, fromAccount : String, fromDevice : String, toAccount : String, toDevice : String, epoch : Int, commitIdB64 : String, membershipB64 : String, commitmentB64 : String, welcomeB64 : String }
     | ClipboardCopy { text : String, tag : String }
+    | PersonReportReceiptSave { key : String, nick : String, reason : String, draft : String }
     | TranslateRequest { msgid : String, lang : String, source : String, text : String, targetLang : String }
     | TranslationTargetSave { target : String }
     | AccountDownload { filename : String, json : String }
@@ -2573,6 +2576,14 @@ type Msg
     | UserProfileOpened { nick : String, channel : String }
     | UserProfileClosed
     | MemberMention { nick : String, channel : String }
+    | MemberMessage String
+    | SafetyOpenBlock { nick : String, guest : Bool }
+    | SafetyOpenReport { nick : String, guest : Bool }
+    | SafetyReason String
+    | SafetyNote String
+    | SafetyConfirmBlock
+    | SafetySubmitReport
+    | SafetyClose
     | MemberCopyNick String
     | MemberCardWhois String
     | ModerationPropose { kind : Moderation.ModerationKind, channel : String, target : String }
@@ -2938,6 +2949,7 @@ init nick url =
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
     , moderationDraft = Nothing
+    , personSafety = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -3377,6 +3389,7 @@ blank =
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
     , moderationDraft = Nothing
+    , personSafety = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -9893,6 +9906,107 @@ sendComposerText model target =
 
         else
             renderOptimisticSend cleared target texts outgoing Nothing model.composerAudience
+{-| Append a report draft into the #root composer, keeping
+anything already written (mirroring the `injectComposerText`
+append handoff in `submitReport`). -}
+mergeReportDraft : Model -> String -> Model
+mergeReportDraft model draft =
+    let
+        key =
+            String.toLower PersonSafety.reportRoom
+
+        current =
+            if Maybe.map String.toLower model.activeChannel == Just key then
+                model.composer
+
+            else
+                Maybe.withDefault "" (Dict.get key model.composerDrafts)
+
+        merged =
+            (ComposerInject.mergeComposerInsert current draft ComposerInject.InjectAppend).text
+    in
+    if Maybe.map String.toLower model.activeChannel == Just key then
+        { model | composer = merged, composerDrafts = Dict.insert key merged model.composerDrafts }
+
+    else
+        { model | composerDrafts = Dict.insert key merged model.composerDrafts }
+
+
+{-| Submit a validated report draft (mirroring `submitReport`:
+receipt persists ports-side, offline warns, online joins #root,
+appends the draft, and navigates there for user review). -}
+submitParsedReport :
+    Model
+    -> { pending : PersonSafety.SafetyPending, reason : String, note : String }
+    -> { nick : String, guest : Bool }
+    -> PersonSafety.ReportReason
+    -> ( Model, List Outbound )
+submitParsedReport model sheet details parsed =
+    let
+        draft =
+            PersonSafety.formatDraft
+                { nick = details.nick
+                , reason = parsed
+                , note = sheet.note
+                , from = model.ourNick
+                , guest = details.guest
+                }
+
+        receiptOut =
+            case Maybe.andThen PersonSafety.ownerStorageKey (deviceMemoryOwner model) of
+                Just key ->
+                    [ PersonReportReceiptSave
+                        { key = key
+                        , nick = details.nick
+                        , reason = PersonSafety.reasonToString parsed
+                        , draft = draft
+                        }
+                    ]
+
+                Nothing ->
+                    []
+
+        reset current =
+            { current | personSafety = Nothing }
+    in
+    if model.connection /= Live then
+        ( addToast
+            { variant = ToastWarning
+            , title = "Could not open #root"
+            , description = Just "You are offline. Your existing local draft was preserved; reconnect and draft this report in shared #root."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            (reset model)
+        , receiptOut
+        )
+
+    else
+        let
+            merged =
+                mergeReportDraft model draft
+
+            ( navigated, navOut ) =
+                selectChannel merged PersonSafety.reportRoom
+        in
+        ( addToast
+            { variant = ToastInfo
+            , title = "Draft is in #root"
+            , description = Just "Review the draft in the shared room, then send it yourself if you choose."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            (reset navigated)
+        , [ SendLine (Wire.formatIrcLine "JOIN" [ PersonSafety.reportRoom ]) ]
+            ++ receiptOut
+            ++ navOut
+        )
+
+
 {-| Request a WHOIS query (mirroring `openWhois`: the query goes
 out live with a re-armed timeout generation; offline the target still
 records but nothing sends). -}
@@ -37312,6 +37426,142 @@ update msg model =
             -- `handleWhois`): the card closes and the WHOIS request
             -- opens the sheet.
             Tuple.mapFirst (\m -> { m | userProfileCard = Nothing }) (requestWhois model nick)
+
+        MemberMessage nick ->
+            -- The card opens a DM unless the peer is blocked
+            -- (mirroring `handleDm`); navigating away closes the
+            -- card like the oracle popover unmount.
+            if isBlockedDmTarget model nick then
+                let
+                    copy =
+                        blockedDmComposeCopy nick
+                in
+                ( addToast
+                    { variant = ToastInfo
+                    , title = copy.title
+                    , description = Just copy.description
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    model.nowMs
+                    model
+                , []
+                )
+
+            else
+                Tuple.mapFirst (\m -> { m | userProfileCard = Nothing }) (selectChannel model nick)
+
+        SafetyOpenBlock { nick, guest } ->
+            -- Staging a block confirm (mirroring
+            -- `openPersonBlockConfirm`); blank names stage nothing.
+            if String.isEmpty (String.trim nick) then
+                ( model, [] )
+
+            else
+                ( { model
+                    | personSafety =
+                        Just
+                            { pending = PersonSafety.SafetyBlock { nick = String.trim nick, guest = guest }
+                            , reason = "harassment"
+                            , note = ""
+                            }
+                  }
+                , []
+                )
+
+        SafetyOpenReport { nick, guest } ->
+            -- Staging a report draft (mirroring
+            -- `openPersonReport`); blank names stage nothing.
+            if String.isEmpty (String.trim nick) then
+                ( model, [] )
+
+            else
+                ( { model
+                    | personSafety =
+                        Just
+                            { pending = PersonSafety.SafetyReport { nick = String.trim nick, guest = guest }
+                            , reason = "harassment"
+                            , note = ""
+                            }
+                  }
+                , []
+                )
+
+        SafetyReason value ->
+            case model.personSafety of
+                Nothing ->
+                    ( model, [] )
+
+                Just pending ->
+                    ( { model | personSafety = Just { pending | reason = value } }, [] )
+
+        SafetyNote value ->
+            case model.personSafety of
+                Nothing ->
+                    ( model, [] )
+
+                Just pending ->
+                    ( { model | personSafety = Just { pending | note = value } }, [] )
+
+        SafetyClose ->
+            ( { model | personSafety = Nothing }, [] )
+
+        SafetyConfirmBlock ->
+            -- Confirming writes the device ignore with the quiet
+            -- sentence (mirroring `confirmBlock`).
+            case model.personSafety of
+                Just { pending } ->
+                    case pending of
+                        PersonSafety.SafetyBlock details ->
+                            let
+                                updated =
+                                    { model
+                                        | ignoredUsers = parseNameBlocklist 512 128 (details.nick :: Set.toList model.ignoredUsers)
+                                        , personSafety = Nothing
+                                    }
+                            in
+                            ( addToast
+                                { variant = ToastInfo
+                                , title = "Blocked " ++ details.nick
+                                , description = Just (PersonSafety.blockBody details.nick)
+                                , duration = Nothing
+                                , groupKey = Nothing
+                                , undo = Nothing
+                                }
+                                model.nowMs
+                                updated
+                            , blocklistsSaveOut updated
+                            )
+
+                        PersonSafety.SafetyReport _ ->
+                            ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        SafetySubmitReport ->
+            -- Submitting drafts the note into shared #root
+            -- (mirroring `submitReport`): the receipt persists
+            -- ports-side, offline warns and preserves nothing
+            -- beyond the reset, online joins #root, appends the
+            -- draft, and navigates there for user review.
+            case model.personSafety of
+                Just sheet ->
+                    case sheet.pending of
+                        PersonSafety.SafetyReport details ->
+                            case PersonSafety.reasonFromString sheet.reason of
+                                Nothing ->
+                                    ( model, [] )
+
+                                Just parsed ->
+                                    submitParsedReport model sheet details parsed
+
+                        PersonSafety.SafetyBlock _ ->
+                            ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
 
         ModerationPropose { kind, channel, target } ->
             -- A card moderation control stages a review draft and

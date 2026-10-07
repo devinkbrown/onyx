@@ -285,6 +285,8 @@ port guidesProgressRequest : () -> Cmd msg
 
 port guidesProgressStore : List String -> Cmd msg
 
+port personReportReceiptSave : { key : String, nick : String, reason : String, draft : String } -> Cmd msg
+
 port guidesProgressLoaded : (Decode.Value -> msg) -> Sub msg
 
 port historyReplace : String -> Cmd msg
@@ -1209,6 +1211,9 @@ perform key outbound =
 
         App.GuidesProgressStore req ->
             guidesProgressStore req.ids
+
+        App.PersonReportReceiptSave req ->
+            personReportReceiptSave req
 
         App.HttpFetch req ->
             httpFetch req

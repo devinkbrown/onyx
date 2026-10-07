@@ -4794,6 +4794,64 @@ function fetchPublicFeed(url) {
       });
     }
 
+    /* Local report receipts, mirroring lib/people/personReportReceipt:
+       no server inbox — a copy of the drafted note, kept on this device
+       under the Elm-computed owner-scoped key so one account's receipts
+       are never claimed by another. Newest first, capped at 20 rows;
+       an oversized or unreadable journal degrades to a fresh write. */
+    var PERSON_REPORT_RECEIPTS_MAX = 20;
+    var PERSON_REPORT_RECEIPTS_CHARS = 64 * 1024;
+    function sanitizePersonTokenJs(value, max) {
+      if (typeof value !== "string") return "";
+      return value.replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, max);
+    }
+    function sanitizePersonMultilineJs(value, max) {
+      if (typeof value !== "string") return "";
+      return value.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, "").trim().slice(0, max);
+    }
+    function readPersonReportReceipts(store, key) {
+      try {
+        var raw = store.getItem(key);
+        if (!raw || raw.length > PERSON_REPORT_RECEIPTS_CHARS) return [];
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        var out = [];
+        for (var i = 0; i < parsed.length && out.length < PERSON_REPORT_RECEIPTS_MAX; i++) {
+          var row = parsed[i];
+          if (!row || typeof row.id !== "string" || typeof row.at !== "number" || !isFinite(row.at)) continue;
+          if (typeof row.nick !== "string" || typeof row.reason !== "string" || typeof row.draft !== "string") continue;
+          var draft = sanitizePersonMultilineJs(row.draft, 2000);
+          if (!draft) continue;
+          out.push({
+            id: sanitizePersonTokenJs(row.id, 64),
+            at: row.at,
+            nick: sanitizePersonTokenJs(row.nick, 128),
+            reason: sanitizePersonTokenJs(row.reason, 32),
+            draft: draft,
+          });
+        }
+        return out;
+      } catch (err) { return []; }
+    }
+    if (app.ports.personReportReceiptSave) {
+      app.ports.personReportReceiptSave.subscribe(function (req) {
+        try {
+          var store = (typeof window !== "undefined" && window.localStorage) ? window.localStorage : null;
+          if (!store || !req || typeof req.key !== "string" || !req.key) return;
+          var next = {
+            id: "report-" + Date.now().toString(36),
+            at: Date.now(),
+            nick: sanitizePersonTokenJs(req.nick, 128),
+            reason: sanitizePersonTokenJs(req.reason, 32),
+            draft: sanitizePersonMultilineJs(req.draft, 2000),
+          };
+          if (!next.nick || !next.draft) return;
+          var receipts = [next].concat(readPersonReportReceipts(store, req.key)).slice(0, PERSON_REPORT_RECEIPTS_MAX);
+          store.setItem(req.key, JSON.stringify(receipts));
+        } catch (err) { /* private browsing or quota policy; the draft handoff already landed */ }
+      });
+    }
+
     if (app.ports.sessionTokenStore) {
       app.ports.sessionTokenStore.subscribe(function (req) {
         storeResumeToken(req.server, req.nick, req.kind, req.token, req.expiresAt);

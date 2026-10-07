@@ -1294,9 +1294,19 @@ suite =
                             |> Event.expect (MemberMention { nick = "alice", channel = "#c" })
                     , \_ ->
                         query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Send DM to alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MemberMessage "alice")
+                    , \_ ->
+                        query carded
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Block alice on this device") ]
                             |> Event.simulate Event.click
-                            |> Event.expect (IgnoreUser "alice")
+                            |> Event.expect (SafetyOpenBlock { nick = "alice", guest = True })
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Report alice") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (SafetyOpenReport { nick = "alice", guest = True })
                     , \_ ->
                         query blocked
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Unblock alice on this device") ]
@@ -1406,6 +1416,87 @@ suite =
                         query standardCard
                             |> Query.find [ Selector.class "onyx-member-card" ]
                             |> Query.hasNot [ Selector.text "Kick" ]
+                    ]
+                    ()
+        , test "person safety sheet confirms blocks and drafts reports" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    base =
+                        { blank | ourNick = "me" }
+
+                    blocking =
+                        Tuple.first (update (SafetyOpenBlock { nick = "bob", guest = False }) base)
+
+                    reporting =
+                        Tuple.first (update (SafetyOpenReport { nick = "eve", guest = True }) base)
+
+                    noted =
+                        Tuple.first (update (SafetyNote "posted links in #lounge") reporting)
+                            |> (\m -> Tuple.first (update (SafetyReason "spam") m))
+                in
+                Expect.all
+                    [ \_ ->
+                        query blocking
+                            |> Query.find [ Selector.class "person-safety__panel" ]
+                            |> Query.has
+                                [ Selector.text "Block bob?"
+                                , Selector.text "You will not see bob on this device. They are not told."
+                                ]
+                    , \_ ->
+                        query blocking
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "person-block-confirm") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect SafetyConfirmBlock
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.class "person-safety__panel" ]
+                            |> Query.has
+                                [ Selector.text "Report eve"
+                                , Selector.text "shared #root report room"
+                                , Selector.text "not a private inbox or police report"
+                                , Selector.text "Guest"
+                                ]
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "What happened") ]
+                            |> Query.has [ Selector.text "Harassment", Selector.text "Spam" ]
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.value "spam") ]
+                            |> Event.simulate (Event.check True)
+                            |> Event.expect (SafetyReason "spam")
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "person-report-note") ]
+                            |> Event.simulate (Event.input "posted links")
+                            |> Event.expect (SafetyNote "posted links")
+                    , \_ ->
+                        query noted
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "person-report-note") ]
+                            |> Query.has [ Selector.attribute (Attr.value "posted links in #lounge") ]
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "person-report-submit") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect SafetySubmitReport
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "person-safety-cancel") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect SafetyClose
+                    , \_ ->
+                        query reporting
+                            |> Query.find [ Selector.class "person-safety__panel" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect SafetyClose
                     ]
                     ()
         , test "menu translation item, section, and unavailable note" <|
