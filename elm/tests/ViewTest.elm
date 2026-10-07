@@ -2765,6 +2765,59 @@ suite =
                     in
                     query opened
                         |> Query.has [ Selector.text "Parent message is not loaded in this transcript." ]
+            , test "topic filter bar lists, activates, and selects conversations" <|
+                \_ ->
+                    let
+                        tagged =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed m "@onyx/topic=roadmap :bob!u@h PRIVMSG #c :two")
+                                |> (\m -> feed m ":bob!u@h PRIVMSG #c :loose")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        selected =
+                            Tuple.first
+                                (update (App.ChannelTopicSelect { channel = "#c", topic = Just "roadmap" }) tagged)
+
+                        cleared =
+                            Tuple.first
+                                (update (App.ChannelTopicSelect { channel = "#c", topic = Nothing }) selected)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query tagged
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
+                                |> Query.has [ Selector.text "All", Selector.text "Roadmap" ]
+                        , \_ ->
+                            query tagged
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
+                                |> Query.findAll [ Selector.class "topic-chip" ]
+                                |> Query.count (Expect.equal 2)
+                        , \_ ->
+                            query tagged
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ ->
+                            query tagged
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Roadmap" ] ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.ChannelTopicSelect { channel = "#c", topic = Just "Roadmap" })
+                        , \_ ->
+                            query selected
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Roadmap" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ ->
+                            query cleared
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ ->
+                            query channelModel
+                                |> Query.findAll [ Selector.class "topic-filter-bar" ]
+                                |> Query.count (Expect.equal 0)
+                        ]
+                        ()
             , test "no facepile without channel members" <|
                 \_ ->
                     query blank

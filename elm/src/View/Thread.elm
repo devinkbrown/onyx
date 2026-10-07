@@ -9,6 +9,7 @@ import Avatar
 import Dict
 import Emoji
 import Facepile
+import Topic
 import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput)
@@ -70,6 +71,7 @@ thread model =
                             in
                             div []
                                 [ facepileRow channel
+                                , topicFilterBar model channel
                                 , if win.hiddenBefore > 0 then
                                     div [ class "onyx-earlier" ]
                                         [ button
@@ -337,6 +339,83 @@ facepileRow channel =
                         []
                    )
             )
+
+
+{-| Named-conversation filter chips (mirroring
+`TopicFilterBar`: an `All` reset plus one chip per available
+topic, active states off the selected label, selection through
+the validated `ChannelTopicSelect`; shown only with the topic
+tools preference and at least one labelled row).
+-}
+topicFilterBar : Model -> App.Channel -> Html Msg
+topicFilterBar model channel =
+    let
+        topics =
+            Topic.listTopics
+                (List.map (\m -> { topic = topicLabelOf m, at = m.at }) (List.reverse channel.messages))
+
+        active =
+            App.activeChannelTopic model channel.name
+    in
+    if not model.prefs.topicTools || List.isEmpty topics then
+        text ""
+
+    else
+        div [ class "topic-filter-bar", attribute "role" "group", attribute "aria-label" "Topic filters" ]
+            (button
+                [ type_ "button"
+                , classList [ ( "topic-chip", True ), ( "topic-chip--all", True ), ( "is-active", active == Nothing ) ]
+                , attribute "aria-pressed" (boolToString (active == Nothing))
+                , onClick (App.ChannelTopicSelect { channel = channel.name, topic = Nothing })
+                ]
+                [ text "All" ]
+                :: List.map (topicChip channel.name active) topics
+            )
+
+
+topicChip : String -> Maybe String -> String -> Html Msg
+topicChip channel active label =
+    let
+        isActive =
+            case active of
+                Just selected ->
+                    String.toLower selected == String.toLower label
+
+                Nothing ->
+                    False
+    in
+    button
+        [ type_ "button"
+        , classList [ ( "topic-chip", True ), ( "is-active", isActive ) ]
+        , attribute "aria-pressed" (boolToString isActive)
+        , attribute "aria-label" label
+        , attribute "title" label
+        , onClick (App.ChannelTopicSelect { channel = channel, topic = Just label })
+        ]
+        [ span [ class "topic-chip__hash", attribute "aria-hidden" "true" ] [ text "#" ]
+        , span [ class "topic-chip__label" ] [ text label ]
+        ]
+
+
+{-| Topic label of a row (`Nothing` for untagged rows, mirroring
+the `TopicMessage` null shape).
+-}
+topicLabelOf : App.ChatMessage -> Maybe String
+topicLabelOf m =
+    if m.topic == "" then
+        Nothing
+
+    else
+        Just m.topic
+
+
+boolToString : Bool -> String
+boolToString value =
+    if value then
+        "true"
+
+    else
+        "false"
 
 
 facepileFace : String -> Facepile.Entry -> Html Msg

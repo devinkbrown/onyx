@@ -73,6 +73,13 @@
 .onyx-thread-msg-text { margin: 4px 0 0; }
 .onyx-thread-state { color: var(--onyx-dim); font-size: 12px; }
 
+/* Named-conversation filter chips. */
+
+.topic-filter-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.topic-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--onyx-line); background: transparent; color: var(--onyx-dim); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+.topic-chip.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
+.topic-chip__hash { opacity: 0.7; }
+
 /* Conversation facepile: overlapping avatar stack + overflow chip. */
 
 .onyx-facepile { display: inline-flex; align-items: center; padding: 4px 0 4px 4px; }
