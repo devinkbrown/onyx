@@ -2578,6 +2578,34 @@ suite =
                                 |> Query.count (Expect.equal 0)
                         ]
                         ()
+            , test "system rows render as plain event text" <|
+                \_ ->
+                    let
+                        withJoin =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":carol!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        q =
+                            query withJoin
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.class "onyx-system", Selector.containing [ Selector.text "carol joined" ] ] q
+                                |> Query.has
+                                    [ Selector.attribute (Attr.attribute "data-event" "system")
+                                    , Selector.attribute (Attr.attribute "role" "article")
+                                    ]
+                        , \_ ->
+                            Query.find [ Selector.class "onyx-system", Selector.containing [ Selector.text "carol joined" ] ] q
+                                |> Query.hasNot [ Selector.class "onyx-avatar" ]
+                        , \_ ->
+                            Query.find [ Selector.class "onyx-system", Selector.containing [ Selector.text "carol joined" ] ] q
+                                |> Query.hasNot [ Selector.class "onyx-sender" ]
+                        ]
+                        ()
             , test "roster rows render small hidden avatars" <|
                 \_ ->
                     let

@@ -181,87 +181,96 @@ messageRow model target prev m =
                 Nothing ->
                     False
     in
-    li
-        [ classList
-            [ ( "onyx-message", True )
-            , ( "onyx-continuation", cont )
-            , ( "onyx-whisper", m.whisper )
-            , ( "onyx-locked", App.messageLocked m )
-            , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
-            , ( "onyx-uncertain", uncertainDelivery )
-            , ( "onyx-message-search-current", App.searchActiveId model == Just m.id )
-            , ( "onyx-mention", m.highlight && not withdrawn )
-            , ( "onyx-withdrawn", withdrawn )
+    if isSystemRow m then
+        div
+            [ class "onyx-system"
+            , attribute "data-event" m.msgType
+            , attribute "role" "article"
+            , attribute "tabindex" "-1"
+            , attribute "aria-label" m.body
             ]
-        , attribute "role" "article"
-        , attribute "aria-label" (App.messageAccessibleLabel m)
-        ]
-        [ (if cont || isSystemRow m then
-            text ""
+            [ text m.body ]
 
-         else
-            div
-                [ class "onyx-row-avatar"
-                , attribute "aria-hidden" "true"
-                , style "--nick-tint" (Avatar.nickTint m.from)
+    else
+        li
+            [ classList
+                [ ( "onyx-message", True )
+                , ( "onyx-continuation", cont )
+                , ( "onyx-whisper", m.whisper )
+                , ( "onyx-locked", App.messageLocked m )
+                , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
+                , ( "onyx-uncertain", uncertainDelivery )
+                , ( "onyx-message-search-current", App.searchActiveId model == Just m.id )
+                , ( "onyx-mention", m.highlight && not withdrawn )
+                , ( "onyx-withdrawn", withdrawn )
                 ]
-                [ Avatar.view
-                    { name = m.from
-                    , owner = m.from == model.ourNick
-                    , size = Avatar.Sm
-                    , extraClass = ""
-                    , hidden = True
-                    }
-                ]
-        )
-        , (if cont then
-            text ""
+            , attribute "role" "article"
+            , attribute "aria-label" (App.messageAccessibleLabel m)
+            ]
+            [ (if cont || isSystemRow m then
+                text ""
 
-           else
-            strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
-          )
-        , (if cont then
-            text ""
+             else
+                div
+                    [ class "onyx-row-avatar"
+                    , attribute "aria-hidden" "true"
+                    , style "--nick-tint" (Avatar.nickTint m.from)
+                    ]
+                    [ Avatar.view
+                        { name = m.from
+                        , owner = m.from == model.ourNick
+                        , size = Avatar.Sm
+                        , extraClass = ""
+                        , hidden = True
+                        }
+                    ]
+            )
+            , (if cont then
+                text ""
 
-           else
-            case m.audience of
-                Nothing ->
-                    text ""
+               else
+                strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
+              )
+            , (if cont then
+                text ""
 
-                Just _ ->
-                    span
-                        [ class "onyx-audience"
-                        , attribute "title" (App.audienceTitle m.audience)
-                        ]
-                        [ text (App.audienceLabel m.audience) ]
-          )
-        , if m.at <= 0 then
-            text ""
+               else
+                case m.audience of
+                    Nothing ->
+                        text ""
 
-          else
-            time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
-                [ text (App.formatRowClock model.zone model.prefs.clock m.at) ]
-        , span [ class "onyx-body" ] (messageBody model m)
-        , if m.outboxId == Nothing && not m.pending then
-            text ""
+                    Just _ ->
+                        span
+                            [ class "onyx-audience"
+                            , attribute "title" (App.audienceTitle m.audience)
+                            ]
+                            [ text (App.audienceLabel m.audience) ]
+              )
+            , if m.at <= 0 then
+                text ""
 
-          else if uncertainDelivery then
-            span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
+              else
+                time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
+                    [ text (App.formatRowClock model.zone model.prefs.clock m.at) ]
+            , span [ class "onyx-body" ] (messageBody model m)
+            , if m.outboxId == Nothing && not m.pending then
+                text ""
 
-          else
-            span [ class "onyx-pending-note" ] [ text " · queued" ]
-        , if m.edited && not withdrawn then
-            span [ class "onyx-edited", attribute "title" (editTitle model m) ] [ text " · edited" ]
+              else if uncertainDelivery then
+                span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
 
-          else
-            text ""
-        , boostBar model target m
-        , messageMenuButton model target m
-        , messageMenuPanel model target m
-        , reactionPickerPanel model target m
-        ]
+              else
+                span [ class "onyx-pending-note" ] [ text " · queued" ]
+            , if m.edited && not withdrawn then
+                span [ class "onyx-edited", attribute "title" (editTitle model m) ] [ text " · edited" ]
 
-
+              else
+                text ""
+            , boostBar model target m
+            , messageMenuButton model target m
+            , messageMenuPanel model target m
+            , reactionPickerPanel model target m
+            ]
 {-| Per-message actions entry (mirrors the message menu trigger:
 offered only for rows with a server msgid, and only when at least
 one menu action applies; the Elm shell uses text buttons where the
