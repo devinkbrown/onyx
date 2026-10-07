@@ -298,6 +298,7 @@ type alias Model =
     , pendingAttachmentSend : Maybe { target : String, caption : String }
     , linkPreviews : Dict String (Maybe Upload.LinkPreview)
     , linkPreviewInflight : Set String
+    , previewMediaFailed : Set String
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -2569,6 +2570,7 @@ type Msg
     | UploadProgress { key : String, index : Int, loaded : Int, total : Maybe Int }
     | PreviewArrived { key : String, ok : Bool, status : Int, body : String }
     | PreviewImageAllow String
+    | PreviewMediaFailed String
     | ChannelSelect String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
@@ -2812,6 +2814,7 @@ init nick url =
     , linkPreviewInflight = Set.empty
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
+    , previewMediaFailed = Set.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -3236,6 +3239,7 @@ blank =
     , linkPreviewInflight = Set.empty
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
+    , previewMediaFailed = Set.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -7988,6 +7992,7 @@ quarantineOwnerChange model =
     , linkPreviewInflight = Set.empty
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
+    , previewMediaFailed = Set.empty
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -32261,6 +32266,7 @@ clearLinkPreviews model =
         , linkPreviewInflight = Set.empty
         , linkPreviewOrder = []
         , previewImagesAllowed = Set.empty
+        , previewMediaFailed = Set.empty
     }
 
 
@@ -33935,6 +33941,9 @@ update msg model =
 
         PreviewImageAllow url ->
             ( { model | previewImagesAllowed = Set.insert url model.previewImagesAllowed }, [] )
+
+        PreviewMediaFailed url ->
+            ( { model | previewMediaFailed = Set.insert url model.previewMediaFailed }, [] )
 
         ComposerSend ->
             case model.activeChannel of

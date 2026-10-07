@@ -265,6 +265,133 @@ suite =
                             |> Query.hasNot [ Selector.class "shell-msg-preview" ]
                     ]
                     ()
+        , test "inline media unfurl auto-loads same-origin images" <|
+            \_ ->
+                let
+                    withMedia =
+                        feed channelModel ":alice!u@h PRIVMSG #c :see https://app.example.test/pics/a.png today"
+
+                    sameOrigin =
+                        { withMedia | origin = "https://app.example.test" }
+                in
+                query sameOrigin
+                    |> Query.find [ Selector.class "onyx-media", Selector.tag "img" ]
+                    |> Query.has [ Selector.attribute (Attr.attribute "src" "https://app.example.test/pics/a.png") ]
+        , test "inline media unfurl defers cross-origin video behind consent" <|
+            \_ ->
+                let
+                    withMedia =
+                        feed channelModel ":alice!u@h PRIVMSG #c :watch https://cdn.example.test/v.mp4 now"
+
+                    remote =
+                        { withMedia | origin = "https://app.example.test" }
+
+                    allowed =
+                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/v.mp4") remote)
+                in
+                Expect.all
+                    [ \_ ->
+                        query remote
+                            |> Query.find [ Selector.class "onyx-media-consent" ]
+                            |> Query.has [ Selector.text "Load external video", Selector.text "cdn.example.test" ]
+                    , \_ ->
+                        query remote
+                            |> Query.find [ Selector.class "onyx-media-consent" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (PreviewImageAllow "https://cdn.example.test/v.mp4")
+                    , \_ ->
+                        query allowed
+                            |> Query.find [ Selector.tag "video" ]
+                            |> Query.has
+                                [ Selector.attribute (Attr.attribute "src" "https://cdn.example.test/v.mp4")
+                                , Selector.attribute (Attr.attribute "preload" "none")
+                                ]
+                    , \_ ->
+                        query allowed
+                            |> Query.hasNot [ Selector.class "onyx-media-consent" ]
+                    ]
+                    ()
+        , test "inline media unfurl renders deferred audio without preload" <|
+            \_ ->
+                let
+                    withMedia =
+                        feed channelModel ":alice!u@h PRIVMSG #c :hear https://cdn.example.test/a.mp3 ok"
+
+                    allowed =
+                        Tuple.first
+                            (update (PreviewImageAllow "https://cdn.example.test/a.mp3")
+                                { withMedia | origin = "https://app.example.test" }
+                            )
+                in
+                query allowed
+                    |> Query.find [ Selector.tag "audio" ]
+                    |> Query.has
+                        [ Selector.attribute (Attr.attribute "src" "https://cdn.example.test/a.mp3")
+                        , Selector.attribute (Attr.attribute "preload" "none")
+                        ]
+        , test "inline media unfurl stays fail-closed on prefs, hosts, and kinds" <|
+            \_ ->
+                let
+                    withMedia =
+                        feed channelModel ":alice!u@h PRIVMSG #c :see https://cdn.example.test/a.png and https://example.test/story"
+
+                    remote =
+                        { withMedia | origin = "https://app.example.test" }
+
+                    prefsOff =
+                        let
+                            p =
+                                remote.prefs
+                        in
+                        { remote | prefs = { p | linkPreviews = False } }
+
+                    blocked =
+                        let
+                            p =
+                                remote.prefs
+                        in
+                        { remote | prefs = { p | blockedHosts = [ "cdn.example.test" ] } }
+
+                    plainHttp =
+                        feed channelModel ":alice!u@h PRIVMSG #c :see http://cdn.example.test/a.png"
+                            |> (\m -> { m | origin = "https://app.example.test" })
+
+                    pageOnly =
+                        feed channelModel ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+                            |> (\m -> { m | origin = "https://app.example.test" })
+                in
+                Expect.all
+                    [ \_ -> query prefsOff |> Query.hasNot [ Selector.class "onyx-media" ]
+                    , \_ -> query blocked |> Query.hasNot [ Selector.class "onyx-media" ]
+                    , \_ -> query plainHttp |> Query.hasNot [ Selector.class "onyx-media" ]
+                    , \_ -> query pageOnly |> Query.hasNot [ Selector.class "onyx-media" ]
+                    ]
+                    ()
+        , test "inline media unfurl falls back to a link after an element error" <|
+            \_ ->
+                let
+                    withMedia =
+                        feed channelModel ":alice!u@h PRIVMSG #c :see https://app.example.test/pics/a.png today"
+
+                    failed =
+                        Tuple.first
+                            (update (PreviewMediaFailed "https://app.example.test/pics/a.png")
+                                { withMedia | origin = "https://app.example.test" }
+                            )
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal True
+                            (Set.member "https://app.example.test/pics/a.png" failed.previewMediaFailed)
+                    , \_ ->
+                        query failed
+                            |> Query.find [ Selector.class "onyx-media-fallback" ]
+                            |> Query.has [ Selector.text "Image preview unavailable — open attachment" ]
+                    , \_ ->
+                        query failed
+                            |> Query.hasNot [ Selector.tag "img" ]
+                    ]
+                    ()
         , test "pins drawer lists newest-first with jump and op unpin" <|
             \_ ->
                 let

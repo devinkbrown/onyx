@@ -6,9 +6,10 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, a, button, div, h2, img, li, section, span, strong, text, time, ul)
-import Html.Attributes exposing (attribute, class, classList, datetime, href, rel, src, target)
-import Html.Events exposing (onClick)
+import Html exposing (Html, a, audio, button, div, h2, img, li, section, span, strong, text, time, ul, video)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, href, preload, rel, src, target)
+import Html.Events exposing (on, onClick)
+import Json.Decode as Decode
 import Set
 import Prefs
 import Upload
@@ -262,6 +263,7 @@ boostChip model target m groups chip =
 {-| Row body: the caption as text plus one card per `[file]`
 receipt (images render a thumbnail; every card links the
 sanitized URL, so no `javascript:` href can reach the DOM),
+plus one inline-media unfurl per direct image/video/audio URL,
 plus the first-link OG preview card when fetched. -}
 messageBody : Model -> App.ChatMessage -> List (Html Msg)
 messageBody model m =
@@ -271,7 +273,138 @@ messageBody model m =
     in
     [ text presented.caption ]
         ++ List.map attachmentCard presented.attachments
+        ++ mediaUnfurls model (App.displayBody m)
         ++ [ previewCard model (App.displayBody m) ]
+
+
+{-| Inline-media unfurl (mirrors `MediaUnfurl`): every direct
+image/video/audio URL in the body renders an inline player gated by
+the same sink policy as OG cards — auto-load for same-origin or
+`previewableHosts` URLs, one explicit consent click otherwise, and a
+link fallback once the element reports an error. Kind detection
+reuses `classifyAttachmentKind` (extension allowlist); `KindFile`
+stays fail-closed with no unfurl. -}
+mediaUnfurls : Model -> String -> List (Html Msg)
+mediaUnfurls model body =
+    let
+        privacy =
+            App.liveUnfurlPrivacy model
+    in
+    if not privacy.linkPreviews then
+        []
+
+    else
+        List.filterMap (mediaUnfurl model privacy) (Upload.extractHttpUrls body)
+
+
+mediaUnfurl : Model -> Upload.UnfurlPrefs -> String -> Maybe (Html Msg)
+mediaUnfurl model privacy href =
+    case Upload.classifyAttachmentKind href Nothing of
+        Upload.KindFile ->
+            Nothing
+
+        kind ->
+            if Upload.isSameOriginHttpUrl model.origin href || Upload.isPreviewableUrl href privacy then
+                Just (mediaElement model kind href)
+
+            else
+                Nothing
+
+
+mediaElement : Model -> Upload.AttachmentKind -> String -> Html Msg
+mediaElement model kind href =
+    if Set.member href model.previewMediaFailed then
+        mediaFallback kind href
+
+    else if Upload.isSameOriginHttpUrl model.origin href || Set.member href model.previewImagesAllowed then
+        mediaPlayer kind href
+
+    else
+        mediaConsent kind href
+
+
+mediaKindWord : Upload.AttachmentKind -> String
+mediaKindWord kind =
+    case kind of
+        Upload.KindImage ->
+            "image"
+
+        Upload.KindVideo ->
+            "video"
+
+        Upload.KindAudio ->
+            "audio"
+
+        Upload.KindFile ->
+            "file"
+
+
+mediaPlayer : Upload.AttachmentKind -> String -> Html Msg
+mediaPlayer kind href =
+    let
+        word =
+            mediaKindWord kind
+
+        failed =
+            Decode.succeed (App.PreviewMediaFailed href)
+
+        cls =
+            "onyx-media onyx-media-" ++ word
+    in
+    case kind of
+        Upload.KindImage ->
+            img [ src href, class cls, attribute "alt" (word ++ " attachment"), on "error" failed ] []
+
+        Upload.KindVideo ->
+            video [ src href, class cls, controls True, preload "none", on "error" failed ] []
+
+        Upload.KindAudio ->
+            audio [ src href, class cls, controls True, preload "none", on "error" failed ] []
+
+        Upload.KindFile ->
+            text ""
+
+
+mediaConsent : Upload.AttachmentKind -> String -> Html Msg
+mediaConsent kind href =
+    let
+        word =
+            mediaKindWord kind
+
+        host =
+            Upload.parseAbsoluteUrl href
+                |> Maybe.map .host
+                |> Maybe.withDefault href
+    in
+    button
+        [ class "onyx-media onyx-media-consent"
+        , onClick (App.PreviewImageAllow href)
+        , attribute "aria-label" ("Load external " ++ word ++ " from " ++ host)
+        ]
+        [ text ("Load external " ++ word)
+        , span [ class "onyx-media-host" ] [ text host ]
+        ]
+
+
+mediaFallback : Upload.AttachmentKind -> String -> Html Msg
+mediaFallback kind url =
+    let
+        word =
+            case kind of
+                Upload.KindImage ->
+                    "Image"
+
+                Upload.KindVideo ->
+                    "Video"
+
+                Upload.KindAudio ->
+                    "Audio"
+
+                Upload.KindFile ->
+                    "File"
+    in
+    a [ href url, class "onyx-media onyx-media-fallback" ]
+        [ text (word ++ " preview unavailable — open attachment") ]
 
 
 {-| First-link OG card (mirrors `LinkPreviewCard`: preference-gated,
