@@ -198,6 +198,36 @@ suite =
                         ]
                         ()
             ]
+        , describe "buildExtBan"
+            [ test "builds typed and negated masks" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "$a:alice") (buildExtBan False 'a' "alice")
+                        , \_ -> Expect.equal (Just "$~m:*!*@*") (buildExtBan True 'm' "*!*@*")
+                        , \_ -> Expect.equal (Just "$o") (buildExtBan False 'o' "")
+                        , \_ -> Expect.equal (Just "$~z") (buildExtBan True 'z' "")
+                        ]
+                        ()
+            , test "refuses invalid parts" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (buildExtBan False 'x' "yz")
+                        , \_ -> Expect.equal Nothing (buildExtBan False 'a' "")
+                        , \_ -> Expect.equal Nothing (buildExtBan False 'a' "has space")
+                        , \_ -> Expect.equal Nothing (buildExtBan False 'a' "has\ttab")
+                        ]
+                        ()
+            , test "round-trips through the parser" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just { negated = True, banType = 'r', mask = "bob" })
+                                (buildExtBan True 'r' "bob" |> Maybe.andThen parseExtBan)
+                        , \_ -> Expect.equal "Account ($a:)" (extBanTypeLabel 'a')
+                        , \_ -> Expect.equal "Oper class ($o:)" (extBanTypeLabel 'o')
+                        ]
+                        ()
+            ]
         , describe "role resolution"
             [ test "plain members resolve to the member role" <|
                 \_ ->

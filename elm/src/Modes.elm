@@ -12,6 +12,9 @@ module Modes exposing
     , groupLabelFor
     , highestStatusMode
     , modeConsumesArg
+    , buildExtBan
+    , extBanTypeLabel
+    , extBanTypes
     , parseChannelModeString
     , parseChanGroups
     , parseExtBan
@@ -834,3 +837,63 @@ isMaskBad c =
             Char.toCode c
     in
     code <= 0x20 || code == 0x7F
+
+
+{-| Human label per extban type for the builder select. -}
+extBanTypeLabel : Char -> String
+extBanTypeLabel banType =
+    case banType of
+        'a' ->
+            "Account ($a:)"
+
+        'c' ->
+            "Channel ($c:)"
+
+        'g' ->
+            "Geo ($g:)"
+
+        'm' ->
+            "Mute ($m:)"
+
+        'r' ->
+            "Realname ($r:)"
+
+        'z' ->
+            "TLS ($z:)"
+
+        'o' ->
+            "Oper class ($o:)"
+
+        _ ->
+            "Unknown"
+
+
+{-| Build an extban mask from builder parts (the UI half the TS
+client never got: type + optional negation + pattern, validated
+through the same shape rules by round-tripping `parseExtBan` —
+`Nothing` means the builder shows invalid, never a guess). -}
+buildExtBan : Bool -> Char -> String -> Maybe String
+buildExtBan negated banType pattern =
+    let
+        mask =
+            "$"
+                ++ (if negated then
+                        "~"
+
+                    else
+                        ""
+                   )
+                ++ String.fromChar banType
+                ++ (if String.isEmpty pattern then
+                        ""
+
+                    else
+                        ":" ++ pattern
+                   )
+    in
+    case parseExtBan mask of
+        Just _ ->
+            Just mask
+
+        Nothing ->
+            Nothing

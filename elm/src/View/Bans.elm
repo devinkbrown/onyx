@@ -10,10 +10,11 @@ oracle mounts its equivalent inside the moderation cockpit rather than
 inline, so non-moderators never see the surface at all).
 -}
 
-import App exposing (BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
-import Html exposing (Html, button, code, div, h4, li, p, section, span, text, ul)
-import Html.Attributes exposing (attribute, class, disabled)
-import Html.Events exposing (onClick)
+import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
+import Html exposing (Html, button, code, div, h4, input, label, li, option, p, section, select, span, text, ul)
+import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, type_, value)
+import Html.Events exposing (onCheck, onClick, onInput)
+import Modes
 import String
 
 
@@ -46,8 +47,135 @@ banPanel model channel =
              ]
                 ++ statusLine view
                 ++ entryList model channel view
+                ++ addForm model channel live
                 ++ reviewDialog model channel
             )
+
+
+addForm : Model -> String -> Bool -> List (Html Msg)
+addForm model channel live =
+    let
+        form =
+            model.banAdd
+    in
+    [ section [ class "moderation-desk__ban-add", attribute "data-testid" "ban-add-form" ]
+        ([ div [ class "moderation-cockpit__head" ]
+            [ h4 [] [ text "Add a timed block" ] ]
+         , label [ class "onyx-steward-label", for "ban-add-mask" ] [ text "Mask" ]
+         , input
+            [ id "ban-add-mask"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "ban-add-mask"
+            , placeholder "nick!user@host"
+            , value form.mask
+            , disabled form.useExtBan
+            , onInput BanAddMask
+            ]
+            []
+         , label [ class "onyx-steward-label", for "ban-add-minutes" ] [ text "Minutes" ]
+         , input
+            [ id "ban-add-minutes"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "ban-add-minutes"
+            , value form.minutes
+            , onInput BanAddMinutes
+            ]
+            []
+         , label [ class "chb-check" ]
+            [ input
+                [ type_ "checkbox"
+                , checked form.useExtBan
+                , attribute "data-testid" "ban-add-ext-toggle"
+                , onCheck BanAddUseExtBan
+                ]
+                []
+            , span [] [ text "Extended ban ($a/$c/$g/$m/$r/$z/$o)" ]
+            ]
+         ]
+            ++ extBuilder form
+            ++ [ if String.isEmpty form.error then
+                    text ""
+
+                 else
+                    p [ class "moderation-cockpit__hint", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
+                        [ text form.error ]
+               , div [ class "onyx-steward-actions" ]
+                    [ button
+                        [ class "onyx-steward-btn onyx-steward-btn-primary"
+                        , attribute "data-testid" "ban-add-submit"
+                        , disabled (not live)
+                        , onClick (BanAddSubmit channel)
+                        ]
+                        [ text "Add block" ]
+                    ]
+               ]
+        )
+    ]
+
+
+extBuilder : BanAddForm -> List (Html Msg)
+extBuilder form =
+    if not form.useExtBan then
+        []
+
+    else
+        [ label [ class "onyx-steward-label", for "ban-add-ext-type" ] [ text "Type" ]
+        , select
+            [ id "ban-add-ext-type"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "ban-add-ext-type"
+            , value form.extType
+            , onInput BanAddExtType
+            ]
+            (List.map
+                (\t -> option [ value (String.fromChar t) ] [ text (Modes.extBanTypeLabel t) ])
+                (String.toList Modes.extBanTypes)
+            )
+        , label [ class "onyx-steward-label", for "ban-add-ext-pattern" ] [ text "Pattern" ]
+        , input
+            [ id "ban-add-ext-pattern"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "ban-add-ext-pattern"
+            , placeholder "alice"
+            , value form.extPattern
+            , onInput BanAddExtPattern
+            ]
+            []
+        , label [ class "chb-check" ]
+            [ input
+                [ type_ "checkbox"
+                , checked form.extNegated
+                , attribute "data-testid" "ban-add-ext-negate"
+                , onCheck BanAddExtNegated
+                ]
+                []
+            , span [] [ text "Negate ($~…)" ]
+            ]
+        , p [ class "moderation-cockpit__hint", attribute "data-testid" "ban-add-preview" ]
+            [ text
+                (case extPreview form of
+                    Just mask ->
+                        "Will add: " ++ mask
+
+                    Nothing ->
+                        "Does not validate — check the type and pattern."
+                )
+            ]
+        ]
+
+
+extPreview : BanAddForm -> Maybe String
+extPreview form =
+    let
+        banType =
+            case String.uncons form.extType of
+                Just ( t, _ ) ->
+                    t
+
+                Nothing ->
+                    'a'
+    in
+    Modes.buildExtBan form.extNegated banType (String.trim form.extPattern)
 
 
 statusLine : BanListView -> List (Html Msg)

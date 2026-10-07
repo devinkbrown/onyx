@@ -10614,6 +10614,94 @@ suite =
                         ]
                         ()
             ]
+        , describe "ban-add form"
+            [ test "raw submit sends +b and clears the form" <|
+                \_ ->
+                    let
+                        base =
+                            blankBanAdd
+
+                        live =
+                            { blank | connection = Live, banAdd = { base | mask = " *!*@* ", minutes = "10" } }
+
+                        ( m, outs ) =
+                            update (BanAddSubmit "#c") live
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.member (SendLine "MODE #c +b *!*@*\r\n") outs)
+                        , \_ -> Expect.equal "" m.banAdd.mask
+                        , \_ -> Expect.equal "" m.banAdd.error
+                        , \_ -> Expect.equal "10" m.banAdd.minutes
+                        ]
+                        ()
+            , test "extban submit builds the mask" <|
+                \_ ->
+                    let
+                        base =
+                            blankBanAdd
+
+                        live =
+                            { blank
+                                | connection = Live
+                                , banAdd = { base | useExtBan = True, extType = "a", extPattern = "alice", minutes = "30" }
+                            }
+
+                        ( m, outs ) =
+                            update (BanAddSubmit "#c") live
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.member (SendLine "MODE #c +b $a:alice\r\n") outs)
+                        , \_ -> Expect.equal "" m.banAdd.error
+                        ]
+                        ()
+            , test "bad minutes, masks, and offline report into the form" <|
+                \_ ->
+                    let
+                        base =
+                            blankBanAdd
+
+                        badMinutes =
+                            { blank | banAdd = { base | mask = "m", minutes = "0" } }
+
+                        ( m1, out1 ) =
+                            update (BanAddSubmit "#c") badMinutes
+
+                        badMask =
+                            { blank | banAdd = { base | mask = "  ", minutes = "10" } }
+
+                        ( m2, out2 ) =
+                            update (BanAddSubmit "#c") badMask
+
+                        badExt =
+                            { blank | banAdd = { base | useExtBan = True, extType = "a", extPattern = "", minutes = "10" } }
+
+                        ( m3, out3 ) =
+                            update (BanAddSubmit "#c") badExt
+
+                        offline =
+                            { blank | connection = Offline, banAdd = { base | mask = "m", minutes = "10" } }
+
+                        ( m4, out4 ) =
+                            update (BanAddSubmit "#c") offline
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out1
+                        , \_ -> Expect.equal "Enter minutes between 1 and 10080." m1.banAdd.error
+                        , \_ -> Expect.equal [] out2
+                        , \_ -> Expect.equal "Enter a ban mask." m2.banAdd.error
+                        , \_ -> Expect.equal [] out3
+                        , \_ ->
+                            Expect.equal "That extended ban does not validate — check the type and pattern."
+                                m3.banAdd.error
+                        , \_ -> Expect.equal [] out4
+                        , \_ -> Expect.equal "You are offline — reconnect to add blocks." m4.banAdd.error
+                        ]
+                        ()
+            ]
         , describe "timed bans"
             [ test "request sends +b now and schedules the unban" <|
                 \_ ->

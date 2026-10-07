@@ -932,6 +932,50 @@ suite =
                         ]
                         ()
             ]
+        , describe "ban add form"
+            [ test "raw form renders with minutes default" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            query banOpModel
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ban-add-form") ]
+                                |> Query.has [ Selector.text "Add a timed block" ]
+                        , \_ ->
+                            query banOpModel
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ban-add-minutes") ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "value" "60") ]
+                        ]
+                        ()
+            , test "extban builder previews the validated mask" <|
+                \_ ->
+                    let
+                        base =
+                            banOpModel.banAdd
+
+                        ext =
+                            { banOpModel
+                                | banAdd =
+                                    { base | useExtBan = True, extType = "a", extPattern = "alice" }
+                            }
+
+                        invalid =
+                            { banOpModel
+                                | banAdd =
+                                    { base | useExtBan = True, extType = "a", extPattern = "" }
+                            }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query ext
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ban-add-preview") ]
+                                |> Query.has [ Selector.text "Will add: $a:alice" ]
+                        , \_ ->
+                            query invalid
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ban-add-preview") ]
+                                |> Query.has [ Selector.text "Does not validate" ]
+                        ]
+                        ()
+            ]
         , describe "ban desk"
             [ test "populated panel lists masks with review buttons" <|
                 \_ ->
