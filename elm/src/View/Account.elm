@@ -16,9 +16,11 @@ renders inline in the panel where the oracle uses a Sheet modal.
 
 import App exposing (ConnectionState(..), Model, Msg(..), TotpCopy(..), TotpStatus(..), accountCertNotices, accountKeytransNotices, dropReady, isTotpCode, millisToIso, totpCodeLength)
 import Html exposing (Html, a, button, code, dd, div, dl, dt, form, h2, h3, h4, input, label, li, nav, p, section, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, pattern, placeholder, type_, value)
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, pattern, placeholder, tabindex, type_, value)
+import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
+import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 
 
@@ -68,6 +70,7 @@ accountPanel model =
                             , devicesSection model
                             , sessionSection model
                             , capsSection model
+                            , retentionSection model
                             , dataSection model
                             ]
                 ]
@@ -90,6 +93,7 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-sessions-title" ] [ text "Devices" ]
         , a [ class "onyx-account-nav__item", href "#acct-session-title" ] [ text "Session" ]
         , a [ class "onyx-account-nav__item", href "#acct-caps-title" ] [ text "Capabilities" ]
+        , a [ class "onyx-account-nav__item", href "#acct-history-title" ] [ text "History" ]
         , a [ class "onyx-account-nav__item", href "#acct-download-store-title" ] [ text "Data" ]
         ]
 
@@ -294,6 +298,138 @@ capRow row =
         , span [ class "onyx-account-cap-status" ] [ text (capStatusLabel row.status) ]
         , span [ class "onyx-account-hint" ] [ text (" — " ++ row.hint) ]
         ]
+
+
+retentionSection : Model -> Html Msg
+retentionSection model =
+    let
+        policy =
+            model.retentionPolicy
+
+        keepCurrent =
+            String.fromInt policy.keep
+
+        ageCurrent =
+            case policy.maxAgeDays of
+                Nothing ->
+                    "none"
+
+                Just days ->
+                    let
+                        id =
+                            String.fromFloat days
+                    in
+                    if List.member id (List.filterMap (\opt -> Maybe.map String.fromFloat opt) Retention.ageOptions) then
+                        id
+
+                    else
+                        "none"
+
+    in
+    section [ class "onyx-account-section", id "acct-history-title" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text "On-device history" ]
+        , span [ class "onyx-account-scope" ] [ text "This device" ]
+        , p [ class "onyx-account-hint" ]
+            [ text "Choose how much recent history this browser keeps for fast opening, offline reading, and device-memory search. Older messages are pruned automatically. Encrypted DM plaintext is never stored." ]
+        , p [ class "onyx-account-chips__label", id "acct-history-keep" ] [ text "Messages per conversation" ]
+        , p [ class "onyx-account-chips__desc" ] [ text "The newest messages retained for each room or DM on this device." ]
+        , div [ class "onyx-account-chips", attribute "role" "radiogroup", attribute "aria-labelledby" "acct-history-keep" ]
+            (List.map
+                (\keep ->
+                    let
+                        id =
+                            String.fromInt keep
+
+                        isOn =
+                            id == keepCurrent
+                    in
+                    button
+                        [ type_ "button"
+                        , class ("onyx-account-chip" ++ (if isOn then " on" else ""))
+                        , attribute "role" "radio"
+                        , attribute "aria-checked"
+                            (if isOn then
+                                "true"
+
+                             else
+                                "false"
+                            )
+                        , tabindex
+                            (if isOn then
+                                0
+
+                             else
+                                -1
+                            )
+                        , on "keydown" (retentionRadioKey "keep" keepCurrent (List.map String.fromInt Retention.keepOptions))
+                        , onClick (RetentionKeepSelected id)
+                        ]
+                        [ text (Retention.keepLabels keep) ]
+                )
+                Retention.keepOptions
+            )
+        , p [ class "onyx-account-chips__label", id "acct-history-age" ] [ text "Maximum local age" ]
+        , p [ class "onyx-account-chips__desc" ] [ text "Also prune messages older than this age, even when the message limit has room." ]
+        , div [ class "onyx-account-chips", attribute "role" "radiogroup", attribute "aria-labelledby" "acct-history-age" ]
+            (List.map
+                (\opt ->
+                    let
+                        id =
+                            case opt of
+                                Nothing ->
+                                    "none"
+
+                                Just days ->
+                                    String.fromFloat days
+
+                        isOn =
+                            id == ageCurrent
+                    in
+                    button
+                        [ type_ "button"
+                        , class ("onyx-account-chip" ++ (if isOn then " on" else ""))
+                        , attribute "role" "radio"
+                        , attribute "aria-checked"
+                            (if isOn then
+                                "true"
+
+                             else
+                                "false"
+                            )
+                        , tabindex
+                            (if isOn then
+                                0
+
+                             else
+                                -1
+                            )
+                        , on "keydown" (retentionRadioKey "age" ageCurrent retentionAgeIds)
+                        , onClick (RetentionAgeSelected id)
+                        ]
+                        [ text (Retention.ageLabels opt) ]
+                )
+                Retention.ageOptions
+            )
+        , p [ class "onyx-account-hint" ]
+            [ text "This changes only the private vault in this browser. It does not change server history or a room's EPHEMERAL retention setting." ]
+        , case model.retentionStatus of
+            Nothing ->
+                text ""
+
+            Just status ->
+                p [ class "onyx-account-status", attribute "role" "status" ] [ text status ]
+        ]
+
+
+retentionAgeIds : List String
+retentionAgeIds =
+    "none" :: List.filterMap (\opt -> Maybe.map String.fromFloat opt) Retention.ageOptions
+
+
+retentionRadioKey : String -> String -> List String -> Decode.Decoder Msg
+retentionRadioKey group current ids =
+    Decode.field "key" Decode.string
+        |> Decode.map (\key -> RetentionRadioKey { group = group, current = current, key = key })
 
 
 capStatusLabel : Session.CapStatus -> String

@@ -21085,6 +21085,117 @@ suite =
                             update ComposerSend { blank | activeChannel = Just "#c", composer = "/import" }
                     in
                     Expect.equal [ VaultImportPick ] out
+        , describe "retention policy"
+            [ test "keep selection saves and parks the applying status" <|
+                \_ ->
+                    let
+                        ( saved, out ) =
+                            update (RetentionKeepSelected "1000") blank
+
+                        saves =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        RetentionPolicySave req ->
+                                            Just req.json
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1000 saved.retentionPolicy.keep
+                        , \_ -> Expect.equal (Just "Applying local history limit…") saved.retentionStatus
+                        , \_ -> Expect.equal True (List.any (String.contains "\"keep\":1000") saves)
+                        ]
+                        ()
+            , test "unlisted keep values fall back to 400" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal 400 (Tuple.first (update (RetentionKeepSelected "999") blank)).retentionPolicy.keep
+                        , \_ -> Expect.equal 400 (Tuple.first (update (RetentionKeepSelected "lots") blank)).retentionPolicy.keep
+                        ]
+                        ()
+            , test "age selection sets and clears the cutoff" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just 30)
+                                (Tuple.first (update (RetentionAgeSelected "30") blank)).retentionPolicy.maxAgeDays
+                        , \_ ->
+                            Expect.equal Nothing
+                                (Tuple.first (update (RetentionAgeSelected "none") { blank | retentionPolicy = { keep = 400, perChannel = Dict.empty, maxAgeDays = Just 30 } })).retentionPolicy.maxAgeDays
+                        , \_ ->
+                            Expect.equal Nothing
+                                (Tuple.first (update (RetentionAgeSelected "bogus") blank)).retentionPolicy.maxAgeDays
+                        ]
+                        ()
+            , test "stored policies load silently and receipts settle the status" <|
+                \_ ->
+                    let
+                        ( loaded, _ ) =
+                            update
+                                (RetentionPolicyLoaded
+                                    (Encode.object
+                                        [ ( "keep", Encode.int 200 )
+                                        , ( "maxAgeDays", Encode.float 7 )
+                                        ]
+                                    )
+                                )
+                                blank
+
+                        ( both, _ ) =
+                            update (RetentionPolicyApplied { saved = True, pruned = True }) loaded
+
+                        ( unavailable, _ ) =
+                            update (RetentionPolicyApplied { saved = True, pruned = False }) loaded
+
+                        ( sessionOnly, _ ) =
+                            update (RetentionPolicyApplied { saved = False, pruned = False }) loaded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 200 loaded.retentionPolicy.keep
+                        , \_ -> Expect.equal (Just 7) loaded.retentionPolicy.maxAgeDays
+                        , \_ -> Expect.equal Nothing loaded.retentionStatus
+                        , \_ ->
+                            Expect.equal
+                                (Just "Local history limit saved and existing messages pruned for this device.")
+                                both.retentionStatus
+                        , \_ ->
+                            Expect.equal
+                                (Just "Local history limit saved; the vault is unavailable in this browser session.")
+                                unavailable.retentionStatus
+                        , \_ ->
+                            Expect.equal
+                                (Just "Limit applied for this session, but this browser could not save it.")
+                                sessionOnly.retentionStatus
+                        ]
+                        ()
+            , test "arrow keys walk the keep group" <|
+                \_ ->
+                    let
+                        ( moved, out ) =
+                            update (RetentionRadioKey { group = "keep", current = "400", key = "ArrowRight" }) blank
+
+                        saves =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        RetentionPolicySave req ->
+                                            Just req.json
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1000 moved.retentionPolicy.keep
+                        , \_ -> Expect.equal True (List.any (String.contains "\"keep\":1000") saves)
+                        ]
+                        ()
+            ]
             , test "optimistic sends persist msg" <|
                 \_ ->
                     let

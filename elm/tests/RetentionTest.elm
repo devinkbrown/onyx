@@ -8,6 +8,7 @@ boundaries). Mirrors the oracle `retentionPolicy` suites.
 
 import Dict
 import Expect
+import Json.Encode as Encode
 import Retention
 import Test exposing (Test, describe, test)
 
@@ -191,5 +192,50 @@ suite =
                             Retention.sanitizePolicy { keep = 0, perChannel = Dict.empty, maxAgeDays = Just 1 }
                     in
                     Expect.equal [] (Retention.selectMessagesToPrune [] policy 9999)
+            ]
+        , describe "options and storage"
+            [ test "keep and age options mirror the oracle sets" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal [ 200, 400, 1000, 5000 ] Retention.keepOptions
+                        , \_ -> Expect.equal [ "200", "400", "1,000", "5,000" ] (List.map Retention.keepLabels Retention.keepOptions)
+                        , \_ ->
+                            Expect.equal [ "Any age", "7 days", "30 days", "90 days", "1 year" ]
+                                (List.map Retention.ageLabels Retention.ageOptions)
+                        ]
+                        ()
+            , test "default policy keeps 400 with no age cutoff" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal 400 Retention.defaultPolicy.keep
+                        , \_ -> Expect.equal Nothing Retention.defaultPolicy.maxAgeDays
+                        , \_ -> Expect.equal Dict.empty Retention.defaultPolicy.perChannel
+                        ]
+                        ()
+            , test "encode and decode round-trip through sanitize" <|
+                \_ ->
+                    let
+                        policy =
+                            Retention.sanitizePolicy { keep = 1000, perChannel = Dict.fromList [ ( "#C", 50 ) ], maxAgeDays = Just 30 }
+
+                        revived =
+                            Retention.sanitizePolicy (Retention.decodeRawPolicy (Retention.encodePolicy policy))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal policy revived
+                        , \_ -> Expect.equal (Just "#c") (List.head (Dict.keys revived.perChannel))
+                        ]
+                        ()
+            , test "hostile stored JSON fails closed to defaults" <|
+                \_ ->
+                    let
+                        revived =
+                            Retention.sanitizePolicy (Retention.decodeRawPolicy (Encode.object [ ( "keep", Encode.string "lots" ) ]))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 400 revived.keep
+                        , \_ -> Expect.equal Nothing revived.maxAgeDays
+                        ]
+                        ()
             ]
         ]

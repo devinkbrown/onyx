@@ -3021,6 +3021,17 @@ suite =
                             query { blank | accountName = Just "kai", ourNick = "kai", accountOpen = True, connection = Offline }
                                 |> Query.has [ Selector.text "Connect to see what this browser connection supports." ]
                         , \_ ->
+                            query { blank | accountName = Just "kai", ourNick = "kai", accountOpen = True, retentionStatus = Just "Applying local history limit…" }
+                                |> Query.find [ Selector.id "acct-history-title" ]
+                                |> Query.has
+                                    [ Selector.text "On-device history"
+                                    , Selector.text "Messages per conversation"
+                                    , Selector.text "Maximum local age"
+                                    , Selector.text "1,000"
+                                    , Selector.text "Any age"
+                                    , Selector.text "Applying local history limit…"
+                                    ]
+                        , \_ ->
                             Query.has [ Selector.text "kai" ] q
                         ]
                         ()

@@ -4222,6 +4222,107 @@ function fetchPublicFeed(url) {
         try { app.ports.searchHotkey.send(null); } catch (err) { /* best-effort */ }
       });
     }
+    /* Device vault retention policy (mirroring `readRetentionPolicy` /
+       `writeRetentionPolicy` + `applyRetentionPolicy`: the stored JSON
+       is the source of truth — `trimTarget` re-reads it on every
+       write — and saving re-applies it across all targets at once.
+       The receipt mirrors the oracle status branches: saved+pruned,
+       saved-but-unavailable, or session-only. */
+    function sendRetentionPolicy() {
+      if (!app.ports.retentionPolicyLoaded) return;
+      var policy = readRetentionPolicy();
+      try { app.ports.retentionPolicyLoaded.send(policy); } catch (err) { /* port gone */ }
+    }
+    if (app.ports.retentionPolicyRequest) {
+      app.ports.retentionPolicyRequest.subscribe(function () { sendRetentionPolicy(); });
+      sendRetentionPolicy();
+    }
+    function pruneAllTargets(db, onDone) {
+      var seen = [];
+      var tx;
+      try {
+        tx = db.transaction(STORE, "readonly");
+      } catch (err) { onDone(0); return; }
+      var cursor;
+      try {
+        cursor = tx.objectStore(STORE).openCursor();
+      } catch (err) { onDone(0); return; }
+      cursor.onsuccess = function () {
+        var c = cursor.result;
+        if (c) {
+          var plain = vaultPlainRow(c.value);
+          seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at });
+          c.continue();
+        } else {
+          pruneCollectedTargets(db, seen, onDone);
+        }
+      };
+      cursor.onerror = function () { onDone(0); };
+    }
+    function pruneCollectedTargets(db, seen, onDone) {
+      var policy = readRetentionPolicy();
+      var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
+      var byTarget = {};
+      seen.forEach(function (entry) {
+        if (!entry.target) return;
+        (byTarget[entry.target] = byTarget[entry.target] || []).push(entry);
+      });
+      var targets = Object.keys(byTarget);
+      if (targets.length === 0) { onDone(0); return; }
+      var tx;
+      try {
+        tx = db.transaction(STORE, "readwrite");
+      } catch (err) { onDone(0); return; }
+      var store = tx.objectStore(STORE);
+      var deleted = 0;
+      var finished = false;
+      function finish(count) {
+        if (finished) return;
+        finished = true;
+        onDone(count);
+      }
+      tx.oncomplete = function () { finish(deleted); };
+      tx.onerror = function () { finish(deleted); };
+      targets.forEach(function (target) {
+        var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
+        if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
+        var prune = selectPruneIds(byTarget[target], channelPolicy, now);
+        var keyById = {};
+        byTarget[target].forEach(function (entry) { keyById[entry.id] = entry.key; });
+        prune.forEach(function (id) {
+          if (keyById[id] !== undefined) {
+            try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
+          }
+        });
+      });
+    }
+    if (app.ports.retentionPolicySave) {
+      app.ports.retentionPolicySave.subscribe(function (req) {
+        var saved = false;
+        try {
+          var parsed = (req && typeof req.json === "string") ? JSON.parse(req.json) : null;
+          var safe = sanitizeRetentionPolicy(parsed);
+          var store = (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+          if (store) {
+            store.setItem(RETENTION_POLICY_KEY, JSON.stringify(safe));
+            saved = true;
+          }
+        } catch (err) { saved = false; }
+        openVault(function (db) {
+          function receipt(pruned) {
+            if (!app.ports.retentionPolicyApplied) return;
+            try { app.ports.retentionPolicyApplied.send({ saved: saved, pruned: pruned }); } catch (err) {}
+          }
+          if (db === null) {
+            receipt(false);
+            return;
+          }
+          try {
+            pruneAllTargets(db, function (deleted) { receipt(deleted > 0); });
+          } catch (err) { receipt(false); }
+        });
+      });
+    }
     if (app.ports.appearanceStoreSceneMotion) {
       app.ports.appearanceStoreSceneMotion.subscribe(function (req) {
         if (req && typeof req.value === "string") writeSlot("onyx:scene-motion", req.value);

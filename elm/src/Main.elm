@@ -195,6 +195,18 @@ port vaultSearch : { query : String, limit : Int, seq : Int, mode : String, acti
 port vaultSearchModeSave : { mode : String } -> Cmd msg
 
 
+port retentionPolicyRequest : () -> Cmd msg
+
+
+port retentionPolicySave : { json : String } -> Cmd msg
+
+
+port retentionPolicyLoaded : (Encode.Value -> msg) -> Sub msg
+
+
+port retentionPolicyApplied : ({ saved : Bool, pruned : Bool } -> msg) -> Sub msg
+
+
 port vaultClassifyDm : { target : String } -> Cmd msg
 
 
@@ -892,6 +904,7 @@ init rawFlags url key =
         , savedSearchesList ()
         , guidesProgressRequest ()
         , appearanceRequest ()
+        , retentionPolicyRequest ()
         ]
     )
         |> (\( model, cmds ) ->
@@ -1127,6 +1140,12 @@ perform key outbound =
 
         App.TranscriptDownload req ->
             transcriptDownload req
+
+        App.RetentionPolicyRequest ->
+            retentionPolicyRequest ()
+
+        App.RetentionPolicySave req ->
+            retentionPolicySave req
 
         App.AppearanceStoreSceneMotion req ->
             appearanceStoreSceneMotion req
@@ -1365,6 +1384,8 @@ subscriptions model =
         , notifyPermissionChanged App.NotifyPermissionChanged
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , searchHotkey (\_ -> App.SearchHotkey)
+        , retentionPolicyLoaded App.RetentionPolicyLoaded
+        , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived
         , vaultSearched App.VaultSearched
         , vaultDmPrivacyClassified App.VaultDmPrivacyClassified

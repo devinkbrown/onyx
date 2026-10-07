@@ -55,6 +55,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import RecoveryCodes
 import Regex
+import Retention
 import Route exposing (Route)
 import SavedSearches
 import Schedule
@@ -407,6 +408,8 @@ type alias Model =
     , vaultPersistOrder : List String
     , modexModes : Dict String (List String)
     , modexPending : Dict String (List String)
+    , retentionPolicy : Retention.RetentionPolicy
+    , retentionStatus : Maybe String
     , historyLanding : Maybe String
     , accountName : Maybe String
     , identifyReplyAccount : Maybe String
@@ -778,6 +781,8 @@ type Outbound
     | VoiceMute { muted : Bool }
     | VaultExportRequest
     | VaultImportPick
+    | RetentionPolicyRequest
+    | RetentionPolicySave { json : String }
     | OutboxQueue { target : String, text : String }
     | OutboxFlush { labeled : Bool }
     | OutboxRetryTimer { delayMs : Int }
@@ -2354,6 +2359,11 @@ type Msg
     | VaultOpenHit { target : String, at : Int }
     | SearchRunServer
     | SearchHotkey
+    | RetentionKeepSelected String
+    | RetentionAgeSelected String
+    | RetentionRadioKey { group : String, current : String, key : String }
+    | RetentionPolicyLoaded Decode.Value
+    | RetentionPolicyApplied { saved : Bool, pruned : Bool }
     | ServerOpenResult { target : String }
     | VaultExported { targets : Int, messages : Int }
     | VaultStored { target : String, stored : Int }
@@ -2894,6 +2904,8 @@ init nick url =
     , vaultPersistOrder = []
     , modexModes = Dict.empty
     , modexPending = Dict.empty
+    , retentionPolicy = Retention.defaultPolicy
+    , retentionStatus = Nothing
     , historyLanding = Nothing
     , accountName = Nothing
     , currentNickIsAlias = False
@@ -3316,6 +3328,8 @@ blank =
     , vaultPersistOrder = []
     , modexModes = Dict.empty
     , modexPending = Dict.empty
+    , retentionPolicy = Retention.defaultPolicy
+    , retentionStatus = Nothing
     , historyLanding = Nothing
     , accountName = Nothing
     , currentNickIsAlias = False
@@ -17054,6 +17068,37 @@ requestModex model raw =
                 { model | composer = "" }
             , []
             )
+
+
+{-| The retention policy in force (mirroring `policy()`). -}
+currentRetention : Model -> Retention.RetentionPolicy
+currentRetention model =
+    model.retentionPolicy
+
+
+{-| Option ids for one retention radio group (mirroring
+`VAULT_KEEP_OPTIONS` / `VAULT_AGE_OPTIONS` with the `none` age). -}
+retentionOptionIds : String -> List String
+retentionOptionIds group =
+    if group == "keep" then
+        List.map String.fromInt Retention.keepOptions
+
+    else
+        "none" :: List.filterMap (\opt -> Maybe.map String.fromFloat opt) Retention.ageOptions
+
+
+{-| Persist a retention choice (mirroring `applyPolicy` minus the
+async prune: sanitize-then-hold locally, write through the storage
+bridge, and park the in-flight status — the `RetentionPolicyApplied`
+receipt settles it). -}
+saveRetentionPolicy : Model -> Retention.RetentionPolicy -> ( Model, List Outbound )
+saveRetentionPolicy model next =
+    ( { model
+        | retentionPolicy = next
+        , retentionStatus = Just "Applying local history limit…"
+      }
+    , [ RetentionPolicySave { json = Encode.encode 0 (Retention.encodePolicy next) } ]
+    )
 
 
 {-| Download this view's local scrollback (mirroring the oracle
@@ -34245,6 +34290,110 @@ update msg model =
 
             else
                 ( scheduleVaultSearch { model | searchOpen = True, composer = "" }, [] )
+
+        RetentionKeepSelected raw ->
+            -- Keep-count segmented control (mirroring `setKeep`:
+            -- unlisted values fall back to the 400 default).
+            case String.toInt (String.trim raw) of
+                Just keep ->
+                    if List.member keep Retention.keepOptions then
+                        let
+                            current =
+                                model.retentionPolicy
+                        in
+                        saveRetentionPolicy model { current | keep = keep }
+
+                    else
+                        let
+                            current =
+                                model.retentionPolicy
+                        in
+                        saveRetentionPolicy model { current | keep = Retention.defaultKeep }
+
+                Nothing ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | keep = Retention.defaultKeep }
+
+        RetentionAgeSelected raw ->
+            -- Age-cutoff segmented control (mirroring `setAge`:
+            -- `none` drops the cutoff, unlisted values drop it too,
+            -- per-channel overrides ride along untouched).
+            case String.trim raw of
+                "7" ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | maxAgeDays = Just 7 }
+
+                "30" ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | maxAgeDays = Just 30 }
+
+                "90" ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | maxAgeDays = Just 90 }
+
+                "365" ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | maxAgeDays = Just 365 }
+
+                _ ->
+                    let
+                        current =
+                            model.retentionPolicy
+                    in
+                    saveRetentionPolicy model { current | maxAgeDays = Nothing }
+
+        RetentionPolicyLoaded value ->
+            -- Stored policy adopted silently (mirroring the subscribe
+            -- fold: sanitize-then-hold, no status line).
+            ( { model | retentionPolicy = Retention.sanitizePolicy (Retention.decodeRawPolicy value) }, [] )
+
+        RetentionRadioKey { group, current, key } ->
+            -- Arrow/Home/End move within one retention radio group
+            -- (mirroring the Appearance chips: DOM focus travel stays
+            -- a documented narrowing).
+            case radioTarget (retentionOptionIds group) current key of
+                Nothing ->
+                    ( model, [] )
+
+                Just target ->
+                    if group == "keep" then
+                        update (RetentionKeepSelected target) model
+
+                    else
+                        update (RetentionAgeSelected target) model
+
+        RetentionPolicyApplied { saved, pruned } ->
+            -- Save/prune receipt (mirroring the oracle status branches).
+            ( { model
+                | retentionStatus =
+                    Just
+                        (if saved && pruned then
+                            "Local history limit saved and existing messages pruned for this device."
+
+                         else if saved then
+                            "Local history limit saved; the vault is unavailable in this browser session."
+
+                         else
+                            "Limit applied for this session, but this browser could not save it."
+                        )
+              }
+            , []
+            )
 
         SearchQuery { query } ->
             -- Bounded input with spaces preserved; a new query

@@ -1,8 +1,15 @@
 module Retention exposing
     ( RetentionPolicy
     , RawPolicy
+    , ageLabels
+    , ageOptions
     , dayMs
+    , decodeRawPolicy
     , defaultKeep
+    , defaultPolicy
+    , encodePolicy
+    , keepLabels
+    , keepOptions
     , maxAgeDaysCeiling
     , maxKeep
     , storageKey
@@ -23,13 +30,16 @@ cutoff would drop it.
 The IndexedDB save/prune path stays ports-side (`ports.js` carries a
 structurally-identical mirror, exercised by `vaultHistory.smoke.mjs`);
 this module is the shared truth for validation and selection, and the
-executable spec lives in `tests/RetentionTest.elm`. There is no
-preferences UI in the Elm client yet, so no Elm caller sets a policy —
-the ports mirror reads `storageKey` live on every trim, which is also
-how a future UI (or a manually-stored value) takes effect.
+executable spec lives in `tests/RetentionTest.elm`. The Account
+settings "On-device history" section (`View.Account.retentionSection`)
+is the preferences UI: keep/age segmented controls persist through the
+`retentionPolicySave` bridge (which re-applies across all targets at
+once) and the stored policy arrives back over `retentionPolicyLoaded`.
 -}
 
 import Dict exposing (Dict)
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Set
 
 
@@ -62,6 +72,111 @@ dayMs =
 storageKey : String
 storageKey =
     "onyx:vault-retention-policy"
+
+
+{-| Keep-count options for the segmented control (mirroring
+`VAULT_KEEP_OPTIONS` and `VAULT_KEEP_LABELS`). -}
+keepOptions : List Int
+keepOptions =
+    [ 200, 400, 1000, 5000 ]
+
+
+keepLabels : Int -> String
+keepLabels keep =
+    if keep == 1000 then
+        "1,000"
+
+    else if keep == 5000 then
+        "5,000"
+
+    else
+        String.fromInt keep
+
+
+{-| Age-cutoff options for the segmented control (mirroring
+`VAULT_AGE_OPTIONS` and `VAULT_AGE_LABELS`; `Nothing` is "any age"). -}
+ageOptions : List (Maybe Float)
+ageOptions =
+    [ Nothing, Just 7, Just 30, Just 90, Just 365 ]
+
+
+ageLabels : Maybe Float -> String
+ageLabels maybeDays =
+    case maybeDays of
+        Nothing ->
+            "Any age"
+
+        Just days ->
+            if days == 7 then
+                "7 days"
+
+            else if days == 30 then
+                "30 days"
+
+            else if days == 90 then
+                "90 days"
+
+            else if days == 365 then
+                "1 year"
+
+            else
+                String.fromFloat days ++ " days"
+
+
+{-| The policy in force with nothing stored (mirroring the ports
+`readRetentionPolicy` fallback). -}
+defaultPolicy : RetentionPolicy
+defaultPolicy =
+    { keep = defaultKeep
+    , perChannel = Dict.empty
+    , maxAgeDays = Nothing
+    }
+
+
+{-| Encode a validated policy for the storage bridge (mirroring
+`writeRetentionPolicy`'s `JSON.stringify(safe)` shape). -}
+encodePolicy : RetentionPolicy -> Encode.Value
+encodePolicy policy =
+    Encode.object
+        ([ ( "keep", Encode.int policy.keep ) ]
+            ++ (case policy.maxAgeDays of
+                    Just days ->
+                        [ ( "maxAgeDays", Encode.float days ) ]
+
+                    Nothing ->
+                        []
+               )
+            ++ (if Dict.isEmpty policy.perChannel then
+                    []
+
+                else
+                    [ ( "perChannel", Encode.dict identity Encode.int policy.perChannel ) ]
+               )
+        )
+
+
+{-| Decode an untrusted stored policy into the raw shape for
+`sanitizePolicy` (unknown or malformed fields are `Nothing`/empty —
+sanitize fails them closed downstream). -}
+decodeRawPolicy : Decode.Value -> RawPolicy
+decodeRawPolicy value =
+    let
+        keep =
+            Decode.decodeValue (Decode.field "keep" Decode.float) value
+                |> Result.withDefault (toFloat defaultKeep)
+
+        perChannel =
+            Decode.decodeValue (Decode.field "perChannel" (Decode.dict Decode.float)) value
+                |> Result.withDefault Dict.empty
+
+        maxAgeDays =
+            Decode.decodeValue (Decode.field "maxAgeDays" Decode.float) value
+                |> Result.toMaybe
+    in
+    { keep = keep
+    , perChannel = perChannel
+    , maxAgeDays = maxAgeDays
+    }
 
 
 {-| Untrusted policy shape (e.g. parsed localStorage JSON). Counts
