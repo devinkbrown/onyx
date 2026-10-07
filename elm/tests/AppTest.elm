@@ -2593,6 +2593,109 @@ suite =
                     , \_ -> Expect.equal 2 (List.length (topicVisibleRows blank "#c" rows))
                     ]
                     ()
+        , test "topic selection narrows the unread surface" <|
+            \_ ->
+                let
+                    unreadOf m =
+                        case Dict.get "#c" m.channels of
+                            Just ch ->
+                                ch.unread
+
+                            Nothing ->
+                                -1
+
+                    ( watched, _ ) =
+                        update (ChannelSelect "#c") (joinFirst blank "me" "#c")
+
+                    ( seeded, _ ) =
+                        feed watched "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :seed"
+
+                    ( selected, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "roadmap" }) seeded
+
+                    ( sameTopic, _ ) =
+                        feed selected "@onyx/topic=ROADMAP :bob!u@h PRIVMSG #c :in the roadmap thread"
+
+                    ( otherTopic, _ ) =
+                        feed sameTopic "@onyx/topic=Release :bob!u@h PRIVMSG #c :hidden in release"
+
+                    firstId =
+                        Dict.get "#c" otherTopic.firstUnreadId
+
+                    ( untagged, _ ) =
+                        feed otherTopic ":bob!u@h PRIVMSG #c :whole room chat"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "Roadmap") (activeChannelTopic selected "#c")
+                    , \_ -> Expect.equal 0 (unreadOf sameTopic)
+                    , \_ -> Expect.equal False (Dict.member "#c" sameTopic.firstUnreadId)
+                    , \_ -> Expect.equal 1 (unreadOf otherTopic)
+                    , \_ -> Expect.equal True (Dict.member "#c" otherTopic.firstUnreadId)
+                    , \_ -> Expect.equal 2 (unreadOf untagged)
+                    , \_ -> Expect.equal firstId (Dict.get "#c" untagged.firstUnreadId)
+                    ]
+                    ()
+        , test "hidden topics notify follows and honor the notify level" <|
+            \_ ->
+                let
+                    unreadOf m =
+                        case Dict.get "#c" m.channels of
+                            Just ch ->
+                                ch.unread
+
+                            Nothing ->
+                                -1
+
+                    follows m =
+                        List.filter (\note -> note.kind == NotifFollow) m.notifications
+
+                    ( watched, _ ) =
+                        update (ChannelSelect "#c") (joinFirst blank "me" "#c")
+
+                    ( seeded, _ ) =
+                        feed watched "@onyx/topic=RoadMap :alice!u@h PRIVMSG #c :seed"
+
+                    ( selected, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "RoadMap" }) seeded
+
+                    ( withFollows, _ ) =
+                        update (FollowConversation { target = "#c", topic = Just "roadmap" }) selected
+
+                    ( withBoth, _ ) =
+                        update (FollowConversation { target = "#c", topic = Just "release" }) withFollows
+
+                    ( sameCase, _ ) =
+                        feed withBoth "@onyx/topic=ROADMAP :alice!u@h PRIVMSG #c :in the roadmap thread"
+
+                    ( hidden, _ ) =
+                        feed sameCase "@onyx/topic=Release :alice!u@h PRIVMSG #c :followed hidden release"
+
+                    muted =
+                        { hidden | channelNotify = Dict.fromList [ ( "#c", "none" ) ] }
+
+                    ( suppressed, _ ) =
+                        feed muted "@onyx/topic=Release :alice!u@h PRIVMSG #c :stored quietly"
+
+                    stored =
+                        case Dict.get "#c" suppressed.channels of
+                            Just ch ->
+                                List.any (\row -> row.body == "stored quietly") ch.messages
+
+                            Nothing ->
+                                False
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 0 (unreadOf sameCase)
+                    , \_ -> Expect.equal [] (follows sameCase)
+                    , \_ -> Expect.equal 1 (unreadOf hidden)
+                    , \_ -> Expect.equal True (Dict.member "#c" hidden.firstUnreadId)
+                    , \_ -> Expect.equal 1 (List.length (follows hidden))
+                    , \_ -> Expect.equal [ Just "Release" ] (List.map .topic (follows hidden))
+                    , \_ -> Expect.equal True stored
+                    , \_ -> Expect.equal 1 (unreadOf suppressed)
+                    , \_ -> Expect.equal 1 (List.length (follows suppressed))
+                    ]
+                    ()
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let
