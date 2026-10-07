@@ -6,6 +6,7 @@ module Invite exposing
     , OgMeta
     , buildInviteCard
     , buildInviteLink
+    , buildMomentLink
     , formEncode
     , guestNameError
     , inviteDescription
@@ -800,3 +801,36 @@ buildInviteLink spec opts nowMs =
     , appHref = opts.appOrigin ++ query
     , hasChannel = card.channel /= Nothing
     }
+
+
+{-| Shareable channel-moment link (mirrors `buildMomentLink`): the
+origin of the running app with `/app/?join=<channel>&at=<iso>`,
+stale paths/queries/hashes dropped. Unparseable origins yield
+`Nothing` (fail-closed — no link is ever guessed). -}
+buildMomentLink : String -> String -> Float -> Maybe String
+buildMomentLink origin channel atMs =
+    case String.indexes "://" origin of
+        [] ->
+            Nothing
+
+        sep :: _ ->
+            let
+                authority =
+                    String.dropLeft (sep + 3) origin
+                        |> String.split "/"
+                        |> List.head
+                        |> Maybe.withDefault ""
+            in
+            if String.isEmpty authority then
+                Nothing
+
+            else
+                Just
+                    (String.left sep origin
+                        ++ "://"
+                        ++ authority
+                        ++ "/app/?join="
+                        ++ formEncode channel
+                        ++ "&at="
+                        ++ formEncode (SavedSearches.isoFromMillis atMs)
+                    )

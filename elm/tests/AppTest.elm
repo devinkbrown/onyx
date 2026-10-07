@@ -2682,6 +2682,46 @@ suite =
                     , \_ -> Expect.equal Time.utc (.zone (Tuple.first (update (ZoneReceived Time.utc) blank)))
                     ]
                     ()
+        , test "moment copy emits a clipboard outbound" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        update (MessageCopyMoment { target = "#c", at = 1783535400000 })
+                            { blank | origin = "https://app.example.test/thread?x=1" }
+                in
+                Expect.equal
+                    [ ClipboardCopy
+                        { text = "https://app.example.test/app/?join=%23c&at=2026-07-08T18%3A30%3A00.000Z"
+                        , tag = "moment"
+                        }
+                    ]
+                    out
+        , test "moment copy without an origin fails closed with a toast" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update (MessageCopyMoment { target = "#c", at = 1783535400000 }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal [ "Copy failed" ] (List.map .title m.toasts)
+                    ]
+                    ()
+        , test "moment copy result toasts verbatim oracle copy" <|
+            \_ ->
+                let
+                    ( okModel, _ ) =
+                        update (ClipboardResult { tag = "moment", ok = True }) blank
+
+                    ( badModel, _ ) =
+                        update (ClipboardResult { tag = "moment", ok = False }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Moment copied" ] (List.map .title okModel.toasts)
+                    , \_ -> Expect.equal [ "Moment link copied." ] (List.filterMap .description okModel.toasts)
+                    , \_ -> Expect.equal [ "Copy failed" ] (List.map .title badModel.toasts)
+                    ]
+                    ()
         , test "vault query schedules a debounced scan" <|
             \_ ->
                 let

@@ -2616,6 +2616,7 @@ type Msg
     | MediaLightboxOpen String
     | MediaLightboxClose
     | MediaSave String
+    | MessageCopyMoment { target : String, at : Int }
     | ZoneReceived Time.Zone
     | ChannelSelect String
     | ThreadShowEarlier
@@ -34009,6 +34010,25 @@ update msg model =
         MediaSave url ->
             ( model, [ MediaSaveDownload { href = url, name = Upload.mediaSaveName url Nothing } ] )
 
+        MessageCopyMoment { target, at } ->
+            case Invite.buildMomentLink model.origin target (toFloat at) of
+                Just link ->
+                    ( model, [ ClipboardCopy { text = link, tag = "moment" } ] )
+
+                Nothing ->
+                    ( addToast
+                        { variant = ToastError
+                        , title = "Copy failed"
+                        , description = Just "Moment link is unavailable."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
         ZoneReceived zone ->
             ( { model | zone = zone }, [] )
 
@@ -34618,6 +34638,36 @@ update msg model =
 
             else if tag == "create-invite" then
                 ( foldCreateCopyResult model ok, [] )
+
+            else if tag == "moment" then
+                -- Mirrors the menu's moment-link report copy verbatim.
+                if ok then
+                    ( addToast
+                        { variant = ToastSuccess
+                        , title = "Moment copied"
+                        , description = Just "Moment link copied."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
+
+                else
+                    ( addToast
+                        { variant = ToastError
+                        , title = "Copy failed"
+                        , description = Just "Allow clipboard access in this browser and try again."
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        model.nowMs
+                        model
+                    , []
+                    )
 
             else if tag == "stats-compare" then
                 -- A result for a previous selection never announces the

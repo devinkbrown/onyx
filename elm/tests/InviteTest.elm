@@ -374,4 +374,63 @@ suite =
                         ]
                         ()
             ]
+        , describe "buildMomentLink"
+                [ test "builds the canonical app time-travel URL" <|
+                    \_ ->
+                        Expect.equal
+                            (Just "https://onyx.example/app/?join=%23root&at=2026-07-08T18%3A30%3A00.000Z")
+                            (buildMomentLink "https://onyx.example/stats?from=old#pulse" "#root" 1783535400000)
+                , test "encodes DM-style targets and drops stale query" <|
+                    \_ ->
+                        Expect.equal
+                            (Just "https://onyx.example/app/?join=%26ops&at=2026-07-08T18%3A30%3A00.000Z")
+                            (buildMomentLink "https://onyx.example/app/?utm=drop" "&ops" 1783535400000)
+                , test "round-trips the channel through parseJoinParam" <|
+                    \_ ->
+                        case buildMomentLink "https://onyx.example/app/" "#dev-ops.chat" 1783512000000 of
+                            Nothing ->
+                                Expect.fail "expected a moment link"
+
+                            Just link ->
+                                let
+                                    query =
+                                        link
+                                            |> String.split "?"
+                                            |> List.drop 1
+                                            |> List.head
+                                            |> Maybe.withDefault ""
+
+                                    value name =
+                                        query
+                                            |> String.split "&"
+                                            |> List.filterMap
+                                                (\part ->
+                                                    case String.split "=" part of
+                                                        [ k, v ] ->
+                                                            if k == name then
+                                                                Just v
+
+                                                            else
+                                                                Nothing
+
+                                                        _ ->
+                                                            Nothing
+                                                )
+                                            |> List.head
+                                in
+                                Expect.all
+                                    [ \_ -> Expect.equal (Just "#dev-ops.chat") (parseJoinParam (value "join"))
+                                    , \_ -> Expect.equal True (String.contains "at=2026-07-08T12%3A00%3A00.000Z" link)
+                                    ]
+                                    ()
+                , test "fails closed on unparseable origins" <|
+                    \_ ->
+                        Expect.all
+                            [ \_ -> Expect.equal Nothing (buildMomentLink "" "#c" 1783512000000)
+                            , \_ -> Expect.equal Nothing (buildMomentLink "notaurl" "#c" 1783512000000)
+                            , \_ -> Expect.equal Nothing (buildMomentLink "https:///" "#c" 1783512000000)
+                            ]
+                            ()
+                ]
         ]
+
