@@ -258,6 +258,27 @@ isChatHistory outbound =
             False
 
 
+vaultTestRow : Int -> String -> List MessageReaction -> ChatMessage
+vaultTestRow id body reactions =
+    { id = id
+    , from = "alice"
+    , body = body
+    , whisper = False
+    , audience = Nothing
+    , highlight = False
+    , outboxId = Nothing
+    , pending = False
+    , plaintext = Nothing
+    , at = 0
+    , msgid = Nothing
+    , reactions = reactions
+    , edited = False
+    , deleted = False
+    , redacted = False
+    , topic = ""
+    }
+
+
 {-| Live-traffic base: self-JOIN first. The oracle's `_addChannelMessage`
 drops channel traffic without a room shell, so fixtures asserting on
 folded live rows must establish membership before the traffic. -}
@@ -5221,6 +5242,128 @@ suite =
                             joined
                 in
                 Expect.equal 0 loaded.messageSeq
+        , test "vault signatures match the oracle byte-for-byte" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal "0:ztntfp" (vaultBufferSignature [])
+                    , \_ ->
+                        Expect.equal "1:r6bmc7"
+                            (vaultBufferSignature [ vaultTestRow 0 "hello world" [] ])
+                    , \_ ->
+                        let
+                            reacted =
+                                vaultTestRow 1 "hi" [ { emoji = "👍", users = [ "alice", "bob" ] } ]
+                        in
+                        Expect.equal "1:146gjp"
+                            (vaultBufferSignature [ { reacted | edited = True } ])
+                    , \_ ->
+                        Expect.equal True
+                            (vaultBufferSignature [ vaultTestRow 0 "a" [] ]
+                                /= vaultBufferSignature [ vaultTestRow 0 "b" [] ]
+                            )
+                    ]
+                    ()
+        , test "vault flush persists inbound rows once, then stays quiet" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                    ( m1, out1 ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    persists1 =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    VaultPersist persist ->
+                                        Just persist
+
+                                    _ ->
+                                        Nothing
+                            )
+                            out1
+
+                    ( m2, out2 ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :hello again"
+
+                    ( _, out3 ) =
+                        flushVaultBuffer m2 "#c"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "#c" ]
+                            (List.map .target persists1)
+                    , \_ ->
+                        Expect.equal [ "hello" ]
+                            (List.concatMap (.rows >> List.map .body) persists1)
+                    , \_ -> Expect.equal True (Dict.member "#c" m1.vaultPersistSig)
+                    , \_ ->
+                        Expect.equal True
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        VaultPersist _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out2
+                            )
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        VaultPersist _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out3
+                            )
+                    ]
+                    ()
+        , test "vault flush skips pending placeholders" <|
+            \_ ->
+                let
+                    ghost =
+                        vaultTestRow 1 "ghost" []
+
+                    rows =
+                        [ vaultTestRow 0 "settled" [], { ghost | pending = True } ]
+
+                    ( pending, _ ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                    ( flushed, flushOut ) =
+                        flushVaultBuffer pending "#c"
+
+                    ( quiet, quietOut ) =
+                        flushVaultBuffer flushed "#c"
+
+                    persists =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    VaultPersist persist ->
+                                        Just persist
+
+                                    _ ->
+                                        Nothing
+                            )
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ 0 ] (List.map .id (persistableVaultRows rows))
+                    , \_ ->
+                        Expect.equal [ { target = "#c", rows = [] } ]
+                            (persists flushOut)
+                    , \_ -> Expect.equal [] (persists quietOut)
+                    , \_ -> Expect.equal True (Dict.member "#c" quiet.vaultPersistSig)
+                    ]
+                    ()
         , test "unavailable history logs on an empty channel, stays silent over live traffic" <|
             \_ ->
                 let
