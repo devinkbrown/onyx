@@ -197,6 +197,7 @@ type alias ModerationDeskForm =
     , action : String
     , reason : String
     , mask : String
+    , invite : String
     }
 
 
@@ -206,6 +207,7 @@ blankModerationDesk =
     , action = "kick"
     , reason = ""
     , mask = ""
+    , invite = ""
     }
 
 
@@ -2626,6 +2628,9 @@ type Msg
     | ModerationDeskMask String
     | ModerationDeskSubmitMember String
     | ModerationDeskSubmitBan String
+    | ModerationDeskInvite String
+    | ModerationDeskSubmitInvite String
+    | ModerationDeskToggleMode String String
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -37772,6 +37777,72 @@ update msg model =
               }
             , []
             )
+
+        ModerationDeskInvite nick ->
+            let
+                desk =
+                    model.moderationDesk
+            in
+            ( { model | moderationDesk = { desk | invite = nick } }, [] )
+
+        ModerationDeskSubmitInvite channel ->
+            -- The desk invite row sends directly (mirroring
+            -- `sendInvite`: RFC order `INVITE <nick> <channel>`,
+            -- gated on room authority and a live connection, with
+            -- the field cleared after the send).
+            case String.trim model.moderationDesk.invite of
+                "" ->
+                    ( model, [] )
+
+                nick ->
+                    if model.connection /= Live || not (isChannelOp model channel) then
+                        ( model, [] )
+
+                    else
+                        let
+                            desk =
+                                model.moderationDesk
+                        in
+                        ( { model | moderationDesk = { desk | invite = "" } }
+                        , [ SendLine (Wire.formatIrcLine "INVITE" [ nick, channel ]) ]
+                        )
+
+        ModerationDeskToggleMode channel letter ->
+            -- A safeguard toggle (mirroring `toggleMode`); only the
+            -- three desk letters flip, and only with room authority
+            -- on a live connection.
+            if model.connection /= Live || not (isChannelOp model channel) then
+                ( model, [] )
+
+            else
+                case String.uncons letter of
+                    Just ( flag, "" ) ->
+                        if flag /= 'm' && flag /= 'i' && flag /= 't' then
+                            ( model, [] )
+
+                        else
+                            let
+                                flags =
+                                    case Dict.get (String.toLower channel) model.channels of
+                                        Nothing ->
+                                            []
+
+                                        Just room ->
+                                            (Modes.parseChannelModeString room.modes).flags
+
+                                sign =
+                                    if List.member flag flags then
+                                        "-"
+
+                                    else
+                                        "+"
+                            in
+                            ( model
+                            , [ SendLine (Wire.formatIrcLine "MODE" [ channel, sign ++ letter ]) ]
+                            )
+
+                    _ ->
+                        ( model, [] )
 
         ModerationConfirm ->
             -- Confirm re-validates and invalidates on disconnect or

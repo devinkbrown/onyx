@@ -13593,6 +13593,77 @@ suite =
                         , \_ -> Expect.equal Nothing (Maybe.andThen .target blanked.moderationDraft)
                         ]
                         ()
+            , test "moderation desk invite and safeguard toggles send gated lines" <|
+                \_ ->
+                    let
+                        prefs =
+                            blank.prefs
+
+                        room modes =
+                            let base = shellOf "#c" 0 -1 in { base | modes = modes, members = Dict.fromList [ ( "me", { nick = "me", modes = Set.singleton 'o', away = False } ), ( "alice", { nick = "alice", modes = Set.empty, away = False } ) ] }
+
+                        opped =
+                            { blank
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = ExperienceAdvanced }
+                                , channels = Dict.singleton "#c" (room "+nt")
+                            }
+
+                        ( withInvite, _ ) =
+                            update (ModerationDeskInvite "carol") opped
+
+                        ( invited, inviteOut ) =
+                            update (ModerationDeskSubmitInvite "#c") withInvite
+
+                        ( blankInvite, blankInviteOut ) =
+                            update (ModerationDeskSubmitInvite "#c") opped
+
+                        ( offlineInvite, offlineInviteOut ) =
+                            update (ModerationDeskSubmitInvite "#c") { withInvite | connection = Offline }
+
+                        voiced =
+                            { opped | channels = Dict.singleton "#c" (let base = shellOf "#c" 0 -1 in { base | members = Dict.fromList [ ( "me", { nick = "me", modes = Set.singleton 'v', away = False } ) ] }) }
+
+                        voicedDesk =
+                            voiced.moderationDesk
+
+                        ( _, voicedOut ) =
+                            update (ModerationDeskSubmitInvite "#c") { voiced | moderationDesk = { voicedDesk | invite = "carol" } }
+
+                        ( _, addOut ) =
+                            update (ModerationDeskToggleMode "#c" "m") opped
+
+                        ( _, removeOut ) =
+                            update (ModerationDeskToggleMode "#c" "t") opped
+
+                        ( _, inviteOnlyOut ) =
+                            update (ModerationDeskToggleMode "#c" "i") opped
+
+                        ( _, badLetterOut ) =
+                            update (ModerationDeskToggleMode "#c" "o") opped
+
+                        ( _, offlineToggleOut ) =
+                            update (ModerationDeskToggleMode "#c" "m") { opped | connection = Offline }
+
+                        ( _, voicedToggleOut ) =
+                            update (ModerationDeskToggleMode "#c" "m") voiced
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "carol" withInvite.moderationDesk.invite
+                        , \_ -> Expect.equal [ SendLine "INVITE carol #c\r\n" ] inviteOut
+                        , \_ -> Expect.equal "" invited.moderationDesk.invite
+                        , \_ -> Expect.equal [] blankInviteOut
+                        , \_ -> Expect.equal [] offlineInviteOut
+                        , \_ -> Expect.equal "carol" offlineInvite.moderationDesk.invite
+                        , \_ -> Expect.equal [] voicedOut
+                        , \_ -> Expect.equal [ SendLine "MODE #c +m\r\n" ] addOut
+                        , \_ -> Expect.equal [ SendLine "MODE #c -t\r\n" ] removeOut
+                        , \_ -> Expect.equal [ SendLine "MODE #c +i\r\n" ] inviteOnlyOut
+                        , \_ -> Expect.equal [] badLetterOut
+                        , \_ -> Expect.equal [] offlineToggleOut
+                        , \_ -> Expect.equal [] voicedToggleOut
+                        ]
+                        ()
             , test "person safety stages, confirms, and drafts reports" <|
                 \_ ->
                     let

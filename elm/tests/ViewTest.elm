@@ -2260,7 +2260,7 @@ suite =
                     Expect.all
                         [ \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-form") ] q
-                                |> Query.has [ Selector.text "Take action" ]
+                                |> Query.has [ Selector.text "Room member action" ]
                         , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-select") ] q
                                 |> Query.has [ Selector.text "alice", Selector.text "bob" ]
@@ -2268,8 +2268,8 @@ suite =
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-action-select") ] q
                                 |> Query.has [ Selector.text "Remove", Selector.text "Block" ]
                         , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-reason") ] q
-                                |> Query.has [ Selector.attribute (Attr.attribute "placeholder" "Tell the room why (optional)") ]
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-member-form") ] q
+                                |> Query.has [ Selector.text "No expiry is available for this room action; a moderator can lift a block later." ]
                         , \_ ->
                             Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-ban-form") ] q
                                 |> Query.has [ Selector.text "Block a mask" ]
@@ -2300,7 +2300,7 @@ suite =
                             query desked
 
                         reasoned =
-                            query { desked | moderationDesk = { member = "alice", action = "op", reason = "", mask = "" } }
+                            query { desked | moderationDesk = { member = "alice", action = "op", reason = "", mask = "", invite = "" } }
                     in
                     Expect.all
                         [ \_ ->
@@ -2332,6 +2332,126 @@ suite =
                     query banVoiceModel
                         |> Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "desk-member-form") ]
                         |> Query.count (Expect.equal 0)
+            , test "invite row sends gated invites with the people hint" <|
+                \_ ->
+                    let
+                        prefs =
+                            banOpModel.prefs
+
+                        room =
+                            banChannelWith (Set.singleton 'o')
+
+                        desked =
+                            { banOpModel
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = Prefs.ExperienceAdvanced }
+                                , channels =
+                                    Dict.singleton "#c"
+                                        { room | members = Dict.fromList [ ( "me", { nick = "me", modes = Set.singleton 'o', away = False } ), ( "alice", { nick = "alice", modes = Set.empty, away = False } ), ( "bob", { nick = "bob", modes = Set.empty, away = False } ) ] }
+                            }
+
+                        q =
+                            query desked
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-form") ] q
+                                |> Query.has [ Selector.text "Invite someone", Selector.text "People here: alice, bob" ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-nick") ] q
+                                |> Query.has [ Selector.attribute (Attr.attribute "placeholder" "Nickname") ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-nick") ] q
+                                |> Event.simulate (Event.input "carol")
+                                |> Event.expect (ModerationDeskInvite "carol")
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-submit") ] q
+                                |> Query.has [ Selector.disabled True ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-submit") ]
+                                (query { desked | moderationDesk = { member = "", action = "kick", reason = "", mask = "", invite = "carol" } })
+                                |> Event.simulate Event.click
+                                |> Event.expect (ModerationDeskSubmitInvite "#c")
+                        ]
+                        ()
+            , test "safeguard toggles reflect the live mode state" <|
+                \_ ->
+                    let
+                        room =
+                            banChannelWith (Set.singleton 'o')
+
+                        desked =
+                            { banOpModel | ourNick = "me", channels = Dict.singleton "#c" { room | modes = "+mi" } }
+
+                        q =
+                            query desked
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-mode-m") ] q
+                                |> Query.has [ Selector.text "Moderated", Selector.text "On", Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-mode-t") ] q
+                                |> Query.has [ Selector.text "Protected topic", Selector.text "Off", Selector.attribute (Attr.attribute "aria-pressed" "false") ]
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-mode-m") ] q
+                                |> Event.simulate Event.click
+                                |> Event.expect (ModerationDeskToggleMode "#c" "m")
+                        , \_ ->
+                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "desk-mode-i") ]
+                                (query { desked | connection = Offline })
+                                |> Query.has [ Selector.disabled True ]
+                        ]
+                        ()
+            , test "rail, activity log, and protocol disclosure mirror the cockpit" <|
+                \_ ->
+                    let
+                        logged =
+                            { banOpModel
+                                | ourNick = "me"
+                                , moderationLog =
+                                    [ { at = 1000, action = "KICK", target = "bob", by = "alice", channel = "#c" }
+                                    , { at = 2000, action = "BAN", target = "*!*@bad.example", by = "alice", channel = "#other" }
+                                    ]
+                            }
+
+                        q =
+                            query logged
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.has [ Selector.text "Room moderation", Selector.text "Last room update" ] q
+                        , \_ ->
+                            query banOpModel
+                                |> Query.has [ Selector.text "None yet" ]
+                        , \_ ->
+                            Query.has [ Selector.text "Server activity", Selector.text "alice kick bob" ] q
+                        , \_ ->
+                            Query.hasNot [ Selector.text "alice ban *!*@bad.example" ] q
+                        , \_ ->
+                            Query.has [ Selector.text "Open-wire details", Selector.text "MODE #c (no modes set)" ] q
+                        , \_ ->
+                            query banOpModel
+                                |> Query.has [ Selector.text "No recent server-echoed moderation activity in this room." ]
+                        , \_ ->
+                            query { banOpModel | connection = Offline }
+                                |> Query.has [ Selector.text "Reconnect to send room changes. Drafts stay on this device." ]
+                        ]
+                        ()
+            , test "non-moderators get the read-only fallback" <|
+                \_ ->
+                    let
+                        q =
+                            query banVoiceModel
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.has [ Selector.text "You can view this room’s context, but only room moderators can change its rules or invite people." ] q
+                        , \_ ->
+                            Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "desk-invite-form") ] q
+                                |> Query.count (Expect.equal 0)
+                        ]
+                        ()
             ]
         , describe "notification inbox"
             [ test "bell badges attention unread only" <|

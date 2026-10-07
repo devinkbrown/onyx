@@ -24,7 +24,14 @@ import String
 banPanel : Model -> String -> Html Msg
 banPanel model channel =
     if not (isChannelOp model channel) then
-        div [] []
+        -- Non-moderators get the read-only context (mirroring the
+        -- cockpit fallback): the boundary copy plus the last known
+        -- mode state, and no rule-changing surface.
+        div [ class "moderation-cockpit__empty-wrap" ]
+            [ p [ class "moderation-cockpit__empty" ]
+                [ text "You can view this room’s context, but only room moderators can change its rules or invite people." ]
+            , protocolDisclosure model channel
+            ]
 
     else
         let
@@ -48,10 +55,13 @@ banPanel model channel =
                     [ text "Refresh list" ]
                 ]
              ]
+                ++ deskRail model channel live
                 ++ statusLine view
                 ++ entryList model channel view
                 ++ addForm model channel live
                 ++ deskForms model channel live
+                ++ deskActivity model channel
+                ++ [ protocolDisclosure model channel ]
                 ++ reviewDialog model channel
             )
 
@@ -289,14 +299,132 @@ isReviewFor review channel =
     String.toLower review.channel == String.toLower channel
 
 
-{-| Room-desk moderation forms — the member-action and ban-mask
-inputs (mirroring `ModerationCockpit`; the desk renders only where
-we moderate, and both forms stage a review draft rather than
-sending).
+{-| Room authority rail — the boundary note, the live
+authority facts, and the offline coaching (mirroring the cockpit
+`moderation-desk__boundary` rail and offline note).
+-}
+deskRail : Model -> String -> Bool -> List (Html Msg)
+deskRail model channel live =
+    [ div [ class "moderation-desk__boundary", attribute "role" "note" ]
+        [ span [] [ text "Room moderation" ]
+        , span [] [ text "These controls affect this room on the server. Personal mute/block lives in Preferences and only affects your device." ]
+        ]
+    , div [ class "moderation-desk__rail", attribute "aria-label" "Room authority" ]
+        [ div []
+            [ span [] [ text "Connected" ]
+            , span [] [ text (if live then "Yes" else "No") ]
+            ]
+        , div []
+            [ span [] [ text "Moderator" ]
+            , span [] [ text "Yes" ]
+            ]
+        , div []
+            [ span [] [ text "Last room update" ]
+            , span [] [ text (deskLastUpdateLabel model channel) ]
+            ]
+        ]
+    ]
+        ++ (if live then
+                []
+
+            else
+                [ p [ class "moderation-desk__offline", attribute "role" "status" ]
+                    [ text "Reconnect to send room changes. Drafts stay on this device." ]
+                ]
+           )
+
+
+{-| Desk safeguard toggles (mirroring `QUICK_MODES`).
+-}
+deskToggles : Model -> String -> Bool -> List (Html Msg)
+deskToggles model channel live =
+    let
+        flags =
+            case Dict.get (String.toLower channel) model.channels of
+                Nothing ->
+                    []
+
+                Just room ->
+                    (Modes.parseChannelModeString room.modes).flags
+
+        toggle letter label help =
+            let
+                on =
+                    List.member letter flags
+            in
+            button
+                [ type_ "button"
+                , class "moderation-cockpit__mode"
+                , attribute "data-testid" ("desk-mode-" ++ String.fromChar letter)
+                , attribute "aria-pressed" (if on then "true" else "false")
+                , disabled (not live)
+                , attribute "title" help
+                , onClick (ModerationDeskToggleMode channel (String.fromChar letter))
+                ]
+                [ span [] [ text label ]
+                , Html.small [] [ text (if on then "On" else "Off") ]
+                ]
+    in
+    [ div [ class "moderation-cockpit__modes", attribute "role" "group", attribute "aria-label" "Room safeguards" ]
+        [ toggle 'm' "Moderated" "Only voiced members and moderators can speak."
+        , toggle 'i' "Invite-only" "New people need an invitation to join."
+        , toggle 't' "Protected topic" "Only moderators can change the topic."
+        ]
+    ]
+
+
+{-| Room-desk moderation forms — the safeguard toggles, the
+invite row, and the member-action and ban-mask inputs (mirroring
+`ModerationCockpit`; the action and mask forms stage a review
+draft rather than sending, while invites and toggles send
+directly under the same authority gate).
 -}
 deskForms : Model -> String -> Bool -> List (Html Msg)
 deskForms model channel live =
-    deskBanForm model channel live ++ deskMemberForm model channel live
+    deskToggles model channel live
+        ++ deskInviteForm model channel live
+        ++ deskMemberForm model channel live
+        ++ deskBanForm model channel live
+
+
+deskInviteForm : Model -> String -> Bool -> List (Html Msg)
+deskInviteForm model channel live =
+    let
+        desk =
+            model.moderationDesk
+
+        candidates =
+            deskCandidates model channel
+    in
+    [ section [ class "moderation-cockpit__form", attribute "data-testid" "desk-invite-form" ]
+        ([ label [ class "onyx-steward-label", for "desk-invite-nick" ] [ text "Invite someone" ]
+         , input
+            [ id "desk-invite-nick"
+            , class "onyx-steward-field"
+            , attribute "data-testid" "desk-invite-nick"
+            , placeholder "Nickname"
+            , attribute "autocomplete" "off"
+            , value desk.invite
+            , onInput ModerationDeskInvite
+            ]
+            []
+         , button
+            [ attribute "data-testid" "desk-invite-submit"
+            , disabled (String.trim desk.invite == "" || not live)
+            , onClick (ModerationDeskSubmitInvite channel)
+            ]
+            [ text "Send invite" ]
+         ]
+            ++ (if List.isEmpty candidates then
+                    []
+
+                else
+                    [ p [ class "moderation-cockpit__hint" ]
+                        [ text ("People here: " ++ String.join ", " candidates) ]
+                    ]
+               )
+        )
+    ]
 
 
 deskBanForm : Model -> String -> Bool -> List (Html Msg)
@@ -308,12 +436,13 @@ deskBanForm model channel live =
     [ section [ class "moderation-ban-form", attribute "data-testid" "desk-ban-form" ]
         [ div [ class "moderation-cockpit__head" ]
             [ h4 [] [ text "Block a mask" ] ]
-        , label [ class "onyx-steward-label", for "desk-ban-mask" ] [ text "Mask" ]
+        , label [ class "onyx-steward-label", for "desk-ban-mask" ] [ text "Block an address in this room" ]
         , input
             [ id "desk-ban-mask"
             , class "onyx-steward-field"
             , attribute "data-testid" "desk-ban-mask"
-            , placeholder "nick!user@host (e.g. *!*@bad.example)"
+            , placeholder "name!*@*"
+            , attribute "autocomplete" "off"
             , value desk.mask
             , onInput ModerationDeskMask
             ]
@@ -324,6 +453,8 @@ deskBanForm model channel live =
             , onClick (ModerationDeskSubmitBan channel)
             ]
             [ text "Review block" ]
+        , p [ class "moderation-cockpit__hint" ]
+            [ text "Server-side, persistent until lifted. Review the target and reason before sending." ]
         ]
     ]
 
@@ -344,9 +475,7 @@ deskMemberForm model channel live =
             desk.action == "kick" || desk.action == "ban"
     in
     [ section [ class "moderation-member-form", attribute "data-testid" "desk-member-form" ]
-        ([ div [ class "moderation-cockpit__head" ]
-            [ h4 [] [ text "Take action" ] ]
-         , label [ class "onyx-steward-label", for "desk-member-select" ] [ text "Person" ]
+        ([ label [ class "onyx-steward-label", for "desk-member-select" ] [ text "Room member action" ]
          , select
             [ id "desk-member-select"
             , class "onyx-steward-field"
@@ -354,14 +483,14 @@ deskMemberForm model channel live =
             , onInput ModerationDeskMember
             , value desk.member
             ]
-            (option [ value "" ] [ text "Choose a person" ]
+            (option [ value "" ] [ text "Choose a member" ]
                 :: List.map (\nick -> option [ value nick ] [ text nick ]) candidates
             )
-         , label [ class "onyx-steward-label", for "desk-action-select" ] [ text "Action" ]
          , select
             [ id "desk-action-select"
             , class "onyx-steward-field"
             , attribute "data-testid" "desk-action-select"
+            , attribute "aria-label" "Member action"
             , onInput ModerationDeskAction
             , value desk.action
             ]
@@ -371,17 +500,22 @@ deskMemberForm model channel live =
             )
          ]
             ++ (if showReason then
-                    [ label [ class "onyx-steward-label", for "desk-member-reason" ] [ text "Reason" ]
+                    [ label [ class "onyx-steward-label", for "desk-member-reason" ]
+                        [ text "Reason "
+                        , span [ class "moderation-desk__optional" ] [ text "optional" ]
+                        ]
                     , input
                         [ id "desk-member-reason"
                         , class "onyx-steward-field"
                         , attribute "data-testid" "desk-member-reason"
                         , type_ "text"
-                        , placeholder "Tell the room why (optional)"
+                        , attribute "autocomplete" "off"
                         , value desk.reason
                         , onInput ModerationDeskReason
                         ]
                         []
+                    , p [ class "moderation-cockpit__hint" ]
+                        [ text "No expiry is available for this room action; a moderator can lift a block later." ]
                     ]
 
                 else
@@ -396,6 +530,132 @@ deskMemberForm model channel live =
                ]
         )
     ]
+
+
+{-| Recent server-echoed room activity (mirroring the cockpit
+log: only echoed changes appear, newest first, capped at twelve).
+-}
+deskActivity : Model -> String -> List (Html Msg)
+deskActivity model channel =
+    let
+        key =
+            String.toLower (String.trim channel)
+
+        entries =
+            model.moderationLog
+                |> List.filter (\entry -> String.toLower entry.channel == key)
+                |> List.take 12
+    in
+    [ section [ class "moderation-desk__log", attribute "aria-label" "Recent room activity" ]
+        ([ h4 [] [ text "Server activity" ]
+         , p [ class "moderation-desk__receipt" ]
+            [ text "Only server-echoed changes appear here. A review is a local draft until confirmed." ]
+         ]
+            ++ (if List.isEmpty entries then
+                    [ p [ class "moderation-cockpit__hint" ]
+                        [ text "No recent server-echoed moderation activity in this room." ]
+                    ]
+
+                else
+                    [ ul [ class "moderation-desk__log-list" ]
+                        (List.map
+                            (\entry -> li [] [ text (entry.by ++ " " ++ String.toLower entry.action ++ " " ++ entry.target) ])
+                            entries
+                        )
+                    ]
+               )
+        )
+    ]
+
+
+{-| Read-only open-wire mode state (mirroring the cockpit
+protocol disclosure).
+-}
+protocolDisclosure : Model -> String -> Html Msg
+protocolDisclosure model channel =
+    let
+        raw =
+            case Dict.get (String.toLower channel) model.channels of
+                Nothing ->
+                    ""
+
+                Just room ->
+                    room.modes
+    in
+    Html.details [ class "moderation-cockpit__protocol" ]
+        [ Html.summary [] [ text "Open-wire details" ]
+        , p [] [ text "This is a read-only view of the room’s last known mode state. Changes above wait for a server reply before the interface updates." ]
+        , Html.code []
+            [ text
+                ("MODE "
+                    ++ channel
+                    ++ " "
+                    ++ (if String.trim raw == "" then
+                            "(no modes set)"
+
+                        else
+                            raw
+                       )
+                )
+            ]
+        ]
+
+
+{-| Last room-update stamp (mirroring `selectLastRoomUpdateAt`:
+the ban-list fetch stamp versus the newest log entry, whichever
+is later; `None yet` when neither exists, else the message clock).
+-}
+deskLastUpdateLabel : Model -> String -> String
+deskLastUpdateLabel model channel =
+    let
+        key =
+            String.toLower (String.trim channel)
+
+        fromList =
+            case Dict.get key model.banListMeta of
+                Just meta ->
+                    meta.updatedAt
+
+                Nothing ->
+                    Nothing
+
+        fromLog =
+            List.foldl
+                (\entry best ->
+                    if String.toLower entry.channel == key then
+                        case best of
+                            Nothing ->
+                                Just entry.at
+
+                            Just top ->
+                                Just (max top entry.at)
+
+                    else
+                        best
+                )
+                Nothing
+                model.moderationLog
+
+        latest =
+            case ( fromList, fromLog ) of
+                ( Just a, Just b ) ->
+                    Just (max a b)
+
+                ( Just a, Nothing ) ->
+                    Just a
+
+                ( Nothing, Just b ) ->
+                    Just b
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+    in
+    case latest of
+        Nothing ->
+            "None yet"
+
+        Just at ->
+            App.formatRowClock model.zone model.prefs.clock at
 
 
 {-| Desk member candidates (mirroring the cockpit `candidates`:
