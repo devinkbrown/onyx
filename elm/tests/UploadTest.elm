@@ -341,6 +341,18 @@ suite =
                         , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "//app.example.test/x")
                         ]
                         ()
+            , test "names explicit media saves" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "my photo.png" (mediaSaveName "https://h/pics/a.png" (Just "  my photo.png "))
+                        , \_ -> Expect.equal "abcd.png" (mediaSaveName "https://h/a.png" (Just "ab/c\\d.png"))
+                        , \_ -> Expect.equal "a.png" (mediaSaveName "https://h/pics/a.png" (Just "   "))
+                        , \_ -> Expect.equal "a.png" (mediaSaveName "https://h/pics/a.png" Nothing)
+                        , \_ -> Expect.equal "f.mp4" (mediaSaveName "https://h/f.mp4?x=1#frag" Nothing)
+                        , \_ -> Expect.equal "image" (mediaSaveName "https://h/" Nothing)
+                        , \_ -> Expect.equal "image" (mediaSaveName "" Nothing)
+                        ]
+                        ()
             , test "labels Original and Compact with honest sizes" <|
                 \_ ->
                     Expect.all

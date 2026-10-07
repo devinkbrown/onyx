@@ -6,8 +6,8 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Dict
-import Html exposing (Html, a, audio, button, div, h2, img, li, section, span, strong, text, time, ul, video)
-import Html.Attributes exposing (attribute, class, classList, controls, datetime, href, preload, rel, src, target)
+import Html exposing (Html, a, audio, button, div, h2, img, li, section, small, span, strong, text, time, ul, video)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, href, preload, rel, src, tabindex, target, type_)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 import Set
@@ -100,6 +100,7 @@ thread model =
                                   else
                                     text ""
                                 ]
+        , mediaLightboxDialog model
         ]
 
 
@@ -260,9 +261,10 @@ boostChip model target m groups chip =
             span [ class "boost-pill", attribute "title" title ] kids
 
 
-{-| Row body: the caption as text plus one card per `[file]`
-receipt (images render a thumbnail; every card links the
-sanitized URL, so no `javascript:` href can reach the DOM),
+{-| Row body: the caption as text plus one block per `[file]`
+receipt (attached images/videos unfurl inline when the sink gate
+passes, everything else renders a `FileChip` link with
+`target=_blank`, so no `javascript:` href can reach the DOM),
 plus one inline-media unfurl per direct image/video/audio URL,
 plus the first-link OG preview card when fetched. -}
 messageBody : Model -> App.ChatMessage -> List (Html Msg)
@@ -272,8 +274,8 @@ messageBody model m =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
     [ text presented.caption ]
-        ++ List.map attachmentCard presented.attachments
-        ++ mediaUnfurls model (App.displayBody m)
+        ++ List.map (attachmentCard model) presented.attachments
+        ++ mediaUnfurls model presented
         ++ [ previewCard model (App.displayBody m) ]
 
 
@@ -284,43 +286,57 @@ the same sink policy as OG cards — auto-load for same-origin or
 link fallback once the element reports an error. Kind detection
 reuses `classifyAttachmentKind` (extension allowlist); `KindFile`
 stays fail-closed with no unfurl. -}
-mediaUnfurls : Model -> String -> List (Html Msg)
-mediaUnfurls model body =
+mediaUnfurls : Model -> Upload.AttachmentPresentation -> List (Html Msg)
+mediaUnfurls model presented =
     let
         privacy =
             App.liveUnfurlPrivacy model
+
+        attached =
+            Set.fromList (List.map .url presented.attachments)
     in
     if not privacy.linkPreviews then
         []
 
     else
-        List.filterMap (mediaUnfurl model privacy) (Upload.extractHttpUrls body)
+        List.filterMap (mediaUnfurl model privacy attached) (Upload.extractHttpUrls presented.caption)
 
 
-mediaUnfurl : Model -> Upload.UnfurlPrefs -> String -> Maybe (Html Msg)
-mediaUnfurl model privacy href =
-    case Upload.classifyAttachmentKind href Nothing of
-        Upload.KindFile ->
-            Nothing
-
-        kind ->
-            if Upload.isSameOriginHttpUrl model.origin href || Upload.isPreviewableUrl href privacy then
-                Just (mediaElement model kind href)
-
-            else
-                Nothing
-
-
-mediaElement : Model -> Upload.AttachmentKind -> String -> Html Msg
-mediaElement model kind href =
-    if Set.member href model.previewMediaFailed then
-        mediaFallback kind href
-
-    else if Upload.isSameOriginHttpUrl model.origin href || Set.member href model.previewImagesAllowed then
-        mediaPlayer kind href
+mediaUnfurl : Model -> Upload.UnfurlPrefs -> Set.Set String -> String -> Maybe (Html Msg)
+mediaUnfurl model privacy attached href =
+    if Set.member href attached then
+        Nothing
 
     else
-        mediaConsent kind href
+        case Upload.classifyAttachmentKind href Nothing of
+            Upload.KindFile ->
+                Nothing
+
+            kind ->
+                if Upload.isSameOriginHttpUrl model.origin href || Upload.isPreviewableUrl href privacy then
+                    Just (mediaElement model kind href)
+
+                else
+                    Nothing
+
+
+{-| Shared `MediaUnfurl` element (mirrors the oracle `MediaUnfurl`:
+credential-free same-origin or public http(s) hosts may load;
+cross-origin stays behind consent; errors swap to the fallback
+link; images open the lightbox dialog). Narrowing: no focus trap
+or return-focus on the dialog (Escape and backdrop close it). -}
+mediaElement : Model -> Upload.AttachmentKind -> String -> Html Msg
+mediaElement model kind href =
+    div [ class "shell-msg-media" ]
+        [ if Set.member href model.previewMediaFailed then
+            mediaFallback kind href
+
+          else if Upload.isSameOriginHttpUrl model.origin href || Set.member href model.previewImagesAllowed then
+            mediaPlayer kind href
+
+          else
+            mediaConsent kind href
+        ]
 
 
 mediaKindWord : Upload.AttachmentKind -> String
@@ -342,24 +358,52 @@ mediaKindWord kind =
 mediaPlayer : Upload.AttachmentKind -> String -> Html Msg
 mediaPlayer kind href =
     let
-        word =
-            mediaKindWord kind
-
         failed =
             Decode.succeed (App.PreviewMediaFailed href)
-
-        cls =
-            "onyx-media onyx-media-" ++ word
     in
     case kind of
         Upload.KindImage ->
-            img [ src href, class cls, attribute "alt" (word ++ " attachment"), on "error" failed ] []
+            button
+                [ type_ "button"
+                , class "shell-msg-media-open"
+                , attribute "aria-label" "Open image"
+                , onClick (App.MediaLightboxOpen href)
+                ]
+                [ img
+                    [ src href
+                    , attribute "alt" ""
+                    , attribute "loading" "lazy"
+                    , attribute "decoding" "async"
+                    , attribute "referrerpolicy" "no-referrer"
+                    , class "shell-msg-media-img"
+                    , on "error" failed
+                    ]
+                    []
+                ]
 
         Upload.KindVideo ->
-            video [ src href, class cls, controls True, preload "none", on "error" failed ] []
+            video
+                [ src href
+                , controls True
+                , preload "none"
+                , class "shell-msg-media-video"
+                , attribute "aria-label" "Attached video"
+                , attribute "loading" "lazy"
+                , on "error" failed
+                ]
+                []
 
         Upload.KindAudio ->
-            audio [ src href, class cls, controls True, preload "none", on "error" failed ] []
+            audio
+                [ src href
+                , controls True
+                , preload "none"
+                , class "shell-msg-media-audio"
+                , attribute "aria-label" "Attached audio"
+                , attribute "loading" "lazy"
+                , on "error" failed
+                ]
+                []
 
         Upload.KindFile ->
             text ""
@@ -377,12 +421,13 @@ mediaConsent kind href =
                 |> Maybe.withDefault href
     in
     button
-        [ class "onyx-media onyx-media-consent"
+        [ type_ "button"
+        , class "shell-msg-media-consent"
         , onClick (App.PreviewImageAllow href)
         , attribute "aria-label" ("Load external " ++ word ++ " from " ++ host)
         ]
-        [ text ("Load external " ++ word)
-        , span [ class "onyx-media-host" ] [ text host ]
+        [ span [] [ text ("Load external " ++ word) ]
+        , small [] [ text host ]
         ]
 
 
@@ -403,8 +448,64 @@ mediaFallback kind url =
                 Upload.KindFile ->
                     "File"
     in
-    a [ href url, class "onyx-media onyx-media-fallback" ]
+    a
+        [ href url
+        , target "_blank"
+        , rel "noopener noreferrer"
+        , class "shell-msg-link shell-msg-media-fallback"
+        ]
         [ text (word ++ " preview unavailable — open attachment") ]
+
+
+{-| Image lightbox dialog (mirrors `MessageImageLightbox`: modal
+dialog with backdrop-click and Save/Close actions; Escape closes it
+via the top-level subscription). Narrowing: no focus trap or
+return-focus. -}
+mediaLightboxDialog : Model -> Html Msg
+mediaLightboxDialog model =
+    case model.mediaLightbox of
+        Nothing ->
+            text ""
+
+        Just url ->
+            div [ class "shell-msg-lightbox", attribute "role" "presentation" ]
+                [ div
+                    [ class "shell-msg-lightbox-backdrop"
+                    , attribute "aria-hidden" "true"
+                    , onClick App.MediaLightboxClose
+                    ]
+                    []
+                , div
+                    [ class "shell-msg-lightbox-dialog"
+                    , attribute "role" "dialog"
+                    , attribute "aria-modal" "true"
+                    , attribute "aria-label" "Image"
+                    , tabindex -1
+                    ]
+                    [ img
+                        [ src url
+                        , attribute "alt" ""
+                        , class "shell-msg-lightbox-img"
+                        , attribute "referrerpolicy" "no-referrer"
+                        ]
+                        []
+                    , div [ class "shell-msg-lightbox-actions" ]
+                        [ button
+                            [ type_ "button"
+                            , class "shell-msg-lightbox-save"
+                            , onClick (App.MediaSave url)
+                            ]
+                            [ text "Save" ]
+                        , button
+                            [ type_ "button"
+                            , class "shell-msg-lightbox-close"
+                            , attribute "aria-label" "Close"
+                            , onClick App.MediaLightboxClose
+                            ]
+                            [ text "×" ]
+                        ]
+                    ]
+                ]
 
 
 {-| First-link OG card (mirrors `LinkPreviewCard`: preference-gated,
@@ -547,25 +648,64 @@ previewHost url =
             "external host"
 
 
-attachmentCard : Upload.ParsedAttachment -> Html Msg
-attachmentCard attachment =
+{-| Attached `[file]` receipt block (mirrors `AttachmentBlock`):
+attached images/videos unfurl through the shared media element when
+the sink gate passes — first-party uploads are chat media, and
+cross-origin ones additionally honor the link-preview preference
+(whose consent click lives in the unfurl itself). Everything else
+renders a `FileChip` link. -}
+attachmentCard : Model -> Upload.ParsedAttachment -> Html Msg
+attachmentCard model attachment =
     let
-        label =
-            Maybe.withDefault "file" attachment.name
-                ++ (case attachment.sizeLabel of
-                        Just size ->
-                            " (" ++ size ++ ")"
+        mediaKind =
+            case attachment.kind of
+                Upload.KindImage ->
+                    Just Upload.KindImage
 
-                        Nothing ->
-                            ""
-                   )
+                Upload.KindVideo ->
+                    Just Upload.KindVideo
+
+                _ ->
+                    Nothing
     in
-    div [ class "onyx-attachment" ]
-        [ case attachment.kind of
-            Upload.KindImage ->
-                img [ src attachment.url, class "onyx-attachment-thumb" ] []
+    case mediaKind of
+        Just kind ->
+            if attachmentCanUnfurl model attachment.url then
+                mediaElement model kind attachment.url
 
-            _ ->
+            else
+                fileChip attachment
+
+        Nothing ->
+            fileChip attachment
+
+
+attachmentCanUnfurl : Model -> String -> Bool
+attachmentCanUnfurl model url =
+    let
+        privacy =
+            App.liveUnfurlPrivacy model
+    in
+    (Upload.isSameOriginHttpUrl model.origin url || Upload.isPreviewableUrl url privacy)
+        && (Upload.isSameOriginHttpUrl model.origin url || privacy.linkPreviews)
+
+
+{-| Download chip (mirrors `FileChip`): name plus an optional size,
+linked with `target=_blank`. -}
+fileChip : Upload.ParsedAttachment -> Html Msg
+fileChip attachment =
+    a
+        [ href attachment.url
+        , target "_blank"
+        , rel "noopener noreferrer"
+        , class "shell-msg-file"
+        ]
+        [ span [ class "shell-msg-file-name" ]
+            [ text (Maybe.withDefault "File" attachment.name) ]
+        , case attachment.sizeLabel of
+            Just size ->
+                span [ class "shell-msg-file-size" ] [ text size ]
+
+            Nothing ->
                 text ""
-        , a [ href attachment.url, class "onyx-attachment-link" ] [ text label ]
         ]

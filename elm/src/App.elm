@@ -299,6 +299,7 @@ type alias Model =
     , linkPreviews : Dict String (Maybe Upload.LinkPreview)
     , linkPreviewInflight : Set String
     , previewMediaFailed : Set String
+    , mediaLightbox : Maybe String
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -832,6 +833,7 @@ type Outbound
     | ClipboardCopy { text : String, tag : String }
     | AccountDownload { filename : String, json : String }
     | TranscriptDownload { filename : String, body : String, mime : String }
+    | MediaSaveDownload { href : String, name : String }
     | DeviceHistoryCopyRequest { seq : Int }
     | AppearanceRequest
     | AppearanceStorePrefs { json : String }
@@ -2571,6 +2573,9 @@ type Msg
     | PreviewArrived { key : String, ok : Bool, status : Int, body : String }
     | PreviewImageAllow String
     | PreviewMediaFailed String
+    | MediaLightboxOpen String
+    | MediaLightboxClose
+    | MediaSave String
     | ChannelSelect String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
@@ -2815,6 +2820,7 @@ init nick url =
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
+    , mediaLightbox = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -3240,6 +3246,7 @@ blank =
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
+    , mediaLightbox = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -7993,6 +8000,7 @@ quarantineOwnerChange model =
     , linkPreviewOrder = []
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
+    , mediaLightbox = Nothing
     , attachmentSeq = 0
     , attachmentEndpoint = "/upload"
     , pendingAttachmentSend = Nothing
@@ -32267,6 +32275,7 @@ clearLinkPreviews model =
         , linkPreviewOrder = []
         , previewImagesAllowed = Set.empty
         , previewMediaFailed = Set.empty
+        , mediaLightbox = Nothing
     }
 
 
@@ -33944,6 +33953,15 @@ update msg model =
 
         PreviewMediaFailed url ->
             ( { model | previewMediaFailed = Set.insert url model.previewMediaFailed }, [] )
+
+        MediaLightboxOpen url ->
+            ( { model | mediaLightbox = Just url }, [] )
+
+        MediaLightboxClose ->
+            ( { model | mediaLightbox = Nothing }, [] )
+
+        MediaSave url ->
+            ( model, [ MediaSaveDownload { href = url, name = Upload.mediaSaveName url Nothing } ] )
 
         ComposerSend ->
             case model.activeChannel of

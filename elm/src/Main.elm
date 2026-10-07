@@ -439,6 +439,8 @@ port searchHotkey : (() -> msg) -> Sub msg
 
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
 
+port mediaSave : { href : String, name : String } -> Cmd msg
+
 port appearanceStoreSceneMotion : { value : String } -> Cmd msg
 
 port appearanceStoreTheme : { id : String } -> Cmd msg
@@ -1141,6 +1143,9 @@ perform key outbound =
         App.TranscriptDownload req ->
             transcriptDownload req
 
+        App.MediaSaveDownload req ->
+            mediaSave req
+
         App.RetentionPolicyRequest ->
             retentionPolicyRequest ()
 
@@ -1351,7 +1356,10 @@ subscriptions model =
                             -- chrome, which closes before the sheet, which
                             -- closes before the nav menu (mirroring the
                             -- panels' Escape-to-close over page chrome).
-                            if model.app.searchOpen then
+                            if model.app.mediaLightbox /= Nothing then
+                                Decode.succeed App.MediaLightboxClose
+
+                            else if model.app.searchOpen then
                                 Decode.succeed App.SearchClose
 
                             else if model.app.scheduleOpen then

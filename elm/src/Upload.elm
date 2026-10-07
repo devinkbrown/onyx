@@ -37,6 +37,7 @@ module Upload exposing
     , maxAttachmentName
     , maxAttachmentSizeLabel
     , mayUnfurlUrl
+    , mediaSaveName
     , normalizePreview
     , parseAbsoluteUrl
     , parseAttachmentLine
@@ -402,6 +403,59 @@ sanitizeAttachmentUrl url =
 
             Nothing ->
                 Just trimmed
+
+
+{-| Explicit-save file name (mirrors `mediaSaveName`): the trimmed
+attachment name with slashes stripped wins; otherwise the URL path
+leaf; otherwise `"image"`. -}
+mediaSaveName : String -> Maybe String -> String
+mediaSaveName href maybeName =
+    let
+        cleaned =
+            case maybeName of
+                Nothing ->
+                    ""
+
+                Just name ->
+                    String.trim (Regex.replace slashBackslash (\_ -> "") name)
+    in
+    if not (String.isEmpty cleaned) then
+        cleaned
+
+    else
+        case urlPathLeaf href of
+            Just leaf ->
+                leaf
+
+            Nothing ->
+                "image"
+
+
+urlPathLeaf : String -> Maybe String
+urlPathLeaf href =
+    let
+        pathPart =
+            case parseAbsoluteUrl href of
+                Just parsed ->
+                    parsed.rest
+
+                Nothing ->
+                    href
+
+        noQuery =
+            pathPart
+                |> String.split "?"
+                |> List.head
+                |> Maybe.withDefault pathPart
+                |> String.split "#"
+                |> List.head
+                |> Maybe.withDefault pathPart
+    in
+    noQuery
+        |> String.split "/"
+        |> List.filter (not << String.isEmpty)
+        |> List.reverse
+        |> List.head
 
 
 {-| File-name sanitizer (mirrors `sanitizeFileName`): trims, strips

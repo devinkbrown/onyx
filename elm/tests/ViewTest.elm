@@ -275,8 +275,8 @@ suite =
                         { withMedia | origin = "https://app.example.test" }
                 in
                 query sameOrigin
-                    |> Query.find [ Selector.class "onyx-media", Selector.tag "img" ]
-                    |> Query.has [ Selector.attribute (Attr.attribute "src" "https://app.example.test/pics/a.png") ]
+                    |> Query.find [ Selector.class "shell-msg-media-open" ]
+                    |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open image") ]
         , test "inline media unfurl defers cross-origin video behind consent" <|
             \_ ->
                 let
@@ -292,11 +292,11 @@ suite =
                 Expect.all
                     [ \_ ->
                         query remote
-                            |> Query.find [ Selector.class "onyx-media-consent" ]
+                            |> Query.find [ Selector.class "shell-msg-media-consent" ]
                             |> Query.has [ Selector.text "Load external video", Selector.text "cdn.example.test" ]
                     , \_ ->
                         query remote
-                            |> Query.find [ Selector.class "onyx-media-consent" ]
+                            |> Query.find [ Selector.class "shell-msg-media-consent" ]
                             |> Event.simulate Event.click
                             |> Event.expect (PreviewImageAllow "https://cdn.example.test/v.mp4")
                     , \_ ->
@@ -308,7 +308,7 @@ suite =
                                 ]
                     , \_ ->
                         query allowed
-                            |> Query.hasNot [ Selector.class "onyx-media-consent" ]
+                            |> Query.hasNot [ Selector.class "shell-msg-media-consent" ]
                     ]
                     ()
         , test "inline media unfurl renders deferred audio without preload" <|
@@ -361,10 +361,10 @@ suite =
                             |> (\m -> { m | origin = "https://app.example.test" })
                 in
                 Expect.all
-                    [ \_ -> query prefsOff |> Query.hasNot [ Selector.class "onyx-media" ]
-                    , \_ -> query blocked |> Query.hasNot [ Selector.class "onyx-media" ]
-                    , \_ -> query plainHttp |> Query.hasNot [ Selector.class "onyx-media" ]
-                    , \_ -> query pageOnly |> Query.hasNot [ Selector.class "onyx-media" ]
+                    [ \_ -> query prefsOff |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    , \_ -> query blocked |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    , \_ -> query plainHttp |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    , \_ -> query pageOnly |> Query.hasNot [ Selector.class "shell-msg-media" ]
                     ]
                     ()
         , test "inline media unfurl falls back to a link after an element error" <|
@@ -385,7 +385,7 @@ suite =
                             (Set.member "https://app.example.test/pics/a.png" failed.previewMediaFailed)
                     , \_ ->
                         query failed
-                            |> Query.find [ Selector.class "onyx-media-fallback" ]
+                            |> Query.find [ Selector.class "shell-msg-media-fallback" ]
                             |> Query.has [ Selector.text "Image preview unavailable — open attachment" ]
                     , \_ ->
                         query failed
@@ -527,16 +527,162 @@ suite =
                             |> Query.has [ Selector.text "Conversation: Sprint " ]
                     ]
                     ()
-        , test "thread renders attachment cards with links" <|
+        , test "thread renders attachment file chips with links" <|
             \_ ->
                 let
                     withFile =
                         channelModel
                             |> (\m -> feed m ":alice!u@h PRIVMSG #c :see this\n[file: a.png] 2.0 KB https://cdn.example.test/a.png")
+
+                    prefsOff =
+                        let
+                            p =
+                                withFile.prefs
+                        in
+                        { withFile | prefs = { p | linkPreviews = False } }
                 in
-                query withFile
-                    |> Query.find [ Selector.class "onyx-attachment-link" ]
-                    |> Query.has [ Selector.text "a.png (2.0 KB)" ]
+                Expect.all
+                    [ \_ ->
+                        -- Default prefs keep the link-preview switch on, so a
+                        -- public cross-origin receipt defers to media consent.
+                        query withFile
+                            |> Query.find [ Selector.class "shell-msg-media-consent" ]
+                            |> Query.has [ Selector.text "Load external image" ]
+                    , \_ ->
+                        query prefsOff
+                            |> Query.find [ Selector.class "shell-msg-file" ]
+                            |> Query.has
+                                [ Selector.text "a.png"
+                                , Selector.text "2.0 KB"
+                                , Selector.attribute (Attr.attribute "target" "_blank")
+                                ]
+                    , \_ ->
+                        query prefsOff
+                            |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    ]
+                    ()
+        , test "attached same-origin image unfurls once and opens the lightbox" <|
+            \_ ->
+                let
+                    withFile =
+                        feed channelModel ":alice!u@h PRIVMSG #c :see this\n[file: a.png] 2.0 KB https://app.example.test/a.png"
+
+                    sameOrigin =
+                        { withFile | origin = "https://app.example.test" }
+
+                    opened =
+                        Tuple.first (update (MediaLightboxOpen "https://app.example.test/a.png") sameOrigin)
+
+                    closed =
+                        Tuple.first (update MediaLightboxClose opened)
+
+                    ( _, saveOut ) =
+                        update (MediaSave "https://app.example.test/a.png") opened
+                in
+                Expect.all
+                    [ \_ ->
+                        -- A unique find proves the receipt URL unfurls exactly
+                        -- once (no bare-URL double render).
+                        query sameOrigin
+                            |> Query.find
+                                [ Selector.tag "img"
+                                , Selector.attribute (Attr.attribute "src" "https://app.example.test/a.png")
+                                ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "alt" "") ]
+                    , \_ ->
+                        query sameOrigin
+                            |> Query.find [ Selector.class "shell-msg-media-open" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MediaLightboxOpen "https://app.example.test/a.png")
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "shell-msg-lightbox-dialog" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Image") ]
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "shell-msg-lightbox-save" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MediaSave "https://app.example.test/a.png")
+                    , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "shell-msg-lightbox-close" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MediaLightboxClose
+                    , \_ ->
+                        query closed
+                            |> Query.hasNot [ Selector.class "shell-msg-lightbox" ]
+                    , \_ ->
+                        case saveOut of
+                            [ MediaSaveDownload req ] ->
+                                Expect.all
+                                    [ \_ -> Expect.equal "https://app.example.test/a.png" req.href
+                                    , \_ -> Expect.equal "a.png" req.name
+                                    ]
+                                    ()
+
+                            _ ->
+                                Expect.fail "MediaSave emits one MediaSaveDownload outbound"
+                    ]
+                    ()
+        , test "attached video honors the link-preview preference" <|
+            \_ ->
+                let
+                    withFile =
+                        feed channelModel ":alice!u@h PRIVMSG #c :watch this\n[file: v.mp4] 1.0 MB https://cdn.example.test/v.mp4"
+
+                    remote =
+                        { withFile | origin = "https://app.example.test" }
+
+                    prefsOff =
+                        let
+                            p =
+                                remote.prefs
+                        in
+                        { remote | prefs = { p | linkPreviews = False } }
+
+                    allowed =
+                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/v.mp4") remote)
+                in
+                Expect.all
+                    [ \_ ->
+                        query remote
+                            |> Query.find [ Selector.class "shell-msg-media-consent" ]
+                            |> Query.has [ Selector.text "Load external video" ]
+                    , \_ ->
+                        query prefsOff
+                            |> Query.find [ Selector.class "shell-msg-file" ]
+                            |> Query.has [ Selector.text "v.mp4" ]
+                    , \_ ->
+                        query prefsOff
+                            |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    , \_ ->
+                        query allowed
+                            |> Query.find [ Selector.tag "video" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Attached video") ]
+                    ]
+                    ()
+        , test "attached audio never unfurls inline" <|
+            \_ ->
+                let
+                    withFile =
+                        feed channelModel ":alice!u@h PRIVMSG #c :hear this\n[file: a.mp3] 1.0 MB https://app.example.test/a.mp3"
+
+                    sameOrigin =
+                        { withFile | origin = "https://app.example.test" }
+                in
+                Expect.all
+                    [ \_ ->
+                        query sameOrigin
+                            |> Query.find [ Selector.class "shell-msg-file" ]
+                            |> Query.has [ Selector.text "a.mp3" ]
+                    , \_ ->
+                        query sameOrigin
+                            |> Query.hasNot [ Selector.class "shell-msg-media" ]
+                    , \_ ->
+                        query sameOrigin
+                            |> Query.hasNot [ Selector.tag "audio" ]
+                    ]
+                    ()
         , test "thread marks queued placeholders pending" <|
             \_ ->
                 let

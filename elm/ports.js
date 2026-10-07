@@ -4814,6 +4814,25 @@ function fetchPublicFeed(url) {
       });
     }
 
+    /* Explicit Save for chat media — mirrors `saveMediaFromUserGesture`:
+       a transient <a download> click, never a gallery/background write.
+       The filename is Elm-built (`mediaSaveName`); empty still defaults. */
+    if (app.ports.mediaSave) {
+      app.ports.mediaSave.subscribe(function (req) {
+        try {
+          var href = req && req.href ? String(req.href) : "";
+          if (!href) return;
+          var anchor = document.createElement("a");
+          anchor.href = href;
+          anchor.download = req && req.name ? String(req.name) : "image";
+          anchor.rel = "noopener noreferrer";
+          anchor.target = "_blank";
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+        } catch (err) { /* no DOM download here */ }
+      });
+    }
     app.ports.wsSend.subscribe(function (line) {
       socket.send(line);
     });
