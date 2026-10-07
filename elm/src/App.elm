@@ -914,6 +914,8 @@ type alias VaultRow =
     , body : String
     , at : Int
     , rowType : String
+    , deleted : Bool
+    , redacted : Bool
     }
 
 
@@ -1081,6 +1083,8 @@ importVaultRow message =
     , body = message.body
     , at = floor message.atMs
     , rowType = message.msgType
+    , deleted = False
+    , redacted = False
     }
 
 
@@ -31027,6 +31031,8 @@ renderOptimisticSend model target texts outgoing label audience =
                     , body = text
                     , at = floor rendered.nowMs
                     , rowType = "msg"
+                    , deleted = False
+                    , redacted = False
                     }
             in
             ( updateChannel { rendered | messageSeq = messageId + 1 } target
@@ -35889,6 +35895,8 @@ update msg model =
                                         , body = envelope
                                         , at = floor model.nowMs
                                         , rowType = "msg"
+                                        , deleted = False
+                                        , redacted = False
                                         }
 
                                     filed =
@@ -36050,6 +36058,8 @@ update msg model =
                             , body = envelope
                             , at = floor model.nowMs
                             , rowType = "msg"
+                            , deleted = False
+                            , redacted = False
                             }
 
                         filed =
@@ -36429,6 +36439,8 @@ persistChatRow model parsed =
 
                         else
                             "msg"
+                    , deleted = False
+                    , redacted = False
                     }
             in
             if Dict.member key model.channels then
@@ -36474,8 +36486,8 @@ mergeVaultRows model target rows =
                         , msgid = Nothing
                         , reactions = []
                         , edited = False
-                        , deleted = False
-                        , redacted = False
+                        , deleted = row.deleted
+                        , redacted = row.redacted
                         , topic = ""
                         , msgType = row.rowType
                         }
@@ -36680,6 +36692,8 @@ chatToVaultRow target message =
     , body = message.body
     , at = message.at
     , rowType = message.msgType
+    , deleted = message.deleted
+    , redacted = message.redacted
     }
 
 
@@ -36819,8 +36833,8 @@ mergeVaultAround model target anchor rows =
                         , msgid = Nothing
                         , reactions = []
                         , edited = False
-                        , deleted = False
-                        , redacted = False
+                        , deleted = row.deleted
+                        , redacted = row.redacted
                         , topic = ""
                         , msgType = row.rowType
                         }

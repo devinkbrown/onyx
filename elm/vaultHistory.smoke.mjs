@@ -81,6 +81,50 @@ test("exportSnapshot carries row types; legacy rows default to msg", () => {
   );
 });
 
+test("tombstoned rows never surface in recall or time-travel", () => {
+  const textRows = [
+    { id: "#c:1", target: "#c", from: "alice", body: "hello world picnic", at: 1000 },
+    { id: "#c:2", target: "#c", from: "bob", body: "hello world picnic plans", at: 2000, deleted: true },
+    { id: "#c:3", target: "#c", from: "carol", body: "hello world picnic menu", at: 3000, redacted: true },
+  ];
+
+  // Exact recall skips tombstones newest-first.
+  assert.deepEqual(
+    vaultStore.searchRows(textRows, "picnic", 80).map((r) => r.id),
+    ["#c:1"],
+  );
+
+  // Semantic + hybrid rank over the live slice only.
+  assert.deepEqual(
+    vaultStore.searchRowsSemantic(textRows, "hello world picnic", 80).map((r) => r.id),
+    ["#c:1"],
+  );
+  assert.deepEqual(
+    vaultStore.searchRowsHybrid(textRows, "hello world picnic", { limit: 80 }).map((r) => r.id),
+    ["#c:1"],
+  );
+
+  // Time-travel windows skip tombstones before ranking.
+  const window = vaultStore.aroundWindow(
+    [...textRows, ...ROWS.map((r) => ({ ...r, target: "#d" }))],
+    2500,
+    10,
+  );
+  assert.ok(window.every((r) => !r.deleted && !r.redacted));
+  assert.ok(window.some((r) => r.id === "#c:1"));
+});
+
+test("plainRow carries tombstone flags; legacy rows read back clear", () => {
+  assert.deepEqual(
+    vaultStore.plainRow({ id: "x", target: "#c", from: "a", body: "b", at: 1, deleted: 1, redacted: 0 }),
+    { id: "x", target: "#c", from: "a", body: "b", at: 1, rowType: "msg", deleted: true, redacted: false },
+  );
+  assert.deepEqual(
+    vaultStore.plainRow(row("#c:1", 1000)),
+    { ...row("#c:1", 1000), rowType: "msg", deleted: false, redacted: false },
+  );
+});
+
 test("null store fails closed with unavailable/empty results", async () => {
   const got = await new Promise((resolve) => vaultStore.get(null, "#c", 10, (rows, status) => resolve({ rows, status })));
   assert.deepEqual(got, { rows: [], status: "unavailable" });

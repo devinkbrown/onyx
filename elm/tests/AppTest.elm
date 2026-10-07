@@ -773,7 +773,7 @@ suite =
                             [ SendLine "PRIVMSG #c hello\r\n"
                             , VaultPersist
                                 { target = "#c"
-                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0, rowType = "msg" } ]
+                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 }
                             ]
                             out
@@ -803,8 +803,8 @@ suite =
                     , VaultPersist
                         { target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0, rowType = "msg" }
-                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0, rowType = "msg" }
+                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0, rowType = "msg", deleted = False, redacted = False }
+                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0, rowType = "msg", deleted = False, redacted = False }
                             ]
                         }
                     ]
@@ -824,7 +824,7 @@ suite =
                     [ SendLine "PRIVMSG #c onetwo\r\n"
                     , VaultPersist
                         { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0, rowType = "msg" } ]
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                         }
                     ]
                     out
@@ -2593,7 +2593,7 @@ suite =
             \_ ->
                 let
                     window =
-                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000, rowType = "msg" } ]
+                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000, rowType = "msg", deleted = False, redacted = False } ]
 
                     ( m1, _ ) =
                         feed blank ":me!u@h JOIN #c"
@@ -2609,6 +2609,60 @@ suite =
                         Nothing ->
                             []
                     )
+        , test "vault restore revives tombstone flags" <|
+            \_ ->
+                let
+                    window =
+                        [ { id = "#c:9", target = "#c", from = "bob", body = "[Message deleted]", at = 1791115200000, rowType = "msg", deleted = False, redacted = True } ]
+
+                    ( m1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+
+                    ( f2, _ ) =
+                        update (VaultRowsReceived { target = "#c", rows = window, status = "ok" }) m1
+
+                    flags model =
+                        case Dict.get "#c" model.channels of
+                            Just c ->
+                                List.map (\m -> ( m.redacted, m.deleted, m.body )) c.messages
+
+                            Nothing ->
+                                []
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ ( True, False, "[Message deleted]" ) ] (flags m2)
+                    , \_ -> Expect.equal [ ( True, False, "[Message deleted]" ) ] (flags f2)
+                    ]
+                    ()
+        , test "redacted rows persist their tombstone flag" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me" }
+
+                    ( m1, _ ) =
+                        feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                    ( _, out ) =
+                        update (WsLineReceived ":mallory!u@h REDACT #c m1 :spam") m1
+
+                    persists =
+                        List.concatMap
+                            (\o ->
+                                case o of
+                                    VaultPersist req ->
+                                        req.rows
+
+                                    _ ->
+                                        []
+                            )
+                            out
+                in
+                Expect.equal [ ( True, False, "[Message deleted]" ) ]
+                    (List.map (\r -> ( r.redacted, r.deleted, r.body )) persists)
         , test "clock label renders UTC HH:MM" <|
             \_ ->
                 Expect.all
@@ -2689,8 +2743,8 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000, rowType = "msg" }
-                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000, rowType = "msg" }
+                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000, rowType = "msg", deleted = False, redacted = False }
+                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000, rowType = "msg", deleted = False, redacted = False }
                         ]
 
                     ( scheduled, _ ) =
@@ -2709,9 +2763,9 @@ suite =
             \_ ->
                 let
                     rows =
-                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000, rowType = "msg" }
-                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000, rowType = "msg" }
-                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000, rowType = "msg" }
+                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000, rowType = "msg", deleted = False, redacted = False }
+                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000, rowType = "msg", deleted = False, redacted = False }
+                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000, rowType = "msg", deleted = False, redacted = False }
                         ]
 
                     ( scheduled, _ ) =
@@ -5180,7 +5234,7 @@ suite =
                     [ VaultPersist
                         { target = "#c"
                         , rows =
-                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0, rowType = "msg" } ]
+                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                         }
                     ]
                     outbound
@@ -5233,7 +5287,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "msg" } ]
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 , status = "ok"
                                 }
                             )
@@ -5260,7 +5314,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0, rowType = "msg" } ]
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 , status = "ok"
                                 }
                             )
@@ -5287,7 +5341,7 @@ suite =
                             (VaultRowsReceived
                                 { target = "#a"
                                 , rows =
-                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0, rowType = "msg" } ]
+                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 , status = "ok"
                                 }
                             )
@@ -5446,8 +5500,8 @@ suite =
                         feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
 
                     window =
-                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000, rowType = "msg" }
-                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100, rowType = "msg" }
+                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000, rowType = "msg", deleted = False, redacted = False }
+                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100, rowType = "msg", deleted = False, redacted = False }
                         ]
 
                     ( m2, _ ) =
@@ -5472,8 +5526,8 @@ suite =
                         feed blank ":me!u@h JOIN #c"
 
                     window =
-                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300, rowType = "msg" }
-                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg" }
+                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300, rowType = "msg", deleted = False, redacted = False }
+                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg", deleted = False, redacted = False }
                         ]
 
                     ( m2, _ ) =
@@ -5534,8 +5588,8 @@ suite =
                             [ VaultPersist
                                 { target = "#c"
                                 , rows =
-                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000, rowType = "msg" }
-                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000, rowType = "notice" }
+                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000, rowType = "msg", deleted = False, redacted = False }
+                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000, rowType = "notice", deleted = False, redacted = False }
                                     ]
                                 }
                             ]
@@ -8022,7 +8076,7 @@ suite =
                             [ DmOpenRequested { peer = "dave", presentedKey = peerKey, messageId = 0, envelope = envelopeBody, owner = Nothing }
                             , VaultPersist
                                 { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg" } ]
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 }
                             ]
                             outbound
@@ -8040,7 +8094,7 @@ suite =
                         Expect.equal
                             [ VaultPersist
                                 { target = "dave"
-                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg" } ]
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False } ]
                                 }
                             ]
                             outbound
@@ -8132,7 +8186,7 @@ suite =
                     [ SendLine "PRIVMSG bob hello\r\n"
                     , VaultPersist
                         { target = "bob"
-                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0, rowType = "msg" } ]
+                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                         }
                     ]
                     outbound
@@ -9395,6 +9449,8 @@ suite =
                                       , body = envelopeBody
                                       , at = floor m3.nowMs
                                       , rowType = "msg"
+                                      , deleted = False
+                                      , redacted = False
                                       }
                                     ]
                                 }
@@ -9770,7 +9826,7 @@ suite =
                     [ SendLine "PRIVMSG #c :hi room\r\n"
                     , VaultPersist
                         { target = "#c"
-                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0, rowType = "msg" } ]
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0, rowType = "msg", deleted = False, redacted = False } ]
                         }
                     ]
                     outbound
@@ -9791,7 +9847,7 @@ suite =
                     , \_ -> Expect.equal (Just roomEnvelopeBody) (Maybe.map .body (List.head stored))
                     , \_ ->
                         Expect.equal [ RoomOpenRequested { room = "#c", messageId = 0, envelope = roomEnvelopeBody } ]
-                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0, rowType = "msg" } ] }) outbound)
+                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0, rowType = "msg", deleted = False, redacted = False } ] }) outbound)
                     ]
                     ()
         , test "RoomSealed sends tagged ciphertext and keeps plaintext local" <|
@@ -9822,6 +9878,8 @@ suite =
                                       , body = roomEnvelopeBody
                                       , at = floor m4.nowMs
                                       , rowType = "msg"
+                                      , deleted = False
+                                      , redacted = False
                                       }
                                     ]
                                 }
@@ -9864,6 +9922,8 @@ suite =
                                       , body = envelopeBody
                                       , at = floor m3.nowMs
                                       , rowType = "msg"
+                                      , deleted = False
+                                      , redacted = False
                                       }
                                     ]
                                 }
@@ -9942,6 +10002,8 @@ suite =
                                       , body = roomEnvelopeBody
                                       , at = floor m4.nowMs
                                       , rowType = "msg"
+                                      , deleted = False
+                                      , redacted = False
                                       }
                                     ]
                                 }
@@ -21013,7 +21075,7 @@ suite =
                                 (VaultRowsReceived
                                     { target = "#c"
                                     , rows =
-                                        [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "notice" } ]
+                                        [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0, rowType = "notice", deleted = False, redacted = False } ]
                                     , status = "ok"
                                     }
                                 )

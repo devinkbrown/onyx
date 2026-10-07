@@ -98,8 +98,18 @@
       from: String(row.from || ""),
       body: String(row.body || ""),
       at: vaultRowAt(row.at),
-      rowType: VAULT_ROW_TYPES[rowType] ? rowType : "msg"
+      rowType: VAULT_ROW_TYPES[rowType] ? rowType : "msg",
+      // Tombstone flags ride with the row (mirroring StoredMessage);
+      // legacy rows predate them and read back clear.
+      deleted: !!row.deleted,
+      redacted: !!row.redacted
     };
+  }
+
+  /* Deleted/redacted tombstones never surface in recall or time-travel,
+     mirroring the `!r.deleted && !r.redacted` read filters. */
+  function vaultTombstoned(row) {
+    return !!(row && (row.deleted || row.redacted));
   }
 
   /* Vault retention policy — structurally-identical mirror of the pure
@@ -196,6 +206,8 @@
       // Elm has no clock: stamp write time ports-side so loadAround has
       // an anchor. An explicit stamp is never clobbered.
       if (!row.at) row.at = now;
+      row.deleted = !!row.deleted;
+      row.redacted = !!row.redacted;
       store.put(row);
       // Any write voids the target's proof (mirroring
       // `invalidateVaultDmSearchPrivacy`): the proof is re-earned by a
@@ -387,6 +399,7 @@
     for (var i = 0; i < newest.length && matches.length < capped; i++) {
       var row = vaultPlainRow(newest[i]);
       if (!row.id || !row.target) continue;
+      if (vaultTombstoned(row)) continue;
       var body = String(row.body).slice(0, SEARCH_CORPUS_TEXT_MAX).toLowerCase();
       var from = String(row.from).slice(0, SEARCH_CORPUS_TEXT_MAX).toLowerCase();
       if (body.indexOf(q) !== -1 || from.indexOf(q) !== -1) matches.push(row);
@@ -552,7 +565,8 @@
   }
 
   function vaultNewestSlice(rows) {
-    return rows.slice().sort(vaultNewestFirst).slice(0, VAULT_SEARCH_SCAN_MAX);
+    return rows.slice().filter(function (row) { return !vaultTombstoned(vaultPlainRow(row)); })
+      .sort(vaultNewestFirst).slice(0, VAULT_SEARCH_SCAN_MAX);
   }
 
   function vaultSearchRowsSemantic(rows, query, limit, minScore) {
@@ -660,7 +674,8 @@
      node can smoke-test the selection without IndexedDB. */
   function vaultAroundWindow(rows, anchorAt, limit) {
     var capped = Math.max(0, limit | 0);
-    var ranked = rows.slice().sort(function (a, b) {
+    var live = rows.slice().filter(function (row) { return !vaultTombstoned(vaultPlainRow(row)); });
+    var ranked = live.sort(function (a, b) {
       var da = Math.abs(vaultRowAt(a.at) - anchorAt);
       var db = Math.abs(vaultRowAt(b.at) - anchorAt);
       if (da !== db) return da - db;
@@ -7800,6 +7815,7 @@ function fetchPublicFeed(url) {
       dmPrivacyRowEncrypted: vaultDmPrivacyRowEncrypted,
       dmPrivacyInvalidate: vaultDmPrivacyInvalidate,
       exportSnapshot: vaultExportSnapshot,
+      plainRow: vaultPlainRow,
       retentionPolicy: readRetentionPolicy,
       sanitizeRetentionPolicy: sanitizeRetentionPolicy,
       retentionEffectiveKeep: retentionEffectiveKeep,
