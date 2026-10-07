@@ -336,6 +336,7 @@ shellOf name unread lastAt =
               , edited = False
               , deleted = False
               , redacted = False
+              , topic = ""
               }
             ]
     , lastSeen = Nothing
@@ -371,6 +372,7 @@ bigShell name n =
                 , edited = False
                 , deleted = False
                 , redacted = False
+                , topic = ""
                 }
             )
             (List.reverse (List.range 1 n))
@@ -2218,6 +2220,69 @@ suite =
 
                     _ ->
                         Expect.fail ("expected one BEFORE fetch, got: " ++ String.fromInt (List.length out))
+        , test "topic selection validates against the registry" <|
+            \_ ->
+                let
+                    base =
+                        { blank | topicHistory = Dict.fromList [ ( "#c", [ "Sprint" ] ) ] }
+
+                    ( m1, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "sprint" }) base
+
+                    ( m2, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "nope" }) m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "Sprint") (activeChannelTopic m1 "#c")
+                    , \_ -> Expect.equal Nothing (activeChannelTopic m2 "#c")
+                    ]
+                    ()
+        , test "channel sends carry the active conversation tag" <|
+            \_ ->
+                let
+                    live =
+                        { blank
+                            | connection = Live
+                            , activeChannel = Just "#c"
+                            , composer = "hi"
+                            , topicHistory = Dict.fromList [ ( "#c", [ "Sprint" ] ) ]
+                        }
+
+                    ( m1, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "Sprint" }) live
+
+                    ( _, out ) =
+                        update ComposerSend m1
+                in
+                Expect.equal True (List.member (SendLine "@onyx/topic=Sprint PRIVMSG #c hi\r\n") out)
+        , test "topic filter shows only matching rows" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( j2, _ ) =
+                        feed j1 "@onyx/topic=Sprint :alice!u@h PRIVMSG #c :standup"
+
+                    ( j3, _ ) =
+                        feed j2 ":bob!u@h PRIVMSG #c :general chat"
+
+                    ( m1, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "Sprint" }) j3
+
+                    rows =
+                        case Dict.get "#c" m1.channels of
+                            Just ch ->
+                                ch.messages
+
+                            Nothing ->
+                                []
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (topicVisibleRows m1 "#c" rows))
+                    , \_ -> Expect.equal 2 (List.length (topicVisibleRows blank "#c" rows))
+                    ]
+                    ()
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let
@@ -12158,6 +12223,7 @@ suite =
                             , edited = True
                             , deleted = False
                             , redacted = False
+                            , topic = ""
                             }
 
                         withdrawn =

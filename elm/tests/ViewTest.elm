@@ -158,6 +158,7 @@ bigModel =
                     , edited = False
                     , deleted = False
                     , redacted = False
+                    , topic = ""
                     }
                 )
                 (List.reverse (List.range 1 150))
@@ -240,6 +241,24 @@ suite =
                     , \_ ->
                         query staged
                             |> Query.has [ Selector.text "uploading…" ]
+                    ]
+                    ()
+        , test "topic picker offers registry conversations" <|
+            \_ ->
+                let
+                    topical =
+                        { channelModel | topicHistory = Dict.fromList [ ( "#c", [ "Sprint" ] ) ] }
+
+                    ( selected, _ ) =
+                        update (ChannelTopicSelect { channel = "#c", topic = Just "Sprint" }) topical
+                in
+                Expect.all
+                    [ \_ ->
+                        query topical
+                            |> Query.has [ Selector.text "Sprint" ]
+                    , \_ ->
+                        query selected
+                            |> Query.has [ Selector.text "Conversation: Sprint " ]
                     ]
                     ()
         , test "thread renders attachment cards with links" <|

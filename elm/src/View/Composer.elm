@@ -15,6 +15,7 @@ a nested form, so Enter in the composer still sends.
 -}
 
 import App exposing (Model, Msg(..))
+import Dict
 import Html exposing (Html, button, div, form, input, label, p, span, text)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
@@ -94,6 +95,7 @@ composer model =
                         text ""
                     ]
         , attachments model
+        , conversation model
         ]
 
 
@@ -132,6 +134,60 @@ attachments model =
          ]
             ++ List.map stagedRow model.attachments
         )
+
+
+{-| Named-conversation picker (mirroring the oracle topic
+surface: the registry offers known conversations, the active one
+badges with a clear action, and a stale pick falls back to the
+whole room). -}
+conversation : Model -> Html Msg
+conversation model =
+    case model.activeChannel of
+        Nothing ->
+            text ""
+
+        Just channel ->
+            let
+                options =
+                    Maybe.withDefault [] (Dict.get (String.toLower channel) model.topicHistory)
+
+                active =
+                    App.activeChannelTopic model channel
+            in
+            if List.isEmpty options && active == Nothing then
+                text ""
+
+            else
+                div [ class "onyx-topic" ]
+                    [ case active of
+                        Just label ->
+                            span [ class "onyx-topic-active" ]
+                                [ text ("Conversation: " ++ label ++ " ")
+                                , button
+                                    [ type_ "button"
+                                    , class "onyx-topic-clear"
+                                    , attribute "aria-label" "Show the whole room"
+                                    , onClick (ChannelTopicSelect { channel = channel, topic = Nothing })
+                                    ]
+                                    [ text "Whole room" ]
+                                ]
+
+                        Nothing ->
+                            text ""
+                    , div [ class "onyx-topic-options", attribute "role" "group", attribute "aria-label" "Conversations" ]
+                        (List.map
+                            (\label ->
+                                button
+                                    [ type_ "button"
+                                    , class "onyx-topic-option"
+                                    , attribute "aria-pressed" (if active == Just label then "true" else "false")
+                                    , onClick (ChannelTopicSelect { channel = channel, topic = Just label })
+                                    ]
+                                    [ text label ]
+                            )
+                            options
+                        )
+                    ]
 
 
 stagedRow : App.StagedAttachment -> Html Msg

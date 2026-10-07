@@ -41,7 +41,7 @@ thread model =
                                     App.threadWindowFor model channel
 
                                 chronological =
-                                    List.reverse channel.messages
+                                    App.topicVisibleRows model channel.name (List.reverse channel.messages)
 
                                 rows =
                                     chronological
