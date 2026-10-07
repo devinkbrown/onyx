@@ -1,4 +1,4 @@
-module View.Profile exposing ( profileCard, profileSheet )
+module View.Profile exposing ( moderationReview, profileCard, profileSheet )
 
 {-| Member network-identity sheet (mirroring `WhoisSheet`: a thin
 reactive view over the folded WHOIS cache — title, description,
@@ -8,10 +8,12 @@ summary, live status, and the details list; the sheet opens through
 import App exposing (Model, Msg(..))
 import Dict
 import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, li, p, small, span, summary, text, time, ul)
-import Html.Attributes exposing (attribute, class, datetime, href)
+import Html.Attributes exposing (attribute, class, datetime, disabled, href)
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 import Modes
+import Moderation
+import Prefs
 import Services
 import Set
 
@@ -576,6 +578,7 @@ cardFor model nick channel =
                 (summary [ class "onyx-member-advanced-toggle" ] [ text "Room and network details" ]
                     :: advancedRows nick channel role account info
                 )
+            , moderationControls model nick channel member isSelf
             ]
         ]
 
@@ -751,6 +754,240 @@ profileEscapeDecoder =
                             (\key ->
                                 if key == "Escape" then
                                     Decode.succeed App.WhoisClose
+
+                                else
+                                    Decode.fail "not-escape"
+                            )
+            )
+
+
+{-| Card moderation controls (mirroring the oracle `showRoomModeration`
+/ `showIrcRoleControls` gates: room op, not self, and the experience
+mode publishing kick (room actions) or op (role controls)). -}
+moderationControls : Model -> String -> String -> Maybe App.Member -> Bool -> Html Msg
+moderationControls model nick channel member isSelf =
+    let
+        kinds =
+            Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)
+
+        canModerate =
+            App.isChannelOp model channel
+
+        modes =
+            Maybe.map .modes member |> Maybe.withDefault Set.empty
+
+        propose kind =
+            App.ModerationPropose { kind = kind, channel = channel, target = nick }
+    in
+    if not canModerate || isSelf then
+        text ""
+
+    else if not (List.member Moderation.Kick kinds) then
+        text ""
+
+    else
+        div
+            [ class "onyx-member-mod"
+            , attribute "role" "group"
+            , attribute "aria-label" ("Moderate " ++ nick)
+            ]
+            ([]
+                ++ (if List.member Moderation.Op kinds then
+                        [ if Set.member 'o' modes then
+                            modButton ("Remove op from " ++ nick) "Deop" (propose Moderation.Deop)
+
+                          else
+                            modButton ("Give op to " ++ nick) "Op" (propose Moderation.Op)
+                        , if Set.member 'v' modes then
+                            modButton ("Remove voice from " ++ nick) "Devoice" (propose Moderation.Devoice)
+
+                          else
+                            modButton ("Give voice to " ++ nick) "Voice" (propose Moderation.Voice)
+                        ]
+
+                    else
+                        []
+                   )
+                ++ [ modButton ("Kick " ++ nick ++ " from " ++ channel) "Kick" (propose Moderation.Kick)
+                   , modButton ("Ban " ++ nick ++ " from " ++ channel) "Ban" (propose Moderation.Ban)
+                   ]
+            )
+
+
+{-| One moderation control button. -}
+modButton : String -> String -> Msg -> Html Msg
+modButton label visible msg =
+    button
+        [ attribute "type" "button"
+        , class "onyx-member-action"
+        , attribute "aria-label" label
+        , onClick msg
+        ]
+        [ text visible ]
+
+
+{-| Review-first confirmation for a staged draft (mirroring
+`ModerationActionReview`: nothing sends until the labelled confirm
+control is used, and confirm invalidates on disconnect or lost
+room authority). -}
+moderationReview : Model -> Html Msg
+moderationReview model =
+    case model.moderationDraft of
+        Nothing ->
+            text ""
+
+        Just draft ->
+            let
+                validation =
+                    Moderation.validateDraft draft model.ourNick
+
+                review =
+                    case validation of
+                        Ok valid ->
+                            Just valid.review
+
+                        Err _ ->
+                            Nothing
+
+                errors =
+                    case validation of
+                        Ok _ ->
+                            []
+
+                        Err problems ->
+                            problems
+
+                connected =
+                    model.connection == App.Live
+
+                canModerate =
+                    App.isChannelOp model draft.channel
+
+                blockedReason =
+                    if not connected then
+                        Just "Reconnect to send this change. Your draft stays on this device."
+
+                    else if not canModerate then
+                        Just "You no longer have moderator permission in this room."
+
+                    else
+                        Nothing
+
+                canSend =
+                    review /= Nothing && blockedReason == Nothing
+
+                title =
+                    Maybe.map .title review |> Maybe.withDefault "Review room action"
+
+                describedBy =
+                    case ( blockedReason, review ) of
+                        ( Just _, _ ) ->
+                            "moderation-review-status"
+
+                        ( Nothing, Nothing ) ->
+                            "moderation-review-errors"
+
+                        ( Nothing, Just _ ) ->
+                            ""
+            in
+            div [ class "onyx-profile-pop" ]
+                [ div
+                    [ class "onyx-profile-backdrop"
+                    , onClick App.ModerationCancel
+                    ]
+                    []
+                , div
+                    [ class "onyx-moderation-review"
+                    , attribute "role" "dialog"
+                    , attribute "aria-label" title
+                    , attribute "aria-describedby" "moderation-review-desc"
+                    , on "keydown" reviewEscapeDecoder
+                    ]
+                    [ h2 [ class "onyx-moderation-title" ] [ text title ]
+                    , p [ class "onyx-moderation-desc", attribute "id" "moderation-review-desc" ]
+                        [ text "Nothing is sent until you confirm." ]
+                    , case review of
+                        Just copy ->
+                            div []
+                                [ dl [ class "onyx-moderation-facts" ]
+                                    [ div [ class "onyx-profile-field" ]
+                                        [ dt [] [ text "Permission" ]
+                                        , dd [] [ text (if canModerate then "Room moderator" else "Not available") ]
+                                        ]
+                                    , div [ class "onyx-profile-field" ]
+                                        [ dt [] [ text "Target scope" ]
+                                        , dd [] [ text draft.channel ]
+                                        ]
+                                    , div [ class "onyx-profile-field" ]
+                                        [ dt [] [ text "Receipt" ]
+                                        , dd [] [ text "Local draft until confirmed; server echo is the source of truth." ]
+                                        ]
+                                    ]
+                                , p [ class "onyx-moderation-summary" ] [ text copy.summary ]
+                                , p [ class "onyx-moderation-impact" ] [ text copy.impact ]
+                                ]
+
+                        Nothing ->
+                            ul
+                                [ attribute "id" "moderation-review-errors"
+                                , class "onyx-moderation-errors"
+                                , attribute "role" "alert"
+                                ]
+                                (List.map (\problem -> li [] [ text problem ]) errors)
+                    , case blockedReason of
+                        Just reason ->
+                            p
+                                [ attribute "id" "moderation-review-status"
+                                , class "onyx-moderation-status"
+                                , attribute "role" "status"
+                                ]
+                                [ text reason ]
+
+                        Nothing ->
+                            text ""
+                    , div [ class "onyx-moderation-actions" ]
+                        [ button
+                            [ attribute "type" "button"
+                            , class "onyx-member-action"
+                            , attribute "aria-label" "Cancel room action"
+                            , onClick App.ModerationCancel
+                            ]
+                            [ text "Cancel" ]
+                        , button
+                            ([ attribute "type" "button"
+                             , class "onyx-member-action onyx-member-confirm"
+                             , onClick App.ModerationConfirm
+                             , disabled (not canSend)
+                             ]
+                                ++ (if String.isEmpty describedBy then
+                                        []
+
+                                    else
+                                        [ attribute "aria-describedby" describedBy ]
+                                   )
+                            )
+                            [ text (Maybe.map .confirmLabel review |> Maybe.withDefault "Confirm") ]
+                        ]
+                    ]
+                ]
+
+
+{-| Escape cancels the review (same IME-yielding shape as the
+other decoders). -}
+reviewEscapeDecoder : Decode.Decoder Msg
+reviewEscapeDecoder =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.field "key" Decode.string
+                        |> Decode.andThen
+                            (\key ->
+                                if key == "Escape" then
+                                    Decode.succeed App.ModerationCancel
 
                                 else
                                     Decode.fail "not-escape"

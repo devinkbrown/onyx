@@ -1469,6 +1469,28 @@ html, body {
 .onyx-member-meta { color: var(--onyx-dim); margin: 6px 0 0; }
 .onyx-member-hostmask { margin: 6px 0 0; word-break: break-all; }
 .onyx-member-ledger { color: var(--onyx-accent); font-size: 13px; }
+.onyx-member-mod { display: flex; flex-wrap: wrap; gap: 8px; }
+.onyx-moderation-review {
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 8px 16px;
+  max-width: 360px;
+  padding: 12px;
+}
+.onyx-moderation-title { font-size: 15px; margin: 0; }
+.onyx-moderation-desc { color: var(--onyx-dim); font-size: 12px; margin: 0; }
+.onyx-moderation-facts { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.onyx-moderation-summary { font-size: 13px; margin: 0; }
+.onyx-moderation-impact { color: var(--onyx-dim); font-size: 13px; margin: 0; }
+.onyx-moderation-errors { color: var(--onyx-bad); font-size: 13px; margin: 0; padding-left: 18px; }
+.onyx-moderation-status { font-size: 13px; margin: 0; }
+.onyx-moderation-actions { display: flex; gap: 8px; }
+.onyx-member-confirm { border-color: var(--onyx-bad); }
+.onyx-member-confirm:disabled { cursor: not-allowed; opacity: 0.5; }
 .onyx-msg-menu-delete-confirm { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
 .onyx-msg-menu-delete-confirm-title { font-weight: 700; font-size: 13px; margin: 0; }
 .onyx-msg-menu-delete-confirm-copy { color: var(--onyx-dim); font-size: 12px; margin: 0; }

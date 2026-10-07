@@ -46,6 +46,7 @@ import Isupport exposing (ISupport)
 import Labels
 import Status
 import Media
+import Moderation
 import Modes
 import MessageWindow
 import Multiline
@@ -326,6 +327,7 @@ type alias Model =
     , whoisTimerGen : Int
     , userProfiles : Dict String Services.UserProfile
     , userProfileCard : Maybe { nick : String, channel : String }
+    , moderationDraft : Maybe Moderation.Draft
     , editHistory : Dict String (List EditRevision)
     , userMetadata : Dict String (Dict String String)
     , typingUsers : Dict String (Dict String Typist)
@@ -2573,6 +2575,9 @@ type Msg
     | MemberMention { nick : String, channel : String }
     | MemberCopyNick String
     | MemberCardWhois String
+    | ModerationPropose { kind : Moderation.ModerationKind, channel : String, target : String }
+    | ModerationConfirm
+    | ModerationCancel
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -2932,6 +2937,7 @@ init nick url =
     , whoisTimerGen = 0
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
+    , moderationDraft = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -3370,6 +3376,7 @@ blank =
     , whoisTimerGen = 0
     , userProfiles = Dict.empty
     , userProfileCard = Nothing
+    , moderationDraft = Nothing
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -9910,6 +9917,49 @@ requestWhois model nick =
 
         Nothing ->
             ( { model | whois = cache, whoisTarget = Just nick, whoisTimerGen = gen }, [] )
+
+
+{-| Dispatch a reviewed room action through the wire commands
+(mirroring `applyMemberModeration`: kick/ban/unban/op/deop/voice/devoice). -}
+applyModerationAction : Moderation.NormalizedAction -> List Outbound
+applyModerationAction action =
+    case action of
+        Moderation.KickAction details ->
+            [ SendLine
+                (Wire.formatIrcLine "KICK"
+                    (case details.reason of
+                        Just reason ->
+                            [ details.channel, details.target, reason ]
+
+                        Nothing ->
+                            [ details.channel, details.target ]
+                    )
+                )
+            ]
+
+        Moderation.BanAction details ->
+            [ SendLine (Wire.formatIrcLine "MODE" [ details.channel, "+b", details.mask ]) ]
+
+        Moderation.UnbanAction details ->
+            [ SendLine (Wire.formatIrcLine "MODE" [ details.channel, "-b", details.mask ]) ]
+
+        Moderation.RoleAction details ->
+            let
+                flag =
+                    case details.kind of
+                        Moderation.Op ->
+                            "+o"
+
+                        Moderation.Deop ->
+                            "-o"
+
+                        Moderation.Voice ->
+                            "+v"
+
+                        _ ->
+                            "-v"
+            in
+            [ SendLine (Wire.formatIrcLine "MODE" [ details.channel, flag, details.target ]) ]
 
 
 {-| Drop one conversation's rows (mirroring `clearMessages`: the
@@ -37262,6 +37312,52 @@ update msg model =
             -- `handleWhois`): the card closes and the WHOIS request
             -- opens the sheet.
             Tuple.mapFirst (\m -> { m | userProfileCard = Nothing }) (requestWhois model nick)
+
+        ModerationPropose { kind, channel, target } ->
+            -- A card moderation control stages a review draft and
+            -- closes the card (mirroring `requestModeration`); the
+            -- review surface validates it live.
+            ( { model
+                | userProfileCard = Nothing
+                , moderationDraft =
+                    Just
+                        { kind = kind
+                        , channel = channel
+                        , target = Just target
+                        , mask = Nothing
+                        , reason = Nothing
+                        }
+              }
+            , []
+            )
+
+        ModerationCancel ->
+            ( { model | moderationDraft = Nothing }, [] )
+
+        ModerationConfirm ->
+            -- Confirm re-validates and invalidates on disconnect or
+            -- lost room authority (mirroring the review `canSend`
+            -- gate); nothing is sent until all three hold.
+            case model.moderationDraft of
+                Nothing ->
+                    ( model, [] )
+
+                Just draft ->
+                    case Moderation.validateDraft draft model.ourNick of
+                        Err _ ->
+                            ( model, [] )
+
+                        Ok { action } ->
+                            if model.connection /= Live then
+                                ( model, [] )
+
+                            else if not (isChannelOp model draft.channel) then
+                                ( model, [] )
+
+                            else
+                                ( { model | moderationDraft = Nothing }
+                                , applyModerationAction action
+                                )
 
         MessageEditRequested target messageId newText ->
             requestEdit model target messageId newText

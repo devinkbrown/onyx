@@ -17,6 +17,8 @@ import Html.Attributes as Attr
 import Isupport
 import Json.Encode as Encode
 import Media
+import Moderation
+import Prefs
 import Route
 import Test exposing (Test, describe, test)
 import Status
@@ -1324,6 +1326,86 @@ suite =
                         query selfed
                             |> Query.find [ Selector.class "onyx-member-card" ]
                             |> Query.hasNot [ Selector.text "Mention", Selector.text "Guest" ]
+                    ]
+                    ()
+                , test "member moderation controls stage a review and confirm" <|
+            \_ ->
+                let
+                    key name composing =
+                        Event.custom "keydown"
+                            (Encode.object
+                                [ ( "key", Encode.string name )
+                                , ( "isComposing", Encode.bool composing )
+                                ]
+                            )
+
+                    prefs =
+                        blank.prefs
+
+                    opped =
+                        { blank | ourNick = "me", prefs = { prefs | experienceMode = Prefs.ExperienceAdvanced } }
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m ":op!u@h MODE #c +o me")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    carded =
+                        Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) opped)
+
+                    reviewing =
+                        Tuple.first (update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" }) carded)
+
+                    offlineReview =
+                        { reviewing | connection = Offline }
+
+                    standardCard =
+                        Tuple.first
+                            (update (UserProfileOpened { nick = "alice", channel = "#c" })
+                                { opped | prefs = { prefs | experienceMode = Prefs.ExperienceStandard } }
+                            )
+                in
+                Expect.all
+                    [ \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Moderate alice") ]
+                            |> Query.has [ Selector.text "Kick", Selector.text "Ban" ]
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Kick alice from #c") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" })
+                    , \_ ->
+                        query reviewing
+                            |> Query.find [ Selector.class "onyx-moderation-review" ]
+                            |> Query.has
+                                [ Selector.attribute (Attr.attribute "aria-label" "Remove from room")
+                                , Selector.text "Remove alice from #c. They can rejoin unless they are also blocked."
+                                , Selector.text "This sends a kick. It is not undone automatically."
+                                , Selector.text "Room moderator"
+                                ]
+                    , \_ ->
+                        query reviewing
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Cancel room action") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ModerationCancel
+                    , \_ ->
+                        query reviewing
+                            |> Query.find [ Selector.class "onyx-moderation-review" ]
+                            |> Event.simulate (key "Escape" False)
+                            |> Event.expect ModerationCancel
+                    , \_ ->
+                        query reviewing
+                            |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Remove from room" ] ]
+                            |> Event.simulate Event.click
+                            |> Event.expect ModerationConfirm
+                    , \_ ->
+                        query offlineReview
+                            |> Query.find [ Selector.class "onyx-moderation-review" ]
+                            |> Query.has [ Selector.text "Reconnect to send this change." ]
+                    , \_ ->
+                        query standardCard
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.hasNot [ Selector.text "Kick" ]
                     ]
                     ()
         , test "menu translation item, section, and unavailable note" <|

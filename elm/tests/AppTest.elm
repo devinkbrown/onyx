@@ -25,7 +25,8 @@ import SavedSearches exposing (SearchMode(..))
 import Schedule
 import Services
 import Isupport
-import Prefs exposing (ReactionDensity(..))
+import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
+import Moderation
 import Session
 import Set
 import Test exposing (Test, describe, test)
@@ -13451,6 +13452,75 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal (Just { nick = "bob", channel = "#c" }) m1.userProfileCard
                         , \_ -> Expect.equal Nothing m2.userProfileCard
+                        ]
+                        ()
+            , test "moderation propose stages, confirm sends, cancel and gates drop" <|
+                \_ ->
+                    let
+                        prefs =
+                            blank.prefs
+
+                        opped =
+                            { blank
+                                | ourNick = "me"
+                                , prefs = { prefs | experienceMode = ExperienceAdvanced }
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                            }
+
+                        carded =
+                            Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) opped)
+
+                        ( proposed, _ ) =
+                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "alice" }) carded
+
+                        ( confirmed, confirmOut ) =
+                            update ModerationConfirm proposed
+
+                        ( cancelled, _ ) =
+                            update ModerationCancel proposed
+
+                        ( offline, offlineOut ) =
+                            update ModerationConfirm { proposed | connection = Offline }
+
+                        ( deopped, deoppedOut ) =
+                            update ModerationConfirm
+                                { proposed
+                                    | channels =
+                                        Dict.singleton "#c"
+                                            (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.empty, away = False } })
+                                }
+
+                        ( _, selfedOut ) =
+                            update (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = "me" }) carded
+                                |> Tuple.first
+                                |> (\m -> update ModerationConfirm m)
+
+                        banned =
+                            Tuple.first (update (ModerationPropose { kind = Moderation.Ban, channel = "#c", target = "alice" }) carded)
+                                |> (\m -> update ModerationConfirm m)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing proposed.userProfileCard
+                        , \_ ->
+                            Expect.equal True
+                                (case proposed.moderationDraft of
+                                    Just draft ->
+                                        draft.channel == "#c"
+
+                                    Nothing ->
+                                        False
+                                )
+                        , \_ -> Expect.equal [ SendLine "KICK #c alice\r\n" ] confirmOut
+                        , \_ -> Expect.equal Nothing confirmed.moderationDraft
+                        , \_ -> Expect.equal Nothing cancelled.moderationDraft
+                        , \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.notEqual Nothing offline.moderationDraft
+                        , \_ -> Expect.equal [] deoppedOut
+                        , \_ -> Expect.notEqual Nothing deopped.moderationDraft
+                        , \_ -> Expect.equal [] selfedOut
+                        , \_ -> Expect.equal [ SendLine "MODE #c +b alice!*@*\r\n" ] (Tuple.second banned)
                         ]
                         ()
             , test "member mention appends, copies, and hands off to whois" <|
