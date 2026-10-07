@@ -932,6 +932,21 @@ suite =
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect MessageMenuClose
                     , \_ ->
+                        query opened
+                            |> Query.find [ Selector.class "onyx-msg-menu-backdrop" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MessageMenuClose
+                    , \_ ->
+                        query opened
+                            |> Query.find
+                                [ Selector.tag "a"
+                                , Selector.attribute (Attr.attribute "aria-label" "Room ledger for #c")
+                                ]
+                            |> Query.has
+                                [ Selector.text "Room ledger"
+                                , Selector.attribute (Attr.href "/stats/?room=%23c")
+                                ]
+                    , \_ ->
                         query owned
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
                             |> Query.has [ Selector.text "Edit", Selector.text "Delete for everyone" ]

@@ -1330,3 +1330,5 @@ html, body {
 }
 .onyx-msg-menu-delete-confirm-cancel { background: transparent; color: var(--onyx-text); }
 .onyx-msg-menu-delete-confirm-delete { background: transparent; border-color: var(--onyx-bad); color: var(--onyx-bad); }
+.onyx-msg-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.onyx-msg-menu { position: relative; z-index: 41; }

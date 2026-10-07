@@ -204,7 +204,7 @@ messageMenuButton model target m =
                 caps =
                     App.capabilities (menuInput model target m)
             in
-            if not (menuHasActions caps) then
+            if not (menuHasActions caps || App.isChannelName model target) then
                 text ""
 
             else
@@ -260,9 +260,10 @@ menuHasActions caps =
 
 
 {-| The open menu for one row (mirrors the oracle menu order and
-copy: Reply, Copy, Quote, Moment, Search, Topic, Edit, then Delete
-behind its inline confirm step; tiers are flattened into one menu
-and react/pin/translate/ignore/collapse stay later slices). -}
+copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
+then Delete behind its inline confirm step; tiers are flattened
+into one menu with a light-dismiss backdrop, and
+react/pin/translate/ignore/collapse stay later slices). -}
 messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuPanel model target m =
     case m.msgid of
@@ -286,12 +287,18 @@ messageMenuPanel model target m =
                             actionTarget =
                                 "message from " ++ m.from
                         in
-                        div
-                            [ class "onyx-msg-menu"
-                            , attribute "role" "menu"
-                            , attribute "aria-label" ("More actions for " ++ actionTarget)
-                            , on "keydown" (menuEscapeDecoder model)
-                            ]
+                        div [ class "onyx-msg-menu-pop" ]
+                            [ div
+                                [ class "onyx-msg-menu-backdrop"
+                                , onClick App.MessageMenuClose
+                                ]
+                                []
+                            , div
+                                [ class "onyx-msg-menu"
+                                , attribute "role" "menu"
+                                , attribute "aria-label" ("More actions for " ++ actionTarget)
+                                , on "keydown" (menuEscapeDecoder model)
+                                ]
                             (List.filterMap identity
                                 [ if caps.canReply then
                                     Just
@@ -325,6 +332,20 @@ messageMenuPanel model target m =
                                         (menuItem ("Copy moment link for " ++ actionTarget)
                                             "Copy moment link"
                                             (App.MessageCopyMoment { target = target, at = m.at })
+                                        )
+
+                                  else
+                                    Nothing
+                                , if App.isChannelName model target then
+                                    Just
+                                        (a
+                                            [ class "onyx-msg-menu-item"
+                                            , attribute "role" "menuitem"
+                                            , href (App.statsRoomHref target)
+                                            , attribute "aria-label" ("Room ledger for " ++ target)
+                                            , onClick App.MessageMenuClose
+                                            ]
+                                            [ text "Room ledger" ]
                                         )
 
                                   else
@@ -376,6 +397,7 @@ messageMenuPanel model target m =
                                     Nothing
                                 ]
                             )
+                        ]
 
 
 {-| One menu item (text button with the oracle accessible name). -}
