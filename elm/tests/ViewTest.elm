@@ -2824,8 +2824,19 @@ suite =
                                 [ Selector.text "Overview"
                                 , Selector.text "Devices"
                                 , Selector.text "Session"
+                                , Selector.text "Capabilities"
                                 ]
                                 q
+                        , \_ ->
+                            query { blank | accountName = Just "kai", ourNick = "kai", accountOpen = True, connection = Live, caps = [ "message-tags", "server-time" ], capAvailable = [ "message-tags", "server-time", "sasl" ] }
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "capability-matrix-list") ]
+                                |> Query.has
+                                    [ Selector.text "Message tags"
+                                    , Selector.text "active"
+                                    ]
+                        , \_ ->
+                            query { blank | accountName = Just "kai", ourNick = "kai", accountOpen = True, connection = Offline }
+                                |> Query.has [ Selector.text "Connect to see what this browser connection supports." ]
                         , \_ ->
                             Query.has [ Selector.text "kai" ] q
                         ]

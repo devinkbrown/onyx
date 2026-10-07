@@ -14,12 +14,12 @@ C3 adds Email, Password, Recovery codes, Passkeys, and Data
 renders inline in the panel where the oracle uses a Sheet modal.
 -}
 
-import App exposing (Model, Msg(..), TotpCopy(..), TotpStatus(..), accountCertNotices, accountKeytransNotices, dropReady, isTotpCode, millisToIso, totpCodeLength)
+import App exposing (ConnectionState(..), Model, Msg(..), TotpCopy(..), TotpStatus(..), accountCertNotices, accountKeytransNotices, dropReady, isTotpCode, millisToIso, totpCodeLength)
 import Html exposing (Html, a, button, code, dd, div, dl, dt, form, h2, h3, h4, input, label, li, nav, p, section, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, pattern, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Passkey exposing (PasskeyCredential, maxLabelLength)
-import Session exposing (SessionState(..))
+import Session exposing (CapStatus(..), SessionState(..))
 
 
 accountPanel : Model -> Html Msg
@@ -67,6 +67,7 @@ accountPanel model =
                             , passkeysSection model
                             , devicesSection model
                             , sessionSection model
+                            , capsSection model
                             , dataSection model
                             ]
                 ]
@@ -88,6 +89,7 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-passkeys-title" ] [ text "Passkeys" ]
         , a [ class "onyx-account-nav__item", href "#acct-sessions-title" ] [ text "Devices" ]
         , a [ class "onyx-account-nav__item", href "#acct-session-title" ] [ text "Session" ]
+        , a [ class "onyx-account-nav__item", href "#acct-caps-title" ] [ text "Capabilities" ]
         , a [ class "onyx-account-nav__item", href "#acct-download-store-title" ] [ text "Data" ]
         ]
 
@@ -251,6 +253,63 @@ sessionSection model =
             ]
         , pushRow model
         ]
+
+
+{-| Session capabilities (mirroring the oracle
+`CapabilityMatrixSection`: active means this connection uses it
+now; disconnected shows the connect prompt instead). -}
+capsSection : Model -> Html Msg
+capsSection model =
+    let
+        rows =
+            Session.buildCapabilityMatrix { negotiated = model.caps, available = model.capAvailable }
+    in
+    section [ class "onyx-account-section", id "acct-caps-title" ]
+        [ h3 [ class "onyx-account-section__title" ] [ text "Session capabilities" ]
+        , p [ class "onyx-account-hint" ]
+            [ text "These are browser and server connection capabilities, not native-app features. Active means this connection is using it now." ]
+        , p [ class "onyx-account-hint", attribute "data-testid" "capability-matrix-summary", attribute "role" "status" ]
+            [ text
+                (if model.connection == Live then
+                    Session.capabilitySummary rows
+
+                 else
+                    "Connect to see what this browser connection supports."
+                )
+            ]
+        , if model.connection == Live then
+            ul [ class "onyx-account-caps", attribute "aria-label" "Product capabilities", attribute "data-testid" "capability-matrix-list" ]
+                (List.map capRow rows)
+
+          else
+            text ""
+        ]
+
+
+capRow : Session.CapRow -> Html Msg
+capRow row =
+    li [ class "onyx-account-cap", attribute "data-testid" "capability-matrix-row", attribute "data-cap-status" (capStatusLabel row.status) ]
+        [ strong [] [ text row.label ]
+        , text " · "
+        , span [ class "onyx-account-cap-status" ] [ text (capStatusLabel row.status) ]
+        , span [ class "onyx-account-hint" ] [ text (" — " ++ row.hint) ]
+        ]
+
+
+capStatusLabel : Session.CapStatus -> String
+capStatusLabel status =
+    case status of
+        Active ->
+            "active"
+
+        Available ->
+            "available"
+
+        Missing ->
+            "missing"
+
+        Unknown ->
+            "unknown"
 
 
 {-| Closed-tab alerts: the WEBPUSH toggle lives with the session
