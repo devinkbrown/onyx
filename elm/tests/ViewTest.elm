@@ -197,7 +197,7 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        Query.find [ Selector.tag "input" ] q
+                        Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Offline — sends queue on this device") ] q
                             |> Query.has
                                 [ Selector.attribute (Attr.placeholder "Offline — sends queue on this device")
                                 , Selector.disabled False
@@ -218,7 +218,7 @@ suite =
                     q =
                         query blank
                 in
-                Query.find [ Selector.tag "input" ] q
+                Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Select a channel") ] q
                     |> Query.has
                         [ Selector.attribute (Attr.placeholder "Select a channel")
                         , Selector.disabled True
@@ -800,7 +800,7 @@ suite =
                             |> Event.expect EditCancel
                     , \_ ->
                         query armed
-                            |> Query.find [ Selector.tag "input" ]
+                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Query.has [ Selector.attribute (Attr.placeholder "Edit message") ]
                     , \_ ->
                         query armed
@@ -853,17 +853,17 @@ suite =
                 Expect.all
                     [ \_ ->
                         query edited
-                            |> Query.find [ Selector.tag "input" ]
+                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
                     , \_ ->
                         query replied
-                            |> Query.find [ Selector.tag "input" ]
+                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect ReplyCancel
                     , \_ ->
                         query both
-                            |> Query.find [ Selector.tag "input" ]
+                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
                     ]
@@ -2878,6 +2878,133 @@ suite =
                             query cardOpened
                                 |> Query.findAll [ Selector.class "shell-topic-forum" ]
                                 |> Query.count (Expect.equal 0)
+                        ]
+                        ()
+            , test "topic tools pin, follow, and unread badges" <|
+                \_ ->
+                    let
+                        inactive =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> feed m "@onyx/topic=Release :bob!u@h PRIVMSG #c :two")
+
+                        watched =
+                            Tuple.first (update (ChannelSelect "#c") inactive)
+
+                        lived =
+                            feed watched "@onyx/topic=Release :bob!u@h PRIVMSG #c :three"
+
+                        forumed =
+                            Tuple.first (update (ForumToggle "#c") lived)
+
+                        pinned =
+                            Tuple.first (update (ForumChannelToggle "#c") lived)
+
+                        repinned =
+                            Tuple.first (update (ChannelSelect "#c") pinned)
+
+                        followed =
+                            Tuple.first (update (FollowTopicToggle { channel = "#c", topic = Nothing }) lived)
+
+                        cardFollowed =
+                            Tuple.first (update (FollowTopicToggle { channel = "#c", topic = Just "Roadmap" }) forumed)
+
+                        topicSelected =
+                            Tuple.first
+                                (update (ChannelTopicSelect { channel = "#c", topic = Just "Roadmap" }) lived)
+
+                        bare =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query bare
+                                |> Query.find [ Selector.class "shell-topic-create" ]
+                                |> Query.has [ Selector.text "Start topic" ]
+                        , \_ ->
+                            query bare
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Follow room" ] ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.FollowTopicToggle { channel = "#c", topic = Nothing })
+                        , \_ ->
+                            query bare
+                                |> Query.findAll [ Selector.class "topic-filter-bar" ]
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
+                            query bare
+                                |> Query.findAll [ Selector.tag "button", Selector.containing [ Selector.text "Forum" ] ]
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
+                            query lived
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Attr.attribute "aria-label" "Release, 2 unread")
+                                    ]
+                                |> Query.has [ Selector.text "2" ]
+                        , \_ ->
+                            query lived
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Attr.attribute "aria-label" "Roadmap, 1 unread")
+                                    ]
+                                |> Query.has [ Selector.text "1" ]
+                        , \_ ->
+                            query forumed
+                                |> Query.findAll [ Selector.class "shell-topic-card-unread" ]
+                                |> Query.count (Expect.equal 2)
+                        , \_ ->
+                            query forumed
+                                |> Query.find
+                                    [ Selector.class "shell-topic-card-main"
+                                    , Selector.attribute
+                                        (Attr.attribute "aria-label" "Open topic Release, 2 messages, 2 unread on this device")
+                                    ]
+                                |> Query.has
+                                    [ Selector.attribute
+                                        (Attr.attribute "aria-label" "Open topic Release, 2 messages, 2 unread on this device")
+                                    ]
+                        , \_ ->
+                            query forumed
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Attr.attribute "aria-label" "Follow topic Roadmap")
+                                    ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.FollowTopicToggle { channel = "#c", topic = Just "Roadmap" })
+                        , \_ ->
+                            query cardFollowed
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.attribute (Attr.attribute "aria-label" "Unfollow topic Roadmap")
+                                    ]
+                                |> Query.has [ Selector.text "Following" ]
+                        , \_ ->
+                            query lived
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Pin forum" ] ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.ForumChannelToggle "#c")
+                        , \_ ->
+                            query pinned
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Forum pinned" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ -> Expect.equal True (App.forumPinnedFor pinned "#c")
+                        , \_ ->
+                            query repinned
+                                |> Query.find [ Selector.class "shell-topic-forum" ]
+                                |> Query.has [ Selector.text "#Release" ]
+                        , \_ ->
+                            query followed
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Following room" ] ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
+                        , \_ ->
+                            query topicSelected
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Follow Roadmap" ] ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.FollowTopicToggle { channel = "#c", topic = Just "Roadmap" })
                         ]
                         ()
             , test "no facepile without channel members" <|

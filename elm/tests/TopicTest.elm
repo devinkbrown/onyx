@@ -6,6 +6,7 @@ significant whitespace, empty-string labels, dedupe with first
 casing, recency-then-alphabetical order, counts, latest stamps).
 -}
 
+import Dict
 import Expect
 import Test exposing (Test, describe, test)
 import Topic exposing (..)
@@ -173,4 +174,71 @@ suite =
                         ]
                 in
                 Expect.equal [ { topic = "Topic", count = 3, lastAt = d03 } ] (summarizeTopics messages)
+        , test "projector counts the boundary row and newer rows by lowercase label" <|
+            \_ ->
+                let
+                    scope =
+                        { ours = "me", notifyLevel = "all" }
+
+                    rows =
+                        [ urow 3 "Release" "bob" False False
+                        , urow 2 "ROADMAP" "bob" False False
+                        , urow 1 "roadmap" "bob" False False
+                        ]
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Dict.fromList [ ( "release", 1 ), ( "roadmap", 1 ) ])
+                            (projectTopicUnread scope rows (Just 2))
+                    , \_ ->
+                        Expect.equal
+                            (Dict.fromList [ ( "release", 1 ) ])
+                            (projectTopicUnread scope rows (Just 3))
+                    , \_ ->
+                        Expect.equal Dict.empty (projectTopicUnread scope rows Nothing)
+                    , \_ ->
+                        Expect.equal Dict.empty (projectTopicUnread scope rows (Just 99))
+                    ]
+                    ()
+        , test "projector skips system, own, and untagged rows" <|
+            \_ ->
+                let
+                    scope =
+                        { ours = "me", notifyLevel = "all" }
+
+                    rows =
+                        [ urow 4 "Release" "ME" False False
+                        , urow 3 "" "bob" False False
+                        , urow 2 "Release" "bob" False True
+                        , urow 1 "Release" "bob" False False
+                        ]
+                in
+                Expect.equal
+                    (Dict.fromList [ ( "release", 1 ) ])
+                    (projectTopicUnread scope rows (Just 1))
+        , test "projector honors the notify level" <|
+            \_ ->
+                let
+                    rows =
+                        [ urow 2 "Release" "bob" False False
+                        , urow 1 "Roadmap" "bob" True False
+                        ]
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            Dict.empty
+                            (projectTopicUnread { ours = "me", notifyLevel = "none" } rows (Just 1))
+                    , \_ ->
+                        Expect.equal
+                            (Dict.fromList [ ( "roadmap", 1 ) ])
+                            (projectTopicUnread { ours = "me", notifyLevel = "mentions" } rows (Just 1))
+                    ]
+                    ()
         ]
+
+
+urow : Int -> String -> String -> Bool -> Bool -> TopicUnreadRow
+urow id topic from highlight system =
+    { id = id, topic = topic, from = from, highlight = highlight, system = system }

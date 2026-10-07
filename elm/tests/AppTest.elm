@@ -2696,6 +2696,85 @@ suite =
                     , \_ -> Expect.equal 1 (List.length (follows suppressed))
                     ]
                     ()
+        , test "forum pin toggles, persists, and re-opens on navigation" <|
+            \_ ->
+                let
+                    ( watched, _ ) =
+                        update (ChannelSelect "#c") (joinFirst blank "me" "#c")
+
+                    ( seeded, _ ) =
+                        feed watched "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :one"
+
+                    ( pinned, pinOuts ) =
+                        update (ForumChannelToggle "#c") seeded
+
+                    ( unpinned, unpinOuts ) =
+                        update (ForumChannelToggle "#C") pinned
+
+                    ( invalid, invalidOuts ) =
+                        update (ForumChannelToggle "not a channel") seeded
+
+                    ( reopened, _ ) =
+                        update (ChannelSelect "#c") pinned
+
+                    bareWatched =
+                        Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                    ( barePinned, _ ) =
+                        update (ForumChannelToggle "#c") bareWatched
+
+                    ( bareReselected, _ ) =
+                        update (ChannelSelect "#c") { barePinned | forumView = Dict.empty }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (forumPinnedFor pinned "#c")
+                    , \_ -> Expect.equal (Just True) (Dict.get "#c" pinned.forumView)
+                    , \_ -> Expect.equal [ ForumChannelsSave { channels = [ "#c" ] } ] pinOuts
+                    , \_ -> Expect.equal False (forumPinnedFor unpinned "#c")
+                    , \_ -> Expect.equal [ ForumChannelsSave { channels = [] } ] unpinOuts
+                    , \_ -> Expect.equal (Just True) (Dict.get "#c" unpinned.forumView)
+                    , \_ -> Expect.equal False (forumPinnedFor invalid "#c")
+                    , \_ -> Expect.equal [] invalidOuts
+                    , \_ -> Expect.equal (Just True) (Dict.get "#c" reopened.forumView)
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" bareReselected.forumView)
+                    , \_ ->
+                        Expect.equal
+                            (Set.fromList [ "#a", "#b" ])
+                            (parseForumChannels [ " #A ", "#b", "nope", "", "#b" ])
+                    ]
+                    ()
+        , test "conversation follow toggle covers rooms and topics" <|
+            \_ ->
+                let
+                    ( watched, _ ) =
+                        update (ChannelSelect "#c") (joinFirst blank "me" "#c")
+
+                    ( seeded, _ ) =
+                        feed watched "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :one"
+
+                    ( roomFollowed, roomOuts ) =
+                        update (FollowTopicToggle { channel = "#c", topic = Nothing }) seeded
+
+                    ( roomUnfollowed, _ ) =
+                        update (FollowTopicToggle { channel = "#c", topic = Nothing }) roomFollowed
+
+                    ( topicFollowed, topicOuts ) =
+                        update (FollowTopicToggle { channel = "#c", topic = Just "Roadmap" }) seeded
+
+                    ( topicUnfollowed, _ ) =
+                        update (FollowTopicToggle { channel = "#c", topic = Just "roadmap" }) topicFollowed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (followActiveFor roomFollowed "#c")
+                    , \_ -> Expect.equal [ FollowedSave { keys = [ "#c" ] } ] roomOuts
+                    , \_ -> Expect.equal False (followActiveFor roomUnfollowed "#c")
+                    , \_ -> Expect.equal True (topicFollowedFor topicFollowed "#c" "Roadmap")
+                    , \_ -> Expect.equal True (topicFollowedFor topicFollowed "#c" "roadmap")
+                    , \_ -> Expect.equal [ FollowedSave { keys = [ "#c/roadmap" ] } ] topicOuts
+                    , \_ -> Expect.equal False (followActiveFor topicFollowed "#c")
+                    , \_ -> Expect.equal False (topicFollowedFor topicUnfollowed "#c" "Roadmap")
+                    ]
+                    ()
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let

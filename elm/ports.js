@@ -3130,6 +3130,27 @@ function fetchPublicFeed(url) {
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
     }
+    /* Forum-pinned rooms: Elm normalizes fail-closed (trim+lower, `#`/`&`
+       lead, 128-char cap, no space/comma/controls, 256 max); the bridge
+       writes the validated array under the plain
+       `onyx:forum-channels` key — the oracle bundles forum pins into the
+       whole owner-scoped `onyx:channel-navigation` object instead, which
+       stays ahead until Elm carries navigation memory. An emptied set
+       removes the key, like the starred rail. */
+    if (app.ports.forumChannelsSave) {
+      app.ports.forumChannelsSave.subscribe(function (req) {
+        if (!req || !Array.isArray(req.channels)) return;
+        try {
+          if (req.channels.length === 0) {
+            if (typeof window !== "undefined" && window.localStorage) {
+              window.localStorage.removeItem("onyx:forum-channels");
+            }
+          } else {
+            writeSlot("onyx:forum-channels", JSON.stringify(req.channels));
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
     /* Auto-join rooms: Elm normalizes fail-closed (trim+lower, `#`/`&`
        lead, 128-char cap, no space/comma/controls, first-wins dedupe,
        128 max, insertion-ordered); the bridge writes the validated array

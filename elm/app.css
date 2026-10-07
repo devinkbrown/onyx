@@ -92,6 +92,12 @@
 .shell-topic-card-meta { display: flex; gap: 8px; color: var(--onyx-dim); font-size: 12px; }
 .shell-topic-card-preview { display: flex; gap: 8px; font-size: 12px; }
 .shell-topic-card-author { font-weight: 650; }
+.shell-topic-card-unread { font-weight: 700; color: var(--onyx-text); }
+.shell-topic-card-follow { background: none; border: 1px solid var(--onyx-line); color: var(--onyx-dim); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; margin: 0 10px 8px; }
+.shell-topic-card-follow.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
+.shell-topic-follow { background: none; border: 1px solid var(--onyx-line); color: var(--onyx-dim); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+.shell-topic-follow.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
+.shell-topic-action.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
 
 /* Named-conversation filter chips. */
 
@@ -99,6 +105,7 @@
 .topic-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--onyx-line); background: transparent; color: var(--onyx-dim); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
 .topic-chip.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
 .topic-chip__hash { opacity: 0.7; }
+.topic-chip__unread { background: var(--onyx-accent); color: var(--onyx-bg); border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700; }
 
 /* Conversation facepile: overlapping avatar stack + overflow chip. */
 

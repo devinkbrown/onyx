@@ -382,6 +382,9 @@ port channelNotifySave : { entries : List { channel : String, level : String } }
 port starredSave : { channels : List String } -> Cmd msg
 
 
+port forumChannelsSave : { channels : List String } -> Cmd msg
+
+
 port autoJoinSave : { channels : List String } -> Cmd msg
 
 
@@ -740,6 +743,7 @@ type alias Flags =
     , dndUntil : Maybe Int
     , channelNotify : List { channel : String, level : String }
     , starredChannels : List String
+    , forumChannels : List String
     , autoJoinChannels : List String
     , channelColors : List { channel : String, color : String }
     , scheduledMessages : Maybe String
@@ -873,6 +877,9 @@ init rawFlags url key =
                 , starredChannels =
                     App.parseStarredChannels
                         (Maybe.withDefault [] (decodeField "starredChannels" (Decode.list Decode.string) rawFlags))
+                , forumChannels =
+                    App.parseForumChannels
+                        (Maybe.withDefault [] (decodeField "forumChannels" (Decode.list Decode.string) rawFlags))
                 , autoJoinChannels =
                     App.parseAutoJoinChannels
                         (Maybe.withDefault [] (decodeField "autoJoinChannels" (Decode.list Decode.string) rawFlags))
@@ -1122,6 +1129,9 @@ perform key outbound =
 
         App.StarredSave req ->
             starredSave req
+
+        App.ForumChannelsSave req ->
+            forumChannelsSave req
 
         App.AutoJoinSave req ->
             autoJoinSave req

@@ -345,9 +345,10 @@ facepileRow channel =
 
 {-| Named-conversation filter chips (mirroring
 `TopicFilterBar`: an `All` reset plus one chip per available
-topic, active states off the selected label, selection through
-the validated `ChannelTopicSelect`; shown only with the topic
-tools preference and at least one labelled row).
+topic with per-topic unread badges, active states off the
+selected label, selection through the validated
+`ChannelTopicSelect`; shown only with the topic tools
+preference and at least one labelled row).
 -}
 topicFilterBar : Model -> App.Channel -> Html Msg
 topicFilterBar model channel =
@@ -357,6 +358,9 @@ topicFilterBar model channel =
 
         active =
             App.activeChannelTopic model channel.name
+
+        counts =
+            topicUnreadFor model channel
     in
     if not model.prefs.topicTools || List.isEmpty topics then
         text ""
@@ -370,34 +374,58 @@ topicFilterBar model channel =
                 , onClick (App.ChannelTopicSelect { channel = channel.name, topic = Nothing })
                 ]
                 [ text "All" ]
-                :: List.map (topicChip channel.name active) topics
+                :: List.map (topicChip channel.name active counts) topics
             )
 
 
-{-| Topic create form plus the forum toggle (mirroring the
-`shell-topic-filter` tools: a validated new-topic submit and a
-pressed-state Forum switch; the pin and follow buttons arrive
-with the navigation-memory and follow slices).
-
-Like the filter bar, the whole tools row stays hidden until the
-channel has at least one topic.
+{-| Topic tools row (mirroring the `shell-topic-filter` block:
+a validated new-topic submit, a pressed-state Forum switch, a
+pin switch, and the follow toggle; only the filter bar and the
+Forum/pin switches wait for at least one topic — like the
+oracle, the create form and the follow toggle render as soon as
+the preference is on).
 -}
 topicTools : Model -> App.Channel -> Html Msg
 topicTools model channel =
-    let
-        summaries =
-            Topic.summarizeTopics (chronologicalTopicRows channel)
-    in
-    if not model.prefs.topicTools || List.isEmpty summaries then
+    if not model.prefs.topicTools then
         text ""
 
     else
         let
+            summaries =
+                Topic.summarizeTopics (chronologicalTopicRows channel)
+
             forumOpen =
                 Maybe.withDefault False (Dict.get (String.toLower channel.name) model.forumView)
 
+            pinned =
+                App.forumPinnedFor model channel.name
+
+            active =
+                App.activeChannelTopic model channel.name
+
+            following =
+                App.followActiveFor model channel.name
+
             canStart =
                 App.isValidTopicLabel (String.trim model.topicDraft)
+
+            followLabel =
+                if following then
+                    case active of
+                        Just label ->
+                            "Following " ++ label
+
+                        Nothing ->
+                            "Following room"
+
+                else
+                    case active of
+                        Just label ->
+                            "Follow " ++ label
+
+                        Nothing ->
+                            "Follow room"
         in
         div [ class "onyx-topic-tools" ]
             [ Html.form [ class "shell-topic-create", onSubmit (App.TopicCreateSubmit channel.name) ]
@@ -421,28 +449,49 @@ topicTools model channel =
                     [ text "Start topic" ]
                 ]
             , div [ class "shell-topic-actions" ]
-                ([ (if List.isEmpty summaries then
-                        text ""
+                ((if List.isEmpty summaries then
+                    []
 
-                    else
-                        button
+                  else
+                    [ button
+                        [ type_ "button"
+                        , classList [ ( "shell-topic-action", True ), ( "is-active", forumOpen ) ]
+                        , attribute "aria-pressed" (boolToString forumOpen)
+                        , onClick (App.ForumToggle channel.name)
+                        ]
+                        [ text "Forum" ]
+                    , button
+                        [ type_ "button"
+                        , classList [ ( "shell-topic-action", True ), ( "is-active", pinned ) ]
+                        , attribute "aria-pressed" (boolToString pinned)
+                        , onClick (App.ForumChannelToggle channel.name)
+                        ]
+                        [ text
+                            (if pinned then
+                                "Forum pinned"
+
+                             else
+                                "Pin forum"
+                            )
+                        ]
+                    ]
+                 )
+                    ++ [ button
                             [ type_ "button"
-                            , class "shell-topic-action"
-                            , attribute "aria-pressed" (boolToString forumOpen)
-                            , onClick (App.ForumToggle channel.name)
+                            , classList [ ( "shell-topic-follow", True ), ( "is-active", following ) ]
+                            , attribute "aria-pressed" (boolToString following)
+                            , onClick (App.FollowTopicToggle { channel = channel.name, topic = active })
                             ]
-                            [ text "Forum" ]
-                   )
-                 ]
+                            [ text followLabel ]
+                       ]
                 )
             ]
 
 
 {-| Forum cards for every labelled conversation (mirroring the
 `shell-topic-forum` section: one card per summary with count,
-latest stamp, and preview, opening through the validated forum
-select; per-topic unread arrives with the read-ledger
-projector).
+per-topic unread, latest stamp, and preview, opening through
+the validated forum select plus a per-card follow switch).
 -}
 forumCards : Model -> App.Channel -> Html Msg
 forumCards model channel =
@@ -452,6 +501,9 @@ forumCards model channel =
 
         summaries =
             Topic.summarizeTopics (chronologicalTopicRows channel)
+
+        counts =
+            topicUnreadFor model channel
     in
     if not model.prefs.topicTools || not forumOpen || List.isEmpty summaries then
         text ""
@@ -459,15 +511,18 @@ forumCards model channel =
     else
         section [ class "shell-topic-forum", attribute "aria-labelledby" "shell-topic-forum-title" ]
             (h3 [ id "shell-topic-forum-title", class "sr-only" ] [ text "Topic forum" ]
-                :: List.map (forumCard model channel) summaries
+                :: List.map (forumCard model channel counts) summaries
             )
 
 
-forumCard : Model -> App.Channel -> Topic.TopicSummary -> Html Msg
-forumCard model channel summary =
+forumCard : Model -> App.Channel -> Dict.Dict String Int -> Topic.TopicSummary -> Html Msg
+forumCard model channel counts summary =
     let
         latest =
             latestTopicMessage channel summary.topic
+
+        unread =
+            Maybe.withDefault 0 (Dict.get (String.toLower summary.topic) counts)
 
         countLabel =
             String.fromInt summary.count
@@ -477,23 +532,47 @@ forumCard model channel summary =
                     else
                         " messages"
                    )
+
+        openLabel =
+            "Open topic "
+                ++ summary.topic
+                ++ ", "
+                ++ countLabel
+                ++ (if unread > 0 then
+                        ", " ++ String.fromInt unread ++ " unread on this device"
+
+                    else
+                        ""
+                   )
+
+        cardFollowed =
+            App.topicFollowedFor model channel.name summary.topic
     in
     article [ class "shell-topic-card" ]
         [ button
             [ type_ "button"
             , class "shell-topic-card-main"
             , onClick (App.ForumOpenTopic { channel = channel.name, topic = summary.topic })
-            , attribute "aria-label" ("Open topic " ++ summary.topic ++ ", " ++ countLabel)
+            , attribute "aria-label" openLabel
             ]
             [ span [ class "shell-topic-card-title" ] [ text ("#" ++ summary.topic) ]
             , span [ class "shell-topic-card-meta" ]
-                [ span [] [ text countLabel ]
-                , time
-                    [ datetime (App.millisToIso (toFloat summary.lastAt))
-                    , attribute "title" (App.millisToIso (toFloat summary.lastAt))
-                    ]
-                    [ text ("latest " ++ shortDayLabel model summary.lastAt) ]
-                ]
+                ([ span [] [ text countLabel ] ]
+                    ++ (if unread > 0 then
+                            [ span [ class "shell-topic-card-unread" ]
+                                [ text (String.fromInt unread ++ " unread") ]
+                            ]
+
+                        else
+                            []
+                       )
+                    ++ [ time
+                            [ datetime (App.millisToIso (toFloat summary.lastAt))
+                            , attribute "title" (App.millisToIso (toFloat summary.lastAt))
+                            ]
+                            [ text ("latest " ++ shortDayLabel model summary.lastAt) ]
+                       ]
+                )
             , case latest of
                 Nothing ->
                     text ""
@@ -503,6 +582,30 @@ forumCard model channel summary =
                         [ span [ class "shell-topic-card-author" ] [ text message.from ]
                         , span [] [ text (clippedTopicPreview (Maybe.withDefault message.body message.plaintext)) ]
                         ]
+            ]
+        , button
+            [ type_ "button"
+            , classList [ ( "shell-topic-card-follow", True ), ( "is-active", cardFollowed ) ]
+            , attribute "aria-pressed" (boolToString cardFollowed)
+            , attribute "aria-label"
+                ((if cardFollowed then
+                    "Unfollow"
+
+                  else
+                    "Follow"
+                 )
+                    ++ " topic "
+                    ++ summary.topic
+                )
+            , onClick (App.FollowTopicToggle { channel = channel.name, topic = Just summary.topic })
+            ]
+            [ text
+                (if cardFollowed then
+                    "Following"
+
+                 else
+                    "Follow"
+                )
             ]
         ]
 
@@ -592,8 +695,8 @@ monthShort month =
             "Dec"
 
 
-topicChip : String -> Maybe String -> String -> Html Msg
-topicChip channel active label =
+topicChip : String -> Maybe String -> Dict.Dict String Int -> String -> Html Msg
+topicChip channel active counts label =
     let
         isActive =
             case active of
@@ -602,18 +705,73 @@ topicChip channel active label =
 
                 Nothing ->
                     False
+
+        unread =
+            Maybe.withDefault 0 (Dict.get (String.toLower label) counts)
+
+        accessibleLabel =
+            if unread > 0 then
+                label ++ ", " ++ String.fromInt unread ++ " unread"
+
+            else
+                label
     in
     button
         [ type_ "button"
         , classList [ ( "topic-chip", True ), ( "is-active", isActive ) ]
         , attribute "aria-pressed" (boolToString isActive)
-        , attribute "aria-label" label
+        , attribute "aria-label" accessibleLabel
         , attribute "title" label
         , onClick (App.ChannelTopicSelect { channel = channel, topic = Just label })
         ]
-        [ span [ class "topic-chip__hash", attribute "aria-hidden" "true" ] [ text "#" ]
-        , span [ class "topic-chip__label" ] [ text label ]
-        ]
+        ([ span [ class "topic-chip__hash", attribute "aria-hidden" "true" ] [ text "#" ]
+         , span [ class "topic-chip__label" ] [ text label ]
+         ]
+            ++ (if unread > 0 then
+                    [ span [ class "topic-chip__unread", attribute "aria-label" (String.fromInt unread ++ " unread") ]
+                        [ text (String.fromInt unread) ]
+                    ]
+
+                else
+                    []
+               )
+        )
+
+
+{-| Per-topic unread counts for one room (mirroring
+`topicUnreadCounts`: the divider else the first-unread cursor
+bounds the newest-first buffer under the room notify level).
+-}
+topicUnreadFor : Model -> App.Channel -> Dict.Dict String Int
+topicUnreadFor model channel =
+    let
+        key =
+            String.toLower channel.name
+
+        boundary =
+            case Dict.get key model.viewUnreadDividerId of
+                Just divider ->
+                    Just divider
+
+                Nothing ->
+                    Dict.get key model.firstUnreadId
+
+        rows =
+            List.map
+                (\m ->
+                    { id = m.id
+                    , topic = m.topic
+                    , from = m.from
+                    , highlight = m.highlight
+                    , system = isSystemRow m
+                    }
+                )
+                channel.messages
+    in
+    Topic.projectTopicUnread
+        { ours = model.ourNick, notifyLevel = App.notifyLevel model channel.name }
+        rows
+        boundary
 
 
 {-| Topic label of a row (`Nothing` for untagged rows, mirroring
