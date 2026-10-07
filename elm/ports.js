@@ -4833,6 +4833,49 @@ function fetchPublicFeed(url) {
         return out;
       } catch (err) { return []; }
     }
+    /* Private identity journals, mirroring lib/identityOverrides:
+       owner-scoped keys computed in Elm; every read purges the legacy
+       ownerless journals first so an upgrade never claims another
+       account's names. Raw journal values pass through untouched —
+       all validation stays in Elm (`IdentityOverrides.parse*`); an
+       unreadable journal lands empty. */
+    var IDENTITY_OVERRIDE_BASE_KEYS = ["onyx:soft-ignore", "onyx:nick-colors", "onyx:display-names"];
+    var IDENTITY_OVERRIDE_CHARS = 256 * 1024;
+    function purgeLegacyIdentityOverridesJs(store) {
+      try {
+        for (var i = 0; i < IDENTITY_OVERRIDE_BASE_KEYS.length; i++) {
+          store.removeItem(IDENTITY_OVERRIDE_BASE_KEYS[i]);
+        }
+      } catch (err) { /* private browsing or quota policy; journals stay usable */ }
+    }
+    function readIdentityJournalJs(store, key, fallback) {
+      try {
+        if (!store || typeof key !== "string" || !key) return fallback;
+        var raw = store.getItem(key);
+        if (!raw || raw.length > IDENTITY_OVERRIDE_CHARS) return fallback;
+        return JSON.parse(raw);
+      } catch (err) { return fallback; }
+    }
+    if (app.ports.identityOverridesRequest) {
+      app.ports.identityOverridesRequest.subscribe(function (req) {
+        function send(payload) {
+          if (!app.ports.identityOverridesLoaded) return;
+          try { app.ports.identityOverridesLoaded.send(payload); } catch (err) {}
+        }
+        try {
+          var store = (typeof window !== "undefined" && window.localStorage) ? window.localStorage : null;
+          if (store) purgeLegacyIdentityOverridesJs(store);
+          var keys = req || {};
+          send({
+            softIgnore: readIdentityJournalJs(store, keys.softIgnoreKey, []),
+            nickColors: readIdentityJournalJs(store, keys.nickColorsKey, {}),
+            displayNames: readIdentityJournalJs(store, keys.displayNamesKey, {}),
+          });
+        } catch (err) {
+          send({ softIgnore: [], nickColors: {}, displayNames: {} });
+        }
+      });
+    }
     if (app.ports.personReportReceiptSave) {
       app.ports.personReportReceiptSave.subscribe(function (req) {
         try {

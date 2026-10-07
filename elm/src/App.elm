@@ -46,6 +46,7 @@ import Isupport exposing (ISupport)
 import Labels
 import Status
 import Media
+import IdentityOverrides
 import Moderation
 import Modes
 import PersonSafety
@@ -330,6 +331,9 @@ type alias Model =
     , userProfileCard : Maybe { nick : String, channel : String }
     , moderationDraft : Maybe Moderation.Draft
     , personSafety : Maybe { pending : PersonSafety.SafetyPending, reason : String, note : String }
+    , softIgnoreList : Set String
+    , nickColorOverrides : Dict String String
+    , displayNameOverrides : Dict String String
     , editHistory : Dict String (List EditRevision)
     , userMetadata : Dict String (Dict String String)
     , typingUsers : Dict String (Dict String Typist)
@@ -582,6 +586,7 @@ type alias Model =
     , ctcpTimeEnabled : Bool
     , ctcpPingEnabled : Bool
     , ctcpOwner : Maybe DeviceMemoryOwner
+    , identityOverridesOwner : Maybe DeviceMemoryOwner
     , namesBursts : Dict String NamesBurst
     , lastRosterRefresh : Dict String Float
     , lastRosterPollMs : Float
@@ -850,6 +855,7 @@ type Outbound
     | MediaEngineFrame { bytes : List Int }
     | GroupWelcomeOpen { key : String, room : String, fromAccount : String, fromDevice : String, toAccount : String, toDevice : String, epoch : Int, commitIdB64 : String, membershipB64 : String, commitmentB64 : String, welcomeB64 : String }
     | ClipboardCopy { text : String, tag : String }
+    | IdentityOverridesRequest { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String }
     | PersonReportReceiptSave { key : String, nick : String, reason : String, draft : String }
     | TranslateRequest { msgid : String, lang : String, source : String, text : String, targetLang : String }
     | TranslationTargetSave { target : String }
@@ -2584,6 +2590,8 @@ type Msg
     | SafetyConfirmBlock
     | SafetySubmitReport
     | SafetyClose
+    | IdentityOverridesReload
+    | IdentityOverridesLoaded Decode.Value
     | MemberCopyNick String
     | MemberCardWhois String
     | ModerationPropose { kind : Moderation.ModerationKind, channel : String, target : String }
@@ -2950,6 +2958,9 @@ init nick url =
     , userProfileCard = Nothing
     , moderationDraft = Nothing
     , personSafety = Nothing
+    , softIgnoreList = Set.empty
+    , nickColorOverrides = Dict.empty
+    , displayNameOverrides = Dict.empty
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -3141,6 +3152,7 @@ init nick url =
     , ctcpTimeEnabled = True
     , ctcpPingEnabled = True
     , ctcpOwner = Nothing
+    , identityOverridesOwner = Nothing
     , namesBursts = Dict.empty
     , lastRosterRefresh = Dict.empty
     , lastRosterPollMs = 0
@@ -3390,6 +3402,9 @@ blank =
     , userProfileCard = Nothing
     , moderationDraft = Nothing
     , personSafety = Nothing
+    , softIgnoreList = Set.empty
+    , nickColorOverrides = Dict.empty
+    , displayNameOverrides = Dict.empty
     , editHistory = Dict.empty
     , userMetadata = Dict.empty
     , typingUsers = Dict.empty
@@ -3581,6 +3596,7 @@ blank =
     , ctcpTimeEnabled = True
     , ctcpPingEnabled = True
     , ctcpOwner = Nothing
+    , identityOverridesOwner = Nothing
     , namesBursts = Dict.empty
     , lastRosterRefresh = Dict.empty
     , lastRosterPollMs = 0
@@ -10005,6 +10021,27 @@ submitParsedReport model sheet details parsed =
             ++ receiptOut
             ++ navOut
         )
+
+
+{-| Owner-scoped keys for the three override journals
+(Nothing fields when the owner is unusable). -}
+identityOverridesKeys : Model -> { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String }
+identityOverridesKeys model =
+    case deviceMemoryOwner model of
+        Nothing ->
+            { softIgnoreKey = Nothing, nickColorsKey = Nothing, displayNamesKey = Nothing }
+
+        Just owner ->
+            identityOverridesKeysForOwner owner
+
+
+{-| Owner-scoped keys for one known owner. -}
+identityOverridesKeysForOwner : DeviceMemoryOwner -> { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String }
+identityOverridesKeysForOwner owner =
+    { softIgnoreKey = IdentityOverrides.scopedKey IdentityOverrides.softIgnoreKey owner
+    , nickColorsKey = IdentityOverrides.scopedKey IdentityOverrides.nickColorsKey owner
+    , displayNamesKey = IdentityOverrides.scopedKey IdentityOverrides.displayNamesKey owner
+    }
 
 
 {-| Request a WHOIS query (mirroring `openWhois`: the query goes
@@ -18921,8 +18958,20 @@ requestIdentityProfile previous model =
                         ( { withContacts | ctcpOwner = Just owner }
                         , [ CtcpConfigRequest { serverUrl = owner.serverUrl, identity = owner.identity } ]
                         )
+                -- The private identity journals ride the same owner
+                -- transition (same namespace, same staleness rule),
+                -- mirroring the owned override loads on
+                -- connect/nick/auth change.
+                ( withOverrides, overridesOutbound ) =
+                    if withCtcp.identityOverridesOwner == Just owner then
+                        ( withCtcp, [] )
+
+                    else
+                        ( { withCtcp | identityOverridesOwner = Just owner }
+                        , [ IdentityOverridesRequest (identityOverridesKeysForOwner owner) ]
+                        )
             in
-            ( withCtcp, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound )
+            ( withOverrides, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound ++ overridesOutbound )
 
 
 {-| Set our custom-status expiry (mirroring `setCustomStatusExpiry`:
@@ -37506,6 +37555,25 @@ update msg model =
 
         SafetyClose ->
             ( { model | personSafety = Nothing }, [] )
+
+        IdentityOverridesReload ->
+            -- Reload the private journals for the current device
+            -- owner (mirroring the owner-scoped override loads);
+            -- unusable owners load nothing rather than claiming
+            -- another account's journals.
+            ( model, [ IdentityOverridesRequest (identityOverridesKeys model) ] )
+
+        IdentityOverridesLoaded raw ->
+            -- Lenient element-wise decode (unknown shapes drop;
+            -- malformed payloads land empty, like the parse
+            -- fallbacks behind every override load).
+            ( { model
+                | softIgnoreList = IdentityOverrides.parseSoftIgnore (IdentityOverrides.stringsAt "softIgnore" raw)
+                , nickColorOverrides = IdentityOverrides.parseNickColors (IdentityOverrides.pairsAt "nickColors" raw)
+                , displayNameOverrides = IdentityOverrides.parseDisplayNames (IdentityOverrides.pairsAt "displayNames" raw)
+              }
+            , []
+            )
 
         SafetyConfirmBlock ->
             -- Confirming writes the device ignore with the quiet

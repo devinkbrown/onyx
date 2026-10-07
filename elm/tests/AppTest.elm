@@ -12235,12 +12235,18 @@ suite =
                                 , FriendsRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 , WatchListRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , IdentityOverridesRequest
+                                    { softIgnoreKey = Just "onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
+                                    , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
+                                    , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
+                                    }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.nickAliasesOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.contactsOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.ctcpOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityOverridesOwner
                         , \_ -> Expect.equal seeded.userActivities foreign.userActivities
                         , \_ -> Expect.equal [] foreignOuts
                         ]
@@ -12265,12 +12271,18 @@ suite =
                                 , FriendsRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 , WatchListRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , IdentityOverridesRequest
+                                    { softIgnoreKey = Just "onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
+                                    , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
+                                    , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
+                                    }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.nickAliasesOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.contactsOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.ctcpOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityOverridesOwner
                         ]
                         ()
             , test "818 rows project user STATUS and skip channels and other props" <|
@@ -13608,6 +13620,53 @@ suite =
                             Expect.equal True
                                 (List.member (SendLine "METADATA alice GET ocean.dm-key\r\n") messageOut)
                         , \_ -> Expect.equal [ "Blocked alice", "You blocked alice" ] (List.map .title blockedDm.toasts)
+                        ]
+                        ()
+            , test "identity overrides reload with owner keys and decode leniently" <|
+                \_ ->
+                    let
+                        owned =
+                            { blank
+                                | ourNick = "me"
+                                , endpoint = Just "wss://harbor.test/ws"
+                                , accountName = Just "alice"
+                            }
+
+                        ( _, reloadOut ) =
+                            update IdentityOverridesReload owned
+
+                        ( _, ownerlessOut ) =
+                            update IdentityOverridesReload blank
+
+                        payload =
+                            Encode.object
+                                [ ( "softIgnore", Encode.list identity [ Encode.string " Bob ", Encode.int 42, Encode.string "bad nick" ] )
+                                , ( "nickColors", Encode.object [ ( "Bob", Encode.string "#ABCDEF" ), ( "unsafe", Encode.int 7 ) ] )
+                                , ( "displayNames", Encode.object [ ( "Bob", Encode.string "  Best bud  " ), ( "spoof", Encode.int 7 ) ] )
+                                ]
+
+                        decoded =
+                            Tuple.first (update (IdentityOverridesLoaded payload) blank)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ IdentityOverridesRequest
+                                    { softIgnoreKey = Just "onyx:soft-ignore:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+                                    , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+                                    , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Fharbor.test%2Fws%22%2C%22alice%22%5D"
+                                    }
+                                ]
+                                reloadOut
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityOverridesRequest
+                                    { softIgnoreKey = Nothing, nickColorsKey = Nothing, displayNamesKey = Nothing }
+                                ]
+                                ownerlessOut
+                        , \_ -> Expect.equal (Set.fromList [ "bob" ]) decoded.softIgnoreList
+                        , \_ -> Expect.equal (Dict.fromList [ ( "bob", "#abcdef" ) ]) decoded.nickColorOverrides
+                        , \_ -> Expect.equal (Dict.fromList [ ( "bob", "Best bud" ) ]) decoded.displayNameOverrides
                         ]
                         ()
             , test "member mention appends, copies, and hands off to whois" <|

@@ -398,16 +398,32 @@ cardFor model nick channel =
             String.toLower nick == String.toLower model.ourNick
 
         displayName =
-            case Maybe.andThen .displayName profile of
-                Just published ->
-                    if String.isEmpty (String.trim published) then
-                        nick
+            case
+                Dict.get (String.toLower nick) model.displayNameOverrides
+                    |> Maybe.map String.trim
+                    |> Maybe.andThen
+                        (\local ->
+                            if String.isEmpty local then
+                                Nothing
 
-                    else
-                        String.trim published
+                            else
+                                Just local
+                        )
+            of
+                Just local ->
+                    local
 
                 Nothing ->
-                    nick
+                    case Maybe.andThen .displayName profile of
+                        Just published ->
+                            if String.isEmpty (String.trim published) then
+                                nick
+
+                            else
+                                String.trim published
+
+                        Nothing ->
+                            nick
 
         pronouns =
             Maybe.andThen .pronouns profile

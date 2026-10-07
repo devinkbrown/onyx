@@ -285,6 +285,10 @@ port guidesProgressRequest : () -> Cmd msg
 
 port guidesProgressStore : List String -> Cmd msg
 
+port identityOverridesRequest : { softIgnoreKey : Maybe String, nickColorsKey : Maybe String, displayNamesKey : Maybe String } -> Cmd msg
+
+port identityOverridesLoaded : (Decode.Value -> msg) -> Sub msg
+
 port personReportReceiptSave : { key : String, nick : String, reason : String, draft : String } -> Cmd msg
 
 port guidesProgressLoaded : (Decode.Value -> msg) -> Sub msg
@@ -919,6 +923,7 @@ init rawFlags url key =
         , appearanceRequest ()
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
+        , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
         ]
     )
         |> (\( model, cmds ) ->
@@ -1212,6 +1217,9 @@ perform key outbound =
         App.GuidesProgressStore req ->
             guidesProgressStore req.ids
 
+        App.IdentityOverridesRequest req ->
+            identityOverridesRequest req
+
         App.PersonReportReceiptSave req ->
             personReportReceiptSave req
 
@@ -1448,6 +1456,7 @@ subscriptions model =
         , translateResult (\res -> App.TranslationResult { msgid = res.msgid, lang = res.lang, source = res.source, ok = res.ok, text = res.text })
         , translationConfig (\res -> App.TranslationConfig { available = res.available, target = res.target, browserLang = res.browserLang })
         , guidesProgressLoaded App.GuidesProgressLoaded
+        , identityOverridesLoaded App.IdentityOverridesLoaded
         , appearanceSnapshot App.AppearanceSnapshot
         , appearancePreviewed App.AppearancePreviewed
         , studioPromptResult App.StudioPromptResult

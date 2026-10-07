@@ -1338,7 +1338,33 @@ suite =
                             |> Query.hasNot [ Selector.text "Mention", Selector.text "Guest" ]
                     ]
                     ()
-                , test "member moderation controls stage a review and confirm" <|
+                , test "member card prefers a local display name" <|
+            \_ ->
+                let
+                    rosterBase =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    carded =
+                        Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) rosterBase)
+
+                    overridden =
+                        { carded | displayNameOverrides = Dict.fromList [ ( "alice", "  Ally  " ) ] }
+                in
+                Expect.all
+                    [ \_ ->
+                        query overridden
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.has [ Selector.text "Ally" ]
+                    , \_ ->
+                        query carded
+                            |> Query.find [ Selector.class "onyx-member-card" ]
+                            |> Query.hasNot [ Selector.text "Ally" ]
+                    ]
+                    ()
+        , test "member moderation controls stage a review and confirm" <|
             \_ ->
                 let
                     key name composing =
