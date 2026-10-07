@@ -2891,6 +2891,19 @@ suite =
                                 Expect.fail "expected one toast"
                     ]
                     m
+        , test "FAIL PRIVMSG INVALID_UTF8 rides the generic send-failure path" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed blank ":srv FAIL PRIVMSG INVALID_UTF8 :invalid utf-8 in message"
+                in
+                Expect.all
+                    [ \v -> Expect.equal [ "invalid utf-8 in message" ] (List.take 1 v.serviceLog)
+                    , \v ->
+                        Expect.equal [ "invalid utf-8 in message" ]
+                            (List.filterMap .description v.toasts)
+                    ]
+                    m
         , test "echo with an unknown label falls through to the normal fold" <|
             \_ ->
                 let
@@ -6111,6 +6124,12 @@ suite =
                     , \_ -> Expect.equal [ "#c is invite-only" ] (texts ":srv 473 me #c :Invite only")
                     , \_ -> Expect.equal [ "You are banned from #c" ] (texts ":srv 474 me #c :Banned")
                     , \_ -> Expect.equal [ "Bad channel mask: ##bad" ] (texts ":srv 476 me ##bad :Bad mask")
+                    , \_ ->
+                        Expect.equal [ "a,b Too many targets" ]
+                            (List.take 1 (feed blank ":srv 407 me a,b :Too many targets" |> Tuple.first |> .serviceLog))
+                    , \_ ->
+                        Expect.equal [ "#c Registered nick required" ]
+                            (List.take 1 (feed blank ":srv 477 me #c :Registered nick required" |> Tuple.first |> .serviceLog))
                     , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text denied.notifications)
                     , \_ -> Expect.equal (Just BanError) (Maybe.map .status (Dict.get "#c" denied.banListMeta))
                     , \_ -> Expect.equal (Just "You need moderator permission to view this list.") (Maybe.andThen .error (Dict.get "#c" denied.banListMeta))

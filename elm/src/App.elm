@@ -4593,6 +4593,13 @@ foldLine model message =
         "405" ->
             foldErrorNumeric model message
 
+        "407" ->
+            -- Too many targets (contract `MAXTARGETS = 4`): neither
+            -- client multi-targets, so this only arrives
+            -- unsolicited — the generic numeric log, like the
+            -- oracle (no 407 path in `src/lib`).
+            foldErrorNumeric model message
+
         "421" ->
             foldErrorNumeric model message
 
@@ -4633,6 +4640,12 @@ foldLine model message =
             foldErrorNumeric model message
 
         "476" ->
+            foldErrorNumeric model message
+
+        "477" ->
+            -- Registered/account-only room (`+a`/`+R`): the oracle
+            -- has no 477 path either (generic numeric log), so
+            -- this stays on it rather than inventing a prompt.
             foldErrorNumeric model message
 
         "482" ->
