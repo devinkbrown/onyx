@@ -2606,6 +2606,79 @@ suite =
                                 |> Query.hasNot [ Selector.class "onyx-sender" ]
                         ]
                         ()
+            , test "conversation head renders the facepile stack" <|
+                \_ ->
+                    let
+                        stacked =
+                            blank
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":bob!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        q =
+                            query stacked
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "3 people here") ]
+                        , \_ ->
+                            Query.findAll [ Selector.class "onyx-facepile-face" ] q
+                                |> Query.count (Expect.equal 3)
+                        , \_ ->
+                            Query.find
+                                [ Selector.tag "button"
+                                , Selector.containing [ Selector.text "AL" ]
+                                ]
+                                q
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open profile for alice, here") ]
+                        , \_ ->
+                            Query.find
+                                [ Selector.tag "button"
+                                , Selector.containing [ Selector.text "AL" ]
+                                ]
+                                q
+                                |> Event.simulate Event.click
+                                |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
+                        ]
+                        ()
+            , test "facepile caps the stack with an overflow chip" <|
+                \_ ->
+                    let
+                        crowded =
+                            blank
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m ":bob!u@h JOIN #c")
+                                |> (\m -> feed m ":carol!u@h JOIN #c")
+                                |> (\m -> feed m ":dave!u@h JOIN #c")
+                                |> (\m -> feed m ":erin!u@h JOIN #c")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        q =
+                            query crowded
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "6 people here") ]
+                        , \_ ->
+                            Query.findAll [ Selector.class "onyx-facepile-face" ] q
+                                |> Query.count (Expect.equal 5)
+                        , \_ ->
+                            Query.find [ Selector.class "onyx-facepile-overflow" ] q
+                                |> Query.has
+                                    [ Selector.text "+1"
+                                    , Selector.attribute (Attr.attribute "aria-label" "1 more people in this room")
+                                    ]
+                        ]
+                        ()
+            , test "no facepile without channel members" <|
+                \_ ->
+                    query blank
+                        |> Query.findAll [ Selector.class "onyx-facepile" ]
+                        |> Query.count (Expect.equal 0)
             , test "roster rows render small hidden avatars" <|
                 \_ ->
                     let
@@ -2618,10 +2691,12 @@ suite =
                     Expect.all
                         [ \_ ->
                             query rostered
+                                |> Query.find [ Selector.class "onyx-roster" ]
                                 |> Query.findAll [ Selector.class "onyx-avatar--sm" ]
                                 |> Query.count (Expect.equal 2)
                         , \_ ->
                             query rostered
+                                |> Query.find [ Selector.class "onyx-roster" ]
                                 |> Query.findAll
                                     [ Selector.class "onyx-avatar"
                                     , Selector.attribute (Attr.attribute "aria-hidden" "true")

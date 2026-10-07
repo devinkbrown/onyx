@@ -8,6 +8,7 @@ import App exposing (Model, Msg(..))
 import Avatar
 import Dict
 import Emoji
+import Facepile
 import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput)
@@ -36,7 +37,8 @@ thread model =
                     Just channel ->
                         if List.isEmpty channel.messages then
                             div [ class "onyx-empty" ]
-                                [ h2 [] [ text channel.name ]
+                                [ facepileRow channel
+                                , h2 [] [ text channel.name ]
                                 , text "No messages yet. Say hello."
                                 ]
 
@@ -58,7 +60,8 @@ thread model =
                                     Dict.get (String.toLower channel.name) model.viewUnreadDividerId
                             in
                             div []
-                                [ if win.hiddenBefore > 0 then
+                                [ facepileRow channel
+                                , if win.hiddenBefore > 0 then
                                     div [ class "onyx-earlier" ]
                                         [ button
                                             [ class "onyx-earlier-button"
@@ -105,6 +108,76 @@ thread model =
                                     text ""
                                 ]
         , mediaLightboxDialog model
+        ]
+
+
+{-| Overlapping avatar stack for the conversation head
+(mirroring the ribbon `Facepile`: prioritized faces open the
+member card; the popover chrome stays a narrowing).
+-}
+facepileRow : App.Channel -> Html Msg
+facepileRow channel =
+    let
+        pile =
+            Facepile.buildFacepile
+                (List.map
+                    (\m -> { nick = m.nick, modes = m.modes, away = m.away, lastActiveAt = Nothing })
+                    (Dict.values channel.members)
+                )
+                Nothing
+    in
+    if pile.total == 0 then
+        text ""
+
+    else
+        div
+            [ class "onyx-facepile"
+            , attribute "role" "group"
+            , attribute "aria-label" (Facepile.groupLabel pile.total)
+            ]
+            (List.map (facepileFace channel.name) pile.entries
+                ++ (if pile.overflow > 0 then
+                        [ span
+                            [ class "onyx-facepile-overflow"
+                            , attribute "title" (String.fromInt pile.overflow ++ " more")
+                            , attribute "aria-label" (String.fromInt pile.overflow ++ " more people in this room")
+                            ]
+                            [ span [ attribute "aria-hidden" "true" ] [ text ("+" ++ String.fromInt pile.overflow) ] ]
+                        ]
+
+                    else
+                        []
+                   )
+            )
+
+
+facepileFace : String -> Facepile.Entry -> Html Msg
+facepileFace channel entry =
+    button
+        [ type_ "button"
+        , class "onyx-facepile-face"
+        , attribute "aria-label" ("Open profile for " ++ entry.nick ++ ", " ++ (if entry.away then "away" else "here"))
+        , attribute "title"
+            (if entry.away then
+                entry.nick ++ " — away"
+
+             else
+                entry.nick
+            )
+        , onClick (App.UserProfileOpened { nick = entry.nick, channel = channel })
+        ]
+        [ Avatar.view
+            { name = entry.nick
+            , owner = entry.owner
+            , size = Avatar.Sm
+            , extraClass =
+                if entry.away then
+                    "onyx-facepile-away"
+
+                else
+                    ""
+            , hidden = True
+            }
         ]
 
 
