@@ -285,6 +285,92 @@ suite =
                         ]
                         ()
             ]
+        , describe "MODEX named modes"
+            [ test "the table carries all 25 server names" <|
+                \_ ->
+                    Expect.equal 25 (List.length modexTable)
+            , test "lookup is ASCII case-insensitive" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "AUTHONLY")
+                                (Maybe.map .name (lookupModexName "authonly"))
+                        , \_ ->
+                            Expect.equal (Just 'a')
+                                (Maybe.andThen .letter (lookupModexName "AuthOnly"))
+                        , \_ ->
+                            Expect.equal (Just ModexMember)
+                                (Maybe.map .kind (lookupModexName "voice"))
+                        ]
+                        ()
+            , test "unknown and malformed names stay Nothing" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (lookupModexName "BOGUS")
+                        , \_ -> Expect.equal Nothing (lookupModexName "")
+                        , \_ -> Expect.equal Nothing (lookupModexName "AUTH-ONLY")
+                        , \_ -> Expect.equal Nothing (lookupModexName "AUTH ONLY")
+                        , \_ -> Expect.equal Nothing (lookupModexName (String.repeat 65 "A"))
+                        ]
+                        ()
+            , test "PUBLIC has no letter; oper-only marks ride CLONE/REGISTERED/SERVICE" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (Maybe.andThen .letter (lookupModexName "PUBLIC"))
+                        , \_ -> Expect.equal (Just True) (Maybe.map .requiresOper (lookupModexName "CLONE"))
+                        , \_ -> Expect.equal (Just True) (Maybe.map .requiresOper (lookupModexName "REGISTERED"))
+                        , \_ -> Expect.equal (Just True) (Maybe.map .requiresOper (lookupModexName "SERVICE"))
+                        , \_ -> Expect.equal (Just False) (Maybe.map .requiresOper (lookupModexName "AUDITORIUM"))
+                        , \_ -> Expect.equal (Just (Just '@')) (Maybe.map .statusPrefix (lookupModexName "HOST"))
+                        ]
+                        ()
+            , test "letters round-trip to canonical names" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "AUTHONLY") (letterToModexName 'a')
+                        , \_ -> Expect.equal (Just "VOICE") (letterToModexName 'v')
+                        , \_ -> Expect.equal Nothing (letterToModexName 'Z')
+                        ]
+                        ()
+            , test "targets parse channel and member shapes" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { channel = "#c", member = Nothing })
+                                (parseModexTarget "#c")
+                        , \_ ->
+                            Expect.equal
+                                (Just { channel = "#c", member = Just "alice" })
+                                (parseModexTarget "#c,alice")
+                        , \_ -> Expect.equal Nothing (parseModexTarget "c")
+                        , \_ -> Expect.equal Nothing (parseModexTarget "#c,alice,bob")
+                        , \_ -> Expect.equal Nothing (parseModexTarget "#c,")
+                        , \_ -> Expect.equal Nothing (parseModexTarget "")
+                        ]
+                        ()
+            , test "query builder emits bare MODEX lines" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "MODEX #c") (buildModexQuery "#c")
+                        , \_ -> Expect.equal (Just "MODEX #c,alice") (buildModexQuery "  #c,alice  ")
+                        , \_ -> Expect.equal Nothing (buildModexQuery "bogus")
+                        , \_ -> Expect.equal Nothing (buildModexQuery "")
+                        ]
+                        ()
+            , test "826 rows validate each token to canonical names" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal [ "AUTHONLY", "MODERATED" ]
+                                (parseModexListRow "AUTHONLY MODERATED")
+                        , \_ ->
+                            Expect.equal [ "VOICE" ]
+                                (parseModexListRow "voice BOGUS")
+                        , \_ -> Expect.equal [] (parseModexListRow "")
+                        ]
+                        ()
+            ]
         ]
 
 

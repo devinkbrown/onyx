@@ -2,6 +2,9 @@ module Modes exposing
     ( ArgGroups
     , ChannelModeState
     , ExtBan
+    , ModexKind(..)
+    , ModexSpec
+    , ModexTarget
     , ResolvedRole
     , UserModeAccess(..)
     , applyChannelModeDelta
@@ -13,11 +16,20 @@ module Modes exposing
     , highestStatusMode
     , modeConsumesArg
     , buildExtBan
+    , buildModexQuery
     , extBanTypeLabel
     , extBanTypes
+    , letterToModexName
+    , lookupModexName
+    , maxModexChanges
+    , maxModexNameBytes
+    , maxModexTargetBytes
+    , modexTable
     , parseChannelModeString
     , parseChanGroups
     , parseExtBan
+    , parseModexListRow
+    , parseModexTarget
     , resolveRole
     , roleSequence
     , statusRank
@@ -897,3 +909,215 @@ buildExtBan negated banType pattern =
 
         Nothing ->
             Nothing
+
+
+-- IRCX MODEX named modes
+
+
+{-| Which state a MODEX name controls (mirroring `ModeKind`:
+channel flags, visibility selectors, and per-member statuses). -}
+type ModexKind
+    = ModexChannel
+    | ModexVisibility
+    | ModexMember
+
+
+{-| One MODEX name-table row (mirroring `ModeSpec`: canonical
+UPPER spelling, the IRC letter it stands for — `Nothing` for the
+letterless `PUBLIC` visibility — the kind gate, the oper-only
+mark, and the member status prefix). -}
+type alias ModexSpec =
+    { name : String
+    , letter : Maybe Char
+    , kind : ModexKind
+    , requiresOper : Bool
+    , statusPrefix : Maybe Char
+    }
+
+
+{-| The 25-row MODEX name table, verbatim from
+`src/proto/ircx_modex.zig` (`mode_table`). -}
+modexTable : List ModexSpec
+modexTable =
+    [ { name = "PUBLIC", letter = Nothing, kind = ModexVisibility, requiresOper = False, statusPrefix = Nothing }
+    , { name = "PRIVATE", letter = Just 'p', kind = ModexVisibility, requiresOper = False, statusPrefix = Nothing }
+    , { name = "HIDDEN", letter = Just 'h', kind = ModexVisibility, requiresOper = False, statusPrefix = Nothing }
+    , { name = "SECRET", letter = Just 's', kind = ModexVisibility, requiresOper = False, statusPrefix = Nothing }
+    , { name = "MODERATED", letter = Just 'm', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "TOPICOP", letter = Just 't', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "INVITEONLY", letter = Just 'i', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "NOEXTERN", letter = Just 'n', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "KNOCK", letter = Just 'u', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "AUTHONLY", letter = Just 'a', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "NOFORMAT", letter = Just 'f', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "CLONEABLE", letter = Just 'd', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "CLONE", letter = Just 'E', kind = ModexChannel, requiresOper = True, statusPrefix = Nothing }
+    , { name = "REGISTERED", letter = Just 'r', kind = ModexChannel, requiresOper = True, statusPrefix = Nothing }
+    , { name = "SERVICE", letter = Just 'z', kind = ModexChannel, requiresOper = True, statusPrefix = Nothing }
+    , { name = "AUDITORIUM", letter = Just 'x', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "NOWHISPER", letter = Just 'w', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "OPMODERATE", letter = Just 'U', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "NOCOMICDATA", letter = Just 'V', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "FREETARGET", letter = Just 'F', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "DISFORWARD", letter = Just 'D', kind = ModexChannel, requiresOper = False, statusPrefix = Nothing }
+    , { name = "FOUNDER", letter = Just 'Q', kind = ModexMember, requiresOper = False, statusPrefix = Just '~' }
+    , { name = "OWNER", letter = Just 'q', kind = ModexMember, requiresOper = False, statusPrefix = Just '.' }
+    , { name = "HOST", letter = Just 'o', kind = ModexMember, requiresOper = False, statusPrefix = Just '@' }
+    , { name = "VOICE", letter = Just 'v', kind = ModexMember, requiresOper = False, statusPrefix = Just '+' }
+    ]
+
+
+{-| MODEX wire budgets from `ircx_modex.zig` (`Params` defaults). -}
+maxModexNameBytes : Int
+maxModexNameBytes =
+    64
+
+
+maxModexTargetBytes : Int
+maxModexTargetBytes =
+    160
+
+
+maxModexChanges : Int
+maxModexChanges =
+    16
+
+
+{-| ASCII case-insensitive name lookup (mirroring `lookupName`:
+1–64 ASCII-alpha bytes, then the table scan — unknown and
+malformed names are `Nothing`, never a guess). -}
+lookupModexName : String -> Maybe ModexSpec
+lookupModexName raw =
+    if String.isEmpty raw || String.length raw > maxModexNameBytes then
+        Nothing
+
+    else if not (String.all isAsciiAlphaChar raw) then
+        Nothing
+
+    else
+        let
+            needle =
+                String.toUpper raw
+        in
+        List.filter (\spec -> spec.name == needle) modexTable
+            |> List.head
+
+
+{-| Map an IRC mode letter back to its canonical MODEX name
+(mirroring `letterToName`; `PUBLIC` has no letter, so no letter
+maps to it). -}
+letterToModexName : Char -> Maybe String
+letterToModexName letter =
+    List.filter (\spec -> spec.letter == Just letter) modexTable
+        |> List.head
+        |> Maybe.map .name
+
+
+isAsciiAlphaChar : Char -> Bool
+isAsciiAlphaChar c =
+    (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+
+
+{-| A parsed MODEX target: `#channel` or `#channel,nick`
+(mirroring `parseTarget`). -}
+type alias ModexTarget =
+    { channel : String
+    , member : Maybe String
+    }
+
+
+{-| Parse a MODEX target (mirroring `parseTargetWith`: at most one
+comma, channel 1–128 bytes starting with `#`, member 1–64 bytes
+with no spaces/commas/controls, whole target within 160 bytes). -}
+parseModexTarget : String -> Maybe ModexTarget
+parseModexTarget raw =
+    if String.isEmpty raw || String.length raw > maxModexTargetBytes then
+        Nothing
+
+    else
+        case String.split "," raw of
+            [ channel ] ->
+                if validModexChannel channel then
+                    Just { channel = channel, member = Nothing }
+
+                else
+                    Nothing
+
+            [ channel, member ] ->
+                if validModexChannel channel && validModexMember member then
+                    Just { channel = channel, member = Just member }
+
+                else
+                    Nothing
+
+            _ ->
+                Nothing
+
+
+validModexChannel : String -> Bool
+validModexChannel channel =
+    not (String.isEmpty channel)
+        && String.length channel <= 128
+        && String.startsWith "#" channel
+        && not (String.contains " " channel)
+        && not (String.any isModexControlChar channel)
+
+
+validModexMember : String -> Bool
+validModexMember member =
+    not (String.isEmpty member)
+        && String.length member <= 64
+        && not (String.contains " " member)
+        && not (String.contains "," member)
+        && not (String.any isModexControlChar member)
+
+
+isModexControlChar : Char -> Bool
+isModexControlChar c =
+    let
+        code =
+            Char.toCode c
+    in
+    code < 32 || code == 127
+
+
+{-| Build a MODEX list query for a target (mirroring the query half
+of `parseCommand`: a bare `MODEX <target>` with no change tokens
+asks the server to list — `Nothing` for an unparseable target, so
+the composer never sends a malformed query). -}
+buildModexQuery : String -> Maybe String
+buildModexQuery raw =
+    case parseModexTarget (String.trim raw) of
+        Just target ->
+            Just
+                ("MODEX "
+                    ++ target.channel
+                    ++ (case target.member of
+                            Just member ->
+                                "," ++ member
+
+                            Nothing ->
+                                ""
+                       )
+                )
+
+        Nothing ->
+            Nothing
+
+
+{-| Split an 826 `RPL_MODEXLIST` trailing row into canonical names
+(mirroring `writeModexList`: space-separated UPPER names — lookup
+validates each token, so unknown tokens drop and the fold stores
+only table names, never wire guesses). -}
+parseModexListRow : String -> List String
+parseModexListRow row =
+    List.filterMap
+        (\token ->
+            case lookupModexName token of
+                Just spec ->
+                    Just spec.name
+
+                Nothing ->
+                    Nothing
+        )
+        (String.words row)

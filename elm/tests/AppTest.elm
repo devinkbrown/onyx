@@ -8724,8 +8724,9 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 57 (List.length slashCommands)
+                    [ \_ -> Expect.equal 58 (List.length slashCommands)
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
+                    , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
                     , \_ -> Expect.equal (Just "join") (Maybe.map .name (findSlashCommand "j"))
                     , \_ -> Expect.equal (Just "color") (Maybe.map .name (findSlashCommand "colour"))
                     , \_ -> Expect.equal (Just "broadcast") (Maybe.map .name (findSlashCommand "wallops"))
@@ -20688,6 +20689,95 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal [] out
                         , \_ -> Expect.equal blank kept
+                        ]
+                        ()
+            ]
+        , describe "MODEX named-mode query"
+            [ test "826 rows accumulate and 827 commits named modes" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            feed blank ":srv 826 alice #c :AUTHONLY MODERATED"
+
+                        ( closed, _ ) =
+                            feed listed ":srv 827 alice #c :End of modes"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (Dict.get "#c" listed.modexModes)
+                        , \_ ->
+                            Expect.equal (Just [ "AUTHONLY", "MODERATED" ])
+                                (Dict.get "#c" listed.modexPending)
+                        , \_ ->
+                            Expect.equal (Just [ "AUTHONLY", "MODERATED" ])
+                                (Dict.get "#c" closed.modexModes)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" closed.modexPending)
+                        , \_ ->
+                            Expect.equal True
+                                (List.any (String.contains "AUTHONLY") closed.serviceLog)
+                        ]
+                        ()
+            , test "827 with no open rows is a silent no-op" <|
+                \_ ->
+                    let
+                        ( closed, _ ) =
+                            feed blank ":srv 827 alice #c :End of modes"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (Dict.get "#c" closed.modexModes)
+                        , \_ -> Expect.equal [] closed.serviceLog
+                        ]
+                        ()
+            , test "unknown 826 tokens drop; bad targets leave no trace" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            feed blank ":srv 826 alice #C :voice BOGUS"
+
+                        ( closed, _ ) =
+                            feed listed ":srv 827 alice #C :End of modes"
+
+                        ( bad, _ ) =
+                            feed blank ":srv 826 alice bogus :AUTHONLY"
+
+                        ( badClosed, _ ) =
+                            feed bad ":srv 827 alice bogus :End of modes"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just [ "VOICE" ])
+                                (Dict.get "#c" closed.modexModes)
+                        , \_ -> Expect.equal Nothing (Dict.get "bogus" badClosed.modexModes)
+                        , \_ -> Expect.equal [] badClosed.serviceLog
+                        ]
+                        ()
+            , test "member targets key under the full target" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            feed blank ":srv 826 alice #c,bob :VOICE"
+
+                        ( closed, _ ) =
+                            feed listed ":srv 827 alice #c,bob :End of modes"
+                    in
+                    Expect.equal (Just [ "VOICE" ])
+                        (Dict.get "#c,bob" closed.modexModes)
+            , test "/modex sends a bare query, defaulting to the room" <|
+                \_ ->
+                    let
+                        ( _, namedOut ) =
+                            update ComposerSend { blank | activeChannel = Just "#c", composer = "/modex #c" }
+
+                        ( _, currentOut ) =
+                            update ComposerSend { blank | activeChannel = Just "#c", composer = "/modex" }
+
+                        ( bad, badOut ) =
+                            update ComposerSend { blank | activeChannel = Just "#c", composer = "/modex bogus" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "MODEX #c" ] (sendLines namedOut)
+                        , \_ -> Expect.equal [ "MODEX #c" ] (sendLines currentOut)
+                        , \_ -> Expect.equal [] (sendLines badOut)
+                        , \_ -> Expect.equal [ "Named modes" ] (List.map .title bad.toasts)
                         ]
                         ()
             ]
