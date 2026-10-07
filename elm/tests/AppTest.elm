@@ -224,6 +224,20 @@ sendLines outs =
         outs
 
 
+previewFetches : List Outbound -> List Outbound
+previewFetches outs =
+    List.filter
+        (\o ->
+            case o of
+                PreviewFetch _ ->
+                    True
+
+                _ ->
+                    False
+        )
+        outs
+
+
 {-| Live-traffic base: self-JOIN first. The oracle's `_addChannelMessage`
 drops channel traffic without a room shell, so fixtures asserting on
 folded live rows must establish membership before the traffic. -}
@@ -2181,6 +2195,92 @@ suite =
                     , \_ -> Expect.equal [ Just 50 ] (List.map .progress m4.attachments)
                     , \_ -> Expect.equal [ Nothing ] (List.map .progress m5.attachments)
                     , \_ -> Expect.equal [ Nothing ] (List.map .progress m6.attachments)
+                    ]
+                    ()
+        , test "PRIVMSG with a link queues one preview fetch" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                    ( m1, out1 ) =
+                        feed joined ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    ( m2, out2 ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :again https://example.test/story here"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ PreviewFetch { key = "https://example.test/story", endpoint = "/linkpreview", url = "https://example.test/story" } ] (previewFetches out1)
+                    , \_ -> Expect.equal [] (previewFetches out2)
+                    , \_ -> Expect.equal (Set.fromList [ "https://example.test/story" ]) m1.linkPreviewInflight
+                    ]
+                    ()
+        , test "preview fetch respects prefs, cache, and settle" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                    noPreviews =
+                        let
+                            p =
+                                joined.prefs
+                        in
+                        { joined | prefs = { p | linkPreviews = False } }
+
+                    ( _, outOff ) =
+                        feed noPreviews ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    ( m2, _ ) =
+                        update (PreviewArrived { key = "https://example.test/story", ok = True, status = 200, body = "{\"title\":\"Story\",\"site\":\"Example\"}" }) m1
+
+                    ( m3, outCached ) =
+                        feed m2 ":bob!u@h PRIVMSG #c :again https://example.test/story here"
+
+                    ( m4, _ ) =
+                        update (PreviewArrived { key = "https://example.test/other", ok = False, status = 500, body = "" }) m3
+
+                    ( m5, outRetry ) =
+                        feed m4 ":bob!u@h PRIVMSG #c :see https://example.test/other ok"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (previewFetches outOff)
+                    , \_ ->
+                        Expect.equal (Just (Just { url = "https://example.test/story", title = "Story", description = "", image = "", site = "Example" }))
+                            (Dict.get "https://example.test/story" m2.linkPreviews)
+                    , \_ -> Expect.equal [] (previewFetches outCached)
+                    , \_ -> Expect.equal Nothing (Dict.get "https://example.test/other" m4.linkPreviews)
+                    , \_ ->
+                        Expect.equal
+                            [ PreviewFetch { key = "https://example.test/other", endpoint = "/linkpreview", url = "https://example.test/other" } ]
+                            (previewFetches outRetry)
+                    ]
+                    ()
+        , test "logout clears the preview cache" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst { blank | ourNick = "me" } "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    ( m2, _ ) =
+                        update (PreviewArrived { key = "https://example.test/story", ok = True, status = 200, body = "{\"title\":\"Story\"}" }) m1
+
+                    authed =
+                        { m2 | accountName = Just "kai" }
+
+                    ( m4, _ ) =
+                        feed authed ":s 901 me :You are now logged out"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (Dict.isEmpty m2.linkPreviews)
+                    , \_ -> Expect.equal True (Dict.isEmpty m4.linkPreviews)
+                    , \_ -> Expect.equal True (Set.isEmpty m4.linkPreviewInflight)
                     ]
                     ()
         , test "UploadDone failure aborts with the draft kept" <|

@@ -318,6 +318,29 @@ suite =
                         , \_ -> Expect.equal False (hasPngExif [ 0x00, 0x01 ])
                         ]
                         ()
+            , test "extracts http(s) tokens and trims punctuation" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "https://example.test/a", "http://example.test/b" ]
+                                (extractHttpUrls "see https://example.test/a, and (http://example.test/b).")
+                        , \_ -> Expect.equal [] (extractHttpUrls "no links here")
+                        , \_ -> Expect.equal [] (extractHttpUrls "javascript:alert(1)")
+                        , \_ -> Expect.equal [ "HTTPS://example.test/x" ] (extractHttpUrls "HTTPS://example.test/x")
+                        ]
+                        ()
+            , test "spots same-origin targets" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal True (isSameOriginHttpUrl "https://app.example.test" "/linkpreview?url=x")
+                        , \_ -> Expect.equal True (isSameOriginHttpUrl "https://app.example.test" "https://app.example.test/uploads/a.png")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "https://evil.example.test/x")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "https://user@app.example.test/x")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "" "/linkpreview")
+                        , \_ -> Expect.equal False (isSameOriginHttpUrl "https://app.example.test" "//app.example.test/x")
+                        ]
+                        ()
             , test "labels Original and Compact with honest sizes" <|
                 \_ ->
                     Expect.all

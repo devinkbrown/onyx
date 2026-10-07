@@ -223,6 +223,78 @@ suite =
             \_ ->
                 query channelModel
                     |> Query.has [ Selector.text "hello world" ]
+        , test "link preview card renders with consent-gated thumbnail" <|
+            \_ ->
+                let
+                    withLink =
+                        feed channelModel ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    card =
+                        { url = "https://example.test/story"
+                        , title = "Story"
+                        , description = "A description"
+                        , image = "https://cdn.example.test/i.png"
+                        , site = "Example"
+                        }
+
+                    cached =
+                        { withLink
+                            | origin = "https://app.example.test"
+                            , linkPreviews =
+                                Dict.fromList [ ( "https://example.test/story", Just card ) ]
+                        }
+
+                    allowed =
+                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/i.png") cached)
+                in
+                Expect.all
+                    [ \_ ->
+                        query cached
+                            |> Query.find [ Selector.class "shell-msg-preview" ]
+                            |> Query.has [ Selector.text "Story", Selector.text "Example" ]
+                    , \_ ->
+                        query cached
+                            |> Query.has [ Selector.text "Load image" ]
+                    , \_ ->
+                        query allowed
+                            |> Query.find [ Selector.class "shell-msg-preview-thumb" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "src" "https://cdn.example.test/i.png") ]
+                    , \_ ->
+                        query { cached | linkPreviews = Dict.fromList [ ( "https://example.test/story", Nothing ) ] }
+                            |> Query.hasNot [ Selector.class "shell-msg-preview" ]
+                    ]
+                    ()
+        , test "same-origin preview thumbnails load without consent" <|
+            \_ ->
+                let
+                    withLink =
+                        feed channelModel ":alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    card =
+                        { url = "https://example.test/story"
+                        , title = "Story"
+                        , description = ""
+                        , image = "https://app.example.test/i.png"
+                        , site = ""
+                        }
+
+                    cached =
+                        { withLink
+                            | origin = "https://app.example.test"
+                            , linkPreviews =
+                                Dict.fromList [ ( "https://example.test/story", Just card ) ]
+                        }
+                in
+                Expect.all
+                    [ \_ ->
+                        query cached
+                            |> Query.find [ Selector.class "shell-msg-preview-thumb" ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "src" "https://app.example.test/i.png") ]
+                    , \_ ->
+                        query cached
+                            |> Query.hasNot [ Selector.text "Load image" ]
+                    ]
+                    ()
         , test "composer attach button and staged rows render" <|
             \_ ->
                 let

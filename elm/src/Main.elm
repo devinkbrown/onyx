@@ -147,6 +147,12 @@ port uploadDone : ({ key : String, index : Int, ok : Bool, status : Int, body : 
 port uploadProgress : ({ key : String, index : Int, loaded : Int, total : Maybe Int } -> msg) -> Sub msg
 
 
+port previewFetch : { key : String, endpoint : String, url : String } -> Cmd msg
+
+
+port previewDone : ({ key : String, ok : Bool, status : Int, body : String } -> msg) -> Sub msg
+
+
 port wsClose : () -> Cmd msg
 
 
@@ -948,6 +954,9 @@ perform key outbound =
         App.UploadSend req ->
             uploadSend req
 
+        App.PreviewFetch req ->
+            previewFetch req
+
         App.WsDisconnect ->
             wsClose ()
 
@@ -1341,6 +1350,7 @@ subscriptions model =
         , uploadPicked App.UploadPicked
         , uploadDone App.UploadDone
         , uploadProgress App.UploadProgress
+        , previewDone App.PreviewArrived
         , wsOpened App.WsOpened
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged

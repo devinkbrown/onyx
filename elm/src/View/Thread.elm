@@ -4,11 +4,12 @@ module View.Thread exposing (thread)
 channel, newest last.
 -}
 
-import App exposing (Model, Msg)
+import App exposing (Model, Msg(..))
 import Dict
 import Html exposing (Html, a, button, div, h2, img, li, section, span, strong, text, time, ul)
-import Html.Attributes exposing (attribute, class, classList, datetime, href, src)
+import Html.Attributes exposing (attribute, class, classList, datetime, href, rel, src, target)
 import Html.Events exposing (onClick)
+import Set
 import Prefs
 import Upload
 
@@ -166,7 +167,7 @@ messageRow model target m =
           else
             time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
                 [ text (App.formatClockUtc m.at) ]
-        , span [ class "onyx-body" ] (messageBody m)
+        , span [ class "onyx-body" ] (messageBody model m)
         , if m.outboxId == Nothing && not m.pending then
             text ""
 
@@ -260,15 +261,157 @@ boostChip model target m groups chip =
 
 {-| Row body: the caption as text plus one card per `[file]`
 receipt (images render a thumbnail; every card links the
-sanitized URL, so no `javascript:` href can reach the DOM). -}
-messageBody : App.ChatMessage -> List (Html Msg)
-messageBody m =
+sanitized URL, so no `javascript:` href can reach the DOM),
+plus the first-link OG preview card when fetched. -}
+messageBody : Model -> App.ChatMessage -> List (Html Msg)
+messageBody model m =
     let
         presented =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
     [ text presented.caption ]
         ++ List.map attachmentCard presented.attachments
+        ++ [ previewCard model (App.displayBody m) ]
+
+
+{-| First-link OG card (mirrors `LinkPreviewCard`: preference-gated,
+canonical URL re-validated at the sink, cross-origin thumbnails
+behind an explicit consent click; same-origin thumbnails load
+directly). -}
+previewCard : Model -> String -> Html Msg
+previewCard model body =
+    let
+        privacy =
+            App.liveUnfurlPrivacy model
+    in
+    if not privacy.linkPreviews then
+        text ""
+
+    else
+        case previewUrlFor privacy body of
+            Nothing ->
+                text ""
+
+            Just url ->
+                case Dict.get url model.linkPreviews of
+                    Just (Just card) ->
+                        if previewSafe model card then
+                            linkPreviewCard model card
+
+                        else
+                            text ""
+
+                    _ ->
+                        text ""
+
+
+{-| First plain web link, media-kind hrefs left for media unfurls
+(mirrors the oracle `previewUrl` memo). -}
+previewUrlFor : Upload.UnfurlPrefs -> String -> Maybe String
+previewUrlFor privacy body =
+    Upload.pickPreviewUrl
+        (List.filter
+            (\href -> Upload.classifyAttachmentKind href Nothing == Upload.KindFile)
+            (Upload.extractHttpUrls body)
+        )
+        privacy
+
+
+{-| Sink gate (mirrors `isAutoLoadableHttpUrl`): the endpoint-derived
+canonical URL must be credential-free same-origin or public http(s). -}
+previewSafe : Model -> Upload.LinkPreview -> Bool
+previewSafe model card =
+    Upload.isSameOriginHttpUrl model.origin card.url
+        || Upload.isPreviewableUrl card.url (App.liveUnfurlPrivacy model)
+
+
+linkPreviewCard : Model -> Upload.LinkPreview -> Html Msg
+linkPreviewCard model card =
+    let
+        thumbnail =
+            if String.isEmpty card.image then
+                Nothing
+
+            else if
+                Upload.isSameOriginHttpUrl model.origin card.image
+                    || Set.member card.image model.previewImagesAllowed
+            then
+                if Upload.isSameOriginHttpUrl model.origin card.image || Upload.isPreviewableUrl card.image Upload.previewSsrfOnly then
+                    Just card.image
+
+                else
+                    Nothing
+
+            else
+                Nothing
+
+        consentNeeded =
+            not (String.isEmpty card.image) && thumbnail == Nothing
+    in
+    span [ class "shell-msg-preview" ]
+        [ a
+            [ href card.url
+            , class "shell-msg-preview-link"
+            , target "_blank"
+            , rel "noopener noreferrer"
+            , attribute "aria-label" ("Link preview: " ++ (if String.isEmpty card.title then card.url else card.title))
+            ]
+            [ span [ class "shell-msg-preview-body" ]
+                ([ if String.isEmpty card.site then
+                    text ""
+
+                   else
+                    span [ class "shell-msg-preview-site" ] [ text card.site ]
+                 , if String.isEmpty card.title then
+                    text ""
+
+                   else
+                    span [ class "shell-msg-preview-title" ] [ text card.title ]
+                 , if String.isEmpty card.description then
+                    text ""
+
+                   else
+                    span [ class "shell-msg-preview-desc" ] [ text card.description ]
+                 ]
+                )
+            ]
+        , case thumbnail of
+            Just image ->
+                img
+                    [ src image
+                    , class "shell-msg-preview-thumb"
+                    , attribute "alt" ""
+                    , attribute "width" "72"
+                    , attribute "height" "72"
+                    , attribute "loading" "lazy"
+                    , attribute "decoding" "async"
+                    , attribute "referrerpolicy" "no-referrer"
+                    ]
+                    []
+
+            Nothing ->
+                if consentNeeded then
+                    button
+                        [ attribute "type" "button"
+                        , class "shell-msg-preview-consent"
+                        , attribute "aria-label" ("Load external preview image from " ++ previewHost card.image)
+                        , onClick (PreviewImageAllow card.image)
+                        ]
+                        [ text "Load image" ]
+
+                else
+                    text ""
+        ]
+
+
+previewHost : String -> String
+previewHost url =
+    case Upload.parseAbsoluteUrl url of
+        Just parsed ->
+            parsed.host
+
+        Nothing ->
+            "external host"
 
 
 attachmentCard : Upload.ParsedAttachment -> Html Msg

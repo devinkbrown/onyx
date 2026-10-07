@@ -16,11 +16,14 @@ module Upload exposing
     , extractAttachmentPresentation
     , compactPhotoJpegQuality
     , compactPhotoMaxEdge
+    , extractHttpUrls
     , formatAttachmentBytes
     , formatFileSize
     , hasJpegExif
     , hasPngExif
     , isPhotoFile
+    , isSameOriginHttpUrl
+    , linkPreviewCacheCap
     , photoQualityOptions
     , isPreviewableUrl
     , linkPreviewDescriptionMax
@@ -35,6 +38,7 @@ module Upload exposing
     , maxAttachmentSizeLabel
     , mayUnfurlUrl
     , normalizePreview
+    , parseAbsoluteUrl
     , parseAttachmentLine
     , parseUploadResponse
     , pickPreviewUrl
@@ -1709,6 +1713,91 @@ type alias LinkPreview =
     , image : String
     , site : String
     }
+
+
+{-| Module cache cap (mirrors `CACHE_CAP` in `linkPreview.ts`). -}
+linkPreviewCacheCap : Int
+linkPreviewCacheCap =
+    300
+
+
+{-| Collect candidate web-link tokens from a message body (the Elm
+stand-in for the oracle's `parseMessage` link tokens: whitespace
+split, http(s) prefix, surrounding punctuation trimmed). -}
+extractHttpUrls : String -> List String
+extractHttpUrls body =
+    List.filterMap cleanHttpWord (String.words body)
+
+
+cleanHttpWord : String -> Maybe String
+cleanHttpWord word =
+    let
+        trimmed =
+            trimHttpPunctuation False (trimHttpPunctuation True word)
+
+        lower =
+            String.toLower trimmed
+    in
+    if String.startsWith "http://" lower || String.startsWith "https://" lower then
+        Just trimmed
+
+    else
+        Nothing
+
+
+trimHttpPunctuation : Bool -> String -> String
+trimHttpPunctuation fromLeft word =
+    let
+        punct =
+            [ "(", "<", "[", "{", "\"", "'" ]
+
+        trailing =
+            [ ".", ",", ";", ":", "!", "?", ")", ">", "]", "}", "\"", "'" ]
+    in
+    if fromLeft then
+        case String.uncons word of
+            Just ( head, tail ) ->
+                if List.member (String.fromChar head) punct then
+                    trimHttpPunctuation True tail
+
+                else
+                    word
+
+            Nothing ->
+                word
+
+    else
+        case String.uncons (String.reverse word) of
+            Just ( last, restRev ) ->
+                if List.member (String.fromChar last) trailing then
+                    trimHttpPunctuation False (String.reverse restRev)
+
+                else
+                    word
+
+            Nothing ->
+                word
+
+
+{-| Same-origin http(s) check (mirrors `isSameOriginHttpUrl`:
+credential-free absolute URLs whose scheme + authority match the
+app origin, or root-relative paths which resolve same-origin). -}
+isSameOriginHttpUrl : String -> String -> Bool
+isSameOriginHttpUrl origin url =
+    if String.isEmpty origin then
+        False
+
+    else if String.startsWith "/" url && not (String.startsWith "//" url) then
+        True
+
+    else
+        case ( parseAbsoluteUrl origin, parseAbsoluteUrl url ) of
+            ( Just o, Just u ) ->
+                (u.scheme == "http" || u.scheme == "https")
+                    && u.authority == o.authority
+
+            _ ->
+                False
 
 
 {-| Validate a fetched preview payload (mirrors `normalize`:
