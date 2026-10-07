@@ -2174,6 +2174,50 @@ suite =
                     , \_ -> Expect.equal [] out
                     ]
                     ()
+        , test "rewind fetches BEFORE anchored at the oldest row" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+
+                    ( j2, _ ) =
+                        feed j1 "@msgid=s1 :alice!u@h PRIVMSG #c :old"
+
+                    ( m1, _ ) =
+                        update (ChannelSelect "#c") { j2 | historyLoading = Set.empty }
+
+                    ( m2, out ) =
+                        update ThreadShowEarlier m1
+
+                    ( _, out2 ) =
+                        update ThreadShowEarlier m2
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CHATHISTORY BEFORE #c msgid=s1 50\r\n" ] out
+                    , \_ -> Expect.equal [] out2
+                    ]
+                    ()
+        , test "rewind anchors local rows by stamp" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+
+                    ( j2, _ ) =
+                        feed j1 ":bob!u@h PRIVMSG #c :hi"
+
+                    ( m1, _ ) =
+                        update (ChannelSelect "#c") { j2 | historyLoading = Set.empty }
+
+                    ( _, out ) =
+                        update ThreadShowEarlier m1
+                in
+                case out of
+                    [ SendLine line ] ->
+                        Expect.equal True (String.startsWith "CHATHISTORY BEFORE #c timestamp=" line)
+
+                    _ ->
+                        Expect.fail ("expected one BEFORE fetch, got: " ++ String.fromInt (List.length out))
         , test "vault restore preserves stored stamps" <|
             \_ ->
                 let
