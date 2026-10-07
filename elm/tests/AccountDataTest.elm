@@ -157,7 +157,7 @@ suite =
                         message =
                             copyHistoryMessage
                                 (vaultRowHistorySource
-                                    { id = "r1", target = "#a", from = "kai", body = "hi", at = 0, rowType = "msg", deleted = False, redacted = False }
+                                    { id = "r1", target = "#a", from = "kai", body = "hi", at = 0, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                                 )
                     in
                     Expect.all

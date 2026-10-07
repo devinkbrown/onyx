@@ -33,6 +33,7 @@ liveRow from body =
     , redacted = False
     , topic = ""
     , msgType = "msg"
+    , replyTo = Nothing
     }
 
 

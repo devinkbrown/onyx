@@ -114,14 +114,23 @@ test("tombstoned rows never surface in recall or time-travel", () => {
   assert.ok(window.some((r) => r.id === "#c:1"));
 });
 
+test("plainRow carries reply context; hostile shapes read back empty", () => {
+  assert.deepEqual(
+    vaultStore.plainRow({ ...row("#c:1", 1000), replyTo: { id: "m1", from: "alice", text: "hello" } }).replyTo,
+    { id: "m1", from: "alice", text: "hello" },
+  );
+  assert.equal(vaultStore.plainRow({ ...row("#c:1", 1000), replyTo: { id: 7 } }).replyTo, null);
+  assert.equal(vaultStore.plainRow(row("#c:1", 1000)).replyTo, null);
+});
+
 test("plainRow carries tombstone flags; legacy rows read back clear", () => {
   assert.deepEqual(
     vaultStore.plainRow({ id: "x", target: "#c", from: "a", body: "b", at: 1, deleted: 1, redacted: 0 }),
-    { id: "x", target: "#c", from: "a", body: "b", at: 1, rowType: "msg", deleted: true, redacted: false },
+    { id: "x", target: "#c", from: "a", body: "b", at: 1, rowType: "msg", deleted: true, redacted: false, replyTo: null },
   );
   assert.deepEqual(
     vaultStore.plainRow(row("#c:1", 1000)),
-    { ...row("#c:1", 1000), rowType: "msg", deleted: false, redacted: false },
+    { ...row("#c:1", 1000), rowType: "msg", deleted: false, redacted: false, replyTo: null },
   );
 });
 

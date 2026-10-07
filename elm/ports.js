@@ -92,6 +92,7 @@
   function vaultPlainRow(value) {
     var row = value || {};
     var rowType = typeof row.rowType === "string" ? row.rowType : "";
+    var reply = row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null;
     return {
       id: String(row.id || ""),
       target: String(row.target || ""),
@@ -102,7 +103,13 @@
       // Tombstone flags ride with the row (mirroring StoredMessage);
       // legacy rows predate them and read back clear.
       deleted: !!row.deleted,
-      redacted: !!row.redacted
+      redacted: !!row.redacted,
+      // Reply context rides with the row (mirroring StoredMessage.replyTo);
+      // hostile or legacy shapes read back empty (Elm re-sanitizes on merge).
+      replyTo:
+        reply && typeof reply.id === "string" && typeof reply.from === "string" && typeof reply.text === "string"
+          ? { id: reply.id, from: reply.from, text: reply.text }
+          : null
     };
   }
 

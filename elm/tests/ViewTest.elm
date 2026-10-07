@@ -160,6 +160,7 @@ bigModel =
                     , redacted = False
                     , topic = ""
                     , msgType = "msg"
+                    , replyTo = Nothing
                     }
                 )
                 (List.reverse (List.range 1 150))
@@ -769,6 +770,24 @@ suite =
                             |> Query.has [ Selector.text "[message deleted]" ]
                     ]
                     ()
+        , test "thread renders inbound reply context" <|
+            \_ ->
+                let
+                    convo =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> feed m "@+draft/reply=m1 :bob!u@h PRIVMSG #c :agreed")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+                in
+                query convo
+                    |> Query.find [ Selector.class "shell-msg-reply" ]
+                    |> Query.has
+                        [ Selector.text "alice"
+                        , Selector.text "hello there"
+                        , Selector.attribute (Attr.attribute "aria-label" "Replying to alice")
+                        ]
         , test "thread hides the clock for unstamped rows" <|
             \_ ->
                 query channelModel

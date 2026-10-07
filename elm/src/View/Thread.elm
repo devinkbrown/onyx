@@ -273,10 +273,40 @@ messageBody model m =
         presented =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
-    [ text presented.caption ]
+    (case m.replyTo of
+        Just ref ->
+            [ replyContext ref ]
+
+        Nothing ->
+            []
+    )
+        ++ [ text presented.caption ]
         ++ List.map (attachmentCard model) presented.attachments
         ++ mediaUnfurls model presented
         ++ [ previewCard model (App.displayBody m) ]
+
+
+{-| Reply context line (mirrors the oracle `shell-msg-reply` block:
+sender plus the sanitized preview clipped to 80 chars). -}
+replyContext : App.ReplyRef -> Html Msg
+replyContext ref =
+    div [ class "shell-msg-reply", attribute "aria-label" ("Replying to " ++ ref.from) ]
+        [ span [ class "shell-msg-reply-from" ] [ text ref.from ]
+        , span [] [ text (clippedReplyPreview ref.text) ]
+        ]
+
+
+clippedReplyPreview : String -> String
+clippedReplyPreview text =
+    let
+        safe =
+            App.sanitizePersistedReplyPreviewText text
+    in
+    if String.length safe > 80 then
+        String.left 80 safe ++ "…"
+
+    else
+        safe
 
 
 {-| Inline-media unfurl (mirrors `MediaUnfurl`): every direct
