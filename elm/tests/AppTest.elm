@@ -3253,6 +3253,25 @@ suite =
                     , \_ -> Expect.equal "de-DE" configured.translationBrowserLang
                     ]
                     ()
+        , test "translation target persists normalised and stays silent when unchanged" <|
+            \_ ->
+                let
+                    ( set, setOut ) =
+                        update (TranslationTargetSet { target = "pt-BR" }) blank
+
+                    ( noop, noopOut ) =
+                        update (TranslationTargetSet { target = "" }) blank
+
+                    ( same, sameOut ) =
+                        update (TranslationTargetSet { target = "pt" }) set
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "pt" set.translationTarget
+                    , \_ -> Expect.equal [ TranslationTargetSave { target = "pt" } ] setOut
+                    , \_ -> Expect.equal ( blank, [] ) ( noop, noopOut )
+                    , \_ -> Expect.equal ( set, [] ) ( same, sameOut )
+                    ]
+                    ()
         , test "menu translation reports busy past four concurrent requests" <|
             \_ ->
                 let

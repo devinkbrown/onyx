@@ -9,6 +9,8 @@ module Translate exposing
     , maxResultLength
     , maxSourceLength
     , normalizeLang
+    , readinessDetail
+    , readinessLabel
     , resolveTranslationTarget
     , storageKey
     , translationProvenance
@@ -186,6 +188,27 @@ targetLabels =
     , ( "ar", "Arabic" )
     , ( "hi", "Hindi" )
     ]
+
+
+{-| Readiness label for the local translator state (mirroring
+`localTranslationReadiness`). -}
+readinessLabel : Bool -> String
+readinessLabel available =
+    if available then
+        "Browser local translator available"
+
+    else
+        "No browser local translator detected"
+
+
+{-| Readiness detail for the local translator state. -}
+readinessDetail : Bool -> String -> String
+readinessDetail available targetLang =
+    if available then
+        "Onyx can hand selected text to this browser's on-device translator for " ++ targetLang ++ "."
+
+    else
+        "Onyx will not send message text to an external translation endpoint. Copy text or transcript lines to a translator you choose."
 
 
 {-| Human-readable label for a target subtag, falling back to the

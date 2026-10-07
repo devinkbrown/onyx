@@ -16,12 +16,13 @@ focus (as on the OnyxOS tabs).
 -}
 
 import App exposing (Model, Msg(..), backgroundDirty, renderedBackground)
-import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, main_, p, section, small, span, summary, text)
+import Html exposing (Html, a, b, button, details, div, h1, h2, h3, header, label, main_, option, p, section, select, small, span, summary, text)
 import Html.Attributes exposing (attribute, class, disabled, href, style, tabindex, title)
 import Html.Events exposing (on, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave)
 import Json.Decode as Decode
 import Prefs
 import ThemeLook
+import Translate
 import View.Studio
 
 
@@ -191,6 +192,7 @@ view model =
                     , privacySwitch "httpsOnly" model.prefs.httpsOnly "Only unfurl https links" "When on, plain http links never fetch a preview or media unfurl."
                     ]
                 ]
+            , languageTools model
             , section [ class "ap-group" ]
                 [ h2 [ class "ap-glabel" ] [ text "Motion and data" ]
                 , div [ class "ap-choice-toggles" ]
@@ -281,6 +283,55 @@ lookChip model ids entry =
         [ span [ class "ap-theme-swatch", attribute "aria-hidden" "true" ]
             (List.map (\color -> span [ style "background" color ] []) entry.swatch)
         , span [ class "ap-theme-name" ] [ text entry.label ]
+        ]
+
+
+{-| Local language tools (mirroring the PreferencesPanel
+section: the translator readiness row plus, when available, the
+translation-language select over the curated targets — with the
+effective target surfaced first when it is not curated, so the
+shown selection always matches what captions translate to. The
+caption-transcript row has no Elm counterpart yet). -}
+languageTools : Model -> Html Msg
+languageTools model =
+    let
+        effective =
+            Translate.resolveTranslationTarget model.translationTarget model.translationBrowserLang
+
+        options =
+            if Translate.isTranslationTarget effective then
+                Translate.translationTargets
+
+            else
+                effective :: Translate.translationTargets
+    in
+    section [ class "ap-group" ]
+        [ h2 [ class "ap-glabel" ] [ text "Local language tools" ]
+        , p [ class "ap-desc" ]
+            [ text "Caption and translation handoffs stay local-first. Onyx labels what can run on this device and refuses hidden external translation." ]
+        , div [ class "ap-readiness-row" ]
+            [ span [ class "ap-readiness-state" ] [ text (if model.translationAvailable then "available" else "unavailable") ]
+            , span [ class "ap-readiness-main" ]
+                [ span [ class "ap-readiness-title" ] [ text (Translate.readinessLabel model.translationAvailable) ]
+                , small [] [ text (Translate.readinessDetail model.translationAvailable effective) ]
+                ]
+            ]
+        , if model.translationAvailable then
+            div [ class "ap-translation-target" ]
+                [ label [ class "ap-label" ] [ text "Translation language" ]
+                , select
+                    [ on "change" (Decode.at [ "target", "value" ] Decode.string |> Decode.map (\code -> TranslationTargetSet { target = code }))
+                    ]
+                    (List.map
+                        (\code -> option [ Html.Attributes.value code, Html.Attributes.selected (code == effective) ] [ text (Translate.languageLabel code) ])
+                        options
+                    )
+                , p [ class "ap-desc" ]
+                    [ text "On-device target for the message Translate action. Text is translated in this browser and never sent to an external endpoint." ]
+                ]
+
+          else
+            text ""
         ]
 
 

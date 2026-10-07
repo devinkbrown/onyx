@@ -32,6 +32,7 @@ function harness({ translator, storedTarget } = {}) {
   let config = null;
   const requests = [];
   let resultHandler = null;
+  let targetSave = null;
   const ports = {
     wsConnect: stub(),
     wsSend: stub(),
@@ -56,9 +57,11 @@ function harness({ translator, storedTarget } = {}) {
     translationConfig: { send(payload) { config = payload; } },
     translateRequest: { subscribe(fn) { requests.push(fn); } },
     translateResult: { send(payload) { if (resultHandler) resultHandler(payload); } },
+    translationTargetSave: { subscribe(fn) { targetSave = fn; } },
   };
   wire({ ports });
-  return { dom, requests, getConfig: () => config, onResult: (fn) => { resultHandler = fn; } };
+  assert.equal(typeof targetSave, "function");
+  return { dom, requests, getConfig: () => config, onResult: (fn) => { resultHandler = fn; }, saveTarget: targetSave };
 }
 
 function cleanup(h) {
@@ -114,6 +117,16 @@ test("requests translate through the browser API and echo the request", async ()
     assert.equal(result.msgid, "m1");
     assert.equal(result.lang, "en");
     assert.equal(result.source, "hola");
+  } finally {
+    cleanup(h);
+  }
+});
+
+test("target saves persist to the onyx key", async () => {
+  const h = harness({ translator: null });
+  try {
+    h.saveTarget({ target: "fr" });
+    assert.equal(h.dom.window.localStorage.getItem("onyx:translation-target"), "fr");
   } finally {
     cleanup(h);
   }

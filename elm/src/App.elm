@@ -846,6 +846,7 @@ type Outbound
     | GroupWelcomeOpen { key : String, room : String, fromAccount : String, fromDevice : String, toAccount : String, toDevice : String, epoch : Int, commitIdB64 : String, membershipB64 : String, commitmentB64 : String, welcomeB64 : String }
     | ClipboardCopy { text : String, tag : String }
     | TranslateRequest { msgid : String, lang : String, source : String, text : String, targetLang : String }
+    | TranslationTargetSave { target : String }
     | AccountDownload { filename : String, json : String }
     | TranscriptDownload { filename : String, body : String, mime : String }
     | MediaSaveDownload { href : String, name : String }
@@ -2680,6 +2681,7 @@ type Msg
     | MessageTranslate { target : String, msgid : String }
     | MessageTranslationDismiss { msgid : String }
     | MessageTranslationCopy { msgid : String }
+    | TranslationTargetSet { target : String }
     | InviteJoinSubmit
     | SelectOnyxosStage { stage : String }
     | OnyxosStageKey { key : String }
@@ -34957,6 +34959,22 @@ update msg model =
             -- `localTranslationReadiness` plus the stored target and
             -- the browser fallback language).
             ( { model | translationAvailable = available, translationTarget = target, translationBrowserLang = browserLang }, [] )
+
+        TranslationTargetSet { target } ->
+            -- Persist the on-device translation target (mirroring
+            -- `setTranslationTarget`: normalised to its primary
+            -- subtag; an unchanged value stays silent).
+            let
+                next =
+                    Translate.normalizeLang target
+            in
+            if next == model.translationTarget then
+                ( model, [] )
+
+            else
+                ( { model | translationTarget = next }
+                , [ TranslationTargetSave { target = next } ]
+                )
 
         MessageTranslate { target, msgid } ->
             -- Menu on-device translation (mirroring

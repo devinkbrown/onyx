@@ -3561,6 +3561,24 @@ suite =
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-checked" "true") ]
                         , \_ ->
                             q
+                                |> Query.has [ Selector.text "Local language tools" ]
+                        , \_ ->
+                            query { blank | route = Route.Appearance, translationAvailable = True }
+                                |> Query.find [ Selector.tag "select" ]
+                                |> Query.has
+                                    [ Selector.text "English"
+                                    , Selector.text "Japanese"
+                                    ]
+                        , \_ ->
+                            query { blank | route = Route.Appearance, translationAvailable = True }
+                                |> Query.find [ Selector.tag "select" ]
+                                |> Event.simulate (Event.custom "change" (Encode.object [ ( "target", Encode.object [ ( "value", Encode.string "ja" ) ] ) ]))
+                            |> Event.expect (TranslationTargetSet { target = "ja" })
+                        , \_ ->
+                            q
+                                |> Query.has [ Selector.text "No browser local translator detected" ]
+                        , \_ ->
+                            q
                                 |> Query.has [ Selector.text "Use less data" ]
                         , \_ ->
                             q

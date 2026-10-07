@@ -2883,6 +2883,16 @@ function fetchPublicFeed(url) {
         try { app.ports.translationConfig.send({ available: available, target: target, browserLang: browserLang }); } catch (err) { /* port gone */ }
       })();
     }
+    /* Stored on-device translation target (mirroring
+       `setTranslationTarget`: normalised upstream; the write is
+       best-effort like the other preference slots). */
+    if (app.ports.translationTargetSave) {
+      app.ports.translationTargetSave.subscribe(function (req) {
+        try {
+          if (window.localStorage) window.localStorage.setItem("onyx:translation-target", String((req && req.target) || ""));
+        } catch (err) { /* storage unavailable — non-fatal */ }
+      });
+    }
     if (app.ports.translateRequest) {
       app.ports.translateRequest.subscribe(function (req) {
         function done(ok, text) {

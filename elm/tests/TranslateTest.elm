@@ -157,6 +157,23 @@ suite =
                         ]
                         ()
             ]
+        , describe "readiness copy"
+            [ test "labels and details follow availability" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "Browser local translator available" (readinessLabel True)
+                        , \_ -> Expect.equal "No browser local translator detected" (readinessLabel False)
+                        , \_ ->
+                            Expect.equal
+                                "Onyx can hand selected text to this browser's on-device translator for ja."
+                                (readinessDetail True "ja")
+                        , \_ ->
+                            Expect.equal
+                                "Onyx will not send message text to an external translation endpoint. Copy text or transcript lines to a translator you choose."
+                                (readinessDetail False "ja")
+                        ]
+                        ()
+            ]
         , describe "languageLabel"
             [ test "labels curated targets and uppercases the rest" <|
                 \_ ->

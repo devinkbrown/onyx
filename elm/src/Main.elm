@@ -279,6 +279,8 @@ port translateResult : ({ msgid : String, lang : String, source : String, ok : B
 
 port translationConfig : ({ available : Bool, target : String, browserLang : String } -> msg) -> Sub msg
 
+port translationTargetSave : { target : String } -> Cmd msg
+
 port guidesProgressRequest : () -> Cmd msg
 
 port guidesProgressStore : List String -> Cmd msg
@@ -1030,6 +1032,9 @@ perform key outbound =
 
         App.TranslateRequest req ->
             translateRequest req
+
+        App.TranslationTargetSave req ->
+            translationTargetSave req
 
         App.AppearanceRequest ->
             appearanceRequest ()
