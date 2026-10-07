@@ -59,6 +59,9 @@ playwright-report/
 # agent/codex worktrees
 .claude/worktrees/
 
+# Elm compiler artifacts (regenerable via elm make; cache via ELM_HOME)
+elm/elm-stuff/
+
 # Claude Code personal (uncommitted) settings
 .claude/settings.local.json
 .eslintcache

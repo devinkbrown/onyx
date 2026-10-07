@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onyx</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app"></div>
+<script src="app.js"></script>
+<script src="ports.js"></script>
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  // Mirror preferences.ts: `onyx:preferences` JSON, `e2eeDms` boolean,
+  // default true on missing/unreadable store or non-boolean value.
+  var e2eeDms = true;
+  try {
+    var rawPrefs = window.localStorage.getItem("onyx:preferences");
+    if (rawPrefs) {
+      var parsedPrefs = JSON.parse(rawPrefs);
+      if (parsedPrefs && typeof parsedPrefs.e2eeDms === "boolean") {
+        e2eeDms = parsedPrefs.e2eeDms;
+      }
+    }
+  } catch (e) { /* fail open to the default; the fold stays fail-closed */ }
+  // Ignore/mute blocklists: `onyx:ignored-users` / `onyx:muted-dms` JSON
+  // string arrays. Anything else restores as empty; Elm normalizes
+  // fail-closed (trim/lower, 128-char cap, no controls, 512 max).
+  function readStringArray(key) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(function (v) { return typeof v === "string"; });
+    } catch (e) { return []; }
+  }
+  var ignoredUsers = readStringArray("onyx:ignored-users");
+  var mutedDMs = readStringArray("onyx:muted-dms");
+  // Highlight terms (`onyx:highlight-words` JSON string array, plain key
+  // like the blocklists; Elm normalizes fail-closed).
+  var highlightWords = readStringArray("onyx:highlight-words");
+  // Per-room notify levels (`onyx:channel-notify` JSON object
+  // `{ [channel]: level }`, plain key like the other prefs; Elm
+  // re-validates fail-closed, mirroring oracle `parse`).
+  var channelNotify = [];
+  try {
+    var rawNotify = window.localStorage.getItem("onyx:channel-notify");
+    if (rawNotify) {
+      var parsedNotify = JSON.parse(rawNotify);
+      if (parsedNotify && typeof parsedNotify === "object" && !Array.isArray(parsedNotify)) {
+        channelNotify = Object.keys(parsedNotify).map(function (ch) {
+          return { channel: ch, level: typeof parsedNotify[ch] === "string" ? parsedNotify[ch] : "" };
+        });
+      }
+    }
+  } catch (e) { channelNotify = []; }
+  // Room accent labels (`onyx:channel-color-labels` JSON object
+  // `{ [channel]: color }`, plain key; Elm re-validates fail-closed,
+  // mirroring oracle `parseChannelColors`). Non-string values coerce to
+  // "" so one bad entry cannot sink the whole map decode.
+  function readColorMap(key) {
+    try {
+      var raw = window.localStorage.getItem(key);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+      return Object.keys(parsed).map(function (ch) {
+        return { channel: ch, color: typeof parsed[ch] === "string" ? parsed[ch] : "" };
+      });
+    } catch (e) { return []; }
+  }
+  // Followed conversations (`onyx:followed` JSON string array) and the
+  // notification prefs, mirroring the oracle loaders: `onyx:sound`
+  // (default true, legacy `onyx:notif-sounds`), `onyx:sound-volume`
+  // (default 0.5, sanitized), `onyx:push-notifications` (default true,
+  // legacy `onyx:notif-desktop`), `onyx:dnd-enabled`, `onyx:dnd-until`.
+  var followed = readStringArray("onyx:followed");
+  // Default device-memory search mode (`onyx:vault-search-mode`),
+  // mirroring `loadDefaultVaultSearchMode`: unknown reads hybrid.
+  var vaultSearchMode = "hybrid";
+  try {
+    var storedMode = window.localStorage.getItem("onyx:vault-search-mode");
+    if (storedMode === "exact" || storedMode === "semantic" || storedMode === "hybrid") {
+      vaultSearchMode = storedMode;
+    }
+  } catch (e) {}
+  function readFlagTrue(key, legacy) {
+    try {
+      var v = window.localStorage.getItem(key);
+      if (v !== null) return v !== "false";
+      if (legacy) {
+        var l = window.localStorage.getItem(legacy);
+        if (l === null) return true;
+        return key === "onyx:push-notifications" ? l !== "false" : l === "true";
+      }
+      return true;
+    } catch (e) { return true; }
+  }
+  var pushEnabled = readFlagTrue("onyx:push-notifications", "onyx:notif-desktop");
+  var soundEnabled = readFlagTrue("onyx:sound", "onyx:notif-sounds");
+  var soundVolume = 0.5;
+  try {
+    var parsedVol = parseFloat(window.localStorage.getItem("onyx:sound-volume") || "");
+    if (isFinite(parsedVol)) soundVolume = Math.max(0, Math.min(1, parsedVol));
+  } catch (e) {}
+  var dndEnabled = false;
+  var dndUntil = null;
+  try {
+    dndEnabled = window.localStorage.getItem("onyx:dnd-enabled") === "true";
+    var parsedUntil = Number(window.localStorage.getItem("onyx:dnd-until"));
+    if (isFinite(parsedUntil) && parsedUntil > Date.now()) dndUntil = Math.floor(parsedUntil);
+  } catch (e) {}
+  // Resume Bearer [REDACTED] persisted by the session-token capture path
+  // (ports.js `resumeCredentials`, `onyx:credentials` localStorage).
+  // Slot key mirrors credentialSlotKey: "<host>|<nick>", lowercased.
+  // Invalid or missing slots restore as nulls; the reclaim plan then
+  // skips RESUME and the socket registers fresh.
+  var resumeTokens = { sessionToken: null, meshToken: null, meshExpiresAtMs: null };
+  try {
+    var wsUrl = params.get("ws") || "wss://irc.onyx.example/ws";
+    var bootNick = params.get("nick") || "guest";
+    var slotKey = "";
+    try {
+      slotKey = new URL(wsUrl).host.toLowerCase() + "|" + bootNick.toLowerCase();
+    } catch (u) { slotKey = ""; }
+    var rawCreds = window.localStorage.getItem("onyx:credentials");
+    if (rawCreds && slotKey) {
+      var credStore = JSON.parse(rawCreds);
+      var slot = credStore && credStore.slots && credStore.slots[slotKey];
+      if (slot && typeof slot === "object") {
+        if (typeof slot.sessionToken === "string" && slot.sessionToken) {
+          resumeTokens.sessionToken = slot.sessionToken;
+        }
+        if (typeof slot.meshToken === "string" && slot.meshToken) {
+          resumeTokens.meshToken = slot.meshToken;
+        }
+        if (typeof slot.meshExpiresAtMs === "number" && isFinite(slot.meshExpiresAtMs)) {
+          resumeTokens.meshExpiresAtMs = slot.meshExpiresAtMs;
+        }
+      }
+    }
+  } catch (e) { /* no durable resume state; register fresh */ }
+  var app = Elm.Main.init({
+    node: document.getElementById("app"),
+    flags: {
+      wsUrl: params.get("ws") || "wss://irc.onyx.example/ws",
+      nick: params.get("nick") || "guest",
+      origin: window.location.origin,
+      nowMs: Date.now(),
+      e2eeDms: e2eeDms,
+      ignoredUsers: ignoredUsers,
+      mutedDMs: mutedDMs,
+      followed: followed,
+      highlightWords: highlightWords,
+      channelNotify: channelNotify,
+      starredChannels: readStringArray("onyx:starred-channels"),
+      autoJoinChannels: readStringArray("onyx:autojoin-channels"),
+      channelColors: readColorMap("onyx:channel-color-labels"),
+      scheduledMessages: (function () {
+        try { return window.localStorage.getItem("onyx:scheduled"); }
+        catch (e) { return null; }
+      })(),
+      vaultSearchMode: vaultSearchMode,
+      pushEnabled: pushEnabled,
+      soundEnabled: soundEnabled,
+      soundVolume: soundVolume,
+      dndEnabled: dndEnabled,
+      dndUntil: dndUntil,
+      sessionToken: resumeTokens.sessionToken,
+      meshToken: resumeTokens.meshToken,
+      meshExpiresAtMs: resumeTokens.meshExpiresAtMs
+    }
+  });
+  OnyxPorts.wire(app);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,20025 @@
+module AppTest exposing (suite)
+
+{-| Fold semantics for the application core: the priority-1 roster APPEND
+invariant, identity-wide QUIT, multi-channel PART, 005 learning, PING
+answers, bounded message retention, and composer sends (plain +
+multiline). All through the pure `foldLine` / `update` — no socket.
+-}
+
+import App exposing (..)
+import Attribution
+import Base64Url
+import Cadence
+import Dict
+import DmCipher
+import Expect
+import GroupCommit
+import GroupControl
+import GroupDirectory
+import GroupEnvelope
+import GroupPublisher
+import Json.Decode as Decode
+import Json.Encode as Encode
+import Labels
+import SavedSearches exposing (SearchMode(..))
+import Schedule
+import Services
+import Isupport
+import Prefs exposing (ReactionDensity(..))
+import Session
+import Set
+import Test exposing (Test, describe, test)
+import Time
+import Wire exposing (SaslMechanism(..))
+
+
+groupPayload : String
+groupPayload =
+    case GroupControl.packGroupControlPayload
+        { version = GroupControl.payloadVersion
+        , kind = GroupControl.Commit
+        , epoch = 1
+        , body = [ 1, 2, 3 ]
+        , signerPub = List.repeat 32 9
+        , signature = List.repeat 64 8
+        , diagnosticOnly = False
+        }
+    of
+        Just wire ->
+            wire
+
+        Nothing ->
+            ""
+
+
+oddWire : String
+oddWire =
+    case GroupDirectory.encodeEntry { signerPub = 1 :: List.repeat 31 0, encryptionPub = 4 :: List.repeat 64 7 } of
+        Just wire ->
+            wire
+
+        Nothing ->
+            ""
+
+
+welcomePayload : String
+welcomePayload =
+    case GroupControl.packGroupControlPayload
+        { version = GroupControl.payloadVersion
+        , kind = GroupControl.Welcome
+        , epoch = 1
+        , body = [ 7, 7, 7 ]
+        , signerPub = List.repeat 32 9
+        , signature = List.repeat 64 8
+        , diagnosticOnly = False
+        }
+    of
+        Just wire ->
+            wire
+
+        Nothing ->
+            ""
+
+
+altPayload : String
+altPayload =
+    case GroupControl.packGroupControlPayload
+        { version = GroupControl.payloadVersion
+        , kind = GroupControl.Commit
+        , epoch = 1
+        , body = [ 8, 8, 8 ]
+        , signerPub = List.repeat 32 9
+        , signature = List.repeat 64 8
+        , diagnosticOnly = False
+        }
+    of
+        Just wire ->
+            wire
+
+        Nothing ->
+            ""
+
+
+oddSigner : String
+oddSigner =
+    Base64Url.encode (1 :: List.repeat 31 0)
+
+
+admittedModel : Model
+admittedModel =
+    let
+        ( m1, _ ) =
+            feed blank ":irc.example 001 me :welcome"
+
+        ( m2, _ ) =
+            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+        ( m3, _ ) =
+            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=1"
+
+        ( m4, _ ) =
+            update
+                (GroupDirectoryDerived
+                    { account = "alice"
+                    , rows =
+                        [ { deviceId = "phone"
+                          , directoryKey = Just oddSigner
+                          , derivedId = Just "ogc1-test"
+                          , trusted = True
+                          }
+                        ]
+                    }
+                )
+                m3
+    in
+    m4
+
+
+verifiedRecord : String -> String -> Maybe String -> Maybe String -> String -> Msg
+verifiedRecord kind payload toAccount toDevice trust =
+    GroupControlVerified
+        { channel = "#secure"
+        , epoch = 1
+        , signerB64 = oddSigner
+        , fromAccount = "alice"
+        , fromDevice = "phone"
+        , toAccount = toAccount
+        , toDevice = toDevice
+        , kind = kind
+        , payload = payload
+        , signatureValid = True
+        , trust = trust
+        }
+
+
+peerKey : String
+peerKey =
+    Base64Url.encode (0x04 :: List.repeat 64 7)
+
+
+{-| A model with a resolvable device-memory owner (endpoint + account
+identity), for seal-path tests that must pass the trust-namespace
+gate. `ourNick` stays blank so DM bucketing is untouched. -}
+ownedBase : Model
+ownedBase =
+    { blank | endpoint = Just "wss://irc.example", accountName = Just "me" }
+
+
+ownedOwner : { serverUrl : String, identity : String }
+ownedOwner =
+    { serverUrl = "wss://irc.example", identity = "me" }
+
+
+envelopeBody : String
+envelopeBody =
+    "ONYXDM1 " ++ Base64Url.encode (List.repeat 28 1)
+
+
+roomEnvelopeBody : String
+roomEnvelopeBody =
+    "ONYXROOM1 " ++ Base64Url.encode ([ 1, 0, 0, 0, 1 ] ++ List.repeat 12 7 ++ List.repeat 16 9)
+
+
+roomLockedText : String
+roomLockedText =
+    "\u{1F512} Encrypted room message (missing room key)"
+
+
+joinChan : Model -> String -> String -> ( Model, List Outbound )
+joinChan model nick chan =
+    feed model (":" ++ nick ++ "!u@h JOIN " ++ chan)
+
+
+requireRoom : Model -> String -> ( Model, List Outbound )
+requireRoom model chan =
+    feed model (":s 818 me " ++ chan ++ " encryption-policy :required")
+
+
+dmMessages : Model -> String -> List ChatMessage
+dmMessages model bucket =
+    case Dict.get bucket model.channels of
+        Just c ->
+            c.messages
+
+        Nothing ->
+            []
+
+
+feed : Model -> String -> ( Model, List Outbound )
+feed model line =
+    update (WsLineReceived line) model
+
+
+sendLines : List Outbound -> List String
+sendLines outs =
+    List.filterMap
+        (\o ->
+            case o of
+                SendLine line ->
+                    Just line
+
+                _ ->
+                    Nothing
+        )
+        outs
+
+
+{-| Live-traffic base: self-JOIN first. The oracle's `_addChannelMessage`
+drops channel traffic without a room shell, so fixtures asserting on
+folded live rows must establish membership before the traffic. -}
+joinFirst : Model -> String -> String -> Model
+joinFirst base nick channel =
+    Tuple.first (feed base (":" ++ nick ++ "!u@h JOIN " ++ channel))
+
+
+{-| Device-memory owner model for the custom-status slice: endpoint +
+nick resolve the oracle's `_scheduledMessageOwner` account-or-nick
+identity without an authed account. -}
+ownerBase : Model
+ownerBase =
+    { blank | endpoint = Just "wss://irc.example", ourNick = "kai" }
+
+
+ownerLive : Model
+ownerLive =
+    { ownerBase | connection = Live }
+
+
+ownerOffline : Model
+ownerOffline =
+    { ownerBase | connection = Offline }
+
+
+{-| Room-care fixtures: alice owns #harbor (founder+owner), bob and
+cara help, drew and erin are plain members. -}
+stewardRoom : Channel
+stewardRoom =
+    let
+        base =
+            shellOf "#harbor" 0 -1
+
+        member nick modes =
+            ( String.toLower nick, { nick = nick, modes = Set.fromList modes, away = False } )
+    in
+    { base
+        | members =
+            Dict.fromList
+                [ member "alice" [ 'Q', 'q' ]
+                , member "bob" [ 'o' ]
+                , member "cara" [ 'o' ]
+                , member "drew" []
+                , member "erin" []
+                ]
+    }
+
+
+stewardLive : Model
+stewardLive =
+    { ownerBase | connection = Live, ourNick = "alice", channels = Dict.fromList [ ( "#harbor", stewardRoom ) ] }
+
+
+isWhoisTimeoutStart : Outbound -> Bool
+isWhoisTimeoutStart outbound =
+    case outbound of
+        WhoisTimeoutStart _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| Online single-part composer send on #c as alice. -}
+labeledSend : List String -> String -> ( Model, List Outbound )
+labeledSend caps text =
+    update (ComposerInput text) { blank | ourNick = "alice", caps = caps, activeChannel = Just "#c" }
+        |> Tuple.first
+        |> (\m -> update ComposerSend m)
+
+
+{-| Bodies buffered on #c, newest first. -}
+channelBodies : Model -> List String
+channelBodies m =
+    List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels)))
+
+
+{-| Pending flags buffered on #c, newest first. -}
+channelPendings : Model -> List Bool
+channelPendings m =
+    List.map .pending (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels)))
+
+
+{-| One DM working-set entry: unread counter plus a single row stamped
+at the given ms (empty stamp reads 0). -}
+shellOf : String -> Int -> Int -> Channel
+shellOf name unread lastAt =
+    { name = name
+    , topic = ""
+    , members = Dict.empty
+    , modes = ""
+    , messages =
+        if lastAt < 0 then
+            []
+
+        else
+            [ { id = 1
+              , from = name
+              , body = "hi"
+              , whisper = False
+              , audience = Nothing
+              , highlight = False
+              , outboxId = Nothing
+              , pending = False
+              , plaintext = Nothing
+              , at = lastAt
+              , msgid = Nothing
+              , reactions = []
+              , edited = False
+              , deleted = False
+              , redacted = False
+              }
+            ]
+    , lastSeen = Nothing
+    , unread = unread
+    , highlights = 0
+    , createdAt = Nothing
+    }
+
+
+{-| One conversation buffer with n rows (ids 1..n, oldest first in
+display order; newest-first in the buffer like live appends). -}
+bigShell : String -> Int -> Channel
+bigShell name n =
+    { name = name
+    , topic = ""
+    , members = Dict.empty
+    , modes = ""
+    , messages =
+        List.map
+            (\i ->
+                { id = i
+                , from = "u"
+                , body = "m" ++ String.fromInt i
+                , whisper = False
+                , audience = Nothing
+                , highlight = False
+                , outboxId = Nothing
+                , pending = False
+                , plaintext = Nothing
+                , at = i
+                , msgid = Nothing
+                , reactions = []
+                , edited = False
+                , deleted = False
+                , redacted = False
+                }
+            )
+            (List.reverse (List.range 1 n))
+    , lastSeen = Nothing
+    , unread = 0
+    , highlights = 0
+    , createdAt = Nothing
+    }
+
+
+{-| Fill a model with 256 DM entries built per index. -}
+fillDmSet : (Int -> Channel) -> Model -> Model
+fillDmSet build model =
+    List.foldl
+        (\i m ->
+            let
+                entry =
+                    build i
+            in
+            { m | channels = Dict.insert (String.toLower entry.name) entry m.channels }
+        )
+        model
+        (List.range 0 255)
+
+
+{-| Raw line of a `SendLine` outbound, empty for anything else. -}
+sendLineText : Outbound -> String
+sendLineText outbound =
+    case outbound of
+        SendLine line ->
+            line
+
+        _ ->
+            ""
+
+
+isVaultPersist : Outbound -> Bool
+isVaultPersist outbound =
+    case outbound of
+        VaultPersist _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| Live authed socket for account-roster tests. -}
+rosterAuthed : Model
+rosterAuthed =
+    { blank | connection = Live, accountName = Just "alice" }
+
+
+isSessionTokenStored : Outbound -> Bool
+isSessionTokenStored outbound =
+    case outbound of
+        SessionTokenStored _ ->
+            True
+
+        _ ->
+            False
+
+
+sendLineIsNick : Outbound -> Bool
+sendLineIsNick outbound =
+    String.startsWith "NICK " (sendLineText outbound)
+
+
+sendLineIsModePlusB : Outbound -> Bool
+sendLineIsModePlusB outbound =
+    let
+        line =
+            sendLineText outbound
+    in
+    String.startsWith "MODE " line && String.contains " +b" line
+
+
+isIdentityProfileRequest : Outbound -> Bool
+isIdentityProfileRequest outbound =
+    case outbound of
+        IdentityProfileRequest _ ->
+            True
+
+        _ ->
+            False
+
+
+membersOf : Model -> String -> List String
+membersOf model channel =
+    case Dict.get channel model.channels of
+        Just c ->
+            List.map .nick (Dict.values c.members)
+
+        Nothing ->
+            []
+
+
+suite : Test
+suite =
+    describe "App"
+        [ test "overlapping NAMES bursts APPEND instead of replacing" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( settled, _ ) =
+                        feed joined ":s 366 me #c :End of names"
+
+                    ( m1, _ ) =
+                        feed settled ":s 353 me = #c :alice bob"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 353 me = #c :carol alice"
+                in
+                Expect.equal [ "alice", "bob", "carol", "me" ]
+                    (List.sort (membersOf m2 "#c"))
+        , test "prefixed nicks keep their status modes" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m, _ ) =
+                        feed joined ":s 353 me = #c :@alice +bob"
+                in
+                case Dict.get "#c" m.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ ->
+                                Expect.equal (Just (Set.fromList [ 'o' ]))
+                                    (Maybe.map .modes (Dict.get "alice" c.members))
+                            , \_ ->
+                                Expect.equal (Just (Set.fromList [ 'v' ]))
+                                    (Maybe.map .modes (Dict.get "bob" c.members))
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "JOIN validates channel and nick tokens" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me" }
+
+                    ( j1, _ ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( badChan, _ ) =
+                        feed j1 ":me!u@h JOIN ::x"
+
+                    ( badNick, _ ) =
+                        feed j1 ":bad,nick!u@h JOIN #c"
+
+                    ( badLead, _ ) =
+                        feed j1 "::evil!u@h JOIN #c"
+
+                    ( ok, _ ) =
+                        feed j1 ":bob!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (Dict.member ":x" badChan.channels)
+                    , \_ -> Expect.equal [ "me" ] (membersOf badNick "#c")
+                    , \_ -> Expect.equal [ "me" ] (membersOf badLead "#c")
+                    , \_ -> Expect.equal [ "bob", "me" ] (List.sort (membersOf ok "#c"))
+                    ]
+                    ()
+        , test "PART with a channel list drops the whole line" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "alice" }
+
+                    ( m1, _ ) =
+                        feed base ":alice!u@h JOIN #a"
+
+                    ( m2, _ ) =
+                        feed m1 ":alice!u@h JOIN #b"
+
+                    ( m3, outs ) =
+                        feed m2 ":alice!u@h PART #a,#b :leaving"
+
+                    ( m4, singleOuts ) =
+                        feed m3 ":alice!u@h PART #a :leaving"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "alice" ] (membersOf m3 "#a")
+                    , \_ -> Expect.equal [ "alice" ] (membersOf m3 "#b")
+                    , \_ -> Expect.equal [] outs
+                    , \_ -> Expect.equal [] (membersOf m4 "#a")
+                    , \_ -> Expect.equal [ "alice" ] (membersOf m4 "#b")
+                    , \_ -> Expect.equal [ SendLine "ACTIVITY UNSUBSCRIBE #a\r\n" ] singleOuts
+                    ]
+                    ()
+        , test "QUIT is identity-wide across channels" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":alice!u@h JOIN #a"
+
+                    ( m2, _ ) =
+                        feed m1 ":alice!u@h JOIN #b"
+
+                    ( m3, _ ) =
+                        feed m2 ":alice!u@h QUIT :gone"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (membersOf m3 "#a")
+                    , \_ -> Expect.equal [] (membersOf m3 "#b")
+                    ]
+                    ()
+        , test "NICK renames the member everywhere" <|
+            \_ ->
+                let
+                    ( s0, _ ) =
+                        feed blank ":me!u@h JOIN #a"
+
+                    ( m1, _ ) =
+                        feed s0 ":alice!u@h JOIN #a"
+
+                    ( m2, _ ) =
+                        feed m1 ":alice!u@h NICK :alicia"
+                in
+                Expect.equal [ "alicia", "me" ] (membersOf m2 "#a")
+        , test "forced guest self-NICK toasts and files a system notice" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed { blank | ourNick = "kai" } ":kai!u@h NICK :Guest123"
+                in
+                Expect.all
+                    [ \v -> Expect.equal "Guest123" v.ourNick
+                    , \v -> Expect.equal True v.currentNickIsAlias
+                    , \v ->
+                        case v.toasts of
+                            [ toast ] ->
+                                Expect.all
+                                    [ \t -> Expect.equal ToastError t.variant
+                                    , \t -> Expect.equal "Renamed to Guest123" t.title
+                                    , \t ->
+                                        Expect.equal
+                                            (Just "kai is a protected nick — sign in to the account to use it.")
+                                            t.description
+                                    ]
+                                    toast
+
+                            _ ->
+                                Expect.fail "expected one toast"
+                    , \v ->
+                        case v.notifications of
+                            [ note ] ->
+                                Expect.all
+                                    [ \n -> Expect.equal NotifSystem n.kind
+                                    , \n ->
+                                        Expect.equal
+                                            "The server renamed you to Guest123: \u{201C}kai\u{201D} is protected. Sign in (or /IDENTIFY) to reclaim it."
+                                            n.text
+                                    ]
+                                    note
+
+                            _ ->
+                                Expect.fail "expected one notification"
+                    ]
+                    m
+        , test "ordinary self-NICK stays silent" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed { blank | ourNick = "kai" } ":kai!u@h NICK :robert"
+                in
+                Expect.all
+                    [ \v -> Expect.equal "robert" v.ourNick
+                    , \v -> Expect.equal [] v.toasts
+                    , \v -> Expect.equal [] v.notifications
+                    ]
+                    m
+        , test "Guest-to-Guest self-NICK stays silent" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed { blank | ourNick = "Guest7" } ":Guest7!u@h NICK :Guest9"
+                in
+                Expect.all
+                    [ \v -> Expect.equal "Guest9" v.ourNick
+                    , \v -> Expect.equal [] v.toasts
+                    , \v -> Expect.equal [] v.notifications
+                    ]
+                    m
+        , test "005 lines update the ISUPPORT table" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed blank ":s 005 me MODES=1 NICKLEN=32 :are supported"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 m.isupport.modesPerLine
+                    , \_ -> Expect.equal 32 m.isupport.nicklen
+                    ]
+                    ()
+        , test "PING answers PONG on the token" <|
+            \_ ->
+                Expect.equal [ SendLine "PONG abc123\r\n" ]
+                    (Tuple.second (feed blank ":s PING :abc123"))
+        , test "chat messages are retained newest-first up to the bound" <|
+            \_ ->
+                let
+                    feedN n model =
+                        List.foldl
+                            (\i acc -> Tuple.first (feed acc (":a!u@h PRIVMSG #c :m" ++ String.fromInt i)))
+                            model
+                            (List.range 1 n)
+
+                    m =
+                        feedN 405 (joinFirst blank "me" "#c")
+                in
+                case Dict.get "#c" m.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal 400 (List.length c.messages)
+                            , \_ ->
+                                Expect.equal "m405"
+                                    (Maybe.withDefault "" (Maybe.map .body (List.head c.messages)))
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "composer sends a plain PRIVMSG and clears" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (ComposerInput "hello") { blank | activeChannel = Just "#c" }
+
+                    ( m2, out ) =
+                        update ComposerSend m1
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine "PRIVMSG #c hello\r\n"
+                            , VaultPersist
+                                { target = "#c"
+                                , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hello", at = 0 } ]
+                                }
+                            ]
+                            out
+                    , \_ -> Expect.equal "" m2.composer
+                    , \_ -> Expect.equal 1 m2.messageSeq
+                    , \_ ->
+                        Expect.equal [ ( 0, "me", "hello" ) ]
+                            (List.map (\m -> ( m.id, m.from, m.body ))
+                                (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels)))
+                            )
+                    ]
+                    ()
+        , test "composer plans a multiline batch when the cap is negotiated" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update (ComposerInput "one\ntwo")
+                            { blank | activeChannel = Just "#c", caps = [ "draft/multiline" ] }
+                            |> Tuple.first
+                            |> (\m2 -> update ComposerSend m2)
+                in
+                Expect.equal
+                    [ SendLine "BATCH +ml0 draft/multiline #c\r\n"
+                    , SendLine "@batch=ml0 PRIVMSG #c :one\r\n"
+                    , SendLine "@batch=ml0 PRIVMSG #c :two\r\n"
+                    , SendLine "BATCH -ml0\r\n"
+                    , VaultPersist
+                        { target = "#c"
+                        , rows =
+                            [ { id = "#c:0", target = "#c", from = "me", body = "one", at = 0 }
+                            , { id = "#c:1", target = "#c", from = "me", body = "two", at = 0 }
+                            ]
+                        }
+                    ]
+                    out
+        , test "composer falls back to one line without the cap" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        update (ComposerInput "one\ntwo")
+                            { blank | activeChannel = Just "#c" }
+                            |> Tuple.first
+                            |> (\m2 -> update ComposerSend m2)
+                in
+                -- No cap: single PRIVMSG with wire controls stripped,
+                -- plus the optimistic render and vault persist.
+                Expect.equal
+                    [ SendLine "PRIVMSG #c onetwo\r\n"
+                    , VaultPersist
+                        { target = "#c"
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "one\ntwo", at = 0 } ]
+                        }
+                    ]
+                    out
+        , test "own untagged echo drops without echo-message" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | ourNick = "alice" }
+
+                    ( m1, out1 ) =
+                        feed seeded ":alice!u@h PRIVMSG #c :hello again"
+
+                    ( m2, _ ) =
+                        feed (joinFirst seeded "alice" "#c") ":bob!u@h PRIVMSG #c :hello again"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty m1.channels
+                    , \_ -> Expect.equal [] out1
+                    , \_ -> Expect.equal 1 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    ]
+                    ()
+        , test "send then echo renders exactly one copy" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (ComposerInput "hello") { blank | activeChannel = Just "#c" }
+
+                    ( m2, _ ) =
+                        update ComposerSend m1
+
+                    ( m3, out3 ) =
+                        feed m2 ":me!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "hello" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m3.channels))))
+                    , \_ -> Expect.equal [] out3
+                    ]
+                    ()
+        , test "own echo folds with echo-message and sends wait for it" <|
+            \_ ->
+                let
+                    capped =
+                        { blank | ourNick = "alice", caps = [ "echo-message" ] }
+
+                    ( m1, out1 ) =
+                        feed (joinFirst capped "alice" "#c") ":alice!u@h PRIVMSG #c :from the server"
+
+                    ( m2, out2 ) =
+                        update (ComposerInput "hi") { capped | activeChannel = Just "#c" }
+                            |> Tuple.first
+                            |> (\m -> update ComposerSend m)
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "from the server" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m1.channels))))
+                    , \_ -> Expect.equal [ SendLine "PRIVMSG #c hi\r\n" ] out2
+                    , \_ -> Expect.equal Dict.empty m2.channels
+                    ]
+                    ()
+        , test "own NOTICE still folds without the cap" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst { blank | ourNick = "alice" } "alice" "#c") ":alice!u@h NOTICE #c :service note"
+                in
+                Expect.equal [ "service note" ]
+                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+        , test "tagged live line files its msgid and still folds" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst blank "me" "#c") "@msgid=abc :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "hello" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+                    , \_ -> Expect.equal (Just [ "abc" ]) (Dict.get "#c" m.seenMsgids)
+                    ]
+                    ()
+        , test "bouncer replay of a seen msgid drops" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "@msgid=abc :bob!u@h PRIVMSG #c :hello"
+
+                    ( m2, out2 ) =
+                        feed m1 "@msgid=abc :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "hello" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    , \_ -> Expect.equal [] out2
+                    ]
+                    ()
+        , test "same text with a fresh msgid folds again" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "@msgid=abc :bob!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 "@msgid=def :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.equal [ "hello", "hello" ]
+                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+        , test "untagged lines never file and never drop" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":bob!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "hello", "hello" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" m2.seenMsgids)
+                    ]
+                    ()
+        , test "replayed own message is history, not an echo" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        feed (joinFirst { blank | ourNick = "alice" } "alice" "#c") "@msgid=m1 :alice!u@h PRIVMSG #c :from history"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "from history" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+                    , \_ -> Expect.equal False (List.isEmpty out)
+                    ]
+                    ()
+        , test "NOTICE replays dedupe by msgid too" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "@msgid=n1 :srv NOTICE #c :note"
+
+                    ( m2, out2 ) =
+                        feed m1 "@msgid=n1 :srv NOTICE #c :note"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "note" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    , \_ -> Expect.equal [] out2
+                    ]
+                    ()
+        , test "batched playback holds children until close" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    ( held, heldOut ) =
+                        feed opened "@batch=h1 :bob!u@h PRIVMSG #c :old"
+
+                    ( held2, _ ) =
+                        feed held "@batch=h1 :srv NOTICE #c :older"
+
+                    ( closed, closedOut ) =
+                        feed held2 "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (Dict.get "#c" held.channels)
+                    , \_ -> Expect.equal [] heldOut
+                    , \_ ->
+                        Expect.equal [ "older", "old" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+                    , \_ -> Expect.equal True (List.any isVaultPersist closedOut)
+                    ]
+                    ()
+        , test "short plain close proves history exhausted" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    ( held, _ ) =
+                        feed opened "@batch=h1 :bob!u@h PRIVMSG #c :old"
+
+                    ( held2, _ ) =
+                        feed held "@batch=h1 :srv NOTICE #c :older"
+
+                    ( closed, _ ) =
+                        feed held2 "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (isHistoryExhausted closed "#c")
+                    , \_ -> Expect.equal True (isHistoryExhausted closed "#C")
+                    , \_ -> Expect.equal False (Set.member "#c" closed.historyLoading)
+                    , \_ -> Expect.equal 50 historyPageSize
+                    ]
+                    ()
+        , test "full-page plain close keeps history open" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    flooded =
+                        List.foldl
+                            (\i m -> Tuple.first (feed m ("@batch=h1 :u!u@h PRIVMSG #c :m" ++ String.fromInt i)))
+                            opened
+                            (List.range 1 50)
+
+                    ( closed, _ ) =
+                        feed flooded "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (isHistoryExhausted closed "#c")
+                    , \_ -> Expect.equal 50 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+                    ]
+                    ()
+        , test "failed fetch proves history exhausted and blocks refetch" <|
+            \_ ->
+                let
+                    loading =
+                        { blank | historyLoading = Set.fromList [ "#a" ] }
+
+                    ( failed, _ ) =
+                        feed loading ":irc.example FAIL CHATHISTORY INVALID_TARGET #a :history unavailable"
+
+                    ( skipped, outs ) =
+                        applyHistoryTarget { target = "#a", latestAt = 999 } ( failed, [] )
+
+                    disconnected =
+                        Tuple.first (update (WsClosed { clean = True, reason = "test" }) failed)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (isHistoryExhausted failed "#a")
+                    , \_ -> Expect.equal False (Set.member "#a" failed.historyLoading)
+                    , \_ -> Expect.equal [] outs
+                    , \_ -> Expect.equal False (Dict.member "#a" skipped.channels)
+                    , \_ -> Expect.equal True (isHistoryExhausted disconnected "#a")
+                    ]
+                    ()
+        , test "own JOIN on an empty buffer fetches recent history" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                    ( fetched, out ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( _, alla ) =
+                        feed base ":alla!u@h JOIN #c"
+
+                    ( full, fullOut ) =
+                        feed { base | caps = [ "chathistory", "draft/read-marker" ] } ":me!u@h JOIN #c"
+
+                    ( buffered, bufferedOut ) =
+                        feed base ":me!u@h JOIN #c"
+                            |> (\( m, _ ) -> feed m ":alice!u@h PRIVMSG #c :live")
+                            |> (\( m, _ ) -> feed m ":me!u@h JOIN #c")
+
+                    ( _, cappedOut ) =
+                        feed { base | caps = [] } ":me!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine "CHATHISTORY LATEST #c * 50\r\n"
+                            , SendLine "WHO #c\r\n"
+                            , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
+                            ]
+                            out
+                    , \_ -> Expect.equal True (Set.member "#c" fetched.historyLoading)
+                    , \_ -> Expect.equal [] alla
+                    , \_ ->
+                        Expect.equal
+                            [ SendLine "MARKREAD #c\r\n"
+                            , SendLine "CHATHISTORY LATEST #c * 50\r\n"
+                            , SendLine "WHO #c\r\n"
+                            , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
+                            ]
+                            fullOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] bufferedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] cappedOut
+                    ]
+                    ()
+        , test "self-JOIN rejoins with messages still refetch" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                    ( joined, _ ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( messaged, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :live"
+
+                    -- The first fetch completed (batch close cleared the
+                    -- flight) while scrollback stayed: a later self-JOIN
+                    -- refetches like the oracle's unconditional
+                    -- `loadHistory`, instead of trusting stale rows.
+                    settled =
+                        { messaged | historyLoading = Set.empty }
+
+                    ( _, out ) =
+                        feed settled ":me!u@h JOIN #c"
+                in
+                Expect.equal True (List.member (SendLine "CHATHISTORY LATEST #c * 50\r\n") out)
+        , test "JOIN without the cap marks history exhausted" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [], ourNick = "me" }
+
+                    ( capped, out ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( rejoined, reOut ) =
+                        feed capped ":me!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Set.member "#c" capped.historyExhausted)
+                    , \_ -> Expect.equal False (Set.member "#c" capped.historyLoading)
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] reOut
+                    , \_ -> Expect.equal True (Set.member "#c" rejoined.historyExhausted)
+                    ]
+                    ()
+        , test "self-JOIN still asks WHO when the fetch skips" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [ "chathistory" ], ourNick = "me", historyLoading = Set.fromList [ "#c" ] }
+
+                    ( _, out ) =
+                        feed base ":me!u@h JOIN #c"
+
+                    ( merging, mergingOut ) =
+                        feed { base | historyMerging = True, historyLoading = Set.empty } ":me!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    , \_ -> Expect.equal [] mergingOut
+                    ]
+                    ()
+        , test "self-JOIN requests NAMES when no-implicit-names is negotiated" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me" }
+
+                    ( _, draftOut ) =
+                        feed { base | caps = [ "draft/no-implicit-names" ] } ":me!u@h JOIN #c"
+
+                    ( _, bareOut ) =
+                        feed { base | caps = [ "no-implicit-names" ] } ":me!u@h JOIN #c"
+
+                    ( _, plainOut ) =
+                        feed { base | caps = [ "chathistory" ] } ":me!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (List.member (SendLine "NAMES #c\r\n") draftOut)
+                    , \_ -> Expect.equal True (List.member (SendLine "NAMES #c\r\n") bareOut)
+                    , \_ -> Expect.equal False (List.member (SendLine "NAMES #c\r\n") plainOut)
+                    , \_ -> Expect.equal [ SendLine "NAMES #c\r\n" ] (namesAfterSelfJoin { base | caps = [ "draft/no-implicit-names" ] } "#c")
+                    , \_ -> Expect.equal [] (namesAfterSelfJoin base "#c")
+                    ]
+                    ()
+        , test "self-JOIN past 256 rooms refuses outright" <|
+            \_ ->
+                let
+                    fill i m =
+                        { m | channels = Dict.insert ("#r" ++ String.fromInt i) (shellOf ("#r" ++ String.fromInt i) 0 -1) m.channels }
+
+                    full =
+                        List.foldl fill { blank | caps = [ "chathistory" ], ourNick = "me" } (List.range 0 255)
+
+                    ( refused, refusedOut ) =
+                        feed full ":me!u@h JOIN #new"
+
+                    ( known, knownOut ) =
+                        feed full ":me!u@h JOIN #r7"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 256 maxLiveChannels
+                    , \_ -> Expect.equal 256 (liveChannelCount full)
+                    , \_ -> Expect.equal True (channelJoinRefused full "#new")
+                    , \_ -> Expect.equal False (channelJoinRefused full "#r7")
+                    , \_ -> Expect.equal False (Dict.member "#new" refused.channels)
+                    , \_ -> Expect.equal [] refusedOut
+                    , \_ ->
+                        Expect.equal
+                            [ SendLine "CHATHISTORY LATEST #r7 * 50\r\n"
+                            , SendLine "WHO #r7\r\n"
+                            , SendLine "ACTIVITY SUBSCRIBE #r7\r\n"
+                            ]
+                            knownOut
+                    ]
+                    ()
+        , test "replayed JOIN collects instead of touching live state" <|
+            \_ ->
+                let
+                    base =
+                        { blank | ourNick = "me" }
+
+                    ( opened, _ ) =
+                        feed base "BATCH +h1 draft/chathistory #c"
+
+                    ( diverted, divertOut ) =
+                        feed opened "@batch=h1 :bob!u@h JOIN #c"
+
+                    ( selfDiverted, selfOut ) =
+                        feed diverted "@batch=h1 :me!u@h JOIN #c"
+
+                    ( closed, _ ) =
+                        feed selfDiverted "BATCH -h1"
+
+                    bodies =
+                        List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels)))
+
+                    members =
+                        Maybe.map (Dict.keys << .members) (Dict.get "#c" closed.channels)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] divertOut
+                    , \_ -> Expect.equal [] selfOut
+                    , \_ -> Expect.equal [ "me joined", "bob joined" ] bodies
+                    , \_ -> Expect.equal (Just []) members
+                    ]
+                    ()
+        , test "replayed PART/QUIT/KICK/TOPIC/NICK/MODE collect oracle texts" <|
+            \_ ->
+                let
+                    stamp n =
+                        "@batch=h1;time=2026-10-04T11:0" ++ String.fromInt n ++ ":00.000Z "
+
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    lines =
+                        [ stamp 0 ++ ":bob!u@h PART #c :bye"
+                        , stamp 1 ++ ":dave!u@h QUIT :gone"
+                        , stamp 2 ++ ":alice!u@h KICK #c bob :spam"
+                        , stamp 3 ++ ":alice!u@h TOPIC #c :new topic"
+                        , stamp 4 ++ ":bob!u@h NICK :robert"
+                        , stamp 5 ++ ":alice!u@h MODE #c +m"
+                        ]
+
+                    ( collected, outs ) =
+                        List.foldl (\line ( m, os ) -> let ( m2, o2 ) = feed m line in ( m2, os ++ o2 )) ( opened, [] ) lines
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -h1"
+
+                    bodies =
+                        List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels)))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outs
+                    , \_ -> Expect.equal True (List.member "bob left (bye)" bodies)
+                    , \_ -> Expect.equal True (List.member "dave quit: gone" bodies)
+                    , \_ -> Expect.equal True (List.member "bob was kicked by alice (spam)" bodies)
+                    , \_ -> Expect.equal True (List.member "alice set the topic: new topic" bodies)
+                    , \_ -> Expect.equal True (List.member "bob is now known as robert" bodies)
+                    , \_ -> Expect.equal True (List.member "alice set mode +m" bodies)
+                    ]
+                    ()
+        , test "untagged msgid lines divert only while the batch is open" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    ( diverted, divertOut ) =
+                        feed opened "@msgid=m1 :bob!u@h PART #c"
+
+                    ( closed, _ ) =
+                        feed diverted "BATCH -h1"
+
+                    liveJoined =
+                        Tuple.first (feed blank ":me!u@h JOIN #c")
+                            |> (\m -> Tuple.first (feed m ":bob!u@h JOIN #c"))
+
+                    ( liveParted, liveOut ) =
+                        feed liveJoined "@msgid=m2 :bob!u@h PART #c"
+
+                    liveMembers =
+                        Maybe.map (Dict.keys << .members) (Dict.get "#c" liveParted.channels)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] divertOut
+                    , \_ ->
+                        Expect.equal [ "bob left" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+                    , \_ -> Expect.equal (Just [ "me" ]) liveMembers
+                    , \_ -> Expect.equal [] liveOut
+                    ]
+                    ()
+        , test "live membership lines still fold without a batch" <|
+            \_ ->
+                let
+                    ( s0, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( j1, _ ) =
+                        feed s0 ":bob!u@h JOIN #c"
+
+                    ( j2, _ ) =
+                        feed j1 ":carol!u@h JOIN #c"
+
+                    ( quit, _ ) =
+                        feed j2 ":bob!u@h QUIT :bye"
+
+                    ( nicked, _ ) =
+                        feed quit ":carol!u@h NICK :carolina"
+
+                    members model =
+                        Maybe.map (Dict.keys << .members) (Dict.get "#c" model.channels)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just [ "bob", "carol", "me" ]) (members j2)
+                    , \_ -> Expect.equal (Just [ "carol", "me" ]) (members quit)
+                    , \_ -> Expect.equal (Just [ "carolina", "me" ]) (members nicked)
+                    ]
+                    ()
+        , test "short replay-only batch proves history exhausted" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    ( e1, _ ) =
+                        feed opened "@batch=h1 :bob!u@h JOIN #c"
+
+                    ( e2, _ ) =
+                        feed e1 "@batch=h1 :carol!u@h PART #c"
+
+                    ( closed, _ ) =
+                        feed e2 "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (isHistoryExhausted closed "#c")
+                    , \_ -> Expect.equal 2 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+                    ]
+                    ()
+        , test "duplicate replay lines file once" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +h1 draft/chathistory #c"
+
+                    ( once, _ ) =
+                        feed opened "@batch=h1;msgid=d1 :bob!u@h JOIN #c"
+
+                    ( twice, _ ) =
+                        feed once "@batch=h1;msgid=d1 :bob!u@h JOIN #c"
+
+                    ( closed, _ ) =
+                        feed twice "BATCH -h1"
+                in
+                Expect.equal [ "bob joined" ]
+                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+        , test "own JOIN skips the fetch while loading, exhausted, or searched" <|
+            \_ ->
+                let
+                    base =
+                        { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                    ( loading, loadingOut ) =
+                        feed { base | historyLoading = Set.fromList [ "#c" ] } ":me!u@h JOIN #c"
+
+                    ( exhausted, exhaustedOut ) =
+                        feed (markHistoryExhausted base "#c") ":me!u@h JOIN #c"
+
+                    ( _, searchedOut ) =
+                        feed
+                            { base
+                                | serverSearchPending =
+                                    Just
+                                        { generation = 1
+                                        , target = "#c"
+                                        , targetKey = "#c"
+                                        , query = "q"
+                                        , batchRef = Nothing
+                                        , deadline = 9999999999999
+                                        }
+                            }
+                            ":me!u@h JOIN #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] loadingOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] exhaustedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] searchedOut
+                    , \_ -> Expect.equal True (Set.member "#c" loading.historyLoading)
+                    ]
+                    ()
+        , test "thread earlier grows the tail capacity while pinned to it" <|
+            \_ ->
+                let
+                    base =
+                        { blank | activeChannel = Just "#c", channels = Dict.fromList [ ( "#c", bigShell "#c" 150 ) ] }
+
+                    channel =
+                        Maybe.withDefault (bigShell "#c" 0) (Dict.get "#c" base.channels)
+
+                    ( grown, _ ) =
+                        update ThreadShowEarlier base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 320 grown.threadWindowSize
+                    , \_ -> Expect.equal Nothing grown.threadPageStart
+                    , \_ -> Expect.equal True grown.ignoreUnreadAnchor
+                    , \_ -> Expect.equal 30 (threadWindowFor base channel).hiddenBefore
+                    ]
+                    ()
+        , test "thread earlier pages back once off the live tail" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | activeChannel = Just "#c"
+                            , channels = Dict.fromList [ ( "#c", bigShell "#c" 150 ) ]
+                            , threadPageStart = Just 10
+                        }
+
+                    ( paged, _ ) =
+                        update ThreadShowEarlier base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 120 base.threadWindowSize
+                    , \_ -> Expect.equal (Just 0) paged.threadPageStart
+                    , \_ -> Expect.equal True paged.ignoreUnreadAnchor
+                    ]
+                    ()
+        , test "thread earlier is a no-op at the very top" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | activeChannel = Just "#c"
+                            , channels = Dict.fromList [ ( "#c", bigShell "#c" 150 ) ]
+                            , threadWindowSize = 320
+                        }
+
+                    ( same, out ) =
+                        update ThreadShowEarlier base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 320 same.threadWindowSize
+                    , \_ -> Expect.equal Nothing same.threadPageStart
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
+        , test "thread latest resets to the trailing window" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | activeChannel = Just "#c"
+                            , channels = Dict.fromList [ ( "#c", bigShell "#c" 150 ) ]
+                            , threadWindowSize = 320
+                            , threadPageStart = Just 0
+                        }
+
+                    ( trailed, _ ) =
+                        update ThreadShowLatest base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 120 trailed.threadWindowSize
+                    , \_ -> Expect.equal Nothing trailed.threadPageStart
+                    , \_ -> Expect.equal True trailed.ignoreUnreadAnchor
+                    ]
+                    ()
+        , test "channel select re-opens the trailing window" <|
+            \_ ->
+                let
+                    base =
+                        { blank
+                            | activeChannel = Just "#c"
+                            , channels = Dict.fromList [ ( "#c", bigShell "#c" 150 ) ]
+                            , threadWindowSize = 320
+                            , threadPageStart = Just 0
+                            , ignoreUnreadAnchor = True
+                        }
+
+                    ( selected, _ ) =
+                        update (ChannelSelect "#c") base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 120 selected.threadWindowSize
+                    , \_ -> Expect.equal Nothing selected.threadPageStart
+                    , \_ -> Expect.equal False selected.ignoreUnreadAnchor
+                    ]
+                    ()
+        , test "unread divider anchors the window until the user pages" <|
+            \_ ->
+                let
+                    channel =
+                        bigShell "#c" 150
+
+                    base =
+                        { blank
+                            | activeChannel = Just "#c"
+                            , channels = Dict.fromList [ ( "#c", channel ) ]
+                            , firstUnreadId = Dict.fromList [ ( "#c", 21 ) ]
+                        }
+
+                    win =
+                        threadWindowFor base channel
+
+                    ( paged, _ ) =
+                        update ThreadShowEarlier base
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just 149) (threadRowIndex channel.messages 150)
+                    , \_ -> Expect.equal (Just 0) (threadRowIndex channel.messages 1)
+                    , \_ -> Expect.equal Nothing (threadRowIndex channel.messages 999)
+                    , \_ -> Expect.equal (Just 20) (threadAnchorIndex base channel)
+                    , \_ -> Expect.equal 8 win.start
+                    , \_ -> Expect.equal 8 win.hiddenBefore
+                    , \_ -> Expect.equal 22 win.hiddenAfter
+                    , \_ -> Expect.equal (Just 0) paged.threadPageStart
+                    , \_ -> Expect.equal True paged.ignoreUnreadAnchor
+                    , \_ -> Expect.equal Nothing (threadAnchorIndex paged channel)
+                    ]
+                    ()
+        , test "batch close sorts by stamp newest-first" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank "BATCH +h1 chathistory #c"
+
+                    ( m2, _ ) =
+                        feed m1 "@batch=h1 :a!u@h PRIVMSG #c :second"
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=h1;time=2026-10-04T12:00:00Z :b!u@h PRIVMSG #c :first"
+
+                    ( m4, _ ) =
+                        feed m3 "@batch=h1;time=2026-10-04T12:02:00Z :c!u@h PRIVMSG #c :third"
+
+                    ( closed, _ ) =
+                        feed m4 "BATCH -h1"
+                in
+                Expect.equal [ "third", "first", "second" ]
+                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+        , test "batch replay dedupes already-live msgids" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :same"
+
+                    ( m2, _ ) =
+                        feed m1 "BATCH +h1 draft/chathistory #c"
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=h1;msgid=m1 :bob!u@h PRIVMSG #c :same"
+
+                    ( closed, _ ) =
+                        feed m3 "BATCH -h1"
+                in
+                Expect.equal [ "same" ]
+                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+        , test "unknown batch closes and foreign children fold live" <|
+            \_ ->
+                let
+                    ( m1, out1 ) =
+                        feed (joinFirst blank "me" "#c") "BATCH -nope"
+
+                    ( m2, _ ) =
+                        feed m1 "@batch=zzz :bob!u@h PRIVMSG #c :live"
+
+                    ( m3, out3 ) =
+                        feed m2 "BATCH +h1 draft/multiline #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out1
+                    , \_ ->
+                        Expect.equal [ "live" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    , \_ -> Expect.equal [] out3
+                    ]
+                    ()
+        , test "invalid batch envelopes never open" <|
+            \_ ->
+                let
+                    ctlRef =
+                        "+has" ++ String.fromChar (Char.fromCode 1) ++ "ctl"
+
+                    opens =
+                        [ "BATCH + draft/chathistory #c"
+                        , "BATCH " ++ ctlRef ++ " draft/chathistory #c"
+                        , "BATCH +with space draft/chathistory #c"
+                        , "BATCH +" ++ String.repeat 129 "r" ++ " draft/chathistory #c"
+                        , "BATCH +h2 draft/chathistory " ++ String.repeat 513 "t"
+                        , "BATCH +h3 draft/chathistory"
+                        ]
+
+                    tryOpen line =
+                        let
+                            ( opened, _ ) =
+                                feed (joinFirst blank "me" "#c") line
+
+                            ( held, _ ) =
+                                feed opened "@batch=h3 :bob!u@h PRIVMSG #c :live"
+                        in
+                        List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels)))
+                in
+                Expect.equal (List.repeat (List.length opens) [ "live" ]) (List.map tryOpen opens)
+        , test "open batch refs dedupe and cap at 64" <|
+            \_ ->
+                let
+                    opened =
+                        List.foldl
+                            (\i m -> Tuple.first (feed m ("BATCH +r" ++ String.fromInt i ++ " draft/chathistory #c")))
+                            (joinFirst blank "me" "#c")
+                            (List.range 1 65)
+
+                    ( held, _ ) =
+                        feed opened "@batch=r65 :bob!u@h PRIVMSG #c :live"
+
+                    ( dupped, _ ) =
+                        feed opened "BATCH +r1 draft/chathistory #other"
+
+                    ( diverted, _ ) =
+                        feed dupped "@batch=r1 :bob!u@h PRIVMSG #other :x"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "live" ]
+                            (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels))))
+                    , \_ -> Expect.equal Nothing (Dict.get "#other" diverted.channels)
+                    ]
+                    ()
+        , test "deep search sends SEARCH and tracks the generation" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( m, out ) =
+                        update SearchRunServer ready
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "SEARCH #c hello\r\n" ] out
+                    , \_ -> Expect.equal ServerSearchPending m.serverSearchStatus
+                    , \_ -> Expect.equal 1 m.serverSearchGen
+                    , \_ -> Expect.equal "#c" m.serverSearchTarget
+                    , \_ -> Expect.equal "hello" m.serverSearchQuery
+                    , \_ ->
+                        Expect.equal
+                            (Just { generation = 1, target = "#c", targetKey = "#c", query = "hello", batchRef = Nothing, deadline = 7000 })
+                            m.serverSearchPending
+                    ]
+                    ()
+        , test "deep search refuses without cap, connection, or query" <|
+            \_ ->
+                let
+                    base =
+                        { blank | searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( noCap, noCapOut ) =
+                        update SearchRunServer base
+
+                    ( offline, offlineOut ) =
+                        update SearchRunServer { base | caps = [ "draft/search" ], connection = Offline }
+
+                    ( noQuery, noQueryOut ) =
+                        update SearchRunServer { base | caps = [ "draft/search" ], searchQuery = "  " }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchIdle noCap.serverSearchStatus
+                    , \_ -> Expect.equal [] noCapOut
+                    , \_ -> Expect.equal [] offlineOut
+                    , \_ -> Expect.equal [] noQueryOut
+                    ]
+                    ()
+        , test "deep search blocks designated DM conversations" <|
+            \_ ->
+                let
+                    ready =
+                        { blank
+                            | caps = [ "draft/search" ]
+                            , searchOpen = True
+                            , searchQuery = "hello"
+                            , activeChannel = Just "dave"
+                            , peerKeyChanges = Set.fromList [ "dave" ]
+                            , nowMs = 1000
+                        }
+
+                    ( m, out ) =
+                        update SearchRunServer ready
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchError m.serverSearchStatus
+                    , \_ -> Expect.equal (Just "Encrypted conversation search stays on this device.") m.serverSearchError
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
+        , test "deep search withholds unproven DM history and asks for a proof" <|
+            \_ ->
+                let
+                    ready =
+                        { blank
+                            | caps = [ "draft/search" ]
+                            , searchOpen = True
+                            , searchQuery = "hello"
+                            , activeChannel = Just "dave"
+                            , nowMs = 1000
+                        }
+
+                    ( m, out ) =
+                        update SearchRunServer ready
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchError m.serverSearchStatus
+                    , \_ -> Expect.equal (Just "Checking device history before server search. Try again shortly.") m.serverSearchError
+                    , \_ -> Expect.equal [ ClassifyVaultDm { target = "dave" } ] out
+                    ]
+                    ()
+        , test "deep search proceeds for a proven-plain DM" <|
+            \_ ->
+                let
+                    ready =
+                        { blank
+                            | caps = [ "draft/search" ]
+                            , searchOpen = True
+                            , searchQuery = "hello"
+                            , activeChannel = Just "dave"
+                            , vaultDmPrivacy = Dict.fromList [ ( "dave", DmPrivacyPlain ) ]
+                            , nowMs = 1000
+                        }
+
+                    ( m, out ) =
+                        update SearchRunServer ready
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchPending m.serverSearchStatus
+                    , \_ -> Expect.equal [ SendLine "SEARCH dave hello\r\n" ] out
+                    ]
+                    ()
+        , test "host encrypted proof designates the DM for search" <|
+            \_ ->
+                let
+                    proved =
+                        foldVaultDmPrivacy blank "dave" "encrypted"
+
+                    ready =
+                        { blank
+                            | caps = [ "draft/search" ]
+                            , searchOpen = True
+                            , searchQuery = "hello"
+                            , activeChannel = Just "dave"
+                            , vaultDmPrivacy = proved.vaultDmPrivacy
+                            , nowMs = 1000
+                        }
+
+                    ( m, out ) =
+                        update SearchRunServer ready
+                in
+                Expect.all
+                    [ \_ -> Expect.equal DmPrivacyEncrypted (vaultPrivacyFor proved "DAVE")
+                    , \_ -> Expect.equal True (dmDesignated proved "dave")
+                    , \_ -> Expect.equal ServerSearchError m.serverSearchStatus
+                    , \_ -> Expect.equal (Just "Encrypted conversation search stays on this device.") m.serverSearchError
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
+        , test "privacy proofs commit plain and fail closed on garbage" <|
+            \_ ->
+                let
+                    proved =
+                        foldVaultDmPrivacy blank "dave" "plain"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal DmPrivacyPlain (vaultPrivacyFor proved "dave")
+                    , \_ -> Expect.equal "plain" (vaultDmPrivacyToString DmPrivacyPlain)
+                    , \_ -> Expect.equal "unknown" (vaultDmPrivacyToString DmPrivacyUnknown)
+                    , \_ -> Expect.equal "encrypted" (vaultDmPrivacyToString DmPrivacyEncrypted)
+                    , \_ -> Expect.equal DmPrivacyUnknown (parseVaultDmPrivacy "bogus")
+                    , \_ -> Expect.equal DmPrivacyUnknown (parseVaultDmPrivacy "")
+                    , \_ -> Expect.equal DmPrivacyUnknown (vaultPrivacyFor blank "nobody")
+                    ]
+                    ()
+        , test "DM appends void plain proofs and prove envelopes" <|
+            \_ ->
+                let
+                    proved =
+                        foldVaultDmPrivacy blank "dave" "plain"
+
+                    voided =
+                        trackVaultDmPrivacy proved "dave" "just chatting"
+
+                    sealed =
+                        trackVaultDmPrivacy proved "dave" (DmCipher.envelopePrefix ++ "ciphertext")
+
+                    roomKept =
+                        trackVaultDmPrivacy proved "#c" "just chatting"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal DmPrivacyUnknown (vaultPrivacyFor voided "dave")
+                    , \_ -> Expect.equal DmPrivacyEncrypted (vaultPrivacyFor sealed "dave")
+                    , \_ -> Expect.equal DmPrivacyPlain (vaultPrivacyFor roomKept "dave")
+                    , \_ -> Expect.equal DmPrivacyUnknown (vaultPrivacyFor roomKept "#c")
+                    ]
+                    ()
+        , test "deep search errors on stale ambiguity and open history" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( stale, _ ) =
+                        update SearchRunServer { ready | staleServerSearches = Dict.fromList [ ( "#c", 1 ) ] }
+
+                    ( opened, _ ) =
+                        feed ready "BATCH +h1 draft/chathistory #c"
+
+                    ( busy, busyOut ) =
+                        update SearchRunServer opened
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "A prior search response is still ambiguous. Reconnect before searching again.") stale.serverSearchError
+                    , \_ -> Expect.equal (Just "Wait for the current history request to finish before searching this conversation.") busy.serverSearchError
+                    , \_ -> Expect.equal [] busyOut
+                    ]
+                    ()
+        , test "search batch collects, sorts, and settles results" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +s1 draft/chathistory #c"
+
+                    ( held, heldOut ) =
+                        feed opened "@batch=s1;msgid=n2;time=2026-10-04T12:02:00Z :bob!u@h PRIVMSG #c :hello newer"
+
+                    ( held2, _ ) =
+                        feed held "@batch=s1;msgid=n1;time=2026-10-04T12:00:00Z :alice!u@h PRIVMSG #c :hello older"
+
+                    ( closed, _ ) =
+                        feed held2 "BATCH -s1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (Dict.get "#c" held.channels)
+                    , \_ -> Expect.equal [] heldOut
+                    , \_ -> Expect.equal ServerSearchDone closed.serverSearchStatus
+                    , \_ -> Expect.equal [ "n1", "n2" ] (List.map .id closed.serverSearchResults)
+                    , \_ -> Expect.equal Nothing closed.serverSearchNotice
+                    , \_ -> Expect.equal Nothing closed.serverSearchPending
+                    ]
+                    ()
+        , test "search collection drops invalid, duplicate, and envelope rows" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +s1 chathistory #c"
+
+                    feedChild m line =
+                        Tuple.first (feed m line)
+
+                    collected =
+                        opened
+                            |> (\m -> feedChild m "@batch=s1;msgid=ok1;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello fine")
+                            |> (\m -> feedChild m "@batch=s1;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello noid")
+                            |> (\m -> feedChild m "@batch=s1;msgid=ok1;time=2026-10-04T12:01:00Z :bob!u@h PRIVMSG #c :hello again")
+                            |> (\m -> feedChild m "@batch=s1;msgid=env1;time=2026-10-04T12:02:00Z :bob!u@h PRIVMSG #c :ONYXDM1 xyz")
+                            |> (\m -> feedChild m "@batch=s1;msgid=wrong;time=2026-10-04T12:03:00Z :bob!u@h PRIVMSG #other :hello elsewhere")
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -s1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "ok1" ] (List.map .id closed.serverSearchResults)
+                    , \_ -> Expect.equal (Just "Invalid search rows were omitted. Duplicate search rows were removed. Encrypted history rows were omitted and remain device-only.") closed.serverSearchNotice
+                    ]
+                    ()
+        , test "overlapping search batches quarantine and error" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( first, _ ) =
+                        feed requested "BATCH +s1 draft/chathistory #c"
+
+                    ( overlapped, _ ) =
+                        feed first "BATCH +s2 draft/chathistory #c"
+
+                    ( dropped, _ ) =
+                        feed overlapped "@batch=s1;msgid=n1;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello lost"
+
+                    ( closed, _ ) =
+                        feed dropped "BATCH -s1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchError overlapped.serverSearchStatus
+                    , \_ -> Expect.equal (Just "The server returned overlapping history batches, so search results were discarded.") overlapped.serverSearchError
+                    , \_ -> Expect.equal Nothing overlapped.serverSearchPending
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" dropped.channels)
+                    , \_ -> Expect.equal [] closed.serverSearchResults
+                    ]
+                    ()
+        , test "search timeout quarantines and errors" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( early, _ ) =
+                        update (Tick (Time.millisToPosix 2000)) requested
+
+                    ( timed, _ ) =
+                        update (Tick (Time.millisToPosix 8000)) requested
+
+                    ( lateBatch, _ ) =
+                        feed timed "BATCH +s9 draft/chathistory #c"
+
+                    ( lateChild, _ ) =
+                        feed lateBatch "@batch=s9;msgid=n9;time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello late"
+
+                    ( lateClose, _ ) =
+                        feed lateChild "BATCH -s9"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchPending early.serverSearchStatus
+                    , \_ -> Expect.equal ServerSearchError timed.serverSearchStatus
+                    , \_ -> Expect.equal (Just "No response from the server. Late results will be discarded.") timed.serverSearchError
+                    , \_ -> Expect.equal (Dict.fromList [ ( "#c", 1 ) ]) timed.staleServerSearches
+                    , \_ -> Expect.equal Nothing timed.serverSearchPending
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" lateChild.channels)
+                    , \_ -> Expect.equal [] lateClose.serverSearchResults
+                    ]
+                    ()
+        , test "FAIL SEARCH resolves the pending search" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( failed, failedOut ) =
+                        feed requested ":srv FAIL SEARCH FAILED :history unavailable"
+
+                    ( staleOnly, _ ) =
+                        feed { blank | staleServerSearches = Dict.fromList [ ( "#c", 1 ) ] } ":srv FAIL SEARCH FAILED :history unavailable"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchError failed.serverSearchStatus
+                    , \_ -> Expect.equal (Just "history unavailable") failed.serverSearchError
+                    , \_ -> Expect.equal Nothing failed.serverSearchPending
+                    , \_ -> Expect.equal [] failedOut
+                    , \_ -> Expect.equal Dict.empty staleOnly.staleServerSearches
+                    ]
+                    ()
+        , test "close errors a pending search and clears transport" <|
+            \_ ->
+                let
+                    ready =
+                        { blank | caps = [ "draft/search" ], searchOpen = True, searchQuery = "hello", activeChannel = Just "#c", nowMs = 1000 }
+
+                    ( requested, _ ) =
+                        update SearchRunServer ready
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +s1 draft/chathistory #c"
+
+                    ( closed, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) opened
+                in
+                Expect.all
+                    [ \_ -> Expect.equal ServerSearchError closed.serverSearchStatus
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    , \_ -> Expect.equal Nothing closed.serverSearchPending
+                    , \_ -> Expect.equal Dict.empty closed.staleServerSearches
+                    ]
+                    ()
+        , test "archived hit opens its conversation and closes" <|
+            \_ ->
+                let
+                    done =
+                        { blank
+                            | searchOpen = True
+                            , searchQuery = "hello"
+                            , activeChannel = Just "#c"
+                            , serverSearchTarget = "#b"
+                            , serverSearchQuery = "hello"
+                            , serverSearchStatus = ServerSearchDone
+                            , serverSearchResults = [ { id = "n9", from = "bob", text = "hello archived", at = 1791115200000, target = "#b" } ]
+                        }
+
+                    ( m, _ ) =
+                        update (ServerOpenResult { target = "#b" }) done
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#b") m.activeChannel
+                    , \_ -> Expect.equal False m.searchOpen
+                    , \_ -> Expect.equal ServerSearchDone (serverStatusForPanel m)
+                    ]
+                    ()
+        , test "server status line announces lifecycle and context" <|
+            \_ ->
+                let
+                    base =
+                        { blank | searchOpen = True, searchQuery = "hello", activeChannel = Just "#c" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "Searching full server history for “hello” in #c." (serverStatusLabel { base | serverSearchStatus = ServerSearchPending })
+                    , \_ -> Expect.equal "Full-history search failed. Search failed." (serverStatusLabel { base | serverSearchStatus = ServerSearchError, serverSearchTarget = "#c", serverSearchQuery = "hello" })
+                    , \_ -> Expect.equal "Full-history search complete with no archived matches." (serverStatusLabel { base | serverSearchStatus = ServerSearchDone, serverSearchTarget = "#c", serverSearchQuery = "hello" })
+                    , \_ -> Expect.equal "" (serverStatusLabel { base | serverSearchStatus = ServerSearchDone, serverSearchTarget = "#other", serverSearchQuery = "hello" })
+                    ]
+                    ()
+        , test "server time tag stamps the row" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") "@time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.equal [ 1791115200000 ]
+                    (List.map .at (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+        , test "untagged lines stamp the fold moment" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") ":bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.equal [ 5000 ]
+                    (List.map .at (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+        , test "unparseable server time falls back to the fold moment" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") "@time=not-a-date :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.equal [ 5000 ]
+                    (List.map .at (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+        , test "NOTICE server time stamps too" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") "@time=2026-10-04T12:00:00Z :srv NOTICE #c :note"
+                in
+                Expect.equal [ 1791115200000 ]
+                    (List.map .at (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+        , test "vault persist carries the row stamp" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        feed (joinFirst { blank | nowMs = 5000 } "me" "#c") "@time=2026-10-04T12:00:00Z :bob!u@h PRIVMSG #c :hello"
+
+                    stamps =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    VaultPersist { rows } ->
+                                        Just (List.map .at rows)
+
+                                    _ ->
+                                        Nothing
+                            )
+                            out
+                in
+                Expect.equal [ [ 1791115200000 ] ] stamps
+        , test "vault restore preserves stored stamps" <|
+            \_ ->
+                let
+                    window =
+                        [ { id = "#c:9", target = "#c", from = "bob", body = "old", at = 1791115200000 } ]
+
+                    ( m1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                in
+                Expect.equal [ 1791115200000 ]
+                    (case Dict.get "#c" m2.channels of
+                        Just c ->
+                            List.map .at c.messages
+
+                        Nothing ->
+                            []
+                    )
+        , test "clock label renders UTC HH:MM" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal "12:00" (formatClockUtc 1791115200000)
+                    , \_ -> Expect.equal "00:00" (formatClockUtc 0)
+                    , \_ -> Expect.equal "23:59" (formatClockUtc -1000)
+                    ]
+                    ()
+        , test "vault query schedules a debounced scan" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update SearchOpen { blank | nowMs = 1000 }
+
+                    ( m2, _ ) =
+                        update (SearchQuery { query = "hello" }) m
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchPending m2.vaultStatus
+                    , \_ -> Expect.equal 1 m2.vaultSearchSeq
+                    , \_ -> Expect.equal 1200 m2.vaultSearchDueAt
+                    , \_ -> Expect.equal "hello" m2.vaultSearchQuery
+                    ]
+                    ()
+        , test "short vault query idles and clears" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( m2, _ ) =
+                        update (SearchQuery { query = "x" }) m
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchIdle m2.vaultStatus
+                    , \_ -> Expect.equal [] m2.vaultRawHits
+                    , \_ -> Expect.equal 0 m2.vaultSearchDueAt
+                    ]
+                    ()
+        , test "search close invalidates the pending scan" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( m2, _ ) =
+                        update SearchClose m
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchIdle m2.vaultStatus
+                    , \_ -> Expect.equal (m.vaultSearchSeq + 1) m2.vaultSearchSeq
+                    , \_ -> Expect.equal False m2.searchOpen
+                    ]
+                    ()
+        , test "tick fires the due vault scan exactly once" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( early, earlyOut ) =
+                        update (Tick (Time.millisToPosix 1100)) m
+
+                    ( fired, firedOut ) =
+                        update (Tick (Time.millisToPosix 1300)) m
+
+                    ( again, againOut ) =
+                        update (Tick (Time.millisToPosix 1400)) fired
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] earlyOut
+                    , \_ -> Expect.equal [ VaultSearch { query = "hello", limit = 80, seq = 1, mode = "hybrid", activeTarget = Nothing, selfNick = "me", nowMs = 1300 } ] firedOut
+                    , \_ -> Expect.equal 0 fired.vaultSearchDueAt
+                    , \_ -> Expect.equal [] againOut
+                    ]
+                    ()
+        , test "vault response maps newest-first hits" <|
+            \_ ->
+                let
+                    rows =
+                        [ { id = "#b:7", target = "#b", from = "bob", body = "hello there", at = 2000 }
+                        , { id = "#a:3", target = "#a", from = "alice", body = "hello again", at = 1000 }
+                        ]
+
+                    ( scheduled, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( m, _ ) =
+                        update (VaultSearched { rows = rows, status = "ok", seq = scheduled.vaultSearchSeq, mode = "hybrid" }) scheduled
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchDone m.vaultStatus
+                    , \_ -> Expect.equal [ "#b:7", "#a:3" ] (List.map .id (vaultHits m))
+                    , \_ -> Expect.equal [ "#b", "#a" ] (List.map .target (vaultHits m))
+                    ]
+                    ()
+        , test "vault response drops DM envelopes but keeps channel envelopes" <|
+            \_ ->
+                let
+                    rows =
+                        [ { id = "dave:1", target = "dave", from = "dave", body = "ONYXDM1 xyz", at = 3000 }
+                        , { id = "erin:1", target = "erin", from = "erin", body = "ONYXROOM1 xyz", at = 2000 }
+                        , { id = "#c:1", target = "#c", from = "carol", body = "ONYXDM1 xyz", at = 1000 }
+                        ]
+
+                    ( scheduled, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( m, _ ) =
+                        update (VaultSearched { rows = rows, status = "ok", seq = scheduled.vaultSearchSeq, mode = "hybrid" }) scheduled
+                in
+                Expect.equal [ "#c:1" ] (List.map .id (vaultHits m))
+        , test "stale vault responses drop" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( stale, _ ) =
+                        update (VaultSearched { rows = [], status = "ok", seq = 99, mode = "hybrid" }) m
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchPending stale.vaultStatus
+                    , \_ -> Expect.equal [] stale.vaultRawHits
+                    ]
+                    ()
+        , test "vault unavailability resolves empty, errors report" <|
+            \_ ->
+                let
+                    ( scheduled, _ ) =
+                        update (SearchQuery { query = "hello" }) { blank | searchOpen = True, nowMs = 1000 }
+
+                    ( gone, _ ) =
+                        update (VaultSearched { rows = [], status = "unavailable", seq = scheduled.vaultSearchSeq, mode = "hybrid" }) scheduled
+
+                    ( broken, _ ) =
+                        update (VaultSearched { rows = [], status = "boom", seq = scheduled.vaultSearchSeq, mode = "hybrid" }) scheduled
+                in
+                Expect.all
+                    [ \_ -> Expect.equal VaultSearchDone gone.vaultStatus
+                    , \_ -> Expect.equal [] gone.vaultRawHits
+                    , \_ -> Expect.equal VaultSearchError broken.vaultStatus
+                    ]
+                    ()
+        , test "vault search modes parse, cycle, and persist" <|
+            \_ ->
+                let
+                    ( cycled, cycleOut ) =
+                        update CycleVaultSearchMode blank
+
+                    ( cycled2, _ ) =
+                        update CycleVaultSearchMode cycled
+
+                    ( cycled3, _ ) =
+                        update CycleVaultSearchMode cycled2
+
+                    ( set, setOut ) =
+                        update (SetVaultSearchMode SemanticVaultSearch) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal HybridVaultSearch blank.vaultSearchMode
+                    , \_ -> Expect.equal HybridVaultSearch (parseVaultSearchMode "hybrid")
+                    , \_ -> Expect.equal HybridVaultSearch (parseVaultSearchMode "nope")
+                    , \_ -> Expect.equal ExactVaultSearch (parseVaultSearchMode "exact")
+                    , \_ -> Expect.equal SemanticVaultSearch (parseVaultSearchMode "semantic")
+                    , \_ -> Expect.equal "hybrid" (vaultSearchModeToString HybridVaultSearch)
+                    , \_ -> Expect.equal "exact" (vaultSearchModeToString ExactVaultSearch)
+                    , \_ -> Expect.equal "semantic" (vaultSearchModeToString SemanticVaultSearch)
+                    , \_ -> Expect.equal ExactVaultSearch cycled.vaultSearchMode
+                    , \_ -> Expect.equal [ VaultSearchModeSave { mode = "exact" } ] cycleOut
+                    , \_ -> Expect.equal SemanticVaultSearch cycled2.vaultSearchMode
+                    , \_ -> Expect.equal HybridVaultSearch cycled3.vaultSearchMode
+                    , \_ -> Expect.equal SemanticVaultSearch set.vaultSearchMode
+                    , \_ -> Expect.equal [ VaultSearchModeSave { mode = "semantic" } ] setOut
+                    ]
+                    ()
+        , test "vault fire carries the mode context and collect echoes it" <|
+            \_ ->
+                let
+                    ( switched, _ ) =
+                        update (SetVaultSearchMode ExactVaultSearch) { blank | searchOpen = True, nowMs = 1000, ourNick = "me", activeChannel = Just "#c" }
+
+                    ( queried, _ ) =
+                        update (SearchQuery { query = "hello" }) switched
+
+                    ( fired, firedOut ) =
+                        update (Tick (Time.millisToPosix 1300)) queried
+
+                    ( collected, _ ) =
+                        update (VaultSearched { rows = [], status = "ok", seq = fired.vaultSearchSeq, mode = "exact" }) fired
+
+                    ( retoggled, _ ) =
+                        update CycleVaultSearchMode collected
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ VaultSearch { query = "hello", limit = 80, seq = 1, mode = "exact", activeTarget = Just "#c", selfNick = "me", nowMs = 1300 } ]
+                            firedOut
+                    , \_ -> Expect.equal ExactVaultSearch collected.vaultSearchModeShown
+                    , \_ -> Expect.equal SemanticVaultSearch retoggled.vaultSearchMode
+                    , \_ -> Expect.equal SemanticVaultSearch retoggled.vaultSearchModeShown
+                    ]
+                    ()
+        , test "vault hits dedupe live-loaded rows" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #b"
+
+                    ( live, _ ) =
+                        feed joined ":bob!u@h PRIVMSG #b :hello live"
+
+                    hitLive =
+                        { id = "#b:0", from = "bob", text = "hello live", at = 2000, target = "#b" }
+
+                    hitOther =
+                        { id = "#b:9", from = "bob", text = "hello stored", at = 1000, target = "#b" }
+
+                    m =
+                        { live | activeChannel = Just "#b", searchOpen = True, vaultRawHits = [ hitLive, hitOther ], vaultStatus = VaultSearchDone }
+                in
+                Expect.equal [ "#b:9" ] (List.map .id (vaultHits m))
+        , test "vault hit opens its conversation at its stamp" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update (VaultOpenHit { target = "#b", at = 2000 }) { blank | searchOpen = True, nowMs = 1000 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#b") m.activeChannel
+                    , \_ -> Expect.equal False m.searchOpen
+                    , \_ -> Expect.equal VaultSearchIdle m.vaultStatus
+                    , \_ -> Expect.equal [ VaultFetchAround { target = "#b", at = 2000, limit = 400 } ] out
+                    ]
+                    ()
+        , test "recall pivots include vault hit text" <|
+            \_ ->
+                let
+                    hit =
+                        { id = "#b:9", from = "bob", text = "hello orchard", at = 1000, target = "#b" }
+
+                    m =
+                        { blank | searchOpen = True, searchQuery = "hello", vaultRawHits = [ hit ] }
+                in
+                Expect.equal True (List.member "orchard" (searchRecallTerms m))
+        , test "vault status line announces lifecycle" <|
+            \_ ->
+                let
+                    base =
+                        { blank | searchOpen = True, searchQuery = "hello" }
+
+                    hit =
+                        { id = "#b:9", from = "bob", text = "hello orchard", at = 1000, target = "#b" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "Searching device memory for “hello”." (vaultStatusLabel { base | vaultStatus = VaultSearchPending })
+                    , \_ -> Expect.equal "Device-memory search could not be completed." (vaultStatusLabel { base | vaultStatus = VaultSearchError })
+                    , \_ -> Expect.equal "Device-memory search complete with no remembered matches." (vaultStatusLabel { base | vaultStatus = VaultSearchDone })
+                    , \_ -> Expect.equal "Device-memory search complete with 1 remembered match." (vaultStatusLabel { base | vaultStatus = VaultSearchDone, vaultRawHits = [ hit ] })
+                    , \_ -> Expect.equal "" (vaultStatusLabel { base | searchQuery = "x" })
+                    ]
+                    ()
+        , test "labeled send stamps @label and renders the row pending" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, out1 ) =
+                        labeledSend [ "labeled-response" ] "hi"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "@label=" ++ label ++ " PRIVMSG #c hi\r\n" ]
+                            (List.filter (\s -> not (String.isEmpty s)) (List.map sendLineText out1))
+                    , \_ -> Expect.equal [ "hi" ] (channelBodies m1)
+                    , \_ -> Expect.equal [ True ] (channelPendings m1)
+                    , \_ -> Expect.equal 1 (Dict.size m1.pendingLabels)
+                    , \_ -> Expect.equal 1 m1.labelCounter
+                    ]
+                    ()
+        , test "labeled echo confirms the row instead of duplicating it" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                    ( m2, out2 ) =
+                        feed m1 ("@label=" ++ label ++ ";msgid=m9 :alice!u@h PRIVMSG #c :hi")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hi" ] (channelBodies m2)
+                    , \_ -> Expect.equal [ False ] (channelPendings m2)
+                    , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal (Just [ "m9" ]) (Dict.get "#c" m2.seenMsgids)
+                    , \_ -> Expect.equal [] (List.filter (not << String.isEmpty) (List.map sendLineText out2))
+                    , \_ -> Expect.equal 1 (List.length (List.filter isVaultPersist out2))
+                    ]
+                    ()
+        , test "bare ACK confirms the pending row in place" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( m2, out2 ) =
+                        feed m1 ("@label=" ++ label ++ " ACK")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hi" ] (channelBodies m2)
+                    , \_ -> Expect.equal [ False ] (channelPendings m2)
+                    , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal [] out2
+                    ]
+                    ()
+        , test "labeled FAIL drops the row and logs the failure" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( m2, out2 ) =
+                        feed m1 ("@label=" ++ label ++ " :srv FAIL PRIVMSG CANNOT_SEND :rejected")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (channelBodies m2)
+                    , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal [ "Message not delivered: rejected" ] (List.take 1 m2.serviceLog)
+                    , \_ -> Expect.equal [] out2
+                    , \_ ->
+                        case m2.toasts of
+                            [ toast ] ->
+                                Expect.all
+                                    [ \t -> Expect.equal ToastError t.variant
+                                    , \t -> Expect.equal "Message not delivered" t.title
+                                    , \t -> Expect.equal (Just "rejected") t.description
+                                    ]
+                                    toast
+
+                            _ ->
+                                Expect.fail "expected one toast"
+                    ]
+                    ()
+        , test "unlabeled messaging FAIL still surfaces a notice" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed blank ":srv FAIL PRIVMSG CANNOT_SEND :rejected"
+                in
+                Expect.all
+                    [ \v -> Expect.equal [ "rejected" ] (List.take 1 v.serviceLog)
+                    , \v ->
+                        case v.toasts of
+                            [ toast ] ->
+                                Expect.all
+                                    [ \t -> Expect.equal ToastError t.variant
+                                    , \t -> Expect.equal "Message not delivered" t.title
+                                    , \t -> Expect.equal (Just "rejected") t.description
+                                    ]
+                                    toast
+
+                            _ ->
+                                Expect.fail "expected one toast"
+                    ]
+                    m
+        , test "echo with an unknown label falls through to the normal fold" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        feed { blank | ourNick = "alice" } "@label=zzz :alice!u@h PRIVMSG #c :hi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty m.channels
+                    , \_ -> Expect.equal Dict.empty m.pendingLabels
+                    , \_ -> Expect.equal [] out
+                    ]
+                    ()
+        , test "registry eviction promotes the oldest row past 128 in flight" <|
+            \_ ->
+                let
+                    texts =
+                        List.map (\n -> "m" ++ String.fromInt n) (List.range 1 (Labels.maxPendingLabeledSends + 2))
+
+                    sequenced =
+                        List.foldl
+                            (\text m ->
+                                update (ComposerInput text) { m | activeChannel = Just "#c" }
+                                    |> Tuple.first
+                                    |> (\m2 -> update ComposerSend m2)
+                                    |> Tuple.first
+                            )
+                            { blank | ourNick = "alice", caps = [ "labeled-response" ], activeChannel = Just "#c" }
+                            texts
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Labels.maxPendingLabeledSends (Dict.size sequenced.pendingLabels)
+                    , \_ ->
+                        Expect.equal Labels.maxPendingLabeledSends
+                            (List.length (List.filter identity (channelPendings sequenced)))
+                    , \_ ->
+                        Expect.equal (Labels.maxPendingLabeledSends + 2)
+                            (List.length (channelBodies sequenced))
+                    ]
+                    ()
+        , test "disconnect confirms every pending row and clears the registry" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( m2, out2 ) =
+                        update (WsClosed { clean = True, reason = "test" }) m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ False ] (channelPendings m2)
+                    , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    , \_ -> Expect.equal [] out2
+                    ]
+                    ()
+        , test "labeled multiline stamps the opening BATCH and pends every part" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, out1 ) =
+                        labeledSend [ "labeled-response", "draft/multiline" ] "one\ntwo"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ "@label=" ++ label ++ " BATCH +ml0 draft/multiline #c\r\n"
+                            , "@batch=ml0 PRIVMSG #c :one\r\n"
+                            , "@batch=ml0 PRIVMSG #c :two\r\n"
+                            , "BATCH -ml0\r\n"
+                            ]
+                            (List.filter (not << String.isEmpty) (List.map sendLineText out1))
+                    , \_ -> Expect.equal [ "two", "one" ] (channelBodies m1)
+                    , \_ -> Expect.equal [ True, True ] (channelPendings m1)
+                    , \_ -> Expect.equal 1 (Dict.size m1.pendingLabels)
+                    ]
+                    ()
+        , test "labeled multiline echo reassembles and collapses on close" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message", "draft/multiline" ] "one\ntwo"
+
+                    ( m2, _ ) =
+                        feed m1 ("@label=" ++ label ++ " BATCH +ml0 draft/multiline #c")
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=ml0 :alice!u@h PRIVMSG #c :one"
+
+                    ( m4, _ ) =
+                        feed m3 "@batch=ml0 :alice!u@h PRIVMSG #c :two"
+
+                    ( m5, closedOut ) =
+                        feed m4 "BATCH -ml0"
+                in
+                Expect.all
+                    [ -- The opening label stays pending under the
+                      -- collector; the echo fold defers to it.
+                      \_ -> Expect.equal Set.empty m2.ownEchoBatches
+                    , \_ -> Expect.equal [ True, True ] (channelPendings m2)
+                    , \_ -> Expect.equal 1 (Dict.size m2.pendingLabels)
+                    , \_ -> Expect.equal [ "two", "one" ] (channelBodies m4)
+                    , \_ -> Expect.equal [ True, True ] (channelPendings m4)
+                      -- The close synthetic resolves the label and
+                      -- collapses both part rows into one message.
+                    , \_ -> Expect.equal [ "one\ntwo" ] (channelBodies m5)
+                    , \_ -> Expect.equal [ False ] (channelPendings m5)
+                    , \_ -> Expect.equal Dict.empty m5.pendingLabels
+                    , \_ -> Expect.equal Set.empty m5.ownEchoBatches
+                    , \_ -> Expect.equal Dict.empty m5.historyBatches
+                    , \_ -> Expect.equal True (List.any isVaultPersist closedOut)
+                    ]
+                    ()
+        , test "labeled-response wrapper batch resolves a single send" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message" ] "hi"
+
+                    ( m2, _ ) =
+                        feed m1 ("@label=" ++ label ++ " BATCH +w1 labeled-response")
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=w1 :alice!u@h PRIVMSG #c :hi"
+
+                    ( m4, _ ) =
+                        feed m3 "BATCH -w1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hi" ] (channelBodies m4)
+                    , \_ -> Expect.equal [ False ] (channelPendings m4)
+                    , \_ -> Expect.equal Dict.empty m4.pendingLabels
+                    , \_ -> Expect.equal Set.empty m4.ownEchoBatches
+                    ]
+                    ()
+        , test "foreign multiline batches reassemble without touching echo state" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "BATCH +other draft/multiline #c"
+
+                    ( m2, _ ) =
+                        feed m1 "@batch=other :bob!u@h PRIVMSG #c :hi"
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=other :bob!u@h PRIVMSG #c :there"
+
+                    ( m4, _ ) =
+                        feed m3 "BATCH -other"
+
+                    ( m5, _ ) =
+                        feed (joinFirst { blank | ourNick = "alice", caps = [ "echo-message" ] } "alice" "#c") "@batch=other :alice!u@h PRIVMSG #c :hi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Set.empty m1.ownEchoBatches
+                    , \_ -> Expect.equal Set.empty m2.ownEchoBatches
+                    , \_ -> Expect.equal [] (channelBodies m2)
+                    , \_ -> Expect.equal [] (channelBodies m3)
+                    , \_ -> Expect.equal [ "hi\nthere" ] (channelBodies m4)
+                    , \_ -> Expect.equal [ "hi" ] (channelBodies m5)
+                    ]
+                    ()
+        , test "multiline concat joins without a newline and keeps first-line provenance" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "BATCH +m1 draft/multiline #c"
+
+                    ( m2, _ ) =
+                        feed m1 "@batch=m1 :bob!u@h PRIVMSG #c :line1"
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=m1;draft/multiline-concat :bob!u@h PRIVMSG #c :part"
+
+                    ( m4, _ ) =
+                        feed m3 "@batch=m1;+draft/multiline-concat :mallory!u@h NOTICE #c :tail"
+
+                    ( m5, _ ) =
+                        feed m4 "@batch=m1 :mallory!u@h PRIVMSG #c :line2"
+
+                    ( closed, _ ) =
+                        feed m5 "BATCH -m1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (channelBodies m4)
+                    , \_ -> Expect.equal [ "line1parttail\nline2" ] (channelBodies closed)
+                    , \_ ->
+                        Expect.equal [ "bob" ]
+                            (List.map .from (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" closed.channels))))
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    ]
+                    ()
+        , test "multiline files the synthetic msgid for rewind dedup" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") "BATCH +m1 draft/multiline #c"
+
+                    ( m2, _ ) =
+                        feed m1 "@batch=m1;msgid=g1 :bob!u@h PRIVMSG #c :a"
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=m1 :bob!u@h PRIVMSG #c :b"
+
+                    ( closed, _ ) =
+                        feed m3 "BATCH -m1"
+
+                    ( redelivered, _ ) =
+                        feed closed "@msgid=g1 :bob!u@h PRIVMSG #c :a"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just [ "g1" ]) (Dict.get "#c" closed.seenMsgids)
+                    , \_ -> Expect.equal [ "a\nb" ] (channelBodies closed)
+                    , \_ -> Expect.equal [ "a\nb" ] (channelBodies redelivered)
+                    ]
+                    ()
+        , test "multiline past 64 parts rejects the whole batch" <|
+            \_ ->
+                let
+                    ( opened, _ ) =
+                        feed blank "BATCH +m1 draft/multiline #c"
+
+                    flooded =
+                        List.foldl
+                            (\i m -> Tuple.first (feed m ("@batch=m1 :bob!u@h PRIVMSG #c :p" ++ String.fromInt i)))
+                            opened
+                            (List.range 1 65)
+
+                    ( closed, _ ) =
+                        feed flooded "BATCH -m1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (channelBodies flooded)
+                    , \_ -> Expect.equal [] (channelBodies closed)
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" closed.seenMsgids)
+                    ]
+                    ()
+        , test "multiline past 64k chars rejects the whole batch" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank "BATCH +m1 draft/multiline #c"
+
+                    ( m2, _ ) =
+                        feed m1 ("@batch=m1 :bob!u@h PRIVMSG #c :" ++ String.repeat 65530 "x")
+
+                    ( m3, _ ) =
+                        feed m2 "@batch=m1 :bob!u@h PRIVMSG #c :0123456789"
+
+                    ( closed, _ ) =
+                        feed m3 "BATCH -m1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (channelBodies closed)
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    ]
+                    ()
+        , test "rejected multiline close still promotes the pending label" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        labeledSend [ "labeled-response", "echo-message", "draft/multiline" ] "one\ntwo"
+
+                    ( m2, _ ) =
+                        feed m1 ("@label=" ++ label ++ " BATCH +ml0 draft/multiline #c")
+
+                    flooded =
+                        List.foldl
+                            (\i m -> Tuple.first (feed m ("@batch=ml0 :alice!u@h PRIVMSG #c :p" ++ String.fromInt i)))
+                            m2
+                            (List.range 1 65)
+
+                    ( closed, _ ) =
+                        feed flooded "BATCH -ml0"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "two", "one" ] (channelBodies closed)
+                    , \_ -> Expect.equal [ False, False ] (channelPendings closed)
+                    , \_ -> Expect.equal Dict.empty closed.pendingLabels
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    ]
+                    ()
+        , test "invalid multiline envelopes never open" <|
+            \_ ->
+                let
+                    ctlRef =
+                        "+has" ++ String.fromChar (Char.fromCode 1) ++ "ctl"
+
+                    opens =
+                        [ "BATCH + draft/multiline #c"
+                        , "BATCH " ++ ctlRef ++ " draft/multiline #c"
+                        , "BATCH +with space draft/multiline #c"
+                        , "BATCH +" ++ String.repeat 129 "r" ++ " draft/multiline #c"
+                        , "BATCH +m2 draft/multiline " ++ String.repeat 513 "t"
+                        , "BATCH +m3 draft/multiline"
+                        ]
+
+                    tryOpen line =
+                        let
+                            ( opened, _ ) =
+                                feed (joinFirst blank "me" "#c") line
+
+                            ( held, _ ) =
+                                feed opened "@batch=m3 :bob!u@h PRIVMSG #c :live"
+                        in
+                        List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" held.channels)))
+                in
+                Expect.equal (List.repeat (List.length opens) [ "live" ]) (List.map tryOpen opens)
+        , test "001 with chathistory cap requests a TARGETS sweep" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        feed { blank | caps = [ "chathistory" ] } ":irc.example 001 me :welcome"
+
+                    targetsLines =
+                        List.filter (String.startsWith "CHATHISTORY TARGETS") (List.map sendLineText out)
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ "CHATHISTORY TARGETS timestamp=1970-01-01T00:00:00.000Z timestamp=1970-01-01T00:00:10.000Z 64\r\n" ]
+                            targetsLines
+                    , \_ -> Expect.equal True m.historyTargetsPending
+                    , \_ -> Expect.equal (Just 0) m.historyTargetsStartedAt
+                    ]
+                    ()
+        , test "001 without chathistory cap sends no TARGETS sweep" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        feed blank ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (List.filter (String.startsWith "CHATHISTORY TARGETS") (List.map sendLineText out))
+                    , \_ -> Expect.equal False m.historyTargetsPending
+                    , \_ -> Expect.equal True (List.member "LUSERS\r\n" (List.map sendLineText out))
+                    ]
+                    ()
+        , test "001 names us, marks media, resets registry sync, and logs welcome" <|
+            \_ ->
+                let
+                    prior =
+                        blank.props
+
+                    seeded =
+                        { blank | ourNick = "kai", props = { prior | synced = Set.singleton "#c" } }
+
+                    ( m, _ ) =
+                        feed seeded ":irc.example 001 Guest7 :welcome home"
+
+                    ( bare, _ ) =
+                        feed seeded ":irc.example 001"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "Guest7" m.ourNick
+                    , \_ -> Expect.equal True m.mediaAvailable
+                    , \_ -> Expect.equal Set.empty m.props.synced
+                    , \_ -> Expect.equal True (List.member "welcome home" m.serviceLog)
+                    , \_ -> Expect.equal "kai" bare.ourNick
+                    , \_ -> Expect.equal True bare.mediaAvailable
+                    ]
+                    ()
+        , test "deep-link query parses join/at/topic fail-closed" <|
+            \_ ->
+                let
+                    full =
+                        parseDeepLinkQuery (Just "join=%23room&at=1700000000&topic=hello")
+
+                    noJoin =
+                        parseDeepLinkQuery (Just "at=1700000000&topic=hello")
+
+                    firstWins =
+                        parseDeepLinkQuery (Just "join=%23a&join=%23b")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#room") (parseDeepLinkJoin "%23room")
+                    , \_ -> Expect.equal (Just "#room") (parseDeepLinkJoin "#room")
+                    , \_ -> Expect.equal (Just "&ops") (parseDeepLinkJoin "&ops")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin "room")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin "#a b")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin "#a,b")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin "")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin "%ZZ")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkJoin ("#" ++ String.repeat 64 "a"))
+                    , \_ -> Expect.equal (Just "hello") (parseDeepLinkTopic "hello")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkTopic "")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkTopic "a,b")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkTopic (String.repeat 51 "a"))
+                    , \_ -> Expect.equal (Just 1700000000000) (parseDeepLinkAt 1700000000000 "1700000000")
+                    , \_ -> Expect.equal (Just 1700000000000) (parseDeepLinkAt 1700000000000 "1700000000000")
+                    , \_ -> Expect.equal (Just 1700000000000) (parseDeepLinkAt 1700000000000 "2023-11-14T22:13:20Z")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkAt 1700000000000 "junk")
+                    , \_ -> Expect.equal Nothing (parseDeepLinkAt 1700000000000 "1000000000")
+                    , \_ -> Expect.equal (Just "#room") full.join
+                    , \_ -> Expect.equal (Just "1700000000") full.at
+                    , \_ -> Expect.equal (Just "hello") full.topic
+                    , \_ -> Expect.equal Nothing noJoin.join
+                    , \_ -> Expect.equal Nothing noJoin.at
+                    , \_ -> Expect.equal Nothing noJoin.topic
+                    , \_ -> Expect.equal (Just "#a") firstWins.join
+                    , \_ -> Expect.equal { join = Nothing, at = Nothing, topic = Nothing } (parseDeepLinkQuery Nothing)
+                    ]
+                    ()
+        , test "001 fires the pending deep-link join; the echo opens it" <|
+            \_ ->
+                let
+                    linked =
+                        { blank | pendingDeepLinkJoin = Just "#room" }
+
+                    ( fired, out ) =
+                        feed linked ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed { fired | ourNick = "me" } ":me!u@h JOIN #room"
+
+                    topical =
+                        { blank | pendingDeepLinkJoin = Just "#room", pendingDeepLinkTopic = Just "hello" }
+
+                    ( firedTopical, outTopical ) =
+                        feed topical ":irc.example 001 me :welcome"
+
+                    sends o =
+                        List.filterMap
+                            (\e ->
+                                case e of
+                                    SendLine line ->
+                                        Just line
+
+                                    _ ->
+                                        Nothing
+                            )
+                            o
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (List.member "JOIN #room\r\n" (sends out))
+                    , \_ -> Expect.equal (Just "#room") fired.pendingDeepLinkJoin
+                    , \_ -> Expect.equal True (List.member "JOIN #room\r\n" (sends outTopical))
+                    , \_ -> Expect.equal (Just "#room") firedTopical.pendingDeepLinkJoin
+                    , \_ -> Expect.equal (Just "hello") firedTopical.pendingDeepLinkTopic
+                    , \_ -> Expect.equal (Just "#room") opened.activeChannel
+                    , \_ -> Expect.equal Nothing opened.pendingDeepLinkJoin
+                    ]
+                    ()
+        , test "travelTo fetches vault-first, then server AROUND" <|
+            \_ ->
+                let
+                    capped =
+                        { blank | caps = [ "chathistory" ] }
+
+                    ( traveled, out ) =
+                        requestTravelTo capped "#c" 1700000000000
+
+                    ( vaultOnly, vaultOut ) =
+                        requestTravelTo blank "#c" 1700000000000
+
+                    sends o =
+                        List.filterMap
+                            (\e ->
+                                case e of
+                                    SendLine line ->
+                                        Just line
+
+                                    _ ->
+                                        Nothing
+                            )
+                            o
+
+                    hasVault o =
+                        List.any
+                            (\e ->
+                                case e of
+                                    VaultFetchAround _ ->
+                                        True
+
+                                    _ ->
+                                        False
+                            )
+                            o
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (hasVault out)
+                    , \_ ->
+                        Expect.equal True
+                            (List.any (String.startsWith "CHATHISTORY AROUND #c timestamp=2023-11-14T22:13:20") (sends out))
+                    , \_ -> Expect.equal (Just { target = "#c", at = 1700000000000 }) traveled.pendingTravel
+                    , \_ -> Expect.equal True (hasVault vaultOut)
+                    , \_ -> Expect.equal [] (sends vaultOut)
+                    , \_ -> Expect.equal (Just { target = "#c", at = 1700000000000 }) vaultOnly.pendingTravel
+                    ]
+                    ()
+        , test "?at= echo travels; the AROUND close settles without exhausting" <|
+            \_ ->
+                let
+                    linked =
+                        { blank
+                            | pendingDeepLinkJoin = Just "#c"
+                            , pendingDeepLinkAt = Just "1700000000"
+                            , nowMs = 1700000000000
+                            , caps = [ "chathistory" ]
+                        }
+
+                    ( fired, _ ) =
+                        feed linked ":irc.example 001 me :welcome"
+
+                    ( opened, openOut ) =
+                        feed fired ":me!u@h JOIN #c"
+
+                    sends o =
+                        List.filterMap
+                            (\e ->
+                                case e of
+                                    SendLine line ->
+                                        Just line
+
+                                    _ ->
+                                        Nothing
+                            )
+                            o
+
+                    ( batched, _ ) =
+                        feed opened "BATCH +h1 draft/chathistory #c"
+
+                    ( held, _ ) =
+                        feed batched "@batch=h1 :bob!u@h PRIVMSG #c :old"
+
+                    ( closed, _ ) =
+                        feed held "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal True
+                            (List.any (String.startsWith "CHATHISTORY AROUND #c timestamp=") (sends openOut))
+                    , \_ -> Expect.equal (Just { target = "#c", at = 1700000000000 }) opened.pendingTravel
+                    , \_ -> Expect.equal Nothing closed.pendingTravel
+                    , \_ -> Expect.equal False (isHistoryExhausted closed "#c")
+                    , \_ -> Expect.equal Nothing closed.pendingDeepLinkJoin
+                    ]
+                    ()
+        , test "TARGETS sweeps are single-flight and resume from the last sweep" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | caps = [ "draft/chathistory" ], lastHistoryTargetsSweepAt = Just 86800000 }
+
+                    ( m1, out1 ) =
+                        feed seeded ":irc.example 001 me :welcome"
+
+                    ( m2, out2 ) =
+                        feed m1 ":irc.example 001 me :welcome again"
+
+                    targetsLines out =
+                        List.filter (String.startsWith "CHATHISTORY TARGETS") (List.map sendLineText out)
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ "CHATHISTORY TARGETS timestamp=1970-01-02T00:06:30.000Z timestamp=1970-01-01T00:00:10.000Z 64\r\n" ]
+                            (targetsLines out1)
+                    , \_ -> Expect.equal [] (targetsLines out2)
+                    , \_ -> Expect.equal True m2.historyTargetsPending
+                    ]
+                    ()
+        , test "targets batch opens only for the pending request" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank "BATCH +t1 draft/chathistory-targets"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( m3, _ ) =
+                        feed m2 "BATCH -t1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty m1.historyBatches
+                    , \_ -> Expect.equal Dict.empty m3.historyTargets
+                    , \_ -> Expect.equal Nothing m3.lastHistoryTargetsSweepAt
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" m2.channels)
+                    ]
+                    ()
+        , test "targets rows validate strictly and merge newest-wins" <|
+            \_ ->
+                let
+                    stamp t =
+                        ":irc.example CHATHISTORY TARGETS " ++ t
+
+                    ( requested, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    rows =
+                        [ "@batch=t1 " ++ stamp "#a timestamp=2026-10-04T12:00:00.000Z"
+                        , stamp "#b timestamp=2026-10-04T12:01:00.000Z"
+                        , stamp "bob timestamp=2026-10-04T12:00:00.000Z"
+                        , stamp "#a timestamp=2026-10-04T11:00:00.000Z"
+                        , "@batch=t1 " ++ stamp "#a timestamp=2026-10-04T12:02:00.000Z"
+                        , "@batch=t1 " ++ stamp "#bad timestamp=2026-10-04T12:00:00Z"
+                        , "@batch=t1 " ++ stamp "#bad timestamp=2026-13-04T12:00:00.000Z"
+                        , "@batch=t1 " ++ stamp "me timestamp=2026-10-04T12:00:00.000Z"
+                        , "@batch=t1 " ++ stamp "#a,b timestamp=2026-10-04T12:00:00.000Z"
+                        , "@batch=t1 " ++ stamp ":#a timestamp=2026-10-04T12:00:00.000Z"
+                        , "@batch=t1 " ++ stamp ("#" ++ String.repeat 512 "x") ++ " timestamp=2026-10-04T12:00:00.000Z"
+                        , "@batch=wrong " ++ stamp "#c timestamp=2026-10-04T12:00:00.000Z"
+                        ]
+
+                    nicked =
+                        "@batch=t1 :bob!u@h CHATHISTORY TARGETS #d timestamp=2026-10-04T12:00:00.000Z"
+
+                    short =
+                        "@batch=t1 " ++ stamp "#e timestamp=2026-10-04T12:00:00.000Z extra"
+
+                    collected =
+                        List.foldl (\line m -> Tuple.first (feed m line)) opened (rows ++ [ nicked, short ])
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -t1"
+
+                    latestOf key model =
+                        Maybe.map .latestAt (Dict.get key model.historyTargets)
+
+                    ( newerOpened, _ ) =
+                        feed requested "BATCH +t9 draft/chathistory-targets"
+
+                    ( newerCollected, _ ) =
+                        feed newerOpened ("@batch=t9 " ++ stamp "#a timestamp=2026-10-04T12:02:00.000Z")
+
+                    ( newerClosed, _ ) =
+                        feed newerCollected "BATCH -t9"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "#a", "#b", "bob" ] (Dict.keys closed.historyTargets)
+                    , \_ -> Expect.equal (Just "#a") (Maybe.map .target (Dict.get "#a" closed.historyTargets))
+                    , \_ -> Expect.equal (latestOf "#a" newerClosed) (latestOf "#a" closed)
+                    , \_ ->
+                        Expect.equal True
+                            (Maybe.withDefault False
+                                (Maybe.map2 (>) (latestOf "#a" closed) (latestOf "#b" closed))
+                            )
+                    , \_ -> Expect.equal (Just 0) closed.lastHistoryTargetsSweepAt
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    , \_ -> Expect.equal Nothing closed.historyTargetsBatchRef
+                    ]
+                    ()
+        , test "targets close merges into the ledger newest-wins and trims to 64" <|
+            \_ ->
+                let
+                    ( requested, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    flooded =
+                        List.foldl
+                            (\i m -> Tuple.first (feed m (":irc.example CHATHISTORY TARGETS #t" ++ String.fromInt i ++ " timestamp=2026-10-04T12:00:00.000Z")))
+                            opened
+                            (List.range 1 65)
+
+                    ( closed, _ ) =
+                        feed flooded "BATCH -t1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 64 (Dict.size closed.historyTargets)
+                    , \_ -> Expect.equal False (Dict.member "#t65" closed.historyTargets)
+                    , \_ -> Expect.equal Dict.empty closed.historyBatches
+                    ]
+                    ()
+        , test "chat lines tagged into the targets batch drop" <|
+            \_ ->
+                let
+                    ( requested, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( held, _ ) =
+                        feed opened "@batch=t1 :bob!u@h PRIVMSG #c :hi"
+
+                    ( closed, _ ) =
+                        feed held "BATCH -t1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (Dict.get "#c" held.channels)
+                    , \_ -> Expect.equal Dict.empty closed.historyTargets
+                    ]
+                    ()
+        , test "WsClosed clears TARGETS transport but keeps the sweep and ledger" <|
+            \_ ->
+                let
+                    ( requested, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( collected, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( closedBatch, _ ) =
+                        feed collected "BATCH -t1"
+
+                    ( requested2, _ ) =
+                        feed closedBatch ":irc.example 001 me :welcome back"
+
+                    ( reopened, _ ) =
+                        feed requested2 "BATCH +t2 draft/chathistory-targets"
+
+                    ( down, _ ) =
+                        update (WsClosed { clean = True, reason = "test" }) reopened
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just 0) closedBatch.lastHistoryTargetsSweepAt
+                    , \_ -> Expect.equal True (Dict.member "#a" closedBatch.historyTargets)
+                    , \_ -> Expect.equal False down.historyTargetsPending
+                    , \_ -> Expect.equal Nothing down.historyTargetsBatchRef
+                    , \_ -> Expect.equal Dict.empty down.historyBatches
+                    , \_ -> Expect.equal (Just 0) down.lastHistoryTargetsSweepAt
+                    , \_ -> Expect.equal True (Dict.member "#a" down.historyTargets)
+                    ]
+                    ()
+        , test "targets close backfills joined channels and discovered DMs" <|
+            \_ ->
+                let
+                    -- The self-JOIN already fetched #a, so the sweep
+                    -- backfills only the discovered DM (mirroring the
+                    -- oracle: join marks loading, discovery skips it).
+                    ( joined, joinOut ) =
+                        feed { blank | caps = [ "chathistory", "draft/read-marker" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    ( requested, _ ) =
+                        feed joined ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( r1, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( r2, _ ) =
+                        feed r1 ":irc.example CHATHISTORY TARGETS bob timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( r3, _ ) =
+                        feed r2 ":irc.example CHATHISTORY TARGETS #ghost timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( closed, out ) =
+                        feed r3 "BATCH -t1"
+
+                    fetches =
+                        List.filter (\l -> String.startsWith "CHATHISTORY LATEST" l || String.startsWith "MARKREAD" l)
+                            (List.map sendLineText out)
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ "MARKREAD #a\r\n"
+                            , "CHATHISTORY LATEST #a * 50\r\n"
+                            , "WHO #a\r\n"
+                            , "ACTIVITY SUBSCRIBE #a\r\n"
+                            ]
+                            (List.map sendLineText joinOut)
+                    , \_ ->
+                        Expect.equal
+                            [ "MARKREAD bob\r\n"
+                            , "CHATHISTORY LATEST bob * 50\r\n"
+                            ]
+                            fetches
+                    , \_ -> Expect.equal (Set.fromList [ "#a", "bob" ]) closed.historyLoading
+                    , \_ -> Expect.equal [ "bob" ] (Dict.keys closed.pendingDiscoveries)
+                    , \_ ->
+                        Expect.equal (Maybe.map .latestAt (Dict.get "bob" closed.historyTargets))
+                            (Maybe.andThen .lastSeen (Dict.get "bob" closed.channels))
+                    , \_ -> Expect.equal Nothing (Dict.get "#ghost" closed.channels)
+                    ]
+                    ()
+        , test "backfill reference fuzzes the latest buffered stamp" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    -- The join-fetch completed off-stage, so the sweep
+                    -- backfills #a with the fuzzed buffered stamp.
+                    releasedJoin =
+                        { joined | historyLoading = Set.empty }
+
+                    ( stamped, _ ) =
+                        feed releasedJoin "@time=2026-10-04T12:00:00.000Z :bob!u@h PRIVMSG #a :live"
+
+                    latest =
+                        case Dict.get "#a" stamped.channels of
+                            Just channel ->
+                                case channel.messages of
+                                    message :: _ ->
+                                        message.at
+
+                                    [] ->
+                                        0
+
+                            Nothing ->
+                                0
+
+                    ( requested, _ ) =
+                        feed stamped ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( collected, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( _, out ) =
+                        feed collected "BATCH -t1"
+
+                    fetches =
+                        List.filter (String.startsWith "CHATHISTORY LATEST") (List.map sendLineText out)
+                in
+                Expect.all
+                    [ \_ -> Expect.notEqual 0 latest
+                    , \_ ->
+                        Expect.equal
+                            [ "CHATHISTORY LATEST #a timestamp=" ++ millisToIso (toFloat (latest - 10000)) ++ " 50\r\n" ]
+                            fetches
+                    ]
+                    ()
+        , test "discovery-gated targets skip loading, requested, batched, and searched rows" <|
+            \_ ->
+                let
+                    sweep model ref rows =
+                        let
+                            ( opened, _ ) =
+                                feed model ("BATCH +" ++ ref ++ " draft/chathistory-targets")
+
+                            collected =
+                                List.foldl (\line m -> Tuple.first (feed m line)) opened rows
+
+                            ( closedBatch, out ) =
+                                feed collected ("BATCH -" ++ ref)
+                        in
+                        ( closedBatch, List.filter (String.startsWith "CHATHISTORY LATEST") (List.map sendLineText out) )
+
+                    row target =
+                        ":irc.example CHATHISTORY TARGETS " ++ target ++ " timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( joined, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    ( requested, _ ) =
+                        feed joined ":irc.example 001 me :welcome"
+
+                    -- First sweep requests only bob; #a already fetches
+                    -- from the self-JOIN, so the row skips it.
+                    ( closed, firstFetches ) =
+                        sweep { requested | historyBatches = Dict.empty } "t1" [ row "#a", row "bob" ]
+
+                    -- Second sweep: everything still loading/requested
+                    -- skips, so no new fetches go out.
+                    reArmed =
+                        { closed | historyTargetsPending = True, historyTargetsStartedAt = Just 5 }
+
+                    ( _, secondFetches ) =
+                        sweep reArmed "t2" [ row "#a", row "bob" ]
+
+                    -- Fully released: #a backfills again, bob (still
+                    -- held) skips.
+                    released =
+                        { closed
+                            | historyLoading = Set.remove "#a" closed.historyLoading
+                            , pendingDiscoveries = Dict.remove "#a" closed.pendingDiscoveries
+                        }
+
+                    reArmed2 =
+                        { released | historyTargetsPending = True, historyTargetsStartedAt = Just 6 }
+
+                    ( _, thirdFetches ) =
+                        sweep reArmed2 "t3" [ row "#a", row "bob" ]
+
+                    -- An open plain batch for #a also gates it.
+                    ( batched, _ ) =
+                        feed released "BATCH +h9 draft/chathistory #a"
+
+                    reArmed3 =
+                        { batched | historyTargetsPending = True, historyTargetsStartedAt = Just 7 }
+
+                    ( _, fourthFetches ) =
+                        sweep reArmed3 "t4" [ row "#a" ]
+
+                    -- So does ownership by the pending server search.
+                    searched =
+                        { released
+                            | historyLoading = Set.remove "bob" released.historyLoading
+                            , pendingDiscoveries = Dict.remove "bob" released.pendingDiscoveries
+                            , serverSearchPending =
+                                Just
+                                    { generation = 1
+                                    , target = "bob"
+                                    , targetKey = "bob"
+                                    , query = "hello"
+                                    , batchRef = Nothing
+                                    , deadline = 9999999999999
+                                    }
+                            , historyTargetsPending = True
+                            , historyTargetsStartedAt = Just 8
+                        }
+
+                    ( _, fifthFetches ) =
+                        sweep searched "t5" [ row "bob" ]
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length firstFetches)
+                    , \_ -> Expect.equal [] secondFetches
+                    , \_ -> Expect.equal 1 (List.length thirdFetches)
+                    , \_ -> Expect.equal [] fourthFetches
+                    , \_ -> Expect.equal [] fifthFetches
+                    , \_ -> Expect.equal True (serverSearchOwnsTarget searched "BOB")
+                    , \_ -> Expect.equal False (serverSearchOwnsTarget searched "#a")
+                    ]
+                    ()
+        , test "DM working set counts peers, never rooms" <|
+            \_ ->
+                let
+                    withPeers =
+                        { blank
+                            | channels =
+                                Dict.fromList
+                                    [ ( "#a", shellOf "#a" 0 0 )
+                                    , ( "bob", shellOf "bob" 0 0 )
+                                    , ( "carol", shellOf "carol" 2 0 )
+                                    ]
+                        }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 256 maxLiveDmConversations
+                    , \_ -> Expect.equal 2 (dmConversationCount withPeers)
+                    , \_ -> Expect.equal 0 (dmConversationCount blank)
+                    ]
+                    ()
+        , test "eviction keeps unread and open DMs, takes the oldest read" <|
+            \_ ->
+                let
+                    withPeers =
+                        { blank
+                            | activeChannel = Just "carol"
+                            , channels =
+                                Dict.fromList
+                                    [ ( "alice", shellOf "alice" 0 100 )
+                                    , ( "bob", shellOf "bob" 1 50 )
+                                    , ( "carol", shellOf "carol" 0 10 )
+                                    ]
+                        }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "alice") (evictOldestReadInactiveDm withPeers)
+                    , \_ -> Expect.equal Nothing (evictOldestReadInactiveDm blank)
+                    , \_ ->
+                        Expect.equal Nothing
+                            (evictOldestReadInactiveDm
+                                { withPeers | activeChannel = Just "alice", channels = Dict.fromList [ ( "bob", shellOf "bob" 1 50 ) ] }
+                            )
+                    ]
+                    ()
+        , test "full DM set refuses a new shell when nothing is evictable" <|
+            \_ ->
+                let
+                    full =
+                        fillDmSet (\i -> shellOf ("user-" ++ String.fromInt i) 1 i) blank
+
+                    ( refused, ok ) =
+                        ensureDmShellCapacity full "newbie"
+
+                    ( applied, outs ) =
+                        applyHistoryTarget { target = "newbie", latestAt = 999 } ( full, [] )
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 256 (dmConversationCount full)
+                    , \_ -> Expect.equal False ok
+                    , \_ -> Expect.equal 256 (dmConversationCount refused)
+                    , \_ -> Expect.equal False (Dict.member "newbie" applied.channels)
+                    , \_ -> Expect.equal 256 (Dict.size applied.channels)
+                    , \_ -> Expect.equal [] outs
+                    ]
+                    ()
+        , test "full DM set evicts the oldest read shell for a new peer" <|
+            \_ ->
+                let
+                    full =
+                        fillDmSet
+                            (\i ->
+                                if i == 0 then
+                                    shellOf "user-0" 0 0
+
+                                else
+                                    shellOf ("user-" ++ String.fromInt i) 1 i
+                            )
+                            { blank | firstUnreadId = Dict.fromList [ ( "user-0", 7 ) ] }
+
+                    ( room, ok ) =
+                        ensureDmShellCapacity full "newbie"
+
+                    ( applied, _ ) =
+                        applyHistoryTarget { target = "newbie", latestAt = 999 } ( full, [] )
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True ok
+                    , \_ -> Expect.equal False (Dict.member "user-0" room.channels)
+                    , \_ -> Expect.equal 255 (dmConversationCount room)
+                    , \_ -> Expect.equal Nothing (Dict.get "user-0" room.firstUnreadId)
+                    , \_ -> Expect.equal True (Dict.member "newbie" applied.channels)
+                    , \_ -> Expect.equal False (Dict.member "user-0" applied.channels)
+                    , \_ -> Expect.equal 256 (dmConversationCount applied)
+                    ]
+                    ()
+        , test "live channel traffic without membership seeds nothing" <|
+            \_ ->
+                let
+                    ( dropped, outs ) =
+                        feed blank ":bob!u@h PRIVMSG #ghost :hi"
+
+                    ( noticeDropped, noticeOuts ) =
+                        feed blank ":srv NOTICE #ghost :note"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (Dict.get "#ghost" dropped.channels)
+                    , \_ -> Expect.equal [] outs
+                    , \_ -> Expect.equal Nothing (Dict.get "#ghost" noticeDropped.channels)
+                    , \_ -> Expect.equal [] noticeOuts
+                    ]
+                    ()
+        , test "live DM lands in the sender bucket, never the wire target" <|
+            \_ ->
+                let
+                    ( m1, outs ) =
+                        feed { blank | ourNick = "me" } ":bob!u@h PRIVMSG me :hi"
+
+                    ( m2, _ ) =
+                        feed m1 ":carol!u@h PRIVMSG me :yo"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hi" ] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" m1.channels))))
+                    , \_ -> Expect.equal Nothing (Dict.get "me" m1.channels)
+                    , \_ -> Expect.equal [ "yo" ] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "carol" m2.channels))))
+                    , \_ -> Expect.equal [ "hi" ] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" m2.channels))))
+                    , \_ ->
+                        Expect.equal True
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        VaultPersist { target } ->
+                                            target == "bob"
+
+                                        _ ->
+                                            False
+                                )
+                                outs
+                            )
+                    ]
+                    ()
+        , test "live DM at a full set refuses when nothing is evictable" <|
+            \_ ->
+                let
+                    full =
+                        fillDmSet (\i -> shellOf ("user-" ++ String.fromInt i) 1 i) blank
+
+                    ( refused, outs ) =
+                        feed full ":newbie!u@h PRIVMSG me :hi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 256 (dmConversationCount refused)
+                    , \_ -> Expect.equal Nothing (Dict.get "newbie" refused.channels)
+                    , \_ -> Expect.equal [] outs
+                    ]
+                    ()
+        , test "live DM at a full set evicts the oldest read shell" <|
+            \_ ->
+                let
+                    full =
+                        fillDmSet
+                            (\i ->
+                                if i == 0 then
+                                    shellOf "user-0" 0 0
+
+                                else
+                                    shellOf ("user-" ++ String.fromInt i) 1 i
+                            )
+                            blank
+
+                    ( admitted, outs ) =
+                        feed full ":newbie!u@h PRIVMSG me :hi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False (Dict.member "user-0" admitted.channels)
+                    , \_ -> Expect.equal [ "hi" ] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "newbie" admitted.channels))))
+                    , \_ -> Expect.equal False (List.isEmpty outs)
+                    ]
+                    ()
+        , test "plain batches consume discoveries and settle loading plus DM stamps" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    ( requested, _ ) =
+                        feed joined ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( r1, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( r2, _ ) =
+                        feed r1 ":irc.example CHATHISTORY TARGETS bob timestamp=2026-10-04T12:05:00.000Z"
+
+                    ( closed, _ ) =
+                        feed r2 "BATCH -t1"
+
+                    ( backfill, _ ) =
+                        feed closed "BATCH +h1 draft/chathistory #a"
+
+                    ( held, _ ) =
+                        feed backfill "@batch=h1;time=2026-10-04T11:59:00.000Z :bob!u@h PRIVMSG #a :old"
+
+                    ( merged, _ ) =
+                        feed held "BATCH -h1"
+
+                    ( dmBackfill, _ ) =
+                        feed merged "BATCH +h2 draft/chathistory bob"
+
+                    ( dmMerged, _ ) =
+                        feed dmBackfill "BATCH -h2"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "bob" ] (Dict.keys closed.pendingDiscoveries)
+                    , \_ -> Expect.equal [ "old" ] (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#a" merged.channels))))
+                    , \_ -> Expect.equal False (Set.member "#a" merged.historyLoading)
+                    , \_ -> Expect.equal [ "bob" ] (Dict.keys merged.pendingDiscoveries)
+                    , \_ -> Expect.equal False (Set.member "bob" dmMerged.historyLoading)
+                    , \_ ->
+                        Expect.equal (Maybe.map .latestAt (Dict.get "bob" closed.historyTargets))
+                            (Maybe.andThen .lastSeen (Dict.get "bob" dmMerged.channels))
+                    ]
+                    ()
+        , test "FAIL CHATHISTORY releases the named fetch" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    ( requested, _ ) =
+                        feed joined ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( collected, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -t1"
+
+                    ( failed, _ ) =
+                        feed closed ":irc.example FAIL CHATHISTORY INVALID_TARGET #a :history unavailable"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Set.member "#a" closed.historyLoading)
+                    , \_ -> Expect.equal False (Set.member "#a" failed.historyLoading)
+                    , \_ -> Expect.equal Dict.empty failed.pendingDiscoveries
+                    ]
+                    ()
+        , test "FAIL without channel context clears stuck TARGETS transport" <|
+            \_ ->
+                let
+                    ( requested, _ ) =
+                        feed { blank | caps = [ "chathistory" ] } ":irc.example 001 me :welcome"
+
+                    ( failedPending, _ ) =
+                        feed requested ":irc.example FAIL CHATHISTORY TARGETS :history unavailable"
+
+                    ( requested2, _ ) =
+                        feed failedPending ":irc.example 001 me :welcome back"
+
+                    ( opened, _ ) =
+                        feed requested2 "BATCH +t1 draft/chathistory-targets"
+
+                    ( failedOpen, _ ) =
+                        feed opened ":irc.example FAIL CHATHISTORY TARGETS :history unavailable"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True requested.historyTargetsPending
+                    , \_ -> Expect.equal False failedPending.historyTargetsPending
+                    , \_ -> Expect.equal (Just "t1") opened.historyTargetsBatchRef
+                    , \_ -> Expect.equal False failedOpen.historyTargetsPending
+                    , \_ -> Expect.equal Nothing failedOpen.historyTargetsBatchRef
+                    , \_ -> Expect.equal Dict.empty failedOpen.historyBatches
+                    ]
+                    ()
+        , test "background channel rows bump unread with mention highlights" <|
+            \_ ->
+                let
+                    counts model =
+                        Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" model.channels)
+
+                    echoed =
+                        { blank | caps = [ "echo-message" ] }
+
+                    ( m1, _ ) =
+                        feed (joinFirst echoed "me" "#c") ":bob!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :me, look here"
+
+                    ( m3, _ ) =
+                        feed m2 ":me!u@h PRIVMSG #c :mine"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just ( 1, 0 )) (counts m1)
+                    , \_ -> Expect.equal (Just ( 2, 1 )) (counts m2)
+                    , \_ -> Expect.equal (Just ( 2, 1 )) (counts m3)
+                    , \_ -> Expect.equal [ False, True, False ] (List.map .highlight (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m3.channels))))
+                    ]
+                    ()
+        , test "open conversation rows store without counting" <|
+            \_ ->
+                let
+                    ( watching, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( selected, _ ) =
+                        update (ChannelSelect "#c") watching
+
+                    ( m, _ ) =
+                        feed selected ":bob!u@h PRIVMSG #c :hello me"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m.channels))
+                    , \_ -> Expect.equal [ True ] (List.map .highlight (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m.channels))))
+                    ]
+                    ()
+        , test "selecting a conversation marks it read" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :two @here"
+
+                    ( read, _ ) =
+                        update (ChannelSelect "#c") m2
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 2, 1 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m2.channels))
+                    , \_ -> Expect.equal True (Dict.member "#c" m2.firstUnreadId)
+                    , \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" read.channels))
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" read.firstUnreadId)
+                    , \_ -> Expect.equal Nothing (Dict.get "#ghost" read.channels)
+                    ]
+                    ()
+        , test "opening a conversation captures the unread divider" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :two @here"
+
+                    ( read, _ ) =
+                        update (ChannelSelect "#c") m2
+
+                    ( reread, _ ) =
+                        update (ChannelSelect "#c") read
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just 0) (Dict.get "#c" m2.firstUnreadId)
+                    , \_ -> Expect.equal (Just 0) (Dict.get "#c" read.viewUnreadDividerId)
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" read.firstUnreadId)
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" reread.viewUnreadDividerId)
+                    ]
+                    ()
+        , test "caught-up open captures no divider" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":bob!u@h PRIVMSG #c :one"
+
+                    ( read, _ ) =
+                        update (ChannelSelect "#c") { m1 | firstUnreadId = Dict.empty }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty read.viewUnreadDividerId
+                    , \_ -> Expect.equal Nothing (threadAnchorIndex read (Maybe.withDefault (bigShell "#c" 0) (Dict.get "#c" read.channels)))
+                    ]
+                    ()
+        , test "selecting a channel sends MARKREAD only when negotiated" <|
+            \_ ->
+                let
+                    capd =
+                        { blank | caps = [ "draft/read-marker" ], nowMs = 5000 }
+
+                    bare =
+                        { blank | nowMs = 5000 }
+
+                    ( m1, _ ) =
+                        feed (joinFirst capd "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( read, outs ) =
+                        update (ChannelSelect "#c") m1
+
+                    ( m2, _ ) =
+                        feed (joinFirst bare "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( readBare, outsBare ) =
+                        update (ChannelSelect "#c") m2
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "MARKREAD #c timestamp=1970-01-01T00:00:05.000Z\r\n" ]
+                            (List.map sendLineText outs)
+                    , \_ -> Expect.equal (Just "1970-01-01T00:00:05.000Z") (Dict.get "#c" read.readMarkers)
+                    , \_ -> Expect.equal (Just 5000) (Dict.get "#c" read.lastReadAt)
+                    , \_ -> Expect.equal [] (List.map sendLineText outsBare)
+                    , \_ -> Expect.equal (Just "1970-01-01T00:00:05.000Z") (Dict.get "#c" readBare.readMarkers)
+                    , \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" read.channels))
+                    ]
+                    ()
+        , test "server MARKREAD re-derives unread from the marker" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | nowMs = 1000 } "me" "#c") ":bob!u@h PRIVMSG #c :one me"
+
+                    ( m2, _ ) =
+                        feed { m1 | nowMs = 3000 } ":bob!u@h PRIVMSG #c :two"
+
+                    ( marked, _ ) =
+                        feed m2 ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 2, 1 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m2.channels))
+                    , \_ -> Expect.equal (Just "1970-01-01T00:00:02Z") (Dict.get "#c" marked.readMarkers)
+                    , \_ ->
+                        Expect.equal (Just ( 1, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" marked.channels))
+                    ]
+                    ()
+        , test "MARKREAD accepts bare stamps and own-nick senders only" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | nowMs = 1000 } "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( m2, _ ) =
+                        feed { m1 | nowMs = 3000 } ":bob!u@h PRIVMSG #c :two"
+
+                    ( bare, _ ) =
+                        feed m2 ":irc.example.com MARKREAD #c 1970-01-01T00:00:02Z"
+
+                    ( foreign, _ ) =
+                        feed m2 ":mallory!u@h MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+
+                    ( own, _ ) =
+                        feed m2 ":me!u@h MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 1, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" bare.channels))
+                    , \_ ->
+                        Expect.equal (Just ( 2, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" foreign.channels))
+                    , \_ -> Expect.equal Dict.empty foreign.readMarkers
+                    , \_ ->
+                        Expect.equal (Just ( 1, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" own.channels))
+                    ]
+                    ()
+        , test "MARKREAD star drops the marker without touching counts" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed { blank | nowMs = 1000 } ":bob!u@h PRIVMSG #c :one"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+
+                    ( starred, _ ) =
+                        feed m2 ":irc.example.com MARKREAD #c *"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Dict.member "#c" m2.readMarkers)
+                    , \_ -> Expect.equal Dict.empty starred.readMarkers
+                    , \_ ->
+                        Expect.equal
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m2.channels))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" starred.channels))
+                    ]
+                    ()
+        , test "unparseable marker stores without recomputing" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst { blank | nowMs = 1000 } "me" "#c") ":bob!u@h PRIVMSG #c :one"
+
+                    ( marked, _ ) =
+                        feed m1 ":irc.example.com MARKREAD #c timestamp=not-a-date"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "not-a-date") (Dict.get "#c" marked.readMarkers)
+                    , \_ ->
+                        Expect.equal (Just ( 1, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" marked.channels))
+                    ]
+                    ()
+        , test "marker zeroes an open room and merges re-derive" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed { blank | nowMs = 1000 } ":bob!u@h PRIVMSG #c :one"
+
+                    ( watching, _ ) =
+                        feed m1 ":me!u@h JOIN #c"
+
+                    ( selected, _ ) =
+                        update (ChannelSelect "#c") watching
+
+                    ( marked, _ ) =
+                        feed { selected | nowMs = 3000 } ":irc.example.com MARKREAD #c timestamp=1970-01-01T00:00:02Z"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" marked.channels))
+                    , \_ -> Expect.equal (Just "1970-01-01T00:00:02Z") (Dict.get "#c" marked.readMarkers)
+                    ]
+                    ()
+        , test "blocklist parsing normalizes fail-closed" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Set.fromList [ "bob", "alice" ])
+                            (parseNameBlocklist 512 128 [ " Bob ", "ALICE", "", "  ", "bob" ])
+                    , \_ ->
+                        Expect.equal Set.empty
+                            (parseNameBlocklist 512 128 [ "a\u{0007}b", String.repeat 129 "x" ])
+                    , \_ ->
+                        Expect.equal (Set.fromList [ "a", "b" ])
+                            (parseNameBlocklist 2 128 [ "a", "b", "c" ])
+                    ]
+                    ()
+        , test "ignored senders drop silently on channels" <|
+            \_ ->
+                let
+                    ( ignored, outs ) =
+                        update (IgnoreUser " Bob ") blank
+
+                    ( m, _ ) =
+                        feed ignored ":bob!u@h PRIVMSG #c :hi"
+
+                    ( unignored, outs2 ) =
+                        update (UnignoreUser "BOB") ignored
+
+                    ( m2, _ ) =
+                        feed (joinFirst unignored "me" "#c") ":bob!u@h PRIVMSG #c :hi"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Set.fromList [ "bob" ]) ignored.ignoredUsers
+                    , \_ -> Expect.equal [ BlocklistsSave { ignored = [ "bob" ], muted = [] } ] outs
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" m.channels)
+                    , \_ -> Expect.equal Set.empty unignored.ignoredUsers
+                    , \_ -> Expect.equal [ BlocklistsSave { ignored = [], muted = [] } ] outs2
+                    , \_ -> Expect.equal 1 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    ]
+                    ()
+        , test "ignored DMs stay visible as placeholders without counting" <|
+            \_ ->
+                let
+                    ( ignored, _ ) =
+                        update (IgnoreUser "mallory") blank
+
+                    ( m, _ ) =
+                        feed ignored ":mallory!u@h PRIVMSG me :s3cret me"
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "mallory" m.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Message from ignored user" ] (List.map .body rows)
+                    , \_ -> Expect.equal [ False ] (List.map .highlight rows)
+                    , \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "mallory" m.channels))
+                    ]
+                    ()
+        , test "muted DMs store without counting and mute clears arrears" <|
+            \_ ->
+                let
+                    shell =
+                        { name = "bob"
+                        , topic = ""
+                        , members = Dict.empty
+                        , modes = ""
+                        , messages = []
+                        , lastSeen = Nothing
+                        , unread = 2
+                        , highlights = 1
+                        , createdAt = Nothing
+                        }
+
+                    seeded =
+                        { blank
+                            | channels = Dict.insert "bob" shell blank.channels
+                            , firstUnreadId = Dict.fromList [ ( "bob", 7 ) ]
+                        }
+
+                    ( muted, outs ) =
+                        update (MuteDm "Bob") seeded
+
+                    ( m, _ ) =
+                        feed muted ":bob!u@h PRIVMSG me :again"
+
+                    ( unmuted, outs2 ) =
+                        update (UnmuteDm "BOB") muted
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" m.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Set.fromList [ "bob" ]) muted.mutedDMs
+                    , \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "bob" muted.channels))
+                    , \_ -> Expect.equal Nothing (Dict.get "bob" muted.firstUnreadId)
+                    , \_ -> Expect.equal [ BlocklistsSave { ignored = [], muted = [ "bob" ] } ] outs
+                    , \_ -> Expect.equal [ "again" ] (List.map .body rows)
+                    , \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "bob" m.channels))
+                    , \_ -> Expect.equal Set.empty unmuted.mutedDMs
+                    , \_ -> Expect.equal [ BlocklistsSave { ignored = [], muted = [] } ] outs2
+                    , \_ -> Expect.equal [ "Mute conversation" ] (List.map .title muted.toasts)
+                    , \_ ->
+                        Expect.equal [ "Mute conversation", "Unmute conversation" ]
+                            (List.map .title unmuted.toasts)
+                    ]
+                    ()
+        , test "discovery backfill skips ignored senders" <|
+            \_ ->
+                let
+                    ( ignored, _ ) =
+                        update (IgnoreUser "bob") { blank | caps = [ "chathistory" ], ourNick = "me" }
+
+                    ( joined, _ ) =
+                        feed ignored ":me!u@h JOIN #a"
+
+                    ( requested, _ ) =
+                        feed joined ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( collected, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -t1"
+
+                    ( backfill, _ ) =
+                        feed closed "BATCH +h1 draft/chathistory #a"
+
+                    ( held, _ ) =
+                        feed backfill "@batch=h1 :bob!u@h PRIVMSG #a :old me"
+
+                    ( merged, _ ) =
+                        feed held "BATCH -h1"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#a" merged.channels))
+                    , \_ -> Expect.equal 1 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#a" merged.channels))))
+                    ]
+                    ()
+        , test "background mentions emit granted desktop and sound alerts" <|
+            \_ ->
+                let
+                    setup =
+                        { blank | pageVisible = False, appFocused = False, nowMs = 10000 }
+
+                    ( granted, _ ) =
+                        update (NotifyPermissionChanged "granted") setup
+
+                    ( m, outs ) =
+                        feed (joinFirst granted "me" "#c") ":bob!u@h PRIVMSG #c :hi me"
+
+                    alerts =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    NotifyAlert a ->
+                                        Just a
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outs
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ { title = "bob mentioned you in #c"
+                              , body = "hi me"
+                              , tag = "onyx-#c"
+                              , desktop = True
+                              , sound = True
+                              , volume = 0.5
+                              }
+                            ]
+                            alerts
+                    , \_ -> Expect.equal (Just 10000) (Dict.get "#c" m.lastDesktopAt)
+                    , \_ -> Expect.equal (Just 10000) (Dict.get "#c" m.lastSoundAt)
+                    ]
+                    ()
+        , test "alerts stay silent when focused, open, self, muted, or dnd" <|
+            \_ ->
+                let
+                    alerts outs =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    NotifyAlert a ->
+                                        Just a
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outs
+
+                    inactive =
+                        { blank | pageVisible = False, appFocused = False, nowMs = 10000 }
+
+                    ( granted, _ ) =
+                        update (NotifyPermissionChanged "granted") inactive
+
+                    ( _, focusedOuts ) =
+                        feed blank ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( seeded, _ ) =
+                        feed granted ":me!u@h JOIN #c"
+
+                    ( watching, _ ) =
+                        update (ChannelSelect "#c") seeded
+
+                    ( _, openOuts ) =
+                        feed { watching | pageVisible = False, appFocused = False } ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( _, selfOuts ) =
+                        feed granted ":me!u@h PRIVMSG #c :hi me"
+
+                    ( _, mutedOuts ) =
+                        feed { granted | channelNotify = Dict.fromList [ ( "#c", "none" ) ] } ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( _, dndOuts ) =
+                        feed { granted | dndEnabled = True } ":bob!u@h PRIVMSG #c :hi me"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (alerts focusedOuts)
+                    , \_ -> Expect.equal [] (alerts openOuts)
+                    , \_ -> Expect.equal [] (alerts selfOuts)
+                    , \_ -> Expect.equal [] (alerts mutedOuts)
+                    , \_ -> Expect.equal [] (alerts dndOuts)
+                    ]
+                    ()
+        , test "DMs and followed rooms alert with their own titles" <|
+            \_ ->
+                let
+                    alerts outs =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    NotifyAlert a ->
+                                        Just a
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outs
+
+                    inactive =
+                        { blank | pageVisible = False, appFocused = False, nowMs = 10000 }
+
+                    ( granted, _ ) =
+                        update (NotifyPermissionChanged "granted") inactive
+
+                    ( _, dmOuts ) =
+                        feed granted ":bob!u@h PRIVMSG me :hi"
+
+                    ( following, followOuts ) =
+                        update (FollowConversation { target = " #C ", topic = Nothing }) granted
+
+                    ( _, followOuts2 ) =
+                        feed (joinFirst following "me" "#c") ":bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "Direct message from bob" ] (List.map .title (alerts dmOuts))
+                    , \_ -> Expect.equal (Set.fromList [ "#c" ]) following.followed
+                    , \_ -> Expect.equal [ FollowedSave { keys = [ "#c" ] } ] followOuts
+                    , \_ ->
+                        Expect.equal [ "bob posted in #c" ] (List.map .title (alerts followOuts2))
+                    ]
+                    ()
+        , test "topic tags parse with oracle validity" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "general") (parseMessageTopic (Dict.fromList [ ( "onyx/topic", "  general " ) ]))
+                    , \_ -> Expect.equal Nothing (parseMessageTopic Dict.empty)
+                    , \_ -> Expect.equal Nothing (parseMessageTopic (Dict.fromList [ ( "onyx/topic", "   " ) ]))
+                    , \_ -> Expect.equal Nothing (parseMessageTopic (Dict.fromList [ ( "onyx/topic", "a,b" ) ]))
+                    , \_ -> Expect.equal Nothing (parseMessageTopic (Dict.fromList [ ( "onyx/topic", "a\u{0001}b" ) ]))
+                    , \_ -> Expect.equal Nothing (parseMessageTopic (Dict.fromList [ ( "onyx/topic", String.repeat 51 "a" ) ]))
+                    , \_ -> Expect.equal (Just (String.repeat 25 "é")) (parseMessageTopic (Dict.fromList [ ( "onyx/topic", String.repeat 25 "é" ) ]))
+                    , \_ -> Expect.equal Nothing (parseMessageTopic (Dict.fromList [ ( "onyx/topic", String.repeat 26 "é" ) ]))
+                    , \_ -> Expect.equal True (isValidTopicLabel "general")
+                    , \_ -> Expect.equal 50 (utf8ByteLength (String.repeat 25 "é"))
+                    ]
+                    ()
+        , test "followed topics alert and record with narrowing" <|
+            \_ ->
+                let
+                    alerts outs =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    NotifyAlert a ->
+                                        Just a
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outs
+
+                    follows m =
+                        List.filter (\note -> note.kind == NotifFollow) m.notifications
+
+                    inactive =
+                        { blank | pageVisible = False, appFocused = False, nowMs = 10000 }
+
+                    ( granted, _ ) =
+                        update (NotifyPermissionChanged "granted") inactive
+
+                    ( topicOnly, _ ) =
+                        update (FollowConversation { target = "#c", topic = Just "general" }) granted
+
+                    ( m1, outs1 ) =
+                        feed (joinFirst topicOnly "me" "#c") "@onyx/topic=general :bob!u@h PRIVMSG #c :hello"
+
+                    ( both, _ ) =
+                        update (FollowConversation { target = "#c", topic = Nothing }) topicOnly
+
+                    ( m2, _ ) =
+                        feed (joinFirst both "me" "#c") "@onyx/topic=random :bob!u@h PRIVMSG #c :hello"
+
+                    ( m3, _ ) =
+                        feed (joinFirst both "me" "#c") "@onyx/topic=general :bob!u@h PRIVMSG #c :hello"
+
+                    ( watching, _ ) =
+                        update (ChannelSelect "#c") topicOnly
+
+                    ( m4, outs4 ) =
+                        feed (joinFirst watching "me" "#c") "@onyx/topic=general :bob!u@h PRIVMSG #c :hello"
+
+                    ( _, outs5 ) =
+                        feed (joinFirst granted "me" "#c") "@onyx/topic=general :bob!u@h PRIVMSG #c :hello"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "bob posted in #c" ] (List.map .title (alerts outs1))
+                    , \_ -> Expect.equal [ Just "general" ] (List.map .topic (follows m1))
+                    , \_ -> Expect.equal [ Nothing ] (List.map .topic (follows m2))
+                    , \_ -> Expect.equal [ Just "general" ] (List.map .topic (follows m3))
+                    , \_ -> Expect.equal [] (follows m4)
+                    , \_ -> Expect.equal [] (alerts outs4)
+                    , \_ -> Expect.equal [] (alerts outs5)
+                    , \_ -> Expect.equal (Just (Just "general")) (followNotifyTopic topicOnly "#c" (Just "general"))
+                    , \_ -> Expect.equal (Just Nothing) (followNotifyTopic both "#c" (Just "random"))
+                    , \_ -> Expect.equal Nothing (followNotifyTopic granted "#c" (Just "general"))
+                    ]
+                    ()
+        , test "mention and DM inbox producers mirror the oracle arms" <|
+            \_ ->
+                let
+                    mentions m =
+                        List.filter (\note -> note.kind == NotifMention) m.notifications
+
+                    dms m =
+                        List.filter (\note -> note.kind == NotifDm) m.notifications
+
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( watching, _ ) =
+                        update (ChannelSelect "#c") (joinFirst blank "me" "#c")
+
+                    ( m2, _ ) =
+                        feed watching ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( m3, _ ) =
+                        feed (joinFirst blank "me" "#c") ":me!u@h PRIVMSG #c :hi me"
+
+                    base4 =
+                        joinFirst blank "me" "#c"
+
+                    ( m4, _ ) =
+                        feed { base4 | channelNotify = Dict.fromList [ ( "#c", "none" ) ] } ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( m5, _ ) =
+                        feed (joinFirst blank "me" "#c") ":bob!u@h PRIVMSG #c :hello"
+
+                    ( ignored, _ ) =
+                        update (IgnoreUser "bob") (joinFirst blank "me" "#c")
+
+                    ( m6, _ ) =
+                        feed ignored ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( m7, _ ) =
+                        feed { blank | ourNick = "me" } ":bob!u@h PRIVMSG me :hello"
+
+                    ( m8, _ ) =
+                        feed { blank | ourNick = "me", mutedDMs = Set.fromList [ "bob" ] } ":bob!u@h PRIVMSG me :hello"
+
+                    ( sealed, _ ) =
+                        feed { blank | ourNick = "me" } (":bob!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    ( opened, _ ) =
+                        update (DmOpenResult { peer = "bob", messageId = 0, envelope = envelopeBody, plaintext = "decrypted hi" }) sealed
+
+                    ( m9, _ ) =
+                        feed { blank | ourNick = "me" } (":bob!u@h PRIVMSG me :" ++ roomEnvelopeBody)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ ( "hi me", Just "bob", Just "#c" ) ] (List.map (\n -> ( n.text, n.from, n.channel )) (mentions m1))
+                    , \_ -> Expect.equal 1 (List.length (mentions m2))
+                    , \_ -> Expect.equal [] (mentions m3)
+                    , \_ -> Expect.equal [] (mentions m4)
+                    , \_ -> Expect.equal [] (mentions m5)
+                    , \_ -> Expect.equal 1 (List.length (mentions m6))
+                    , \_ -> Expect.equal 0 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m6.channels))))
+                    , \_ -> Expect.equal [ ( "hello", Just "bob", Nothing ) ] (List.map (\n -> ( n.text, n.from, n.channel )) (dms m7))
+                    , \_ -> Expect.equal [] (dms m8)
+                    , \_ -> Expect.equal [] (dms sealed)
+                    , \_ -> Expect.equal [ ( "decrypted hi", Just "bob", Nothing ) ] (List.map (\n -> ( n.text, n.from, n.channel )) (dms opened))
+                    , \_ -> Expect.equal [ GroupEnvelope.groupLockedPlaceholder ] (List.map .text (dms m9))
+                    ]
+                    ()
+        , test "alert bodies redact envelopes and sounds throttle" <|
+            \_ ->
+                let
+                    alerts outs =
+                        List.filterMap
+                            (\o ->
+                                case o of
+                                    NotifyAlert a ->
+                                        Just a
+
+                                    _ ->
+                                        Nothing
+                            )
+                            outs
+
+                    inactive =
+                        { blank | pageVisible = False, appFocused = False, nowMs = 10000 }
+
+                    ( granted, _ ) =
+                        update (NotifyPermissionChanged "granted") inactive
+
+                    ( _, envOuts ) =
+                        feed granted (":bob!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    ( m1, outs1 ) =
+                        feed (joinFirst granted "me" "#c") ":bob!u@h PRIVMSG #c :hi me"
+
+                    ( _, outs2 ) =
+                        feed m1 ":bob!u@h PRIVMSG #c :yo me"
+
+                    ( ungranted, ungrantedOuts ) =
+                        feed (joinFirst inactive "me" "#c") ":bob!u@h PRIVMSG #c :hi me"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "New encrypted message" ] (List.map .body (alerts envOuts))
+                    , \_ -> Expect.equal 1 (List.length (alerts outs1))
+                    , \_ -> Expect.equal [] (alerts outs2)
+                    , \_ ->
+                        Expect.equal [ { title = "bob mentioned you in #c", body = "hi me", tag = "onyx-#c", desktop = False, sound = True, volume = 0.5 } ]
+                            (alerts ungrantedOuts)
+                    , \_ -> Expect.equal Dict.empty ungranted.lastDesktopAt
+                    , \_ -> Expect.equal (Just 10000) (Dict.get "#c" ungranted.lastSoundAt)
+                    ]
+                    ()
+        , test "follow keys and permission strings normalize" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal "#c/dev" (followKey " #C " (Just " Dev "))
+                    , \_ -> Expect.equal "#c" (followKey "#C" Nothing)
+                    , \_ ->
+                        Expect.equal (Set.fromList [ "#c", "#c/dev" ])
+                            (parseFollowedKeys [ "#C", "#c/dev", "", "#C" ])
+                    , \_ -> Expect.equal Set.empty (parseFollowedKeys [ "", "   " ])
+                    ]
+                    ()
+        , test "notify levels gate counting" <|
+            \_ ->
+                let
+                    muted =
+                        { blank | channelNotify = Dict.fromList [ ( "#c", "none" ) ] }
+
+                    mentions =
+                        { blank | channelNotify = Dict.fromList [ ( "#c", "mentions" ) ] }
+
+                    counts model =
+                        Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" model.channels)
+
+                    ( m1, _ ) =
+                        feed (joinFirst muted "me" "#c") ":bob!u@h PRIVMSG #c :hello me"
+
+                    ( m2, _ ) =
+                        feed (joinFirst mentions "me" "#c") ":bob!u@h PRIVMSG #c :plain hello"
+
+                    ( m3, _ ) =
+                        feed m2 ":bob!u@h PRIVMSG #c :@everyone listen"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just ( 0, 0 )) (counts m1)
+                    , \_ -> Expect.equal 1 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m1.channels))))
+                    , \_ -> Expect.equal (Just ( 0, 0 )) (counts m2)
+                    , \_ -> Expect.equal (Just ( 1, 1 )) (counts m3)
+                    ]
+                    ()
+        , test "saved keywords highlight whole tokens only" <|
+            \_ ->
+                let
+                    keyed =
+                        { blank | highlightWords = [ "deploy", "ship it" ] }
+
+                    counts model =
+                        Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" model.channels)
+
+                    ( m1, _ ) =
+                        feed (joinFirst keyed "me" "#c") ":bob!u@h PRIVMSG #c :ship the deploy today"
+
+                    ( m2, _ ) =
+                        feed (joinFirst keyed "me" "#c") ":bob!u@h PRIVMSG #c :a deployment plan"
+
+                    ( m3, _ ) =
+                        feed (joinFirst keyed "me" "#c") ":bob!u@h PRIVMSG #c :we ship it now"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just ( 1, 1 )) (counts m1)
+                    , \_ -> Expect.equal [ False ] (List.map .highlight (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m1.channels))))
+                    , \_ -> Expect.equal (Just ( 1, 0 )) (counts m2)
+                    , \_ -> Expect.equal (Just ( 1, 1 )) (counts m3)
+                    ]
+                    ()
+        , test "DM delivery always highlights and sealed bodies never match" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed { blank | ourNick = "me" } ":bob!u@h PRIVMSG me :hi there"
+
+                    ( m2, _ ) =
+                        feed (joinFirst m1 "me" "#c") ":bob!u@h PRIVMSG #c :ONYXDM1 me stuff"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ True ] (List.map .highlight (Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" m1.channels))))
+                    , \_ ->
+                        Expect.equal (Just ( 1, 1 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "bob" m1.channels))
+                    , \_ -> Expect.equal [ False ] (List.map .highlight (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))))
+                    ]
+                    ()
+        , test "discovery backfill bumps only background rows" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed { blank | caps = [ "chathistory" ], ourNick = "me" } ":me!u@h JOIN #a"
+
+                    -- The join-fetch completed off-stage, so the sweep
+                    -- plants the discovery the manual batch consumes.
+                    releasedJoin =
+                        { joined | historyLoading = Set.empty }
+
+                    ( requested, _ ) =
+                        feed releasedJoin ":irc.example 001 me :welcome"
+
+                    ( opened, _ ) =
+                        feed requested "BATCH +t1 draft/chathistory-targets"
+
+                    ( collected, _ ) =
+                        feed opened ":irc.example CHATHISTORY TARGETS #a timestamp=2026-10-04T12:00:00.000Z"
+
+                    ( closed, _ ) =
+                        feed collected "BATCH -t1"
+
+                    ( backfill, _ ) =
+                        feed closed "BATCH +h1 draft/chathistory #a"
+
+                    ( held, _ ) =
+                        feed backfill "@batch=h1 :bob!u@h PRIVMSG #a :old me"
+
+                    ( merged, _ ) =
+                        feed held "BATCH -h1"
+
+                    ( watching, _ ) =
+                        update (ChannelSelect "#a") merged
+
+                    ( backfill2, _ ) =
+                        feed watching "BATCH +h2 draft/chathistory #a"
+
+                    ( held2, _ ) =
+                        feed backfill2 "@batch=h2 :bob!u@h PRIVMSG #a :older"
+
+                    ( merged2, _ ) =
+                        feed held2 "BATCH -h2"
+
+                    counts model =
+                        Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#a" model.channels)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just ( 1, 1 )) (counts merged)
+                    , \_ -> Expect.equal (Just ( 0, 0 )) (counts merged2)
+                    , \_ -> Expect.equal 2 (List.length (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#a" merged2.channels))))
+                    ]
+                    ()
+        , test "MODE tracks flags and member status" <|
+            \_ ->
+                let
+                    ( s0, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed s0 ":alice!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":op!u@h MODE #c +m"
+
+                    ( m3, _ ) =
+                        feed m2 ":op!u@h MODE #c +o alice"
+                in
+                case Dict.get "#c" m3.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal "+m" c.modes
+                            , \_ ->
+                                Expect.equal (Just (Set.fromList [ 'o' ]))
+                                    (Maybe.map .modes (Dict.get "alice" c.members))
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "topic 332 sets and 331 leaves it alone" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed joined ":s 332 me #c :hello topic"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 331 me #c"
+
+                    ( stray, _ ) =
+                        feed blank ":s 332 me #ghost :spooky"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "hello topic" (Maybe.withDefault "" (Maybe.map .topic (Dict.get "#c" m1.channels)))
+                    , \_ -> Expect.equal "hello topic" (Maybe.withDefault "x" (Maybe.map .topic (Dict.get "#c" m2.channels)))
+                    , \_ -> Expect.equal Nothing (Dict.get "#ghost" stray.channels)
+                    ]
+                    ()
+        , test "332 empty and short forms clear without history" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( seeded, _ ) =
+                        feed joined ":s 332 me #c :seeded topic"
+
+                    ( emptied, _ ) =
+                        feed seeded ":s 332 me #c :"
+
+                    ( short, _ ) =
+                        feed emptied ":s 332 me #c :again"
+
+                    ( cleared, _ ) =
+                        feed short ":s 332 me #c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "seeded topic") (Dict.get "#c" seeded.channels |> Maybe.map .topic)
+                    , \_ -> Expect.equal (Just "") (Dict.get "#c" emptied.channels |> Maybe.map .topic)
+                    -- The empty 332 records nothing: the seed entry
+                    -- stands unchanged.
+                    , \_ -> Expect.equal (Just [ "seeded topic" ]) (Dict.get "#c" emptied.topicHistory)
+                    , \_ -> Expect.equal (Just "") (Dict.get "#c" cleared.channels |> Maybe.map .topic)
+                    , \_ -> Expect.equal (Just [ "again", "seeded topic" ]) (Dict.get "#c" cleared.topicHistory)
+                    ]
+                    ()
+        , test "TOPIC clear audits and ghost TOPIC records without conjuring" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( seeded, _ ) =
+                        feed joined ":op!u@h TOPIC #c :loud"
+
+                    before =
+                        List.length seeded.auditLog
+
+                    ( m1, _ ) =
+                        feed seeded ":op!u@h TOPIC #c :"
+
+                    ( m2, _ ) =
+                        feed m1 ":op!u@h TOPIC #ghost :spooky"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "") (Dict.get "#c" m1.channels |> Maybe.map .topic)
+                    , \_ -> Expect.equal (before + 1) (List.length m1.auditLog)
+                    , \_ ->
+                        Expect.equal (Just ( AuditTopic, Just "", Just "#c" ))
+                            (List.head m1.auditLog |> Maybe.map (\e -> ( e.kind, e.detail, e.channel )))
+                    , \_ -> Expect.equal Nothing (Dict.get "#ghost" m2.channels)
+                    , \_ -> Expect.equal (Just [ "spooky" ]) (Dict.get "#ghost" m2.topicHistory)
+                    , \_ -> Expect.equal (before + 2) (List.length m2.auditLog)
+                    ]
+                    ()
+        , test "333 falls through to the default numeric log" <|
+            \_ ->
+                let
+                    ( m1, out ) =
+                        feed blank ":s 333 me #c op!u@h :1700000000"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal Dict.empty m1.channels
+                    , \_ -> Expect.equal True (List.member "#c op!u@h 1700000000" m1.serviceLog)
+                    ]
+                    ()
+        , test "PRIVMSG fold emits VaultPersist with a target:seq id" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :hi"
+                in
+                Expect.equal
+                    [ VaultPersist
+                        { target = "#c"
+                        , rows =
+                            [ { id = "#c:0", target = "#c", from = "alice", body = "hi", at = 0 } ]
+                        }
+                    ]
+                    outbound
+        , test "PING fold emits no VaultPersist" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        feed blank ":s PING :abc123"
+                in
+                Expect.equal False
+                    (List.any
+                        (\o ->
+                            case o of
+                                VaultPersist _ ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        outbound
+                    )
+        , test "ChannelSelect on an empty channel emits VaultFetch" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( _, outbound ) =
+                        update (ChannelSelect "#c") joined
+                in
+                Expect.equal [ VaultFetch { target = "#c", limit = 400 } ] outbound
+        , test "ChannelSelect on a live channel emits no fetch" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":alice!u@h PRIVMSG #c :hi"
+
+                    ( _, outbound ) =
+                        update (ChannelSelect "#c") m1
+                in
+                Expect.equal [] outbound
+        , test "VaultRowsReceived fills an empty channel and fast-forwards seq" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( loaded, _ ) =
+                        update
+                            (VaultRowsReceived
+                                { target = "#c"
+                                , rows =
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "old", at = 0 } ]
+                                , status = "ok"
+                                }
+                            )
+                            joined
+                in
+                case Dict.get "#c" loaded.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal [ "old" ] (List.map .body c.messages)
+                            , \_ -> Expect.equal 8 loaded.messageSeq
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "VaultRowsReceived never clobbers live messages" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
+
+                    ( m2, _ ) =
+                        update
+                            (VaultRowsReceived
+                                { target = "#c"
+                                , rows =
+                                    [ { id = "#c:7", target = "#c", from = "alice", body = "stale", at = 0 } ]
+                                , status = "ok"
+                                }
+                            )
+                            m1
+                in
+                case Dict.get "#c" m2.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal [ "live" ] (List.map .body c.messages)
+                            , \_ -> Expect.equal 1 m2.messageSeq
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "VaultRowsReceived ignores rows keyed under a longer prefix" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":alice!u@h JOIN #a"
+
+                    ( loaded, _ ) =
+                        update
+                            (VaultRowsReceived
+                                { target = "#a"
+                                , rows =
+                                    [ { id = "#ab:5", target = "#ab", from = "x", body = "nope", at = 0 } ]
+                                , status = "ok"
+                                }
+                            )
+                            joined
+                in
+                Expect.equal 0 loaded.messageSeq
+        , test "unavailable history logs on an empty channel, stays silent over live traffic" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( empty, _ ) =
+                        update (VaultRowsReceived { target = "#c", rows = [], status = "unavailable" }) joined
+
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
+
+                    ( m2, _ ) =
+                        update (VaultRowsReceived { target = "#c", rows = [], status = "unavailable" }) m1
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            "Local history is unavailable on this device."
+                            (Maybe.withDefault "" (List.head empty.serviceLog))
+                    , \_ -> Expect.equal m1.serviceLog m2.serviceLog
+                    ]
+                    ()
+        , test "around window merges ahead of the live tail without duplicating" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
+
+                    window =
+                        [ { id = "#c:0", target = "#c", from = "alice", body = "live", at = 1000 }
+                        , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100 }
+                        ]
+
+                    ( m2, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                in
+                case Dict.get "#c" m2.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal [ "live", "old" ] (List.map .body c.messages)
+                            , \_ -> Expect.equal (Just "#c:5") m2.historyLanding
+                            , \_ -> Expect.equal 6 m2.messageSeq
+                            , \_ -> Expect.equal True (List.member "#c:5" m2.vaultSeenIds)
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "around window fills an empty channel and picks the nearest landing" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    window =
+                        [ { id = "#c:3", target = "#c", from = "alice", body = "m3", at = 300 }
+                        , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400 }
+                        ]
+
+                    ( m2, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 350, rows = window, status = "ok" }) joined
+                in
+                case Dict.get "#c" m2.channels of
+                    Just c ->
+                        Expect.all
+                            [ \_ -> Expect.equal [ "m4", "m3" ] (List.map .body c.messages)
+                            , \_ -> Expect.equal (Just "#c:3") m2.historyLanding
+                            ]
+                            ()
+
+                    Nothing ->
+                        Expect.fail "expected #c"
+        , test "empty around window is a no-op; unavailable around logs" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h PRIVMSG #c :live"
+
+                    ( m2, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = [], status = "ok" }) m1
+
+                    ( m3, _ ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = [], status = "unavailable" }) m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m2.historyLanding
+                    , \_ -> Expect.equal (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels)))) [ "live" ]
+                    , \_ ->
+                        Expect.equal
+                            "Local history is unavailable on this device."
+                            (Maybe.withDefault "" (List.head m3.serviceLog))
+                    ]
+                    ()
+        , test "VaultExported logs the snapshot counts" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (VaultExported { targets = 2, messages = 40 }) blank
+                in
+                Expect.equal
+                    "Vault exported (40 messages, 2 targets)."
+                    (Maybe.withDefault "" (List.head m.serviceLog))
+        , test "VaultImportFile merges validated rows through VaultPersist" <|
+            \_ ->
+                let
+                    json =
+                        "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#C\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000},{\"id\":\"m2\",\"from\":\"b\",\"text\":\"yo\",\"type\":\"notice\",\"time\":2000}]}]}"
+
+                    ( m, outbound ) =
+                        update (VaultImportFile { json = json }) blank
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ VaultPersist
+                                { target = "#c"
+                                , rows =
+                                    [ { id = "m1", target = "#c", from = "a", body = "hi", at = 1000 }
+                                    , { id = "m2", target = "#c", from = "b", body = "yo", at = 2000 }
+                                    ]
+                                }
+                            ]
+                            outbound
+                    , \_ ->
+                        Expect.equal "Importing 2 messages into 1 conversations."
+                            (Maybe.withDefault "" (List.head m.serviceLog))
+                    ]
+                    ()
+        , test "VaultImportFile refuses blank, broken, and empty snapshots" <|
+            \_ ->
+                let
+                    ( blanked, blankedOut ) =
+                        update (VaultImportFile { json = "   " }) blank
+
+                    ( broken, _ ) =
+                        update (VaultImportFile { json = "{oops" }) blank
+
+                    ( wrong, _ ) =
+                        update (VaultImportFile { json = "{\"kind\":\"other\",\"version\":1,\"targets\":[]}" }) blank
+
+                    ( empty, _ ) =
+                        update (VaultImportFile { json = "{\"kind\":\"onyx-vault\",\"version\":1,\"targets\":[]}" }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] blankedOut
+                    , \_ -> Expect.equal [] blanked.serviceLog
+                    , \_ ->
+                        Expect.equal "Vault import file could not be read as JSON."
+                            (Maybe.withDefault "" (List.head broken.serviceLog))
+                    , \_ ->
+                        Expect.equal "Vault import file held no valid vault snapshot."
+                            (Maybe.withDefault "" (List.head wrong.serviceLog))
+                    , \_ ->
+                        Expect.equal "Vault import file held no importable messages."
+                            (Maybe.withDefault "" (List.head empty.serviceLog))
+                    ]
+                    ()
+        , test "WsBatchReceived folds every line in order" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update
+                            (WsBatchReceived
+                                { at = 0
+                                , lines =
+                                    [ ":s PING :abc123"
+                                    , ":alice!u@h PRIVMSG #c :hi"
+                                    ]
+                                }
+                            )
+                            (joinFirst blank "me" "#c")
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "PONG abc123\r\n") outbound)
+                    , \_ ->
+                        Expect.equal [ "hi" ]
+                            (Maybe.withDefault [] (Maybe.map (List.map .body << .messages) (Dict.get "#c" m1.channels)))
+                    ]
+                    ()
+        , test "WsClosed marks Offline and WsOpened recovers to Registering" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsClosed { clean = True, reason = "" }) blank
+
+                    ( m2, _ ) =
+                        update (WsOpened { url = "wss://x" }) m1
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Offline m1.connection
+                    , \_ -> Expect.equal Registering m2.connection
+                    ]
+                    ()
+        , test "auto-reconnect schedules, counts down, and redials" <|
+            \_ ->
+                let
+                    live =
+                        { blank | nowMs = 0, autoReconnect = True, endpoint = Just "wss://x" }
+
+                    ( down, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) live
+
+                    ( early, earlyOut ) =
+                        update (Tick (Time.millisToPosix 3999)) down
+
+                    ( due, dueOut ) =
+                        update (Tick (Time.millisToPosix 4000)) down
+
+                    ( down2, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) { due | connection = Offline }
+
+                    capped =
+                        { live | reconnectAttempts = 5 }
+
+                    ( stoodDown, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) capped
+
+                    ( manual, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) { live | autoReconnect = False }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 4 down.reconnectIn
+                    , \_ -> Expect.equal 4000 down.reconnectDueMs
+                    , \_ -> Expect.equal 1 early.reconnectIn
+                    , \_ -> Expect.equal [] earlyOut
+                    , \_ -> Expect.equal [ WsConnect { url = "wss://x" } ] dueOut
+                    , \_ -> Expect.equal 1 due.reconnectAttempts
+                    , \_ -> Expect.equal 0 due.reconnectDueMs
+                    , \_ -> Expect.equal 1 down2.reconnectAttempts
+                    , \_ -> Expect.equal 16000 down2.reconnectDueMs
+                    , \_ -> Expect.equal False stoodDown.autoReconnect
+                    , \_ -> Expect.equal 0 stoodDown.reconnectDueMs
+                    , \_ -> Expect.equal 0 manual.reconnectIn
+                    , \_ -> Expect.equal 4 (reconnectDelaySecs 0 0)
+                    , \_ -> Expect.equal True (reconnectDelaySecs 10 0 >= 1 && reconnectDelaySecs 10 0 <= 60)
+                    ]
+                    ()
+        , test "reconnect banner reads each recovery phase" <|
+            \_ ->
+                let
+                    live =
+                        { blank | nowMs = 10000, backOnlineAt = 0 }
+
+                    backOnline =
+                        { blank | nowMs = 11000, backOnlineAt = 10000 }
+
+                    expired =
+                        { blank | nowMs = 13001, backOnlineAt = 10000 }
+
+                    registering =
+                        { blank | connection = Registering }
+
+                    retrying =
+                        { blank | connection = Offline, reconnectDueMs = 5000, reconnectIn = 4, nowMs = 1000 }
+
+                    restoring =
+                        { blank | connection = Offline, reconnectDueMs = 5000, reconnectIn = 0 }
+
+                    dropped =
+                        { blank | connection = Offline, autoReconnect = True }
+
+                    manual =
+                        { blank | connection = Offline, autoReconnect = False }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (reconnectBanner live)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Back online", detail = "", online = True })
+                            (reconnectBanner backOnline)
+                    , \_ -> Expect.equal Nothing (reconnectBanner expired)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Connecting…", detail = "Opening a secure session to Onyx Server.", online = False })
+                            (reconnectBanner registering)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Reconnecting…", detail = "Retrying in 4s.", online = False })
+                            (reconnectBanner retrying)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Reconnecting…", detail = "Trying to restore your session.", online = False })
+                            (reconnectBanner restoring)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Disconnected", detail = "Connection lost — Onyx will retry automatically.", online = False })
+                            (reconnectBanner dropped)
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Disconnected", detail = "Reconnect when you are ready.", online = False })
+                            (reconnectBanner manual)
+                    ]
+                    ()
+        , test "001 off-live opens the Back-online window; 001 while live does not" <|
+            \_ ->
+                let
+                    down =
+                        { blank | connection = Offline, nowMs = 7000 }
+
+                    ( registered, _ ) =
+                        feed down ":irc.example 001 me :welcome"
+
+                    later =
+                        { registered | nowMs = 9000 }
+
+                    ( again, _ ) =
+                        feed later ":irc.example 001 me :welcome again"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Live registered.connection
+                    , \_ -> Expect.equal 7000 registered.backOnlineAt
+                    , \_ ->
+                        Expect.equal
+                            (Just { title = "Back online", detail = "", online = True })
+                            (reconnectBanner { registered | nowMs = 8000 })
+                    , \_ -> Expect.equal 7000 again.backOnlineAt
+                    ]
+                    ()
+        , test "ReconnectNow redials once from Offline and stands down elsewhere" <|
+            \_ ->
+                let
+                    down =
+                        { blank | connection = Offline, endpoint = Just "wss://x", reconnectAttempts = 2, reconnectIn = 3, reconnectDueMs = 9000 }
+
+                    ( fired, firedOut ) =
+                        update ReconnectNow down
+
+                    ( liveFired, liveOut ) =
+                        update ReconnectNow blank
+
+                    ( registeringFired, registeringOut ) =
+                        update ReconnectNow { blank | connection = Registering, endpoint = Just "wss://x" }
+
+                    ( noEndpoint, noOut ) =
+                        update ReconnectNow { down | endpoint = Nothing }
+
+                    ( blankUrl, blankOut ) =
+                        update ReconnectNow { down | endpoint = Just "  " }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ WsConnect { url = "wss://x" } ] firedOut
+                    , \_ -> Expect.equal 0 fired.reconnectAttempts
+                    , \_ -> Expect.equal 0 fired.reconnectIn
+                    , \_ -> Expect.equal 0 fired.reconnectDueMs
+                    , \_ -> Expect.equal [] liveOut
+                    , \_ -> Expect.equal [] registeringOut
+                    , \_ -> Expect.equal Registering registeringFired.connection
+                    , \_ -> Expect.equal [] noOut
+                    , \_ -> Expect.equal 0 noEndpoint.reconnectDueMs
+                    , \_ -> Expect.equal [] blankOut
+                    ]
+                    ()
+        , test "requestIdentify captures context and gates on live input" <|
+            \_ ->
+                let
+                    ( sent, sentOut ) =
+                        requestIdentify blank " alice " "s3cret"
+
+                    ( offline, offlineOut ) =
+                        requestIdentify { blank | connection = Offline } "alice" "s3cret"
+
+                    ( emptyAcct, emptyAcctOut ) =
+                        requestIdentify blank "  " "s3cret"
+
+                    ( emptyPass, emptyPassOut ) =
+                        requestIdentify blank "alice" ""
+
+                    ( badToken, badTokenOut ) =
+                        requestIdentify blank "alice" "has space"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "alice") sent.identifyReplyAccount
+                    , \_ -> Expect.equal Nothing sent.accountActionError
+                    , \_ -> Expect.equal [ SendLine "IDENTIFY alice s3cret\r\n" ] sentOut
+                    , \_ -> Expect.equal Nothing offline.identifyReplyAccount
+                    , \_ -> Expect.equal [] offlineOut
+                    , \_ -> Expect.equal Nothing emptyAcct.identifyReplyAccount
+                    , \_ -> Expect.equal [] emptyAcctOut
+                    , \_ -> Expect.equal Nothing emptyPass.identifyReplyAccount
+                    , \_ -> Expect.equal [] emptyPassOut
+                    , \_ -> Expect.equal Nothing badToken.identifyReplyAccount
+                    , \_ -> Expect.equal [] badTokenOut
+                    ]
+                    ()
+        , test "464 and FAIL IDENTIFY fold only into a live attempt" <|
+            \_ ->
+                let
+                    live =
+                        { blank | identifyReplyAccount = Just "alice" }
+
+                    ( badPass, _ ) =
+                        feed live ":s 464 alice :bad password"
+
+                    ( stray, _ ) =
+                        feed blank ":s 464 alice :bad password"
+
+                    ( failed, _ ) =
+                        feed live ":s FAIL IDENTIFY BADPASS :bad password"
+
+                    ( warned, _ ) =
+                        feed live ":s WARN IDENTIFY LOCKED :try later"
+
+                    ( stale, _ ) =
+                        feed blank ":s FAIL IDENTIFY BADPASS :bad password"
+
+                    ( bare, _ ) =
+                        feed live ":s FAIL IDENTIFY BADPASS"
+
+                    ( loggedIn, _ ) =
+                        feed live ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( closed, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) live
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { command = "IDENTIFY", code = "464", description = "bad password" })
+                            badPass.accountActionError
+                    , \_ -> Expect.equal Nothing badPass.identifyReplyAccount
+                    , \_ -> Expect.equal Nothing stray.accountActionError
+                    , \_ ->
+                        Expect.equal
+                            (Just { command = "IDENTIFY", code = "BADPASS", description = "bad password" })
+                            failed.accountActionError
+                    , \_ -> Expect.equal Nothing failed.identifyReplyAccount
+                    , \_ ->
+                        Expect.equal
+                            (Just { command = "IDENTIFY", code = "LOCKED", description = "try later" })
+                            warned.accountActionError
+                    , \_ -> Expect.equal Nothing stale.accountActionError
+                    , \_ -> Expect.equal blank stale
+                    , \_ ->
+                        Expect.equal
+                            (Just { command = "IDENTIFY", code = "BADPASS", description = "BADPASS" })
+                            bare.accountActionError
+                    , \_ -> Expect.equal Nothing loggedIn.identifyReplyAccount
+                    , \_ -> Expect.equal Nothing closed.identifyReplyAccount
+                    ]
+                    ()
+        , test "generic account FAIL/WARN folds action error and inbox row" <|
+            \_ ->
+                let
+                    ( certFailed, _ ) =
+                        feed blank ":s FAIL CERTADD DENIED :nope"
+
+                    ( dropBare, _ ) =
+                        feed blank ":s FAIL DROP GONE"
+
+                    ( keyWarned, _ ) =
+                        feed blank ":s WARN KEYTRANS OFFLINE :try later"
+
+                    lastText notes =
+                        List.head (List.reverse notes) |> Maybe.map .text
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { command = "CERTADD", code = "DENIED", description = "nope" })
+                            certFailed.accountActionError
+                    , \_ -> Expect.equal (Just "nope") (lastText certFailed.notifications)
+                    , \_ ->
+                        Expect.equal
+                            (Just { command = "DROP", code = "GONE", description = "GONE" })
+                            dropBare.accountActionError
+                    , \_ -> Expect.equal (Just "DROP failed (GONE)") (lastText dropBare.notifications)
+                    , \_ ->
+                        Expect.equal
+                            (Just { command = "KEYTRANS", code = "OFFLINE", description = "try later" })
+                            keyWarned.accountActionError
+                    ]
+                    ()
+        , test "nick-in-use derivation reads the alias flag and the latest error" <|
+            \_ ->
+                let
+                    aliased =
+                        { blank | currentNickIsAlias = True, accountName = Just "alice", ourNick = "alice_" }
+
+                    saslOnly =
+                        { blank | currentNickIsAlias = True, saslAccount = Just "alice", ourNick = "Guest1" }
+
+                    bare =
+                        { blank | currentNickIsAlias = True, ourNick = "Guest1" }
+
+                    noted text =
+                        addNotification blank
+                            { kind = NotifError, text = text, from = Nothing, channel = Nothing, topic = Nothing }
+
+                    mixed =
+                        addNotification
+                            (addNotification blank
+                                { kind = NotifError, text = "first", from = Nothing, channel = Nothing, topic = Nothing }
+                            )
+                            { kind = NotifError, text = "Nickname in use: bob", from = Nothing, channel = Nothing, topic = Nothing }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" (lastErrorText blank)
+                    , \_ -> Expect.equal "Nickname in use: bob" (lastErrorText mixed)
+                    , \_ -> Expect.equal True (nickInUsePhrase "Nickname in use: bob")
+                    , \_ -> Expect.equal True (nickInUsePhrase "NICK IN USE")
+                    , \_ -> Expect.equal True (nickInUsePhrase "nick\t in  use")
+                    , \_ -> Expect.equal False (nickInUsePhrase "bad password")
+                    , \_ -> Expect.equal False (nickInUsePhrase "")
+                    , \_ -> Expect.equal False (nickInUse blank)
+                    , \_ -> Expect.equal True (nickInUse aliased)
+                    , \_ -> Expect.equal True (nickInUse (noted "Nickname in use: bob"))
+                    , \_ -> Expect.equal False (nickInUse (noted "bad password"))
+                    , \_ -> Expect.equal Nothing (reclaimTarget blank)
+                    , \_ -> Expect.equal (Just "alice") (reclaimTarget aliased)
+                    , \_ -> Expect.equal (Just "alice") (reclaimTarget saslOnly)
+                    , \_ -> Expect.equal Nothing (reclaimTarget bare)
+                    , \_ ->
+                        Expect.equal Nothing
+                            (reclaimTarget { blank | accountName = Just "alice" })
+                    ]
+                    ()
+        , test "reclaim dialog submits GHOST+NICK once and stands down" <|
+            \_ ->
+                let
+                    base =
+                        { blank | currentNickIsAlias = True, accountName = Just "alice", ourNick = "alice_" }
+
+                    ( opened, _ ) =
+                        update ReclaimOpen base
+
+                    ( shut, _ ) =
+                        update ReclaimOpen blank
+
+                    ( typed, _ ) =
+                        update (ReclaimPasswordInput "s3cret") opened
+
+                    ( cancelled, _ ) =
+                        update ReclaimClose typed
+
+                    ( sent, sentOut ) =
+                        update ReclaimSubmit typed
+
+                    ( emptyPw, emptyOut ) =
+                        update ReclaimSubmit { opened | reclaimPassword = "  " }
+
+                    ( offline, offlineOut ) =
+                        update ReclaimSubmit { typed | connection = Offline }
+
+                    ( noTarget, noTargetOut ) =
+                        update ReclaimSubmit { opened | currentNickIsAlias = False, accountName = Nothing }
+
+                    ( closed, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) typed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True opened.reclaimOpen
+                    , \_ -> Expect.equal False shut.reclaimOpen
+                    , \_ -> Expect.equal "s3cret" typed.reclaimPassword
+                    , \_ -> Expect.equal False cancelled.reclaimOpen
+                    , \_ -> Expect.equal "s3cret" cancelled.reclaimPassword
+                    , \_ ->
+                        Expect.equal
+                            [ SendLine "GHOST alice s3cret\r\n", SendLine "NICK alice\r\n" ]
+                            sentOut
+                    , \_ -> Expect.equal False sent.reclaimOpen
+                    , \_ -> Expect.equal "" sent.reclaimPassword
+                    , \_ -> Expect.equal (Just "alice") sent.nickReclaimTarget
+                    , \_ -> Expect.equal 30000 sent.nickReclaimDueMs
+                    , \_ -> Expect.equal True emptyPw.reclaimOpen
+                    , \_ -> Expect.equal [] emptyOut
+                    , \_ -> Expect.equal True offline.reclaimOpen
+                    , \_ -> Expect.equal [] offlineOut
+                    , \_ -> Expect.equal False noTarget.reclaimOpen
+                    , \_ -> Expect.equal [] noTargetOut
+                    , \_ -> Expect.equal False closed.reclaimOpen
+                    , \_ -> Expect.equal "" closed.reclaimPassword
+                    ]
+                    ()
+        , test "STATUSMSG lines file under the bare channel" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst blank "me" "#c"
+
+                    withStatus =
+                        { joined | isupport = Isupport.applyIsupportToken joined.isupport "STATUSMSG" "!.@+" }
+
+                    bodies model name =
+                        Maybe.withDefault [] (Maybe.map (List.map .body << .messages) (Dict.get name model.channels))
+
+                    ( filed, _ ) =
+                        feed withStatus ":alice!u@h PRIVMSG @#c :ops hello"
+
+                    ( noted, _ ) =
+                        feed withStatus ":alice!u@h NOTICE @#c :ops note"
+
+                    ( phantom, _ ) =
+                        feed joined ":alice!u@h PRIVMSG @#c :ops hello"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "ops hello" ] (bodies filed "#c")
+                    , \_ -> Expect.equal [ "ops note" ] (bodies noted "#c")
+                    , \_ -> Expect.equal False (Dict.member "alice" filed.channels)
+                    , \_ -> Expect.equal True (Dict.member "alice" phantom.channels)
+                    , \_ -> Expect.equal "#c" (stripStatusmsgTarget withStatus "@#c")
+                    , \_ -> Expect.equal "@#c" (stripStatusmsgTarget joined "@#c")
+                    , \_ -> Expect.equal "#c" (dmFileBucket withStatus "@#c" "alice")
+                    , \_ -> Expect.equal "alice" (dmFileBucket joined "@#c" "alice")
+                    , \_ -> Expect.equal "#c" (dmMutateBucket withStatus "@#c" "alice")
+                    ]
+                    ()
+        , test "STATUSMSG audience badges rows and addresses sends" <|
+            \_ ->
+                let
+                    statusSupport =
+                        Isupport.applyIsupportToken blank.isupport "STATUSMSG" "!.@+"
+
+                    statusBase =
+                        { blank | isupport = statusSupport }
+
+                    joined =
+                        joinFirst statusBase "me" "#c"
+
+                    audiences model =
+                        Maybe.withDefault [] (Maybe.map (List.map .audience << .messages) (Dict.get "#c" model.channels))
+
+                    ( filed, _ ) =
+                        feed joined ":alice!u@h PRIVMSG @#c :ops hello"
+
+                    sendBase =
+                        { blank | activeChannel = Just "#c", isupport = statusSupport }
+
+                    ( typed, _ ) =
+                        update (ComposerInput "hi ops") sendBase
+
+                    aimed =
+                        { typed | composerAudience = Just '@' }
+
+                    ( sent, sentOut ) =
+                        update ComposerSend aimed
+
+                    ( refused, refusedOut ) =
+                        update ComposerSend { aimed | isupport = blank.isupport }
+
+                    ( switched, _ ) =
+                        update (ChannelSelect "#c") aimed
+
+                    baseProps =
+                        blank.props
+
+                    requiredProps =
+                        { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] }
+
+                    requiredBase =
+                        { sendBase | props = requiredProps }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ Just '@' ] (audiences filed)
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG @#c :hi ops\r\n") sentOut)
+                    , \_ -> Expect.equal [ Just '@' ] (audiences sent)
+                    , \_ -> Expect.equal "" sent.composer
+                    , \_ -> Expect.equal Nothing sent.composerAudience
+                    , \_ -> Expect.equal [] refusedOut
+                    , \_ -> Expect.equal "hi ops" refused.composer
+                    , \_ ->
+                        Expect.equal [ "Status audience unavailable here — message not sent." ]
+                            (List.take 1 refused.serviceLog)
+                    , \_ -> Expect.equal Nothing switched.composerAudience
+                    , \_ -> Expect.equal (Just "#c") (composerSendTarget blank "#c")
+                    , \_ ->
+                        Expect.equal (Just "@#c")
+                            (composerSendTarget { statusBase | composerAudience = Just '@' } "#c")
+                    , \_ ->
+                        Expect.equal Nothing
+                            (composerSendTarget { statusBase | composerAudience = Just '@' } "alice")
+                    , \_ ->
+                        Expect.equal Nothing
+                            (composerSendTarget { blank | composerAudience = Just '@' } "#c")
+                    , \_ -> Expect.equal True (composerAudienceOffered sendBase)
+                    , \_ -> Expect.equal False (composerAudienceOffered blank)
+                    , \_ -> Expect.equal False (composerAudienceOffered { sendBase | activeChannel = Just "alice" })
+                    , \_ -> Expect.equal False (composerAudienceOffered { sendBase | isupport = blank.isupport })
+                    , \_ -> Expect.equal False (composerAudienceOffered requiredBase)
+                    , \_ -> Expect.equal (Just '!') (nextComposerAudience statusBase)
+                    , \_ ->
+                        Expect.equal (Just '.')
+                            (nextComposerAudience { statusBase | composerAudience = Just '!' })
+                    , \_ ->
+                        Expect.equal Nothing
+                            (nextComposerAudience { statusBase | composerAudience = Just '+' })
+                    , \_ ->
+                        Expect.equal Nothing
+                            (nextComposerAudience { statusBase | composerAudience = Just 'x' })
+                    , \_ -> Expect.equal "Everyone" (audienceLabel Nothing)
+                    , \_ -> Expect.equal "Ops" (audienceLabel (Just '@'))
+                    , \_ -> Expect.equal "Voice" (audienceLabel (Just '+'))
+                    , \_ -> Expect.equal "Founders" (audienceLabel (Just '!'))
+                    , \_ -> Expect.equal "Owners" (audienceLabel (Just '.'))
+                    , \_ -> Expect.equal "" (audienceTitle Nothing)
+                    , \_ -> Expect.equal "Only visible to ops" (audienceTitle (Just '@'))
+                    ]
+                    ()
+        , test "WsClosed records the disconnect row and log line" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (WsClosed { clean = False, reason = "lost" }) blank
+
+                    systems =
+                        List.filter (\note -> note.kind == NotifSystem) m.notifications
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Disconnected: lost" ] (List.map .text systems)
+                    , \_ -> Expect.equal [ "Disconnected: lost" ] (List.take 1 m.serviceLog)
+                    , \_ -> Expect.equal Offline m.connection
+                    ]
+                    ()
+        , test "WsOpened begins CAP negotiation with NICK and USER" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+                in
+                Expect.equal
+                    [ SendLine "CAP LS 302\r\n"
+                    , SendLine "NICK me\r\n"
+                    , SendLine "USER webchat 0 * :me (webchat)\r\n"
+                    ]
+                    outbound
+        , test "CAP LS requests wanted caps and skips sasl" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me LS :sasl tls draft/multiline message-tags"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CAP REQ :draft/multiline message-tags\r\n" ] outbound
+                    , \_ -> Expect.equal 1 m2.capReqPending
+                    , \_ -> Expect.equal True m2.capNegotiating
+                    ]
+                    ()
+        , test "CAP ACK marks negotiated and ends negotiation" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, _ ) =
+                        feed m1 ":s CAP me LS :draft/multiline"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s CAP me ACK :draft/multiline"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "draft/multiline" ] m3.caps
+                    , \_ -> Expect.equal [ SendLine "CAP END\r\n" ] outbound
+                    , \_ -> Expect.equal False m3.capNegotiating
+                    ]
+                    ()
+        , test "CAP NAK ends negotiation without caps" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, _ ) =
+                        feed m1 ":s CAP me LS :draft/multiline"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s CAP me NAK :draft/multiline"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] m3.caps
+                    , \_ -> Expect.equal [ SendLine "CAP END\r\n" ] outbound
+                    ]
+                    ()
+        , test "multiline CAP LS accumulates before requesting" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, out1 ) =
+                        feed m1 ":s CAP me LS * :draft/multiline"
+
+                    ( m3, out2 ) =
+                        feed m2 ":s CAP me LS :message-tags sasl"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] out1
+                    , \_ -> Expect.equal [ "draft/multiline", "message-tags", "sasl" ] m3.capAvailable
+                    , \_ -> Expect.equal [ SendLine "CAP REQ :draft/multiline message-tags\r\n" ] out2
+                    ]
+                    ()
+        , test "CAP NEW requests newly advertised caps" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me NEW :draft/multiline"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "CAP REQ draft/multiline\r\n" ] outbound
+                    , \_ -> Expect.equal [ "draft/multiline" ] m2.capAvailable
+                    ]
+                    ()
+        , test "433 pre-registration rotates the alias list" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    aliased =
+                        { m1 | nickAliases = [ "me", "kai", "kain" ] }
+
+                    ( m2, outbound ) =
+                        feed aliased ":s 433 me me :Nickname is already in use"
+
+                    ( m3, outbound3 ) =
+                        feed m2 ":s 433 kai kai :Nickname is already in use"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
+                    , \_ -> Expect.equal "kai" m2.ourNick
+                    , \_ -> Expect.equal 2 m2.nickAliasTryIdx
+                    , \_ -> Expect.equal True m2.currentNickIsAlias
+                    , \_ -> Expect.equal [] m2.serviceLog
+                    , \_ -> Expect.equal [] m2.notifications
+                    , \_ -> Expect.equal [ SendLine "NICK kain\r\n" ] outbound3
+                    , \_ -> Expect.equal "kain" m3.ourNick
+                    , \_ -> Expect.equal 3 m3.nickAliasTryIdx
+                    ]
+                    ()
+        , test "433 with no aliases left errors and resets the index" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, outbound ) =
+                        feed m1 ":s 433 me me :Nickname is already in use"
+
+                    ( m3, outbound3 ) =
+                        feed { m1 | nickAliases = [ "kai" ], nickAliasTryIdx = 1 } ":s 433 me me :Nickname is already in use"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m2.notifications)
+                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
+                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m3.notifications)
+                    , \_ -> Expect.equal 0 m3.nickAliasTryIdx
+                    , \_ -> Expect.equal [] outbound3
+                    ]
+                    ()
+        , test "433 after registration rotates, then logs when exhausted" <|
+            \_ ->
+                let
+                    live =
+                        { blank | nickAliases = [ "kai" ] }
+
+                    ( rotated, outbound ) =
+                        feed live ":s 433 me me :Nickname is already in use"
+
+                    ( bare, bareOut ) =
+                        feed blank ":s 433 me me :Nickname is already in use"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
+                    , \_ -> Expect.equal "kai" rotated.ourNick
+                    , \_ -> Expect.equal [] bareOut
+                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    ]
+                    ()
+        , test "error numerics record verbatim inbox rows" <|
+            \_ ->
+                let
+                    texts line =
+                        List.map .text (feed blank line |> Tuple.first |> .notifications)
+
+                    loading =
+                        { blank | banListMeta = Dict.fromList [ ( "#c", { emptyBanListMeta | status = BanLoading } ) ] }
+
+                    ( denied, _ ) =
+                        feed loading ":srv 482 me #c :You're not channel operator"
+
+                    ( idle, _ ) =
+                        feed blank ":srv 482 me #c :You're not channel operator"
+
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( sending, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( failed403, _ ) =
+                        feed sending ("@label=" ++ label ++ " :srv 403 alice #c :No such channel")
+
+                    ( sending2, _ ) =
+                        labeledSend [ "labeled-response" ] "hi"
+
+                    ( failed404, _ ) =
+                        feed sending2 ("@label=" ++ label ++ " :srv 404 alice #c muted :Cannot send")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "No such channel: #nope" ] (texts ":srv 403 me #nope :No such channel")
+                    , \_ -> Expect.equal [ "Cannot send to #c: muted" ] (texts ":srv 404 me #c muted :Cannot send")
+                    , \_ -> Expect.equal [ "Too many channels" ] (texts ":srv 405 me :Too many channels")
+                    , \_ -> Expect.equal [ "Unknown command: FROB" ] (texts ":srv 421 me FROB :Unknown command")
+                    , \_ -> Expect.equal [ "No nickname given" ] (texts ":srv 431 me :No nickname given")
+                    , \_ -> Expect.equal [ "bob is not in #c" ] (texts ":srv 441 me bob #c :Not in channel")
+                    , \_ -> Expect.equal [ "You're not in #c" ] (texts ":srv 442 me #c :Not on channel")
+                    , \_ -> Expect.equal [ "bob is already in #c" ] (texts ":srv 443 me bob #c :Already on channel")
+                    , \_ -> Expect.equal [ "You need to register first" ] (texts ":srv 451 me :Not registered")
+                    , \_ -> Expect.equal [ "Missing parameters for JOIN" ] (texts ":srv 461 me JOIN :Need more params")
+                    , \_ -> Expect.equal [ "bad password" ] (texts ":srv 464 me :bad password")
+                    , \_ -> Expect.equal [ "Room key already set" ] (texts ":srv 467 me #c :Key already set")
+                    , \_ -> Expect.equal [ "#c is full" ] (texts ":srv 471 me #c :Channel is full")
+                    , \_ -> Expect.equal [ "#c is invite-only" ] (texts ":srv 473 me #c :Invite only")
+                    , \_ -> Expect.equal [ "You are banned from #c" ] (texts ":srv 474 me #c :Banned")
+                    , \_ -> Expect.equal [ "Bad channel mask: ##bad" ] (texts ":srv 476 me ##bad :Bad mask")
+                    , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text denied.notifications)
+                    , \_ -> Expect.equal (Just BanError) (Maybe.map .status (Dict.get "#c" denied.banListMeta))
+                    , \_ -> Expect.equal (Just "You need moderator permission to view this list.") (Maybe.andThen .error (Dict.get "#c" denied.banListMeta))
+                    , \_ -> Expect.equal [ "You need operator privileges in #c" ] (List.map .text idle.notifications)
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" idle.banListMeta)
+                    , \_ -> Expect.equal [] (channelBodies failed403)
+                    , \_ -> Expect.equal Dict.empty failed403.pendingLabels
+                    , \_ -> Expect.equal [ "Message not delivered: No such channel: #c" ] (List.take 1 failed403.serviceLog)
+                    , \_ -> Expect.equal [ "No such channel: #c" ] (List.map .text failed403.notifications)
+                    , \_ -> Expect.equal [ "No such channel: #c" ] (List.filterMap .description failed403.toasts)
+                    , \_ -> Expect.equal [] (channelBodies failed404)
+                    , \_ -> Expect.equal [ "Message not delivered: muted" ] (List.take 1 failed404.serviceLog)
+                    , \_ -> Expect.equal [ "Cannot send to #c: muted" ] (List.map .text failed404.notifications)
+                    , \_ -> Expect.equal [ "muted" ] (List.filterMap .description failed404.toasts)
+                    ]
+                    ()
+        , test "join rejections store the prompt and self-JOIN clears it" <|
+            \_ ->
+                let
+                    prompt line =
+                        feed blank line |> Tuple.first |> .channelJoinPrompt
+
+                    ( full, _ ) =
+                        feed blank ":srv 471 me #c :Channel is full"
+
+                    ( keyed, _ ) =
+                        feed blank ":srv 475 me #c :Bad key"
+
+                    ( cleared, _ ) =
+                        feed { blank | ourNick = "me", channelJoinPrompt = Just { channel = "#c", error = "This room is full" } } ":me!u@h JOIN #c"
+
+                    ( kept, _ ) =
+                        feed { blank | ourNick = "me", channelJoinPrompt = Just { channel = "#c", error = "This room is full" } } ":me!u@h JOIN #d"
+
+                    armed =
+                        { blank | pendingCreateRoom = Just { channel = "#c", topic = "", firstLine = "", dueMs = 16000 } }
+
+                    ( rejected, _ ) =
+                        feed armed ":srv 471 me #c :Channel is full"
+
+                    ( otherRoom, _ ) =
+                        feed { armed | pendingCreateRoom = Just { channel = "#d", topic = "", firstLine = "", dueMs = 16000 } } ":srv 471 me #c :Channel is full"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just { channel = "#c", error = "This room is full" }) (prompt ":srv 471 me #c :Channel is full")
+                    , \_ -> Expect.equal (Just { channel = "#c", error = "Channel is invite-only" }) (prompt ":srv 473 me #c :Invite only")
+                    , \_ -> Expect.equal (Just { channel = "#c", error = "You are banned from this room" }) (prompt ":srv 474 me #c :Banned")
+                    , \_ -> Expect.equal (Just { channel = "#c", error = "This room is full" }) full.channelJoinPrompt
+                    , \_ -> Expect.equal (Just { channel = "#c", error = "Incorrect channel password" }) keyed.channelJoinPrompt
+                    , \_ -> Expect.equal [] keyed.notifications
+                    , \_ -> Expect.equal [ "#c is full" ] (List.map .text full.notifications)
+                    , \_ -> Expect.equal Nothing cleared.channelJoinPrompt
+                    , \_ -> Expect.equal (Just { channel = "#c", error = "This room is full" }) kept.channelJoinPrompt
+                    , \_ -> Expect.equal Nothing rejected.pendingCreateRoom
+                    , \_ -> Expect.equal (Just "#d") (Maybe.map .channel otherRoom.pendingCreateRoom)
+                    ]
+                    ()
+        , test "401 on the active sheet also records the inbox row" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, ourNick = "kai" }
+
+                    ( requested, _ ) =
+                        update (WhoisRequest "ghost") live
+
+                    ( m, _ ) =
+                        feed requested ":srv 401 kai ghost :No such nick"
+
+                    ( stray, _ ) =
+                        feed live ":srv 401 kai ghost :No such nick"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "No such nick: ghost" ] (List.map .text m.notifications)
+                    , \_ -> Expect.equal [] stray.notifications
+                    ]
+                    ()
+        , test "nick aliases validate shape, cap, dedupe, and canonical" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "kai") (normalizeNickAlias " kai ")
+                    , \_ -> Expect.equal Nothing (normalizeNickAlias "9lives")
+                    , \_ -> Expect.equal Nothing (normalizeNickAlias "has space")
+                    , \_ -> Expect.equal Nothing (normalizeNickAlias "")
+                    , \_ -> Expect.equal Nothing (normalizeNickAlias (String.repeat 65 "x"))
+                    , \_ ->
+                        Expect.equal [ "zed" ]
+                            (normalizeNickAliases [ "kai", "KAI", "zed", "bad nick", "", "zed" ] "kai")
+                    , \_ ->
+                        Expect.equal 16
+                            (List.length (normalizeNickAliases (List.map (\i -> "nick" ++ String.fromInt i) (List.range 1 20)) "owner"))
+                    ]
+                    ()
+        , test "alias rotation skips current, rejected, and tried" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( "a", 1 ))
+                            (nextNickAlias [ "a", "b", "c" ] 0 "me" "taken")
+                    , \_ ->
+                        Expect.equal (Just ( "c", 3 ))
+                            (nextNickAlias [ "a", "b", "c" ] 2 "b" "taken")
+                    , \_ ->
+                        Expect.equal Nothing
+                            (nextNickAlias [ "a", "b" ] 2 "me" "taken")
+                    , \_ ->
+                        Expect.equal Nothing
+                            (nextNickAlias [ "me" ] 0 "me" "taken")
+                    ]
+                    ()
+        , test "001 ends rotation and requests the owner alias list" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        feed { blank | nickAliasTryIdx = 3, endpoint = Just "wss://irc.example" } ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 0 m.nickAliasTryIdx
+                    , \_ ->
+                        Expect.equal True
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        NickAliasesRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                            )
+                    ]
+                    ()
+        , test "alias loads normalize against the canonical identity" <|
+            \_ ->
+                let
+                    owned =
+                        { blank | endpoint = Just "wss://irc.example", ourNick = "kai" }
+
+                    ( loaded, _ ) =
+                        update (NickAliasesLoaded (Encode.list Encode.string [ "kai", "zed", "bad nick", "zed" ])) owned
+
+                    ( kept, _ ) =
+                        update (NickAliasesLoaded (Encode.string "nope")) { loaded | nickAliases = [ "old" ] }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "zed" ] loaded.nickAliases
+                    , \_ -> Expect.equal [ "old" ] kept.nickAliases
+                    ]
+                    ()
+        , test "432 naming a registered nick disconnects with guidance" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (WsOpened { url = "wss://x" }) { blank | connection = Offline }
+
+                    ( m2, outbound ) =
+                        feed m1 ":s 432 me me :Nickname is registered; authenticate as the owner"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ WsDisconnect ] outbound
+                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
+                    ]
+                    ()
+        , test "PONG re-arms the keepalive" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        feed blank ":s PONG me :keepalive"
+                in
+                Expect.equal [ PingObserved ] outbound
+        , test "PingDue sends the keepalive probe" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update PingDue blank
+                in
+                Expect.equal [ SendLine "PING keepalive\r\n" ] outbound
+        , test "ERROR surfaces the server reason" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":s ERROR :Closing link: too many connections"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "Server error: Closing link: too many connections" (Maybe.withDefault "" (List.head m1.serviceLog))
+                    ]
+                    ()
+        , test "credentials are held ports-side, never in Elm state" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "alice") m1.saslAccount
+                    , \_ -> Expect.equal True m1.saslPasswordHeld
+                    , \_ -> Expect.equal False m1.saslClientCert
+                    , \_ ->
+                        Expect.equal
+                            [ SaslCredentialsStored { account = "alice", password = "s3cret", hasClientCert = False } ]
+                            outbound
+                    , \_ -> Expect.equal SaslIdle m1.sasl
+                    ]
+                    ()
+        , test "sasl joins CAP REQ only with credentials held" <|
+            \_ ->
+                let
+                    ( held, _ ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+
+                    ( mHeld, outboundHeld ) =
+                        feed held ":s CAP me LS :sasl=PLAIN multi-prefix"
+
+                    ( _, outboundGuest ) =
+                        feed blank ":s CAP me LS :sasl=PLAIN multi-prefix"
+
+                    hasSaslReq outbound =
+                        List.any
+                            (\o ->
+                                case o of
+                                    SendLine line ->
+                                        String.startsWith "CAP REQ" line && String.contains "sasl" line
+
+                                    _ ->
+                                        False
+                            )
+                            outbound
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "PLAIN" ] mHeld.saslMechs
+                    , \_ -> Expect.equal True (hasSaslReq outboundHeld)
+                    , \_ -> Expect.equal False (hasSaslReq outboundGuest)
+                    ]
+                    ()
+        , test "ACK sasl begins the PLAIN exchange" <|
+            \_ ->
+                let
+                    ( held, _ ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+
+                    ( m1, _ ) =
+                        feed held ":s CAP me LS :sasl=PLAIN"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me ACK :sasl"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (SaslPending Plain) m2.sasl
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "AUTHENTICATE PLAIN\r\n") outbound)
+                    , \_ -> Expect.equal True (List.member SaslTimerStarted outbound)
+                    ]
+                    ()
+        , test "ACK sasl without credentials just releases" <|
+            \_ ->
+                let
+                    negotiating =
+                        { blank | capNegotiating = True }
+
+                    ( m1, _ ) =
+                        feed negotiating ":s CAP me LS :sasl=PLAIN multi-prefix"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me ACK :sasl"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal SaslIdle m2.sasl
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "CAP END\r\n") outbound)
+                    , \_ -> Expect.equal False (List.member SaslTimerStarted outbound)
+                    ]
+                    ()
+        , test "unsupported mechanism fails closed, never guest" <|
+            \_ ->
+                let
+                    ( held, _ ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+
+                    ( m1, _ ) =
+                        feed held ":s CAP me LS :sasl=UNKNOWN-MECH"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me ACK :sasl"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal SaslIdle m2.sasl
+                    , \_ -> Expect.equal True (List.member WsDisconnect outbound)
+                    , \_ -> Expect.equal True (List.member SaslTimerCleared outbound)
+                    , \_ -> Expect.equal False (List.isEmpty m2.serviceLog)
+                    , \_ ->
+                        Expect.equal False
+                            (List.member (SendLine "CAP END\r\n") outbound)
+                    ]
+                    ()
+        , test "PLAIN challenge relays to the ports side" <|
+            \_ ->
+                let
+                    ( held, _ ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "s3cret", hasClientCert = False }) blank
+
+                    ( m1, _ ) =
+                        feed held ":s CAP me LS :sasl=PLAIN"
+
+                    ( m2, _ ) =
+                        feed m1 ":s CAP me ACK :sasl"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s AUTHENTICATE +"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SaslRespond { mech = "PLAIN", nick = "me", param = "+" } ]
+                            outbound
+                    , \_ -> Expect.equal (SaslPending Plain) m3.sasl
+                    ]
+                    ()
+        , test "EXTERNAL answers the empty challenge directly" <|
+            \_ ->
+                let
+                    ( held, _ ) =
+                        update (SaslCredentialsProvided { account = "alice", password = "", hasClientCert = True }) blank
+
+                    ( m1, _ ) =
+                        feed held ":s CAP me LS :sasl=EXTERNAL"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s CAP me ACK :sasl"
+
+                    ( m3, outbound3 ) =
+                        feed m2 ":s AUTHENTICATE +"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "AUTHENTICATE EXTERNAL\r\n") outbound)
+                    , \_ ->
+                        Expect.equal
+                            [ SendLine "AUTHENTICATE +\r\n" ]
+                            outbound3
+                    , \_ -> Expect.equal (SaslPending External) m3.sasl
+                    ]
+                    ()
+        , test "payload answers chunk into AUTHENTICATE lines" <|
+            \_ ->
+                let
+                    pending =
+                        { blank | sasl = SaslPending Plain }
+
+                    big =
+                        String.repeat 401 "p"
+
+                    ( _, outbound ) =
+                        update (SaslPayload { payload = big }) pending
+
+                    ( _, idleOutbound ) =
+                        update (SaslPayload { payload = big }) blank
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine ("AUTHENTICATE " ++ String.repeat 400 "p" ++ "\r\n")
+                            , SendLine "AUTHENTICATE p\r\n"
+                            ]
+                            outbound
+                    , \_ -> Expect.equal [] idleOutbound
+                    ]
+                    ()
+        , test "903 in flight completes the login" <|
+            \_ ->
+                let
+                    negotiating =
+                        { blank | capNegotiating = True, sasl = SaslPending Plain }
+
+                    ( m1, outbound ) =
+                        feed negotiating ":s 903 me :SASL authentication successful"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal SaslIdle m1.sasl
+                    , \_ -> Expect.equal True m1.saslAuthenticated
+                    , \_ -> Expect.equal True (List.member SaslTimerCleared outbound)
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "CAP END\r\n") outbound)
+                    ]
+                    ()
+        , test "903 idle stays on the numeric path" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":s 903 me :ERR_BADLEVEL"
+
+                    logged =
+                        List.isEmpty m1.serviceLog
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False m1.saslAuthenticated
+                    , \_ -> Expect.equal False logged
+                    , \_ -> Expect.equal False (List.member SaslTimerCleared outbound)
+                    ]
+                    ()
+        , test "904 in flight fails closed without CAP END" <|
+            \_ ->
+                let
+                    negotiating =
+                        { blank | capNegotiating = True, sasl = SaslPending Plain }
+
+                    ( m1, outbound ) =
+                        feed negotiating ":s 904 me :SASL authentication failed"
+
+                    ( m2, outbound2 ) =
+                        feed blank ":s 904 me :whatever"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal SaslIdle m1.sasl
+                    , \_ -> Expect.equal True (List.member WsDisconnect outbound)
+                    , \_ -> Expect.equal True (List.member SaslTimerCleared outbound)
+                    , \_ -> Expect.equal False (List.isEmpty m1.serviceLog)
+                    , \_ ->
+                        Expect.equal False
+                            (List.member (SendLine "CAP END\r\n") outbound)
+                    , \_ -> Expect.equal False (List.member WsDisconnect outbound2)
+                    ]
+                    ()
+        , test "AUTHENTICATE idle is dropped" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":s AUTHENTICATE +"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal SaslIdle m1.sasl
+                    ]
+                    ()
+        , test "timeout and stray failures never kill a live socket" <|
+            \_ ->
+                let
+                    pending =
+                        { blank | sasl = SaslPending Plain }
+
+                    ( m1, outbound ) =
+                        update SaslTimeout pending
+
+                    ( m2, outbound2 ) =
+                        update SaslTimeout blank
+
+                    ( m3, outbound3 ) =
+                        update (SaslFailed { reason = "boom" }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal SaslIdle m1.sasl
+                    , \_ -> Expect.equal True (List.member WsDisconnect outbound)
+                    , \_ -> Expect.equal [] outbound2
+                    , \_ -> Expect.equal False (List.isEmpty m3.serviceLog)
+                    , \_ -> Expect.equal [] outbound3
+                    ]
+                    ()
+        , test "sasl proof admits session commands before 900" <|
+            \_ ->
+                let
+                    authed =
+                        { blank
+                            | saslAuthenticated = True
+                            , sessionTokens =
+                                { sessionToken = Just "tok123"
+                                , meshToken = Nothing
+                                , meshTokenExpiresAt = Nothing
+                                }
+                        }
+
+                    ( m1, outbound ) =
+                        feed authed ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.sessionCommandsSent
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
+                    ]
+                    ()
+        , test "server NOTICE SESSION TOKEN is captured and persisted" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, outbound ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "tok123") m2.sessionTokens.sessionToken
+                    , \_ ->
+                        Expect.equal
+                            [ SessionTokenStored { kind = "token", token = "tok123", expiresAt = Nothing, server = "", nick = "alice" } ]
+                            outbound
+                    ]
+                    ()
+        , test "server NOTICE SESSION MTOKEN merges with ms deadline" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+
+                    ( m3, outbound ) =
+                        feed m2 ":irc.example NOTICE me :SESSION MTOKEN hex9 expires=99"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "tok123") m3.sessionTokens.sessionToken
+                    , \_ -> Expect.equal (Just "hex9") m3.sessionTokens.meshToken
+                    , \_ -> Expect.equal (Just 99000) m3.sessionTokens.meshTokenExpiresAt
+                    , \_ ->
+                        Expect.equal
+                            [ SessionTokenStored { kind = "mtoken", token = "hex9", expiresAt = Just 99, server = "", nick = "alice" } ]
+                            outbound
+                    ]
+                    ()
+        , test "guest token notices stay silent and unpersisted" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":irc.example NOTICE me :SESSION TOKEN tok123"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m1.sessionTokens.sessionToken
+                    , \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal [] m1.serviceLog
+                    ]
+                    ()
+        , test "peer SESSION mentions never plant Bearer [REDACTED]" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, outbound ) =
+                        feed m1 ":dave!u@h NOTICE me :SESSION TOKEN tok123"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m2.sessionTokens.sessionToken
+                    , \_ -> Expect.equal [] (List.filter isSessionTokenStored outbound)
+                    ]
+                    ()
+        , test "legacy NOTE SESSION TOKEN is captured" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s NOTE SESSION TOKEN :tok123"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "tok123") m2.sessionTokens.sessionToken
+                    , \_ ->
+                        Expect.equal
+                            [ SessionTokenStored { kind = "token", token = "tok123", expiresAt = Nothing, server = "", nick = "alice" } ]
+                            outbound
+                    ]
+                    ()
+        , test "900 with seeded holdings sends RESUME plus rotation once" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank
+                            | sessionTokens =
+                                { sessionToken = Just "tok123"
+                                , meshToken = Nothing
+                                , meshTokenExpiresAt = Nothing
+                                }
+                        }
+
+                    ( m1, outbound ) =
+                        feed seeded ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, outbound2 ) =
+                        feed m1 ":irc.example 001 me :welcome"
+
+                    ( m3, outbound3 ) =
+                        feed m2 ":s 900 me nick!u@h alice :You are now logged in as alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.sessionCommandsSent
+                    , \_ ->
+                        Expect.equal
+                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
+                            m1.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (ReclaimTimerStarted { stage = "confirm" }) outbound)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.startsWith "SESSION" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound2
+                            )
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.startsWith "SESSION" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound3
+                            )
+                    , \_ -> Expect.equal True m2.sessionCommandsSent
+                    ]
+                    ()
+        , test "001 sends RESUME for an already-authed socket" <|
+            \_ ->
+                let
+                    authed =
+                        { blank
+                            | accountName = Just "alice"
+                            , sessionTokens =
+                                { sessionToken = Just "tok123"
+                                , meshToken = Nothing
+                                , meshTokenExpiresAt = Nothing
+                                }
+                        }
+
+                    ( m1, outbound ) =
+                        feed authed ":irc.example 001 me :welcome"
+
+                    ( m2, outbound2 ) =
+                        feed m1 ":irc.example 001 me :welcome again"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.sessionCommandsSent
+                    , \_ ->
+                        Expect.equal
+                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
+                            m1.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.startsWith "SESSION" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound2
+                            )
+                    ]
+                    ()
+        , test "001 without holdings sends rotation only" <|
+            \_ ->
+                let
+                    authed =
+                        { blank | accountName = Just "alice" }
+
+                    ( m1, outbound ) =
+                        feed authed ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.sessionCommandsSent
+                    , \_ -> Expect.equal Nothing m1.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.contains "RESUME" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , test "900 after 001 runs the session commands for passwordless login" <|
+            \_ ->
+                let
+                    ( m1, outbound1 ) =
+                        feed blank ":irc.example 001 me :welcome"
+
+                    ( m2, outbound2 ) =
+                        feed m1 ":s 900 me nick!u@h alice :You are now logged in as alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False m1.sessionCommandsSent
+                    , \_ -> Expect.equal True m2.sessionCommandsSent
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.startsWith "SESSION" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound1
+                            )
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound2)
+                    ]
+                    ()
+        , test "lapsed mesh Bearer [REDACTED] through to the local one" <|
+            \_ ->
+                let
+                    authed =
+                        { blank
+                            | nowMs = 1000000
+                            , accountName = Just "alice"
+                            , sessionTokens =
+                                { sessionToken = Just "tok123"
+                                , meshToken = Just "hex9"
+                                , meshTokenExpiresAt = Just 99000
+                                }
+                        }
+
+                    ( m1, outbound ) =
+                        feed authed ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { phase = Restoring, kind = Just Session.LocalBearer })
+                            m1.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION RESUME tok123\r\n") outbound)
+                    ]
+                    ()
+        , test "lapsed mesh Bearer [REDACTED] sign-in-again banner" <|
+            \_ ->
+                let
+                    authed =
+                        { blank
+                            | nowMs = 1000000
+                            , accountName = Just "alice"
+                            , sessionTokens =
+                                { sessionToken = Nothing
+                                , meshToken = Just "hex9"
+                                , meshTokenExpiresAt = Just 99000
+                                }
+                        }
+
+                    ( m1, outbound ) =
+                        feed authed ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { phase = SignInAgain, kind = Nothing })
+                            m1.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.contains "RESUME" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , test "FAIL SESSION INVALID_TOKEN revokes the Bearer [REDACTED]" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s FAIL SESSION INVALID_TOKEN :stale bearer"
+
+                    ( m4, outbound2 ) =
+                        update (ReclaimTimerFired { stage = "confirm" }) m3
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m3.sessionTokens.sessionToken
+                    , \_ ->
+                        Expect.equal
+                            (Just { phase = ReclaimFailed, kind = Nothing })
+                            m3.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SessionTokensCleared { server = "", nick = "me" }) outbound)
+                    , \_ ->
+                        Expect.equal True
+                            (List.member ReclaimTimersCleared outbound)
+                    , \_ -> Expect.equal True m3.sessionTokenWritesAllowed
+                    , \_ -> Expect.equal True m3.credentialCanonicalOnly
+                    , \_ -> Expect.equal False (List.isEmpty m3.serviceLog)
+                    , \_ -> Expect.equal m3.sessionReclaim m4.sessionReclaim
+                    , \_ -> Expect.equal [] outbound2
+                    ]
+                    ()
+        , test "FAIL SESSION LIST never erases the Bearer [REDACTED]" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s FAIL SESSION LIST :no such session list"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "tok123") m3.sessionTokens.sessionToken
+                    , \_ -> Expect.equal Nothing m3.sessionReclaim
+                    , \_ -> Expect.equal False (List.isEmpty m3.serviceLog)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SessionTokensCleared _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , test "account switch drops the old account's holdings" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+
+                    ( m3, outbound ) =
+                        feed m2 ":s 900 me nick!u@h bob :You are now logged in as bob"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m3.sessionTokens.sessionToken
+                    , \_ -> Expect.equal (Just "bob") m3.accountName
+                    , \_ -> Expect.equal True m3.sessionCommandsSent
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (SendLine "SESSION TOKEN\r\n") outbound)
+                    , \_ ->
+                        Expect.equal False
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            String.contains "RESUME" line
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , test "901 clears live resume tokens and re-arms the commands" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, _ ) =
+                        feed m1 ":irc.example NOTICE me :SESSION TOKEN tok123"
+
+                    ( m3, _ ) =
+                        feed m2 ":irc.example 001 me :welcome"
+
+                    ( m4, _ ) =
+                        feed m3 ":s 901 me :You are now logged out"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m4.sessionTokens.sessionToken
+                    , \_ -> Expect.equal False m4.sessionCommandsSent
+                    , \_ -> Expect.equal Nothing m4.accountName
+                    ]
+                    ()
+        , test "reclaim confirm and dismiss timers walk the banner" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank
+                            | sessionTokens =
+                                { sessionToken = Just "tok123"
+                                , meshToken = Nothing
+                                , meshTokenExpiresAt = Nothing
+                                }
+                        }
+
+                    ( m1, _ ) =
+                        feed seeded ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m4, outbound4 ) =
+                        update (ReclaimTimerFired { stage = "confirm" }) m1
+
+                    ( m5, _ ) =
+                        update (ReclaimTimerFired { stage = "dismiss" }) m4
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            (Just { phase = Reclaimed, kind = Just Session.LocalBearer })
+                            m4.sessionReclaim
+                    , \_ ->
+                        Expect.equal True
+                            (List.member (ReclaimTimerStarted { stage = "dismiss" }) outbound4)
+                    , \_ -> Expect.equal Nothing m5.sessionReclaim
+                    ]
+                    ()
+        , test "901 clears the logged-in account" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    ( m2, outbound ) =
+                        feed m1 ":s 901 me :You are now logged out"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing m2.accountName
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "900 guest login quarantines the old identity's state" <|
+            \_ ->
+                let
+                    joined =
+                        joinFirst blank "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG me :hi"
+
+                    seeded =
+                        { m2
+                            | composer = "draft"
+                            , customStatus = "busy"
+                            , topicHistory = Dict.fromList [ ( "#c", [ "old topic" ] ) ]
+                            , nickAliases = [ "alt" ]
+                            , outboxRetries = 3
+                            , outboxFailed = True
+                            , notifications =
+                                [ { id = "n1"
+                                  , kind = NotifSystem
+                                  , text = "old"
+                                  , from = Nothing
+                                  , channel = Nothing
+                                  , topic = Nothing
+                                  , atMs = 0
+                                  }
+                                ]
+                        }
+
+                    ( m3, _ ) =
+                        feed seeded ":s 900 me nick!u@h alice :You are now logged in as alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m2 "#c"))
+                    , \_ -> Expect.equal 1 (List.length (dmMessages m2 "bob"))
+                    , \_ -> Expect.equal [] (dmMessages m3 "#c")
+                    , \_ -> Expect.equal Nothing (Dict.get "bob" m3.channels)
+                    , \_ -> Expect.equal "" m3.composer
+                    , \_ -> Expect.equal [] m3.notifications
+                    , \_ -> Expect.equal "" m3.customStatus
+                    , \_ -> Expect.equal Dict.empty m3.topicHistory
+                    , \_ -> Expect.equal [] m3.nickAliases
+                    , \_ -> Expect.equal 0 m3.outboxRetries
+                    , \_ -> Expect.equal False m3.outboxFailed
+                    , \_ -> Expect.equal (Just "alice") m3.accountName
+                    ]
+                    ()
+        , test "900 account switch quarantines the old account's state" <|
+            \_ ->
+                let
+                    ( logged, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    joined =
+                        joinFirst logged "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 900 me nick!u@h bob :You are now logged in as bob"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m1 "#c"))
+                    , \_ -> Expect.equal [] (dmMessages m2 "#c")
+                    , \_ -> Expect.equal (Just "bob") m2.accountName
+                    ]
+                    ()
+        , test "900 for the same account keeps scrollback" <|
+            \_ ->
+                let
+                    ( logged, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    joined =
+                        joinFirst logged "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 900 me nick!u@h alice :You are now logged in as alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m1 "#c"))
+                    , \_ -> Expect.equal 1 (List.length (dmMessages m2 "#c"))
+                    , \_ -> Expect.equal (Just "alice") m2.accountName
+                    ]
+                    ()
+        , test "ACCOUNT switch quarantines the old account's state" <|
+            \_ ->
+                let
+                    base =
+                        { blank | accountName = Just "alice", ourNick = "me" }
+
+                    joined =
+                        joinFirst base "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    seeded =
+                        { m1 | composer = "draft", nickAliases = [ "alt" ] }
+
+                    ( m2, _ ) =
+                        feed seeded ":me!u@h ACCOUNT bob"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m1 "#c"))
+                    , \_ -> Expect.equal [] (dmMessages m2 "#c")
+                    , \_ -> Expect.equal "" m2.composer
+                    , \_ -> Expect.equal [] m2.nickAliases
+                    , \_ -> Expect.equal (Just "bob") m2.accountName
+                    , \_ -> Expect.equal True m2.currentNickIsAlias
+                    ]
+                    ()
+        , test "self-NICK owner flip quarantines the old identity's state" <|
+            \_ ->
+                let
+                    base =
+                        { blank | endpoint = Just "wss://irc.example", ourNick = "guest1" }
+
+                    joined =
+                        joinFirst base "guest1" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    seeded =
+                        { m1 | composer = "draft" }
+
+                    ( m2, _ ) =
+                        feed seeded ":guest1!u@h NICK visitor1"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m1 "#c"))
+                    , \_ -> Expect.equal "visitor1" m2.ourNick
+                    , \_ -> Expect.equal [] (dmMessages m2 "#c")
+                    , \_ -> Expect.equal "" m2.composer
+                    ]
+                    ()
+        , test "901 quarantines the old identity's state" <|
+            \_ ->
+                let
+                    ( logged, _ ) =
+                        feed blank ":s 900 me nick!u@h alice :You are now logged in as alice"
+
+                    joined =
+                        joinFirst logged "me" "#c"
+
+                    ( m1, _ ) =
+                        feed joined ":alice!u@h PRIVMSG #c :hello"
+
+                    ( m2, _ ) =
+                        feed m1 ":bob!u@h PRIVMSG me :hi"
+
+                    ( m3, _ ) =
+                        feed m2 ":s 901 me :You are now logged out"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length (dmMessages m2 "#c"))
+                    , \_ -> Expect.equal 1 (List.length (dmMessages m2 "bob"))
+                    , \_ -> Expect.equal [] (dmMessages m3 "#c")
+                    , \_ -> Expect.equal Nothing (Dict.get "bob" m3.channels)
+                    , \_ -> Expect.equal Nothing m3.accountName
+                    ]
+                    ()
+        , test "quarantine drops in-flight seals with the old owner" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank
+                            | pendingSeals = Dict.singleton "dave" { text = "hi", keys = [ peerKey ] }
+                            , roomSeals = Dict.singleton "#c" "hi room"
+                        }
+
+                    quarantined =
+                        quarantineOwnerChange seeded
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty quarantined.pendingSeals
+                    , \_ -> Expect.equal Dict.empty quarantined.roomSeals
+                    ]
+                    ()
+        , test "WHISPER appends a flagged message and persists it" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed (joinFirst blank "me" "#c") ":alice!u@h WHISPER #c :psst"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ True ]
+                            (Maybe.withDefault []
+                                (Maybe.map (List.map .whisper << .messages) (Dict.get "#c" m1.channels))
+                            )
+                    , \_ ->
+                        Expect.equal True
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        VaultPersist _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , test "WHISPER self-echo never renders" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":me!u@h WHISPER #c :echo"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing (Dict.get "#c" m1.channels)
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "801 folds into access for known channels only" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed joined ":s 801 me #c HOST alice"
+
+                    ( m2, _ ) =
+                        feed blank ":s 801 me #x HOST alice"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "alice!*@*" ]
+                            (Maybe.withDefault []
+                                (Maybe.map (List.map .mask) (Dict.get "#c" m1.access.lists))
+                            )
+                    , \_ -> Expect.equal Dict.empty m2.access.lists
+                    ]
+                    ()
+        , test "803 804 805 commit a buffered access list" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed joined ":s 803 me #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 804 me #c HOST alice!*@* op 25"
+
+                    ( m3, _ ) =
+                        feed m2 ":s 805 me #c"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "alice!*@*" ]
+                            (Maybe.withDefault []
+                                (Maybe.map (List.map .mask) (Dict.get "#c" m3.access.lists))
+                            )
+                    , \_ -> Expect.equal False (Set.member "#c" m3.access.loading)
+                    ]
+                    ()
+        , test "775 appends a service notice to the known channel" <|
+            \_ ->
+                let
+                    ( joined, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed joined ":s 775 me #c alice!*@* HOST"
+                in
+                Expect.equal [ "Channel" ]
+                    (Maybe.withDefault []
+                        (Maybe.map (List.map .from << .messages) (Dict.get "#c" m1.channels))
+                    )
+        , test "818 stores props and 819 marks sync" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 818 me #c ocean.display-name :Lounge"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 819 me #c"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just "Lounge")
+                            (Dict.get "#c" m1.props.channelProps
+                                |> Maybe.andThen (Dict.get "ocean.display-name")
+                            )
+                    , \_ -> Expect.equal True (Set.member "#c" m2.props.synced)
+                    ]
+                    ()
+        , test "live PROP STATUS parses activity from the value param" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s PROP alice STATUS :playing chess"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "playing chess") (Dict.get "alice" m1.props.userProps |> Maybe.andThen (Dict.get "STATUS"))
+                    , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "alice" m1.userActivities)
+                    ]
+                    ()
+        , test "WhoisRequest opens a sheet and 311 fills it" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update (WhoisRequest "alice") blank
+
+                    ( m2, _ ) =
+                        feed m1 ":s 311 me alice auser ahost * :Alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "WHOIS alice alice\r\n", WhoisTimeoutStart { nick = "alice", gen = 1, delayMs = whoisRequestTimeoutMs } ] outbound
+                    , \_ -> Expect.equal (Just "alice") m1.whoisTarget
+                    , \_ ->
+                        Expect.equal (Just "auser")
+                            (Dict.get "alice" m2.whois.entries
+                                |> Maybe.andThen .username
+                            )
+                    ]
+                    ()
+        , test "WhoisRequest offline opens the sheet with the reconnect error" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update (WhoisRequest "alice") { blank | connection = Offline }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal (Just "alice") m1.whoisTarget
+                    , \_ -> Expect.equal (Just "Reconnect to request profile details.") (Dict.get "alice" m1.whois.entries |> Maybe.andThen .error)
+                    , \_ -> Expect.equal 1 m1.whoisTimerGen
+                    ]
+                    ()
+        , test "381 sets oper state with the admin badge" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 381 me :You are now a network administrator"
+
+                    -- Second elevation chains off the first: a non-admin
+                    -- 381 restates (clears) the admin badge instead of
+                    -- OR-accumulating it.
+                    ( m2, _ ) =
+                        feed m1 ":s 381 me :You are now an IRC operator"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.isOper
+                    , \_ -> Expect.equal True m1.isNetworkAdmin
+                    , \_ -> Expect.equal True m2.isOper
+                    , \_ -> Expect.equal False m2.isNetworkAdmin
+                    , \_ -> Expect.equal True (List.member "You are now a network administrator" m1.serviceLog)
+                    , \_ -> Expect.equal True (List.member "You are now an IRC operator" m2.serviceLog)
+                    ]
+                    ()
+        , test "305 and 306 track away state" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 306 me :gone"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 305 me :back"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m1.isAway
+                    , \_ -> Expect.equal False m2.isAway
+                    ]
+                    ()
+        , test "WALLOPS lands in the service log" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s WALLOPS :Restart soon"
+                in
+                Expect.equal [ "WALLOPS: Restart soon" ] m1.serviceLog
+        , test "EVENT WEBAUTHN AUTH-CHALLENGE arms settle" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank ":s EVENT me WEBAUTHN AUTH-CHALLENGE AAAAAAAAAAAAAAAAAAAAAA irc.example :alice"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ PasskeySettleRequest ] outbound
+                    , \_ -> Expect.equal True (m1.passkey.pendingAuth /= Nothing)
+                    ]
+                    ()
+        , test "PasskeySettle runs the get ceremony" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s EVENT me WEBAUTHN AUTH-CHALLENGE AAAAAAAAAAAAAAAAAAAAAA irc.example :alice"
+
+                    ( _, outbound ) =
+                        update PasskeySettle m1
+                in
+                Expect.equal 1 (List.length outbound)
+        , test "PasskeyCreated sends REGISTER-FINISH" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update
+                            (PasskeyCreated { credId = "QUJD", clientDataJSON = "Q0Q", authData = "Q0Q" })
+                            blank
+                in
+                Expect.equal [ SendLine "WEBAUTHN REGISTER-FINISH QUJD Q0Q Q0Q\r\n" ] outbound
+        , test "PasskeyAssertion sends AUTH-FINISH" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update
+                            (PasskeyAssertion { credId = "QUJD", clientDataJSON = "Q0Q", authData = "Q0Q", signature = "U0U" })
+                            blank
+                in
+                Expect.equal [ SendLine "WEBAUTHN AUTH-FINISH QUJD Q0Q Q0Q U0U\r\n" ] outbound
+        , test "PasskeyFailed records the error" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (PasskeyFailed { message = "cancelled" }) blank
+                in
+                Expect.equal (Just "cancelled") m1.passkey.error
+        , test "NOTE MEDIA JOIN lands in a joined channel" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s NOTE MEDIA #c JOIN dave"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
+                    , \_ -> Expect.equal True m2.mediaAvailable
+                    ]
+                    ()
+        , test "EVENT MEDIA redispatches into the media fold" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s EVENT me MEDIA JOIN #c dave"
+                in
+                Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
+        , test "FAIL MEDIA folds and marks the plane available" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s FAIL MEDIA #c JOIN dave"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just [ "dave" ]) (Dict.get "#c" m2.media.participants)
+                    , \_ -> Expect.equal True m2.mediaAvailable
+                    ]
+                    ()
+        , test "MEDIA for an unknown channel allocates nothing" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s NOTE MEDIA #other JOIN dave"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Dict.isEmpty m1.media.participants)
+                    , \_ -> Expect.equal True m1.mediaAvailable
+                    ]
+                    ()
+        , test "761 ocean.dm-key lands in the device directory" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+                in
+                Expect.equal (Just peerKey) (Dict.get "dave" m1.dmDirectory.primary)
+        , test "761 drops unsafe keys and targets" <|
+            \_ ->
+                let
+                    ( m1, o1 ) =
+                        feed blank ":s 761 me dave __proto__ pub :x"
+
+                    ( m2, o2 ) =
+                        feed blank ":s 761 me dave CONSTRUCTOR pub :x"
+
+                    ( m3, o3 ) =
+                        feed blank ":s 761 me __proto__ ocean.bio pub :x"
+
+                    ( m4, o4 ) =
+                        feed blank ":s METADATA dave prototype * :x"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Dict.empty m1.userMetadata
+                    , \_ -> Expect.equal [] o1
+                    , \_ -> Expect.equal Dict.empty m2.userMetadata
+                    , \_ -> Expect.equal [] o2
+                    , \_ -> Expect.equal Dict.empty m3.userMetadata
+                    , \_ -> Expect.equal [] o3
+                    , \_ -> Expect.equal Dict.empty m4.userMetadata
+                    , \_ -> Expect.equal [] o4
+                    ]
+                    ()
+        , test "761 stores colon and comma keys like the oracle" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 761 me dave weird:key pub :v"
+
+                    ( m2, _ ) =
+                        feed blank ":s 761 me dave a,b pub :w"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Dict.fromList [ ( "weird:key", "v" ) ]) (Maybe.withDefault Dict.empty (Dict.get "dave" m1.userMetadata))
+                    , \_ -> Expect.equal (Dict.fromList [ ( "a,b", "w" ) ]) (Maybe.withDefault Dict.empty (Dict.get "dave" m2.userMetadata))
+                    ]
+                    ()
+        , test "inbound envelope stays locked and kicks an open" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, outbound ) =
+                        feed m1 (":dave!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    stored =
+                        dmMessages m2 "dave"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length stored)
+                    , \_ -> Expect.equal (Just DmCipher.lockedPlaceholder) (Maybe.map displayBody (List.head stored))
+                    , \_ -> Expect.equal (Just envelopeBody) (Maybe.map .body (List.head stored))
+                    , \_ ->
+                        Expect.equal
+                            [ DmOpenRequested { peer = "dave", presentedKey = peerKey, messageId = 0, envelope = envelopeBody, owner = Nothing }
+                            , VaultPersist
+                                { target = "dave"
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0 } ]
+                                }
+                            ]
+                            outbound
+                    ]
+                    ()
+        , test "inbound envelope without a key stays locked silently" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        feed blank (":dave!u@h PRIVMSG me :" ++ envelopeBody)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just DmCipher.lockedPlaceholder) (Maybe.map displayBody (List.head (dmMessages m1 "dave")))
+                    , \_ ->
+                        Expect.equal
+                            [ VaultPersist
+                                { target = "dave"
+                                , rows = [ { id = "dave:0", target = "dave", from = "dave", body = envelopeBody, at = 0 } ]
+                                }
+                            ]
+                            outbound
+                    ]
+                    ()
+        , test "designated DM send seals, never plaintext" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, _ ) =
+                        update (ChannelSelect "dave") m1
+
+                    ( m3, outbound ) =
+                        update ComposerSend { m2 | composer = "hi dave" }
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ DmSealRequested { target = "dave", keys = [ peerKey ], plaintext = "hi dave", owner = Just ownedOwner, schedId = Nothing } ] outbound
+                    , \_ -> Expect.equal "" m3.composer
+                    ]
+                    ()
+        , test "designated DM without a trust namespace refuses" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, outbound ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hi dave" m2.composer
+                    , \_ -> Expect.equal [ "Encryption unavailable" ] (List.map .title m2.toasts)
+                    , \_ ->
+                        Expect.equal
+                            (Just "Your message to dave was NOT sent because Onyx could not resolve the active account's encryption trust store.")
+                            (List.head (List.filterMap .description m2.toasts))
+                    , \_ -> Expect.equal (Just "Encryption unavailable — message to dave was not sent (no active account trust namespace).") (Maybe.map .text (List.head m2.notifications))
+                    ]
+                    ()
+        , test "designated DM without a key sends nothing and warns" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase ":s 766 me dave ocean.dm-key :key not set"
+
+                    ( m2, _ ) =
+                        feed m1 (":dave!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    ( m3, outbound ) =
+                        update ComposerSend { m2 | activeChannel = Just "dave", composer = "hi dave" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hi dave" m3.composer
+                    , \_ -> Expect.equal 1 (List.length m3.serviceLog)
+                    , \_ -> Expect.equal [ "Encryption unavailable" ] (List.map .title m3.toasts)
+                    , \_ -> Expect.equal (Just "Encryption unavailable — message to dave was not sent (no valid device key).") (Maybe.map .text (List.head m3.notifications))
+                    ]
+                    ()
+        , test "room-envelope history designates the DM too" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase (":dave!u@h PRIVMSG me :" ++ roomEnvelopeBody)
+
+                    ( m2, outbound ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hi dave" m2.composer
+                    , \_ -> Expect.equal [ "Encryption unavailable" ] (List.map .title m2.toasts)
+                    ]
+                    ()
+        , test "plain DM still sends plaintext" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (ChannelSelect "bob") blank
+
+                    ( _, outbound ) =
+                        update ComposerSend { m1 | composer = "hello" }
+                in
+                Expect.equal
+                    [ SendLine "PRIVMSG bob hello\r\n"
+                    , VaultPersist
+                        { target = "bob"
+                        , rows = [ { id = "bob:0", target = "bob", from = "me", body = "hello", at = 0 } ]
+                        }
+                    ]
+                    outbound
+        , test "offline designated DM refuses instead of sealing" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, outbound ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave", connection = Offline }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hi dave" m2.composer
+                    , \_ ->
+                        Expect.equal "Encrypted DMs aren't stored while offline — reconnect to send this message."
+                            (Maybe.withDefault "" (List.head m2.serviceLog))
+                    , \_ -> Expect.equal [ "Can't queue encrypted DM" ] (List.map .title m2.toasts)
+                    ]
+                    ()
+        , test "offline plain send queues instead of sending" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update ComposerSend { blank | connection = Offline, activeChannel = Just "#c", composer = "hello" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ OutboxQueue { target = "#c", text = "hello" } ] outbound
+                    , \_ -> Expect.equal "hello" m1.composer
+                    , \_ -> Expect.equal [] m1.outbox
+                    ]
+                    ()
+        , test "queued outbox message renders a pending placeholder" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) { blank | activeChannel = Just "#c", composer = "hello" }
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m1.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal "" m1.composer
+                    , \_ -> Expect.equal [ { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 } ] m1.outbox
+                    , \_ -> Expect.equal [ Just "ob-1" ] (List.map .outboxId rows)
+                    , \_ -> Expect.equal [ "hello" ] (List.map .body rows)
+                    ]
+                    ()
+        , test "failed queue keeps the draft and warns" <|
+            \_ ->
+                let
+                    ( m1, outbound ) =
+                        update (OutboxQueueFailed { target = "#c" }) { blank | composer = "hello" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hello" m1.composer
+                    , \_ -> Expect.equal [] m1.outbox
+                    , \_ ->
+                        Expect.equal "Message to #c could not be queued on this device."
+                            (Maybe.withDefault "" (List.head m1.serviceLog))
+                    , \_ -> Expect.equal [ "Offline" ] (List.map .title m1.toasts)
+                    , \_ ->
+                        Expect.equal [ "Message could not be queued on this device." ]
+                            (List.filterMap .description m1.toasts)
+                    ]
+                    ()
+        , test "slash /ignore blocks silently with the slash toast" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/ignore spammer" }
+                in
+                Expect.all
+                    [ \v -> Expect.equal True (Set.member "spammer" v.ignoredUsers)
+                    , \v -> Expect.equal "" v.composer
+                    , \v -> Expect.equal [ "Ignoring spammer" ] (List.map .title v.toasts)
+                    , \v ->
+                        Expect.equal [ "Their messages are hidden on this device. Notifications are silenced too." ]
+                            (List.filterMap .description v.toasts)
+                    , \v -> Expect.equal [ BlocklistsSave { ignored = [ "spammer" ], muted = [] } ] out
+                    ]
+                    m
+        , test "slash /unignore is case-insensitive on the verb" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | ignoredUsers = Set.singleton "spammer" }
+
+                    ( m, out ) =
+                        update ComposerSend { seeded | activeChannel = Just "#c", composer = "/UNIGNORE spammer extra words" }
+                in
+                Expect.all
+                    [ \v -> Expect.equal False (Set.member "spammer" v.ignoredUsers)
+                    , \v -> Expect.equal "" v.composer
+                    , \v -> Expect.equal [ "Unignored spammer" ] (List.map .title v.toasts)
+                    , \v -> Expect.equal [ BlocklistsSave { ignored = [], muted = [] } ] out
+                    ]
+                    m
+        , test "bare slash /ignore lists the set" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | ignoredUsers = Set.fromList [ "zoe", "amy" ] }
+
+                    ( m, out ) =
+                        update ComposerSend { seeded | activeChannel = Just "#c", composer = "/ignore" }
+
+                    ( empty, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/ignore   " }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Ignoring 2" ] (List.map .title m.toasts)
+                    , \_ -> Expect.equal [ "amy, zoe" ] (List.filterMap .description m.toasts)
+                    , \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal [ "Ignore list empty" ] (List.map .title empty.toasts)
+                    ]
+                    ()
+        , test "bare slash /unignore asks whom" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/unignore" }
+                in
+                case m.toasts of
+                    [ toast ] ->
+                        Expect.all
+                            [ \t -> Expect.equal ToastWarning t.variant
+                            , \t -> Expect.equal "Unignore whom?" t.title
+                            , \_ -> Expect.equal [] out
+                            ]
+                            toast
+
+                    _ ->
+                        Expect.fail "expected one toast"
+        , test "slash /ignore is refused offline with the draft kept" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | connection = Offline, activeChannel = Just "#c", composer = "/ignore spammer" }
+                in
+                -- The oracle composer refuses ALL slash while offline
+                -- ("Commands can't be queued"), even local verbs: the
+                -- store-layer dispatch never runs.
+                Expect.all
+                    [ \v -> Expect.equal False (Set.member "spammer" v.ignoredUsers)
+                    , \v -> Expect.equal [] v.toasts
+                    , \v -> Expect.equal [] out
+                    , \v -> Expect.equal "/ignore spammer" v.composer
+                    , \v -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") v.composerError
+                    ]
+                    m
+        , test "slash /read clears badges with the marked-read toast" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | channels = Dict.singleton "#c" (shellOf "#c" 3 -1) }
+
+                    ( m, out ) =
+                        update ComposerSend { seeded | activeChannel = Just "#c", composer = "/read" }
+
+                    capped =
+                        { blank
+                            | caps = [ "draft/read-marker" ]
+                            , channels = Dict.singleton "#c" (shellOf "#c" 1 -1)
+                        }
+
+                    ( marked, out2 ) =
+                        update ComposerSend { capped | activeChannel = Just "#c", composer = "/markread" }
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just ( 0, 0 ))
+                            (Maybe.map (\c -> ( c.unread, c.highlights )) (Dict.get "#c" m.channels))
+                    , \_ -> Expect.equal "" m.composer
+                    , \_ -> Expect.equal [ "Marked read" ] (List.map .title m.toasts)
+                    , \_ ->
+                        Expect.equal [ "Unread badges for #c were cleared on this device." ]
+                            (List.filterMap .description m.toasts)
+                    , \_ -> Expect.equal [] out
+                    , \_ -> Expect.equal [ "Marked read" ] (List.map .title marked.toasts)
+                    , \_ -> Expect.equal 1 (List.length out2)
+                    ]
+                    ()
+        , test "slash /clear empties the view with the cleared toast" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | channels = Dict.singleton "#c" (bigShell "#c" 3) }
+
+                    ( m, out ) =
+                        update ComposerSend { seeded | activeChannel = Just "#c", composer = "/clear" }
+                in
+                Expect.all
+                    [ \v -> Expect.equal (Just []) (Maybe.map .messages (Dict.get "#c" v.channels))
+                    , \v -> Expect.equal "" v.composer
+                    , \v -> Expect.equal [ "Scrollback cleared" ] (List.map .title v.toasts)
+                    , \v ->
+                        Expect.equal [ "Local history for this view was cleared on this device only." ]
+                            (List.filterMap .description v.toasts)
+                    , \v -> Expect.equal [] out
+                    ]
+                    m
+        , test "slash /whois queries and bare /whois coaches" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/whois bob" }
+
+                    ( bare, bareOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/whois   " }
+
+                    ( off, offOut ) =
+                        update ComposerSend { blank | connection = Offline, activeChannel = Just "#c", composer = "/whois bob" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "bob") m.whoisTarget
+                    , \_ -> Expect.equal "" m.composer
+                    , \_ -> Expect.equal [] m.toasts
+                    , \_ -> Expect.equal 2 (List.length out)
+                    , \_ -> Expect.equal [ "Profile details" ] (List.map .title bare.toasts)
+                    , \_ -> Expect.equal [] bareOut
+                    , \_ -> Expect.equal Nothing off.whoisTarget
+                    , \_ -> Expect.equal [] offOut
+                    , \_ -> Expect.equal "/whois bob" off.composer
+                    , \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") off.composerError
+                    ]
+                    ()
+        , test "highlight terms normalize, dedupe, and cap like the oracle" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "release") (normalizeHighlightWord "  Release ")
+                    , \_ -> Expect.equal Nothing (normalizeHighlightWord "")
+                    , \_ -> Expect.equal Nothing (normalizeHighlightWord "bad\u{0000}term")
+                    , \_ -> Expect.equal Nothing (normalizeHighlightWord (String.repeat 257 "a"))
+                    , \_ -> Expect.equal [ "urgent", "release" ] (parseHighlightWords [ "urgent", "  RELEASE " ])
+                    , \_ -> Expect.equal [ "urgent", "release" ] (parseHighlightWords [ "urgent", "release", "release" ])
+                    , \_ ->
+                        Expect.equal maxHighlightWords
+                            (List.length (parseHighlightWords (List.map (\i -> "w" ++ String.fromInt i) (List.range 1 200))))
+                    ]
+                    ()
+        , test "highlight Msgs persist silently" <|
+            \_ ->
+                let
+                    ( added, out ) =
+                        update (AddHighlightWord "  Release ") blank
+
+                    ( removed, out2 ) =
+                        update (RemoveHighlightWord "RELEASE") added
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "release" ] added.highlightWords
+                    , \_ -> Expect.equal [] added.toasts
+                    , \_ -> Expect.equal [ HighlightWordsSave { words = [ "release" ] } ] out
+                    , \_ -> Expect.equal [] removed.highlightWords
+                    , \_ -> Expect.equal [ HighlightWordsSave { words = [] } ] out2
+                    ]
+                    ()
+        , test "slash /highlight adds with the raw-phrase toast" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/highlight  Incident  Response " }
+                in
+                Expect.all
+                    [ \v -> Expect.equal [ "incident  response" ] v.highlightWords
+                    , \v -> Expect.equal "" v.composer
+                    , \v -> Expect.equal [ "Highlight added" ] (List.map .title v.toasts)
+                    , \v ->
+                        Expect.equal [ "Messages containing \u{201C}Incident  Response\u{201D} will highlight on this device." ]
+                            (List.filterMap .description v.toasts)
+                    , \v -> Expect.equal [ HighlightWordsSave { words = [ "incident  response" ] } ] out
+                    ]
+                    m
+        , test "slash /unhighlight removes and bare verbs coach" <|
+            \_ ->
+                let
+                    seeded =
+                        { blank | highlightWords = [ "release" ] }
+
+                    ( m, out ) =
+                        update ComposerSend { seeded | activeChannel = Just "#c", composer = "/UNHIGHLIGHT Release" }
+
+                    ( bareAdd, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/highlight" }
+
+                    ( bareDrop, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/unhighlight  " }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] m.highlightWords
+                    , \_ -> Expect.equal [ "Highlight removed" ] (List.map .title m.toasts)
+                    , \_ ->
+                        Expect.equal [ "\u{201C}Release\u{201D} will no longer force a highlight." ]
+                            (List.filterMap .description m.toasts)
+                    , \_ -> Expect.equal [ HighlightWordsSave { words = [] } ] out
+                    , \_ -> Expect.equal [ "Highlight word" ] (List.map .title bareAdd.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /highlight <word or phrase>." ]
+                            (List.filterMap .description bareAdd.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /unhighlight <word or phrase>." ]
+                            (List.filterMap .description bareDrop.toasts)
+                    ]
+                    ()
+        , test "slash dnd flips both axes with persistence" <|
+            \_ ->
+                let
+                    ( on, onOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/dnd on" }
+
+                    ( off, offOut ) =
+                        update ComposerSend { on | composer = "/DND OFF" }
+
+                    ( bare, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/dnd" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True on.dndEnabled
+                    , \_ -> Expect.equal Nothing on.dndUntil
+                    , \_ -> Expect.equal [ "Do not disturb on" ] (List.map .title on.toasts)
+                    , \_ -> Expect.equal [ DndSave { enabled = True, until = Nothing } ] onOut
+                    , \_ -> Expect.equal False off.dndEnabled
+                    , \_ -> Expect.equal Nothing off.dndUntil
+                    , \_ ->
+                        Expect.equal [ "Do not disturb on", "Do not disturb off" ]
+                            (List.map .title off.toasts)
+                    , \_ -> Expect.equal [ DndSave { enabled = False, until = Nothing } ] offOut
+                    , \_ -> Expect.equal True bare.dndEnabled
+                    ]
+                    ()
+        , test "slash snooze times, floors, and coaches" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | nowMs = 1000000, activeChannel = Just "#c", composer = "/snooze 90" }
+
+                    ( frac, _ ) =
+                        update ComposerSend { blank | nowMs = 0, activeChannel = Just "#c", composer = "/snooze 1.9" }
+
+                    ( bad, badOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/snooze banana" }
+
+                    ( over, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/snooze 2000" }
+
+                    ( zero, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/dnd 0" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False m.dndEnabled
+                    , \_ -> Expect.equal (Just (1000000 + 90 * 60000)) m.dndUntil
+                    , \_ -> Expect.equal [ "Snoozed 90m" ] (List.map .title m.toasts)
+                    , \_ -> Expect.equal [ DndSave { enabled = False, until = Just (1000000 + 90 * 60000) } ] out
+                    , \_ -> Expect.equal (Just (0 + 1 * 60000)) frac.dndUntil
+                    , \_ -> Expect.equal [ "Snoozed 1m" ] (List.map .title frac.toasts)
+                    , \_ -> Expect.equal [ "Snooze" ] (List.map .title bad.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /snooze <minutes> (1–1440), or /dnd on|off." ]
+                            (List.filterMap .description bad.toasts)
+                    , \_ -> Expect.equal [] badOut
+                    , \_ -> Expect.equal False bad.dndEnabled
+                    , \_ -> Expect.equal [ "Snooze" ] (List.map .title over.toasts)
+                    , \_ -> Expect.equal [ "Do not disturb off" ] (List.map .title zero.toasts)
+                    ]
+                    ()
+        , test "channel notify persistence parses fail-closed" <|
+            \_ ->
+                let
+                    parsed =
+                        parseChannelNotifyEntries
+                            [ { channel = " #C ", level = "none" }
+                            , { channel = "#c", level = "mentions" }
+                            , { channel = "&ops", level = "mentions" }
+                            , { channel = "#all", level = "all" }
+                            , { channel = "#bogus", level = "loud" }
+                            , { channel = "bob", level = "none" }
+                            , { channel = "#has space", level = "none" }
+                            , { channel = "#has,comma", level = "none" }
+                            , { channel = "#has\tsplit", level = "none" }
+                            , { channel = "", level = "none" }
+                            , { channel = String.repeat 65 "#a", level = "none" }
+                            ]
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Dict.fromList [ ( "#c", "none" ), ( "&ops", "mentions" ) ]) parsed
+                    , \_ -> Expect.equal True (isValidNotifyChannel "#c")
+                    , \_ -> Expect.equal False (isValidNotifyChannel "bob")
+                    , \_ -> Expect.equal False (isValidNotifyChannel "#has space")
+                    , \_ ->
+                        Expect.equal 256
+                            (Dict.size
+                                (parseChannelNotifyEntries
+                                    (List.map (\i -> { channel = "#r" ++ String.fromInt i, level = "none" })
+                                        (List.range 1 300)
+                                    )
+                                )
+                            )
+                    ]
+                    ()
+        , test "slash mute unmute and notify toast and persist" <|
+            \_ ->
+                let
+                    ( muted, mutedOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/mute" }
+
+                    ( viaArg, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/mute #C" }
+
+                    ( lost, lostOut ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/mute" }
+
+                    ( mentions, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/NOTIFY Mentions" }
+
+                    ( silenced, silencedOut ) =
+                        update ComposerSend { muted | composer = "/notify mute" }
+
+                    ( restored, restoredOut ) =
+                        update ComposerSend { silenced | composer = "/unmute" }
+
+                    ( badMode, badModeOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/notify loud" }
+
+                    ( outside, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/notify all" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "none") (Dict.get "#c" muted.channelNotify)
+                    , \_ -> Expect.equal [ "Muted #c" ] (List.map .title muted.toasts)
+                    , \_ ->
+                        Expect.equal [ ChannelNotifySave { entries = [ { channel = "#c", level = "none" } ] } ] mutedOut
+                    , \_ -> Expect.equal (Just "none") (Dict.get "#c" viaArg.channelNotify)
+                    , \_ -> Expect.equal [ "Muted #C" ] (List.map .title viaArg.toasts)
+                    , \_ -> Expect.equal [ "Mute a room" ] (List.map .title lost.toasts)
+                    , \_ -> Expect.equal [] lostOut
+                    , \_ -> Expect.equal (Just "mentions") (Dict.get "#c" mentions.channelNotify)
+                    , \_ -> Expect.equal [ "Notify: mentions" ] (List.map .title mentions.toasts)
+                    , \_ ->
+                        Expect.equal [ "#c still badges @ on this device." ]
+                            (List.filterMap .description mentions.toasts)
+                    , \_ -> Expect.equal [ "Muted #c", "Notify: mute" ] (List.map .title silenced.toasts)
+                    , \_ ->
+                        Expect.equal [ ChannelNotifySave { entries = [ { channel = "#c", level = "none" } ] } ] silencedOut
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" restored.channelNotify)
+                    , \_ -> Expect.equal [ "Muted #c", "Notify: mute", "Unmuted #c" ] (List.map .title restored.toasts)
+                    , \_ -> Expect.equal [ ChannelNotifySave { entries = [] } ] restoredOut
+                    , \_ -> Expect.equal [ "Notify mode" ] (List.map .title badMode.toasts)
+                    , \_ -> Expect.equal [] badModeOut
+                    , \_ -> Expect.equal [ "Room notifications" ] (List.map .title outside.toasts)
+                    ]
+                    ()
+        , test "starred persistence parses fail-closed" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Set.fromList [ "#c", "#ok", "&ops" ])
+                            (parseStarredChannels
+                                [ " #C ", "#c", "&OPS", "bob", "#has space", "#has,comma", "", "#ok" ]
+                            )
+                    , \_ ->
+                        Expect.equal 256
+                            (Set.size
+                                (parseStarredChannels
+                                    (List.map (\i -> "#r" ++ String.fromInt i) (List.range 1 300))
+                                )
+                            )
+                    ]
+                    ()
+        , test "slash star toggles silently and unstar forces" <|
+            \_ ->
+                let
+                    ( starred, starredOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/star" }
+
+                    ( toggled, toggledOut ) =
+                        update ComposerSend { starred | composer = "/STAR" }
+
+                    ( viaArg, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/star #C" }
+
+                    ( forced, forcedOut ) =
+                        update ComposerSend { starred | composer = "/unstar #c extra" }
+
+                    ( lost, lostOut ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/unstar" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Set.singleton "#c") starred.starredChannels
+                    , \_ -> Expect.equal [] starred.toasts
+                    , \_ -> Expect.equal "" starred.composer
+                    , \_ ->
+                        Expect.equal [ StarredSave { channels = [ "#c" ] } ] starredOut
+                    , \_ -> Expect.equal Set.empty toggled.starredChannels
+                    , \_ -> Expect.equal [] toggled.toasts
+                    , \_ -> Expect.equal [ StarredSave { channels = [] } ] toggledOut
+                    , \_ -> Expect.equal (Set.singleton "#c") viaArg.starredChannels
+                    , \_ -> Expect.equal Set.empty forced.starredChannels
+                    , \_ ->
+                        Expect.equal [ StarredSave { channels = [] } ] forcedOut
+                    , \_ -> Expect.equal [ "Star a room" ] (List.map .title lost.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /star in a room, or /star #room." ]
+                            (List.filterMap .description lost.toasts)
+                    , \_ -> Expect.equal [] lostOut
+                    ]
+                    ()
+        , test "autojoin persistence keeps insertion order fail-closed" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ "#b", "#a", "&ops" ]
+                            (parseAutoJoinChannels
+                                [ " #B ", "#a", "#b", "&OPS", "bob", "#has space", "", "#a" ]
+                            )
+                    , \_ ->
+                        Expect.equal 128
+                            (List.length
+                                (parseAutoJoinChannels
+                                    (List.map (\i -> "#r" ++ String.fromInt i) (List.range 1 200))
+                                )
+                            )
+                    ]
+                    ()
+        , test "slash autojoin adds and unautojoin removes with toasts" <|
+            \_ ->
+                let
+                    ( added, addedOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/autojoin" }
+
+                    ( dup, dupOut ) =
+                        update ComposerSend { added | composer = "/AUTOJOIN #C" }
+
+                    ( viaArg, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/autojoin #d" }
+
+                    ( removed, removedOut ) =
+                        update ComposerSend { dup | composer = "/unautojoin #c extra" }
+
+                    ( lost, lostOut ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/unautojoin" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "#c" ] added.autoJoinChannels
+                    , \_ -> Expect.equal [ "Auto-join #c" ] (List.map .title added.toasts)
+                    , \_ ->
+                        Expect.equal [ "This room will be rejoined on this device after reconnect." ]
+                            (List.filterMap .description added.toasts)
+                    , \_ ->
+                        Expect.equal [ AutoJoinSave { channels = [ "#c" ] } ] addedOut
+                    , \_ -> Expect.equal [ "#c" ] dup.autoJoinChannels
+                    , \_ ->
+                        Expect.equal [ AutoJoinSave { channels = [ "#c" ] } ] dupOut
+                    , \_ -> Expect.equal [ "#d" ] viaArg.autoJoinChannels
+                    , \_ -> Expect.equal [] removed.autoJoinChannels
+                    , \_ -> Expect.equal [ "Auto-join #c", "Auto-join #c", "Removed auto-join for #c" ] (List.map .title removed.toasts)
+                    , \_ ->
+                        Expect.equal [ AutoJoinSave { channels = [] } ] removedOut
+                    , \_ ->
+                        Expect.equal [ "Reconnect will no longer force-join this room from this device." ]
+                            (List.take 1 (List.reverse (List.filterMap .description removed.toasts)))
+                    , \_ -> Expect.equal [ "Auto-join" ] (List.map .title lost.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /autojoin in a room, or /autojoin #room." ]
+                            (List.filterMap .description lost.toasts)
+                    , \_ -> Expect.equal [] lostOut
+                    ]
+                    ()
+        , test "channel color persistence admits only the hex contract" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#abc") (normalizeChannelColor " #ABC ")
+                    , \_ -> Expect.equal (Just "#abcd") (normalizeChannelColor "#abcd")
+                    , \_ -> Expect.equal (Just "#aabbccdd") (normalizeChannelColor "#AABBCCDD")
+                    , \_ -> Expect.equal Nothing (normalizeChannelColor "red")
+                    , \_ -> Expect.equal Nothing (normalizeChannelColor "#abcde")
+                    , \_ -> Expect.equal Nothing (normalizeChannelColor "rgb(1,2,3)")
+                    , \_ -> Expect.equal Nothing (normalizeChannelColor "")
+                    , \_ ->
+                        Expect.equal (Dict.fromList [ ( "#c", "#222222" ), ( "&ops", "#abc" ) ])
+                            (parseChannelColorEntries
+                                [ { channel = " #C ", color = "#111111" }
+                                , { channel = "#c", color = "#222222" }
+                                , { channel = "&OPS", color = "#ABC" }
+                                , { channel = "#bad", color = "banana" }
+                                , { channel = "bob", color = "#123456" }
+                                ]
+                            )
+                    , \_ ->
+                        Expect.equal 256
+                            (Dict.size
+                                (parseChannelColorEntries
+                                    (List.map (\i -> { channel = "#r" ++ String.fromInt i, color = "#123456" })
+                                        (List.range 1 300)
+                                    )
+                                )
+                            )
+                    ]
+                    ()
+        , test "slash color sets clears and coaches with byte copy" <|
+            \_ ->
+                let
+                    ( set, setOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/color #ABC" }
+
+                    ( bad, badOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/color banana" }
+
+                    ( cleared, clearedOut ) =
+                        update ComposerSend { set | composer = "/COLOUR clear" }
+
+                    ( outside, outsideOut ) =
+                        update ComposerSend { blank | activeChannel = Just "bob", composer = "/color #abc" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "#abc") (Dict.get "#c" set.channelColors)
+                    , \_ -> Expect.equal [ "Room color set" ] (List.map .title set.toasts)
+                    , \_ ->
+                        Expect.equal [ "#c accent updated on this device." ]
+                            (List.filterMap .description set.toasts)
+                    , \_ ->
+                        Expect.equal [ ChannelColorsSave { entries = [ { channel = "#c", color = "#abc" } ] } ] setOut
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" bad.channelColors)
+                    , \_ -> Expect.equal [ "Room color set" ] (List.map .title bad.toasts)
+                    , \_ -> Expect.equal [] badOut
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" cleared.channelColors)
+                    , \_ ->
+                        Expect.equal [ "Room color set", "Room color cleared" ]
+                            (List.map .title cleared.toasts)
+                    , \_ ->
+                        Expect.equal [ ChannelColorsSave { entries = [] } ] clearedOut
+                    , \_ -> Expect.equal [ "Room color" ] (List.map .title outside.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /color #hex in a room." ]
+                            (List.filterMap .description outside.toasts)
+                    , \_ -> Expect.equal [] outsideOut
+                    ]
+                    ()
+        , test "slash registry resolves names aliases and opers" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal 57 (List.length slashCommands)
+                    , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
+                    , \_ -> Expect.equal (Just "join") (Maybe.map .name (findSlashCommand "j"))
+                    , \_ -> Expect.equal (Just "color") (Maybe.map .name (findSlashCommand "colour"))
+                    , \_ -> Expect.equal (Just "broadcast") (Maybe.map .name (findSlashCommand "wallops"))
+                    , \_ -> Expect.equal (Just "read") (Maybe.map .name (findSlashCommand "markread"))
+                    , \_ -> Expect.equal (Just "/mute [#channel]") (Maybe.map .usage (findSlashCommand "/MUTE"))
+                    , \_ -> Expect.equal True (Maybe.map .oper (findSlashCommand "KILL") == Just True)
+                    , \_ -> Expect.equal (Just (Just "¯\\_(ツ)_/¯")) (Maybe.map .insertText (findSlashCommand "shrug"))
+                    , \_ -> Expect.equal Nothing (findSlashCommand "frobnicate")
+                    , \_ -> Expect.equal Nothing (findSlashCommand "")
+                    ]
+                    ()
+        , test "slash help lists and describes with byte copy" <|
+            \_ ->
+                let
+                    ( bare, bareOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/help" }
+
+                    ( hit, hitOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/HELP mute" }
+
+                    ( slashed, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/help /kill" }
+
+                    ( aliased, _ ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/help colour" }
+
+                    ( missed, missedOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/help frobnicate" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Local slash commands" ] (List.map .title bare.toasts)
+                    , \_ ->
+                        Expect.equal [ "/clear · /ignore · /read · /star · /mute · /autojoin · /highlight · /snooze · /dnd · /color · /share · /export · /notify · /search · /help" ]
+                            (List.filterMap .description bare.toasts)
+                    , \_ -> Expect.equal [] bareOut
+                    , \_ -> Expect.equal [ "/mute [#channel]" ] (List.map .title hit.toasts)
+                    , \_ ->
+                        Expect.equal [ "Mute notifications for the current (or named) room on this device." ]
+                            (List.filterMap .description hit.toasts)
+                    , \_ -> Expect.equal [] hitOut
+                    , \_ -> Expect.equal [ "/kill <nick> <reason>" ] (List.map .title slashed.toasts)
+                    , \_ -> Expect.equal [ "/color [#hex|clear]" ] (List.map .title aliased.toasts)
+                    , \_ -> Expect.equal [ "Unknown command" ] (List.map .title missed.toasts)
+                    , \_ ->
+                        Expect.equal [ "No slash command named \u{201C}frobnicate\u{201D}. Try /help." ]
+                            (List.filterMap .description missed.toasts)
+                    , \_ -> Expect.equal [] missedOut
+                    ]
+                    ()
+        , test "event time parses unix digits and ISO like the oracle" <|
+            \_ ->
+                let
+                    now =
+                        1767225600000
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "1767229200")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "1767229200000")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2026-01-01T01:00:00Z")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2026-01-01T03:00:00+02:00")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2026-01-01T03:00:00+0200")
+                    , \_ -> Expect.equal (Just 1767225600) (parseEventTimeMs now "2026-01-01")
+                    , \_ -> Expect.equal (Just 1767225600) (parseEventTimeMs now "2026-01-01T00:00:00.500Z")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2026-01-01 01:00:00Z")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2026-01-01T01:00:00z")
+                    , \_ -> Expect.equal (Just 1767229200) (parseEventTimeMs now "2025-12-31T20:00:00-05:00")
+                    , \_ -> Expect.equal (Just 1767225300) (parseEventTimeMs now "2025-12-31T23:55:00Z")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2026-01-01T03:00:00+02")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2026-13-01")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2026-02-30")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2026-01-01T24:00:00Z")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2026-01-01T00:60:00Z")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "tomorrow")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2020-01-01T00:00:00Z")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2030-01-01")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "123456789012345")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "")
+                    , \_ -> Expect.equal Nothing (parseEventTimeMs now "2025-12-31T23:54:59Z")
+                    , \_ -> Expect.equal (Just 1835395200) (parseEventTimeMs 1830297600000 "2028-02-29T00:00:00Z")
+                    , \_ -> Expect.equal "a b c" (sanitizeEventTitle "a\r\n\rb\nc")
+                    , \_ -> Expect.equal 180 (String.length (sanitizeEventTitle (String.repeat 200 "x")))
+                    ]
+                    ()
+        , test "slash event schedules clears and falls through raw" <|
+            \_ ->
+                let
+                    base =
+                        Isupport.defaultSupport
+
+                    live =
+                        { blank | nowMs = 1767225600000, activeChannel = Just "#c", isupport = { base | ircx = True } }
+
+                    ( set, setOut ) =
+                        update ComposerSend { live | composer = "/event 2026-01-01T01:00:00Z Party time!" }
+
+                    ( cleared, clearedOut ) =
+                        update ComposerSend { set | composer = "/event OFF" }
+
+                    ( bare, bareOut ) =
+                        update ComposerSend { set | composer = "/event" }
+
+                    ( bad, badOut ) =
+                        update ComposerSend { live | composer = "/event banana Party" }
+
+                    ( untitled, untitledOut ) =
+                        update ComposerSend { live | composer = "/event 1767229200" }
+
+                    ( down, downOut ) =
+                        update ComposerSend { live | connection = Offline, composer = "/event 1767229200 X" }
+
+                    ( dm, dmOut ) =
+                        update ComposerSend { live | activeChannel = Just "bob", composer = "/event clear" }
+
+                    ( _, bareDmOut ) =
+                        update ComposerSend { live | activeChannel = Just "bob", composer = "/event" }
+
+                    plainLink =
+                        { live | isupport = base }
+
+                    ( quiet, quietOut ) =
+                        update ComposerSend { plainLink | composer = "/event 1767229200 Shh" }
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just (Dict.singleton "ocean.event" "1767229200|Party time!"))
+                            (Dict.get "#c" set.props.channelProps)
+                    , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :1767229200|Party time!\r\n" ] setOut
+                    , \_ -> Expect.equal [] set.toasts
+                    , \_ -> Expect.equal "" set.composer
+                    , \_ -> Expect.equal Nothing (Dict.get "#c" cleared.props.channelProps)
+                    , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :\r\n" ] clearedOut
+                    , \_ -> Expect.equal [] cleared.toasts
+                    , \_ -> Expect.equal [ SendLine "PROP #c ocean.event :\r\n" ] bareOut
+                    , \_ -> Expect.equal [ "Event not set" ] (List.map .title bad.toasts)
+                    , \_ ->
+                        Expect.equal [ "Use /event <YYYY-MM-DDThh:mmZ> <title>." ]
+                            (List.filterMap .description bad.toasts)
+                    , \_ -> Expect.equal [] badOut
+                    , \_ -> Expect.equal [ "Event not set" ] (List.map .title untitled.toasts)
+                    , \_ -> Expect.equal [] untitledOut
+                    , \_ -> Expect.equal "/event 1767229200 X" down.composer
+                    , \_ -> Expect.equal [] downOut
+                    , \_ -> Expect.equal [] down.toasts
+                    , \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") down.composerError
+                    , \_ -> Expect.equal [ SendLine "EVENT clear\r\n" ] dmOut
+                    , \_ -> Expect.equal [ SendLine "EVENT\r\n" ] bareDmOut
+                    , \_ ->
+                        Expect.equal (Just (Dict.singleton "ocean.event" "1767229200|Shh"))
+                            (Dict.get "#c" quiet.props.channelProps)
+                    , \_ -> Expect.equal [] quietOut
+                    ]
+                    ()
+        , test "oper desk parses and plans fail-closed" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        Expect.equal (Just (OperBroadcast "hi there"))
+                            (parseOperSlashCommand "wallops" [ "hi", "there" ])
+                    , \_ ->
+                        Expect.equal (Just (OperKill { target = "bob", reason = "spamming" }))
+                            (parseOperSlashCommand "kill" [ "bob", "spamming" ])
+                    , \_ ->
+                        Expect.equal (Just (OperEventSubscribe "kill"))
+                            (parseOperSlashCommand "events" [ "add", "kill" ])
+                    , \_ ->
+                        Expect.equal (Just (OperEventUnsubscribe "spam"))
+                            (parseOperSlashCommand "events" [ "remove", "spam" ])
+                    , \_ -> Expect.equal (Just OperEventList) (parseOperSlashCommand "events" [])
+                    , \_ -> Expect.equal (Just OperObserveList) (parseOperSlashCommand "observe" [])
+                    , \_ -> Expect.equal (Just OperObserveOff) (parseOperSlashCommand "observe" [ "off" ])
+                    , \_ -> Expect.equal Nothing (parseOperSlashCommand "join" [ "#c" ])
+                    , \_ ->
+                        Expect.equal
+                            (Ok { command = "EVENT", params = [ "BROADCAST", "Hello ops" ], summary = "Announce to operators subscribed to ANNOUNCE: \u{201C}Hello ops\u{201D}.", destructive = True })
+                            (planOperAction (OperBroadcast "Hello ops"))
+                    , \_ ->
+                        Expect.equal (Err [ "Write the announcement first." ])
+                            (planOperAction (OperBroadcast "   "))
+                    , \_ ->
+                        Expect.equal (Err [ "Keep the broadcast under 400 characters." ])
+                            (planOperAction (OperBroadcast (String.repeat 401 "x")))
+                    , \_ ->
+                        Expect.equal (Err [ "The broadcast cannot include line breaks or control characters." ])
+                            (planOperAction (OperBroadcast "hi\u{0007}there"))
+                    , \_ ->
+                        Expect.equal
+                            (Ok { command = "EVENT", params = [ "ADD", "KILL" ], summary = "Receive KILL events from every node on the network.", destructive = False })
+                            (planOperAction (OperEventSubscribe "kill"))
+                    , \_ ->
+                        Expect.equal (Err [ "Pick a category from the Event Spine list." ])
+                            (planOperAction (OperEventSubscribe "bogus"))
+                    , \_ ->
+                        Expect.equal (Err [ "Enter a nick!user@host mask, wildcards allowed." ])
+                            (planOperAction (OperObserve { mask = "*", actions = [] }))
+                    , \_ ->
+                        Expect.equal (Err [ "Pick from connect, quit, nick, join, part, host, or oper." ])
+                            (planOperAction (OperObserve { mask = "*!*@*.example", actions = [ "bogus" ] }))
+                    , \_ ->
+                        Expect.equal
+                            (Ok { command = "EVENT", params = [ "OBSERVE", "*!*@*.example", "join", "part" ], summary = "Watch *!*@*.example network-wide for join, part. Their real host is revealed to you.", destructive = False })
+                            (planOperAction (OperObserve { mask = "*!*@*.example", actions = [ "part", "join", "part" ] }))
+                    , \_ ->
+                        Expect.equal (Err [ "A reason is required — it is recorded network-wide." ])
+                            (planOperAction (OperKill { target = "bob", reason = "" }))
+                    , \_ ->
+                        Expect.equal (Err [ "Enter the nickname to disconnect." ])
+                            (planOperAction (OperKill { target = "", reason = "" }))
+                    , \_ ->
+                        Expect.equal
+                            (Ok { command = "KILL", params = [ "bob", "spamming" ], summary = "Disconnect bob from the network with the reason \u{201C}spamming\u{201D}.", destructive = True })
+                            (planOperAction (OperKill { target = "bob", reason = "spamming" }))
+                    , \_ -> Expect.equal True (isOperEventCategory "server_link")
+                    , \_ -> Expect.equal False (isOperEventCategory "bogus")
+                    , \_ -> Expect.equal True (isOperObserveAction "Join")
+                    , \_ -> Expect.equal (Just "ANNOUNCE") (normalizeOperCategory "announce")
+                    , \_ -> Expect.equal Nothing (normalizeObserveMask "has space")
+                    , \_ -> Expect.equal Nothing (normalizeOperNick "a,b")
+                    ]
+                    ()
+        , test "slash oper verbs gate on plan status and connection" <|
+            \_ ->
+                let
+                    oper =
+                        { blank | isOper = True, activeChannel = Just "#c" }
+
+                    ( cast, castOut ) =
+                        update ComposerSend { oper | composer = "/broadcast Hello network" }
+
+                    ( _, wallopedOut ) =
+                        update ComposerSend { oper | composer = "/WALLOPS Hi" }
+
+                    ( _, killedOut ) =
+                        update ComposerSend { oper | composer = "/kill bob spamming links" }
+
+                    ( reasonless, reasonlessOut ) =
+                        update ComposerSend { oper | composer = "/kill bob" }
+
+                    ( _, subbedOut ) =
+                        update ComposerSend { oper | composer = "/events add KILL" }
+
+                    ( _, listedOut ) =
+                        update ComposerSend { oper | composer = "/events bogus" }
+
+                    ( _, watchedOut ) =
+                        update ComposerSend { oper | composer = "/observe *!*@*.example part join" }
+
+                    ( _, rehashedOut ) =
+                        update ComposerSend { oper | composer = "/rehash" }
+
+                    ( bare, bareOut ) =
+                        update ComposerSend { oper | composer = "/broadcast" }
+
+                    ( civilian, civilianOut ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/privs" }
+
+                    ( down, downOut ) =
+                        update ComposerSend { oper | connection = Offline, composer = "/privs" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "EVENT BROADCAST :Hello network\r\n" ] castOut
+                    , \_ -> Expect.equal [] cast.toasts
+                    , \_ -> Expect.equal "" cast.composer
+                    , \_ -> Expect.equal [ SendLine "EVENT BROADCAST Hi\r\n" ] wallopedOut
+                    , \_ -> Expect.equal [ SendLine "KILL bob :spamming links\r\n" ] killedOut
+                    , \_ -> Expect.equal [ "Operator command" ] (List.map .title reasonless.toasts)
+                    , \_ ->
+                        Expect.equal [ "A reason is required — it is recorded network-wide." ]
+                            (List.filterMap .description reasonless.toasts)
+                    , \_ -> Expect.equal [] reasonlessOut
+                    , \_ -> Expect.equal [ SendLine "EVENT ADD KILL\r\n" ] subbedOut
+                    , \_ -> Expect.equal [ SendLine "EVENT LIST\r\n" ] listedOut
+                    , \_ -> Expect.equal [ SendLine "EVENT OBSERVE *!*@*.example join part\r\n" ] watchedOut
+                    , \_ -> Expect.equal [ SendLine "REHASH\r\n" ] rehashedOut
+                    , \_ -> Expect.equal [ "Operator command" ] (List.map .title bare.toasts)
+                    , \_ ->
+                        Expect.equal [ "Write the announcement first." ]
+                            (List.filterMap .description bare.toasts)
+                    , \_ -> Expect.equal [] bareOut
+                    , \_ -> Expect.equal [ "Operator access required" ] (List.map .title civilian.toasts)
+                    , \_ ->
+                        Expect.equal [ "This network grants operator status from the signed-in account." ]
+                            (List.filterMap .description civilian.toasts)
+                    , \_ -> Expect.equal [] civilianOut
+                    , \_ -> Expect.equal "/privs" down.composer
+                    , \_ -> Expect.equal [] downOut
+                    , \_ -> Expect.equal [] down.toasts
+                    , \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") down.composerError
+                    ]
+                    ()
+        , test "unknown slash goes out raw, never PRIVMSG" <|
+            \_ ->
+                let
+                    ( m, out ) =
+                        update ComposerSend { blank | activeChannel = Just "#c", composer = "/join #x" }
+                in
+                -- Mirrors the oracle `sendRaw` fallthrough: the verb
+                -- uppercases onto the wire instead of leaking as chat.
+                Expect.all
+                    [ \v -> Expect.equal "" v.composer
+                    , \v -> Expect.equal [] v.toasts
+                    , \_ -> Expect.equal [ SendLine "JOIN #x\r\n" ] out
+                    ]
+                    m
+        , test "491 drops a stale oper badge with an inbox error" <|
+            \_ ->
+                let
+                    ( opped, _ ) =
+                        feed blank ":irc.example 381 me oper"
+
+                    ( stripped, out ) =
+                        feed opped ":irc.example 491 me :No oper for you"
+                in
+                Expect.all
+                    [ \v -> Expect.equal True opped.isOper
+                    , \v -> Expect.equal False stripped.isOper
+                    , \v -> Expect.equal False stripped.isNetworkAdmin
+                    , \v ->
+                        case stripped.notifications of
+                            [ note ] ->
+                                Expect.all
+                                    [ \n -> Expect.equal NotifError n.kind
+                                    , \n -> Expect.equal "OPER not authorized from your host" n.text
+                                    ]
+                                    note
+
+                            _ ->
+                                Expect.fail "expected one notification"
+                    , \_ -> Expect.equal [] out
+                    ]
+                    stripped
+        , test "flush report drops sent placeholders and keeps uncertain" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "one", queuedAt = 1000 }) blank
+
+                    ( m2, _ ) =
+                        update (OutboxQueued { id = "ob-2", target = "#c", text = "two", queuedAt = 2000 }) m1
+
+                    ( m3, outbound ) =
+                        update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [ "ob-2" ], dropped = [], rows = [ { id = "ob-2", target = "#c", text = "two", queuedAt = 2000 } ], waiting = 1, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 }) m2
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m3.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ OutboxRetryTimer { delayMs = 4000 } ] outbound
+                    , \_ -> Expect.equal 1 m3.outboxRetries
+                    , \_ -> Expect.equal False m3.outboxFailed
+                    , \_ -> Expect.equal [ Just "ob-2" ] (List.map .outboxId rows)
+                    , \_ -> Expect.equal [ "ob-2" ] m3.outboxUncertain
+                    , \_ -> Expect.equal 1 (List.length m3.outbox)
+                    ]
+                    ()
+        , test "flush outcomes toast in oracle order" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        update (OutboxFlushed { sent = [ "ob-1", "ob-2" ], uncertain = [ "ob-3" ], dropped = [ "ob-4" ], rows = [], waiting = 1, pruneFailed = 2, expiredPruneFailed = 1, admittedPruneFailed = 1, walkOk = True, sentLabels = [] }) blank
+                in
+                Expect.all
+                    [ \v ->
+                        Expect.equal
+                            [ "Admission uncertain / may have sent"
+                            , "2 queued messages admitted"
+                            , "Queued message expired"
+                            , "Expired queued message needs cleanup"
+                            , "Queued message stuck on this device"
+                            ]
+                            (List.map .title v.toasts)
+                    , \v ->
+                        Expect.equal
+                            [ ToastError, ToastSuccess, ToastWarning, ToastWarning, ToastWarning ]
+                            (List.map .variant v.toasts)
+                    , \v ->
+                        Expect.equal
+                            [ "Admitted to this device connection; recipient delivery confirmation pending." ]
+                            (List.filterMap .description (List.filter (\t -> t.title == "2 queued messages admitted") v.toasts))
+                    ]
+                    m
+        , test "labeled flush keeps the sent placeholder pending and registers it" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+
+                    ( m2, _ ) =
+                        update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "q9" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hello" ] (List.map .body rows)
+                    , \_ -> Expect.equal [ True ] (List.map .pending rows)
+                    , \_ -> Expect.equal [ Just "ob-1" ] (List.map .outboxId rows)
+                    , \_ -> Expect.equal 1 (Dict.size m2.pendingLabels)
+                    ]
+                    ()
+        , test "labeled flush echo resolves and unlinks the placeholder" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+
+                    ( m2, _ ) =
+                        update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "q9" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
+
+                    ( m3, _ ) =
+                        feed { m2 | ourNick = "me" } "@label=q9 :me!u@h PRIVMSG #c :hello"
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m3.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "hello" ] (List.map .body rows)
+                    , \_ -> Expect.equal [ False ] (List.map .pending rows)
+                    , \_ -> Expect.equal [ Nothing ] (List.map .outboxId rows)
+                    , \_ -> Expect.equal Dict.empty m3.pendingLabels
+                    ]
+                    ()
+        , test "invalid flush labels fall back to dropping the placeholder" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (OutboxQueued { id = "ob-1", target = "#c", text = "hello", queuedAt = 1000 }) blank
+
+                    ( m2, _ ) =
+                        update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], sentLabels = [ { id = "ob-1", label = "not a label" } ], waiting = 0, pruneFailed = 0, walkOk = True, expiredPruneFailed = 0, admittedPruneFailed = 0 }) m1
+
+                    rows =
+                        Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" m2.channels))
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] rows
+                    , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                    ]
+                    ()
+        , test "flush request carries the labeled flag from caps" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal [ OutboxFlush { labeled = False } ] (Tuple.second (update OutboxFlushRequest blank))
+                    , \_ ->
+                        Expect.equal [ OutboxFlush { labeled = True } ]
+                            (Tuple.second (update OutboxFlushRequest { blank | caps = [ "labeled-response" ] }))
+                    ]
+                    ()
+        , test "empty flush clears sticky failure chrome" <|
+            \_ ->
+                let
+                    ( m, outbound ) =
+                        update (OutboxFlushed { sent = [ "ob-1" ], uncertain = [], dropped = [], rows = [], waiting = 0, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 })
+                            { blank | outboxFailed = True, outboxRetries = 2 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal False m.outboxFailed
+                    ]
+                    ()
+        , test "mid-flush disconnect defers without burning budget" <|
+            \_ ->
+                let
+                    ( m, outbound ) =
+                        update (OutboxFlushed { sent = [], uncertain = [ "ob-1", "ob-2" ], dropped = [], rows = [], waiting = 2, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 })
+                            { blank | connection = Offline, outboxFailed = False, outboxRetries = 2 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal 2 m.outboxRetries
+                    , \_ -> Expect.equal False m.outboxFailed
+                    ]
+                    ()
+        , test "spent budget marks delivery failed and logs the still-waiting row" <|
+            \_ ->
+                let
+                    ( m, outbound ) =
+                        update (OutboxFlushed { sent = [], uncertain = [ "ob-9" ], dropped = [], rows = [], waiting = 1, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 })
+                            { blank | outboxRetries = 5 }
+
+                    ( m2, _ ) =
+                        update (OutboxFlushed { sent = [], uncertain = [ "ob-9", "ob-10" ], dropped = [], rows = [], waiting = 2, pruneFailed = 0, walkOk = True, sentLabels = [], expiredPruneFailed = 0, admittedPruneFailed = 0 })
+                            { blank | outboxRetries = 5 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal True m.outboxFailed
+                    , \_ ->
+                        Expect.equal "Queued message still waiting — Could not send yet. Open Home or retry from the composer."
+                            (Maybe.withDefault "" (List.head m.serviceLog))
+                    , \_ -> Expect.equal True m2.outboxFailed
+                    , \_ ->
+                        Expect.equal "2 queued messages still waiting — Could not send yet. Open Home or retry from the composer."
+                            (Maybe.withDefault "" (List.head m2.serviceLog))
+                    , \_ ->
+                        Expect.equal [ "Admission uncertain / may have sent", "Queued message still waiting" ]
+                            (List.map .title m.toasts)
+                    , \_ ->
+                        Expect.equal
+                            [ "Admission uncertain / may have sent"
+                            , "Admission uncertain / may have sent"
+                            , "2 queued messages still waiting"
+                            ]
+                            (List.map .title m2.toasts)
+                    ]
+                    ()
+        , test "repeat mark-failed does not re-toast" <|
+            \_ ->
+                let
+                    flush =
+                        OutboxFlushed { sent = [], uncertain = [ "ob-9" ], dropped = [], rows = [], waiting = 1, pruneFailed = 0, expiredPruneFailed = 0, admittedPruneFailed = 0, walkOk = True, sentLabels = [] }
+
+                    ( m, _ ) =
+                        update flush { blank | outboxRetries = 5, outboxFailed = True }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True m.outboxFailed
+                    , \_ -> Expect.equal [ "Admission uncertain / may have sent" ] (List.map .title m.toasts)
+                    ]
+                    ()
+        , test "broken walk marks delivery failed without burning budget" <|
+            \_ ->
+                let
+                    ( m, outbound ) =
+                        update (OutboxFlushed { sent = [], uncertain = [], dropped = [], rows = [], waiting = 0, pruneFailed = 0, expiredPruneFailed = 0, admittedPruneFailed = 0, walkOk = False, sentLabels = [] })
+                            { blank | outboxRetries = 2 }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal True m.outboxFailed
+                    , \_ -> Expect.equal 2 m.outboxRetries
+                    , \_ ->
+                        Expect.equal "Queued messages still waiting — Could not finish sending from this device. Retry from Home or the composer."
+                            (Maybe.withDefault "" (List.head m.serviceLog))
+                    , \_ -> Expect.equal [ "Queued messages still waiting" ] (List.map .title m.toasts)
+                    ]
+                    ()
+        , test "retry timer fire walks the queue again" <|
+            \_ ->
+                Expect.equal [ OutboxFlush { labeled = False } ] (Tuple.second (update OutboxRetryFired blank))
+        , test "001 re-arms the retry budget and clears failure chrome" <|
+            \_ ->
+                let
+                    ( m, _ ) =
+                        feed { blank | outboxRetries = 3, outboxFailed = True } ":irc.example 001 me :welcome"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 0 m.outboxRetries
+                    , \_ -> Expect.equal False m.outboxFailed
+                    ]
+                    ()
+        , test "account switch and logout reset the outbox generation" <|
+            \_ ->
+                let
+                    switched =
+                        { blank | accountName = Just "alice", outboxRetries = 4, outboxFailed = True }
+
+                    ( m1, _ ) =
+                        feed switched ":irc.example 900 me * BOB :logged in"
+
+                    ( m2, _ ) =
+                        feed { blank | accountName = Just "alice", outboxRetries = 4, outboxFailed = True } ":irc.example 901 alice :logged out"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 0 m1.outboxRetries
+                    , \_ -> Expect.equal False m1.outboxFailed
+                    , \_ -> Expect.equal 0 m2.outboxRetries
+                    , \_ -> Expect.equal False m2.outboxFailed
+                    ]
+                    ()
+        , test "offline required room refuses instead of sealing" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    ( m3, outbound ) =
+                        update ComposerSend { m2 | activeChannel = Just "#c", composer = "hi room", connection = Offline }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal "hi room" m3.composer
+                    , \_ ->
+                        Expect.equal "Messages for #c must be encrypted while connected, so this plaintext was not stored. Reconnect to send it."
+                            (Maybe.withDefault "" (List.head m3.serviceLog))
+                    , \_ -> Expect.equal [ "Can't queue encrypted room message" ] (List.map .title m3.toasts)
+                    ]
+                    ()
+        , test "DmSealed sends ciphertext and keeps plaintext local" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, _ ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, outbound ) =
+                        update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) m2
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine ("PRIVMSG dave :" ++ envelopeBody ++ "\r\n")
+                            , VaultPersist
+                                { target = "dave"
+                                , rows =
+                                    [ { id = "dave:1"
+                                      , target = "dave"
+                                      , from = m3.ourNick
+                                      , body = envelopeBody
+                                      , at = floor m3.nowMs
+                                      }
+                                    ]
+                                }
+                            ]
+                            outbound
+                    , \_ -> Expect.equal (Just "hi dave") (Maybe.andThen .plaintext (List.head (dmMessages m3 "dave")))
+                    , \_ -> Expect.equal (Just envelopeBody) (Maybe.map .body (List.head (dmMessages m3 "dave")))
+                    ]
+                    ()
+        , test "DmSealed without a pending seal drops" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) blank
+                in
+                Expect.equal [] outbound
+        , test "DmSealed after directory rotation drops and flags" <|
+            \_ ->
+                let
+                    otherKey =
+                        Base64Url.encode (0x04 :: List.repeat 64 8)
+
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, _ ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, _ ) =
+                        feed m2 (":s 761 me dave ocean.dm-keys pub :" ++ otherKey)
+
+                    ( m4, outbound ) =
+                        update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) m3
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal True (Set.member "dave" m4.peerKeyChanges)
+                    , \_ -> Expect.equal Dict.empty m4.pendingSeals
+                    ]
+                    ()
+        , test "DmSealFailed with keyChanged flags silently" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, _ ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, outbound ) =
+                        update (DmSealFailed { target = "dave", keyChanged = True, schedId = Nothing }) m2
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal True (Set.member "dave" m3.peerKeyChanges)
+                    , \_ -> Expect.equal [] m3.toasts
+                    , \_ -> Expect.equal Dict.empty m3.pendingSeals
+                    ]
+                    ()
+        , test "DmSealFailed without keyChanged toasts verbatim" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    ( m2, _ ) =
+                        update ComposerSend { m1 | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, outbound ) =
+                        update (DmSealFailed { target = "dave", keyChanged = False, schedId = Nothing }) m2
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal False (Set.member "dave" m3.peerKeyChanges)
+                    , \_ -> Expect.equal [ "Encryption unavailable" ] (List.map .title m3.toasts)
+                    , \_ -> Expect.equal (Just "Encryption unavailable — message to dave was not sent (the encrypted DM could not be sealed).") (Maybe.map .text (List.head m3.notifications))
+                    ]
+                    ()
+        , test "DmOpenResult fills plaintext on body match" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":dave!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    ( m2, _ ) =
+                        update (DmOpenResult { peer = "dave", messageId = 0, envelope = envelopeBody, plaintext = "secret" }) m1
+                in
+                Expect.equal (Just "secret") (Maybe.map displayBody (List.head (dmMessages m2 "dave")))
+        , test "DmOpenResult ignores stale bodies" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank (":dave!u@h PRIVMSG me :" ++ envelopeBody)
+
+                    ( m2, _ ) =
+                        update (DmOpenResult { peer = "dave", messageId = 0, envelope = "ONYXDM1 stale", plaintext = "evil" }) m1
+                in
+                Expect.equal (Just DmCipher.lockedPlaceholder) (Maybe.map displayBody (List.head (dmMessages m2 "dave")))
+        , test "DmOpenFailed key-changed flags the peer" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        update (DmOpenFailed { peer = "dave", messageId = 0, keyChanged = True }) blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Set.member "dave" m1.peerKeyChanges)
+                    , \_ -> Expect.equal 1 (List.length m1.serviceLog)
+                    ]
+                    ()
+        , test "001 enters IRCX, publishes the device key, and flushes the outbox" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        feed blank ":s 001 me :welcome"
+                in
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+        , test "selecting an unknown DM fetches its key" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update (ChannelSelect "dave") blank
+                in
+                Expect.equal [ SendLine "METADATA dave GET ocean.dm-key\r\n", SendLine "MONITOR + dave\r\n" ] outbound
+        , test "001 skips device-key publish when e2eeDms is off" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        feed { blank | e2eeDms = False } ":s 001 me :welcome"
+                in
+                -- Outbox flush still fires: queued rows are never
+                -- sealable plaintext (refusal gates), so flushing is
+                -- pref-independent. IRCX mode entry is pref-independent
+                -- too.
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+        , test "DM select skips key fetch when e2eeDms is off" <|
+            \_ ->
+                let
+                    ( _, outbound ) =
+                        update (ChannelSelect "dave") { blank | e2eeDms = False }
+                in
+                -- Presence tracking is pref-independent (the oracle's
+                -- `monitorAdd` runs outside the `e2eeDms` gate); only the
+                -- device-key fetch is gated.
+                Expect.equal [ SendLine "MONITOR + dave\r\n" ] outbound
+        , test "352 marks a roster member away" <|
+            \_ ->
+                let
+                    ( s0, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed s0 ":dave!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 352 me #c duser dhost dserver dave G :0 real name"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just True) (Maybe.map .away (Maybe.andThen (Dict.get "dave" << .members) (Dict.get "#c" m2.channels)))
+                    , \_ -> Expect.equal True (Set.member "dave" m2.awayNicks)
+                    ]
+                    ()
+        , test "352 H clears away again" <|
+            \_ ->
+                let
+                    ( s0, _ ) =
+                        feed blank ":me!u@h JOIN #c"
+
+                    ( m1, _ ) =
+                        feed s0 ":dave!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 352 me #c duser dhost dserver dave G :0 real name"
+
+                    ( m3, _ ) =
+                        feed m2 ":s 352 me #c duser dhost dserver dave H :0 real name"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just False) (Maybe.map .away (Maybe.andThen (Dict.get "dave" << .members) (Dict.get "#c" m3.channels)))
+                    , \_ -> Expect.equal False (Set.member "dave" m3.awayNicks)
+                    ]
+                    ()
+        , test "352 ignores strangers and unknown channels" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":dave!u@h JOIN #c"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 352 me #c muser mhost mserver mallory G :0 real name"
+
+                    ( m3, _ ) =
+                        feed m2 ":s 352 me #other duser dhost dserver dave G :0 real name"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (Set.isEmpty m2.awayNicks)
+                    , \_ -> Expect.equal Nothing (Dict.get "#other" m3.channels)
+                    , \_ -> Expect.equal True (Set.isEmpty m3.awayNicks)
+                    ]
+                    ()
+        , test "HELP numerics land in the service log" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 704 me JOIN :Join a channel"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 706 me JOIN :End of /HELP."
+
+                    ( m3, _ ) =
+                        feed m2 ":s 524 me NOPE :Help not found"
+                in
+                Expect.equal [ "NOPE Help not found", "JOIN End of /HELP.", "JOIN Join a channel" ] m3.serviceLog
+        , test "353 without a visibility char still fills the roster" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                    ( m, _ ) =
+                        feed j1 ":s 353 alice #c :alice bob carol"
+
+                    keys =
+                        Dict.get "#c" m.channels
+                            |> Maybe.map (.members >> Dict.keys >> List.sort)
+                            |> Maybe.withDefault []
+                in
+                Expect.equal [ "alice", "bob", "carol" ] keys
+        , test "353 skips unsafe nicks without dropping the line" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                    ( m, _ ) =
+                        feed j1 ":s 353 alice = #c :alice @bob :evil a,b @carol"
+
+                    keys =
+                        Dict.get "#c" m.channels
+                            |> Maybe.map (.members >> Dict.keys >> List.sort)
+                            |> Maybe.withDefault []
+                in
+                Expect.equal [ "alice", "bob", "carol" ] keys
+        , test "353 bounds hostile token floods" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                    flood =
+                        String.join " " (List.map (\i -> "u" ++ String.fromInt i) (List.range 1 5000))
+
+                    ( m, _ ) =
+                        feed j1 (":s 353 alice = #c :" ++ flood)
+
+                    keys =
+                        Dict.get "#c" m.channels
+                            |> Maybe.map (.members >> Dict.keys)
+                            |> Maybe.withDefault []
+
+                    huge =
+                        String.repeat 600 "x"
+
+                    ( m2, _ ) =
+                        feed j1 (":s 353 alice = #c :alice bob " ++ huge ++ " carol")
+
+                    keys2 =
+                        Dict.get "#c" m2.channels
+                            |> Maybe.map (.members >> Dict.keys >> List.sort)
+                            |> Maybe.withDefault []
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True (List.length keys <= 4096)
+                    , \_ -> Expect.equal True (List.member "u1" keys)
+                    , \_ -> Expect.equal False (List.member "u5000" keys)
+                    , \_ -> Expect.equal [ "alice", "bob", "carol" ] keys2
+                    ]
+                    ()
+        , test "boundNamesTokens splits spaces and cuts ceilings cleanly" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal [ "a", "b" ] (boundNamesTokens "a  b")
+                    , \_ -> Expect.equal [ "a\tb", "c" ] (boundNamesTokens "a\tb c")
+                    , \_ -> Expect.equal [] (boundNamesTokens (String.repeat maxNamesScanChars "z"))
+                    , \_ -> Expect.equal [ "ok" ] (boundNamesTokens ("ok " ++ String.repeat maxNamesScanChars "y"))
+                    ]
+                    ()
+        , test "366 requests the prop list on IRCX" <|
+            \_ ->
+                let
+                    ( j1, _ ) =
+                        joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                    ( x1, _ ) =
+                        feed j1 ":s 005 alice IRCX :are supported by this server"
+
+                    ( m, outs ) =
+                        feed x1 ":s 366 alice #c :End of NAMES"
+
+                    ( plain, plainOuts ) =
+                        feed j1 ":s 366 alice #c :End of NAMES"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ SendLine "PROP #c\r\n" ] outs
+                    , \_ -> Expect.equal [] plainOuts
+                    , \_ -> Expect.equal True (List.member "alice" (Dict.get "#c" m.channels |> Maybe.map (.members >> Dict.keys) |> Maybe.withDefault []))
+                    ]
+                    ()
+        , test "315 and 354 surface via the numeric log rule" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":s 315 me #c :End of WHO list"
+
+                    ( m2, _ ) =
+                        feed m1 ":s 354 me %n #c dave H :0 real"
+                in
+                Expect.equal [ "%n #c dave H 0 real", "#c End of WHO list" ] m2.serviceLog
+        , test "unhandled numerics surface via the generic numeric rule" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        feed blank ":srv 042 me ABCDEF :your unique ID"
+
+                    ( m2, _ ) =
+                        feed m1 ":srv 250 me :Highest connection count: 12"
+
+                    ( m3, _ ) =
+                        feed m2 ":srv 9999 me :too long, dropped"
+
+                    ( m4, _ ) =
+                        feed m3 "FOOBAR me :dropped"
+
+                    ( m5, _ ) =
+                        feed m4 ":srv 043 me"
+
+                    ( m6, _ ) =
+                        feed m5 (":srv 253 me :" ++ String.repeat 5000 "x")
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ "Highest connection count: 12", "ABCDEF your unique ID" ] m2.serviceLog
+                    , \_ -> Expect.equal m2.serviceLog m5.serviceLog
+                    , \_ -> Expect.equal 4096 (String.length (Maybe.withDefault "" (List.head m6.serviceLog)))
+                    ]
+                    ()
+        , test "required room send seals, never plaintext" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    ( m3, outbound ) =
+                        update ComposerSend { m2 | activeChannel = Just "#c", composer = "hi room" }
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal [ RoomSealRequested { room = "#c", plaintext = "hi room" } ] outbound
+                    , \_ -> Expect.equal "" m3.composer
+                    ]
+                    ()
+        , test "unrequired room still sends plaintext" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( _, outbound ) =
+                        update ComposerSend { m1 | activeChannel = Just "#c", composer = "hi room" }
+                in
+                Expect.equal
+                    [ SendLine "PRIVMSG #c :hi room\r\n"
+                    , VaultPersist
+                        { target = "#c"
+                        , rows = [ { id = "#c:0", target = "#c", from = "me", body = "hi room", at = 0 } ]
+                        }
+                    ]
+                    outbound
+        , test "inbound room envelope stays locked and kicks an open" <|
+            \_ ->
+                let
+                    m1 =
+                        joinFirst blank "me" "#c"
+
+                    ( m2, outbound ) =
+                        feed m1 (":dave!u@h PRIVMSG #c :" ++ roomEnvelopeBody)
+
+                    stored =
+                        dmMessages m2 "#c"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just roomLockedText) (Maybe.map displayBody (List.head stored))
+                    , \_ -> Expect.equal (Just roomEnvelopeBody) (Maybe.map .body (List.head stored))
+                    , \_ ->
+                        Expect.equal [ RoomOpenRequested { room = "#c", messageId = 0, envelope = roomEnvelopeBody } ]
+                            (List.filter (\o -> o /= VaultPersist { target = "#c", rows = [ { id = "#c:0", target = "#c", from = "dave", body = roomEnvelopeBody, at = 0 } ] }) outbound)
+                    ]
+                    ()
+        , test "RoomSealed sends tagged ciphertext and keeps plaintext local" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    ( m3, _ ) =
+                        update ComposerSend { m2 | activeChannel = Just "#c", composer = "hi room" }
+
+                    ( m4, outbound ) =
+                        update (RoomSealed { room = "#c", envelope = roomEnvelopeBody }) m3
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine ("@+onyx/e2ee=mls PRIVMSG #c :" ++ roomEnvelopeBody ++ "\r\n")
+                            , VaultPersist
+                                { target = "#c"
+                                , rows =
+                                    [ { id = "#c:1"
+                                      , target = "#c"
+                                      , from = m4.ourNick
+                                      , body = roomEnvelopeBody
+                                      , at = floor m4.nowMs
+                                      }
+                                    ]
+                                }
+                            ]
+                            outbound
+                    , \_ -> Expect.equal (Just "hi room") (Maybe.andThen .plaintext (List.head (dmMessages m4 "#c")))
+                    ]
+                    ()
+        , test "DmSealed stamps @label and renders pending with labeled-response" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    capped =
+                        { m1 | caps = [ "labeled-response" ] }
+
+                    ( m2, _ ) =
+                        update ComposerSend { capped | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, outbound ) =
+                        update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) m2
+
+                    rows =
+                        dmMessages m3 "dave"
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine ("@label=" ++ label ++ " PRIVMSG dave :" ++ envelopeBody ++ "\r\n")
+                            , VaultPersist
+                                { target = "dave"
+                                , rows =
+                                    [ { id = "dave:1"
+                                      , target = "dave"
+                                      , from = m3.ourNick
+                                      , body = envelopeBody
+                                      , at = floor m3.nowMs
+                                      }
+                                    ]
+                                }
+                            ]
+                            outbound
+                    , \_ -> Expect.equal (Just envelopeBody) (Maybe.map .body (List.head rows))
+                    , \_ -> Expect.equal (Just "hi dave") (Maybe.andThen .plaintext (List.head rows))
+                    , \_ -> Expect.equal [ True ] (List.map .pending rows)
+                    , \_ -> Expect.equal 1 (Dict.size m3.pendingLabels)
+                    ]
+                    ()
+        , test "labeled sealed echo resolves and keeps the local plaintext" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        feed ownedBase (":s 761 me dave ocean.dm-key pub :" ++ peerKey)
+
+                    capped =
+                        { m1 | caps = [ "labeled-response", "echo-message" ] }
+
+                    ( m2, _ ) =
+                        update ComposerSend { capped | activeChannel = Just "dave", composer = "hi dave" }
+
+                    ( m3, _ ) =
+                        update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) m2
+
+                    ( m4, out4 ) =
+                        feed m3 ("@label=" ++ label ++ ";msgid=e1 :me!u@h PRIVMSG dave :" ++ envelopeBody)
+
+                    rows =
+                        dmMessages m4 "dave"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ envelopeBody ] (List.map .body rows)
+                    , \_ -> Expect.equal [ False ] (List.map .pending rows)
+                    , \_ -> Expect.equal (Just "hi dave") (Maybe.andThen .plaintext (List.head rows))
+                    , \_ -> Expect.equal Dict.empty m4.pendingLabels
+                    , \_ -> Expect.equal (Just [ "e1" ]) (Dict.get "dave" m4.seenMsgids)
+                    , \_ -> Expect.equal [] (List.filter (not << String.isEmpty) (List.map sendLineText out4))
+                    ]
+                    ()
+        , test "RoomSealed combines the e2ee tag with @label" <|
+            \_ ->
+                let
+                    label =
+                        Labels.nextClientLabel 0 1
+
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    capped =
+                        { m2 | caps = [ "labeled-response", "onyx/e2ee" ] }
+
+                    ( m3, _ ) =
+                        update ComposerSend { capped | activeChannel = Just "#c", composer = "hi room" }
+
+                    ( m4, outbound ) =
+                        update (RoomSealed { room = "#c", envelope = roomEnvelopeBody }) m3
+                in
+                Expect.all
+                    [ \_ ->
+                        Expect.equal
+                            [ SendLine ("@+onyx/e2ee=mls;label=" ++ label ++ " PRIVMSG #c :" ++ roomEnvelopeBody ++ "\r\n")
+                            , VaultPersist
+                                { target = "#c"
+                                , rows =
+                                    [ { id = "#c:1"
+                                      , target = "#c"
+                                      , from = m4.ourNick
+                                      , body = roomEnvelopeBody
+                                      , at = floor m4.nowMs
+                                      }
+                                    ]
+                                }
+                            ]
+                            outbound
+                    , \_ -> Expect.equal [ True ] (List.map .pending (dmMessages m4 "#c"))
+                    , \_ -> Expect.equal 1 (Dict.size m4.pendingLabels)
+                    ]
+                    ()
+        , test "RoomSealFailed warns and drops the pending seal" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    ( m3, _ ) =
+                        update ComposerSend { m2 | activeChannel = Just "#c", composer = "hi room" }
+
+                    ( m4, _ ) =
+                        update (RoomSealFailed { room = "#c", recoveryRequired = False, notProvisioned = False }) m3
+
+                    ( _, outbound ) =
+                        update (RoomSealed { room = "#c", envelope = roomEnvelopeBody }) m4
+                in
+                Expect.all
+                    [ \_ -> Expect.equal 1 (List.length m4.serviceLog)
+                    , \_ -> Expect.equal [ "Encrypted room is locked" ] (List.map .title m4.toasts)
+                    , \_ -> Expect.equal (Just "Encryption unavailable — message to #c was not sent.") (Maybe.map .text (List.head m4.notifications))
+                    , \_ -> Expect.equal [] outbound
+                    ]
+                    ()
+        , test "RoomSealFailed without a session uses the no-bridge copy" <|
+            \_ ->
+                let
+                    ( m1, _ ) =
+                        joinChan blank "dave" "#c"
+
+                    ( m2, _ ) =
+                        requireRoom m1 "#c"
+
+                    ( m3, _ ) =
+                        update ComposerSend { m2 | activeChannel = Just "#c", composer = "hi room" }
+
+                    ( m4, outbound ) =
+                        update (RoomSealFailed { room = "#c", recoveryRequired = False, notProvisioned = True }) m3
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] outbound
+                    , \_ -> Expect.equal [ "Encrypted room is locked" ] (List.map .title m4.toasts)
+                    , \_ ->
+                        Expect.equal
+                            (Just "Your message was not sent. Reconnect or wait for #c's encryption setup to finish, then try again.")
+                            (List.head (List.filterMap .description m4.toasts))
+                    , \_ -> Expect.equal [] m4.notifications
+                    , \_ -> Expect.equal Dict.empty m4.roomSeals
+                    ]
+                    ()
+        , test "RoomOpenResult fills plaintext and clears the flight" <|
+            \_ ->
+                let
+                    m1 =
+                        joinFirst blank "me" "#c"
+
+                    ( m2, _ ) =
+                        feed m1 (":dave!u@h PRIVMSG #c :" ++ roomEnvelopeBody)
+
+                    ( m3, _ ) =
+                        update (RoomOpenResult { room = "#c", messageId = 0, envelope = roomEnvelopeBody, plaintext = "opened" }) m2
+
+                    ( _, outbound ) =
+                        feed m3 (":dave!u@h PRIVMSG #c :" ++ roomEnvelopeBody)
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just "opened") (Maybe.map displayBody (List.head (dmMessages m3 "#c")))
+                    , \_ ->
+                        Expect.equal True
+                            (List.any
+                                (\o ->
+                                    case o of
+                                        RoomOpenRequested _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outbound
+                            )
+                    ]
+                    ()
+        , describe "channel MODE parity"
+            [ test "unsolicited MODE for an unknown room seeds nothing" <|
+                \_ ->
+                    let
+                        ( m, _ ) =
+                            feed blank ":op!u@h MODE #ghost +o bob"
+                    in
+                    Expect.equal False (Dict.member "#ghost" m.channels)
+            , test "live MODE grants status and appends the set-mode row" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( m, _ ) =
+                            feed j2 ":op!u@h MODE #c +o bob"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just (Set.fromList [ 'o' ]))
+                                (Dict.get "#c" m.channels
+                                    |> Maybe.andThen (\c -> Dict.get "bob" c.members)
+                                    |> Maybe.map .modes
+                                )
+                        , \_ ->
+                            Expect.equal True
+                                (List.member "op set mode +o bob" (channelBodies m))
+                        ]
+                        ()
+            , test "ban masks consume an argument even with exotic CHANMODES" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( v1, _ ) =
+                            feed j2 ":op!u@h MODE #c +v bob"
+
+                        ( s1, _ ) =
+                            feed v1 ":s 005 alice CHANMODES=,,,x :are supported"
+
+                        ( m, _ ) =
+                            feed s1 ":op!u@h MODE #c +b-v *!*@* bob"
+                    in
+                    Expect.equal (Just Set.empty)
+                        (Dict.get "#c" m.channels
+                            |> Maybe.andThen (\c -> Dict.get "bob" c.members)
+                            |> Maybe.map .modes
+                        )
+            , test "own user MODE raises the oper badge and logs" <|
+                \_ ->
+                    let
+                        ( m, _ ) =
+                            feed { blank | ourNick = "alice" } ":op!u@h MODE alice +o"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True m.isOper
+                        , \_ ->
+                            Expect.equal (Just "op set your user mode: +o")
+                                (List.head m.serviceLog)
+                        ]
+                        ()
+            , test "own user de-op clears the admin badge with it" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice", isOper = True, isNetworkAdmin = True }
+
+                        ( m, _ ) =
+                            feed base "MODE alice -o"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False m.isOper
+                        , \_ -> Expect.equal False m.isNetworkAdmin
+                        , \_ ->
+                            Expect.equal (Just "your user mode: -o")
+                                (List.head m.serviceLog)
+                        ]
+                        ()
+            , test "bare MODE on a known channel still appends its row" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( m, _ ) =
+                            feed j1 ":op!u@h MODE #c"
+                    in
+                    Expect.equal True
+                        (List.member "op set mode " (channelBodies m))
+            ]
+        , describe "offline MEMO parity"
+            [ test "NOTE MEMO buffers the DM row and folds the aggregate" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :hello there"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "hello there")
+                                (List.head (dmMessages m "bob") |> Maybe.map .body)
+                        , \_ ->
+                            Expect.equal (Just "bob")
+                                (List.head (dmMessages m "bob") |> Maybe.map .from)
+                        , \_ ->
+                            Expect.equal (Just True)
+                                (List.head (dmMessages m "bob") |> Maybe.map .highlight)
+                        , \_ ->
+                            Expect.equal (Just { count = 1, firstMsgId = 0 })
+                                (offlineMemoFor m "bob")
+                        , \_ ->
+                            Expect.equal [ OfflineMemoNotice { channel = "bob", count = 1, firstMsgId = 0 } ] outs
+                        , \_ ->
+                            Expect.equal (Just "Memo from bob")
+                                (List.head m.toasts |> Maybe.map .title)
+                        , \_ ->
+                            Expect.equal (Just "Delivered while you were offline — open the DM to catch up.")
+                                (List.head m.toasts |> Maybe.andThen .description)
+                        ]
+                        ()
+            , test "a second memo bumps the count and keeps the first id" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( m1, _ ) =
+                            feed base ":s NOTE MEMO :from bob :one"
+
+                        ( m2, outs ) =
+                            feed m1 ":s NOTE MEMO :from bob :two"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just { count = 2, firstMsgId = 0 })
+                                (offlineMemoFor m2 "bob")
+                        , \_ ->
+                            Expect.equal [ "two", "one" ]
+                                (List.map .body (dmMessages m2 "bob"))
+                        , \_ ->
+                            Expect.equal [ OfflineMemoNotice { channel = "bob", count = 2, firstMsgId = 0 } ] outs
+                        , \_ ->
+                            Expect.equal (Just "2 memos from bob")
+                                (List.head (List.reverse m2.toasts) |> Maybe.map .title)
+                        ]
+                        ()
+            , test "malformed memo bodies drop silently" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( m1, o1 ) =
+                            feed base ":s NOTE MEMO :bogus"
+
+                        ( m2, o2 ) =
+                            feed m1 ":s NOTE MEMO :from bob"
+
+                        ( m3, o3 ) =
+                            feed m2 ":s NOTE MEMO :from ,bad :x"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] o1
+                        , \_ -> Expect.equal [] o2
+                        , \_ -> Expect.equal [] o3
+                        , \_ -> Expect.equal True (Dict.isEmpty m3.channels)
+                        , \_ -> Expect.equal Nothing (offlineMemoFor m3 "bob")
+                        ]
+                        ()
+            , test "a saturated DM set refuses the shell and the aggregate" <|
+                \_ ->
+                    let
+                        base =
+                            fillDmSet (\i -> shellOf ("u" ++ String.fromInt i) 1 0)
+                                { blank | ourNick = "alice" }
+
+                        ( m, outs ) =
+                            feed base ":s NOTE MEMO :from newguy :hello"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (Dict.member "newguy" m.channels)
+                        , \_ -> Expect.equal Nothing (offlineMemoFor m "newguy")
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "muted DMs store without counting but still aggregate" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice", mutedDMs = Set.fromList [ "bob" ] }
+
+                        ( m, _ ) =
+                            feed base ":s NOTE MEMO :from bob :quiet hello"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "quiet hello")
+                                (List.head (dmMessages m "bob") |> Maybe.map .body)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "bob" m.channels |> Maybe.map .unread)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "bob" m.channels |> Maybe.map .highlights)
+                        , \_ ->
+                            Expect.equal (Just { count = 1, firstMsgId = 0 })
+                                (offlineMemoFor m "bob")
+                        ]
+                        ()
+            , test "opening the DM clears the aggregate" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed { blank | ourNick = "alice" } ":s NOTE MEMO :from bob :hello"
+
+                        ( m2, _ ) =
+                            update (ChannelSelect "bob") m1
+                    in
+                    Expect.equal Nothing (offlineMemoFor m2 "bob")
+            , test "parseMemoBody mirrors the two oracle shapes" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just ( "bob", "hi there" )) (parseMemoBody "from bob :hi there")
+                        , \_ -> Expect.equal (Just ( "bob", "hi" )) (parseMemoBody "from bob hi")
+                        , \_ -> Expect.equal (Just ( "bob", "" )) (parseMemoBody "from bob :")
+                        , \_ -> Expect.equal Nothing (parseMemoBody "bogus")
+                        , \_ -> Expect.equal Nothing (parseMemoBody "from bob")
+                        , \_ -> Expect.equal Nothing (parseMemoBody "from  :x")
+                        ]
+                        ()
+            ]
+        , describe "moderation and audit entries"
+            [ test "KICK drops the member and logs event, audit, and moderation" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( m, _ ) =
+                            feed j2 ":op!u@h KICK #c bob :spam"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal False
+                                (Dict.get "#c" m.channels
+                                    |> Maybe.map (.members >> Dict.member "bob")
+                                    |> Maybe.withDefault True
+                                )
+                        , \_ ->
+                            Expect.equal (Just (EventKick, "bob was kicked by op (spam)"))
+                                (Dict.get "#c" m.channelEvents
+                                    |> Maybe.andThen (List.head << List.reverse << .events)
+                                    |> Maybe.map (\e -> ( e.kind, e.text ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just (AuditKick, "op"))
+                                (List.head m.auditLog
+                                    |> Maybe.map (\e -> ( e.kind, e.actor ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just (Just "bob", Just "#c", Just "spam"))
+                                (List.head m.auditLog
+                                    |> Maybe.map (\e -> ( e.target, e.channel, e.detail ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just ( "KICK", "bob" ))
+                                (List.head m.moderationLog
+                                    |> Maybe.map (\e -> ( e.action, e.target ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just ( "op", "#c" ))
+                                (List.head m.moderationLog
+                                    |> Maybe.map (\e -> ( e.by, e.channel ))
+                                )
+                        ]
+                        ()
+            , test "self-KICK drops the room and deactivates but still logs" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( sel, _ ) =
+                            update (ChannelSelect "#c") j1
+
+                        ( m, _ ) =
+                            feed sel ":op!u@h KICK #c alice :bye"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (Dict.member "#c" m.channels)
+                        , \_ -> Expect.equal Nothing m.activeChannel
+                        , \_ ->
+                            Expect.equal Nothing
+                                (Dict.get "#c" m.channelEvents)
+                        , \_ ->
+                            Expect.equal (Just AuditKick)
+                                (List.head m.auditLog |> Maybe.map .kind)
+                        , \_ ->
+                            Expect.equal (Just "KICK")
+                                (List.head m.moderationLog |> Maybe.map .action)
+                        ]
+                        ()
+            , test "MODE +b logs only the ban audit plus a BAN row" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( m, _ ) =
+                            feed j1 ":op!u@h MODE #c +b *!*@*"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal [ AuditBan ]
+                                (List.map .kind (List.take 1 m.auditLog))
+                        , \_ ->
+                            Expect.equal (Just (Just "*!*@*"))
+                                (List.head m.auditLog |> Maybe.map .target)
+                        , \_ ->
+                            Expect.equal (Just ( "BAN", "*!*@*", "op" ))
+                                (List.head m.moderationLog
+                                    |> Maybe.map (\e -> ( e.action, e.target, e.by ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just "#c")
+                                (List.head m.moderationLog |> Maybe.map .channel)
+                        , \_ ->
+                            Expect.equal (Just (EventMode, "op set mode +b *!*@*"))
+                                (Dict.get "#c" m.channelEvents
+                                    |> Maybe.andThen (List.head << List.reverse << .events)
+                                    |> Maybe.map (\e -> ( e.kind, e.text ))
+                                )
+                        ]
+                        ()
+            , test "MODE mixed ban plus grant logs both ban and mode audits" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( m, _ ) =
+                            feed j2 ":op!u@h MODE #c +bo *!*@* bob"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal [ AuditMode, AuditBan ]
+                                (List.map .kind (List.take 2 m.auditLog))
+                        , \_ ->
+                            Expect.equal (Just ( "GRANT +o", "bob" ))
+                                (List.head m.moderationLog
+                                    |> Maybe.map (\e -> ( e.action, e.target ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just ( "BAN", "*!*@*", "op" ))
+                                (m.moderationLog
+                                    |> List.drop 1
+                                    |> List.head
+                                    |> Maybe.map (\e -> ( e.action, e.target, e.by ))
+                                )
+                        ]
+                        ()
+            , test "MODE +o on a present member logs GRANT" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( m, _ ) =
+                            feed j2 ":op!u@h MODE #c +o bob"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just ( "GRANT +o", "bob" ))
+                                (List.head m.moderationLog
+                                    |> Maybe.map (\e -> ( e.action, e.target ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just AuditMode)
+                                (List.head m.auditLog |> Maybe.map .kind)
+                        ]
+                        ()
+            , test "MODE +o on an absent nick logs a MODE action, not GRANT" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( m, _ ) =
+                            feed j1 ":op!u@h MODE #c +o ghost"
+                    in
+                    Expect.equal (Just ( "MODE", "+o ghost" ))
+                        (List.head m.moderationLog
+                            |> Maybe.map (\e -> ( e.action, e.target ))
+                        )
+            , test "live TOPIC updates and audits; 332 stays silent" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( m1, _ ) =
+                            feed j1 ":op!u@h TOPIC #c :new dawn"
+
+                        before =
+                            List.length m1.auditLog
+
+                        ( m2, _ ) =
+                            feed m1 ":s 332 me #c :initial"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "new dawn")
+                                (Dict.get "#c" m1.channels |> Maybe.map .topic)
+                        , \_ ->
+                            Expect.equal (Just (AuditTopic, "op"))
+                                (List.head m1.auditLog
+                                    |> Maybe.map (\e -> ( e.kind, e.actor ))
+                                )
+                        , \_ ->
+                            Expect.equal (Just (Just "#c", Just "new dawn"))
+                                (List.head m1.auditLog
+                                    |> Maybe.map (\e -> ( e.channel, e.detail ))
+                                )
+                        , \_ -> Expect.equal before (List.length m2.auditLog)
+                        ]
+                        ()
+            , test "JOIN, PART, QUIT, and NICK each log their event" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( p1, _ ) =
+                            feed j2 ":bob!u@h PART #c :bye"
+
+                        ( n1, _ ) =
+                            feed p1 ":carol!u@h JOIN #c"
+
+                        ( n2, _ ) =
+                            feed n1 ":carol!u@h NICK caroline"
+
+                        ( q1, _ ) =
+                            feed n2 ":caroline!u@h QUIT :gone"
+
+                        events channel model =
+                            Dict.get channel model.channelEvents
+                                |> Maybe.map (.events >> List.map (\e -> ( e.kind, e.text )))
+                                |> Maybe.withDefault []
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.member (EventJoin, "bob joined") (events "#c" j2))
+                        , \_ ->
+                            Expect.equal True
+                                (List.member (EventPart, "bob left (bye)") (events "#c" p1))
+                        , \_ ->
+                            Expect.equal True
+                                (List.member (EventNick, "carol → caroline") (events "#c" n2))
+                        , \_ ->
+                            Expect.equal True
+                                (List.member (EventQuit, "caroline quit (gone)") (events "#c" q1))
+                        , \_ ->
+                            Expect.equal True
+                                (Dict.get "#c" n2.channels
+                                    |> Maybe.map (.members >> Dict.member "caroline")
+                                    |> Maybe.withDefault False
+                                )
+                        ]
+                        ()
+            , test "self-NICK tracks our new nick" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( m, _ ) =
+                            feed j1 ":alice!u@h NICK alicia"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "alicia" m.ourNick
+                        , \_ ->
+                            Expect.equal True
+                                (List.any (\( k, _ ) -> k == EventNick)
+                                    (Dict.get "#c" m.channelEvents
+                                        |> Maybe.map (.events >> List.map (\e -> ( e.kind, e.text )))
+                                        |> Maybe.withDefault []
+                                    )
+                                )
+                        ]
+                        ()
+            ]
+        , describe "ban list"
+            [ test "367/368 accumulate and commit a ban list" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( r1, _ ) =
+                            feed j1 ":s 367 me #c *!*@* op 1700000000"
+
+                        ( m, _ ) =
+                            feed r1 ":s 368 me #c"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just [ { mask = "*!*@*", setBy = Just "op", setAt = Just 1700000000 } ])
+                                (Dict.get "#c" m.banList |> Maybe.map .entries)
+                        , \_ ->
+                            Expect.equal True
+                                (case banListViewFor m "#c" of
+                                    BanViewPopulated _ _ ->
+                                        True
+
+                                    _ ->
+                                        False
+                                )
+                        ]
+                        ()
+            , test "367 for an unknown room drops" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":s 367 me #ghost *!*@*"
+
+                        ( m2, _ ) =
+                            feed m1 ":s 368 me #ghost"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.isEmpty m2.banBuffer)
+                        , \_ -> Expect.equal Nothing (Dict.get "#ghost" m2.banList)
+                        ]
+                        ()
+            , test "request sends MODE +b and the round trip marks ready" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice", connection = Live } "alice" "#c"
+
+                        ( r1, outs ) =
+                            update (BanListRequested "#c") j1
+
+                        ( r2, _ ) =
+                            feed r1 ":s 367 me #c *!*@*"
+
+                        ( m, _ ) =
+                            feed r2 ":s 368 me #c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "MODE #c +b\r\n" ] outs
+                        , \_ ->
+                            Expect.equal (Just BanLoading)
+                                (Dict.get "#c" r1.banListMeta |> Maybe.map .status)
+                        , \_ ->
+                            Expect.equal (Just BanReady)
+                                (Dict.get "#c" m.banListMeta |> Maybe.map .status)
+                        , \_ ->
+                            Expect.equal (Just 1)
+                                (Dict.get "#c" m.banList |> Maybe.map (.entries >> List.length))
+                        ]
+                        ()
+            , test "request while offline marks unavailable" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice", connection = Offline } "alice" "#c"
+
+                        ( m, outs ) =
+                            update (BanListRequested "#c") j1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outs
+                        , \_ ->
+                            Expect.equal (Just BanUnavailable)
+                                (Dict.get "#c" m.banListMeta |> Maybe.map .status)
+                        ]
+                        ()
+            , test "live +b/-b updates the stored list" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( b1, _ ) =
+                            feed j1 ":op!u@h MODE #c +b *!*@*"
+
+                        ( m, _ ) =
+                            feed b1 ":op!u@h MODE #c -b *!*@*"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just [ "*!*@*" ])
+                                (Dict.get "#c" b1.banList
+                                    |> Maybe.map (.entries >> List.map .mask)
+                                )
+                        , \_ ->
+                            Expect.equal (Just "op")
+                                (Dict.get "#c" b1.banList
+                                    |> Maybe.andThen (.entries >> List.head)
+                                    |> Maybe.andThen .setBy
+                                )
+                        , \_ ->
+                            Expect.equal (Just [])
+                                (Dict.get "#c" m.banList |> Maybe.map .entries)
+                        ]
+                        ()
+            , test "stale-epoch rows drop their buffer" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        stale =
+                            { j1
+                                | banListMeta =
+                                    Dict.singleton "#c"
+                                        { status = BanLoading
+                                        , updatedAt = Nothing
+                                        , error = Nothing
+                                        , generation = 1
+                                        , epoch = 0
+                                        }
+                                , banEpoch = 1
+                            }
+
+                        ( m1, _ ) =
+                            feed stale ":s 367 me #c *!*@*"
+
+                        ( m2, _ ) =
+                            feed m1 ":s 368 me #c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.isEmpty m1.banBuffer)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" m2.banList)
+                        ]
+                        ()
+            , test "disconnect settles loading fetches to unavailable" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice", connection = Live } "alice" "#c"
+
+                        ( r1, _ ) =
+                            update (BanListRequested "#c") j1
+
+                        ( m, _ ) =
+                            update (WsClosed { clean = True, reason = "bye" }) r1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.isEmpty m.banBuffer)
+                        , \_ ->
+                            Expect.equal (Just BanUnavailable)
+                                (Dict.get "#c" m.banListMeta |> Maybe.map .status)
+                        ]
+                        ()
+            , test "normalizeBanChannel and normalizeBanEntry fail closed" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "#c") (normalizeBanChannel " #C ")
+                        , \_ -> Expect.equal Nothing (normalizeBanChannel "bob")
+                        , \_ -> Expect.equal Nothing (normalizeBanChannel "")
+                        , \_ -> Expect.equal Nothing (normalizeBanEntry "" Nothing Nothing)
+                        , \_ -> Expect.equal Nothing (normalizeBanEntry "a\u{0007}b" Nothing Nothing)
+                        , \_ ->
+                            Expect.equal (Just { mask = "m", setBy = Nothing, setAt = Nothing })
+                                (normalizeBanEntry "m" (Just "  ") (Just -1))
+                        ]
+                        ()
+            ]
+        , describe "live membership rows"
+            [ test "others' joins write rows without counting" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( m, _ ) =
+                            joinChan j1 "bob" "#c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "bob joined" ] (channelBodies m)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "#c" m.channels |> Maybe.map .unread)
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "#c" m.channels |> Maybe.map .highlights)
+                        ]
+                        ()
+            , test "self-join writes nothing, keeping backfill eligible" <|
+                \_ ->
+                    let
+                        ( m, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+                    in
+                    Expect.equal [] (channelBodies m)
+            , test "foreign joins to unknown rooms seed nothing" <|
+                \_ ->
+                    let
+                        ( m, _ ) =
+                            feed blank ":bob!u@h JOIN #x"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (Dict.member "#x" m.channels)
+                        , \_ -> Expect.equal Nothing (Dict.get "#x" m.channelEvents)
+                        ]
+                        ()
+            , test "part, quit, nick, and kick rows use the oracle texts" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "alice" }
+
+                        ( j1, _ ) =
+                            joinChan base "alice" "#c"
+
+                        ( j2, _ ) =
+                            joinChan j1 "bob" "#c"
+
+                        ( j3, _ ) =
+                            joinChan j2 "carol" "#c"
+
+                        ( j4, _ ) =
+                            joinChan j3 "dave" "#c"
+
+                        ( p1, _ ) =
+                            feed j4 ":bob!u@h PART #c :bye"
+
+                        ( q1, _ ) =
+                            feed p1 ":carol!u@h QUIT :gone"
+
+                        ( n1, _ ) =
+                            feed q1 ":dave!u@h NICK daria"
+
+                        ( k1, _ ) =
+                            feed n1 ":op!u@h KICK #c daria :spam"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal (Just "bob left (bye)")
+                                (List.head (channelBodies p1))
+                        , \_ ->
+                            Expect.equal (Just "carol quit: gone")
+                                (List.head (channelBodies q1))
+                        , \_ ->
+                            Expect.equal (Just "dave → daria")
+                                (List.head (channelBodies n1))
+                        , \_ ->
+                            Expect.equal (Just "op kicked daria: spam")
+                                (List.head (channelBodies k1))
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "#c" k1.channels |> Maybe.map .unread)
+                        ]
+                        ()
+            , test "self-part drops the room and deactivates" <|
+                \_ ->
+                    let
+                        ( j1, _ ) =
+                            joinChan { blank | ourNick = "alice" } "alice" "#c"
+
+                        ( sel, _ ) =
+                            update (ChannelSelect "#c") j1
+
+                        ( m, _ ) =
+                            feed sel ":alice!u@h PART #c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (Dict.member "#c" m.channels)
+                        , \_ -> Expect.equal Nothing m.activeChannel
+                        ]
+                        ()
+            ]
+        , describe "timed bans"
+            [ test "request sends +b now and schedules the unban" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        ( m, outs ) =
+                            update (TempBanRequested { channel = "#c", mask = " *!*@* ", minutes = 10 }) live
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ SendLine "MODE #c +b *!*@*\r\n"
+                                , TempBanTimerStart { key = "#c\u{0000}*!*@*", delayMs = 600000 }
+                                ]
+                                outs
+                        , \_ ->
+                            Expect.equal (Just 0)
+                                (Dict.get "#c\u{0000}*!*@*" m.tempBans |> Maybe.map .retries)
+                        ]
+                        ()
+            , test "request validation fails closed" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        bad r =
+                            update (TempBanRequested r) live |> Tuple.second
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (update (TempBanRequested { channel = "#c", mask = "m", minutes = 10 }) { blank | connection = Offline } |> Tuple.second)
+                        , \_ -> Expect.equal [] (bad { channel = "bob", mask = "m", minutes = 10 })
+                        , \_ -> Expect.equal [] (bad { channel = "#c", mask = "a\u{0007}b", minutes = 10 })
+                        , \_ -> Expect.equal [] (bad { channel = "#c", mask = "m", minutes = 0 })
+                        , \_ -> Expect.equal [] (bad { channel = "#c", mask = "m", minutes = 10081 })
+                        ]
+                        ()
+            , test "fire while live sends -b and clears" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        ( s1, _ ) =
+                            update (TempBanRequested { channel = "#c", mask = "m", minutes = 10 }) live
+
+                        ( m, outs ) =
+                            update (TempBanElapsed { key = "#c\u{0000}m" }) s1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "MODE #c -b m\r\n" ] outs
+                        , \_ -> Expect.equal True (Dict.isEmpty m.tempBans)
+                        ]
+                        ()
+            , test "fire while offline retries, then drops at the cap" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        ( s1, _ ) =
+                            update (TempBanRequested { channel = "#c", mask = "m", minutes = 10 }) live
+
+                        off =
+                            { s1 | connection = Offline }
+
+                        fire ( m, _ ) =
+                            update (TempBanElapsed { key = "#c\u{0000}m" }) m
+
+                        ( f1, o1 ) =
+                            fire ( off, [] )
+
+                        ( f21, _ ) =
+                            List.foldl (\_ acc -> fire acc) ( f1, o1 ) (List.range 1 20)
+
+                        ( dropped, dOut ) =
+                            update (TempBanElapsed { key = "#c\u{0000}m" }) f21
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal [ TempBanTimerStart { key = "#c\u{0000}m", delayMs = 30000 } ] o1
+                        , \_ ->
+                            Expect.equal (Just 1)
+                                (Dict.get "#c\u{0000}m" f1.tempBans |> Maybe.map .retries)
+                        , \_ -> Expect.equal True (Dict.isEmpty dropped.tempBans)
+                        , \_ -> Expect.equal [] dOut
+                        ]
+                        ()
+            , test "fire after an account move deletes without retry" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        ( s1, _ ) =
+                            update (TempBanRequested { channel = "#c", mask = "m", minutes = 10 }) live
+
+                        moved =
+                            { s1 | accountName = Just "someone" }
+
+                        ( m, outs ) =
+                            update (TempBanElapsed { key = "#c\u{0000}m" }) moved
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal True (Dict.isEmpty m.tempBans)
+                        ]
+                        ()
+            , test "unknown fire keys drop silently" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            update (TempBanElapsed { key = "nope" }) blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal True (Dict.isEmpty m.tempBans)
+                        ]
+                        ()
+            ]
+        , describe "presence status"
+            [ test "each status sends its AWAY line when live" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+
+                        send status =
+                            update (UserStatusSet status) live |> Tuple.second
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "AWAY\r\n" ] (send StatusOnline)
+                        , \_ -> Expect.equal [ SendLine "AWAY Away\r\n" ] (send StatusIdle)
+                        , \_ -> Expect.equal [ SendLine "AWAY :Do Not Disturb\r\n" ] (send StatusDnd)
+                        , \_ -> Expect.equal [ SendLine "AWAY Invisible\r\n" ] (send StatusOffline)
+                        ]
+                        ()
+            , test "offline status changes land without sending" <|
+                \_ ->
+                    let
+                        off =
+                            { blank | connection = Offline }
+
+                        ( m, outs ) =
+                            update (UserStatusSet StatusDnd) off
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal StatusDnd m.userStatus
+                        ]
+                        ()
+            ]
+        , describe "custom status"
+            [ test "normalize trims, keeps empty, rejects overlong and controls" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "playing chess") (normalizeCustomStatus "  playing chess  ")
+                        , \_ -> Expect.equal (Just "") (normalizeCustomStatus "   ")
+                        , \_ -> Expect.equal (Just (String.repeat 256 "x")) (normalizeCustomStatus (String.repeat 256 "x"))
+                        , \_ -> Expect.equal Nothing (normalizeCustomStatus (String.repeat 257 "x"))
+                        , \_ -> Expect.equal Nothing (normalizeCustomStatus ("hi" ++ String.fromChar (Char.fromCode 7) ++ "there"))
+                        , \_ -> Expect.equal Nothing (normalizeCustomStatus ("hi" ++ String.fromChar (Char.fromCode 0x7F)))
+                        ]
+                        ()
+            , test "parseActivity matches every emoji prefix" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Counter-Strike 2" }) (parseActivity "🎮 Counter-Strike 2")
+                        , \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "onyx" }) (parseActivity "💻 onyx")
+                        , \_ -> Expect.equal (Just { emoji = "🎵", typeLabel = "LISTENING TO MUSIC", text = "Blue" }) (parseActivity "🎵 Blue")
+                        , \_ -> Expect.equal (Just { emoji = "📺", typeLabel = "WATCHING", text = "Severance" }) (parseActivity "📺 Severance")
+                        , \_ -> Expect.equal (Just { emoji = "🔴", typeLabel = "LIVE ON STREAM", text = "speedrun" }) (parseActivity "🔴 speedrun")
+                        , \_ -> Expect.equal (Just { emoji = "📚", typeLabel = "STUDYING", text = "algebra" }) (parseActivity "📚 algebra")
+                        , \_ -> Expect.equal Nothing (parseActivity "🎮")
+                        , \_ -> Expect.equal Nothing (parseActivity "🎮   ")
+                        ]
+                        ()
+            , test "parseActivity matches keywords case-insensitively with the by-arm first" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Hollow Knight" }) (parseActivity "playing Hollow Knight")
+                        , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Hollow Knight" }) (parseActivity "PLAYING Hollow Knight")
+                        , \_ -> Expect.equal (Just { emoji = "🎵", typeLabel = "LISTENING TO MUSIC", text = "Midnights — Taylor Swift" }) (parseActivity "listening to Midnights by Taylor Swift")
+                        , \_ -> Expect.equal (Just { emoji = "🎵", typeLabel = "LISTENING TO MUSIC", text = "Blue" }) (parseActivity "listening Blue")
+                        , \_ -> Expect.equal (Just { emoji = "📺", typeLabel = "WATCHING", text = "Severance" }) (parseActivity "watching Severance")
+                        , \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "onyx" }) (parseActivity "coding on onyx")
+                        , \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "kernel" }) (parseActivity "coding kernel")
+                        , \_ -> Expect.equal (Just { emoji = "🔴", typeLabel = "LIVE ON STREAM", text = "speedrun" }) (parseActivity "streaming speedrun")
+                        , \_ -> Expect.equal Nothing (parseActivity "just a status")
+                        , \_ -> Expect.equal Nothing (parseActivity "")
+                        , \_ -> Expect.equal Nothing (parseActivity "playing ")
+                        ]
+                        ()
+            , test "activityShort truncates to two words" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "Chess" (activityShort { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Chess" })
+                        , \_ -> Expect.equal "Counter-Strike 2" (activityShort { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Counter-Strike 2" })
+                        , \_ -> Expect.equal "Counter-Strike 2…" (activityShort { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "Counter-Strike 2 gameplay" })
+                        ]
+                        ()
+            , test "live IRCX set publishes PROP STATUS and persists owner-keyed" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerLive ":s 005 kai IRCX :are supported"
+
+                        ( m, outs ) =
+                            update (CustomStatusSet "playing chess") supported
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "playing chess" m.customStatus
+                        , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "kai" m.userActivities)
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP * STATUS :playing chess\r\n" ] outs
+                        ]
+                        ()
+            , test "offline set lands and persists without wire" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            update (CustomStatusSet "coding onyx") ownerOffline
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "coding onyx" m.customStatus
+                        , \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "onyx" }) (Dict.get "kai" m.userActivities)
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing } ] outs
+                        ]
+                        ()
+            , test "invalid text and missing owners are silent no-ops" <|
+                \_ ->
+                    let
+                        ( bad, badOuts ) =
+                            update (CustomStatusSet ("hi" ++ String.fromChar (Char.fromCode 7) ++ "there")) ownerOffline
+
+                        ( ownerless, ownerlessOuts ) =
+                            update (CustomStatusSet "playing chess") blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" bad.customStatus
+                        , \_ -> Expect.equal [] badOuts
+                        , \_ -> Expect.equal True (Dict.isEmpty bad.userActivities)
+                        , \_ -> Expect.equal "" ownerless.customStatus
+                        , \_ -> Expect.equal [] ownerlessOuts
+                        ]
+                        ()
+            , test "idle presence couples AWAY to a non-empty status" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerLive ":s 005 kai IRCX :are supported"
+
+                        idle =
+                            { supported | userStatus = StatusIdle }
+
+                        ( m, outs ) =
+                            update (CustomStatusSet "coding onyx") idle
+
+                        ( cleared, clearedOuts ) =
+                            update (CustomStatusSet "") idle
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP * STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
+                        , \_ -> Expect.equal "coding onyx" m.customStatus
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP * STATUS :\r\n" ] clearedOuts
+                        , \_ -> Expect.equal "" cleared.customStatus
+                        , \_ -> Expect.equal True (Dict.isEmpty cleared.userActivities)
+                        ]
+                        ()
+            , test "live non-IRCX set sends nothing" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            update (CustomStatusSet "playing chess") ownerLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "playing chess" m.customStatus
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing } ] outs
+                        ]
+                        ()
+            , test "expiry set validates, clears, and persists ISO" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            update (CustomStatusExpirySet (Just 1700000000000)) ownerOffline
+
+                        ( neg, negOuts ) =
+                            update (CustomStatusExpirySet (Just -1)) ownerOffline
+
+                        ( cleared, clearedOuts ) =
+                            update (CustomStatusExpirySet Nothing) { ownerOffline | customStatusExpiry = Just 1700000000000 }
+
+                        ( ownerless, ownerlessOuts ) =
+                            update (CustomStatusExpirySet (Just 1700000000000)) blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 1700000000000) m.customStatusExpiry
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Just (millisToIso 1700000000000) } ] outs
+                        , \_ -> Expect.equal Nothing neg.customStatusExpiry
+                        , \_ -> Expect.equal [] negOuts
+                        , \_ -> Expect.equal Nothing cleared.customStatusExpiry
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing } ] clearedOuts
+                        , \_ -> Expect.equal [] ownerlessOuts
+                        ]
+                        ()
+            , test "loaded profiles replace and re-project, garbage keeps session state" <|
+                \_ ->
+                    let
+                        seeded =
+                            { ownerOffline | customStatus = "old", userActivities = Dict.singleton "kai" { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "old" } }
+
+                        ( m, outs ) =
+                            update (IdentityProfileLoaded { status = "watching Severance", expiryMs = Just 1700000000000 }) seeded
+
+                        ( kept, keptOuts ) =
+                            update (IdentityProfileLoaded { status = ("bad" ++ String.fromChar (Char.fromCode 7) ++ "status"), expiryMs = Nothing }) seeded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "watching Severance" m.customStatus
+                        , \_ -> Expect.equal (Just 1700000000000) m.customStatusExpiry
+                        , \_ -> Expect.equal (Just { emoji = "📺", typeLabel = "WATCHING", text = "Severance" }) (Dict.get "kai" m.userActivities)
+                        , \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal "old" kept.customStatus
+                        , \_ -> Expect.equal [] keptOuts
+                        ]
+                        ()
+            , test "self nick change quarantines the old identity and reloads the new owner" <|
+                \_ ->
+                    let
+                        ( seeded, _ ) =
+                            update (CustomStatusSet "playing chess") ownerOffline
+
+                        ( m, outs ) =
+                            feed { seeded | ourNick = "oldkai" } ":oldkai!u@h NICK :newkai"
+
+                        ( foreign, foreignOuts ) =
+                            feed seeded ":bob!u@h NICK :robert"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "newkai" m.ourNick
+                        , \_ -> Expect.equal Nothing (Dict.get "oldkai" m.userActivities)
+                        -- An owner-flipping rename quarantines the old
+                        -- identity first (mirroring the oracle NICK arm:
+                        -- the wipe clears the custom status, so no
+                        -- activity rekeys under the new nick).
+                        , \_ -> Expect.equal "" m.customStatus
+                        , \_ -> Expect.equal Nothing (Dict.get "newkai" m.userActivities)
+                        , \_ ->
+                            Expect.equal
+                                [ IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , TopicHistoryRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , NickAliasesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , GuestClaimDismissRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , FriendsRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , WatchListRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                ]
+                                outs
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.nickAliasesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.contactsOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.ctcpOwner
+                        , \_ -> Expect.equal seeded.userActivities foreign.userActivities
+                        , \_ -> Expect.equal [] foreignOuts
+                        ]
+                        ()
+            , test "account-bound nick change skips the profile reload" <|
+                \_ ->
+                    let
+                        authed =
+                            { ownerOffline
+                                | accountName = Just "Kai"
+                                , identityProfileOwner = Just { serverUrl = "wss://irc.example", identity = "kai" }
+                            }
+
+                        ( m, outs ) =
+                            feed authed ":kai!u@h NICK :kai_"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ NickAliasesRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , GuestClaimDismissRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , FriendsRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , WatchListRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , CtcpConfigRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                ]
+                                outs
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.nickAliasesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.contactsOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.ctcpOwner
+                        ]
+                        ()
+            , test "818 rows project user STATUS and skip channels and other props" <|
+                \_ ->
+                    let
+                        ( r1, _ ) =
+                            feed ownerOffline ":s 818 kai bob STATUS :playing chess"
+
+                        ( r2, _ ) =
+                            feed r1 ":s 818 kai #c STATUS :playing chess"
+
+                        ( r3, _ ) =
+                            feed r2 ":s 818 kai bob TOPIC :hello"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "bob" r1.userActivities)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" r2.userActivities)
+                        , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "bob" r3.userActivities)
+                        ]
+                        ()
+            , test "live PROP rows set and clear activities" <|
+                \_ ->
+                    let
+                        ( r1, _ ) =
+                            feed ownerOffline ":bob!u@h PROP bob STATUS :coding on onyx"
+
+                        ( r2, _ ) =
+                            feed r1 ":bob!u@h PROP bob STATUS :plain words"
+
+                        ( r3, _ ) =
+                            feed r2 ":bob!u@h PROP bob STATUS"
+
+                        ( r4, _ ) =
+                            feed ownerOffline ":bob!u@h PROP BOB status :playing chess"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { emoji = "💻", typeLabel = "CODING", text = "onyx" }) (Dict.get "bob" r1.userActivities)
+                        , \_ -> Expect.equal Nothing (Dict.get "bob" r2.userActivities)
+                        , \_ -> Expect.equal Nothing (Dict.get "bob" r3.userActivities)
+                        , \_ -> Expect.equal Nothing (Dict.get "bob" r4.userActivities)
+                        ]
+                        ()
+            , test "001 requests the owner profile once" <|
+                \_ ->
+                    let
+                        registering =
+                            { ownerOffline | connection = Registering }
+
+                        ( r1, outs1 ) =
+                            feed registering ":s 001 kai :welcome"
+
+                        ( _, outs2 ) =
+                            feed r1 ":s 001 kai :welcome"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "kai" }) outs1)
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) r1.identityProfileOwner
+                        , \_ -> Expect.equal False (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "kai" }) outs2)
+                        ]
+                        ()
+            , test "900 login reloads the account-owned profile" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            feed ownerLive ":s 900 kai kai acct :you are logged in"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "acct" }) outs)
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "acct" }) m.identityProfileOwner
+                        ]
+                        ()
+            ]
+        , describe "401 and whois timeout"
+            [ test "labeled 401 drops the row and logs the server text" <|
+                \_ ->
+                    let
+                        label =
+                            Labels.nextClientLabel 0 1
+
+                        ( m1, _ ) =
+                            labeledSend [ "labeled-response" ] "hi"
+
+                        ( m2, out2 ) =
+                            feed m1 ("@label=" ++ label ++ " :srv 401 alice ghost :No such nick/channel")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (channelBodies m2)
+                        , \_ -> Expect.equal Dict.empty m2.pendingLabels
+                        , \_ -> Expect.equal [ "Message not delivered: No such nick/channel" ] (List.take 1 m2.serviceLog)
+                        , \_ -> Expect.equal [] out2
+                        ]
+                        ()
+            , test "labeled 401 without server text falls back to No such nick" <|
+                \_ ->
+                    let
+                        label =
+                            Labels.nextClientLabel 0 1
+
+                        ( m1, _ ) =
+                            labeledSend [ "labeled-response" ] "hi"
+
+                        ( m2, _ ) =
+                            feed m1 ("@label=" ++ label ++ " :srv 401 alice ghost")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (channelBodies m2)
+                        , \_ -> Expect.equal [ "Message not delivered: No such nick: ghost" ] (List.take 1 m2.serviceLog)
+                        ]
+                        ()
+            , test "live WHOIS requests arm a timer start" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, ourNick = "kai" }
+
+                        ( m, outs ) =
+                            update (WhoisRequest "ghost") live
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "ghost") m.whoisTarget
+                        , \_ -> Expect.equal 1 m.whoisTimerGen
+                        , \_ -> Expect.equal (Just True) (Maybe.map .loading (Dict.get "ghost" m.whois.entries))
+                        , \_ -> Expect.equal True (List.member (WhoisTimeoutStart { nick = "ghost", gen = 1, delayMs = whoisRequestTimeoutMs }) outs)
+                        ]
+                        ()
+            , test "offline WHOIS requests disarm without starting a timer" <|
+                \_ ->
+                    let
+                        ( m, outs ) =
+                            update (WhoisRequest "ghost") { blank | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 m.whoisTimerGen
+                        , \_ -> Expect.equal (Just "Reconnect to request profile details.") (Maybe.andThen .error (Dict.get "ghost" m.whois.entries))
+                        , \_ -> Expect.equal [] (List.filter isWhoisTimeoutStart outs)
+                        ]
+                        ()
+            , test "401 on the active sheet errors it and logs No such nick" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, ourNick = "kai" }
+
+                        ( requested, _ ) =
+                            update (WhoisRequest "ghost") live
+
+                        ( m, outs ) =
+                            feed requested ":srv 401 kai ghost :No such nick"
+
+                        entry =
+                            Dict.get "ghost" m.whois.entries
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just False) (Maybe.map .loading entry)
+                        , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
+                        , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
+                        , \_ -> Expect.equal 2 m.whoisTimerGen
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "401 off the active sheet lands nothing" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, ourNick = "kai" }
+
+                        ( requested, _ ) =
+                            update (WhoisRequest "ghost") live
+
+                        ( m, outs ) =
+                            feed requested ":srv 401 kai somebody :No such nick"
+
+                        ( bare, bareOuts ) =
+                            feed blank ":srv 401 kai somebody :No such nick"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 m.whoisTimerGen
+                        , \_ -> Expect.equal (Just True) (Maybe.map .loading (Dict.get "ghost" m.whois.entries))
+                        , \_ -> Expect.equal [] m.serviceLog
+                        , \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal [] bare.serviceLog
+                        , \_ -> Expect.equal [] bareOuts
+                        ]
+                        ()
+            , test "timer fire errors a still-loading sheet" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, ourNick = "kai" }
+
+                        ( requested, _ ) =
+                            update (WhoisRequest "ghost") live
+
+                        ( m, outs ) =
+                            update (WhoisTimeoutElapsed { nick = "ghost", gen = 1 }) requested
+
+                        entry =
+                            Dict.get "ghost" m.whois.entries
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just False) (Maybe.map .loading entry)
+                        , \_ -> Expect.equal (Just whoisTimeoutError) (Maybe.andThen .error entry)
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "stale fires drop after 318, re-requests, and settled sheets" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, ourNick = "kai" }
+
+                        ( requested, _ ) =
+                            update (WhoisRequest "ghost") live
+
+                        ( ended, _ ) =
+                            feed requested ":srv 318 kai ghost :End of WHOIS"
+
+                        ( afterFire, _ ) =
+                            update (WhoisTimeoutElapsed { nick = "ghost", gen = 1 }) ended
+
+                        ( rerequested, _ ) =
+                            update (WhoisRequest "ghost") ended
+
+                        ( afterStale, _ ) =
+                            update (WhoisTimeoutElapsed { nick = "ghost", gen = 1 }) rerequested
+
+                        ( wrongNick, _ ) =
+                            update (WhoisTimeoutElapsed { nick = "other", gen = 2 }) ended
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 2 ended.whoisTimerGen
+                        , \_ -> Expect.equal ended.whois afterFire.whois
+                        , \_ -> Expect.equal 3 rerequested.whoisTimerGen
+                        , \_ -> Expect.equal rerequested.whois afterStale.whois
+                        , \_ -> Expect.equal ended.whois wrongNick.whois
+                        ]
+                        ()
+            ]
+        , describe "typing indicators"
+            [ test "TAGMSG typing sets, pauses, and clears per tag value" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        ( active, _ ) =
+                            feed ticked "@+typing=active :bob!u@h TAGMSG #c"
+
+                        ( paused, _ ) =
+                            feed ticked "@typing=paused :bob!u@h TAGMSG #c"
+
+                        ( done, _ ) =
+                            feed { ticked | typingUsers = active.typingUsers } "@+typing=done :bob!u@h TAGMSG #c"
+
+                        ( unknown, _ ) =
+                            feed { ticked | typingUsers = active.typingUsers } "@+typing=idle :bob!u@h TAGMSG #c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "bob" ] (typistsFor active "#c")
+                        , \_ -> Expect.equal [ "bob" ] (typistsFor paused "#c")
+                        , \_ -> Expect.equal [] (typistsFor done "#c")
+                        , \_ -> Expect.equal [] (typistsFor unknown "#c")
+                        ]
+                        ()
+            , test "TAGMSG prefers +draft/typing, remaps DMs, and drops malformed lines" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        ( draftWins, _ ) =
+                            feed ticked "@+draft/typing=done;+typing=active :bob!u@h TAGMSG #c"
+
+                        ( dm, _ ) =
+                            feed ticked "@+typing=active :bob!u@h TAGMSG kai"
+
+                        ( noNick, _ ) =
+                            feed ticked "@+typing=active TAGMSG #c"
+
+                        ( noTags, _ ) =
+                            feed ticked ":bob!u@h TAGMSG #c"
+
+                        ( noTarget, _ ) =
+                            feed ticked "@+typing=active :bob!u@h TAGMSG"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (typistsFor draftWins "#c")
+                        , \_ -> Expect.equal [ "bob" ] (typistsFor dm "bob")
+                        , \_ -> Expect.equal [] (typistsFor dm "kai")
+                        , \_ -> Expect.equal [] (typistsFor noNick "#c")
+                        , \_ -> Expect.equal [] (typistsFor noTags "#c")
+                        , \_ -> Expect.equal True (Dict.isEmpty noTarget.typingUsers)
+                        ]
+                        ()
+            , test "ACTIVITY typing sets and clears, skipping self and react verbs" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        ( active, _ ) =
+                            feed ticked ":bob!u@h ACTIVITY #c typing active"
+
+                        ( paused, _ ) =
+                            feed ticked ":bob!u@h ACTIVITY #c typing paused"
+
+                        ( done, _ ) =
+                            feed { ticked | typingUsers = active.typingUsers } ":bob!u@h ACTIVITY #c typing done"
+
+                        ( self, _ ) =
+                            feed ticked ":kai!u@h ACTIVITY #c typing active"
+
+                        ( react, _ ) =
+                            feed ticked ":bob!u@h ACTIVITY #c react m1 👍"
+
+                        ( badVerb, _ ) =
+                            feed ticked ":bob!u@h ACTIVITY #c typing sleeping"
+
+                        ( badChan, _ ) =
+                            feed ticked ":bob!u@h ACTIVITY bob typing active"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "bob" ] (typistsFor active "#c")
+                        , \_ -> Expect.equal [ "bob" ] (typistsFor paused "#c")
+                        , \_ -> Expect.equal [] (typistsFor done "#c")
+                        , \_ -> Expect.equal [] (typistsFor self "#c")
+                        , \_ -> Expect.equal [] (typistsFor react "#c")
+                        , \_ -> Expect.equal [] (typistsFor badVerb "#c")
+                        , \_ -> Expect.equal True (Dict.isEmpty badChan.typingUsers)
+                        ]
+                        ()
+            , test "typing entries expire, keep first-seen casing, and validate" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        seeded =
+                            setTyping (setTyping ticked "#c" "BOB" True) "#c" "alice" True
+
+                        expired =
+                            { seeded | nowMs = 200000 }
+
+                        cleared =
+                            setTyping seeded "#c" "bob" False
+
+                        clearedAll =
+                            setTyping cleared "#c" "ALICE" False
+
+                        badTarget =
+                            setTyping ticked "#a,b" "bob" True
+
+                        badNick =
+                            setTyping ticked "#c" "" True
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "BOB", "alice" ] (List.sort (typistsFor seeded "#c"))
+                        , \_ -> Expect.equal [ "BOB" ] (typistsFor seeded "#c" |> List.filter (\n -> n == "BOB"))
+                        , \_ -> Expect.equal [] (typistsFor expired "#c")
+                        , \_ -> Expect.equal [ "alice" ] (typistsFor cleared "#c")
+                        , \_ -> Expect.equal False (Dict.member "#c" clearedAll.typingUsers)
+                        , \_ -> Expect.equal True (Dict.isEmpty badTarget.typingUsers)
+                        , \_ -> Expect.equal True (Dict.isEmpty badNick.typingUsers)
+                        ]
+                        ()
+            , test "typing stores hold 64 targets and 64 typers per target" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        manyTargets =
+                            List.foldl (\i acc -> setTyping acc ("#r" ++ String.fromInt i) "bob" True) ticked (List.range 1 65)
+
+                        manyTypers =
+                            List.foldl (\i acc -> setTyping acc "#c" ("u" ++ String.fromInt i) True) ticked (List.range 1 65)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 64 (Dict.size manyTargets.typingUsers)
+                        , \_ -> Expect.equal 64 (manyTypers.typingUsers |> Dict.get "#c" |> Maybe.map Dict.size |> Maybe.withDefault 0)
+                        ]
+                        ()
+            , test "typing sends gate on the cap, rate-limit, and validate" <|
+                \_ ->
+                    let
+                        nocaps =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        capped =
+                            { nocaps | caps = [ "draft/typing" ] }
+
+                        ( started, startOuts ) =
+                            update (TypingStarted "#c") capped
+
+                        ( limited, limitedOuts ) =
+                            update (TypingStarted "#c") started
+
+                        ( stopped, stopOuts ) =
+                            update (TypingStopped "#c") started
+
+                        ( rearmed, rearmedOuts ) =
+                            update (TypingStarted "#c") stopped
+
+                        ( uncapped, uncappedOuts ) =
+                            update (TypingStarted "#c") nocaps
+
+                        ( invalid, invalidOuts ) =
+                            update (TypingStarted "#a,b") capped
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "@+typing=active TAGMSG #c\r\n" ] startOuts
+                        , \_ -> Expect.equal [] limitedOuts
+                        , \_ -> Expect.equal [ SendLine "@+typing=done TAGMSG #c\r\n" ] stopOuts
+                        , \_ -> Expect.equal [ SendLine "@+typing=active TAGMSG #c\r\n" ] rearmedOuts
+                        , \_ -> Expect.equal [] uncappedOuts
+                        , \_ -> Expect.equal [] invalidOuts
+                        ]
+                        ()
+            , test "self-join subscribes and self-part unsubscribes" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( _, joinOut ) =
+                            feed base ":me!u@h JOIN #c"
+
+                        ( _, foreignJoinOut ) =
+                            feed base ":bob!u@h JOIN #c"
+
+                        ( _, partOut ) =
+                            feed base ":me!u@h PART #c"
+
+                        ( _, foreignPartOut ) =
+                            feed base ":bob!u@h PART #c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (SendLine "ACTIVITY SUBSCRIBE #c\r\n") joinOut)
+                        , \_ -> Expect.equal False (List.member (SendLine "ACTIVITY SUBSCRIBE #c\r\n") foreignJoinOut)
+                        , \_ -> Expect.equal [ SendLine "ACTIVITY UNSUBSCRIBE #c\r\n" ] partOut
+                        , \_ -> Expect.equal [] foreignPartOut
+                        ]
+                        ()
+            , test "Tick drops expired typists" <|
+                \_ ->
+                    let
+                        ticked =
+                            { blank | ourNick = "kai", nowMs = 100000 }
+
+                        seeded =
+                            setTyping ticked "#c" "bob" True
+
+                        ( m, _ ) =
+                            update (Tick (Time.millisToPosix 200000)) seeded
+                    in
+                    Expect.equal [] (typistsFor m "#c")
+            , test "subscribe lines validate channels and ops" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "ACTIVITY SUBSCRIBE #c\r\n") (activitySubscribeLine "SUBSCRIBE" "#c")
+                        , \_ -> Expect.equal (Just "ACTIVITY UNSUBSCRIBE #c\r\n") (activitySubscribeLine "UNSUBSCRIBE" "#c")
+                        , \_ -> Expect.equal Nothing (activitySubscribeLine "SUBSCRIBE" "bob")
+                        , \_ -> Expect.equal Nothing (activitySubscribeLine "SUBSCRIBE" "")
+                        , \_ -> Expect.equal Nothing (activitySubscribeLine "SUBSCRIBE" "#a,b")
+                        , \_ -> Expect.equal Nothing (activitySubscribeLine "JOIN" "#c")
+                        ]
+                        ()
+            ]
+        , describe "reactions"
+            [ test "toggle adds, removes case-insensitively, and drops empty buckets" <|
+                \_ ->
+                    let
+                        added =
+                            toggleMessageReactions [] "👍" "bob"
+
+                        kept =
+                            toggleMessageReactions [ { emoji = "👍", users = [ "ann" ] } ] "👍" "BOB"
+
+                        removed =
+                            toggleMessageReactions added "👍" "BOB"
+
+                        retoggled =
+                            toggleMessageReactions removed "👍" "bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] added
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "ann", "BOB" ] } ] kept
+                        , \_ -> Expect.equal [] removed
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] retoggled
+                        ]
+                        ()
+            , test "toggle ignores empty emoji or nick" <|
+                \_ ->
+                    let
+                        seeded =
+                            [ { emoji = "👍", users = [ "bob" ] } ]
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal seeded (toggleMessageReactions seeded "" "bob")
+                        , \_ -> Expect.equal seeded (toggleMessageReactions seeded "👍" "")
+                        , \_ -> Expect.equal [] (toggleMessageReactions [] "" "")
+                        ]
+                        ()
+            , test "add is idempotent and remove keeps co-reactors" <|
+                \_ ->
+                    let
+                        seeded =
+                            [ { emoji = "👍", users = [ "bob", "ann" ] } ]
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal seeded (addMessageReactor seeded "👍" "BOB")
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "ann" ] } ] (removeMessageReactor seeded "👍" "bob")
+                        , \_ -> Expect.equal seeded (removeMessageReactor seeded "👍" "zed")
+                        , \_ -> Expect.equal seeded (removeMessageReactor seeded "🔥" "bob")
+                        ]
+                        ()
+            , test "parseActivityReact validates verbs and tokens" <|
+                \_ ->
+                    let
+                        wireMsg command nick params =
+                            { tags = Dict.empty
+                            , prefix = Just "bob!u@h"
+                            , nick = nick
+                            , host = Just "u@h"
+                            , command = command
+                            , params = params
+                            , raw = ""
+                            }
+
+                        good =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "react", "m1", "👍" ])
+
+                        unreact =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "UNREACT", "m1", "👍" ])
+
+                        badVerb =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "dance", "m1", "👍" ])
+
+                        missingReaction =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "react", "m1" ])
+
+                        colonReaction =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "react", "m1", ":👍" ])
+
+                        commaMsgid =
+                            parseActivityReact (wireMsg "ACTIVITY" (Just "bob") [ "#c", "react", "m,1", "👍" ])
+
+                        noNick =
+                            parseActivityReact (wireMsg "ACTIVITY" Nothing [ "#c", "react", "m1", "👍" ])
+
+                        notActivity =
+                            parseActivityReact (wireMsg "PRIVMSG" (Just "bob") [ "#c", "react", "m1", "👍" ])
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { channel = "#c", nick = "bob", msgid = "m1", reaction = "👍", remove = False }) good
+                        , \_ -> Expect.equal (Just { channel = "#c", nick = "bob", msgid = "m1", reaction = "👍", remove = True }) unreact
+                        , \_ -> Expect.equal Nothing badVerb
+                        , \_ -> Expect.equal Nothing missingReaction
+                        , \_ -> Expect.equal Nothing colonReaction
+                        , \_ -> Expect.equal Nothing commaMsgid
+                        , \_ -> Expect.equal Nothing noNick
+                        , \_ -> Expect.equal Nothing notActivity
+                        ]
+                        ()
+            , test "TAGMSG react toggles on the addressed row" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( added, _ ) =
+                            feed m1 "@+draft/react=👍;+draft/reply=m1 :bob!u@h TAGMSG #c"
+
+                        ( removed, _ ) =
+                            feed added "@+draft/react=👍;+draft/reply=m1 :BOB!u@h TAGMSG #c"
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] (reactionsOf added)
+                        , \_ -> Expect.equal [] (reactionsOf removed)
+                        ]
+                        ()
+            , test "TAGMSG react drops malformed lines and unknown rows" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( noReply, _ ) =
+                            feed m1 "@+draft/react=👍 :bob!u@h TAGMSG #c"
+
+                        ( noEmoji, _ ) =
+                            feed m1 "@+draft/reply=m1 :bob!u@h TAGMSG #c"
+
+                        ( unknownMsgid, _ ) =
+                            feed m1 "@+draft/react=👍;+draft/reply=m9 :bob!u@h TAGMSG #c"
+
+                        ( unknownConvo, _ ) =
+                            feed m1 "@+draft/react=👍;+draft/reply=m1 :bob!u@h TAGMSG #nope"
+
+                        reactionsOf model key =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get key model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (reactionsOf noReply "#c")
+                        , \_ -> Expect.equal [] (reactionsOf noEmoji "#c")
+                        , \_ -> Expect.equal [] (reactionsOf unknownMsgid "#c")
+                        , \_ -> Expect.equal [] (reactionsOf unknownConvo "#c")
+                        , \_ -> Expect.equal Nothing (Dict.get "#nope" unknownConvo.channels)
+                        ]
+                        ()
+            , test "TAGMSG react to our nick applies to the sender bucket" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base "@msgid=m9 :bob!u@h PRIVMSG me :secret"
+
+                        ( addressed, _ ) =
+                            feed m1 "@+draft/react=👍;+draft/reply=m9 :bob!u@h TAGMSG me"
+
+                        peerBucket =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "bob" addressed.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] peerBucket
+                        , \_ -> Expect.equal Nothing (Dict.get "me" addressed.channels)
+                        ]
+                        ()
+            , test "ACTIVITY react adds and unreact removes on channels only" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( added, _ ) =
+                            feed m1 ":bob!u@h ACTIVITY #c react m1 👍"
+
+                        ( second, _ ) =
+                            feed added ":ann!u@h ACTIVITY #c react m1 👍"
+
+                        ( removed, _ ) =
+                            feed second ":bob!u@h ACTIVITY #c unreact m1 👍"
+
+                        ( elsewhere, _ ) =
+                            feed m1 ":bob!u@h ACTIVITY #elsewhere react m1 👍"
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] (reactionsOf added)
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "bob", "ann" ] } ] (reactionsOf second)
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "ann" ] } ] (reactionsOf removed)
+                        , \_ -> Expect.equal Nothing (Dict.get "#elsewhere" elsewhere.channels)
+                        ]
+                        ()
+            , test "ACTIVITY react diverts inside history batches" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( opened, _ ) =
+                            feed m1 "BATCH +h1 draft/chathistory #c"
+
+                        ( held, _ ) =
+                            feed opened "@batch=h1 :bob!u@h ACTIVITY #c react m1 👍"
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+                    in
+                    Expect.equal [] (reactionsOf held)
+            , test "REACT command toggles, remaps, and drops bad bodies" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( added, _ ) =
+                            feed m1 ":bob!u@h REACT #c :m1 👍"
+
+                        ( removed, _ ) =
+                            feed added ":bob!u@h REACT #c :m1 👍"
+
+                        ( noSpace, _ ) =
+                            feed m1 ":bob!u@h REACT #c :m1"
+
+                        ( blankEmoji, _ ) =
+                            feed m1 ":bob!u@h REACT #c :m1 "
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "bob" ] } ] (reactionsOf added)
+                        , \_ -> Expect.equal [] (reactionsOf removed)
+                        , \_ -> Expect.equal [] (reactionsOf noSpace)
+                        , \_ -> Expect.equal [] (reactionsOf blankEmoji)
+                        ]
+                        ()
+            , test "sendReaction gates on draft/react and echo-message" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( localOnly, localOut ) =
+                            update (ReactionSend "#c" "m1" "👍") m1
+
+                        capped =
+                            { m1 | caps = [ "draft/react" ] }
+
+                        ( optimistic, optimisticOut ) =
+                            update (ReactionSend "#c" "m1" "👍") capped
+
+                        echoed =
+                            { m1 | caps = [ "draft/react", "echo-message" ] }
+
+                        ( held, heldOut ) =
+                            update (ReactionSend "#c" "m1" "👍") echoed
+
+                        reactionsOf model =
+                            Maybe.withDefault [] (Maybe.map (List.concatMap .reactions << .messages) (Dict.get "#c" model.channels))
+
+                        wire =
+                            SendLine "@+draft/react=👍;+draft/reply=m1 TAGMSG #c\r\n"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf localOnly)
+                        , \_ -> Expect.equal [] localOut
+                        , \_ -> Expect.equal [ { emoji = "👍", users = [ "me" ] } ] (reactionsOf optimistic)
+                        , \_ -> Expect.equal [ wire ] optimisticOut
+                        , \_ -> Expect.equal [] (reactionsOf held)
+                        , \_ -> Expect.equal [ wire ] heldOut
+                        ]
+                        ()
+            ]
+        , describe "user profiles"
+            [ test "301/311/312/330 patch the persistent profile" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 311 me bob buser bhost * :Bobby Tables"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 312 me bob irc.example :Example Net"
+
+                        ( m4, _ ) =
+                            feed m3 ":s 301 me bob :out to lunch"
+
+                        ( m5, _ ) =
+                            feed m4 ":s 330 me bob alice :logged in as"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Bobby Tables") (Maybe.andThen .realname (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just "irc.example") (Maybe.andThen .server (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just "Example Net") (Maybe.andThen .serverInfo (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just True) (Maybe.map .away (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just (Just "out to lunch")) (Maybe.map .awayMessage (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just "alice") (Maybe.andThen .account (getUserProfile m5 "bob"))
+                        , \_ -> Expect.equal (Just "bob") (Maybe.map .nick (getUserProfile m5 "BOB"))
+                        ]
+                        ()
+            , test "301 with a blank message stores empty, not missing" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 301 me bob :"
+                    in
+                    Expect.equal (Just (Just "")) (Maybe.map .awayMessage (getUserProfile m2 "bob"))
+            , test "313/335 raise oper and bot flags" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 313 me bob :is an IRC operator"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 335 me bob :is a bot"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just True) (Maybe.map .ircOperator (getUserProfile m3 "bob"))
+                        , \_ -> Expect.equal (Just True) (Maybe.map .bot (getUserProfile m3 "bob"))
+                        ]
+                        ()
+            , test "317 stores idle times and zeroes garbage" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 317 me bob 42 1700000000 :seconds idle"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 317 me bob nope never :seconds idle"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just (Just 42)) (Maybe.map .idleSeconds (getUserProfile m2 "bob"))
+                        , \_ -> Expect.equal (Just (Just 1700000000)) (Maybe.map .signonTime (getUserProfile m2 "bob"))
+                        , \_ -> Expect.equal (Just (Just 0)) (Maybe.map .idleSeconds (getUserProfile m3 "bob"))
+                        ]
+                        ()
+            , test "313 bounds a hostile oper-role line" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 (":s 313 me bob :is an " ++ String.repeat 5000 "x")
+
+                        roleLen =
+                            Dict.get "bob" m2.whois.entries
+                                |> Maybe.andThen .operRole
+                                |> Maybe.map String.length
+                                |> Maybe.withDefault 0
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (roleLen > 0)
+                        , \_ -> Expect.equal True (roleLen <= 4096)
+                        ]
+                        ()
+            , test "319 unions channel fragments into the profile" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 319 me bob :#a #b"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 319 me bob :#b #c"
+                    in
+                    Expect.equal (Just [ "#a", "#b", "#c" ]) (Maybe.map .channels (getUserProfile m3 "bob"))
+            , test "off-target and unsolicited numerics plant nothing" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 311 me mallory u h * :Mallory"
+
+                        ( m3, _ ) =
+                            feed blank ":s 311 me bob u h * :Bobby"
+
+                        ( m4, _ ) =
+                            feed m1 ":s 320 me mallory :special"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (getUserProfile m2 "mallory")
+                        , \_ -> Expect.equal Nothing (getUserProfile m3 "bob")
+                        , \_ -> Expect.equal Nothing (getUserProfile m4 "mallory")
+                        ]
+                        ()
+            , test "missing 311 realname clears the stored one" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (WhoisRequest "bob") blank
+
+                        ( m2, _ ) =
+                            feed m1 ":s 311 me bob u h * :Bobby"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 311 me bob u h *"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Bobby") (Maybe.andThen .realname (getUserProfile m2 "bob"))
+                        , \_ -> Expect.equal (Just Nothing) (Maybe.map .realname (getUserProfile m3 "bob"))
+                        ]
+                        ()
+            , test "SETNAME patches the sender realname and drops blanks" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":bob!u@h SETNAME :Robert Tables"
+
+                        ( m2, _ ) =
+                            feed m1 ":bob!u@h SETNAME :"
+
+                        ( m3, _ ) =
+                            feed m1 "SETNAME :Nobody"
+
+                        ( m4, _ ) =
+                            feed m1 ":__proto__!u@h SETNAME :Evil"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Robert Tables") (Maybe.andThen .realname (getUserProfile m1 "bob"))
+                        , \_ -> Expect.equal (Just "Robert Tables") (Maybe.andThen .realname (getUserProfile m2 "bob"))
+                        , \_ -> Expect.equal Nothing (getUserProfile m3 "nobody")
+                        , \_ -> Expect.equal Nothing (getUserProfile m4 "__proto__")
+                        ]
+                        ()
+            , test "setUserProfileOn refuses bad nicks and caps new targets" <|
+                \_ ->
+                    let
+                        badComma =
+                            Services.setUserProfileOn Dict.empty "a,b" Services.emptyUserProfilePatch
+
+                        badProto =
+                            Services.setUserProfileOn Dict.empty "__proto__" Services.emptyUserProfilePatch
+
+                        badEmpty =
+                            Services.setUserProfileOn Dict.empty "" Services.emptyUserProfilePatch
+
+                        full =
+                            List.range 1 Services.maxUserProfiles
+                                |> List.map (\i -> ( "n" ++ String.fromInt i, Services.blankUserProfile ("n" ++ String.fromInt i) ))
+                                |> Dict.fromList
+
+                        refused =
+                            Services.setUserProfileOn full "newbie" Services.emptyUserProfilePatch
+
+                        botPatch =
+                            Services.emptyUserProfilePatch
+
+                        patched =
+                            Services.setUserProfileOn full "n1" { botPatch | bot = Just True }
+
+                        cased =
+                            Services.setUserProfileOn (Services.setUserProfileOn Dict.empty "BOB" Services.emptyUserProfilePatch) "bob" Services.emptyUserProfilePatch
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Dict.empty badComma
+                        , \_ -> Expect.equal Dict.empty badProto
+                        , \_ -> Expect.equal Dict.empty badEmpty
+                        , \_ -> Expect.equal Services.maxUserProfiles (Dict.size refused)
+                        , \_ -> Expect.equal Nothing (Services.getUserProfileFrom refused "newbie")
+                        , \_ -> Expect.equal (Just True) (Maybe.map .bot (Services.getUserProfileFrom patched "N1"))
+                        , \_ -> Expect.equal (Just "BOB") (Maybe.map .nick (Services.getUserProfileFrom cased "bob"))
+                        ]
+                        ()
+            , test "UserProfileOpened and UserProfileClosed flip the card nick" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (UserProfileOpened "bob") blank
+
+                        ( m2, _ ) =
+                            update UserProfileClosed m1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "bob") m1.userProfileNick
+                        , \_ -> Expect.equal Nothing m2.userProfileNick
+                        ]
+                        ()
+            ]
+        , describe "message editing"
+            [ test "recordEdit bounds ids, bodies, and history size" <|
+                \_ ->
+                    let
+                        blankId =
+                            recordEdit Dict.empty "  " "prior" 1
+
+                        blankBody =
+                            recordEdit Dict.empty "m1" "" 1
+
+                        cut =
+                            recordEdit Dict.empty "m1" (String.repeat 9000 "x") 1
+
+                        dozen =
+                            List.foldl (\i acc -> recordEdit acc "m1" ("v" ++ String.fromInt i) i) Dict.empty (List.range 1 13)
+
+                        many =
+                            List.foldl (\i acc -> recordEdit acc ("k" ++ String.fromInt i) "v" i) Dict.empty (List.range 1 502)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Dict.empty blankId
+                        , \_ -> Expect.equal Dict.empty blankBody
+                        , \_ -> Expect.equal 8192 (Maybe.withDefault 0 (Maybe.map (String.length << .body) (List.head (revisionsFor cut "m1"))))
+                        , \_ -> Expect.equal 12 (List.length (revisionsFor dozen "m1"))
+                        , \_ -> Expect.equal "v2" (Maybe.withDefault "" (Maybe.map .body (List.head (revisionsFor dozen "m1"))))
+                        , \_ -> Expect.equal 500 (Dict.size many)
+                        , \_ -> Expect.equal [] (revisionsFor many "k1")
+                        , \_ -> Expect.equal [ { body = "v", editedAt = 7 } ] (revisionsFor many " k7 ")
+                        ]
+                        ()
+            , test "REDACT redacts any addressed row and ignores the reason" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( redacted, _ ) =
+                            feed m1 ":mallory!u@h REDACT #c m1 :spam"
+
+                        ( bare, _ ) =
+                            feed m1 ":bob!u@h REDACT #c :m1"
+
+                        ( missing, _ ) =
+                            feed m1 ":bob!u@h REDACT #c"
+
+                        ( unknown, _ ) =
+                            feed m1 ":bob!u@h REDACT #nope m1"
+
+                        bodies model =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "[Message deleted]" ] (List.map .body (bodies redacted))
+                        , \_ -> Expect.equal [ True ] (List.map .redacted (bodies redacted))
+                        , \_ -> Expect.equal (Just "[message deleted]") (Maybe.map displayBody (List.head (bodies redacted)))
+                        , \_ -> Expect.equal [ "[Message deleted]" ] (List.map .body (bodies bare))
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body (bodies missing))
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body (bodies unknown))
+                        , \_ -> Expect.equal Nothing (Dict.get "#nope" unknown.channels)
+                        ]
+                        ()
+            , test "EDIT rewrites the addressed row, empty included" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( edited, _ ) =
+                            feed m1 ":bob!u@h EDIT #c m1 :hello again"
+
+                        ( emptied, _ ) =
+                            feed m1 ":bob!u@h EDIT #c m1"
+
+                        ( unknown, _ ) =
+                            feed m1 ":bob!u@h EDIT #c m9 :nope"
+
+                        bodies model =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "hello again" ] (List.map .body (bodies edited))
+                        , \_ -> Expect.equal [ True ] (List.map .edited (bodies edited))
+                        , \_ -> Expect.equal [ "" ] (List.map .body (bodies emptied))
+                        , \_ -> Expect.equal [ True ] (List.map .edited (bodies emptied))
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body (bodies unknown))
+                        ]
+                        ()
+            , test "EDIT skips locked envelope rows" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base ("@msgid=m9 :bob!u@h PRIVMSG me :" ++ envelopeBody)
+
+                        ( edited, _ ) =
+                            feed m1 ":bob!u@h EDIT me m9 :opened"
+
+                        bodies =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" edited.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ envelopeBody ] (List.map .body bodies)
+                        , \_ -> Expect.equal [ False ] (List.map .edited bodies)
+                        ]
+                        ()
+            , test "CTCP EDIT and DELETE mutate without storing a row" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m1 :bob!u@h PRIVMSG #c :hello"
+
+                        ( edited, _ ) =
+                            feed m1 (":bob!u@h PRIVMSG #c :\u{0001}EDIT m1 new here\u{0001}")
+
+                        ( deleted, _ ) =
+                            feed m1 (":bob!u@h PRIVMSG #c :\u{0001}DELETE m1\u{0001}")
+
+                        ( stranger, _ ) =
+                            feed m1 (":mallory!u@h PRIVMSG #c :\u{0001}EDIT m1 hijack\u{0001}")
+
+                        ( badShape, _ ) =
+                            feed m1 (":bob!u@h PRIVMSG #c :\u{0001}EDIT m1\u{0001}")
+
+                        bodies model =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "new here" ] (List.map .body (bodies edited))
+                        , \_ -> Expect.equal 1 (List.length (bodies edited))
+                        , \_ -> Expect.equal [ "" ] (List.map .body (bodies deleted))
+                        , \_ -> Expect.equal [ True ] (List.map .deleted (bodies deleted))
+                        , \_ -> Expect.equal (Just "[message deleted]") (Maybe.map displayBody (List.head (bodies deleted)))
+                        , \_ -> Expect.equal [ "hello" ] (List.map .body (bodies stranger))
+                        -- A text-less EDIT wrapper matches no mutation and is
+                        -- swallowed like every other unknown CTCP (mirroring
+                        -- the oracle query-arm `break`, verified live).
+                        , \_ -> Expect.equal 1 (List.length (bodies badShape))
+                        ]
+                        ()
+            , test "CTCP mutations resolve DMs to the sender" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base "@msgid=m9 :bob!u@h PRIVMSG me :secret"
+
+                        ( edited, _ ) =
+                            feed m1 (":bob!u@h PRIVMSG me :\u{0001}EDIT m9 revealed\u{0001}")
+
+                        bodies =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" edited.channels))
+                    in
+                    Expect.equal [ "revealed" ] (List.map .body bodies)
+            , test "REDACT and EDIT address DMs under the sender bucket" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base "@msgid=m9 :bob!u@h PRIVMSG me :secret"
+
+                        ( redacted, _ ) =
+                            feed m1 ":bob!u@h REDACT me m9"
+
+                        ( m2, _ ) =
+                            feed base "@msgid=m9 :bob!u@h PRIVMSG me :secret"
+
+                        ( edited, _ ) =
+                            feed m2 ":bob!u@h EDIT me m9 :revealed"
+
+                        redactedBodies =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" redacted.channels))
+
+                        editedBodies =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "bob" edited.channels))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "[Message deleted]" ] (List.map .body redactedBodies)
+                        , \_ -> Expect.equal [ "revealed" ] (List.map .body editedBodies)
+                        , \_ -> Expect.equal [ True ] (List.map .edited editedBodies)
+                        ]
+                        ()
+            , test "requestEdit gates on cap, row, and ownership" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me", caps = [ "draft/message-editing" ], nowMs = 1000 }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                        ( m2, _ ) =
+                            feed m1 "@msgid=m1 :bob!u@h PRIVMSG #c :theirs"
+
+                        ( edited, editOut ) =
+                            update (MessageEditRequested "#c" "m9" "mine!") m2
+
+                        ( foreign, foreignOut ) =
+                            update (MessageEditRequested "#c" "m1" "hijack") m2
+
+                        ( unknown, unknownOut ) =
+                            update (MessageEditRequested "#c" "m9x" "nope") m2
+
+                        ( uncap, uncapOut ) =
+                            update (MessageEditRequested "#c" "m9" "mine!") { m2 | caps = [] }
+
+                        ( offline, offlineOut ) =
+                            update (MessageEditRequested "#c" "m9" "mine!") { m2 | connection = Offline }
+
+                        bodies model =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+
+                        ownBody model =
+                            List.filter (\m -> m.msgid == Just "m9") (bodies model)
+                                |> List.head
+                                |> Maybe.map .body
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "mine!") (ownBody edited)
+                        , \_ -> Expect.equal [ SendLine "EDIT #c m9 mine!\r\n" ] editOut
+                        , \_ -> Expect.equal [ { body = "mine", editedAt = 1000 } ] (revisionsFor edited.editHistory "m9")
+                        , \_ -> Expect.equal (Just "theirs") (Maybe.map .body (List.head (List.filter (\m -> m.msgid == Just "m1") (bodies foreign))))
+                        , \_ -> Expect.equal [] foreignOut
+                        , \_ -> Expect.equal (Just "mine") (ownBody unknown)
+                        , \_ -> Expect.equal [] unknownOut
+                        , \_ -> Expect.equal (Just "mine") (ownBody uncap)
+                        , \_ -> Expect.equal [] uncapOut
+                        , \_ -> Expect.equal (Just "mine") (ownBody offline)
+                        , \_ -> Expect.equal [] offlineOut
+                        ]
+                        ()
+            , test "requestDelete needs the cap and refuses pending rows" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me", caps = [ "draft/message-redaction" ] }
+
+                        ( m1, _ ) =
+                            feed (joinFirst base "me" "#c") "@msgid=m9 :me!u@h PRIVMSG #c :mine"
+
+                        ( deleted, deleteOut ) =
+                            update (MessageDeleteRequested "#c" "m9") m1
+
+                        ( uncap, uncapOut ) =
+                            update (MessageDeleteRequested "#c" "m9") { m1 | caps = [] }
+
+                        pended =
+                            case Dict.get "#c" m1.channels of
+                                Just ch ->
+                                    { m1 | channels = Dict.insert "#c" { ch | messages = List.map (\m -> if m.msgid == Just "m9" then { m | pending = True } else m) ch.messages } m1.channels }
+
+                                Nothing ->
+                                    m1
+
+                        ( pendingRefused, pendingOut ) =
+                            update (MessageDeleteRequested "#c" "m9") pended
+
+                        bodies model =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#c" model.channels))
+
+                        redactedOf model =
+                            List.filter (\m -> m.msgid == Just "m9") (bodies model) |> List.head
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just True) (Maybe.map .redacted (redactedOf deleted))
+                        , \_ -> Expect.equal (Just "[Message deleted]") (Maybe.map .body (redactedOf deleted))
+                        , \_ -> Expect.equal [ SendLine "REDACT #c m9 Deleted\r\n" ] deleteOut
+                        , \_ -> Expect.equal (Just False) (Maybe.map .redacted (redactedOf uncap))
+                        , \_ -> Expect.equal [] uncapOut
+                        , \_ -> Expect.equal False (canDeleteRow pended "#c" "m9")
+                        , \_ -> Expect.equal True (canEditRow pended "#c" "m9")
+                        , \_ -> Expect.equal (Just False) (Maybe.map .redacted (redactedOf pendingRefused))
+                        , \_ -> Expect.equal [] pendingOut
+                        ]
+                        ()
+            ]
+        , describe "user metadata"
+            [ test "METADATA stores, bounds, and clears keys" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base ":s METADATA bob ocean.display-name * :Bobby"
+
+                        ( m2, _ ) =
+                            feed m1 ":s METADATA * ocean.bio * :hello world"
+
+                        ( m3, _ ) =
+                            feed m2 (":s METADATA bob ocean.bio * :" ++ String.repeat 9000 "x")
+
+                        ( m4, _ ) =
+                            feed m3 ":s METADATA bob ocean.display-name * :"
+
+                        ( m5, _ ) =
+                            feed m4 ":s METADATA bob ocean.bio * :"
+
+                        meta model nick =
+                            Maybe.withDefault Dict.empty (Dict.get nick model.userMetadata)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Dict.fromList [ ( "ocean.display-name", "Bobby" ) ]) (meta m1 "bob")
+                        , \_ -> Expect.equal (Dict.fromList [ ( "ocean.bio", "hello world" ) ]) (meta m2 "me")
+                        , \_ -> Expect.equal 8192 (Maybe.withDefault 0 (Maybe.map String.length (Dict.get "ocean.bio" (meta m3 "bob"))))
+                        , \_ -> Expect.equal (Dict.fromList [ ( "ocean.bio", String.repeat 8192 "x" ) ]) (meta m4 "bob")
+                        , \_ -> Expect.equal Dict.empty (meta m5 "bob")
+                        , \_ -> Expect.equal Nothing (Dict.get "bob" m5.userMetadata)
+                        ]
+                        ()
+            , test "METADATA drops invalid targets, keys, and short lines" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( badTarget, _ ) =
+                            feed base ":s METADATA a,b ocean.bio * :x"
+
+                        ( badKey, _ ) =
+                            feed base ":s METADATA bob :bad * :x"
+
+                        ( short, _ ) =
+                            feed base ":s METADATA bob"
+
+                        ( noNick, _ ) =
+                            feed { blank | ourNick = "" } ":s METADATA * ocean.bio * :x"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Dict.empty badTarget.userMetadata
+                        , \_ -> Expect.equal Dict.empty badKey.userMetadata
+                        , \_ -> Expect.equal Dict.empty short.userMetadata
+                        , \_ -> Expect.equal Dict.empty noNick.userMetadata
+                        ]
+                        ()
+            , test "metadata projects ocean profile keys and keeps raw values" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( m1, _ ) =
+                            feed base ":s METADATA bob ocean.pronouns * :they/them"
+
+                        ( m2, _ ) =
+                            feed m1 ":s METADATA bob ocean.accent * :#ff0000"
+
+                        ( m3, _ ) =
+                            feed m2 ":s METADATA bob ocean.accent * :red"
+
+                        ( m4, _ ) =
+                            feed m3 ":s METADATA bob ocean.links * :https://a.example, https://b.example"
+
+                        ( m5, _ ) =
+                            feed m4 ":s METADATA bob ocean.banner-url * :https://img.example/x.png"
+
+                        ( m6, _ ) =
+                            feed m5 ":s METADATA bob ocean.banner-url * :ftp://img.example/x.png"
+
+                        ( m7, _ ) =
+                            feed m6 ":s METADATA carol color * :#0f0"
+
+                        profile model nick =
+                            getUserProfile model nick
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "they/them") (Maybe.andThen .pronouns (profile m1 "bob"))
+                        , \_ -> Expect.equal (Just "#ff0000") (Maybe.andThen .accentColor (profile m2 "bob"))
+                        , \_ -> Expect.equal (Just "red") (Dict.get "ocean.accent" (Maybe.withDefault Dict.empty (Dict.get "bob" m3.userMetadata)))
+                        , \_ -> Expect.equal (Just "#ff0000") (Maybe.andThen .accentColor (profile m3 "bob"))
+                        , \_ -> Expect.equal (Just [ "https://a.example", "https://b.example" ]) (Maybe.map .links (profile m4 "bob"))
+                        , \_ -> Expect.equal (Just "https://img.example/x.png") (Maybe.andThen .bannerUrl (profile m5 "bob"))
+                        , \_ -> Expect.equal (Just "https://img.example/x.png") (Maybe.andThen .bannerUrl (profile m6 "bob"))
+                        , \_ -> Expect.equal (Just "#0f0") (Maybe.andThen .accentColor (profile m7 "carol"))
+                        ]
+                        ()
+            , test "metadata budgets refuse only growth" <|
+                \_ ->
+                    let
+                        fullTargets =
+                            List.foldl (\i acc -> applyUserMetadata acc ("n" ++ String.fromInt i) "k" "v") blank (List.range 1 maxUserMetadataTargets)
+
+                        refusedTarget =
+                            applyUserMetadata fullTargets "newbie" "k" "v"
+
+                        patchedTarget =
+                            applyUserMetadata fullTargets "n1" "k2" "v"
+
+                        manyKeys =
+                            List.foldl (\i acc -> applyUserMetadata acc "bob" ("k" ++ String.fromInt i) "v") blank (List.range 1 maxUserMetadataKeys)
+
+                        refusedKey =
+                            applyUserMetadata manyKeys "bob" "kx" "v"
+
+                        clearedKey =
+                            applyUserMetadata manyKeys "bob" "k1" ""
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal maxUserMetadataTargets (Dict.size refusedTarget.userMetadata)
+                        , \_ -> Expect.equal Nothing (Dict.get "newbie" refusedTarget.userMetadata)
+                        , \_ -> Expect.equal (Just "v") (Dict.get "k2" (Maybe.withDefault Dict.empty (Dict.get "n1" patchedTarget.userMetadata)))
+                        , \_ -> Expect.equal maxUserMetadataKeys (Dict.size (Maybe.withDefault Dict.empty (Dict.get "bob" refusedKey.userMetadata)))
+                        , \_ -> Expect.equal Nothing (Dict.get "kx" (Maybe.withDefault Dict.empty (Dict.get "bob" refusedKey.userMetadata)))
+                        , \_ -> Expect.equal (maxUserMetadataKeys - 1) (Dict.size (Maybe.withDefault Dict.empty (Dict.get "bob" clearedKey.userMetadata)))
+                        ]
+                        ()
+            , test "setOwnMetadata sends, deletes, and refuses garbage" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me" }
+
+                        ( sent, sentOut ) =
+                            update (OwnMetadataSet "ocean.bio" "hello world") base
+
+                        ( deleted, deletedOut ) =
+                            update (OwnMetadataSet "ocean.bio" "") base
+
+                        ( commaKey, commaKeyOut ) =
+                            update (OwnMetadataSet "a,b" "x") base
+
+                        ( unsafeKey, unsafeKeyOut ) =
+                            update (OwnMetadataSet "__proto__" "x") base
+
+                        ( badValue, badValueOut ) =
+                            update (OwnMetadataSet "ocean.accent" "red") base
+
+                        ( offline, offlineOut ) =
+                            update (OwnMetadataSet "ocean.bio" "hi") { base | connection = Offline }
+
+                        ownMeta model =
+                            Maybe.withDefault Dict.empty (Dict.get "me" model.userMetadata)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "METADATA * SET ocean.bio :hello world\r\n" ] sentOut
+                        , \_ -> Expect.equal (Dict.fromList [ ( "ocean.bio", "hello world" ) ]) (ownMeta sent)
+                        , \_ -> Expect.equal [ SendLine "METADATA * SET ocean.bio\r\n" ] deletedOut
+                        , \_ -> Expect.equal Dict.empty (ownMeta deleted)
+                        , \_ -> Expect.equal [ SendLine "METADATA * SET a,b x\r\n" ] commaKeyOut
+                        , \_ -> Expect.equal (Dict.fromList [ ( "a,b", "x" ) ]) (ownMeta commaKey)
+                        , \_ -> Expect.equal [] unsafeKeyOut
+                        , \_ -> Expect.equal Dict.empty unsafeKey.userMetadata
+                        , \_ -> Expect.equal [] badValueOut
+                        , \_ -> Expect.equal Dict.empty badValue.userMetadata
+                        , \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal Dict.empty offline.userMetadata
+                        ]
+                        ()
+            , test "account switch drops our own metadata and profile" <|
+                \_ ->
+                    let
+                        seeded =
+                            { blank | ourNick = "me", accountName = Just "alice" }
+
+                        ( w0, _ ) =
+                            update (WhoisRequest "bob") seeded
+
+                        ( m1, _ ) =
+                            feed w0 ":s METADATA * ocean.bio * :mine"
+
+                        ( m2, _ ) =
+                            feed m1 ":s 311 me bob u h * :Bobby"
+
+                        ( m3, _ ) =
+                            feed m2 ":s 900 me x!u@h bob :You are now logged in as bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Dict.fromList [ ( "ocean.bio", "mine" ) ]) (Maybe.withDefault Dict.empty (Dict.get "me" m1.userMetadata))
+                        , \_ -> Expect.equal (Just "Bobby") (Maybe.andThen .realname (getUserProfile m2 "bob"))
+                        , \_ -> Expect.equal Nothing (Dict.get "me" m3.userMetadata)
+                        , \_ -> Expect.equal (Just "Bobby") (Maybe.andThen .realname (getUserProfile m3 "bob"))
+                        ]
+                        ()
+            ]
+        , describe "boost bar"
+            [ test "aggregateBoostGroups groups, dedupes, sorts, and flags you" <|
+                \_ ->
+                    let
+                        groups =
+                            aggregateBoostGroups
+                                [ { emoji = "🔥", users = [ "ann" ] }
+                                , { emoji = "👍", users = [ "bob", "ANN" ] }
+                                , { emoji = "👍", users = [ "BOB", "zed" ] }
+                                , { emoji = "", users = [ "zed" ] }
+                                , { emoji = "🎉", users = [] }
+                                ]
+                                "ann"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "👍", "🔥" ] (List.map .emoji groups)
+                        , \_ -> Expect.equal [ 3, 1 ] (List.map .count groups)
+                        , \_ -> Expect.equal [ "bob", "ANN", "zed" ] (Maybe.withDefault [] (Maybe.map .reactors (List.head groups)))
+                        , \_ -> Expect.equal [ True, True ] (List.map .youBoosted groups)
+                        ]
+                        ()
+            , test "summarizeBoosts honors every density" <|
+                \_ ->
+                    let
+                        groups =
+                            List.map (\i -> { emoji = "e" ++ String.fromInt i, count = 10 - i, reactors = [], youBoosted = i == 1 }) (List.range 1 9)
+
+                        full =
+                            summarizeBoosts groups ReactionFull
+
+                        compact =
+                            summarizeBoosts groups ReactionCompact
+
+                        counts =
+                            summarizeBoosts groups ReactionCountsOnly
+
+                        hidden =
+                            summarizeBoosts groups ReactionHidden
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 8 (List.length full.chips)
+                        , \_ -> Expect.equal 1 full.overflow
+                        , \_ -> Expect.equal False full.hidden
+                        , \_ -> Expect.equal "e1 9" (Maybe.withDefault "" (Maybe.map .label (List.head full.chips)))
+                        , \_ -> Expect.equal 4 (List.length compact.chips)
+                        , \_ -> Expect.equal 5 compact.overflow
+                        , \_ -> Expect.equal "e19" (Maybe.withDefault "" (Maybe.map .label (List.head compact.chips)))
+                        , \_ -> Expect.equal [ { emoji = "💬", count = 45, mine = True, label = "45" } ] counts.chips
+                        , \_ -> Expect.equal 0 counts.overflow
+                        , \_ -> Expect.equal { chips = [], overflow = 0, hidden = True } hidden
+                        ]
+                        ()
+            , test "boostTitle lists reactors then the remainder" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "bob, ann" (boostTitle { emoji = "👍", count = 2, reactors = [ "bob", "ann" ], youBoosted = False })
+                        , \_ -> Expect.equal "a, b, c, d +2" (boostTitle { emoji = "👍", count = 6, reactors = [ "a", "b", "c", "d", "e", "f" ], youBoosted = False })
+                        , \_ -> Expect.equal "1 boost" (boostTitle { emoji = "👍", count = 1, reactors = [], youBoosted = False })
+                        ]
+                        ()
+            , test "messageAccessibleLabel flags state before the body" <|
+                \_ ->
+                    let
+                        row =
+                            { id = 1
+                            , from = "bob"
+                            , body = "hi"
+                            , whisper = False
+                            , audience = Nothing
+                            , highlight = True
+                            , plaintext = Nothing
+                            , outboxId = Nothing
+                            , pending = False
+                            , at = 0
+                            , msgid = Nothing
+                            , reactions = []
+                            , edited = True
+                            , deleted = False
+                            , redacted = False
+                            }
+
+                        withdrawn =
+                            { row | deleted = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "bob (edited, mention): hi" (messageAccessibleLabel row)
+                        , \_ -> Expect.equal "bob: [message deleted]" (messageAccessibleLabel withdrawn)
+                        ]
+                        ()
+            , test "typingLine phrases one, two, and many" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | ourNick = "me", nowMs = 100000 }
+
+                        one =
+                            setTyping base "#c" "bob" True
+
+                        two =
+                            setTyping one "#c" "ann" True
+
+                        many =
+                            setTyping two "#c" "zed" True
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (typingLine base "#c")
+                        , \_ -> Expect.equal (Just "bob is typing…") (typingLine one "#c")
+                        , \_ -> Expect.equal (Just "ann and bob are typing…") (typingLine two "#c")
+                        , \_ -> Expect.equal (Just "3 people are typing…") (typingLine many "#c")
+                        ]
+                        ()
+            ]
+        , describe "modes and statuses"
+            [ test "AWAY marks and clears roster flags across channels" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        base =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":me!u@h JOIN #d")
+                                |> (\m -> step m ":s 353 me = #c :alice bob")
+                                |> (\m -> step m ":s 353 me = #d :bob")
+
+                        awayNick m chan nick =
+                            Dict.get (String.toLower chan) m.channels
+                                |> Maybe.andThen (\c -> Dict.get nick c.members)
+                                |> Maybe.map .away
+
+                        marked =
+                            step base ":bob!u@h AWAY :lunch"
+
+                        cleared =
+                            step marked ":bob!u@h AWAY"
+
+                        emptyMsg =
+                            step marked ":bob!u@h AWAY :"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just False) (awayNick base "#c" "bob")
+                        , \_ -> Expect.equal (Just True) (awayNick marked "#c" "bob")
+                        , \_ -> Expect.equal (Just True) (awayNick marked "#d" "bob")
+                        , \_ -> Expect.equal (Just False) (awayNick cleared "#c" "bob")
+                        , \_ -> Expect.equal (Just False) (awayNick emptyMsg "#c" "bob")
+                        , \_ -> Expect.equal (Just False) (awayNick marked "#c" "alice")
+                        ]
+                        ()
+            , test "AWAY from unknown nicks leaves every roster alone" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        base =
+                            blank
+                                |> (\m -> step m ":alice!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice")
+
+                        ghosted =
+                            step base ":ghost!u@h AWAY :boo"
+                    in
+                    Expect.equal base.channels ghosted.channels
+            , test "PREFIX change re-derives roster mode letters" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        base =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :@alice &bob")
+
+                        modesOf m nick =
+                            Dict.get "#c" m.channels
+                                |> Maybe.andThen (\c -> Dict.get nick c.members)
+                                |> Maybe.map (.modes >> Set.toList >> List.sort)
+
+                        -- Legacy `&` (admin) has no successor under the
+                        -- Onyx Server PREFIX, so it drops; `@` survives.
+                        remapped =
+                            step base ":s 005 me PREFIX=(YQqov)*!.@+ :are supported"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ 'o' ]) (modesOf base "alice")
+                        , \_ -> Expect.equal (Just [ 'a' ]) (modesOf base "bob")
+                        , \_ -> Expect.equal (Just [ 'o' ]) (modesOf remapped "alice")
+                        , \_ -> Expect.equal (Just []) (modesOf remapped "bob")
+                        , \_ -> Expect.equal [ 'Y', 'Q', 'q', 'o', 'v' ] remapped.isupport.prefixOrder
+                        ]
+                        ()
+            , test "367 stamps follow parseInt radix-10" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        burst =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 367 me #c *!*@* bob 123abc")
+                                |> (\m -> step m ":s 367 me #c *!*x* bob 0x10")
+                                |> (\m -> step m ":s 367 me #c *!*y* bob notanum")
+                                |> (\m -> step m ":s 367 me #c *!*z* bob 99999999999999999999")
+                                |> (\m -> step m ":s 368 me #c :End of ban list")
+
+                        stamps =
+                            Dict.get "#c" burst.banList
+                                |> Maybe.map (.entries >> List.map .setAt)
+                    in
+                    Expect.equal (Just [ Just 123, Just 0, Nothing, Nothing ]) stamps
+            ]
+        , describe "names bursts"
+            [ test "the armed 353 replaces, later lines append" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":bob!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice")
+                                |> (\m -> step m ":s 353 me = #c :carol")
+
+                        members =
+                            Dict.get "#c" fed.channels
+                                |> Maybe.map (.members >> Dict.keys >> List.sort)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ "alice", "carol" ]) members
+                        , \_ ->
+                            Expect.equal
+                                (Just BurstAppending)
+                                (Maybe.map .phase (recentNamesBurst fed "#c"))
+                        ]
+                        ()
+            , test "a mid-burst re-arm never resets to replace" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice")
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :bob")
+
+                        members =
+                            Dict.get "#c" fed.channels
+                                |> Maybe.map (.members >> Dict.keys >> List.sort)
+                    in
+                    Expect.equal (Just [ "alice", "bob", "me" ]) members
+            , test "live removals survive stale burst lines" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice bob")
+                                |> (\m -> step m ":bob!u@h PART #c")
+                                |> (\m -> step m ":s 353 me = #c :alice bob")
+
+                        members =
+                            Dict.get "#c" fed.channels
+                                |> Maybe.map (.members >> Dict.keys >> List.sort)
+                    in
+                    Expect.equal (Just [ "alice" ]) members
+            , test "366 settles and a new self-join starts a fresh generation" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        settled =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice")
+                                |> (\m -> step m ":s 366 me #c :End of names")
+
+                        appended =
+                            step settled ":s 353 me = #c :bob"
+
+                        renewed =
+                            appended
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :carol")
+
+                        members m =
+                            Dict.get "#c" m.channels
+                                |> Maybe.map (.members >> Dict.keys >> List.sort)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just BurstSettled)
+                                (Maybe.map .phase (recentNamesBurst settled "#c"))
+                        , \_ -> Expect.equal (Just [ "alice", "bob" ]) (members appended)
+                        , \_ -> Expect.equal (Just [ "carol" ]) (members renewed)
+                        ]
+                        ()
+            , test "a 353 for an unknown room seeds nothing" <|
+                \_ ->
+                    let
+                        ( fed, _ ) =
+                            feed blank ":s 353 me #ghost :alice"
+                    in
+                    Expect.equal Dict.empty fed.channels
+            , test "self-part drops the burst and its throttle" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 353 me = #c :alice")
+                                |> (\m -> step m ":me!u@h PART #c")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (recentNamesBurst fed "#c")
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" fed.lastRosterRefresh)
+                        ]
+                        ()
+            , test "refresh sends NAMES once per throttle window" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        quiet =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 366 me #c :End of names")
+                                |> (\m -> { m | nowMs = 20000 })
+
+                        ( first, out1 ) =
+                            refreshChannelRoster quiet "#c"
+
+                        ( second, out2 ) =
+                            refreshChannelRoster first "#c"
+
+                        ( ghost, out3 ) =
+                            refreshChannelRoster quiet "#ghost"
+
+                        ( offline, out4 ) =
+                            refreshChannelRoster { quiet | connection = Offline } "#c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NAMES #c\r\n" ] out1
+                        , \_ ->
+                            Expect.equal
+                                (Just BurstExpect)
+                                (Maybe.map .phase (recentNamesBurst first "#c"))
+                        , \_ -> Expect.equal (Just 20000) (Dict.get "#c" first.lastRosterRefresh)
+                        , \_ -> Expect.equal [] out2
+                        , \_ -> Expect.equal [] out3
+                        , \_ -> Expect.equal [] out4
+                        , \_ -> Expect.equal quiet.channels second.channels
+                        ]
+                        ()
+            , test "the slow poll refreshes only the active room" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        rooms =
+                            { blank | nowMs = 20000 }
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":me!u@h JOIN #d")
+                                -- Age past the fixture JOINs' own burst
+                                -- TTL (15s): the oracle never stacks a
+                                -- poll NAMES on a recent burst.
+                                |> (\m -> { m | nowMs = 40000, activeChannel = Just "#d" })
+
+                        ( polled, outs ) =
+                            pollChannelRosters rooms
+
+                        ( idle, idleOuts ) =
+                            pollChannelRosters { rooms | activeChannel = Nothing }
+
+                        ( _, dmOuts ) =
+                            pollChannelRosters { rooms | activeChannel = Just "bob" }
+
+                        isRosterLine out =
+                            case out of
+                                SendLine line ->
+                                    String.startsWith "JOIN " line || String.startsWith "NAMES " line
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NAMES #d\r\n" ] outs
+                        , \_ -> Expect.equal 40000 polled.lastRosterPollMs
+                        , \_ ->
+                            Expect.equal
+                                (Just BurstExpect)
+                                (Maybe.map .phase (recentNamesBurst polled "#d"))
+                        , \_ -> Expect.equal Nothing (recentNamesBurst polled "#c")
+                        , \_ -> Expect.equal [] idleOuts
+                        , \_ -> Expect.equal 40000 idle.lastRosterPollMs
+                        , \_ -> Expect.equal [] dmOuts
+                        , \_ -> Expect.equal False (List.any isRosterLine (Tuple.second (pollChannelRosters { polled | connection = Offline })))
+                        ]
+                        ()
+            , test "001 re-JOINs live rooms on reconnect" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        rooms =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":me!u@h JOIN #d")
+                                -- Age past the fixture JOINs' own burst
+                                -- TTL so the armed bursts below prove
+                                -- the storm re-armed them.
+                                |> (\m -> { m | nowMs = 20000 })
+
+                        ( welcomed, outs ) =
+                            feed rooms ":irc.example 001 me :welcome"
+
+                        lines =
+                            sendLines outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "JOIN #c\r\n" lines)
+                        , \_ -> Expect.equal True (List.member "NAMES #c\r\n" lines)
+                        , \_ -> Expect.equal True (List.member "JOIN #d\r\n" lines)
+                        , \_ -> Expect.equal True (List.member "NAMES #d\r\n" lines)
+                        , \_ ->
+                            Expect.equal
+                                (List.repeat 2 (Just BurstExpect))
+                                (List.map (\c -> Maybe.map .phase (recentNamesBurst welcomed c)) [ "#c", "#d" ])
+                        ]
+                        ()
+            , test "001 storm is suppressed by session-sync and skips DM shells" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        rooms =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                -- Age past the fixture JOIN's own burst
+                                -- TTL so a missing burst proves
+                                -- suppression (not expiry confusion).
+                                |> (\m -> { m | nowMs = 20000 })
+
+                        dmmed =
+                            case Dict.get "#c" rooms.channels of
+                                Just shell ->
+                                    { rooms | channels = Dict.insert "bob" { shell | name = "bob" } rooms.channels }
+
+                                Nothing ->
+                                    rooms
+
+                        ( synced, syncedOuts ) =
+                            feed { rooms | caps = [ "onyx/session-sync" ] } ":irc.example 001 me :welcome"
+
+                        ( _, dmOuts ) =
+                            feed dmmed ":irc.example 001 me :welcome"
+
+                        ( _, freshOuts ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        stormLine line =
+                            String.startsWith "JOIN " line || String.startsWith "NAMES " line
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (List.filter stormLine (sendLines syncedOuts))
+                        , \_ -> Expect.equal Nothing (recentNamesBurst synced "#c")
+                        , \_ -> Expect.equal True (List.member "JOIN #c\r\n" (sendLines dmOuts))
+                        , \_ -> Expect.equal False (List.any (\l -> l == "JOIN bob\r\n" || l == "NAMES bob\r\n") (sendLines dmOuts))
+                        , \_ -> Expect.equal [] (List.filter stormLine (sendLines freshOuts))
+                        ]
+                        ()
+            , test "refocusing reconciles the active room" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        quiet =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":s 366 me #c :End of names")
+                                |> (\m -> { m | nowMs = 20000, activeChannel = Just "#c" })
+
+                        ( focused, outs ) =
+                            update (VisibilityChanged { visible = True, focused = True }) quiet
+
+                        ( hidden, noOuts ) =
+                            update (VisibilityChanged { visible = False, focused = False }) quiet
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NAMES #c\r\n" ] outs
+                        , \_ -> Expect.equal [] noOuts
+                        , \_ -> Expect.equal True focused.appFocused
+                        ]
+                        ()
+            ]
+        , describe "nick alias"
+            [ test "guest nick shapes" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal True (isGuestNick "Guest123")
+                        , \_ -> Expect.equal True (isGuestNick "GUEST9")
+                        , \_ -> Expect.equal False (isGuestNick "Guest")
+                        , \_ -> Expect.equal False (isGuestNick "guest")
+                        , \_ -> Expect.equal False (isGuestNick "guesty1")
+                        , \_ -> Expect.equal False (isGuestNick "AGuest1")
+                        , \_ -> Expect.equal True (forcedGuestRename "kai" "Guest123")
+                        , \_ -> Expect.equal False (forcedGuestRename "Guest123" "Guest456")
+                        , \_ -> Expect.equal False (forcedGuestRename "kai" "robert")
+                        ]
+                        ()
+            , test "900 sets the alias flag from nick vs account" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        aliased =
+                            step blank ":s 900 me me!u@h kai :You are now logged in"
+
+                        primary =
+                            step { blank | ourNick = "kai" } ":s 900 kai kai!u@h kai :You are now logged in"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True aliased.currentNickIsAlias
+                        , \_ -> Expect.equal (Just "kai") aliased.accountName
+                        , \_ -> Expect.equal False primary.currentNickIsAlias
+                        ]
+                        ()
+            , test "self-NICK tracks enforcement and account drift" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        authed =
+                            step blank ":s 900 me me!u@h kai :You are now logged in"
+
+                        enforced =
+                            step authed ":me!u@h NICK Guest123"
+
+                        reclaimed =
+                            step enforced ":Guest123!u@h NICK kai"
+
+                        drifting =
+                            step reclaimed ":kai!u@h NICK kai-alt"
+
+                        guestHop =
+                            step blank ":me!u@h NICK Guest123"
+
+                        guestRehop =
+                            step guestHop ":Guest123!u@h NICK Guest456"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "Guest123" enforced.ourNick
+                        , \_ -> Expect.equal True enforced.currentNickIsAlias
+                        , \_ -> Expect.equal "kai" reclaimed.ourNick
+                        , \_ -> Expect.equal False reclaimed.currentNickIsAlias
+                        , \_ -> Expect.equal True drifting.currentNickIsAlias
+                        , \_ -> Expect.equal True guestHop.currentNickIsAlias
+                        , \_ -> Expect.equal False guestRehop.currentNickIsAlias
+                        ]
+                        ()
+            , test "other nicks never touch the flag" <|
+                \_ ->
+                    let
+                        ( fed, _ ) =
+                            feed blank ":bob!u@h NICK Guest999"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False fed.currentNickIsAlias
+                        , \_ -> Expect.equal "me" fed.ourNick
+                        ]
+                        ()
+            , test "900 starts reclaim with an immediate NICK" <|
+                \_ ->
+                    let
+                        ( armed, outs ) =
+                            feed blank ":s 900 me me!u@h kai :You are now logged in"
+
+                        ( settled, settledOuts ) =
+                            feed { blank | ourNick = "kai" } ":s 900 kai kai!u@h kai :You are now logged in"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") armed.nickReclaimTarget
+                        , \_ -> Expect.equal 30000 armed.nickReclaimDueMs
+                        , \_ -> Expect.equal True (List.member (SendLine "NICK kai\r\n") outs)
+                        , \_ -> Expect.equal Nothing settled.nickReclaimTarget
+                        , \_ -> Expect.equal False (List.member (SendLine "NICK kai\r\n") settledOuts)
+                        ]
+                        ()
+            , test "reclaim retries on the Tick and stops itself" <|
+                \_ ->
+                    let
+                        base =
+                            { blank | currentNickIsAlias = True, nickReclaimTarget = Just "kai", nickReclaimDueMs = 30000 }
+
+                        ( due, dueOuts ) =
+                            fireNickReclaim { base | nowMs = 30000 }
+
+                        ( early, earlyOuts ) =
+                            fireNickReclaim { base | nowMs = 10000 }
+
+                        ( cleared, clearedOuts ) =
+                            fireNickReclaim { base | nowMs = 30000, currentNickIsAlias = False }
+
+                        ( offline, offlineOuts ) =
+                            fireNickReclaim { base | nowMs = 30000, connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] dueOuts
+                        , \_ -> Expect.equal 60000 due.nickReclaimDueMs
+                        , \_ -> Expect.equal [] earlyOuts
+                        , \_ -> Expect.equal (Just "kai") early.nickReclaimTarget
+                        , \_ -> Expect.equal Nothing cleared.nickReclaimTarget
+                        , \_ -> Expect.equal [] clearedOuts
+                        , \_ -> Expect.equal (Just "kai") offline.nickReclaimTarget
+                        , \_ -> Expect.equal [] offlineOuts
+                        ]
+                        ()
+            , test "GHOST reclaim and CERTADD emit verbatim lines when live" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "GHOST kai hunter2\r\n" ] (ghostNick live "kai" "hunter2")
+                        , \_ -> Expect.equal [] (ghostNick { blank | connection = Offline } "kai" "hunter2")
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine "GHOST kai hunter2\r\n", SendLine "NICK kai\r\n" ]
+                                (reclaimNickWithPassword live "  kai " "hunter2")
+                        , \_ -> Expect.equal [] (reclaimNickWithPassword live "   " "hunter2")
+                        , \_ -> Expect.equal [] (reclaimNickWithPassword { blank | connection = Offline } "kai" "hunter2")
+                        , \_ -> Expect.equal [ SendLine "CERTADD\r\n" ] (certAddLine live)
+                        , \_ -> Expect.equal [] (certAddLine { blank | connection = Offline })
+                        ]
+                        ()
+            , test "self-NICK and logout stop a running reclaim" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        armed =
+                            step blank ":s 900 me me!u@h kai :You are now logged in"
+
+                        renamed =
+                            step armed ":me!u@h NICK Guest123"
+
+                        loggedOut =
+                            step armed ":s 901 me me!u@h :You are now logged out"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") armed.nickReclaimTarget
+                        , \_ -> Expect.equal Nothing renamed.nickReclaimTarget
+                        , \_ -> Expect.equal True renamed.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing loggedOut.nickReclaimTarget
+                        ]
+                        ()
+            , test "001 with a SASL account flags the alias and reclaims" <|
+                \_ ->
+                    let
+                        ( welcomed, outs ) =
+                            feed { blank | saslAccount = Just "kai" } ":s 001 me :Welcome"
+
+                        ( plain, _ ) =
+                            feed blank ":s 001 me :Welcome"
+
+                        ( drifted, driftedOuts ) =
+                            feed { blank | connectNick = "kai" } ":s 001 me :Welcome"
+
+                        isNickLine out =
+                            case out of
+                                SendLine line ->
+                                    String.startsWith "NICK " line
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True welcomed.currentNickIsAlias
+                        , \_ -> Expect.equal (Just "kai") welcomed.nickReclaimTarget
+                        , \_ -> Expect.equal True (List.member (SendLine "NICK kai\r\n") outs)
+                        , \_ -> Expect.equal False plain.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing plain.nickReclaimTarget
+                        , \_ -> Expect.equal True drifted.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing drifted.nickReclaimTarget
+                        , \_ -> Expect.equal False (List.any isNickLine driftedOuts)
+                        ]
+                        ()
+            ]
+        , describe "account notify"
+            [ test "owner key comparison" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") (accountOwnerKey (Just "  KAI "))
+                        , \_ -> Expect.equal Nothing (accountOwnerKey (Just "   "))
+                        , \_ -> Expect.equal Nothing (accountOwnerKey Nothing)
+                        ]
+                        ()
+            , test "peer ACCOUNT never touches identity" <|
+                \_ ->
+                    let
+                        ( p1, outs1 ) =
+                            feed blank ":bob!u@h ACCOUNT bob"
+
+                        ( p2, outs2 ) =
+                            feed blank ":bob!u@h ACCOUNT *"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing p1.accountName
+                        , \_ -> Expect.equal False p1.currentNickIsAlias
+                        , \_ -> Expect.equal [] outs1
+                        , \_ -> Expect.equal Nothing p2.accountName
+                        , \_ -> Expect.equal [] outs2
+                        ]
+                        ()
+            , test "server-prefix and paramless ACCOUNT stay dropped" <|
+                \_ ->
+                    let
+                        ( p1, outs1 ) =
+                            feed blank ":irc.example ACCOUNT kai"
+
+                        ( p2, outs2 ) =
+                            feed blank ":me!u@h ACCOUNT"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing p1.accountName
+                        , \_ -> Expect.equal [] outs1
+                        , \_ -> Expect.equal Nothing p2.accountName
+                        , \_ -> Expect.equal [] outs2
+                        ]
+                        ()
+            , test "self ACCOUNT captures account and reclaims alias" <|
+                \_ ->
+                    let
+                        ( m1, outs ) =
+                            feed blank ":me!u@h ACCOUNT kai"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") m1.accountName
+                        , \_ -> Expect.equal True m1.currentNickIsAlias
+                        , \_ -> Expect.equal (Just "kai") m1.nickReclaimTarget
+                        , \_ -> Expect.equal True (List.member (SendLine "NICK kai\r\n") outs)
+                        ]
+                        ()
+            , test "self ACCOUNT to own nick clears alias and stops reclaim" <|
+                \_ ->
+                    let
+                        armed =
+                            { blank
+                                | accountName = Just "old"
+                                , currentNickIsAlias = True
+                                , nickReclaimTarget = Just "old"
+                            }
+
+                        ( m1, outs ) =
+                            feed armed ":me!u@h ACCOUNT me"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "me") m1.accountName
+                        , \_ -> Expect.equal False m1.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing m1.nickReclaimTarget
+                        , \_ -> Expect.equal False (List.any sendLineIsNick outs)
+                        ]
+                        ()
+            , test "self ACCOUNT star logs out and stops reclaim" <|
+                \_ ->
+                    let
+                        armed =
+                            { ownerBase
+                                | accountName = Just "old"
+                                , currentNickIsAlias = True
+                                , nickReclaimTarget = Just "old"
+                            }
+
+                        ( m1, _ ) =
+                            feed armed ":kai!u@h ACCOUNT *"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing m1.accountName
+                        , \_ -> Expect.equal False m1.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing m1.nickReclaimTarget
+                        ]
+                        ()
+            , test "owner change drops account-bound state and reloads profile" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase
+                                | accountName = Just "old"
+                                , customStatus = "hello"
+                                , customStatusExpiry = Just 5
+                                , accountSessionsPending = True
+                                , accountSessionsError = Just "x"
+                                , topicHistory = Dict.singleton "#c" [ "t" ]
+                                , outboxRetries = 3
+                                , outboxFailed = True
+                                , typingUsers = Dict.singleton "#c" Dict.empty
+                                , editHistory = Dict.singleton "k" []
+                                , historyLoading = Set.singleton "#c"
+                                , historyExhausted = Set.singleton "#c"
+                                , firstUnreadId = Dict.singleton "#c" 9
+                                , channels =
+                                    Dict.fromList
+                                        [ ( "#c", shellOf "#c" 2 1000 )
+                                        , ( "bob", shellOf "bob" 1 1000 )
+                                        ]
+                                , activeChannel = Just "bob"
+                            }
+
+                        ( m1, outs ) =
+                            feed base ":kai!u@h ACCOUNT new"
+
+                        kept =
+                            Dict.get "#c" m1.channels
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "new") m1.accountName
+                        , \_ -> Expect.equal (Just "new") m1.saslAccount
+                        , \_ -> Expect.equal True m1.currentNickIsAlias
+                        , \_ -> Expect.equal "" m1.customStatus
+                        , \_ -> Expect.equal Nothing m1.customStatusExpiry
+                        , \_ -> Expect.equal [] m1.accountSessions
+                        , \_ -> Expect.equal False m1.accountSessionsPending
+                        , \_ -> Expect.equal Nothing m1.accountSessionsError
+                        , \_ -> Expect.equal Dict.empty m1.topicHistory
+                        , \_ -> Expect.equal 0 m1.outboxRetries
+                        , \_ -> Expect.equal False m1.outboxFailed
+                        , \_ -> Expect.equal Dict.empty m1.typingUsers
+                        , \_ -> Expect.equal Dict.empty m1.editHistory
+                        , \_ -> Expect.equal Set.empty m1.historyLoading
+                        , \_ -> Expect.equal Set.empty m1.historyExhausted
+                        , \_ -> Expect.equal Dict.empty m1.firstUnreadId
+                        , \_ -> Expect.equal (Just []) (Maybe.map .messages kept)
+                        , \_ -> Expect.equal (Just 0) (Maybe.map .unread kept)
+                        , \_ -> Expect.equal False (Dict.member "bob" m1.channels)
+                        , \_ -> Expect.equal Nothing m1.activeChannel
+                        , \_ -> Expect.equal (Just "new") m1.nickReclaimTarget
+                        , \_ -> Expect.equal True (List.member (SendLine "NICK new\r\n") outs)
+                        , \_ ->
+                            Expect.equal True
+                                (List.member
+                                    (IdentityProfileRequest { serverUrl = "wss://irc.example", identity = "new" })
+                                    outs
+                                )
+                        ]
+                        ()
+            , test "same-account ACCOUNT keeps state" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase
+                                | accountName = Just "kai"
+                                , customStatus = "hi"
+                                , topicHistory = Dict.singleton "#c" [ "t" ]
+                                , identityProfileOwner = Just { serverUrl = "wss://irc.example", identity = "kai" }
+                            }
+
+                        ( m1, outs ) =
+                            feed base ":kai!u@h ACCOUNT KAI"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") m1.accountName
+                        , \_ -> Expect.equal "hi" m1.customStatus
+                        , \_ -> Expect.equal (Dict.singleton "#c" [ "t" ]) m1.topicHistory
+                        , \_ -> Expect.equal False m1.currentNickIsAlias
+                        , \_ -> Expect.equal Nothing m1.nickReclaimTarget
+                        , \_ ->
+                            Expect.equal False
+                                (List.any isIdentityProfileRequest outs)
+                        ]
+                        ()
+            ]
+        , describe "notification inbox"
+            [ test "add bounds text and validates entities" <|
+                \_ ->
+                    let
+                        added =
+                            addNotification blank
+                                { kind = NotifMention
+                                , text = "hi"
+                                , from = Just "alice"
+                                , channel = Just "#c"
+                                , topic = Just "t"
+                                }
+
+                        badEntities =
+                            addNotification blank
+                                { kind = NotifDm
+                                , text = "hi"
+                                , from = Just "not a nick"
+                                , channel = Just "no,comma"
+                                , topic = Just "ok"
+                                }
+
+                        badTopic =
+                            addNotification blank
+                                { kind = NotifSystem
+                                , text = "hi"
+                                , from = Nothing
+                                , channel = Nothing
+                                , topic = Just "a\u{0007}b"
+                                }
+
+                        dropped =
+                            addNotification blank
+                                { kind = NotifError, text = "", from = Nothing, channel = Nothing, topic = Nothing }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ { id = "notif-0", kind = NotifMention, text = "hi", from = Just "alice", channel = Just "#c", topic = Just "t", atMs = 0 } ]
+                                added.notifications
+                        , \_ -> Expect.equal 1 added.notifSeq
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .from (List.head badEntities.notifications))
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .channel (List.head badEntities.notifications))
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .topic (List.head badTopic.notifications))
+                        , \_ -> Expect.equal [] dropped.notifications
+                        , \_ -> Expect.equal 0 dropped.notifSeq
+                        ]
+                        ()
+            , test "list keeps the newest fifty and prunes reads" <|
+                \_ ->
+                    let
+                        note n =
+                            { kind = NotifSystem, text = "t" ++ String.fromInt n, from = Nothing, channel = Nothing, topic = Nothing }
+
+                        filled =
+                            List.foldl (\n acc -> addNotification acc (note n)) blank (List.range 1 55)
+
+                        texts =
+                            List.map .text filled.notifications
+
+                        pruned =
+                            { filled | readNotificationIds = Set.singleton "notif-0" }
+                                |> (\m -> addNotification m (note 56))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 50 (List.length filled.notifications)
+                        , \_ -> Expect.equal "notif-5" (Maybe.withDefault "" (Maybe.map .id (List.head filled.notifications)))
+                        , \_ -> Expect.equal "notif-54" (Maybe.withDefault "" (Maybe.map .id (List.head (List.reverse filled.notifications))))
+                        , \_ -> Expect.equal False (List.member "t1" texts)
+                        , \_ -> Expect.equal True (List.member "t55" texts)
+                        , \_ -> Expect.equal Set.empty pruned.readNotificationIds
+                        ]
+                        ()
+            , test "dismiss and read semantics" <|
+                \_ ->
+                    let
+                        two =
+                            addNotification (addNotification blank { kind = NotifError, text = "a", from = Nothing, channel = Nothing, topic = Nothing }) { kind = NotifError, text = "b", from = Nothing, channel = Nothing, topic = Nothing }
+
+                        read =
+                            markNotificationRead two "notif-0"
+
+                        reread =
+                            markNotificationRead read "notif-0"
+
+                        unknownRead =
+                            markNotificationRead two "notif-9"
+
+                        dismissed =
+                            dismissNotification read "notif-0"
+
+                        unknownDismiss =
+                            dismissNotification two "notif-9"
+
+                        allRead =
+                            markAllNotificationsRead two
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Set.singleton "notif-0") read.readNotificationIds
+                        , \_ -> Expect.equal (Set.singleton "notif-0") reread.readNotificationIds
+                        , \_ -> Expect.equal Set.empty unknownRead.readNotificationIds
+                        , \_ -> Expect.equal [ "notif-1" ] (List.map .id dismissed.notifications)
+                        , \_ -> Expect.equal Set.empty dismissed.readNotificationIds
+                        , \_ -> Expect.equal 2 (List.length unknownDismiss.notifications)
+                        , \_ -> Expect.equal (Set.fromList [ "notif-0", "notif-1" ]) allRead.readNotificationIds
+                        ]
+                        ()
+            , test "only attention rows badge" <|
+                \_ ->
+                    let
+                        add kind text acc =
+                            addNotification acc { kind = kind, text = text, from = Nothing, channel = Nothing, topic = Nothing }
+
+                        mixed =
+                            blank
+                                |> add NotifMention "m"
+                                |> add NotifDm "d"
+                                |> add NotifFollow "f"
+                                |> add NotifSystem "s"
+                                |> add NotifError "e"
+
+                        readMention =
+                            markNotificationRead mixed "notif-0"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 3 (unreadAttentionCount mixed)
+                        , \_ -> Expect.equal 2 (unreadAttentionCount readMention)
+                        , \_ -> Expect.equal "alice in #c" (notificationContext { id = "x", kind = NotifMention, text = "t", from = Just "alice", channel = Just "#c", topic = Nothing, atMs = 0 })
+                        , \_ -> Expect.equal "Error" (notificationContext { id = "x", kind = NotifError, text = "t", from = Nothing, channel = Nothing, topic = Nothing, atMs = 0 })
+                        , \_ -> Expect.equal "Mention" (notificationKindLabel NotifMention)
+                        , \_ -> Expect.equal "!" (notificationKindGlyph NotifError)
+                        ]
+                        ()
+            , test "nick errors land in the inbox" <|
+                \_ ->
+                    let
+                        registering =
+                            { blank | connection = Registering }
+
+                        ( bad, _ ) =
+                            feed registering ":s 432 me bad!nick :Erroneous"
+
+                        ( unavailable, _ ) =
+                            feed registering ":s 437 me bad :Unavailable"
+
+                        ( exhausted, _ ) =
+                            feed registering ":s 433 me taken :In use"
+
+                        ( retrying, retryOut ) =
+                            feed { registering | nickAliases = [ "kai" ] } ":s 433 me taken :In use"
+
+                        ( live, _ ) =
+                            feed { blank | connection = Live } ":s 433 me taken :In use"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "Erroneous nickname: bad!nick" ] (List.map .text bad.notifications)
+                        , \_ -> Expect.equal [ "Nick/channel temporarily unavailable" ] (List.map .text unavailable.notifications)
+                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text exhausted.notifications)
+                        , \_ -> Expect.equal [] retrying.notifications
+                        , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] retryOut
+                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text live.notifications)
+                        ]
+                        ()
+            , test "activation navigates from the live record" <|
+                \_ ->
+                    let
+                        mentioned =
+                            addNotification
+                                { blank | channels = Dict.singleton "#c" (shellOf "#c" 0 -1) }
+                                { kind = NotifMention, text = "hey", from = Just "alice", channel = Just "#c", topic = Nothing }
+
+                        dmed =
+                            addNotification blank
+                                { kind = NotifDm, text = "yo", from = Just "bob", channel = Nothing, topic = Nothing }
+
+                        system =
+                            addNotification blank
+                                { kind = NotifSystem, text = "note", from = Nothing, channel = Nothing, topic = Nothing }
+
+                        ( opened, _ ) =
+                            update (NotificationActivated "notif-0") mentioned
+
+                        ( dmOpened, _ ) =
+                            update (NotificationActivated "notif-0") dmed
+
+                        ( sysOpened, sysOuts ) =
+                            update (NotificationActivated "notif-0") system
+
+                        ( stale, staleOuts ) =
+                            update (NotificationActivated "notif-9") mentioned
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "#c") opened.activeChannel
+                        , \_ -> Expect.equal (Set.singleton "notif-0") opened.readNotificationIds
+                        , \_ -> Expect.equal False opened.showNotificationCenter
+                        , \_ -> Expect.equal (Just "bob") dmOpened.activeChannel
+                        , \_ -> Expect.equal (Set.singleton "notif-0") sysOpened.readNotificationIds
+                        , \_ -> Expect.equal [] sysOuts
+                        , \_ -> Expect.equal mentioned stale
+                        , \_ -> Expect.equal [] staleOuts
+                        ]
+                        ()
+            , test "account switch clears the inbox" <|
+                \_ ->
+                    let
+                        loaded =
+                            addNotification { ownerBase | accountName = Just "old" }
+                                { kind = NotifError, text = "x", from = Nothing, channel = Nothing, topic = Nothing }
+
+                        opened =
+                            { loaded | showNotificationCenter = True }
+
+                        ( switched, _ ) =
+                            feed opened ":kai!u@h ACCOUNT new"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] switched.notifications
+                        , \_ -> Expect.equal Set.empty switched.readNotificationIds
+                        , \_ -> Expect.equal False switched.showNotificationCenter
+                        ]
+                        ()
+            , test "center open resets the filter" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update NotificationCenterOpened { blank | inboxFilter = InboxOther }
+
+                        ( closed, _ ) =
+                            update NotificationCenterClosed { blank | showNotificationCenter = True }
+
+                        ( filtered, _ ) =
+                            update (InboxFilterSet InboxOther) blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True opened.showNotificationCenter
+                        , \_ -> Expect.equal InboxAll opened.inboxFilter
+                        , \_ -> Expect.equal False closed.showNotificationCenter
+                        , \_ -> Expect.equal InboxOther filtered.inboxFilter
+                        ]
+                        ()
+            ]
+        , describe "ban desk"
+            [ test "moderator status" <|
+                \_ ->
+                    let
+                        withModes modes =
+                            { blank
+                                | channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = modes, away = False } })
+                            }
+
+                        opped =
+                            withModes (Set.singleton 'o')
+
+                        voiced =
+                            withModes (Set.singleton 'v')
+
+                        plain =
+                            withModes Set.empty
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (isChannelOp { opped | isOper = True } "#nope")
+                        , \_ -> Expect.equal True (isChannelOp opped "#c")
+                        , \_ -> Expect.equal True (isChannelOp opped "#C")
+                        , \_ -> Expect.equal False (isChannelOp voiced "#c")
+                        , \_ -> Expect.equal False (isChannelOp plain "#c")
+                        , \_ -> Expect.equal False (isChannelOp blank "#c")
+                        , \_ -> Expect.equal False (isChannelOp opped "#other")
+                        ]
+                        ()
+            , test "review request gates on live plus op" <|
+                \_ ->
+                    let
+                        opped =
+                            { blank
+                                | connection = Live
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                            }
+
+                        ( staged, _ ) =
+                            update (UnbanReviewRequested { channel = "#c", mask = "m" }) opped
+
+                        ( offline, _ ) =
+                            update (UnbanReviewRequested { channel = "#c", mask = "m" }) { opped | connection = Offline }
+
+                        ( voiced, _ ) =
+                            update (UnbanReviewRequested { channel = "#c", mask = "m" }) blank
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { channel = "#c", mask = "m", account = Nothing, endpoint = Nothing })
+                                staged.pendingUnban
+                        , \_ -> Expect.equal Nothing offline.pendingUnban
+                        , \_ -> Expect.equal Nothing voiced.pendingUnban
+                        ]
+                        ()
+            , test "confirm sends MODE minus-b on fresh authority" <|
+                \_ ->
+                    let
+                        opped =
+                            { blank
+                                | connection = Live
+                                , accountName = Just "kai"
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                                , pendingUnban = Just { channel = "#c", mask = "*!*@bad", account = Just "kai", endpoint = Nothing }
+                            }
+
+                        ( lifted, outs ) =
+                            update UnbanReviewConfirmed opped
+
+                        ( cancelled, _ ) =
+                            update UnbanReviewCancelled opped
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing lifted.pendingUnban
+                        , \_ -> Expect.equal [ SendLine "MODE #c -b *!*@bad\r\n" ] outs
+                        , \_ -> Expect.equal Nothing cancelled.pendingUnban
+                        ]
+                        ()
+            , test "stale authority drops the lift" <|
+                \_ ->
+                    let
+                        opped =
+                            { blank
+                                | connection = Live
+                                , accountName = Just "kai"
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                                , pendingUnban = Just { channel = "#c", mask = "m", account = Just "kai", endpoint = Nothing }
+                            }
+
+                        ( switched, switchedOuts ) =
+                            update UnbanReviewConfirmed { opped | accountName = Just "other" }
+
+                        ( dropped, droppedOuts ) =
+                            update UnbanReviewConfirmed { opped | connection = Offline }
+
+                        demoted =
+                            { opped | channels = Dict.singleton "#c" (shellOf "#c" 0 -1) }
+
+                        ( lostOp, lostOpOuts ) =
+                            update UnbanReviewConfirmed demoted
+
+                        ( idle, idleOuts ) =
+                            update UnbanReviewConfirmed blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing switched.pendingUnban
+                        , \_ -> Expect.equal [] switchedOuts
+                        , \_ -> Expect.equal Nothing dropped.pendingUnban
+                        , \_ -> Expect.equal [] droppedOuts
+                        , \_ -> Expect.equal Nothing lostOp.pendingUnban
+                        , \_ -> Expect.equal [] lostOpOuts
+                        , \_ -> Expect.equal [] idleOuts
+                        ]
+                        ()
+            , test "disconnect clears a pending review" <|
+                \_ ->
+                    let
+                        staged =
+                            { blank | pendingUnban = Just { channel = "#c", mask = "m", account = Nothing, endpoint = Nothing } }
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = True, reason = "test" }) staged
+                    in
+                    Expect.equal Nothing closed.pendingUnban
+            , test "opening a moderated room loads its block list" <|
+                \_ ->
+                    let
+                        opped =
+                            { blank
+                                | connection = Live
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                            }
+
+                        ( _, openOuts ) =
+                            update (ChannelSelect "#c") opped
+
+                        ( _, quietOuts ) =
+                            update (ChannelSelect "#c") { blank | connection = Live }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (SendLine "MODE #c +b\r\n") openOuts)
+                        , \_ -> Expect.equal False (List.member (SendLine "MODE #c +b\r\n") quietOuts)
+                        ]
+                        ()
+            , test "a fresh op grant loads bans for the open room" <|
+                \_ ->
+                    let
+                        plain =
+                            { blank
+                                | connection = Live
+                                , activeChannel = Just "#c"
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.empty, away = False } })
+                            }
+
+                        ( _, granted ) =
+                            feed plain ":alice!u@h MODE #c +o me"
+
+                        ( _, peerGrant ) =
+                            feed plain ":alice!u@h MODE #c +o bob"
+
+                        background =
+                            { plain
+                                | activeChannel = Just "#other"
+                                , channels =
+                                    Dict.insert "#other" (shellOf "#other" 0 -1) plain.channels
+                            }
+
+                        ( _, backgroundGrant ) =
+                            feed background ":alice!u@h MODE #c +o me"
+
+                        ( _, offlineGrant ) =
+                            feed { plain | connection = Offline } ":alice!u@h MODE #c +o me"
+
+                        ( _, operGrant ) =
+                            feed plain ":s MODE me +o"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (SendLine "MODE #c +b\r\n") granted)
+                        , \_ -> Expect.equal False (List.member (SendLine "MODE #c +b\r\n") peerGrant)
+                        , \_ -> Expect.equal False (List.any sendLineIsModePlusB backgroundGrant)
+                        , \_ -> Expect.equal False (List.any sendLineIsModePlusB offlineGrant)
+                        , \_ -> Expect.equal True (List.member (SendLine "MODE #c +b\r\n") operGrant)
+                        ]
+                        ()
+            , test "repeat grants and demotions stay quiet" <|
+                \_ ->
+                    let
+                        opped =
+                            { blank
+                                | connection = Live
+                                , activeChannel = Just "#c"
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                            }
+
+                        ( _, again ) =
+                            feed opped ":alice!u@h MODE #c +o me"
+
+                        ( demoted, demotedOuts ) =
+                            feed opped ":alice!u@h MODE #c -o me"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (List.any sendLineIsModePlusB again)
+                        , \_ -> Expect.equal False (isChannelOp demoted "#c")
+                        , \_ -> Expect.equal False (List.any sendLineIsModePlusB demotedOuts)
+                        ]
+                        ()
+            , test "registration with a moderated room open loads bans" <|
+                \_ ->
+                    let
+                        viewing =
+                            { blank
+                                | activeChannel = Just "#c"
+                                , channels =
+                                    Dict.singleton "#c"
+                                        (let base = shellOf "#c" 0 -1 in { base | members = Dict.singleton "me" { nick = "me", modes = Set.singleton 'o', away = False } })
+                            }
+
+                        ( _, outs ) =
+                            feed viewing ":s 001 me :Welcome"
+
+                        ( _, quiet ) =
+                            feed { blank | activeChannel = Just "#c" } ":s 001 me :Welcome"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.any sendLineIsModePlusB outs)
+                        , \_ -> Expect.equal False (List.any sendLineIsModePlusB quiet)
+                        ]
+                        ()
+            ]
+        , describe "topic history"
+            [ test "TOPIC and 332 record newest-first without duplicates" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":alice!u@h TOPIC #c :first")
+                                |> (\m -> step m ":s 332 me #c :second")
+                                |> (\m -> step m ":alice!u@h TOPIC #c :first")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ "first", "second" ]) (Dict.get "#c" fed.topicHistory)
+                        , \_ -> Expect.equal "first" (Maybe.withDefault "" (Maybe.map .topic (Dict.get "#c" fed.channels)))
+                        ]
+                        ()
+            , test "history records for unjoined rooms but seeds no membership" <|
+                \_ ->
+                    let
+                        ( fed, _ ) =
+                            feed blank ":s 332 me #ghost :spooky"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ "spooky" ]) (Dict.get "#ghost" fed.topicHistory)
+                        , \_ -> Expect.equal Nothing (Dict.get "#ghost" fed.channels)
+                        ]
+                        ()
+            , test "per-room history caps at ten newest" <|
+                \_ ->
+                    let
+                        fed =
+                            List.foldl
+                                (\i acc -> Tuple.first (feed acc (":alice!u@h TOPIC #c :t" ++ String.fromInt i)))
+                                (Tuple.first (feed blank ":me!u@h JOIN #c"))
+                                (List.range 1 12)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just [ "t12", "t11", "t10", "t9", "t8", "t7", "t6", "t5", "t4", "t3" ])
+                                (Dict.get "#c" fed.topicHistory)
+                        ]
+                        ()
+            , test "blank topics and bad rooms never record" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        fed =
+                            blank
+                                |> (\m -> step m ":me!u@h JOIN #c")
+                                |> (\m -> step m ":alice!u@h TOPIC #c :")
+                                |> (\m -> step m ":s 332 me #c :  ")
+                                |> (\m -> step m ":s 332 me notachan :nope")
+                    in
+                    Expect.equal Dict.empty fed.topicHistory
+            , test "stored history loads bounded" <|
+                \_ ->
+                    let
+                        load raw =
+                            case Decode.decodeString Decode.value raw of
+                                Ok value ->
+                                    parseTopicHistoryValue value
+
+                                Err _ ->
+                                    Dict.empty
+
+                        dupeKeys =
+                            load "{\"#C\":[\"old\"],\"#c\":[\"new\"]}"
+
+                        manyTopics =
+                            load "{\"#c\":[\"t1\",\"t2\",\"t3\",\"t4\",\"t5\",\"t6\",\"t7\",\"t8\",\"t9\",\"t10\",\"t11\",\"t1\"]}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Dict.empty (load "[1,2]")
+                        , \_ -> Expect.equal Dict.empty (load "\"nope\"")
+                        , \_ -> Expect.equal Dict.empty (load "{\"notachan\":[\"x\"],\"#c\":[]}")
+                        , \_ -> Expect.equal (Just [ "new" ]) (Dict.get "#c" dupeKeys)
+                        , \_ ->
+                            Expect.equal
+                                (Just [ "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10" ])
+                                (Dict.get "#c" manyTopics)
+                        , \_ ->
+                            Expect.equal Dict.empty
+                                (load "{\"#c\":[\"  \",\"a\u{0007}9b\",5]}")
+                        ]
+                        ()
+            , test "records persist under the current owner only" <|
+                \_ ->
+                    let
+                        ( _, ownedOuts ) =
+                            feed ownerBase ":alice!u@h TOPIC #c :hello"
+
+                        ( _, bareOuts ) =
+                            feed blank ":alice!u@h TOPIC #c :hello"
+
+                        isTopicSave out =
+                            case out of
+                                TopicHistorySave req ->
+                                    req.serverUrl == "wss://irc.example" && req.identity == "kai"
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.any isTopicSave ownedOuts)
+                        , \_ -> Expect.equal False (List.any isTopicSave bareOuts)
+                        ]
+                        ()
+            , test "loaded history replaces the live map" <|
+                \_ ->
+                    let
+                        parseJson raw =
+                            case Decode.decodeString Decode.value raw of
+                                Ok value ->
+                                    parseTopicHistoryValue value
+
+                                Err _ ->
+                                    Dict.empty
+
+                        seeded =
+                            { blank | topicHistory = Dict.singleton "#old" [ "stale" ] }
+
+                        ( replaced, _ ) =
+                            case Decode.decodeString Decode.value "{\"#c\":[\"fresh\"]}" of
+                                Ok value ->
+                                    update (TopicHistoryLoaded value) seeded
+
+                                Err _ ->
+                                    ( seeded, [] )
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Dict.singleton "#c" [ "fresh" ]) replaced.topicHistory
+                        , \_ -> Expect.equal Dict.empty (parseJson "[1]")
+                        , \_ -> Expect.equal Dict.empty (parseJson "{invalid}")
+                        ]
+                        ()
+            , test "registration requests the owner history" <|
+                \_ ->
+                    let
+                        ( _, ownedOuts ) =
+                            feed ownerBase ":s 001 kai :Welcome"
+
+                        ( _, bareOuts ) =
+                            feed blank ":s 001 me :Welcome"
+
+                        isTopicRequest out =
+                            case out of
+                                TopicHistoryRequest _ ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.any isTopicRequest ownedOuts)
+                        , \_ -> Expect.equal False (List.any isTopicRequest bareOuts)
+                        ]
+                        ()
+            ]
+        , describe "session roster"
+            [ test "SessionListRequested sends SESSION LIST and resets the accumulator" <|
+                \_ ->
+                    let
+                        seeded =
+                            { rosterAuthed
+                                | accountSessionsPending = False
+                                , accountSessionsError = Just "stale"
+                            }
+
+                        ( m, out ) =
+                            update SessionListRequested seeded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
+                        , \_ -> Expect.equal True m.accountSessionsPending
+                        , \_ -> Expect.equal Nothing m.accountSessionsError
+                        ]
+                        ()
+            , test "SessionListRequested without an authed socket surfaces the sign-in error" <|
+                \_ ->
+                    let
+                        ( guest, guestOut ) =
+                            update SessionListRequested blank
+
+                        ( offline, offlineOut ) =
+                            update SessionListRequested { blank | connection = Offline, accountName = Just "alice" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] guestOut
+                        , \_ -> Expect.equal (Just "Sign in to list sessions.") guest.accountSessionsError
+                        , \_ -> Expect.equal False guest.accountSessionsPending
+                        , \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal (Just "Sign in to list sessions.") offline.accountSessionsError
+                        ]
+                        ()
+            , test "LIST rows accumulate sorted by index and clear the error" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed rosterAuthed ":irc.example NOTICE me :SESSION LIST - #2 signon=1710000100 detached"
+
+                        ( m2, _ ) =
+                            feed m1 ":irc.example NOTICE me :SESSION LIST * #1 signon=1710000000 attached"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ 1, 2 ] (List.map .index m2.accountSessions)
+                        , \_ -> Expect.equal [ True, False ] (List.map .current m2.accountSessions)
+                        , \_ -> Expect.equal Nothing m2.accountSessionsError
+                        ]
+                        ()
+            , test "end of session list clears pending without an error" <|
+                \_ ->
+                    let
+                        waiting =
+                            { rosterAuthed | accountSessionsPending = True }
+
+                        ( m, out ) =
+                            feed waiting ":irc.example NOTICE me :SESSION: end of session list"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False m.accountSessionsPending
+                        , \_ -> Expect.equal Nothing m.accountSessionsError
+                        , \_ -> Expect.equal [] out
+                        ]
+                        ()
+            , test "DROP ok removes the row and refreshes the list" <|
+                \_ ->
+                    let
+                        seeded =
+                            { rosterAuthed
+                                | accountSessions =
+                                    [ { index = 1, current = True, signonMs = 1, state = Session.Attached, sid = Nothing }
+                                    , { index = 2, current = False, signonMs = 2, state = Session.Detached, sid = Nothing }
+                                    ]
+                                , accountSessionsPending = True
+                            }
+
+                        ( m, out ) =
+                            feed seeded ":irc.example NOTICE me :SESSION DROP #2 ok"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ 1 ] (List.map .index m.accountSessions)
+                        , \_ -> Expect.equal False m.accountSessionsPending
+                        , \_ -> Expect.equal Nothing m.accountSessionsError
+                        , \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
+                        ]
+                        ()
+            , test "sid-form DROP success keeps rows and still refreshes" <|
+                \_ ->
+                    let
+                        seeded =
+                            { rosterAuthed | accountSessionsPending = True }
+
+                        ( m, out ) =
+                            feed seeded ":irc.example NOTICE me :SESSION DROP sid=0123456789abcdef0123456789abcdef ok"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] m.accountSessions
+                        , \_ -> Expect.equal False m.accountSessionsPending
+                        , \_ -> Expect.equal [ SendLine "SESSION LIST\r\n" ] out
+                        ]
+                        ()
+            , test "free-form SESSION errors surface with a 200-unit bound" <|
+                \_ ->
+                    let
+                        waiting =
+                            { rosterAuthed | accountSessionsPending = True }
+
+                        ( m1, _ ) =
+                            feed waiting ":irc.example NOTICE me :SESSION: no such session"
+
+                        longBody =
+                            "SESSION: " ++ String.repeat 300 "x"
+
+                        ( m2, _ ) =
+                            feed waiting (":irc.example NOTICE me :" ++ longBody)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "SESSION: no such session") m1.accountSessionsError
+                        , \_ -> Expect.equal False m1.accountSessionsPending
+                        , \_ -> Expect.equal (Just (String.slice 0 200 longBody)) m2.accountSessionsError
+                        ]
+                        ()
+            , test "FAIL SESSION text surfaces as a roster error" <|
+                \_ ->
+                    let
+                        ( m, _ ) =
+                            feed { rosterAuthed | accountSessionsPending = True }
+                                ":irc.example NOTICE me :FAIL SESSION NO_SESSION"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "FAIL SESSION NO_SESSION") m.accountSessionsError
+                        , \_ -> Expect.equal False m.accountSessionsPending
+                        ]
+                        ()
+            , test "peer and channel NOTICEs can never rewrite the roster" <|
+                \_ ->
+                    let
+                        waiting =
+                            { rosterAuthed | accountSessionsPending = True }
+
+                        ( m1, _ ) =
+                            feed waiting ":alice!u@h NOTICE me :SESSION LIST * #9 signon=1710000000 attached"
+
+                        ( m2, _ ) =
+                            feed waiting ":irc.example NOTICE #c :SESSION: end of session list"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] m1.accountSessions
+                        , \_ -> Expect.equal True m1.accountSessionsPending
+                        , \_ -> Expect.equal True m2.accountSessionsPending
+                        ]
+                        ()
+            , test "SessionDropRequested refuses the current connection" <|
+                \_ ->
+                    let
+                        seeded =
+                            { rosterAuthed
+                                | accountSessions =
+                                    [ { index = 1, current = True, signonMs = 1, state = Session.Attached, sid = Nothing } ]
+                            }
+
+                        ( m, out ) =
+                            update (SessionDropRequested { index = 1 }) seeded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal (Just "Cannot drop this connection — sign out instead.") m.accountSessionsError
+                        ]
+                        ()
+            , test "SessionDropRequested prefers the physical sid and falls back to the ordinal" <|
+                \_ ->
+                    let
+                        seeded =
+                            { rosterAuthed
+                                | accountSessions =
+                                    [ { index = 2, current = False, signonMs = 2, state = Session.Detached, sid = Just "abcdef0123456789abcdef0123456789" } ]
+                            }
+
+                        ( withSid, sidOut ) =
+                            update (SessionDropRequested { index = 2 }) seeded
+
+                        ( _, missingOut ) =
+                            update (SessionDropRequested { index = 7 }) rosterAuthed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "SESSION DROP sid=abcdef0123456789abcdef0123456789\r\n" ] sidOut
+                        , \_ -> Expect.equal True withSid.accountSessionsPending
+                        , \_ -> Expect.equal [ SendLine "SESSION DROP #7\r\n" ] missingOut
+                        ]
+                        ()
+            , test "SessionDropRequested stays silent offline, guest, or with a bad index" <|
+                \_ ->
+                    let
+                        ( guest, guestOut ) =
+                            update (SessionDropRequested { index = 2 }) blank
+
+                        ( offline, offlineOut ) =
+                            update (SessionDropRequested { index = 2 }) { blank | connection = Offline, accountName = Just "alice" }
+
+                        ( bad, badOut ) =
+                            update (SessionDropRequested { index = 0 }) rosterAuthed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] guestOut
+                        , \_ -> Expect.equal Nothing guest.accountSessionsError
+                        , \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal [] badOut
+                        , \_ -> Expect.equal False bad.accountSessionsPending
+                        ]
+                        ()
+            ]
+        , describe "saved searches"
+            [ test "rows replace the list and hostile rows never land" <|
+                \_ ->
+                    let
+                        good =
+                            searchRow "ss-1" "Morning" "hello" "exact" 1000
+
+                        badMode =
+                            searchRow "ss-2" "Bad" "x" "fuzzy" 1000
+
+                        badId =
+                            searchRow "ss-\u{0000}3" "Bad" "x" "exact" 1000
+
+                        future =
+                            searchRow "ss-4" "Future" "x" "hybrid" 100000000000
+
+                        missing =
+                            Encode.object [ ( "id", Encode.string "ss-5" ) ]
+
+                        ( m1, _ ) =
+                            update (SearchRowsReceived { rows = [ good, badMode, badId, future, missing ], status = "ok" }) blank
+                    in
+                    Expect.equal [ "ss-1" ] (List.map .id m1.savedSearches)
+            , test "unavailable store keeps the last known rows" <|
+                \_ ->
+                    let
+                        seeded =
+                            { blank | savedSearches = [ { id = "ss-1", label = "A", query = "q", mode = ExactMode, createdAt = 1000 } ] }
+
+                        ( m1, _ ) =
+                            update (SearchRowsReceived { rows = [], status = "unavailable" }) seeded
+                    in
+                    Expect.equal [ "ss-1" ] (List.map .id m1.savedSearches)
+            , test "saved rows upsert by id and null saves nothing" <|
+                \_ ->
+                    let
+                        seeded =
+                            { blank | savedSearches = [ { id = "ss-1", label = "A", query = "q", mode = ExactMode, createdAt = 1000 } ] }
+
+                        replacement =
+                            searchRow "ss-1" "A2" "q2" "hybrid" 2000
+
+                        addition =
+                            searchRow "ss-9" "B" "qb" "semantic" 3000
+
+                        ( m1, _ ) =
+                            update (SearchSavedReceived { search = replacement }) seeded
+
+                        ( m2, _ ) =
+                            update (SearchSavedReceived { search = addition }) m1
+
+                        ( m3, _ ) =
+                            update (SearchSavedReceived { search = Encode.null }) m2
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "ss-1" ] (List.map .id m1.savedSearches)
+                        , \_ -> Expect.equal (Just "A2") (List.head (List.map .label m1.savedSearches))
+                        , \_ -> Expect.equal [ "ss-9", "ss-1" ] (List.map .id m2.savedSearches)
+                        , \_ -> Expect.equal m2.savedSearches m3.savedSearches
+                        ]
+                        ()
+            , test "delete and clear fold verified answers only" <|
+                \_ ->
+                    let
+                        seeded =
+                            { blank
+                                | savedSearches =
+                                    [ { id = "ss-1", label = "A", query = "q", mode = ExactMode, createdAt = 1000 }
+                                    , { id = "ss-2", label = "B", query = "q", mode = ExactMode, createdAt = 1000 }
+                                    ]
+                            }
+
+                        ( m1, _ ) =
+                            update (SearchDeletedReceived { id = "ss-1", deleted = True }) seeded
+
+                        ( m2, _ ) =
+                            update (SearchDeletedReceived { id = "ss-2", deleted = False }) m1
+
+                        ( m3, _ ) =
+                            update (SearchClearedReceived { cleared = True }) m2
+
+                        ( m4, _ ) =
+                            update (SearchClearedReceived { cleared = False }) seeded
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "ss-2" ] (List.map .id m1.savedSearches)
+                        , \_ -> Expect.equal [ "ss-2" ] (List.map .id m2.savedSearches)
+                        , \_ -> Expect.equal [] m3.savedSearches
+                        , \_ -> Expect.equal seeded.savedSearches m4.savedSearches
+                        ]
+                        ()
+            , test "export downloads snapshots and empty answers nothing" <|
+                \_ ->
+                    let
+                        ( _, outbound ) =
+                            update (SearchExportedReceived { json = "{\"kind\":\"onyx-saved-searches\"}" }) blank
+
+                        ( _, emptyOutbound ) =
+                            update (SearchExportedReceived { json = "" }) blank
+
+                        ( _, importOutbound ) =
+                            update (SearchImportFile { json = "{\"kind\":\"x\"}" }) blank
+
+                        ( _, importEmpty ) =
+                            update (SearchImportFile { json = "  " }) blank
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ SearchDownload { filename = "onyx-saved-searches.json", json = "{\"kind\":\"onyx-saved-searches\"}" } ]
+                                outbound
+                        , \_ -> Expect.equal [] emptyOutbound
+                        , \_ ->
+                            Expect.equal
+                                [ SearchImport { json = "{\"kind\":\"x\"}" } ]
+                                importOutbound
+                        , \_ -> Expect.equal [] importEmpty
+                        ]
+                        ()
+            , test "change notices adopt newer revisions and re-list once" <|
+                \_ ->
+                    let
+                        ( m1, outbound ) =
+                            update (SearchChanged { revision = 3, reason = "save", count = 1 }) blank
+
+                        ( m2, outbound2 ) =
+                            update (SearchChanged { revision = 3, reason = "save", count = 1 }) m1
+
+                        ( m3, outbound3 ) =
+                            update (SearchChanged { revision = 2, reason = "delete", count = 0 }) m1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 3 m1.savedSearchRevision
+                        , \_ -> Expect.equal [ SearchListRequest ] outbound
+                        , \_ -> Expect.equal [] outbound2
+                        , \_ -> Expect.equal [] outbound3
+                        , \_ -> Expect.equal 3 m3.savedSearchRevision
+                        ]
+                        ()
+            ]
+        , describe "group control plane"
+            [ test "FAIL E2EEGROUP surfaces the eligibility matrix" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":s FAIL E2EEGROUP TARGET_UNAVAILABLE :no such device"
+
+                        ( m2, _ ) =
+                            feed blank ":s WARN E2EEGROUP TEMPORARILY_UNAVAILABLE :try later"
+
+                        ( m3, _ ) =
+                            feed blank ":s FAIL E2EEGROUP BOGUS :unknown"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "Group encryption: the target device is unavailable (TARGET_UNAVAILABLE)." ]
+                                m1.serviceLog
+                        , \_ ->
+                            Expect.equal
+                                [ "Group encryption: group encryption is temporarily unavailable (TEMPORARILY_UNAVAILABLE)." ]
+                                m2.serviceLog
+                        , \_ ->
+                            Expect.equal
+                                [ "Group encryption: unexpected response BOGUS." ]
+                                m3.serviceLog
+                        ]
+                        ()
+            , test "unlocked delivery logs routing metadata only" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank (":Alice!alice@localhost E2EE.COMMIT #secure alice phone :" ++ groupPayload)
+                    in
+                    Expect.equal
+                        [ "Received group commit for #secure from alice." ]
+                        m1.serviceLog
+            , test "locked delivery withholds the payload" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":Alice!alice@localhost E2EE.COMMIT #secure alice phone :AQIDBA"
+                    in
+                    Expect.equal
+                        [ "Locked group commit for #secure (unreadable payload); payload withheld." ]
+                        m1.serviceLog
+            , test "non-delivery dotted lines stay silent" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":s !!! ???"
+                    in
+                    Expect.equal [] m1.serviceLog
+            , test "unlocked delivery requests a ports install exactly once" <|
+                \_ ->
+                    let
+                        line =
+                            ":Alice!alice@localhost E2EE.COMMIT #secure alice phone :" ++ groupPayload
+
+                        ( m1, out1 ) =
+                            feed blank line
+
+                        ( _, out2 ) =
+                            feed m1 line
+
+                        installs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        GroupControlInstall args ->
+                                            Just args
+
+                                        _ ->
+                                            Nothing
+                                )
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ { channel = "#secure"
+                                  , kind = "commit"
+                                  , fromAccount = "alice"
+                                  , fromDevice = "phone"
+                                  , toAccount = Nothing
+                                  , toDevice = Nothing
+                                  , payload = groupPayload
+                                  , epoch = 1
+                                  , signerB64 = Base64Url.encode (List.repeat 32 9)
+                                  , localAccount = "me"
+                                  , endpoint = Nothing
+                                  }
+                                ]
+                                (installs out1)
+                        , \_ -> Expect.equal [] (installs out2)
+                        , \_ -> Expect.equal True (Set.member "#secure|1" m1.groupControlInFlight)
+                        ]
+                        ()
+            , test "verified signature parks the room as directory-pending" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank (":Alice!alice@localhost E2EE.COMMIT #secure alice phone :" ++ groupPayload)
+
+                        ( m2, _ ) =
+                            update
+                                (GroupControlVerified
+                                    { channel = "#secure"
+                                    , epoch = 1
+                                    , signerB64 = Base64Url.encode (List.repeat 32 9)
+                                    , fromAccount = "alice"
+                                    , fromDevice = "phone"
+                                    , signatureValid = True
+                                    , toAccount = Nothing
+                                    , toDevice = Nothing
+                                    , kind = "commit"
+                                    , payload = groupPayload
+                                    , trust = "pinned"
+                                    }
+                                )
+                                m1
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomDirectoryPending, epoch = Just 1 })
+                                (Dict.get "#secure" m2.groupRooms)
+                        , \_ ->
+                            Expect.equal
+                                "Group control signature verified for #secure; signer trust pending."
+                                (Maybe.withDefault "" (List.head m2.serviceLog))
+                        , \_ -> Expect.equal False (Set.member "#secure|1" m2.groupControlInFlight)
+                        ]
+                        ()
+            , test "failed verification rejects without touching keys" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank (":Alice!alice@localhost E2EE.COMMIT #secure alice phone :" ++ groupPayload)
+
+                        ( m2, _ ) =
+                            update
+                                (GroupControlVerified
+                                    { channel = "#secure"
+                                    , epoch = 1
+                                    , signerB64 = Base64Url.encode (List.repeat 32 9)
+                                    , fromAccount = "alice"
+                                    , fromDevice = "phone"
+                                    , signatureValid = False
+                                    , toAccount = Nothing
+                                    , toDevice = Nothing
+                                    , kind = "commit"
+                                    , payload = groupPayload
+                                    , trust = "pinned"
+                                    }
+                                )
+                                m1
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomRejected, epoch = Nothing })
+                                (Dict.get "#secure" m2.groupRooms)
+                        , \_ ->
+                            Expect.equal
+                                "Group control record for #secure failed verification; ignored."
+                                (Maybe.withDefault "" (List.head m2.serviceLog))
+                        ]
+                        ()
+            , test "stale verdicts never move the projection backwards" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update
+                                (GroupControlVerified
+                                    { channel = "#secure"
+                                    , epoch = 2
+                                    , signerB64 = "s"
+                                    , fromAccount = "alice"
+                                    , fromDevice = "phone"
+                                    , signatureValid = True
+                                    , toAccount = Nothing
+                                    , toDevice = Nothing
+                                    , kind = "commit"
+                                    , payload = groupPayload
+                                    , trust = "pinned"
+                                    }
+                                )
+                                blank
+
+                        ( m2, _ ) =
+                            update
+                                (GroupControlVerified
+                                    { channel = "#secure"
+                                    , epoch = 1
+                                    , signerB64 = "s"
+                                    , fromAccount = "alice"
+                                    , fromDevice = "phone"
+                                    , signatureValid = False
+                                    , toAccount = Nothing
+                                    , toDevice = Nothing
+                                    , kind = "commit"
+                                    , payload = groupPayload
+                                    , trust = "pinned"
+                                    }
+                                )
+                                m1
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomDirectoryPending, epoch = Just 2 })
+                                (Dict.get "#secure" m2.groupRooms)
+                        , \_ -> Expect.equal 1 (List.length m2.serviceLog)
+                        ]
+                        ()
+            ]
+        , describe "group directory"
+            [ test "001 learns the server prefix first-wins" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 ":evil.example 001 me :welcome"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "irc.example") m1.serverPrefix
+                        , \_ -> Expect.equal (Just "irc.example") m2.serverPrefix
+                        ]
+                        ()
+            , test "trusted snapshots collect and complete outside chat" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+                        ( m3, _ ) =
+                            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=1"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "welcome" ] m2.serviceLog
+                        , \_ ->
+                            Expect.equal (Just 1)
+                                (Maybe.map (List.length << .rows) (Dict.get "alice" m2.groupCollectors))
+                        , \_ ->
+                            Expect.equal (Just 1)
+                                (Maybe.map List.length (Dict.get "alice" m3.groupDirectory))
+                        , \_ -> Expect.equal True (Dict.isEmpty m3.groupCollectors)
+                        ]
+                        ()
+            , test "untrusted prefixes stay on the chat path" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank (":evil.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.isEmpty m1.groupCollectors)
+                        , \_ -> Expect.equal True (Dict.isEmpty m1.groupDirectory)
+                        ]
+                        ()
+            , test "count mismatch fails the snapshot with a log" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+                        ( m3, _ ) =
+                            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=2"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "Group directory snapshot for alice failed.", "welcome" ]
+                                m3.serviceLog
+                        , \_ -> Expect.equal True (Dict.isEmpty m3.groupCollectors)
+                        , \_ -> Expect.equal True (Dict.isEmpty m3.groupDirectory)
+                        ]
+                        ()
+            , test "snapshot completion requests ports derivation" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+                        ( _, out3 ) =
+                            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=1"
+
+                        derives =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        GroupDirectoryDerive args ->
+                                            Just args
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out3
+                    in
+                    Expect.equal
+                        [ { account = "alice"
+                          , rows = [ { deviceId = "phone", publicKey = oddWire } ]
+                          }
+                        ]
+                        derives
+            , test "derivation marks trust and admits pending rooms" <|
+                \_ ->
+                    let
+                        signer =
+                            Base64Url.encode (1 :: List.repeat 31 0)
+
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+                        ( m3, _ ) =
+                            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=1"
+
+                        ( m4, _ ) =
+                            update
+                                (GroupControlVerified
+                                    { channel = "#secure"
+                                    , epoch = 1
+                                    , signerB64 = signer
+                                    , fromAccount = "alice"
+                                    , fromDevice = "phone"
+                                    , signatureValid = True
+                                    , toAccount = Nothing
+                                    , toDevice = Nothing
+                                    , kind = "commit"
+                                    , payload = groupPayload
+                                    , trust = "pinned"
+                                    }
+                                )
+                                m3
+
+                        ( m5, _ ) =
+                            update
+                                (GroupDirectoryDerived
+                                    { account = "alice"
+                                    , rows =
+                                        [ { deviceId = "phone"
+                                          , directoryKey = Just signer
+                                          , derivedId = Just "ogc1-test"
+                                          , trusted = True
+                                          }
+                                        ]
+                                    }
+                                )
+                                m4
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomDirectoryPending, epoch = Just 1 })
+                                (Dict.get "#secure" m4.groupRooms)
+                        , \_ -> Expect.equal True (Dict.member "#secure" m4.groupPending)
+                        , \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomControlApplied, epoch = Just 1 })
+                                (Dict.get "#secure" m5.groupRooms)
+                        , \_ -> Expect.equal False (Dict.member "#secure" m5.groupPending)
+                        , \_ ->
+                            Expect.equal
+                                "Group encryption active for #secure."
+                                (Maybe.withDefault "" (List.head m5.serviceLog))
+                        ]
+                        ()
+            , test "admitted commit and welcome pair ready" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (verifiedRecord "commit" groupPayload Nothing Nothing "pinned") admittedModel
+
+                        ( m2, out2 ) =
+                            update (verifiedRecord "welcome" welcomePayload (Just "Bob") (Just "tablet") "pinned") m1
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                "Group encryption active for #secure."
+                                (Maybe.withDefault "" (List.head m1.serviceLog))
+                        , \_ ->
+                            -- A foreign pair (no account/device identity on
+                            -- `blank`) never opens: admission still logs,
+                            -- but no pair log and no ports request follow.
+                            Expect.equal
+                                "Group control signature verified for #secure; signer trust pending."
+                                (Maybe.withDefault "" (List.head m2.serviceLog))
+                        , \_ -> Expect.equal [] out2
+                        , \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomControlApplied, epoch = Just 1 })
+                                (Dict.get "#secure" m2.groupRooms)
+                        ]
+                        ()
+            , test "exact replays coalesce silently" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (verifiedRecord "commit" groupPayload Nothing Nothing "pinned") admittedModel
+
+                        logCount =
+                            List.length m1.serviceLog
+
+                        ( m2, _ ) =
+                            update (verifiedRecord "commit" groupPayload Nothing Nothing "pinned") m1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal logCount (List.length m2.serviceLog)
+                        , \_ -> Expect.equal True (Dict.isEmpty m2.groupPending)
+                        ]
+                        ()
+            , test "conflicting commits quarantine and reject" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update (verifiedRecord "commit" groupPayload Nothing Nothing "pinned") admittedModel
+
+                        ( m2, _ ) =
+                            update (verifiedRecord "commit" altPayload Nothing Nothing "pinned") m1
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                "Conflicting group records for #secure; quarantined."
+                                (Maybe.withDefault "" (List.head m2.serviceLog))
+                        , \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomRejected, epoch = Just 1 })
+                                (Dict.get "#secure" m2.groupRooms)
+                        ]
+                        ()
+            , test "verdicts for unknown accounts touch nothing" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            update
+                                (GroupDirectoryDerived
+                                    { account = "bob"
+                                    , rows =
+                                        [ { deviceId = "tablet"
+                                          , directoryKey = Just "s"
+                                          , derivedId = Just "ogc1-test"
+                                          , trusted = True
+                                          }
+                                        ]
+                                    }
+                                )
+                                blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (Dict.isEmpty m1.groupDirectory)
+                        , \_ -> Expect.equal [] m1.serviceLog
+                        ]
+                        ()
+            , test "WsOpened learns the endpoint first-wins and scopes installs" <|
+                \_ ->
+                    let
+                        offline =
+                            { blank | connection = Offline }
+
+                        ( m1, _ ) =
+                            update (WsOpened { url = "wss://a.example" }) offline
+
+                        ( m2, _ ) =
+                            update (WsOpened { url = "wss://b.example" }) m1
+
+                        ( _, out3 ) =
+                            feed m1 (":Alice!alice@localhost E2EE.COMMIT #secure alice phone :" ++ groupPayload)
+
+                        endpoints =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        GroupControlInstall args ->
+                                            Just args.endpoint
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out3
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "wss://a.example") m1.endpoint
+                        , \_ -> Expect.equal (Just "wss://a.example") m2.endpoint
+                        , \_ -> Expect.equal [ Just "wss://a.example" ] endpoints
+                        ]
+                        ()
+            , test "pin verdicts gate admission" <|
+                \_ ->
+                    let
+                        verdict trust =
+                            GroupControlVerified
+                                { channel = "#secure"
+                                , epoch = 1
+                                , signerB64 = Base64Url.encode (List.repeat 32 9)
+                                , fromAccount = "alice"
+                                , fromDevice = "phone"
+                                , signatureValid = True
+                                , toAccount = Nothing
+                                , toDevice = Nothing
+                                , kind = "commit"
+                                , payload = groupPayload
+                                , trust = trust
+                                }
+
+                        ( changed, _ ) =
+                            update (verdict "key-changed") blank
+
+                        ( removed, _ ) =
+                            update (verdict "device-absent") blank
+
+                        ( unavailable, _ ) =
+                            update (verdict "weird-future-value") blank
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                (Just { status = GroupControl.RoomRejected, epoch = Nothing })
+                                (Dict.get "#secure" changed.groupRooms)
+                        , \_ ->
+                            Expect.equal
+                                "Group device key for alice/phone changed; control record ignored."
+                                (Maybe.withDefault "" (List.head changed.serviceLog))
+                        , \_ -> Expect.equal False (Dict.member "#secure" changed.groupPending)
+                        , \_ ->
+                            Expect.equal
+                                "Group device phone for alice was removed; control record ignored."
+                                (Maybe.withDefault "" (List.head removed.serviceLog))
+                        , \_ ->
+                            Expect.equal
+                                "Group signer store unavailable; control record for #secure ignored."
+                                (Maybe.withDefault "" (List.head unavailable.serviceLog))
+                        ]
+                        ()
+            , test "FAIL E2EEKEY needs the trusted prefix" <|
+                \_ ->
+                    let
+                        ( m1, _ ) =
+                            feed blank ":irc.example 001 me :welcome"
+
+                        ( m2, _ ) =
+                            feed m1 ":irc.example FAIL E2EEKEY NO_SUCH_ACCOUNT :missing"
+
+                        ( m3, _ ) =
+                            feed m1 ":evil.example FAIL E2EEKEY NO_SUCH_ACCOUNT :missing"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "Group directory: NO_SUCH_ACCOUNT.", "welcome" ]
+                                m2.serviceLog
+                        , \_ -> Expect.equal [ "welcome" ] m3.serviceLog
+                        ]
+                        ()
+            , describe "group publisher"
+                [ test "four-param 900 sets the account and requests identity; short 900 is ignored" <|
+                    \_ ->
+                        let
+                            ( m2, out2 ) =
+                                feed publisherBase ":irc.example 900 me nick!u@h Alice :You are now logged in as Alice"
+
+                            ( m3, out3 ) =
+                                feed publisherBase ":irc.example 900 me :odd error"
+                        in
+                        Expect.all
+                            [ \_ -> Expect.equal (Just "alice") m2.accountName
+                            , \_ -> Expect.equal True (List.member GroupPublisherProject out2)
+                            , \_ -> Expect.equal Nothing m3.accountName
+                            , \_ -> Expect.equal False (List.member GroupPublisherProject out3)
+                            ]
+                            ()
+                , test "a verified projection sends E2EEKEY ADD and schedules the retry" <|
+                    \_ ->
+                        let
+                            ( m3, out3 ) =
+                                update (GroupPublisherIdentity (Just testProjection)) publisherArmed
+                        in
+                        Expect.all
+                            [ \_ -> Expect.equal GroupPublisher.Sent m3.publisher.status
+                            , \_ -> Expect.equal True (List.member GroupPublisherRetryAfter out3)
+                            , \_ ->
+                                Expect.equal True
+                                    (List.any
+                                        (\o ->
+                                            case o of
+                                                SendLine line ->
+                                                    String.startsWith
+                                                        ("E2EEKEY ADD " ++ testProjection.deviceId ++ " onyx-ogc1-v1 ")
+                                                        line
+
+                                                _ ->
+                                                    False
+                                        )
+                                        out3
+                                    )
+                            ]
+                            ()
+                , test "the ADDED confirm acks silently; strangers stay on the log path" <|
+                    \_ ->
+                        let
+                            ( m4, out4 ) =
+                                feed publisherSent (":irc.example NOTICE me :E2EEKEY ADDED id=" ++ testProjection.deviceId ++ " alg=onyx-ogc1-v1")
+
+                            ( m5, _ ) =
+                                feed publisherSent ":irc.example NOTICE me :E2EEKEY ADDED id=ogc1-XXXXXXXXXXXXXXXXXXXXXX alg=onyx-ogc1-v1"
+                        in
+                        Expect.all
+                            [ \_ -> Expect.equal GroupPublisher.ServerAckObserved m4.publisher.status
+                            , \_ -> Expect.equal [ "welcome" ] m4.serviceLog
+                            , \_ -> Expect.equal [] out4
+                            , \_ -> Expect.equal GroupPublisher.Sent m5.publisher.status
+                            , \_ -> Expect.equal 2 (List.length m5.serviceLog)
+                            ]
+                            ()
+                , test "FAIL while sent belongs to the publisher: transient retries, terminal latches" <|
+                    \_ ->
+                        let
+                            ( m4, out4 ) =
+                                feed publisherSent ":irc.example FAIL E2EEKEY STORE_FAILED :durable hiccup"
+
+                            ( m5, out5 ) =
+                                update GroupPublisherRetry m4
+
+                            ( m6, out6 ) =
+                                feed publisherSent ":irc.example FAIL E2EEKEY DEVICE_REVOKED :gone"
+
+                            ( m7, out7 ) =
+                                -- An aliased 900 reclaims the account
+                                -- nick at once; nothing else may escape
+                                -- this publisher-failure vector.
+                                feed m6 ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
+                        in
+                        Expect.all
+                            [ \_ -> Expect.equal (Just GroupPublisher.ServerTransient) m4.publisher.failure
+                            , \_ -> Expect.equal [ "welcome" ] m4.serviceLog
+                            , \_ -> Expect.equal True (List.member GroupPublisherRetryAfter out4)
+                            , \_ -> Expect.equal 2 m5.publisher.attempts
+                            , \_ -> Expect.equal True (List.any isAddLine out5)
+                            , \_ -> Expect.equal (Just GroupPublisher.ServerRejected) m6.publisher.failure
+                            , \_ -> Expect.equal [] out6
+                            , \_ -> Expect.equal [ SendLine "NICK alice\r\n" ] out7
+                            ]
+                            ()
+                , test "socket close invalidates the pending publication" <|
+                    \_ ->
+                        let
+                            ( m4, _ ) =
+                                update (WsClosed { clean = True, reason = "bye" }) publisherSent
+                        in
+                        Expect.equal GroupPublisher.Inactive m4.publisher.status
+                , describe "group welcome open"
+                    [ test "a ready pair for our device requests the welcome open" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( m2, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "ALICE") (Just testProjection.deviceId) "pinned") m1
+
+                                opens =
+                                    List.filterMap
+                                        (\o ->
+                                            case o of
+                                                GroupWelcomeOpen args ->
+                                                    Just args
+
+                                                _ ->
+                                                    Nothing
+                                        )
+                                        out2
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal 1 (List.length opens)
+                                , \_ ->
+                                    Expect.equal
+                                        (Just
+                                            { key = GroupControl.pairBaseKey "#secure" "alice" "phone" 1
+                                            , room = "#secure"
+                                            , fromAccount = "alice"
+                                            , fromDevice = "phone"
+                                            , toAccount = "ALICE"
+                                            , toDevice = testProjection.deviceId
+                                            , epoch = 1
+                                            , commitIdB64 = Base64Url.encode (1 :: List.repeat 31 0)
+                                            , membershipB64 = Base64Url.encode (2 :: List.repeat 31 0)
+                                            , commitmentB64 = Base64Url.encode (3 :: List.repeat 31 0)
+                                            , welcomeB64 = testWelcomeB64
+                                            }
+                                        )
+                                        (List.head opens)
+                                , \_ ->
+                                    Expect.equal
+                                        "Opening group welcome for #secure (epoch 1)."
+                                        (Maybe.withDefault "" (List.head m2.serviceLog))
+                                ]
+                                ()
+                    , test "a foreign welcome never opens" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( _, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just "ogc1-xxxxxxxxxxxxxxxxxxxxxx") "pinned") m1
+                            in
+                            Expect.equal [] out2
+                    , test "a successful install advances the projection and records the epoch" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( m2, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just testProjection.deviceId) "pinned") m1
+
+                                key =
+                                    case openKeys out2 of
+                                        k :: _ ->
+                                            k
+
+                                        _ ->
+                                            ""
+
+                                ( m3, out3 ) =
+                                    update (GroupWelcomeOpened { key = key, room = "#secure", epoch = 1, ok = True, reason = "" }) m2
+                            in
+                            Expect.all
+                                [ \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomControlApplied, epoch = Just 1 })
+                                        (Dict.get "#secure" m3.groupRooms)
+                                , \_ -> Expect.equal 1 (installedGroupEpoch m3 "#secure")
+                                , \_ -> Expect.equal [] out3
+                                , \_ ->
+                                    Expect.equal
+                                        "Group encryption active for #secure (epoch 1)."
+                                        (Maybe.withDefault "" (List.head m3.serviceLog))
+                                ]
+                                ()
+                    , test "a failed open rejects the room; locked stays locked" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( m2, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just testProjection.deviceId) "pinned") m1
+
+                                key =
+                                    case openKeys out2 of
+                                        k :: _ ->
+                                            k
+
+                                        _ ->
+                                            ""
+
+                                ( m3, _ ) =
+                                    update (GroupWelcomeOpened { key = key, room = "#secure", epoch = 1, ok = False, reason = "commitment-mismatch" }) m2
+
+                                ( m4, _ ) =
+                                    update (GroupWelcomeOpened { key = key, room = "#secure", epoch = 1, ok = False, reason = "recipient-key-unavailable" }) m2
+                            in
+                            Expect.all
+                                [ \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomRejected, epoch = Just 1 })
+                                        (Dict.get "#secure" m3.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomControlApplied, epoch = Just 1 })
+                                        (Dict.get "#secure" m4.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        "Group welcome for #secure cannot open yet; locked."
+                                        (Maybe.withDefault "" (List.head m4.serviceLog))
+                                ]
+                                ()
+                    ]
+                ]
+            ]
+        , describe "raw slash fallthrough"
+            [ test "text conveniences expand, everything else passes through" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "¯\\_(ツ)_/¯" (expandSlashTextCommand "/shrug")
+                        , \_ -> Expect.equal "¯\\_(ツ)_/¯ still shipping" (expandSlashTextCommand "/shrug still shipping")
+                        , \_ -> Expect.equal "¯\\_(ツ)_/¯ x" (expandSlashTextCommand "/SHRUG   x")
+                        , \_ -> Expect.equal "(╯°□°）╯︵ ┻━┻" (expandSlashTextCommand "/tableflip")
+                        , \_ -> Expect.equal "( ͡° ͜ʖ ͡°) hi" (expandSlashTextCommand "/lenny  hi")
+                        , \_ -> Expect.equal "¯\\_(ツ)_/¯ x" (expandSlashTextCommand "/shrug\tx")
+                        , \_ -> Expect.equal "/me waves" (expandSlashTextCommand "/me waves")
+                        , \_ -> Expect.equal "/ shrug" (expandSlashTextCommand "/ shrug")
+                        , \_ -> Expect.equal "/" (expandSlashTextCommand "/")
+                        , \_ -> Expect.equal "hello" (expandSlashTextCommand "hello")
+                        , \_ -> Expect.equal "/unknown x" (expandSlashTextCommand "/unknown x")
+                        ]
+                        ()
+            , test "unhandled verbs go out as raw uppercase IRC" <|
+                \_ ->
+                    let
+                        send text =
+                            Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = text })
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
+                        , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
+                        , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
+                        , \_ -> Expect.equal [ SendLine "MSG bob hi\r\n" ] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
+                        , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
+                        ]
+                        ()
+            , test "unhandled verbs clear the draft" <|
+                \_ ->
+                    let
+                        ( sent, _ ) =
+                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/away Gone" }
+                    in
+                    Expect.equal "" sent.composer
+            , test "expanded text sends as an ordinary message" <|
+                \_ ->
+                    let
+                        ( sent, out ) =
+                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/shrug still shipping" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :¯\\_(ツ)_/¯ still shipping\r\n") out)
+                        , \_ -> Expect.equal "" sent.composer
+                        ]
+                        ()
+            , test "offline slash refuses with the draft kept" <|
+                \_ ->
+                    let
+                        ( refused, out ) =
+                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", connection = Offline, composer = "/join #elsewhere" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") refused.composerError
+                        , \_ -> Expect.equal "/join #elsewhere" refused.composer
+                        , \_ -> Expect.equal [] out
+                        ]
+                        ()
+            , test "offline expanded text still queues" <|
+                \_ ->
+                    let
+                        ( _, out ) =
+                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", connection = Offline, composer = "/shrug hi" }
+                    in
+                    Expect.equal [ OutboxQueue { target = "#c", text = "¯\\_(ツ)_/¯ hi" } ] out
+            , test "offline guard precedes local verbs" <|
+                \_ ->
+                    let
+                        ( ran, out ) =
+                            update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", connection = Offline, composer = "/star #c" }
+                    in
+                    -- Even a purely local verb refuses offline: the
+                    -- composer never reaches the store dispatch.
+                    Expect.all
+                        [ \_ -> Expect.equal "/star #c" ran.composer
+                        , \_ -> Expect.equal (Just "Commands can't be queued. Reconnect to run this command.") ran.composerError
+                        , \_ -> Expect.equal [] out
+                        ]
+                        ()
+            ]
+        , describe "authoritative channel modes and creation time"
+            [ test "bounded stamps accept the ceiling and reject junk" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 1767225600) (parseBoundedUnix "1767225600")
+                        , \_ -> Expect.equal (Just 0) (parseBoundedUnix "0")
+                        , \_ -> Expect.equal (Just 4102444800) (parseBoundedUnix "4102444800")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "007")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "-5")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "+5")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "12x")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "4102444801")
+                        , \_ -> Expect.equal Nothing (parseBoundedUnix "99999999999999999999")
+                        ]
+                        ()
+            , test "329 seeds creation ms silently on known rooms only" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #c"
+
+                        ( stamped, stampOut ) =
+                            feed joined ":irc.example 329 me #c 1767225600"
+
+                        ( strange, strangeOut ) =
+                            feed blank ":irc.example 329 me #ghost 1767225600"
+
+                        ( bad, badOut ) =
+                            feed joined ":irc.example 329 me #c banana"
+
+                        ( zero, _ ) =
+                            feed joined ":irc.example 329 me #c 0"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 1767225600000) (Maybe.andThen .createdAt (Dict.get "#c" stamped.channels))
+                        , \_ -> Expect.equal [] stampOut
+                        , \_ -> Expect.equal False (Dict.member "#ghost" strange.channels)
+                        , \_ -> Expect.equal [] strangeOut
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .createdAt (Dict.get "#c" bad.channels))
+                        , \_ -> Expect.equal [] badOut
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .createdAt (Dict.get "#c" zero.channels))
+                        ]
+                        ()
+            , test "324 rebuilds modes from empty without seeding" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #c"
+
+                        ( flagged, _ ) =
+                            feed joined ":irc.example MODE #c +nt"
+
+                        ( rebuilt, rebuiltOut ) =
+                            feed flagged ":irc.example 324 me #c +m"
+
+                        ( keyed, _ ) =
+                            feed joined ":irc.example 324 me #c +l 10"
+
+                        ( strange, strangeOut ) =
+                            feed blank ":irc.example 324 me #ghost +nt"
+
+                        bare =
+                            Tuple.first (feed flagged ":irc.example 324 me #c")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "+m") (Maybe.map .modes (Dict.get "#c" rebuilt.channels))
+                        , \_ -> Expect.equal [] rebuiltOut
+                        , \_ -> Expect.equal (Just "+l 10") (Maybe.map .modes (Dict.get "#c" keyed.channels))
+                        , \_ -> Expect.equal False (Dict.member "#ghost" strange.channels)
+                        , \_ -> Expect.equal [] strangeOut
+                        , \_ -> Expect.equal (Just "") (Maybe.map .modes (Dict.get "#c" bare.channels))
+                        ]
+                        ()
+            ]
+        , describe "latency probe and LUSERS"
+            [ test "lusers counts parse like the oracle" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 12) (parseLusersCount "users" "There are 12 users and 3 invisible on 2 servers")
+                        , \_ -> Expect.equal (Just 2) (parseLusersCount "servers" "There are 12 users and 3 invisible on 2 servers")
+                        , \_ -> Expect.equal Nothing (parseLusersCount "users" "no counts here")
+                        , \_ -> Expect.equal (Just 7) (parseLusersCount "users" "abc07  users")
+                        , \_ -> Expect.equal (Just 5) (parseLusersCount "users" "users: 5 users")
+                        , \_ -> Expect.equal Nothing (parseLusersCount "users" "12 Users")
+                        , \_ -> Expect.equal Nothing (parseLusersCount "users" "100users")
+                        , \_ -> Expect.equal (Just 100) (parseLusersCount "users" "100 users")
+                        ]
+                        ()
+            , test "lenient ints mirror parseInt" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 12) (parseLenientInt "12")
+                        , \_ -> Expect.equal (Just 12) (parseLenientInt "  12abc")
+                        , \_ -> Expect.equal (Just (-3)) (parseLenientInt "-3")
+                        , \_ -> Expect.equal (Just 0) (parseLenientInt "0x12")
+                        , \_ -> Expect.equal (Just 0) (parseLenientInt "0")
+                        , \_ -> Expect.equal Nothing (parseLenientInt "")
+                        , \_ -> Expect.equal Nothing (parseLenientInt "abc")
+                        ]
+                        ()
+            , test "251/252/254 merge over zeroed axes, 255 stays silent" <|
+                \_ ->
+                    let
+                        ( users, usersOut ) =
+                            feed blank ":irc.example 251 me :There are 12 users and 3 invisible on 2 servers"
+
+                        ( opers, opersOut ) =
+                            feed blank ":irc.example 252 me 4 :operator(s) online"
+
+                        ( chans, _ ) =
+                            feed users ":irc.example 254 me 9 :channels formed"
+
+                        ( silent, silentOut ) =
+                            feed blank ":irc.example 255 me :extra"
+
+                        ( missing, _ ) =
+                            feed blank ":irc.example 252 me"
+
+                        ( junk, _ ) =
+                            feed blank ":irc.example 252 me banana"
+
+                        ( quiet, _ ) =
+                            feed blank ":irc.example 251 me :nothing to see here"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal { users = 12, channels = 0, servers = 2, opers = 0 } users.serverStats
+                        , \_ -> Expect.equal [] usersOut
+                        , \_ -> Expect.equal { users = 0, channels = 0, servers = 0, opers = 4 } opers.serverStats
+                        , \_ -> Expect.equal [] opersOut
+                        , \_ -> Expect.equal { users = 12, channels = 9, servers = 2, opers = 0 } chans.serverStats
+                        , \_ -> Expect.equal emptyServerStats silent.serverStats
+                        , \_ -> Expect.equal [] silentOut
+                        , \_ -> Expect.equal { users = 0, channels = 0, servers = 0, opers = 0 } missing.serverStats
+                        , \_ -> Expect.equal emptyServerStats junk.serverStats
+                        , \_ -> Expect.equal emptyServerStats quiet.serverStats
+                        , \_ -> Expect.equal [] quiet.serviceLog
+                        ]
+                        ()
+            , test "probe fires on the Tick cadence, single-flight" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | nowMs = 100000 }
+
+                        ( armed, armedOut ) =
+                            update (Tick (Time.millisToPosix 100000)) live
+
+                        ( fired, firedOut ) =
+                            update (Tick (Time.millisToPosix 100000)) { armed | lastPingAt = 10000 }
+
+                        ( again, againOut ) =
+                            update (Tick (Time.millisToPosix 100001)) fired
+
+                        ( down, downOut ) =
+                            update (Tick (Time.millisToPosix 200000)) { fired | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 100000 armed.lastPingAt
+                        , \_ -> Expect.equal [] armedOut
+                        , \_ -> Expect.equal (Just { cookie = "lat-100000", sentAt = 100000 }) fired.pingPending
+                        , \_ -> Expect.equal [ SendLine "PING lat-100000\r\n" ] firedOut
+                        , \_ -> Expect.equal [] againOut
+                        , \_ -> Expect.equal Nothing down.pingPending
+                        , \_ -> Expect.equal [] downOut
+                        ]
+                        ()
+            , test "matching PONG samples RTT and keeps history at sixty" <|
+                \_ ->
+                    let
+                        probe =
+                            { blank
+                                | pingPending = Just { cookie = "lat-100000", sentAt = 100000 }
+                                , nowMs = 100042
+                                , latencyHistory = List.repeat 60 9
+                            }
+
+                        ( sampled, sampledOut ) =
+                            feed probe ":irc.example PONG :lat-100000"
+
+                        ( strange, _ ) =
+                            feed { probe | nowMs = 100050 } ":irc.example PONG :lat-999"
+
+                        ( plain, _ ) =
+                            feed probe ":irc.example PONG"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 42) sampled.latencyMs
+                        , \_ -> Expect.equal Nothing sampled.pingPending
+                        , \_ -> Expect.equal 60 (List.length sampled.latencyHistory)
+                        , \_ -> Expect.equal (Just 42) (List.head (List.reverse sampled.latencyHistory))
+                        , \_ -> Expect.equal True (List.member PingObserved sampledOut)
+                        , \_ -> Expect.equal (Just { cookie = "lat-100000", sentAt = 100000 }) strange.pingPending
+                        , \_ -> Expect.equal Nothing strange.latencyMs
+                        , \_ -> Expect.equal (Just { cookie = "lat-100000", sentAt = 100000 }) plain.pingPending
+                        ]
+                        ()
+            , test "batch receipt stamps the clock for inter-tick folds" <|
+                \_ ->
+                    let
+                        probe =
+                            { blank
+                                | pingPending = Just { cookie = "lat-100000", sentAt = 100000 }
+                                , nowMs = 100000
+                            }
+
+                        ( sampled, _ ) =
+                            update
+                                (WsBatchReceived { at = 100042, lines = [ ":irc.example PONG :lat-100000" ] })
+                                probe
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 42) sampled.latencyMs
+                        , \_ -> Expect.equal 100042 sampled.nowMs
+                        ]
+                        ()
+            ]
+        , describe "scheduled queue actions"
+            [ test "schedule admits through fence then add" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase | nowMs = 1000 }
+
+                        tag =
+                            "sched-1000-1"
+
+                        owner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        ( requested, out1 ) =
+                            update (ScheduleMessage { channel = "  #c  ", text = "later", sendAt = 5000 }) base
+
+                        fenceReqs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledFenceRequest r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out1
+
+                        ( fenced, out2 ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) requested
+
+                        addReqs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledAddRequest r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out2
+
+                        ( added, out3 ) =
+                            update (ScheduledAddResult { id = tag, ok = True }) fenced
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { tag = tag, owner = owner } ] fenceReqs
+                        , \_ -> Expect.equal 1 (List.length addReqs)
+                        , \_ -> Expect.equal [ Just 0 ] (List.map .expectedEpoch addReqs)
+                        , \_ -> Expect.equal [ Just 0 ] (List.map .expectedGeneration addReqs)
+                        , \_ -> Expect.equal 1 (List.length added.scheduledMessages)
+                        , \_ -> Expect.equal (Just "#c") (Maybe.map .channel (List.head added.scheduledMessages))
+                        , \_ -> Expect.equal (Just owner) (Maybe.andThen .owner (List.head added.scheduledMessages))
+                        , \_ -> Expect.equal True (List.any isScheduledSave out3)
+                        , \_ -> Expect.equal [] added.toasts
+                        , \_ -> Expect.equal [] added.scheduledInflight
+                        , \_ -> Expect.equal 1 (List.length (ownedScheduledMessages added))
+                        ]
+                        ()
+            , test "fence and add refusals drop silently" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase | nowMs = 1000 }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( requested, _ ) =
+                            update (ScheduleMessage { channel = "#c", text = "x", sendAt = 5000 }) base
+
+                        ( refused, refusedOut ) =
+                            update (ScheduledFenceResult { tag = tag, ok = False, epoch = 0, generation = 0 }) requested
+
+                        ( moved, movedOut ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 })
+                                { requested | accountName = Just "alice" }
+
+                        ( fenced, _ ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) requested
+
+                        ( addRefused, addRefusedOut ) =
+                            update (ScheduledAddResult { id = tag, ok = False }) fenced
+
+                        ( addMoved, addMovedOut ) =
+                            update (ScheduledAddResult { id = tag, ok = True })
+                                { fenced | accountName = Just "alice" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] refused.scheduledMessages
+                        , \_ -> Expect.equal [] refusedOut
+                        , \_ -> Expect.equal [] refused.toasts
+                        , \_ -> Expect.equal [] moved.scheduledMessages
+                        , \_ -> Expect.equal [] movedOut
+                        , \_ -> Expect.equal [] addRefused.scheduledMessages
+                        , \_ -> Expect.equal [] addRefusedOut
+                        , \_ -> Expect.equal [] addMoved.scheduledMessages
+                        , \_ -> Expect.equal [] addMovedOut
+                        ]
+                        ()
+            , test "required rooms and designated DMs refuse before storing" <|
+                \_ ->
+                    let
+                        baseProps =
+                            blank.props
+
+                        requiredProps =
+                            { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] }
+
+                        ( refusedRoom, refusedRoomOut ) =
+                            update
+                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 5 })
+                                { ownerBase | props = requiredProps }
+
+                        designatedBase =
+                            { ownerBase | peerKeyChanges = Set.singleton "bob" }
+
+                        ( refusedDm, refusedDmOut ) =
+                            update
+                                (ScheduleMessage { channel = "bob", text = "x", sendAt = 5 })
+                                designatedBase
+
+                        ( plainDm, plainDmOut ) =
+                            update
+                                (ScheduleMessage { channel = "bob", text = "x", sendAt = 5 })
+                                ownerBase
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] refusedRoom.scheduledMessages
+                        , \_ -> Expect.equal [] refusedRoomOut
+                        , \_ -> Expect.equal [ "Encrypted room messages can't be scheduled" ] (List.map .title refusedRoom.toasts)
+                        , \_ -> Expect.equal [] refusedDm.scheduledMessages
+                        , \_ -> Expect.equal [] refusedDmOut
+                        , \_ -> Expect.equal [ "Encrypted DMs can't be scheduled" ] (List.map .title refusedDm.toasts)
+                        , \_ -> Expect.equal [] plainDm.scheduledMessages
+                        , \_ -> Expect.equal 1 (List.length plainDm.scheduledInflight)
+                        , \_ -> Expect.equal True (List.any isScheduledFenceRequest plainDmOut)
+                        ]
+                        ()
+            , test "missing owner and malformed rows refuse silently" <|
+                \_ ->
+                    let
+                        ( noOwner, noOwnerOut ) =
+                            update
+                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 5 })
+                                blank
+
+                        ( blankText, _ ) =
+                            update
+                                (ScheduleMessage { channel = "#c", text = "   ", sendAt = 5 })
+                                ownerBase
+
+                        ( badTime, _ ) =
+                            update
+                                (ScheduleMessage { channel = "#c", text = "x", sendAt = 0 })
+                                ownerBase
+
+                        ( badTarget, _ ) =
+                            update
+                                (ScheduleMessage { channel = "has space", text = "x", sendAt = 5 })
+                                ownerBase
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] noOwner.scheduledMessages
+                        , \_ -> Expect.equal [] noOwnerOut
+                        , \_ -> Expect.equal [] noOwner.toasts
+                        , \_ -> Expect.equal [] blankText.scheduledMessages
+                        , \_ -> Expect.equal [] badTime.scheduledMessages
+                        , \_ -> Expect.equal [] badTarget.scheduledMessages
+                        ]
+                        ()
+            , test "cancel tombstones through the durable close" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000 }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( canceling, cancelOut ) =
+                            update (CancelScheduledMessage { id = tag }) queued
+
+                        cancelReqs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledCancelRequest r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                cancelOut
+
+                        ( canceled, canceledOut ) =
+                            update (ScheduledCancelResult { id = tag, ok = True }) canceling
+
+                        ( refused, refusedOut ) =
+                            update (ScheduledCancelResult { id = tag, ok = False }) canceling
+
+                        ( foreign, foreignOut ) =
+                            update (CancelScheduledMessage { id = tag }) { queued | accountName = Just "alice" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length canceling.scheduledMessages)
+                        , \_ -> Expect.equal 1 (List.length cancelReqs)
+                        , \_ -> Expect.equal [] canceled.scheduledMessages
+                        , \_ -> Expect.equal True (List.any isScheduledSave canceledOut)
+                        , \_ -> Expect.equal 1 (List.length refused.scheduledMessages)
+                        , \_ -> Expect.equal [ "Could not cancel scheduled message" ] (List.map .title refused.toasts)
+                        , \_ -> Expect.equal 1 (List.length foreign.scheduledMessages)
+                        , \_ -> Expect.equal [] foreignOut
+                        ]
+                        ()
+            , test "projection write result folds the degraded flag" <|
+                \_ ->
+                    let
+                        ( failed, _ ) =
+                            update (ScheduledPersisted { ok = False }) ownerBase
+
+                        ( recovered, _ ) =
+                            update (ScheduledPersisted { ok = True }) { ownerBase | scheduledProjectionDegraded = True }
+
+                        ( shown, _ ) =
+                            update (SetShowScheduledMessages True) ownerBase
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True failed.scheduledProjectionDegraded
+                        , \_ -> Expect.equal False recovered.scheduledProjectionDegraded
+                        , \_ -> Expect.equal True shown.showScheduledMessages
+                        ]
+                        ()
+            , test "account switch purges only the outgoing identity" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000 }
+
+                        ( loggedIn, loginOut ) =
+                            feed queued ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        ( notified, notifyOut ) =
+                            feed queued ":kai!u@h ACCOUNT alice"
+
+                        authed =
+                            { ownerBase | accountName = Just "alice" }
+
+                        ( queuedAuthed, _ ) =
+                            scheduleQueued { authed | nowMs = 1000 }
+
+                        ( renamed, renameOut ) =
+                            feed queuedAuthed ":kai!u@h NICK kai2"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] loggedIn.scheduledMessages
+                        , \_ -> Expect.equal True (List.any isScheduledSave loginOut)
+                        , \_ -> Expect.equal [] notified.scheduledMessages
+                        , \_ -> Expect.equal True (List.any isScheduledSave notifyOut)
+                        , \_ -> Expect.equal 1 (List.length renamed.scheduledMessages)
+                        , \_ -> Expect.equal False (List.any isScheduledSave renameOut)
+                        ]
+                        ()
+            , test "guest self-rename retires the nick-owned rows" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000 }
+
+                        ( renamed, renameOut ) =
+                            feed queued ":kai!u@h NICK kai2"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "kai2" renamed.ourNick
+                        , \_ -> Expect.equal [] renamed.scheduledMessages
+                        , \_ -> Expect.equal True (List.any isScheduledSave renameOut)
+                        ]
+                        ()
+            , test "dispatch round claims then sends unlabeled" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( ticked, tickOut ) =
+                            update (Tick (Time.millisToPosix 9000)) queued
+
+                        dispatchReqs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledDispatchRequest r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                tickOut
+
+                        ( resulted, resOut ) =
+                            update
+                                (ScheduledDispatchResult
+                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
+                                    , granted = [ tag ]
+                                    }
+                                )
+                                ticked
+
+                        settles =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledSettle r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                resOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True ticked.scheduledDispatchBusy
+                        , \_ -> Expect.equal 1 (List.length dispatchReqs)
+                        , \_ -> Expect.equal [ { id = tag, token = "claim-9000-1", claimedAt = 9000 } ] (List.concatMap .candidates dispatchReqs)
+                        , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c x\r\n") resOut)
+                        , \_ -> Expect.equal [ { id = tag, owner = { serverUrl = "wss://irc.example", identity = "kai" }, token = "claim-9000-1", admitted = True } ] settles
+                        , \_ -> Expect.equal [] resulted.scheduledMessages
+                        , \_ -> Expect.equal False resulted.scheduledDispatchBusy
+                        , \_ -> Expect.equal True (List.member "Scheduled message sent" (List.map .title resulted.toasts))
+                        ]
+                        ()
+            , test "labeled dispatch admits on ACK and restores on FAIL" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000, caps = [ "labeled-response" ] }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( ticked, _ ) =
+                            update (Tick (Time.millisToPosix 9000)) queued
+
+                        ( labeled, resOut ) =
+                            update
+                                (ScheduledDispatchResult
+                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
+                                    , granted = [ tag ]
+                                    }
+                                )
+                                ticked
+
+                        sentLines =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            if String.startsWith "@label=" line then
+                                                Just line
+
+                                            else
+                                                Nothing
+
+                                        _ ->
+                                            Nothing
+                                )
+                                resOut
+
+                        label =
+                            case sentLines of
+                                line :: _ ->
+                                    Maybe.withDefault "" (List.head (String.split " " (String.dropLeft 7 line)))
+
+                                [] ->
+                                    ""
+
+                        ( acked, ackOut ) =
+                            feed labeled ("@label=" ++ label ++ " ACK")
+
+                        ackSettles =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledSettle r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                ackOut
+
+                        ( failed, failOut ) =
+                            feed labeled ("@label=" ++ label ++ " :srv FAIL PRIVMSG CANNOT_SEND :rejected")
+
+                        failSettles =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledSettle r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                failOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length sentLines)
+                        , \_ -> Expect.equal 1 (Dict.size labeled.scheduledLabels)
+                        , \_ -> Expect.equal 1 (List.length labeled.scheduledMessages)
+                        , \_ -> Expect.equal [] acked.scheduledMessages
+                        , \_ -> Expect.equal True (List.all .admitted ackSettles)
+                        , \_ -> Expect.equal True (List.member "Scheduled message sent" (List.map .title acked.toasts))
+                        , \_ -> Expect.equal 1 (List.length failed.scheduledMessages)
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head failed.scheduledMessages))
+                        , \_ -> Expect.equal [ False ] (List.map .admitted failSettles)
+                        , \_ -> Expect.equal False (List.member "Scheduled message sent" (List.map .title failed.toasts))
+                        ]
+                        ()
+            , test "dead durable pauses and releases claims" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
+
+                        ( ticked, _ ) =
+                            update (Tick (Time.millisToPosix 9000)) queued
+
+                        ( paused, pausedOut ) =
+                            update (ScheduledDispatchResult { queue = Nothing, granted = [] }) ticked
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "Scheduled send paused" ] (List.map .title paused.toasts)
+                        , \_ -> Expect.equal 1 (List.length paused.scheduledMessages)
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head paused.scheduledMessages))
+                        , \_ -> Expect.equal False paused.scheduledDispatchBusy
+                        , \_ -> Expect.equal True (List.any isScheduledSave pausedOut)
+                        ]
+                        ()
+            , test "moved owner settles unadmitted without sending" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000, caps = [] }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( ticked, _ ) =
+                            update (Tick (Time.millisToPosix 9000)) queued
+
+                        ( moved, movedOut ) =
+                            update
+                                (ScheduledDispatchResult
+                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
+                                    , granted = [ tag ]
+                                    }
+                                )
+                                { ticked | accountName = Just "alice" }
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine _ ->
+                                            Just ()
+
+                                        _ ->
+                                            Nothing
+                                )
+                                movedOut
+
+                        settles =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledSettle r ->
+                                            Just r
+
+                                        _ ->
+                                            Nothing
+                                )
+                                movedOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] sends
+                        , \_ -> Expect.equal [ False ] (List.map .admitted settles)
+                        , \_ -> Expect.equal 1 (List.length moved.scheduledMessages)
+                        , \_ -> Expect.equal Nothing (Maybe.andThen .claim (List.head moved.scheduledMessages))
+                        ]
+                        ()
+            , test "disconnect marks in-flight sends uncertain" <|
+                \_ ->
+                    let
+                        ( queued, _ ) =
+                            scheduleQueued { ownerBase | nowMs = 1000, caps = [ "labeled-response" ] }
+
+                        tag =
+                            "sched-1000-1"
+
+                        ( ticked, _ ) =
+                            update (Tick (Time.millisToPosix 9000)) queued
+
+                        ( labeled, _ ) =
+                            update
+                                (ScheduledDispatchResult
+                                    { queue = Just (Schedule.encodeScheduledMessages ticked.scheduledMessages)
+                                    , granted = [ tag ]
+                                    }
+                                )
+                                ticked
+
+                        ( down, _ ) =
+                            update (WsClosed { clean = True, reason = "boom" }) labeled
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Dict.empty down.scheduledLabels
+                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title down.toasts)
+                        , \_ -> Expect.equal 1 (List.length down.scheduledMessages)
+                        , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map (\row -> row.claim /= Nothing) (List.head down.scheduledMessages)))
+                        ]
+                        ()
+            , test "ircx rows wait for prop sync" <|
+                \_ ->
+                    let
+                        sup =
+                            ownerBase.isupport
+
+                        ircxBase =
+                            { ownerBase | isupport = { sup | ircx = True } }
+
+                        mkRow channel =
+                            { id = "s"
+                            , channel = channel
+                            , text = "x"
+                            , sendAt = 1
+                            , owner = Just { serverUrl = "wss://irc.example", identity = "kai" }
+                            , claim = Nothing
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        ircxProps =
+                            ircxBase.props
+
+                        syncedBase =
+                            { ircxBase | props = { ircxProps | synced = Set.singleton "#c" } }
+
+                        baseProps =
+                            blank.props
+
+                        requiredBase =
+                            { ircxBase | props = { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] } }
+
+                        designatedBase =
+                            { ircxBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ircxBase.dmDirectory }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (dispatchableScheduledRow ircxBase (mkRow "#c"))
+                        , \_ -> Expect.equal True (dispatchableScheduledRow syncedBase (mkRow "#c"))
+                        , \_ -> Expect.equal True (dispatchableScheduledRow ircxBase (mkRow "bob"))
+                        , \_ -> Expect.equal True (dispatchableScheduledRow ownerBase (mkRow "#c"))
+                        , \_ -> Expect.equal False (dispatchableScheduledRow requiredBase (mkRow "#c"))
+                        , \_ -> Expect.equal True (dispatchableScheduledRow designatedBase (mkRow "bob"))
+                        ]
+                        ()
+            , test "designated dispatch seals instead of sending plaintext" <|
+                \_ ->
+                    let
+                        schedOwner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        keyed =
+                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
+
+                        row =
+                            { id = "s"
+                            , channel = "bob"
+                            , text = "later hi"
+                            , sendAt = 1
+                            , owner = Just schedOwner
+                            , claim = Just { token = "tok", claimedAt = 1 }
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        ( m1, outbound ) =
+                            sendValidClaims { keyed | scheduledMessages = [ row ] } schedOwner [ ( "s", "tok" ) ] False []
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ DmSealRequested { target = "bob", keys = [ peerKey ], plaintext = "later hi", owner = Just ownedOwner, schedId = Just "s" } ]
+                                (List.filter
+                                    (\o ->
+                                        case o of
+                                            ScheduledSave _ ->
+                                                False
+
+                                            _ ->
+                                                True
+                                    )
+                                    outbound
+                                )
+                        , \_ -> Expect.equal True (List.any isScheduledSave outbound)
+                        , \_ -> Expect.equal (Just "tok") (Maybe.map .token (Dict.get "s" m1.scheduledSeals))
+                        , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
+                        ]
+                        ()
+            , test "scheduled seal-send settles admitted with ciphertext" <|
+                \_ ->
+                    let
+                        schedOwner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        keyed =
+                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
+
+                        row =
+                            { id = "s"
+                            , channel = "bob"
+                            , text = "later hi"
+                            , sendAt = 1
+                            , owner = Just schedOwner
+                            , claim = Just { token = "tok", claimedAt = 1 }
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        sealing =
+                            { keyed
+                                | scheduledMessages = [ row ]
+                                , scheduledSeals =
+                                    Dict.singleton "s"
+                                        { target = "bob"
+                                        , text = "later hi"
+                                        , keys = [ peerKey ]
+                                        , owner = schedOwner
+                                        , token = "tok"
+                                        }
+                            }
+
+                        ( m1, outbound ) =
+                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ SendLine ("PRIVMSG bob :" ++ envelopeBody ++ "\r\n")
+                                , ScheduledSettle { id = "s", owner = schedOwner, token = "tok", admitted = True }
+                                ]
+                                (List.filter
+                                    (\o ->
+                                        case o of
+                                            ScheduledSave _ ->
+                                                False
+
+                                            _ ->
+                                                True
+                                    )
+                                    outbound
+                                )
+                        , \_ -> Expect.equal [] m1.scheduledMessages
+                        , \_ -> Expect.equal Dict.empty m1.scheduledSeals
+                        , \_ -> Expect.equal [ "Scheduled message sent" ] (List.map .title m1.toasts)
+                        ]
+                        ()
+            , test "scheduled seal-send stamps the e2ee tag and @label" <|
+                \_ ->
+                    let
+                        schedOwner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        keyed =
+                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
+
+                        row =
+                            { id = "s"
+                            , channel = "bob"
+                            , text = "later hi"
+                            , sendAt = 1
+                            , owner = Just schedOwner
+                            , claim = Just { token = "tok", claimedAt = 1 }
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        sealing =
+                            { keyed
+                                | scheduledMessages = [ row ]
+                                , scheduledSeals =
+                                    Dict.singleton "s"
+                                        { target = "bob"
+                                        , text = "later hi"
+                                        , keys = [ peerKey ]
+                                        , owner = schedOwner
+                                        , token = "tok"
+                                        }
+                                , caps = [ "labeled-response", "onyx/e2ee" ]
+                            }
+
+                        label =
+                            Labels.nextClientLabel (floor sealing.nowMs) (sealing.labelCounter + 1)
+
+                        ( m1, outbound ) =
+                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ SendLine ("@+onyx/e2ee=mls;label=" ++ label ++ " PRIVMSG bob :" ++ envelopeBody ++ "\r\n")
+                                , ScheduledSettle { id = "s", owner = schedOwner, token = "tok", admitted = True }
+                                ]
+                                (List.filter
+                                    (\o ->
+                                        case o of
+                                            ScheduledSave _ ->
+                                                False
+
+                                            _ ->
+                                                True
+                                    )
+                                    outbound
+                                )
+                        , \_ -> Expect.equal (Just { id = "s", token = "tok" }) (Dict.get label m1.scheduledLabels)
+                        , \_ -> Expect.equal (sealing.labelCounter + 1) m1.labelCounter
+                        ]
+                        ()
+            , test "scheduled seal-send drops on rotation and holds" <|
+                \_ ->
+                    let
+                        schedOwner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        otherKey =
+                            Base64Url.encode (0x04 :: List.repeat 64 8)
+
+                        rotated =
+                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" otherKey ownedBase.dmDirectory }
+
+                        row =
+                            { id = "s"
+                            , channel = "bob"
+                            , text = "later hi"
+                            , sendAt = 1
+                            , owner = Just schedOwner
+                            , claim = Just { token = "tok", claimedAt = 1 }
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        sealing =
+                            { rotated
+                                | scheduledMessages = [ row ]
+                                , scheduledSeals =
+                                    Dict.singleton "s"
+                                        { target = "bob"
+                                        , text = "later hi"
+                                        , keys = [ peerKey ]
+                                        , owner = schedOwner
+                                        , token = "tok"
+                                        }
+                            }
+
+                        ( m1, outbound ) =
+                            update (DmSealed { target = "bob", envelope = envelopeBody, schedId = Just "s" }) sealing
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outbound
+                        , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
+                        , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
+                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        ]
+                        ()
+            , test "scheduled seal failure holds the claim uncertain" <|
+                \_ ->
+                    let
+                        schedOwner =
+                            { serverUrl = "wss://irc.example", identity = "kai" }
+
+                        keyed =
+                            { ownedBase | dmDirectory = DmCipher.applySingleKey "bob" peerKey ownedBase.dmDirectory }
+
+                        row =
+                            { id = "s"
+                            , channel = "bob"
+                            , text = "later hi"
+                            , sendAt = 1
+                            , owner = Just schedOwner
+                            , claim = Just { token = "tok", claimedAt = 1 }
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+
+                        sealing =
+                            { keyed
+                                | scheduledMessages = [ row ]
+                                , scheduledSeals =
+                                    Dict.singleton "s"
+                                        { target = "bob"
+                                        , text = "later hi"
+                                        , keys = [ peerKey ]
+                                        , owner = schedOwner
+                                        , token = "tok"
+                                        }
+                            }
+
+                        ( m1, outbound ) =
+                            update (DmSealFailed { target = "bob", keyChanged = True, schedId = Just "s" }) sealing
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outbound
+                        , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
+                        , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
+                        , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
+                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        ]
+                        ()
+            ]
+        , describe "scheduled composer and sheet"
+            [ test "open clears stale epochs and requests the clock" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase
+                                | nowMs = 1000000
+                                , activeChannel = Just "#c"
+                                , composer = "later"
+                                , schedulePresetEpochs = Dict.singleton "tomorrow-9" 123
+                                , scheduleMinLocal = "2020-01-01T00:00"
+                            }
+
+                        ( opened, outs ) =
+                            update ScheduleOpen base
+
+                        isClockRequest out =
+                            case out of
+                                ScheduleClockRequest ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True opened.scheduleOpen
+                        , \_ -> Expect.equal Nothing opened.scheduleError
+                        , \_ -> Expect.equal Dict.empty opened.schedulePresetEpochs
+                        , \_ -> Expect.equal [ True ] (List.map isClockRequest outs)
+                        ]
+                        ()
+            , test "clock answer fills tomorrow-9 and the datetime floor" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000 }
+
+                        ( clocked, _ ) =
+                            update (ScheduleClockReceived { tomorrow9 = 1750058400000, minLocal = "2025-06-15T07:12" }) opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 1750058400000) (Dict.get "tomorrow-9" clocked.schedulePresetEpochs)
+                        , \_ -> Expect.equal "2025-06-15T07:12" clocked.scheduleMinLocal
+                        ]
+                        ()
+            , test "preset click inside the window queues the draft" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+
+                        ( clicked, outs ) =
+                            update (SchedulePresetClicked { id = "in-15m" }) opened
+
+                        fenceTags =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledFenceRequest r ->
+                                            Just r.tag
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "sched-1000000-1" ] fenceTags
+                        , \_ -> Expect.equal [ { channel = "#c", text = "later", sendAt = 1900000 } ] clicked.schedulePending
+                        , \_ -> Expect.equal Nothing clicked.scheduleError
+                        ]
+                        ()
+            , test "stale clock epoch click raises the preset copy" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+
+                        ( clocked, _ ) =
+                            update (ScheduleClockReceived { tomorrow9 = 2000000, minLocal = "2025-06-15T07:12" }) opened
+
+                        ( clicked, outs ) =
+                            update (SchedulePresetClicked { id = "tomorrow-9" }) { clocked | nowMs = 1999999 }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Pick a time at least a minute from now.") clicked.scheduleError
+                        , \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal [] clicked.schedulePending
+                        ]
+                        ()
+            , test "custom submit asks the bridge to parse the field" <|
+                \_ ->
+                    let
+                        ( submitted, outs ) =
+                            update ScheduleCustomSubmit { ownerBase | scheduleWhen = "2030-01-01T10:00" }
+
+                        parseValues =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduleParseRequest r ->
+                                            Just r.value
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.equal [ "2030-01-01T10:00" ] parseValues
+            , test "parse answers settle: stale dropped, bad or near raise the custom copy, far queues" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later", scheduleWhen = "2030-01-01T10:00" }
+
+                        ( stale, staleOut ) =
+                            update (ScheduleParseReceived { value = "other", epoch = Just 4600000 }) base
+
+                        ( bad, _ ) =
+                            update (ScheduleParseReceived { value = "2030-01-01T10:00", epoch = Nothing }) base
+
+                        ( near, nearOut ) =
+                            update (ScheduleParseReceived { value = "2030-01-01T10:00", epoch = Just 1001000 }) base
+
+                        ( far, farOut ) =
+                            update (ScheduleParseReceived { value = "2030-01-01T10:00", epoch = Just 4600000 }) base
+
+                        farFences =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledFenceRequest r ->
+                                            Just r.tag
+
+                                        _ ->
+                                            Nothing
+                                )
+                                farOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing stale.scheduleError
+                        , \_ -> Expect.equal [] staleOut
+                        , \_ -> Expect.equal (Just "Enter a valid time at least a minute from now.") bad.scheduleError
+                        , \_ -> Expect.equal (Just "Enter a valid time at least a minute from now.") near.scheduleError
+                        , \_ -> Expect.equal [] nearOut
+                        , \_ -> Expect.equal [ "sched-1000000-1" ] farFences
+                        , \_ -> Expect.equal [ { channel = "#c", text = "later", sendAt = 4600000 } ] far.schedulePending
+                        ]
+                        ()
+            , test "admitted composer send toasts, closes, and clears the draft" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+
+                        ( clicked, out1 ) =
+                            update (SchedulePresetClicked { id = "in-15m" }) opened
+
+                        tag =
+                            "sched-1000000-1"
+
+                        ( fenced, _ ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) clicked
+
+                        ( added, _ ) =
+                            update (ScheduledAddResult { id = tag, ok = True }) fenced
+
+                        fenceTags =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ScheduledFenceRequest r ->
+                                            Just r.tag
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "sched-1000000-1" ] fenceTags
+                        , \_ -> Expect.equal [ "Message scheduled" ] (List.map .title added.toasts)
+                        , \_ -> Expect.equal (Just "Will send to #c at the time you picked.") (Maybe.andThen .description (List.head added.toasts))
+                        , \_ -> Expect.equal False added.scheduleOpen
+                        , \_ -> Expect.equal "" added.composer
+                        , \_ -> Expect.equal "" added.scheduleWhen
+                        , \_ -> Expect.equal Nothing added.scheduleError
+                        , \_ -> Expect.equal [] added.schedulePending
+                        , \_ -> Expect.equal 1 (List.length added.scheduledMessages)
+                        ]
+                        ()
+            , test "admitted send keeps the draft after a mid-flight navigation" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+
+                        ( clicked, _ ) =
+                            update (SchedulePresetClicked { id = "in-15m" }) opened
+
+                        tag =
+                            "sched-1000000-1"
+
+                        ( fenced, _ ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) { clicked | activeChannel = Just "#other" }
+
+                        ( added, _ ) =
+                            update (ScheduledAddResult { id = tag, ok = True }) fenced
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "Message scheduled" ] (List.map .title added.toasts)
+                        , \_ -> Expect.equal False added.scheduleOpen
+                        , \_ -> Expect.equal "later" added.composer
+                        , \_ -> Expect.equal [] added.schedulePending
+                        ]
+                        ()
+            , test "refused admission raises the durable copy and keeps the draft" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | nowMs = 1000000, activeChannel = Just "#c", composer = "later" }
+
+                        ( clicked, _ ) =
+                            update (SchedulePresetClicked { id = "in-15m" }) opened
+
+                        tag =
+                            "sched-1000000-1"
+
+                        ( fenced, _ ) =
+                            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) clicked
+
+                        ( refused, refusedOut ) =
+                            update (ScheduledAddResult { id = tag, ok = False }) fenced
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Message was not durably scheduled. Your draft is still here; try again.") refused.scheduleError
+                        , \_ -> Expect.equal [] refusedOut
+                        , \_ -> Expect.equal "later" refused.composer
+                        , \_ -> Expect.equal [] refused.schedulePending
+                        , \_ -> Expect.equal [] refused.scheduledMessages
+                        ]
+                        ()
+            , test "view-queue closes the popover and opens the sheet" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update ScheduleOpen { ownerBase | scheduleWhen = "2030-01-01T10:00" }
+
+                        ( queued, _ ) =
+                            update ScheduleViewQueue opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False queued.scheduleOpen
+                        , \_ -> Expect.equal Nothing queued.scheduleError
+                        , \_ -> Expect.equal True queued.showScheduledMessages
+                        , \_ -> Expect.equal "2030-01-01T10:00" queued.scheduleWhen
+                        ]
+                        ()
+            , test "send label mirrors the compact branch with a UTC date fallback" <|
+                \_ ->
+                    let
+                        now =
+                            1750000000000
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "just now" (scheduleSendLabel now now)
+                        , \_ -> Expect.equal "just now" (scheduleSendLabel (now + 44000) now)
+                        , \_ -> Expect.equal "in 1m" (scheduleSendLabel (now + 45000) now)
+                        , \_ -> Expect.equal "in 15m" (scheduleSendLabel (now + 900000) now)
+                        , \_ -> Expect.equal "in 2h" (scheduleSendLabel (now + 7200000) now)
+                        , \_ -> Expect.equal "in 3d" (scheduleSendLabel (now + 259200000) now)
+                        , \_ -> Expect.equal "5d" (scheduleSendLabel (now - 432000000) now)
+                        , \_ -> Expect.equal "Jun 23" (scheduleSendLabel (now + 691200000) now)
+                        , \_ -> Expect.equal "Apr 11, 2026" (scheduleSendLabel (now + 25920000000) now)
+                        ]
+                        ()
+            , test "sheet holds mirror the live guards" <|
+                \_ ->
+                    let
+                        sup =
+                            ownerBase.isupport
+
+                        ircxBase =
+                            { ownerBase | isupport = { sup | ircx = True } }
+
+                        ircxProps =
+                            ircxBase.props
+
+                        syncedBase =
+                            { ircxBase | props = { ircxProps | synced = Set.singleton "#c" } }
+
+                        baseProps =
+                            blank.props
+
+                        requiredBase =
+                            { ircxBase | props = { baseProps | channelProps = Dict.fromList [ ( "#c", Dict.fromList [ ( "encryption-policy", "required" ) ] ) ] } }
+
+                        mkRow channel =
+                            { id = "s"
+                            , channel = channel
+                            , text = "x"
+                            , sendAt = 1
+                            , owner = Just { serverUrl = "wss://irc.example", identity = "kai" }
+                            , claim = Nothing
+                            , generation = Nothing
+                            , clearEpoch = Nothing
+                            }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (scheduledRowProtected ircxBase (mkRow "#c"))
+                        , \_ -> Expect.equal False (scheduledRowProtected syncedBase (mkRow "#c"))
+                        , \_ -> Expect.equal False (scheduledRowProtected ircxBase (mkRow "bob"))
+                        , \_ -> Expect.equal False (scheduledRowProtected ownerBase (mkRow "#c"))
+                        , \_ -> Expect.equal True (scheduledRowEncryptionRequired requiredBase (mkRow "#c"))
+                        , \_ -> Expect.equal False (scheduledRowEncryptionRequired ircxBase (mkRow "#c"))
+                        , \_ -> Expect.equal False (scheduledRowEncryptionRequired ircxBase (mkRow "bob"))
+                        ]
+                        ()
+            ]
+        , describe "channel rename fold"
+            [ test "rename migrates the room with a bounded note and moves keyed state" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #old"
+
+                        props =
+                            joined.props
+
+                        staged =
+                            { joined
+                                | activeChannel = Just "#old"
+                                , channelNotify = Dict.singleton "#old" "mentions"
+                                , firstUnreadId = Dict.singleton "#old" 7
+                                , typingUsers = Dict.singleton "#old" (Dict.singleton "alice" { nick = "alice", expiresAt = 999999 })
+                                , readMarkers = Dict.singleton "#old" "row-0"
+                                , historyLoading = Set.singleton "#old"
+                                , historyExhausted = Set.singleton "#old"
+                                , props = { props | channelProps = Dict.singleton "#old" (Dict.singleton "topic" "hi") }
+                            }
+
+                        ( renamed, outs ) =
+                            feed staged ":alice!u@h RENAME #old #new :fresh name"
+
+                        moved =
+                            Maybe.withDefault [] (Maybe.map .messages (Dict.get "#new" renamed.channels))
+
+                        notifySaves =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        ChannelNotifySave r ->
+                                            Just r.entries
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (Dict.member "#old" renamed.channels)
+                        , \_ -> Expect.equal (Just "#new") (Maybe.map .name (Dict.get "#new" renamed.channels))
+                        , \_ -> Expect.equal True (List.any (String.contains "alice renamed #old → #new (fresh name)") (List.map .body moved))
+                        , \_ -> Expect.equal (Just "#new") renamed.activeChannel
+                        , \_ -> Expect.equal (Dict.singleton "#new" 7) renamed.firstUnreadId
+                        , \_ -> Expect.equal (Dict.singleton "#new" "mentions") renamed.channelNotify
+                        , \_ -> Expect.equal (Dict.singleton "#new" (Dict.singleton "alice" { nick = "alice", expiresAt = 999999 })) renamed.typingUsers
+                        , \_ -> Expect.equal (Dict.singleton "#new" "row-0") renamed.readMarkers
+                        , \_ -> Expect.equal (Set.singleton "#new") renamed.historyLoading
+                        , \_ -> Expect.equal (Set.singleton "#new") renamed.historyExhausted
+                        , \_ -> Expect.equal (Dict.singleton "#new" (Dict.singleton "topic" "hi")) renamed.props.channelProps
+                        , \_ -> Expect.equal [ [ { channel = "#new", level = "mentions" } ] ] notifySaves
+                        ]
+                        ()
+            , test "rename refuses malformed or unknown rooms" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #old"
+
+                        ( missingArg, out1 ) =
+                            feed joined ":alice!u@h RENAME #old"
+
+                        ( unknown, out2 ) =
+                            feed joined ":alice!u@h RENAME #ghost #new"
+
+                        ( notChannel, out3 ) =
+                            feed joined ":alice!u@h RENAME alice bob"
+
+                        ( serverOrigin, _ ) =
+                            feed joined "RENAME #old #new"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Dict.keys joined.channels) (Dict.keys missingArg.channels)
+                        , \_ -> Expect.equal [] out1
+                        , \_ -> Expect.equal (Dict.keys joined.channels) (Dict.keys unknown.channels)
+                        , \_ -> Expect.equal [] out2
+                        , \_ -> Expect.equal (Dict.keys joined.channels) (Dict.keys notChannel.channels)
+                        , \_ -> Expect.equal [] out3
+                        , \_ -> Expect.equal True (Dict.member "#new" serverOrigin.channels)
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "server renamed #old → #new")
+                                    (List.map .body (Maybe.withDefault [] (Maybe.map .messages (Dict.get "#new" serverOrigin.channels))))
+                                )
+                        ]
+                        ()
+            , test "FAIL RENAME surfaces in the inbox" <|
+                \_ ->
+                    let
+                        ( described, _ ) =
+                            feed blank ":s FAIL RENAME NO_SUCH_CHANNEL :no such room"
+
+                        ( coded, _ ) =
+                            feed blank ":s FAIL RENAME NO_SUCH_CHANNEL"
+
+                        lastText notes =
+                            List.head (List.reverse notes) |> Maybe.map .text
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "no such room") (lastText described.notifications)
+                        , \_ -> Expect.equal (Just "RENAME failed (NO_SUCH_CHANNEL)") (lastText coded.notifications)
+                        ]
+                        ()
+            ]
+        , describe "room stewardship"
+            [ test "owner adds a helper with MODE +o" <|
+                \_ ->
+                    let
+                        room =
+                            { stewardRoom
+                                | members =
+                                    Dict.fromList
+                                        [ ( "alice", { nick = "alice", modes = Set.fromList [ 'Q', 'q' ], away = False } )
+                                        , ( "bob", { nick = "bob", modes = Set.fromList [ 'o' ], away = False } )
+                                        , ( "drew", { nick = "drew", modes = Set.empty, away = False } )
+                                        ]
+                            }
+
+                        open =
+                            { stewardLive | channels = Dict.fromList [ ( "#harbor", room ) ] }
+
+                        ( withInput, _ ) =
+                            update (StewardHelperInput "drew") open
+
+                        ( added, out ) =
+                            update (StewardAddHelper "#harbor") withInput
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "MODE #harbor +o drew\r\n" ] out
+                        , \_ -> Expect.equal "" added.stewardHelper
+                        , \_ -> Expect.equal "" added.stewardStatus
+                        ]
+                        ()
+            , test "third co-admin refused with status copy" <|
+                \_ ->
+                    let
+                        ( refused, out ) =
+                            update (StewardAddHelper "#harbor") { stewardLive | stewardHelper = "erin" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal "This room already has two people who can help." refused.stewardStatus
+                        ]
+                        ()
+            , test "offline and non-owner verbs refuse" <|
+                \_ ->
+                    let
+                        ( offline, offlineOut ) =
+                            update (StewardAddHelper "#harbor") { stewardLive | connection = Offline, stewardHelper = "drew" }
+
+                        ( stranger, strangerOut ) =
+                            update (StewardAddHelper "#harbor") { stewardLive | ourNick = "bob", stewardHelper = "drew" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal "Reconnect to change this room." offline.stewardStatus
+                        , \_ -> Expect.equal [] strangerOut
+                        , \_ -> Expect.equal "Only the owner can do that." stranger.stewardStatus
+                        ]
+                        ()
+            , test "owner removes a helper with MODE -o" <|
+                \_ ->
+                    let
+                        ( removed, out ) =
+                            update (StewardRemoveHelper "#harbor" "bob") stewardLive
+
+                        ( kept, keptOut ) =
+                            update (StewardRemoveHelper "#harbor" "drew") stewardLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "MODE #harbor -o bob\r\n" ] out
+                        , \_ -> Expect.equal [] keptOut
+                        , \_ -> Expect.equal "They do not help with this room." kept.stewardStatus
+                        ]
+                        ()
+            , test "transfer waits for accept before any owner rank" <|
+                \_ ->
+                    let
+                        ( offered, offerOut ) =
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+
+                        ( early, earlyOut ) =
+                            update (StewardGrantTransfer "#harbor") offered
+
+                        ( accepted, acceptOut ) =
+                            update (StewardAcceptTransfer "#harbor") { offered | ourNick = "drew" }
+
+                        ( granted, grantOut ) =
+                            update (StewardGrantTransfer "#harbor") { accepted | ourNick = "alice" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] offerOut
+                        , \_ -> Expect.equal False (Maybe.withDefault True (Maybe.map .accepted (stewardOfferFor offered "#harbor")))
+                        , \_ -> Expect.equal [] earlyOut
+                        , \_ -> Expect.equal "They have to accept before the room changes hands." early.stewardStatus
+                        , \_ -> Expect.equal [] acceptOut
+                        , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map .accepted (stewardOfferFor accepted "#harbor")))
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine "MODE #harbor +q drew\r\n"
+                                , SendLine "MODE #harbor -q alice\r\n"
+                                ]
+                                grantOut
+                        , \_ -> Expect.equal Nothing (stewardOfferFor granted "#harbor")
+                        ]
+                        ()
+            , test "bystander cannot accept and either side can decline" <|
+                \_ ->
+                    let
+                        ( offered, _ ) =
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+
+                        ( stranger, strangerOut ) =
+                            update (StewardAcceptTransfer "#harbor") { offered | ourNick = "erin" }
+
+                        ( declined, _ ) =
+                            update (StewardDeclineTransfer "#harbor") { offered | ourNick = "drew" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] strangerOut
+                        , \_ -> Expect.equal "There is nothing to accept." stranger.stewardStatus
+                        , \_ -> Expect.equal Nothing (stewardOfferFor declined "#harbor")
+                        ]
+                        ()
+            , test "close locks with the existing secret flags" <|
+                \_ ->
+                    let
+                        ( closed, out ) =
+                            update (StewardConfirmClose "#harbor") stewardLive
+                    in
+                    Expect.equal [ SendLine "MODE #harbor +si\r\n" ] out
+            , test "delete needs the typed name then drops" <|
+                \_ ->
+                    let
+                        ( empty, emptyOut ) =
+                            update (StewardConfirmDelete "#harbor") stewardLive
+
+                        ( wrong, wrongOut ) =
+                            update (StewardConfirmDelete "#harbor") { stewardLive | stewardTypedName = "#other" }
+
+                        ( deleted, out ) =
+                            update (StewardConfirmDelete "#harbor") { stewardLive | stewardTypedName = "#harbor" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] emptyOut
+                        , \_ -> Expect.equal "Type the room name to delete it." empty.stewardStatus
+                        , \_ -> Expect.equal [] wrongOut
+                        , \_ -> Expect.equal "Type the room name to delete it." wrong.stewardStatus
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine "CHANNEL DROP #harbor\r\n"
+                                , SendLine "PART #harbor Goodbye\r\n"
+                                ]
+                                out
+                        , \_ -> Expect.equal "" deleted.stewardTypedName
+                        ]
+                        ()
+            , test "panel opens fresh and closes clean" <|
+                \_ ->
+                    let
+                        ( opened, _ ) =
+                            update (StewardOpen "#harbor") { stewardLive | stewardStatus = "stale", stewardHelper = "x" }
+
+                        ( closed, _ ) =
+                            update StewardClose opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "#harbor") opened.stewardRoom
+                        , \_ -> Expect.equal "" opened.stewardStatus
+                        , \_ -> Expect.equal "" opened.stewardHelper
+                        , \_ -> Expect.equal Nothing closed.stewardRoom
+                        ]
+                        ()
+            ]
+        , describe "account attribution"
+            [ test "005 node plus 900 account requests enrollment" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, out ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrolls =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest req ->
+                                            Just req
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ { serverUrl = "wss://irc.example", account = "alice", nodeHex = "0123456789abcdef", gen = 1 } ]
+                                enrolls
+                        , \_ -> Expect.equal (Just "0123456789abcdef") logged.attribution.nodeHex
+                        , \_ -> Expect.equal (Just "alice") logged.attribution.account
+                        ]
+                        ()
+            , test "900 without an advertised node sends nothing" <|
+                \_ ->
+                    let
+                        ( logged, out ) =
+                            feed ownerBase ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrolls =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] enrolls
+                        , \_ -> Expect.equal (Just "alice") logged.attribution.account
+                        ]
+                        ()
+            , test "short 900 form proves nothing and stays silent" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, out ) =
+                            feed supported ":s 900 kai"
+
+                        enrolls =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] enrolls
+                        , \_ -> Expect.equal Nothing logged.attribution.account
+                        ]
+                        ()
+            , test "bare-prefix 900 is not server-originated" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( bare, bareOut ) =
+                            feed supported ":s 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        ( forged, forgedOut ) =
+                            feed supported ":mallory!u@h 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrolls outs =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (enrolls bareOut)
+                        , \_ -> Expect.equal Nothing bare.attribution.account
+                        , \_ -> Expect.equal [] (enrolls forgedOut)
+                        , \_ -> Expect.equal Nothing forged.attribution.account
+                        ]
+                        ()
+            , test "enroll reply sends IDENTITY ADD" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        reply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = String.repeat 128 "b"
+                            , alreadyEnrolled = False
+                            }
+
+                        ( enrolled, out ) =
+                            update (AttributionEnrollReply (Just reply)) logged
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "IDENTITY ADD onyx-abcdef0123456789 " ++ String.repeat 64 "a" ++ " " ++ String.repeat 128 "b" ++ "\r\n" ]
+                                (sendLines out)
+                        , \_ ->
+                            Expect.equal
+                                (Just { account = "alice", label = "onyx-abcdef0123456789", publicHex = String.repeat 64 "a" })
+                                enrolled.attribution.pendingEnroll
+                        ]
+                        ()
+            , test "already-enrolled reply skips ADD for the residence signature" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        reply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = ""
+                            , alreadyEnrolled = True
+                            }
+
+                        ( _, out ) =
+                            update (AttributionEnrollReply (Just reply)) logged
+                    in
+                    Expect.equal
+                        [ AttributionResidenceRequest
+                            { serverUrl = "wss://irc.example"
+                            , account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , epoch = 1
+                            , expiryMs = Attribution.residenceTtlMs
+                            , gen = 1
+                            }
+                        ]
+                        out
+            , test "residence reply sends IDENTITY RESIDENCE and arms refresh" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = ""
+                            , alreadyEnrolled = True
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        residenceReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , epoch = 2000
+                            , expiryMs = 3000
+                            , gen = 1
+                            , sig = String.repeat 128 "c"
+                            }
+
+                        ( published, out ) =
+                            update (AttributionResidenceReply (Just residenceReply)) enrolled
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "IDENTITY RESIDENCE 0123456789abcdef 2000 3000 " ++ String.repeat 128 "c" ++ "\r\n" ]
+                                (sendLines out)
+                        , \_ -> Expect.equal (Just "0123456789abcdef") published.attribution.publishedNode
+                        , \_ -> Expect.equal (Just Attribution.residenceRefreshMs) published.attribution.refreshDueMs
+                        ]
+                        ()
+            , test "ADDED notice confirms the pending label and still reaches chat" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = String.repeat 128 "b"
+                            , alreadyEnrolled = False
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        ( confirmed, out ) =
+                            feed enrolled ":irc.example NOTICE kai :IDENTITY ADDED label=onyx-abcdef0123456789"
+
+                        confirms =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionConfirmEnrolled _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ AttributionConfirmEnrolled
+                                    { serverUrl = "wss://irc.example", account = "alice", publicHex = String.repeat 64 "a" }
+                                ]
+                                confirms
+                        , \_ -> Expect.equal Nothing confirmed.attribution.pendingEnroll
+                        , \_ ->
+                            Expect.notEqual enrolled
+                                { confirmed | attribution = enrolled.attribution }
+                        ]
+                        ()
+            , test "forged ADDED notice from a user is ignored" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = String.repeat 128 "b"
+                            , alreadyEnrolled = False
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        ( forged, out ) =
+                            feed enrolled ":mallory!u@h NOTICE kai :IDENTITY ADDED label=onyx-abcdef0123456789"
+
+                        confirms =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionConfirmEnrolled _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] confirms
+                        , \_ -> Expect.equal enrolled.attribution forged.attribution
+                        ]
+                        ()
+            , test "FAIL IDENTITY STALE_EPOCH retries once then holds" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = ""
+                            , alreadyEnrolled = True
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        residenceReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , epoch = 2000
+                            , expiryMs = 3000
+                            , gen = 1
+                            , sig = String.repeat 128 "c"
+                            }
+
+                        ( published, _ ) =
+                            update (AttributionResidenceReply (Just residenceReply)) enrolled
+
+                        ( retried, out ) =
+                            feed published ":irc.example FAIL IDENTITY STALE_EPOCH :epoch too old"
+
+                        ( twice, out2 ) =
+                            feed retried ":irc.example FAIL IDENTITY STALE_EPOCH :epoch too old"
+
+                        enrolls outs =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ AttributionEnrollRequest
+                                    { serverUrl = "wss://irc.example", account = "alice", nodeHex = "0123456789abcdef", gen = 1 }
+                                ]
+                                (enrolls out)
+                        , \_ -> Expect.equal True retried.attribution.staleRetried
+                        , \_ -> Expect.equal [] (enrolls out2)
+                        , \_ -> Expect.equal retried.attribution twice.attribution
+                        ]
+                        ()
+            , test "forged STALE_EPOCH from a user is ignored" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        ( forged, out ) =
+                            feed logged ":mallory!u@h FAIL IDENTITY STALE_EPOCH :epoch too old"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal logged.attribution forged.attribution
+                        ]
+                        ()
+            , test "close resets the session but keeps the epoch floor" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = ""
+                            , alreadyEnrolled = True
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        residenceReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , epoch = 2000
+                            , expiryMs = 3000
+                            , gen = 1
+                            , sig = String.repeat 128 "c"
+                            }
+
+                        ( published, _ ) =
+                            update (AttributionResidenceReply (Just residenceReply)) enrolled
+
+                        ( closed, _ ) =
+                            update (WsClosed { clean = True, reason = "done" }) published
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing closed.attribution.account
+                        , \_ -> Expect.equal Nothing closed.attribution.nodeHex
+                        , \_ -> Expect.equal 2000 closed.attribution.lastEpoch
+                        , \_ -> Expect.equal 2 closed.attribution.gen
+                        ]
+                        ()
+            , test "tick re-signs a lapsed proof" <|
+                \_ ->
+                    let
+                        ( supported, _ ) =
+                            feed ownerBase ":s 005 kai ACCOUNTRESIDENCE=0123456789abcdef CHANTYPES=# :are supported"
+
+                        ( logged, _ ) =
+                            feed supported ":irc.example 900 kai kai!u@h alice :You are now logged in as alice"
+
+                        enrollReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , gen = 1
+                            , label = "onyx-abcdef0123456789"
+                            , publicHex = String.repeat 64 "a"
+                            , sig = ""
+                            , alreadyEnrolled = True
+                            }
+
+                        ( enrolled, _ ) =
+                            update (AttributionEnrollReply (Just enrollReply)) logged
+
+                        residenceReply =
+                            { account = "alice"
+                            , nodeHex = "0123456789abcdef"
+                            , epoch = 2000
+                            , expiryMs = 3000
+                            , gen = 1
+                            , sig = String.repeat 128 "c"
+                            }
+
+                        ( published, _ ) =
+                            update (AttributionResidenceReply (Just residenceReply)) enrolled
+
+                        ( ticked, out ) =
+                            update (Tick (Time.millisToPosix 1200000)) published
+
+                        enrolls =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        AttributionEnrollRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ AttributionEnrollRequest
+                                    { serverUrl = "wss://irc.example", account = "alice", nodeHex = "0123456789abcdef", gen = 1 }
+                                ]
+                                enrolls
+                        , \_ -> Expect.equal Nothing ticked.attribution.publishedNode
+                        ]
+                        ()
+            ]
+        , describe "totp two-factor core"
+            [ test "enroll sends TOTP ENROLL and forgets shown material" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankTotp | secret = Just "JBSWY3DPEHPK3PXP", otpauth = Just "otpauth://x", error = Just "old" }
+
+                        ( enrolled, outs ) =
+                            requestTotpEnroll { totpLive | totp = shown }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "TOTP ENROLL\r\n" ] outs
+                        , \_ -> Expect.equal True enrolled.totp.busy
+                        , \_ -> Expect.equal Nothing enrolled.totp.error
+                        , \_ -> Expect.equal Nothing enrolled.totp.secret
+                        , \_ -> Expect.equal Nothing enrolled.totp.otpauth
+                        , \_ -> Expect.equal (Just "kai") enrolled.totpReplyAccount
+                        ]
+                        ()
+            , test "confirm refuses malformed codes and sends a trimmed code" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankTotp | secret = Just "JBSWY3DPEHPK3PXP" }
+
+                        base =
+                            { totpLive | totp = shown }
+
+                        ( short, outShort ) =
+                            requestTotpConfirm base "12345"
+
+                        ( alpha, outAlpha ) =
+                            requestTotpConfirm base "12345a"
+
+                        ( long, outLong ) =
+                            requestTotpConfirm base " 1234567 "
+
+                        ( confirmed, outConfirmed ) =
+                            requestTotpConfirm base " 123456 "
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outShort
+                        , \_ -> Expect.equal Nothing short.totpReplyAccount
+                        , \_ -> Expect.equal [] outAlpha
+                        , \_ -> Expect.equal [] outLong
+                        , \_ -> Expect.equal [ SendLine "TOTP CONFIRM 123456\r\n" ] outConfirmed
+                        , \_ -> Expect.equal True confirmed.totp.busy
+                        , \_ -> Expect.equal (Just "JBSWY3DPEHPK3PXP") confirmed.totp.secret
+                        , \_ -> Expect.equal (Just "kai") confirmed.totpReplyAccount
+                        ]
+                        ()
+            , test "disable sends TOTP DISABLE and keeps the shown secret" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankTotp | secret = Just "JBSWY3DPEHPK3PXP", error = Just "old" }
+
+                        ( disabled, outs ) =
+                            requestTotpDisable { totpLive | totp = shown }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "TOTP DISABLE\r\n" ] outs
+                        , \_ -> Expect.equal True disabled.totp.busy
+                        , \_ -> Expect.equal Nothing disabled.totp.error
+                        , \_ -> Expect.equal (Just "JBSWY3DPEHPK3PXP") disabled.totp.secret
+                        , \_ -> Expect.equal (Just "kai") disabled.totpReplyAccount
+                        ]
+                        ()
+            , test "status sends TOTP STATUS without busy" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankTotp | error = Just "old" }
+
+                        ( asked, outs ) =
+                            requestTotpStatus { totpLive | totp = shown }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "TOTP STATUS\r\n" ] outs
+                        , \_ -> Expect.equal False asked.totp.busy
+                        , \_ -> Expect.equal (Just "old") asked.totp.error
+                        , \_ -> Expect.equal (Just "kai") asked.totpReplyAccount
+                        ]
+                        ()
+            , test "verbs refuse guests and dead sockets" <|
+                \_ ->
+                    let
+                        guest =
+                            blank
+
+                        offline =
+                            { totpLive | connection = Offline }
+
+                        ( gEnroll, gEnrollOut ) =
+                            requestTotpEnroll guest
+
+                        ( gConfirm, gConfirmOut ) =
+                            requestTotpConfirm guest "123456"
+
+                        ( gDisable, gDisableOut ) =
+                            requestTotpDisable guest
+
+                        ( gStatus, gStatusOut ) =
+                            requestTotpStatus guest
+
+                        ( oEnroll, oEnrollOut ) =
+                            requestTotpEnroll offline
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] gEnrollOut
+                        , \_ -> Expect.equal [] gConfirmOut
+                        , \_ -> Expect.equal [] gDisableOut
+                        , \_ -> Expect.equal [] gStatusOut
+                        , \_ -> Expect.equal Nothing gEnroll.totpReplyAccount
+                        , \_ -> Expect.equal Nothing gConfirm.totpReplyAccount
+                        , \_ -> Expect.equal Nothing gDisable.totpReplyAccount
+                        , \_ -> Expect.equal Nothing gStatus.totpReplyAccount
+                        , \_ -> Expect.equal [] oEnrollOut
+                        , \_ -> Expect.equal Nothing oEnroll.totpReplyAccount
+                        ]
+                        ()
+            , test "secret and otpauth notices settle without changing status" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | totpReplyAccount = Just "kai", totp = { blankTotp | busy = True } }
+
+                        ( gotSecret, _ ) =
+                            feed pending ":irc.example NOTICE kai :TOTP: secret JBSWY3DPEHPK3PXP"
+
+                        ( gotUri, _ ) =
+                            feed gotSecret ":irc.example NOTICE kai :TOTP: otpauth://totp/x:kai?secret=JBSWY3DPEHPK3PXP&issuer=x"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "JBSWY3DPEHPK3PXP") gotSecret.totp.secret
+                        , \_ -> Expect.equal False gotSecret.totp.busy
+                        , \_ -> Expect.equal TotpUnknown gotSecret.totp.status
+                        , \_ -> Expect.equal (Just "kai") gotSecret.totpReplyAccount
+                        , \_ -> Expect.equal (Just "otpauth://totp/x:kai?secret=JBSWY3DPEHPK3PXP&issuer=x") gotUri.totp.otpauth
+                        , \_ -> Expect.equal (Just "JBSWY3DPEHPK3PXP") gotUri.totp.secret
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: TOTP: secret JBSWY3DPEHPK3PXP")
+                                    gotUri.serviceLog
+                                )
+                        ]
+                        ()
+            , test "status-word notices drive pending/active/disabled and clear on lock" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | totpReplyAccount = Just "kai", totp = { blankTotp | busy = True, secret = Just "OLD" } }
+
+                        ( hinted, _ ) =
+                            feed pending ":irc.example NOTICE kai :TOTP: add this to your authenticator, then run TOTP CONFIRM <code>"
+
+                        ( activated, _ ) =
+                            feed hinted ":irc.example NOTICE kai :TOTP: two-factor authentication is now ACTIVE — future logins require a code"
+
+                        ( off, _ ) =
+                            feed activated ":irc.example NOTICE kai :TOTP: two-factor authentication disabled"
+
+                        ( ignored, _ ) =
+                            feed off ":irc.example NOTICE kai :TOTP: something unexpected"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal TotpPending hinted.totp.status
+                        , \_ -> Expect.equal TotpActive activated.totp.status
+                        , \_ -> Expect.equal Nothing activated.totp.secret
+                        , \_ -> Expect.equal TotpDisabled off.totp.status
+                        , \_ -> Expect.equal TotpDisabled ignored.totp.status
+                        , \_ -> Expect.equal False ignored.totp.busy
+                        ]
+                        ()
+            , test "stray totp notices never touch state" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | totpReplyAccount = Just "kai" }
+
+                        ( noContext, _ ) =
+                            feed totpLive ":irc.example NOTICE kai :TOTP: secret JBSWY3DPEHPK3PXP"
+
+                        ( nicked, _ ) =
+                            feed pending ":alice!u@h NOTICE kai :TOTP: secret JBSWY3DPEHPK3PXP"
+
+                        ( roomTarget, _ ) =
+                            feed pending ":irc.example NOTICE #c :TOTP: secret JBSWY3DPEHPK3PXP"
+
+                        ( otherBody, _ ) =
+                            feed pending ":irc.example NOTICE kai :hello there"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal blankTotp noContext.totp
+                        , \_ -> Expect.equal blankTotp nicked.totp
+                        , \_ -> Expect.equal blankTotp roomTarget.totp
+                        , \_ -> Expect.equal blankTotp otherBody.totp
+                        ]
+                        ()
+            , test "FAIL TOTP errors with the server description and ignores strays" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | totpReplyAccount = Just "kai", totp = { blankTotp | busy = True } }
+
+                        ( failed, _ ) =
+                            feed pending ":irc.example FAIL TOTP BAD_CODE :bad code"
+
+                        ( fallback, _ ) =
+                            foldTotpFail pending { kind = Wire.Fail, command = "TOTP", code = "BAD", context = [], description = "" }
+
+                        ( stray, _ ) =
+                            feed totpLive ":irc.example FAIL TOTP BAD_CODE :bad code"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "bad code") failed.totp.error
+                        , \_ -> Expect.equal False failed.totp.busy
+                        , \_ -> Expect.equal Nothing failed.totpReplyAccount
+                        , \_ -> Expect.equal (Just "TOTP command failed") fallback.totp.error
+                        , \_ -> Expect.equal blankTotp stray.totp
+                        ]
+                        ()
+            , test "totp builders render the four verbs" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "TOTP ENROLL\r\n" Services.totpEnroll
+                        , \_ -> Expect.equal (Just "TOTP CONFIRM 123456\r\n") (Services.totpConfirm "123456")
+                        , \_ -> Expect.equal Nothing (Services.totpConfirm "12 34")
+                        , \_ -> Expect.equal "TOTP DISABLE\r\n" Services.totpDisable
+                        , \_ -> Expect.equal "TOTP STATUS\r\n" Services.totpStatus
+                        ]
+                        ()
+            ]
+        , describe "motd numeric fold"
+            [ test "375 collects lines and 376 commits with the flag" <|
+                \_ ->
+                    let
+                        ( started, _ ) =
+                            feed blank ":irc.example 375 kai :- server MOTD -"
+
+                        ( first, _ ) =
+                            feed started ":irc.example 372 kai :line one"
+
+                        ( second, _ ) =
+                            feed first ":irc.example 372 kai :line two"
+
+                        ( done, _ ) =
+                            feed second ":irc.example 376 kai :end"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True started.motdCollecting
+                        , \_ -> Expect.equal (Just "line one\nline two") done.motd
+                        , \_ -> Expect.equal True done.showMotd
+                        , \_ -> Expect.equal False done.motdCollecting
+                        , \_ ->
+                            Expect.equal True
+                                (List.any (String.contains "line two") done.serviceLog)
+                        ]
+                        ()
+            , test "unsolicited 372 and stray 376 leave motd empty" <|
+                \_ ->
+                    let
+                        ( strayLine, _ ) =
+                            feed blank ":irc.example 372 kai :unsolicited MOTD"
+
+                        ( strayEnd, _ ) =
+                            feed strayLine ":irc.example 376 kai :end"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing strayLine.motd
+                        , \_ -> Expect.equal "" strayLine.motdBuffer
+                        , \_ -> Expect.equal Nothing strayEnd.motd
+                        , \_ -> Expect.equal False strayEnd.showMotd
+                        ]
+                        ()
+            , test "a new 375 resets a stale buffer" <|
+                \_ ->
+                    let
+                        ( started, _ ) =
+                            feed blank ":irc.example 375 kai :- server MOTD -"
+
+                        ( first, _ ) =
+                            feed started ":irc.example 372 kai :stale"
+
+                        ( restarted, _ ) =
+                            feed first ":irc.example 375 kai :- server MOTD -"
+
+                        ( second, _ ) =
+                            feed restarted ":irc.example 372 kai :fresh"
+
+                        ( done, _ ) =
+                            feed second ":irc.example 376 kai :end"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "fresh") done.motd
+                        , \_ -> Expect.equal True done.showMotd
+                        ]
+                        ()
+            , test "an empty 376 commits empty without the flag" <|
+                \_ ->
+                    let
+                        ( started, _ ) =
+                            feed blank ":irc.example 375 kai :- server MOTD -"
+
+                        ( done, _ ) =
+                            feed started ":irc.example 376 kai :end"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "") done.motd
+                        , \_ -> Expect.equal False done.showMotd
+                        , \_ -> Expect.equal False done.motdCollecting
+                        ]
+                        ()
+            , test "closeMotd dismisses the flag and keeps the text" <|
+                \_ ->
+                    let
+                        ( started, _ ) =
+                            feed blank ":irc.example 375 kai :- server MOTD -"
+
+                        ( lined, _ ) =
+                            feed started ":irc.example 372 kai :hello"
+
+                        ( done, _ ) =
+                            feed lined ":irc.example 376 kai :end"
+
+                        closed =
+                            closeMotd done
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True done.showMotd
+                        , \_ -> Expect.equal False closed.showMotd
+                        , \_ -> Expect.equal (Just "hello") closed.motd
+                        ]
+                        ()
+            , test "appendMotdLine bounds the buffer without splitting pairs" <|
+                \_ ->
+                    let
+                        huge =
+                            String.repeat 70000 "m"
+
+                        capped =
+                            appendMotdLine "" huge
+
+                        full =
+                            List.foldl (\line buf -> appendMotdLine buf line) "" (List.repeat 20 (String.repeat 5000 "m"))
+
+                        emojiLine =
+                            String.repeat 4096 "m" ++ "😀tail"
+
+                        ( started, _ ) =
+                            feed blank ":irc.example 375 kai :- server MOTD -"
+
+                        fed =
+                            List.foldl
+                                (\_ acc ->
+                                    Tuple.first (feed acc (":irc.example 372 kai :" ++ emojiLine))
+                                )
+                                started
+                                (List.range 1 24)
+
+                        ( done, _ ) =
+                            feed fed ":irc.example 376 kai :end"
+
+                        tailCode =
+                            Maybe.withDefault 0
+                                (Maybe.map Char.toCode
+                                    (List.head (String.toList (String.right 1 (Maybe.withDefault "" done.motd))))
+                                )
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal maxSystemEventTextLength (String.length capped)
+                        , \_ -> Expect.equal maxMotdTextLength (String.length full)
+                        , \_ -> Expect.equal full (appendMotdLine full "x")
+                        , \_ ->
+                            Expect.equal True
+                                (Maybe.withDefault "" done.motd
+                                    |> String.length
+                                    |> (\n -> n <= maxMotdTextLength)
+                                )
+                        , \_ -> Expect.equal False (tailCode >= 0xD800 && tailCode <= 0xDBFF)
+                        ]
+                        ()
+            ]
+        , describe "channel directory LIST"
+            [ test "321 resets partial rows mid-collection" <|
+                \_ ->
+                    let
+                        loading =
+                            { blank | channelListLoading = True, channelListRequest = Just [ { name = "#stale", count = 3, topic = "old" } ] }
+
+                        ( restarted, outs ) =
+                            feed loading ":irc.example 321 kai Channel :Users Name"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just []) restarted.channelListRequest
+                        , \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal True restarted.channelListLoading
+                        ]
+                        ()
+            , test "stray 321 never starts a collection" <|
+                \_ ->
+                    let
+                        ( idle, _ ) =
+                            feed blank ":irc.example 321 kai Channel :Users Name"
+
+                        quarantined =
+                            { blank | channelListLoading = True, channelListQuarantined = True, channelListRequest = Just [ { name = "#stale", count = 3, topic = "old" } ] }
+
+                        held =
+                            foldListStart quarantined
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing idle.channelListRequest
+                        , \_ -> Expect.equal False idle.channelListLoading
+                        , \_ -> Expect.equal quarantined held
+                        ]
+                        ()
+            , test "322 rows accumulate after a 321 reset and 323 commits" <|
+                \_ ->
+                    let
+                        loading =
+                            { blank | channelListLoading = True, channelListRequest = Just [ { name = "#stale", count = 3, topic = "old" } ] }
+
+                        ( restarted, _ ) =
+                            feed loading ":irc.example 321 kai Channel :Users Name"
+
+                        ( rowed, _ ) =
+                            feed restarted ":irc.example 322 kai #fresh 5 :hello"
+
+                        ( done, _ ) =
+                            feed rowed ":irc.example 323 kai :End of LIST"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just [ { name = "#fresh", count = 5, topic = "hello" } ]) rowed.channelListRequest
+                        , \_ -> Expect.equal [ { name = "#fresh", count = 5, topic = "hello" } ] done.channelList
+                        , \_ -> Expect.equal False done.channelListLoading
+                        ]
+                        ()
+            , test "322 rows gate hostile names and parse counts like parseInt" <|
+                \_ ->
+                    let
+                        hostile =
+                            [ { name = "#with space", count = 1, topic = "t" }
+                            , { name = "#del\u{007F}ete", count = 1, topic = "t" }
+                            , { name = "notachannel", count = 1, topic = "t" }
+                            , { name = "#comma,x", count = 1, topic = "t" }
+                            ]
+
+                        merged =
+                            List.foldl (\row acc -> mergeChannelListRow acc row) [] hostile
+
+                        prefixed =
+                            parseChannelListRow [ "me", "#c", "12abc", "hi" ] |> Maybe.map .count
+
+                        garbage =
+                            parseChannelListRow [ "me", "#c", "abc", "hi" ] |> Maybe.map .count
+
+                        huge =
+                            parseChannelListRow [ "me", "#c", "99999999999999999999", "hi" ] |> Maybe.map .count
+
+                        negative =
+                            parseChannelListRow [ "me", "#c", "-5", "hi" ] |> Maybe.map .count
+
+                        -- A real astral pair straddling the 4096 cut
+                        -- strands a high surrogate (the oracle's
+                        -- `_boundedSystemEventText` repairs the split).
+                        cut =
+                            String.repeat 4095 "x" ++ "\u{10000}" ++ String.repeat 100 "y"
+
+                        repaired =
+                            mergeChannelListRow [] { name = "#c", count = 1, topic = cut }
+
+                        duped =
+                            mergeChannelListRow [ { name = "#C", count = 9, topic = "kept" } ] { name = "#c", count = 3, topic = "fresh" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] merged
+                        , \_ -> Expect.equal (Just 12) prefixed
+                        , \_ -> Expect.equal (Just 0) garbage
+                        , \_ -> Expect.equal (Just 0) huge
+                        , \_ -> Expect.equal (Just 0) negative
+                        , \_ -> Expect.equal [ { name = "#c", count = 1, topic = String.repeat 4095 "x" } ] repaired
+                        , \_ -> Expect.equal [ { name = "#C", count = 9, topic = "kept" } ] duped
+                        ]
+                        ()
+            , test "LIST refresh arms a bare fetch; timeout reverts and quarantines" <|
+                \_ ->
+                    let
+                        live =
+                            { blank | connection = Live, nowMs = 9000 }
+
+                        ( asked, askOut ) =
+                            refreshChannelList live
+
+                        ( duplicate, dupOut ) =
+                            refreshChannelList asked
+
+                        ( offline, offOut ) =
+                            refreshChannelList { blank | connection = Offline }
+
+                        stale =
+                            { blank
+                                | channelListLoading = True
+                                , channelListDueMs = 100
+                                , channelList = [ { name = "#new", count = 1, topic = "" } ]
+                                , channelListCommitted = [ { name = "#old", count = 2, topic = "" } ]
+                                , channelListRequest = Just [ { name = "#new", count = 1, topic = "" } ]
+                            }
+
+                        timed =
+                            fireChannelListTimeout 150 stale
+
+                        early =
+                            fireChannelListTimeout 50 stale
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "LIST\r\n" ] askOut
+                        , \_ -> Expect.equal True asked.channelListLoading
+                        , \_ -> Expect.equal (Just []) asked.channelListRequest
+                        , \_ -> Expect.equal 24000 asked.channelListDueMs
+                        , \_ -> Expect.equal True duplicate.channelListLoading
+                        , \_ -> Expect.equal [] dupOut
+                        , \_ -> Expect.equal False offline.channelListLoading
+                        , \_ -> Expect.equal [] offOut
+                        , \_ -> Expect.equal [ { name = "#old", count = 2, topic = "" } ] timed.channelList
+                        , \_ -> Expect.equal False timed.channelListLoading
+                        , \_ -> Expect.equal Nothing timed.channelListRequest
+                        , \_ -> Expect.equal True timed.channelListQuarantined
+                        , \_ -> Expect.equal stale early
+                        ]
+                        ()
+            ]
+        , describe "CTCP queries"
+            [ test "inbound ACTION is swallowed with no row and no reply" <|
+                \_ ->
+                    let
+                        room =
+                            joinFirst { ownerLive | ourNick = "kai" } "kai" "#c"
+
+                        ( acted, outs ) =
+                            feed room ":bob!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (dmMessages acted "#c")
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "unknown CTCP is swallowed silently" <|
+                \_ ->
+                    let
+                        room =
+                            joinFirst { ownerLive | ourNick = "kai" } "kai" "#c"
+
+                        ( queried, outs ) =
+                            feed room ":bob!u@h PRIVMSG #c :\u{0001}FOO bar\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (dmMessages queried "#c")
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "SCREENSHARE START notifies with no row or reply" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        before =
+                            List.length base.notifications
+
+                        ( started, startOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}SCREENSHARE START\u{0001}"
+
+                        startNote =
+                            List.head (List.reverse started.notifications)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] startOuts
+                        , \_ -> Expect.equal (before + 1) (List.length started.notifications)
+                        , \_ -> Expect.equal True (Maybe.map (.text >> String.endsWith "bob is sharing their screen") startNote |> Maybe.withDefault False)
+                        , \_ -> Expect.equal (Just NotifSystem) (Maybe.map .kind startNote)
+                        , \_ -> Expect.equal (Just (Just "bob")) (Maybe.map .from startNote)
+                        , \_ -> Expect.equal [] (dmMessages started "bob")
+                        ]
+                        ()
+            , test "SCREENSHARE STOP and near-misses swallow silently" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        ( stopped, stopOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}SCREENSHARE STOP\u{0001}"
+
+                        ( spaced, spacedOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}SCREENSHARE START \u{0001}"
+
+                        ( lowered, loweredOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}screenshare start\u{0001}"
+
+                        ( merging, mergingOuts ) =
+                            feed { base | historyMerging = True } ":bob!u@h PRIVMSG kai :\u{0001}SCREENSHARE START\u{0001}"
+
+                        ( gated, gatedOuts ) =
+                            feed { base | ctcpEnabled = False } ":bob!u@h PRIVMSG kai :\u{0001}SCREENSHARE START\u{0001}"
+
+                        gatedNote =
+                            List.head (List.reverse gated.notifications)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] stopOuts
+                        , \_ -> Expect.equal base.notifications stopped.notifications
+                        , \_ -> Expect.equal [] spacedOuts
+                        , \_ -> Expect.equal base.notifications spaced.notifications
+                        , \_ -> Expect.equal [] loweredOuts
+                        , \_ -> Expect.equal base.notifications lowered.notifications
+                        , \_ -> Expect.equal [] mergingOuts
+                        , \_ -> Expect.equal base.notifications merging.notifications
+                        , \_ -> Expect.equal [] gatedOuts
+                        , \_ -> Expect.equal True (Maybe.map (.text >> String.endsWith "bob is sharing their screen") gatedNote |> Maybe.withDefault False)
+                        ]
+                        ()
+            , test "VERSION answers the configured reply" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        ( replied, outs ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}VERSION\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NOTICE bob :\u{0001}VERSION Onyx IRC Client\u{0001}\r\n" ] outs
+                        , \_ -> Expect.equal [] (dmMessages replied "bob")
+                        ]
+                        ()
+            , test "PING echoes its args and CLIENTINFO lists the four queries" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        ( pinged, pingOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}PING 123 abc\u{0001}"
+
+                        ( informed, infoOuts ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}CLIENTINFO\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "NOTICE bob :\u{0001}PING 123 abc\u{0001}\r\n" ] pingOuts
+                        , \_ -> Expect.equal [ SendLine "NOTICE bob :\u{0001}CLIENTINFO VERSION TIME PING CLIENTINFO\u{0001}\r\n" ] infoOuts
+                        , \_ -> Expect.equal [] (dmMessages pinged "bob")
+                        , \_ -> Expect.equal [] (dmMessages informed "bob")
+                        ]
+                        ()
+            , test "TIME resolves through the ports clock outbound" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        ( timed, outs ) =
+                            feed base ":bob!u@h PRIVMSG kai :\u{0001}TIME\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ CtcpTimeReply { to = "bob" } ] outs
+                        , \_ -> Expect.equal [] (dmMessages timed "bob")
+                        ]
+                        ()
+            , test "disabled CTCP and toggled-off TIME/PING stay silent" <|
+                \_ ->
+                    let
+                        base =
+                            { ownerLive | ourNick = "kai" }
+
+                        ( off, offOuts ) =
+                            feed { base | ctcpEnabled = False } ":bob!u@h PRIVMSG kai :\u{0001}VERSION\u{0001}"
+
+                        ( noTime, noTimeOuts ) =
+                            feed { base | ctcpTimeEnabled = False } ":bob!u@h PRIVMSG kai :\u{0001}TIME\u{0001}"
+
+                        ( noPing, noPingOuts ) =
+                            feed { base | ctcpPingEnabled = False } ":bob!u@h PRIVMSG kai :\u{0001}PING 1\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] offOuts
+                        , \_ -> Expect.equal [] noTimeOuts
+                        , \_ -> Expect.equal [] noPingOuts
+                        , \_ -> Expect.equal [] (dmMessages off "bob")
+                        ]
+                        ()
+            , test "NOTICE-form and self CTCP keep the normal path" <|
+                \_ ->
+                    let
+                        base =
+                            joinFirst { ownerLive | ourNick = "kai" } "kai" "#c"
+
+                        ( noticed, _ ) =
+                            feed base ":bob!u@h NOTICE #c :\u{0001}ACTION waves\u{0001}"
+
+                        ( echoed, echoOuts ) =
+                            feed base ":kai!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length (dmMessages noticed "#c"))
+                        , \_ -> Expect.equal [] echoOuts
+                        ]
+                        ()
+            , test "stored replies normalize fail-closed" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "Alice private build" (normalizeCtcpVersionReply "Alice\r\n\u{0000}\u{0001} private build")
+                        , \_ -> Expect.equal maxCtcpVersionReplyLength (String.length (normalizeCtcpVersionReply (String.repeat 300 "m")))
+                        , \_ -> Expect.equal "" (normalizeCtcpVersionReply "")
+                        ]
+                        ()
+            , test "loaded config patches fields and keeps defaults on junk" <|
+                \_ ->
+                    let
+                        good =
+                            Encode.object [ ( "versionReply", Encode.string "Custom build" ), ( "timeEnabled", Encode.bool False ) ]
+
+                        partial =
+                            Encode.object [ ( "versionReply", Encode.string "Bad\r\n\u{0001}build" ) ]
+
+                        junk =
+                            Encode.string "nope"
+
+                        apply raw =
+                            Tuple.first (update (CtcpConfigLoaded raw) blank)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "Custom build" (apply good).ctcpVersionReply
+                        , \_ -> Expect.equal False (apply good).ctcpTimeEnabled
+                        , \_ -> Expect.equal "Badbuild" (apply partial).ctcpVersionReply
+                        , \_ -> Expect.equal True (apply partial).ctcpTimeEnabled
+                        , \_ -> Expect.equal defaultCtcpVersionReply (apply junk).ctcpVersionReply
+                        , \_ -> Expect.equal True (apply junk).ctcpTimeEnabled
+                        ]
+                        ()
+            ]
+        , describe "recovery codes wiring"
+            [ test "status sends and marks busy" <|
+                \_ ->
+                    let
+                        ( asked, outs ) =
+                            requestRecoveryCodesStatus blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "RECOVERYCODES STATUS\r\n" ] outs
+                        , \_ -> Expect.equal True asked.recoveryCodes.busy
+                        , \_ -> Expect.equal Nothing asked.recoveryCodes.error
+                        ]
+                        ()
+            , test "generate and clear send with optional passwords" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankRecoveryCodes | freshCodes = [ "OLD" ], info = Just "old" }
+
+                        base =
+                            { blank | recoveryCodes = shown }
+
+                        ( bare, outBare ) =
+                            requestRecoveryCodesGenerate base Nothing
+
+                        ( blankPw, outBlankPw ) =
+                            requestRecoveryCodesGenerate base (Just "  ")
+
+                        ( withPw, outPw ) =
+                            requestRecoveryCodesGenerate base (Just "s3cret")
+
+                        ( badPw, outBadPw ) =
+                            requestRecoveryCodesGenerate base (Just "a b")
+
+                        ( cleared, outClear ) =
+                            requestRecoveryCodesClear base (Just "s3cret")
+
+                        ( offline, outOffline ) =
+                            requestRecoveryCodesStatus { blank | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "RECOVERYCODES GENERATE\r\n" ] outBare
+                        , \_ -> Expect.equal [] bare.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal Nothing bare.recoveryCodes.info
+                        , \_ -> Expect.equal [ SendLine "RECOVERYCODES GENERATE\r\n" ] outBlankPw
+                        , \_ -> Expect.equal [ SendLine "RECOVERYCODES GENERATE s3cret\r\n" ] outPw
+                        , \_ -> Expect.equal [] outBadPw
+                        , \_ -> Expect.equal shown badPw.recoveryCodes
+                        , \_ -> Expect.equal [ SendLine "RECOVERYCODES CLEAR s3cret\r\n" ] outClear
+                        , \_ -> Expect.equal True cleared.recoveryCodes.busy
+                        , \_ -> Expect.equal [] outOffline
+                        ]
+                        ()
+            , test "login normalizes and queues off-socket" <|
+                \_ ->
+                    let
+                        ( live, outLive ) =
+                            requestRecoveryCodesLogin blank "kai" "abcde-fghjk"
+
+                        ( short, outShort ) =
+                            requestRecoveryCodesLogin blank "kai" "abc"
+
+                        ( noAcct, outNoAcct ) =
+                            requestRecoveryCodesLogin blank "  " "abcde-fghjk"
+
+                        ( queued, outQueued ) =
+                            requestRecoveryCodesLogin { blank | connection = Offline } "kai" "abcde-fghjk"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "RECOVERYCODES LOGIN kai ABCDEFGHJK\r\n" ] outLive
+                        , \_ -> Expect.equal True live.recoveryCodes.busy
+                        , \_ -> Expect.equal [] outShort
+                        , \_ -> Expect.equal [] outNoAcct
+                        , \_ -> Expect.equal [] outQueued
+                        , \_ -> Expect.equal (Just { account = "kai", code = "ABCDEFGHJK" }) queued.pendingRecoveryLogin
+                        , \_ -> Expect.equal True queued.recoveryCodes.busy
+                        ]
+                        ()
+            , test "001 flushes the queued recovery login once" <|
+                \_ ->
+                    let
+                        queued =
+                            { blank | pendingRecoveryLogin = Just { account = "kai", code = "ABCDEFGHJK" } }
+
+                        ( welcomed, outs ) =
+                            feed queued ":irc.example 001 kai :welcome"
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing welcomed.pendingRecoveryLogin
+                        , \_ ->
+                            Expect.equal True
+                                (List.member "RECOVERYCODES LOGIN kai ABCDEFGHJK\r\n" sends)
+                        ]
+                        ()
+            , test "status and generated notices settle" <|
+                \_ ->
+                    let
+                        busy =
+                            { blankRecoveryCodes | busy = True, error = Just "old" }
+
+                        ( counted, _ ) =
+                            feed { blank | recoveryCodes = busy } ":irc.example NOTICE kai :RECOVERYCODES: 3 unused codes"
+
+                        ( minted, _ ) =
+                            feed counted ":irc.example NOTICE kai :RECOVERYCODES: generated 10 single-use codes — keep them safe"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 3) counted.recoveryCodes.remaining
+                        , \_ -> Expect.equal Nothing counted.recoveryCodes.info
+                        , \_ -> Expect.equal Nothing counted.recoveryCodes.error
+                        , \_ -> Expect.equal False counted.recoveryCodes.busy
+                        , \_ -> Expect.equal [] minted.recoveryCodes.freshCodes
+                        , \_ ->
+                            Expect.equal
+                                (Just "generated 10 single-use codes — keep them safe")
+                                minted.recoveryCodes.info
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: RECOVERYCODES: 3 unused codes")
+                                    minted.serviceLog
+                                )
+                        ]
+                        ()
+            , test "code lines accumulate without duplicates" <|
+                \_ ->
+                    let
+                        ( first, _ ) =
+                            feed blank ":irc.example NOTICE kai :RECOVERYCODES: 1. ABCDE-FGHJK"
+
+                        ( second, _ ) =
+                            feed first ":irc.example NOTICE kai :RECOVERYCODES: 2. KMNPQ-RSTVW"
+
+                        ( dup, _ ) =
+                            feed second ":irc.example NOTICE kai :RECOVERYCODES: 2. KMNPQ-RSTVW"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "ABCDE-FGHJK" ] first.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal (Just 1) first.recoveryCodes.remaining
+                        , \_ -> Expect.equal [ "ABCDE-FGHJK", "KMNPQ-RSTVW" ] second.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal (Just 2) second.recoveryCodes.remaining
+                        , \_ -> Expect.equal [ "ABCDE-FGHJK", "KMNPQ-RSTVW" ] dup.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal (Just 2) dup.recoveryCodes.remaining
+                        ]
+                        ()
+            , test "cleared login-ok and free text settle" <|
+                \_ ->
+                    let
+                        stocked =
+                            { blankRecoveryCodes | remaining = Just 3, freshCodes = [ "A", "B" ] }
+
+                        ( emptied, _ ) =
+                            feed { blank | recoveryCodes = stocked } ":irc.example NOTICE kai :RECOVERYCODES: all recovery codes cleared"
+
+                        ( logged, _ ) =
+                            feed { blank | recoveryCodes = stocked } ":irc.example NOTICE kai :RECOVERYCODES: login ok — one code used"
+
+                        ( noted, _ ) =
+                            feed blank ":irc.example NOTICE kai :RECOVERYCODES: something unexpected"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just 0) emptied.recoveryCodes.remaining
+                        , \_ -> Expect.equal [] emptied.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal (Just 2) logged.recoveryCodes.remaining
+                        , \_ -> Expect.equal [ "A", "B" ] logged.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal (Just "something unexpected") noted.recoveryCodes.info
+                        , \_ -> Expect.equal False noted.recoveryCodes.busy
+                        ]
+                        ()
+            , test "stray recovery notices never touch state" <|
+                \_ ->
+                    let
+                        ( nicked, _ ) =
+                            feed blank ":alice!u@h NOTICE kai :RECOVERYCODES: 3 unused codes"
+
+                        ( roomTarget, _ ) =
+                            feed blank ":irc.example NOTICE #c :RECOVERYCODES: 3 unused codes"
+
+                        ( otherBody, _ ) =
+                            feed blank ":irc.example NOTICE kai :hello there"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal blankRecoveryCodes nicked.recoveryCodes
+                        , \_ -> Expect.equal blankRecoveryCodes roomTarget.recoveryCodes
+                        , \_ -> Expect.equal blankRecoveryCodes otherBody.recoveryCodes
+                        ]
+                        ()
+            , test "FAIL settles the error ungated" <|
+                \_ ->
+                    let
+                        busy =
+                            { blankRecoveryCodes | busy = True }
+
+                        ( failed, _ ) =
+                            feed { blank | recoveryCodes = busy } ":irc.example FAIL RECOVERYCODES AUTH_FAILED :nope"
+
+                        ( fallback, _ ) =
+                            foldRecoveryCodesFail blank { kind = Wire.Fail, command = "RECOVERYCODES", code = "X", context = [], description = "" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "nope") failed.recoveryCodes.error
+                        , \_ -> Expect.equal False failed.recoveryCodes.busy
+                        , \_ -> Expect.equal (Just "Recovery codes command failed") fallback.recoveryCodes.error
+                        ]
+                        ()
+            , test "dismiss forgets fresh codes" <|
+                \_ ->
+                    let
+                        shown =
+                            { blankRecoveryCodes | freshCodes = [ "A" ], info = Just "new batch" }
+
+                        closed =
+                            dismissRecoveryCodesFresh { blank | recoveryCodes = shown }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] closed.recoveryCodes.freshCodes
+                        , \_ -> Expect.equal Nothing closed.recoveryCodes.info
+                        ]
+                        ()
+            , test "recovery builders render the verbs" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "RECOVERYCODES STATUS\r\n" Services.recoveryCodesStatus
+                        , \_ -> Expect.equal (Just "RECOVERYCODES GENERATE\r\n") (Services.recoveryCodesGenerate Nothing)
+                        , \_ -> Expect.equal (Just "RECOVERYCODES GENERATE pw\r\n") (Services.recoveryCodesGenerate (Just "pw"))
+                        , \_ -> Expect.equal (Just "RECOVERYCODES CLEAR\r\n") (Services.recoveryCodesClear Nothing)
+                        , \_ -> Expect.equal (Just "RECOVERYCODES LOGIN kai ABC\r\n") (Services.recoveryCodesLogin "kai" "ABC")
+                        , \_ -> Expect.equal Nothing (Services.recoveryCodesLogin "k ai" "ABC")
+                        ]
+                        ()
+            ]
+        , describe "keytrans transparency"
+            [ test "status and proof send with a live context" <|
+                \_ ->
+                    let
+                        ( asked, outAsked ) =
+                            requestKeytransStatus totpLive
+
+                        ( proved, outProved ) =
+                            requestKeytransProof totpLive 41
+
+                        ( negative, outNegative ) =
+                            requestKeytransProof totpLive -1
+
+                        ( guest, outGuest ) =
+                            requestKeytransStatus blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "KEYTRANS STATUS\r\n" ] outAsked
+                        , \_ -> Expect.equal (Just "kai") asked.keytransReplyAccount
+                        , \_ -> Expect.equal [ SendLine "KEYTRANS PROOF 41\r\n" ] outProved
+                        , \_ -> Expect.equal (Just "kai") proved.keytransReplyAccount
+                        , \_ -> Expect.equal [] outNegative
+                        , \_ -> Expect.equal Nothing negative.keytransReplyAccount
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal Nothing guest.keytransReplyAccount
+                        ]
+                        ()
+            , test "keytrans notices surface gated on the live context" <|
+                \_ ->
+                    let
+                        live =
+                            { totpLive | keytransReplyAccount = Just "kai" }
+
+                        ( surfaced, _ ) =
+                            feed live ":irc.example NOTICE kai :KEYTRANS root abc123"
+
+                        ( prefixed, _ ) =
+                            feed live ":irc.example NOTICE kai :[Account]: KEYTRANS proof ok"
+
+                        ( stray, _ ) =
+                            feed totpLive ":irc.example NOTICE kai :KEYTRANS root abc123"
+
+                        ( nicked, _ ) =
+                            feed live ":alice!u@h NOTICE kai :KEYTRANS root abc123"
+
+                        ( headless, _ ) =
+                            feed live ":irc.example NOTICE kai :KEYTRANSFER x"
+
+                        ( otherBody, _ ) =
+                            feed live ":irc.example NOTICE kai :hello there"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: KEYTRANS root abc123")
+                                    surfaced.serviceLog
+                                )
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: [Account]: KEYTRANS proof ok")
+                                    prefixed.serviceLog
+                                )
+                        , \_ -> Expect.equal (Just "kai") surfaced.keytransReplyAccount
+                        , \_ ->
+                            Expect.equal False
+                                (List.any (String.contains "KEYTRANS") stray.serviceLog)
+                        , \_ ->
+                            Expect.equal False
+                                (List.any (String.contains "KEYTRANS") nicked.serviceLog)
+                        , \_ ->
+                            Expect.equal False
+                                (List.any (String.contains "KEYTRANSFER") headless.serviceLog)
+                        , \_ ->
+                            Expect.equal False
+                                (List.any (String.contains "hello there") otherBody.serviceLog)
+                        ]
+                        ()
+            , test "keytrans builders render the verbs" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "KEYTRANS STATUS\r\n" Services.keyTransparencyStatus
+                        , \_ -> Expect.equal (Just "KEYTRANS PROOF 7\r\n") (Services.keyTransparencyProof 7)
+                        , \_ -> Expect.equal Nothing (Services.keyTransparencyProof -2)
+                        ]
+                        ()
+            ]
+        , describe "event media subscription"
+            [ test "001 subscribes to live voice/video presence" <|
+                \_ ->
+                    let
+                        ( _, outs ) =
+                            feed blank ":irc.example 001 kai :welcome"
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.equal True
+                        (List.member "EVENT ADD MEDIA *\r\n" sends)
+            ]
+        , describe "client cert bindings"
+            [ test "add list and delete send with a live context" <|
+                \_ ->
+                    let
+                        ( added, outAdded ) =
+                            requestCertAdd totpLive
+
+                        ( listed, outListed ) =
+                            requestCertList totpLive
+
+                        ( deleted, outDeleted ) =
+                            requestCertDel totpLive "  fp:AA  "
+
+                        ( blankFp, outBlankFp ) =
+                            requestCertDel totpLive "   "
+
+                        ( guest, outGuest ) =
+                            requestCertAdd blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "CERTADD\r\n" ] outAdded
+                        , \_ -> Expect.equal (Just "kai") added.certReplyAccount
+                        , \_ -> Expect.equal [ SendLine "CERTLIST\r\n" ] outListed
+                        , \_ -> Expect.equal (Just "kai") listed.certReplyAccount
+                        , \_ -> Expect.equal [ SendLine "CERTDEL fp:AA\r\n" ] outDeleted
+                        , \_ -> Expect.equal [] outBlankFp
+                        , \_ -> Expect.equal Nothing blankFp.certReplyAccount
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal Nothing guest.certReplyAccount
+                        ]
+                        ()
+            , test "cert notices surface gated on the live context" <|
+                \_ ->
+                    let
+                        live =
+                            { totpLive | certReplyAccount = Just "kai" }
+
+                        ( listed, _ ) =
+                            feed live ":irc.example NOTICE kai :CERTLIST fp:AA:BB"
+
+                        ( removed, _ ) =
+                            feed live ":irc.example NOTICE kai :Certificate fingerprint fp:AA removed from kai"
+
+                        ( stray, _ ) =
+                            feed totpLive ":irc.example NOTICE kai :CERTLIST fp:AA:BB"
+
+                        ( certs, _ ) =
+                            feed live ":irc.example NOTICE kai :CERTS revoked"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: CERTLIST fp:AA:BB")
+                                    listed.serviceLog
+                                )
+                        , \_ ->
+                            Expect.equal True
+                                (List.any
+                                    (String.contains "Account: Certificate fingerprint")
+                                    removed.serviceLog
+                                )
+                        , \_ -> Expect.equal (Just "kai") listed.certReplyAccount
+                        , \_ -> Expect.equal False (List.any (String.contains "CERTLIST") stray.serviceLog)
+                        , \_ -> Expect.equal False (List.any (String.contains "CERTS revoked") certs.serviceLog)
+                        ]
+                        ()
+            ]
+        , describe "account panel C1"
+            [ test "parseAccountInfo reads full bodies and refuses junk" <|
+                \_ ->
+                    let
+                        full =
+                            parseAccountInfo "account=kai flags=3 email=kai@x.test secure=on enforce=off registered=2024-01-01"
+
+                        dup =
+                            parseAccountInfo "account=kai account=zoe"
+
+                        many =
+                            parseAccountInfo (String.join " " (List.map (\n -> "k" ++ String.fromInt n ++ "=v") (List.range 1 65)))
+
+                        badFlags =
+                            parseAccountInfo "account=kai flags=01"
+
+                        badBool =
+                            parseAccountInfo "account=kai secure=maybe"
+
+                        unknownOnly =
+                            parseAccountInfo "frobnicate=yes"
+
+                        badEmail =
+                            parseAccountInfo "account=kai email=a,b@c"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") (Maybe.andThen .account full)
+                        , \_ -> Expect.equal (Just 3) (Maybe.andThen .flags full)
+                        , \_ -> Expect.equal (Just "kai@x.test") (Maybe.andThen .email full)
+                        , \_ -> Expect.equal (Just True) (Maybe.andThen .secure full)
+                        , \_ -> Expect.equal (Just False) (Maybe.andThen .enforce full)
+                        , \_ -> Expect.equal (Just "2024-01-01") (Maybe.andThen .registered full)
+                        , \_ -> Expect.equal Nothing dup
+                        , \_ -> Expect.equal Nothing many
+                        , \_ -> Expect.equal Nothing badFlags
+                        , \_ -> Expect.equal Nothing badBool
+                        , \_ -> Expect.equal Nothing unknownOnly
+                        , \_ -> Expect.equal Nothing badEmail
+                        , \_ -> Expect.equal Nothing (parseAccountInfo "")
+                        ]
+                        ()
+            , test "requestAccountInfo targets self or a named account" <|
+                \_ ->
+                    let
+                        ( mine, outMine ) =
+                            requestAccountInfo totpLive Nothing
+
+                        ( named, outNamed ) =
+                            requestAccountInfo totpLive (Just "  zoe ")
+
+                        ( guest, outGuest ) =
+                            requestAccountInfo blank Nothing
+
+                        ( offline, outOffline ) =
+                            requestAccountInfo { totpLive | connection = Offline } Nothing
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "ACCOUNTINFO\r\n" ] outMine
+                        , \_ -> Expect.equal True mine.accountInfoPending
+                        , \_ -> Expect.equal (Just "kai") mine.accountInfoReplyAccount
+                        , \_ -> Expect.equal [ SendLine "ACCOUNTINFO zoe\r\n" ] outNamed
+                        , \_ -> Expect.equal (Just "zoe") named.accountInfoReplyAccount
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal [] outOffline
+                        ]
+                        ()
+            , test "account info applies only to the live request" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | accountInfoReplyAccount = Just "kai", accountInfoPending = True }
+
+                        fields =
+                            { account = Just "kai"
+                            , flags = Just 3
+                            , email = Nothing
+                            , secure = Just True
+                            , enforce = Nothing
+                            , registered = Nothing
+                            }
+
+                        other =
+                            { fields | account = Just "zoe" }
+
+                        ( settled, _ ) =
+                            feed pending ":irc.example NOTE ACCOUNTINFO :account=kai flags=3 secure=on"
+
+                        ( stray, _ ) =
+                            feed totpLive ":irc.example NOTE ACCOUNTINFO :account=kai flags=3"
+
+                        ( mismatch, _ ) =
+                            feed pending ":irc.example NOTE ACCOUNTINFO :account=zoe flags=3"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "kai") (Maybe.map .account settled.accountInfo)
+                        , \_ -> Expect.equal (Just 3) (Maybe.andThen .flags settled.accountInfo)
+                        , \_ -> Expect.equal False settled.accountInfoPending
+                        , \_ -> Expect.equal Nothing settled.accountInfoReplyAccount
+                        , \_ -> Expect.equal Nothing stray.accountInfo
+                        , \_ -> Expect.equal Nothing mismatch.accountInfo
+                        , \_ -> Expect.equal Nothing (applyAccountInfo { pending | accountInfoReplyAccount = Nothing } fields)
+                        , \_ -> Expect.equal Nothing (applyAccountInfo pending other)
+                        ]
+                        ()
+            , test "accountset notes refetch while authed" <|
+                \_ ->
+                    let
+                        ( refetched, outs ) =
+                            feed totpLive ":irc.example NOTE ACCOUNTSET :ok"
+
+                        ( guest, outGuest ) =
+                            feed blank ":irc.example NOTE ACCOUNTSET :ok"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (SendLine "ACCOUNTINFO\r\n") outs)
+                        , \_ -> Expect.equal [] outGuest
+                        ]
+                        ()
+            , test "failed account info clears the attempt" <|
+                \_ ->
+                    let
+                        pending =
+                            { totpLive | accountInfoReplyAccount = Just "kai", accountInfoPending = True }
+
+                        ( failed, _ ) =
+                            feed pending ":irc.example FAIL ACCOUNTINFO NO_SUCH_ACCOUNT :nope"
+
+                        ( stray, _ ) =
+                            feed totpLive ":irc.example FAIL ACCOUNTINFO X :nope"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing failed.accountInfoReplyAccount
+                        , \_ -> Expect.equal False failed.accountInfoPending
+                        , \_ -> Expect.equal blank.accountInfoPending stray.accountInfoPending
+                        ]
+                        ()
+            , test "opening the panel refreshes info and sessions" <|
+                \_ ->
+                    let
+                        ( opened, outs ) =
+                            update (SetAccountOpen True) totpLive
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+
+                        ( again, outAgain ) =
+                            update (SetAccountOpen True) opened
+
+                        ( closed, _ ) =
+                            update (SetAccountOpen False) opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True opened.accountOpen
+                        , \_ -> Expect.equal True (List.member "ACCOUNTINFO\r\n" sends)
+                        , \_ -> Expect.equal True (List.member "SESSION LIST\r\n" sends)
+                        , \_ -> Expect.equal True opened.accountInfoPending
+                        , \_ -> Expect.equal True opened.accountSessionsPending
+                        , \_ -> Expect.equal [] outAgain
+                        , \_ -> Expect.equal False closed.accountOpen
+                        ]
+                        ()
+            , test "logout sends live and stays silent offline" <|
+                \_ ->
+                    let
+                        ( _, outLive ) =
+                            update SessionLogoutRequested totpLive
+
+                        ( _, outOffline ) =
+                            update SessionLogoutRequested { totpLive | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "LOGOUT\r\n" ] outLive
+                        , \_ -> Expect.equal [] outOffline
+                        ]
+                        ()
+            ]
+        , describe "account panel C2"
+            [ test "boundTotpCode keeps digits capped at six" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "123456" (boundTotpCode "a1b2c3d4e5f6g7")
+                        , \_ -> Expect.equal "" (boundTotpCode "abcdef")
+                        , \_ -> Expect.equal "123456" (boundTotpCode "123456")
+                        ]
+                        ()
+            , test "TotpCodeInput clamps and confirm sends then clears" <|
+                \_ ->
+                    let
+                        ( typed, _ ) =
+                            update (TotpCodeInput "a1b2c3d4e5f6g7") totpLive
+
+                        ( sent, outSent ) =
+                            update TotpConfirmSubmitted { totpLive | totpCodeInput = "123456" }
+
+                        ( refused, outRefused ) =
+                            update TotpConfirmSubmitted { totpLive | totpCodeInput = "12" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "123456" typed.totpCodeInput
+                        , \_ -> Expect.equal [ SendLine "TOTP CONFIRM 123456\r\n" ] outSent
+                        , \_ -> Expect.equal "" sent.totpCodeInput
+                        , \_ -> Expect.equal [] outRefused
+                        , \_ -> Expect.equal "12" refused.totpCodeInput
+                        ]
+                        ()
+            , test "totp copy buttons emit tagged writes with single-flight" <|
+                \_ ->
+                    let
+                        shown =
+                            { totpLive | totp = { blankTotp | secret = Just "ABC", otpauth = Just "otpauth://x" } }
+
+                        ( copying, outCopy ) =
+                            update TotpSecretCopyRequested shown
+
+                        ( busyAgain, outBusy ) =
+                            update TotpSecretCopyRequested copying
+
+                        ( _, outBare ) =
+                            update TotpSecretCopyRequested totpLive
+
+                        ( copied, _ ) =
+                            update (ClipboardResult { tag = "totp-secret", ok = True }) copying
+
+                        ( failed, _ ) =
+                            update (ClipboardResult { tag = "totp-secret", ok = False }) copying
+
+                        stale =
+                            update (ClipboardResult { tag = "totp-secret", ok = True }) shown
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ ClipboardCopy { text = "ABC", tag = "totp-secret" } ] outCopy
+                        , \_ -> Expect.equal TotpCopyBusy copying.totpSecretCopy
+                        , \_ -> Expect.equal [] outBusy
+                        , \_ -> Expect.equal [] outBare
+                        , \_ -> Expect.equal TotpCopyCopied copied.totpSecretCopy
+                        , \_ -> Expect.equal TotpCopyFailed failed.totpSecretCopy
+                        , \_ -> Expect.equal TotpCopyIdle (Tuple.first stale).totpSecretCopy
+                        ]
+                        ()
+            , test "cert bind lists and remove deletes then lists" <|
+                \_ ->
+                    let
+                        ( _, outBind ) =
+                            update CertBindRequested totpLive
+
+                        ( _, outGuest ) =
+                            update CertBindRequested blank
+
+                        ( cleared, outDel ) =
+                            update CertRemoveSubmitted { totpLive | certFingerprint = "  SHA256:abc  " }
+
+                        ( kept, outBlank ) =
+                            update CertRemoveSubmitted { totpLive | certFingerprint = "   " }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "CERTADD\r\n", SendLine "CERTLIST\r\n" ] outBind
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine "CERTDEL SHA256:abc\r\n", SendLine "CERTLIST\r\n" ]
+                                outDel
+                        , \_ -> Expect.equal "" cleared.certFingerprint
+                        , \_ -> Expect.equal [] outBlank
+                        , \_ -> Expect.equal "   " kept.certFingerprint
+                        ]
+                        ()
+            , test "keytrans refresh sends live and stays silent as guest" <|
+                \_ ->
+                    let
+                        ( _, outLive ) =
+                            update KeytransStatusRequested totpLive
+
+                        ( _, outGuest ) =
+                            update KeytransStatusRequested blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "KEYTRANS STATUS\r\n" ] outLive
+                        , \_ -> Expect.equal [] outGuest
+                        ]
+                        ()
+            , test "open-refresh now includes totp and keytrans legs" <|
+                \_ ->
+                    let
+                        sends outs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+
+                        ( _, outLive ) =
+                            update (SetAccountOpen True) totpLive
+
+                        ( _, outGuest ) =
+                            update (SetAccountOpen True) blank
+
+                        live =
+                            sends outLive
+
+                        guest =
+                            sends outGuest
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "TOTP STATUS\r\n" live)
+                        , \_ -> Expect.equal True (List.member "KEYTRANS STATUS\r\n" live)
+                        , \_ -> Expect.equal False (List.member "TOTP STATUS\r\n" guest)
+                        , \_ -> Expect.equal False (List.member "KEYTRANS STATUS\r\n" guest)
+                        ]
+                        ()
+            , test "notice filters surface cert and transparency lines" <|
+                \_ ->
+                    let
+                        logged =
+                            { totpLive
+                                | serviceLog =
+                                    [ "Account: TOTP: secret XYZ"
+                                    , "Chat: KEYTRANS noise"
+                                    , "Account: monkeytransporter"
+                                    , "Account: KEYTRANS root abc"
+                                    , "Account: certificate added"
+                                    , "Account: CERTLIST 2 fingerprints"
+                                    ]
+                            }
+
+                        many =
+                            { totpLive
+                                | serviceLog =
+                                    List.map
+                                        (\n -> "Account: CERTLIST batch " ++ String.fromInt n)
+                                        (List.range 1 6)
+                            }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ "Account: certificate added"
+                                , "Account: CERTLIST 2 fingerprints"
+                                ]
+                                (accountCertNotices logged)
+                        , \_ -> Expect.equal [ "Account: KEYTRANS root abc" ] (accountKeytransNotices logged)
+                        , \_ -> Expect.equal 4 (List.length (accountCertNotices many))
+                        ]
+                        ()
+            , test "901 clears the security inputs" <|
+                \_ ->
+                    let
+                        armed =
+                            { totpLive
+                                | totpCodeInput = "123"
+                                , certFingerprint = "SHA256:abc"
+                                , totpSecretCopy = TotpCopyCopied
+                            }
+
+                        ( cleared, _ ) =
+                            feed armed ":s 901 kai :You are now logged out"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" cleared.totpCodeInput
+                        , \_ -> Expect.equal "" cleared.certFingerprint
+                        , \_ -> Expect.equal TotpCopyIdle cleared.totpSecretCopy
+                        ]
+                        ()
+            ]
+        , describe "account panel C3"
+            [ test "isValidAccountEmail mirrors the oracle gate" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal True (isValidAccountEmail "kai@x.test")
+                        , \_ -> Expect.equal True (isValidAccountEmail "  kai@x.test  ")
+                        , \_ -> Expect.equal False (isValidAccountEmail "not-an-email")
+                        , \_ -> Expect.equal False (isValidAccountEmail "kai@x")
+                        , \_ -> Expect.equal False (isValidAccountEmail "@x.test")
+                        , \_ -> Expect.equal False (isValidAccountEmail "kai @x.test")
+                        , \_ -> Expect.equal False (isValidAccountEmail "")
+                        ]
+                        ()
+            , test "boundedPasskeyLabel strips controls and caps length" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> Expect.equal "My laptop" (boundedPasskeyLabel "My laptop")
+                        , \_ -> Expect.equal "ab" (boundedPasskeyLabel "a\u{0007}b")
+                        , \_ -> Expect.equal 256 (String.length (boundedPasskeyLabel (String.repeat 300 "x")))
+                        ]
+                        ()
+            , test "email submit validates then sends and clears password" <|
+                \_ ->
+                    let
+                        bad =
+                            { totpLive | accountEmail = "nope", accountEmailPassword = "pw" }
+
+                        noPw =
+                            { totpLive | accountEmail = "kai@x.test", accountEmailPassword = "" }
+
+                        good =
+                            { totpLive | accountEmail = "kai@x.test", accountEmailPassword = "pw" }
+
+                        ( badModel, outBad ) =
+                            update AccountEmailSubmitted bad
+
+                        ( noPwModel, outNoPw ) =
+                            update AccountEmailSubmitted noPw
+
+                        ( sent, outSent ) =
+                            update AccountEmailSubmitted good
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outBad
+                        , \_ -> Expect.equal (Just "Enter a valid email address.") badModel.accountEmailError
+                        , \_ -> Expect.equal [] outNoPw
+                        , \_ -> Expect.equal (Just "Your account password is required to change email.") noPwModel.accountEmailError
+                        , \_ -> Expect.equal [ SendLine "ACCOUNTSET kai pw email kai@x.test\r\n" ] outSent
+                        , \_ -> Expect.equal "" sent.accountEmailPassword
+                        , \_ -> Expect.equal Nothing sent.accountEmailError
+                        ]
+                        ()
+            , test "password submit enforces length match and current" <|
+                \_ ->
+                    let
+                        short =
+                            { totpLive | accountNewPassword = "short", accountConfirmPassword = "short", accountCurrentPassword = "old" }
+
+                        mismatch =
+                            { totpLive | accountNewPassword = "longenough", accountConfirmPassword = "different1", accountCurrentPassword = "old" }
+
+                        noCurrent =
+                            { totpLive | accountNewPassword = "longenough", accountConfirmPassword = "longenough", accountCurrentPassword = "" }
+
+                        good =
+                            { totpLive | accountNewPassword = "longenough", accountConfirmPassword = "longenough", accountCurrentPassword = "old" }
+
+                        ( shortModel, outShort ) =
+                            update AccountPasswordSubmitted short
+
+                        ( mismatchModel, outMismatch ) =
+                            update AccountPasswordSubmitted mismatch
+
+                        ( noCurrentModel, outNoCurrent ) =
+                            update AccountPasswordSubmitted noCurrent
+
+                        ( sent, outSent ) =
+                            update AccountPasswordSubmitted good
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outShort
+                        , \_ -> Expect.equal (Just "Use at least 8 characters.") shortModel.accountPasswordError
+                        , \_ -> Expect.equal [] outMismatch
+                        , \_ -> Expect.equal (Just "Passwords do not match.") mismatchModel.accountPasswordError
+                        , \_ -> Expect.equal [] outNoCurrent
+                        , \_ -> Expect.equal (Just "Your current password is required.") noCurrentModel.accountPasswordError
+                        , \_ -> Expect.equal [ SendLine "ACCOUNTSET kai old password longenough\r\n" ] outSent
+                        , \_ -> Expect.equal "" sent.accountNewPassword
+                        , \_ -> Expect.equal "" sent.accountConfirmPassword
+                        , \_ -> Expect.equal "" sent.accountCurrentPassword
+                        ]
+                        ()
+            , test "recovery generate arms then sends and clears" <|
+                \_ ->
+                    let
+                        ( armed, outArmed ) =
+                            update RecoveryCodesGenerateRequested totpLive
+
+                        ( sent, outSent ) =
+                            update RecoveryCodesGenerateRequested { totpLive | recoveryGenerateArmed = True, recoveryPassword = "pw" }
+
+                        ( offline, outOffline ) =
+                            update RecoveryCodesGenerateRequested { totpLive | connection = Offline, recoveryGenerateArmed = True }
+
+                        ( copied, outCopy ) =
+                            update RecoveryCodesCopyAllRequested { totpLive | recoveryCodes = { blankRecoveryCodes | freshCodes = [ "AAAA-1111", "BBBB-2222" ] } }
+
+                        ( _, outCopyBare ) =
+                            update RecoveryCodesCopyAllRequested totpLive
+
+                        dismissed =
+                            Tuple.first (update RecoveryCodesDismissFresh { totpLive | recoveryCodes = { blankRecoveryCodes | freshCodes = [ "AAAA-1111" ] } })
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True armed.recoveryGenerateArmed
+                        , \_ -> Expect.equal [] outArmed
+                        , \_ -> Expect.equal [ SendLine "RECOVERYCODES GENERATE pw\r\n" ] outSent
+                        , \_ -> Expect.equal False sent.recoveryGenerateArmed
+                        , \_ -> Expect.equal "" sent.recoveryPassword
+                        , \_ -> Expect.equal [] outOffline
+                        , \_ -> Expect.equal False offline.recoveryGenerateArmed
+                        , \_ -> Expect.equal [ ClipboardCopy { text = "AAAA-1111\nBBBB-2222", tag = "recovery-codes" } ] outCopy
+                        , \_ -> Expect.equal [] outCopyBare
+                        , \_ -> Expect.equal [] dismissed.recoveryCodes.freshCodes
+                        ]
+                        ()
+            , test "passkey list register remove rename wire legs" <|
+                \_ ->
+                    let
+                        ( _, outGuest ) =
+                            update PasskeyListRequested blank
+
+                        ( listing, outList ) =
+                            update PasskeyListRequested totpLive
+
+                        ( registering, outRegister ) =
+                            update PasskeyRegisterSubmitted { totpLive | passkeyLabel = "laptop" }
+
+                        ( refused, outRefused ) =
+                            update PasskeyRegisterSubmitted { totpLive | connection = Offline, passkeyLabel = "laptop" }
+
+                        ( _, outRemove ) =
+                            update PasskeyRemoveConfirmed { totpLive | passkeyRemoveArmed = Just "cred-1" }
+
+                        ( _, outRemoveBare ) =
+                            update PasskeyRemoveConfirmed totpLive
+
+                        ( renamed, outRename ) =
+                            update PasskeyRenameSubmitted { totpLive | passkeyRenamingId = Just "cred-1", passkeyRenameValue = "phone" }
+
+                        ( _, outRenameBlank ) =
+                            update PasskeyRenameSubmitted { totpLive | passkeyRenamingId = Just "cred-1", passkeyRenameValue = "  " }
+
+                        supported =
+                            Tuple.first (update (PasskeySupportReceived { supported = True }) totpLive)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN LIST\r\n" ] outList
+                        , \_ -> Expect.equal (Just []) listing.passkey.pendingList
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN REGISTER laptop\r\n" ] outRegister
+                        , \_ -> Expect.equal True registering.passkey.busy
+                        , \_ -> Expect.equal "" registering.passkeyLabel
+                        , \_ -> Expect.equal [] outRefused
+                        , \_ -> Expect.equal "laptop" refused.passkeyLabel
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN REMOVE cred-1\r\n" ] outRemove
+                        , \_ -> Expect.equal [] outRemoveBare
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN RENAME cred-1 phone\r\n" ] outRename
+                        , \_ -> Expect.equal Nothing renamed.passkeyRenamingId
+                        , \_ -> Expect.equal [] outRenameBlank
+                        , \_ -> Expect.equal (Just True) supported.passkeyBrowserSupported
+                        ]
+                        ()
+            , test "drop submits only when armed with matching confirm" <|
+                \_ ->
+                    let
+                        unarmed =
+                            { totpLive | dropConfirm = "kai", dropPassword = "pw", dropArmed = False }
+
+                        mismatch =
+                            { totpLive | dropConfirm = "zoe", dropPassword = "pw", dropArmed = True }
+
+                        ready =
+                            { totpLive | dropConfirm = "kai", dropPassword = "pw", dropArmed = True }
+
+                        ( _, outUnarmed ) =
+                            update DropSubmitted unarmed
+
+                        ( _, outMismatch ) =
+                            update DropSubmitted mismatch
+
+                        ( dropped, outDropped ) =
+                            update DropSubmitted ready
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (dropReady unarmed)
+                        , \_ -> Expect.equal [] outUnarmed
+                        , \_ -> Expect.equal False (dropReady mismatch)
+                        , \_ -> Expect.equal [] outMismatch
+                        , \_ -> Expect.equal True (dropReady ready)
+                        , \_ -> Expect.equal [ SendLine "DROP kai pw\r\n" ] outDropped
+                        , \_ -> Expect.equal False dropped.accountOpen
+                        , \_ -> Expect.equal False dropped.dropArmed
+                        ]
+                        ()
+            , test "open-refresh includes recovery and passkey legs plus email seed" <|
+                \_ ->
+                    let
+                        seeded =
+                            { totpLive
+                                | accountInfo =
+                                    Just
+                                        { account = "kai"
+                                        , flags = Nothing
+                                        , email = Just "kai@x.test"
+                                        , secure = Nothing
+                                        , enforce = Nothing
+                                        , registered = Nothing
+                                        }
+                            }
+
+                        ( opened, outs ) =
+                            update (SetAccountOpen True) seeded
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "RECOVERYCODES STATUS\r\n" sends)
+                        , \_ -> Expect.equal True (List.member "WEBAUTHN LIST\r\n" sends)
+                        , \_ -> Expect.equal "kai@x.test" opened.accountEmail
+                        ]
+                        ()
+            , test "901 clears the C3 inputs" <|
+                \_ ->
+                    let
+                        armed =
+                            { totpLive
+                                | recoveryPassword = "pw"
+                                , recoveryGenerateArmed = True
+                                , passkeyLabel = "laptop"
+                                , passkeyRenameValue = "phone"
+                                , accountEmail = "kai@x.test"
+                                , accountNewPassword = "longenough"
+                                , dropConfirm = "kai"
+                                , dropPassword = "pw"
+                                , dropArmed = True
+                            }
+
+                        ( cleared, _ ) =
+                            feed armed ":s 901 kai :You are now logged out"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "" cleared.recoveryPassword
+                        , \_ -> Expect.equal False cleared.recoveryGenerateArmed
+                        , \_ -> Expect.equal "" cleared.passkeyLabel
+                        , \_ -> Expect.equal "" cleared.passkeyRenameValue
+                        , \_ -> Expect.equal "" cleared.accountEmail
+                        , \_ -> Expect.equal "" cleared.accountNewPassword
+                        , \_ -> Expect.equal "" cleared.dropConfirm
+                        , \_ -> Expect.equal "" cleared.dropPassword
+                        , \_ -> Expect.equal False cleared.dropArmed
+                        ]
+                        ()
+            ]
+        , describe "account device keys"
+            [ test "status and list send live and stay silent as guest" <|
+                \_ ->
+                    let
+                        ( _, outStatus ) =
+                            update E2eeKeyStatusRequested totpLive
+
+                        ( _, outList ) =
+                            update E2eeKeyListRequested totpLive
+
+                        ( _, outGuest ) =
+                            update E2eeKeyListRequested blank
+
+                        ( _, outOffline ) =
+                            update E2eeKeyStatusRequested { totpLive | connection = Offline }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "E2EEKEY STATUS\r\n" ] outStatus
+                        , \_ -> Expect.equal [ SendLine "E2EEKEY LIST kai\r\n" ] outList
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal [] outOffline
+                        ]
+                        ()
+            , test "publish arms single-flight and resolves through identity" <|
+                \_ ->
+                    let
+                        ( arming, outArming ) =
+                            update E2eeKeyPublishRequested totpLive
+
+                        ( _, outAgain ) =
+                            update E2eeKeyPublishRequested arming
+
+                        ( _, outGuest ) =
+                            update E2eeKeyPublishRequested blank
+
+                        ( added, outAdded ) =
+                            update
+                                (E2eeDeviceIdentityReceived
+                                    { deviceId = "web-AAAAAAAAAAAAAAAAAAAA"
+                                    , publicKey = "QUJD"
+                                    }
+                                )
+                                arming
+
+                        ( failed, outFailed ) =
+                            update (E2eeDeviceIdentityReceived { deviceId = "", publicKey = "" }) arming
+
+                        ( stale, outStale ) =
+                            update
+                                (E2eeDeviceIdentityReceived
+                                    { deviceId = "web-AAAAAAAAAAAAAAAAAAAA"
+                                    , publicKey = "QUJD"
+                                    }
+                                )
+                                blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ E2eeDeviceIdentityRequest ] outArming
+                        , \_ -> Expect.equal True arming.e2eePublishBusy
+                        , \_ -> Expect.equal [] outAgain
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine "E2EEKEY ADD web-AAAAAAAAAAAAAAAAAAAA onyx-p256 QUJD\r\n" ]
+                                outAdded
+                        , \_ -> Expect.equal False added.e2eePublishBusy
+                        , \_ -> Expect.equal [] outFailed
+                        , \_ -> Expect.equal False failed.e2eePublishBusy
+                        , \_ -> Expect.equal [] outStale
+                        ]
+                        ()
+            , test "publish refuses malformed identity legs" <|
+                \_ ->
+                    let
+                        busy =
+                            { totpLive | e2eePublishBusy = True }
+
+                        badId =
+                            update
+                                (E2eeDeviceIdentityReceived { deviceId = "has space!", publicKey = "QUJD" })
+                                busy
+
+                        badKey =
+                            update
+                                (E2eeDeviceIdentityReceived
+                                    { deviceId = "web-AAAAAAAAAAAAAAAAAAAA"
+                                    , publicKey = "not a key!!"
+                                    }
+                                )
+                                busy
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] (Tuple.second badId)
+                        , \_ -> Expect.equal False (Tuple.first badId).e2eePublishBusy
+                        , \_ -> Expect.equal [] (Tuple.second badKey)
+                        , \_ -> Expect.equal False (Tuple.first badKey).e2eePublishBusy
+                        ]
+                        ()
+            , test "legacy delete sends live and stays silent as guest" <|
+                \_ ->
+                    let
+                        ( _, outLive ) =
+                            update E2eeKeyDeleteLegacyRequested totpLive
+
+                        ( _, outGuest ) =
+                            update E2eeKeyDeleteLegacyRequested blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "E2EEKEY DEL browser\r\n" ] outLive
+                        , \_ -> Expect.equal [] outGuest
+                        ]
+                        ()
+            , test "open-refresh includes the e2eekey leg and 901 clears publish busy" <|
+                \_ ->
+                    let
+                        ( _, outs ) =
+                            update (SetAccountOpen True) totpLive
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+
+                        ( cleared, _ ) =
+                            feed { totpLive | e2eePublishBusy = True } ":s 901 kai :You are now logged out"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "E2EEKEY STATUS\r\n" sends)
+                        , \_ -> Expect.equal False cleared.e2eePublishBusy
+                        ]
+                        ()
+            ]
+        , describe "account personas"
+            [ test "list clears the wardrobe; use/claim/off send normalized" <|
+                \_ ->
+                    let
+                        seeded =
+                            { totpLive
+                                | personas = [ { name = "old", host = "h.example", source = "grant" } ]
+                                , personaOffers = [ { template = "t.example", label = "l" } ]
+                            }
+
+                        ( listed, outList ) =
+                            update VhostListRequested seeded
+
+                        ( _, outUse ) =
+                            update (VhostUseRequested "  star  ") listed
+
+                        ( typedClaim, _ ) =
+                            update (PersonaClaimHostInput "poets.society/you") listed
+
+                        ( _, outClaim ) =
+                            update VhostClaimRequested typedClaim
+
+                        ( _, outOff ) =
+                            update VhostOffRequested listed
+
+                        ( _, outGuest ) =
+                            update VhostListRequested blank
+
+                        ( _, outOffline ) =
+                            update VhostOffRequested { totpLive | connection = Offline }
+
+                        ( _, outBlankUse ) =
+                            update (VhostUseRequested "   ") listed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "VHOST LIST\r\n" ] outList
+                        , \_ -> Expect.equal [] listed.personas
+                        , \_ -> Expect.equal [] listed.personaOffers
+                        , \_ -> Expect.equal [ SendLine "VHOST USE star\r\n" ] outUse
+                        , \_ -> Expect.equal [ SendLine "VHOST CLAIM poets.society/you\r\n" ] outClaim
+                        , \_ -> Expect.equal [ SendLine "VHOST OFF\r\n" ] outOff
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal [] outOffline
+                        , \_ -> Expect.equal [] outBlankUse
+                        ]
+                        ()
+            , test "persona and offer rows collect without a service line" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            update VhostListRequested totpLive
+
+                        ( withPersona, outPersona ) =
+                            feed listed ":irc.example NOTICE kai :VHOST persona star = night.example (staff grant)"
+
+                        ( withOffer, outOffer ) =
+                            feed withPersona ":irc.example NOTICE kai :VHOST offer poets.society/* :poets"
+
+                        logged =
+                            List.any (String.contains "Account: VHOST") withOffer.serviceLog
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outPersona
+                        , \_ -> Expect.equal [ { name = "star", host = "night.example", source = "staff grant" } ] withPersona.personas
+                        , \_ -> Expect.equal [] outOffer
+                        , \_ -> Expect.equal [ { template = "poets.society/*", label = "poets" } ] withOffer.personaOffers
+                        , \_ -> Expect.equal False logged
+                        ]
+                        ()
+            , test "contextless and malformed rows stay out of the wardrobe" <|
+                \_ ->
+                    let
+                        ( bare, outBare ) =
+                            feed totpLive ":irc.example NOTICE kai :VHOST persona star = night.example (staff grant)"
+
+                        bareSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outBare
+
+                        ( listed, _ ) =
+                            update VhostListRequested totpLive
+
+                        ( trailing, _ ) =
+                            feed listed ":irc.example NOTICE kai :VHOST persona star = night.example (staff grant) extra"
+
+                        ( paren, _ ) =
+                            feed listed ":irc.example NOTICE kai :VHOST persona star = night.example (a)b)"
+
+                        ( bareOffer, _ ) =
+                            feed listed ":irc.example NOTICE kai :VHOST offer"
+
+                        logged state =
+                            List.any (String.contains "Account: VHOST") state.serviceLog
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] bareSends
+                        , \_ -> Expect.equal [] bare.personas
+                        , \_ -> Expect.equal False (List.any (String.contains "Account: VHOST") bare.serviceLog)
+                        , \_ -> Expect.equal [] trailing.personas
+                        , \_ -> Expect.equal True (logged trailing)
+                        , \_ -> Expect.equal [] paren.personas
+                        , \_ -> Expect.equal [] bareOffer.personaOffers
+                        , \_ -> Expect.equal True (logged bareOffer)
+                        ]
+                        ()
+            , test "confirmation schedules the re-list for the confirming account" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            update VhostListRequested totpLive
+
+                        ( confirmed, outConfirmed ) =
+                            feed listed ":irc.example NOTICE kai :VHOST You are now wearing star"
+
+                        ( _, outOther ) =
+                            feed listed ":irc.example NOTICE kai :something else entirely"
+
+                        noRefresh o =
+                            case o of
+                                VhostRefreshRequest ->
+                                    Just ()
+
+                                _ ->
+                                    Nothing
+
+                        refreshes =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        VhostRefreshRequest ->
+                                            Just ()
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outConfirmed
+
+                        ( relisted, outRelisted ) =
+                            update VhostRefreshDue confirmed
+
+                        relistSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outRelisted
+
+                        ( dropped, outDropped ) =
+                            update VhostRefreshDue { confirmed | accountName = Just "sam" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ () ] refreshes
+                        , \_ -> Expect.equal True (List.any (String.contains "Account: VHOST You are now wearing") confirmed.serviceLog)
+                        , \_ -> Expect.equal [] (List.filterMap noRefresh outOther)
+                        , \_ -> Expect.equal [ "VHOST LIST\r\n" ] relistSends
+                        , \_ -> Expect.equal [] outDropped
+                        , \_ -> Expect.equal Nothing dropped.vhostRefreshAccount
+                        ]
+                        ()
+            , test "wardrobe dedupes case-insensitively and caps at 64" <|
+                \_ ->
+                    let
+                        full =
+                            List.map
+                                (\i -> { name = "p" ++ String.fromInt i, host = "h.example", source = "s" })
+                                (List.range 0 63)
+
+                        capped =
+                            admitPersona full { name = "new", host = "h.example", source = "s" }
+
+                        replaced =
+                            admitPersona
+                                [ { name = "Star", host = "old.example", source = "s" } ]
+                                { name = "STAR", host = "new.example", source = "t" }
+
+                        cappedOffer =
+                            admitPersonaOffer
+                                (List.map (\i -> { template = "t" ++ String.fromInt i, label = "l" }) (List.range 0 63))
+                                { template = "extra", label = "l" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 64 (List.length capped)
+                        , \_ -> Expect.equal [ { name = "STAR", host = "new.example", source = "t" } ] replaced
+                        , \_ -> Expect.equal 64 (List.length cappedOffer)
+                        ]
+                        ()
+            , test "claim submit clears the input; open-refresh lists" <|
+                \_ ->
+                    let
+                        ( listed, _ ) =
+                            update VhostListRequested totpLive
+
+                        ( typed, _ ) =
+                            update (PersonaClaimHostInput "  poets.society/you  ") listed
+
+                        ( claimed, outClaim ) =
+                            update VhostClaimRequested typed
+
+                        ( _, openOuts ) =
+                            update (SetAccountOpen True) totpLive
+
+                        openSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                openOuts
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "VHOST CLAIM poets.society/you\r\n" ] outClaim
+                        , \_ -> Expect.equal "" claimed.personaClaimHost
+                        , \_ -> Expect.equal True (List.member "VHOST LIST\r\n" openSends)
+                        ]
+                        ()
+            ]
+        , describe "invites and server identity"
+            [ test "invite to me notifies, invite to others lands a channel event" <|
+                \_ ->
+                    let
+                        ( notified, outMe ) =
+                            feed totpLive ":bob!u@h INVITE KAI #room"
+
+                        ( context, outOther ) =
+                            feed totpLive ":bob!u@h INVITE sam #room"
+
+                        ( silent, outBare ) =
+                            feed totpLive ":bob!u@h INVITE kai"
+
+                        lastNote =
+                            List.head (List.reverse notified.notifications)
+
+                        roomEvents =
+                            Maybe.withDefault [] (Maybe.map .events (Dict.get "#room" context.channelEvents))
+
+                        lastEvent =
+                            List.head (List.reverse roomEvents)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outMe
+                        , \_ -> Expect.equal (Just "bob invited you to #room") (Maybe.map .text lastNote)
+                        , \_ -> Expect.equal (Just NotifSystem) (Maybe.map .kind lastNote)
+                        , \_ -> Expect.equal [] outOther
+                        , \_ -> Expect.equal (Just "bob invited sam to #room") (Maybe.map .text lastEvent)
+                        , \_ -> Expect.equal (Just EventJoin) (Maybe.map .kind lastEvent)
+                        , \_ -> Expect.equal [] outBare
+                        , \_ -> Expect.equal totpLive.notifications silent.notifications
+                        ]
+                        ()
+            , test "004 records the server version; short lines stay silent" <|
+                \_ ->
+                    let
+                        ( ver, outVer ) =
+                            feed totpLive ":irc.example 004 kai irc.example onyx-server-1.0 abc abc"
+
+                        ( short, outShort ) =
+                            feed totpLive ":irc.example 004 kai"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "onyx-server-1.0") ver.serverVersion
+                        , \_ -> Expect.equal [] outVer
+                        , \_ -> Expect.equal Nothing short.serverVersion
+                        , \_ -> Expect.equal [] outShort
+                        ]
+                        ()
+            , test "308 collects bounded rules; 309/732/733/762 stay silent" <|
+                \_ ->
+                    let
+                        ( ruled, _ ) =
+                            feed totpLive ":irc.example 308 kai * :No flooding"
+
+                        full =
+                            { totpLive | serverRules = List.repeat 256 "x" }
+
+                        ( capped, _ ) =
+                            feed full ":irc.example 308 kai * :one more"
+
+                        ( endRules, outEnd ) =
+                            feed totpLive ":irc.example 309 kai :End of RULES"
+
+                        ( endMon, _ ) =
+                            feed totpLive ":irc.example 733 kai :End of MONITOR list"
+
+                        ( endMeta, _ ) =
+                            feed totpLive ":irc.example 762 kai :End of metadata"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "No flooding" ] ruled.serverRules
+                        , \_ -> Expect.equal 256 (List.length capped.serverRules)
+                        , \_ -> Expect.equal [] outEnd
+                        , \_ -> Expect.equal totpLive.serviceLog endRules.serviceLog
+                        , \_ -> Expect.equal totpLive.serviceLog endMon.serviceLog
+                        , \_ -> Expect.equal totpLive.serviceLog endMeta.serviceLog
+                        ]
+                        ()
+            , test "CHGHOST is consumed silently like the oracle" <|
+                \_ ->
+                    let
+                        ( changed, out ) =
+                            feed totpLive ":bob!old@old.host CHGHOST newuser new.host"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal totpLive.notifications changed.notifications
+                        , \_ -> Expect.equal totpLive.serviceLog changed.serviceLog
+                        , \_ -> Expect.equal totpLive.channelEvents changed.channelEvents
+                        ]
+                        ()
+            ]
+        , describe "contact presence"
+            [ test "friend verbs persist subscribe and release" <|
+                \_ ->
+                    let
+                        owned =
+                            { totpLive | endpoint = Just "wss://irc.example" }
+
+                        ( added, outAdd ) =
+                            requestFriendAdd owned "  Bob "
+
+                        saves =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        FriendsSave r ->
+                                            Just r.entries
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outAdd
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outAdd
+
+                        ( _, outGuest ) =
+                            requestFriendAdd totpLive "bob"
+
+                        ( _, outBad ) =
+                            requestFriendAdd owned "bad nick"
+
+                        seeded =
+                            { owned | friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing } }
+
+                        ( removed, outRem ) =
+                            requestFriendRemove seeded "BOB"
+
+                        remSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outRem
+
+                        watched =
+                            { seeded | watchList = [ { nick = "bob", online = False, lastSeenMs = Nothing } ] }
+
+                        ( _, outKept ) =
+                            requestFriendRemove watched "bob"
+
+                        keptSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outKept
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just { nick = "Bob", online = False, note = Nothing }) (Dict.get "bob" added.friends)
+                        , \_ -> Expect.equal [ Just "[{\"nick\":\"Bob\"}]" ] saves
+                        , \_ -> Expect.equal [ "MONITOR + Bob\r\n" ] sends
+                        , \_ -> Expect.equal Dict.empty (Tuple.first (requestFriendAdd totpLive "bob")).friends
+                        , \_ -> Expect.equal [] outGuest
+                        , \_ -> Expect.equal [] outBad
+                        , \_ -> Expect.equal Dict.empty removed.friends
+                        , \_ -> Expect.equal [ "MONITOR - BOB\r\n" ] remSends
+                        , \_ -> Expect.equal [] keptSends
+                        ]
+                        ()
+            , test "watch verbs dedupe cap and record offline" <|
+                \_ ->
+                    let
+                        owned =
+                            { totpLive | endpoint = Just "wss://irc.example" }
+
+                        ( watched, outWatch ) =
+                            requestWatchAdd owned "sam"
+
+                        ( _, outDup ) =
+                            requestWatchAdd watched "SAM"
+
+                        full =
+                            { owned | watchList = List.repeat 256 { nick = "x", online = False, lastSeenMs = Nothing } }
+
+                        ( _, outCap ) =
+                            requestWatchAdd full "zed"
+
+                        ( offline, outOffline ) =
+                            requestWatchAdd { owned | connection = Offline } "sam"
+
+                        offSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine _ ->
+                                            Just ()
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outOffline
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { nick = "sam", online = False, lastSeenMs = Nothing } ] watched.watchList
+                        , \_ -> Expect.equal True (List.member "MONITOR + sam\r\n" (sendLines outWatch))
+                        , \_ -> Expect.equal [] outDup
+                        , \_ -> Expect.equal [] outCap
+                        , \_ -> Expect.equal [ { nick = "sam", online = False, lastSeenMs = Nothing } ] offline.watchList
+                        , \_ -> Expect.equal [] offSends
+                        ]
+                        ()
+            , test "stored contacts decode with bounds and first-wins" <|
+                \_ ->
+                    let
+                        friendsValue =
+                            Encode.list identity
+                                [ Encode.object [ ( "nick", Encode.string " Al " ) ]
+                                , Encode.object [ ( "nick", Encode.string "al" ), ( "note", Encode.string "hi" ) ]
+                                , Encode.object [ ( "nick", Encode.string "" ) ]
+                                , Encode.object [ ( "nick", Encode.string "bad nick" ) ]
+                                , Encode.object [ ( "nick", Encode.string "zed" ), ( "note", Encode.string (String.repeat 513 "x") ) ]
+                                ]
+
+                        friends =
+                            decodeFriends friendsValue
+
+                        watchValue =
+                            Encode.list identity
+                                [ Encode.object [ ( "nick", Encode.string "sam" ), ( "lastSeen", Encode.string "2024-01-02T03:04:05.000Z" ) ]
+                                , Encode.object [ ( "nick", Encode.string "old" ), ( "lastSeen", Encode.string "not a date" ) ]
+                                , Encode.object [ ( "nick", Encode.string "long" ), ( "lastSeen", Encode.string (String.repeat 65 "x") ) ]
+                                ]
+
+                        watch =
+                            decodeWatchList watchValue
+
+                        ( loaded, _ ) =
+                            update (FriendsLoaded friendsValue) totpLive
+
+                        ( emptied, _ ) =
+                            update (FriendsLoaded (Encode.string "nope")) { totpLive | friends = Dict.singleton "k" { nick = "k", online = False, note = Nothing } }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "al", "zed" ] (Dict.keys friends)
+                        , \_ -> Expect.equal Nothing (Dict.get "al" friends |> Maybe.andThen .note)
+                        , \_ -> Expect.equal Nothing (Dict.get "zed" friends |> Maybe.andThen .note)
+                        , \_ -> Expect.equal 3 (List.length watch)
+                        , \_ -> Expect.equal False (List.head watch |> Maybe.andThen .lastSeenMs |> (==) Nothing)
+                        , \_ -> Expect.equal Nothing ((List.head (List.drop 1 watch) |> Maybe.andThen .lastSeenMs))
+                        , \_ -> Expect.equal Nothing ((List.head (List.drop 2 watch) |> Maybe.andThen .lastSeenMs))
+                        , \_ -> Expect.equal (Dict.keys friends) (Dict.keys loaded.friends)
+                        , \_ -> Expect.equal Dict.empty emptied.friends
+                        ]
+                        ()
+            , test "watch and monitor numerics fold presence" <|
+                \_ ->
+                    let
+                        base =
+                            { totpLive
+                                | watchList = [ { nick = "sam", online = False, lastSeenMs = Nothing } ]
+                                , friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing }
+                            }
+
+                        ( on, _ ) =
+                            feed base ":s 600 kai sam"
+
+                        ( off, _ ) =
+                            feed { on | nowMs = 9000 } ":s 601 kai sam"
+
+                        ( kept, _ ) =
+                            feed { off | watchList = [ { nick = "sam", online = True, lastSeenMs = Just 7 } ] } ":s 605 kai sam"
+
+                        ( monOn, _ ) =
+                            feed base ":s 730 kai :Bob!u@h"
+
+                        ( monOff, _ ) =
+                            feed { monOn | friends = Dict.singleton "bob" { nick = "Bob", online = True, note = Nothing } } ":s 731 kai :bob"
+
+                        ( full, outFull ) =
+                            feed base ":s 734 kai 100 bob :too many watched"
+
+                        ( bare, _ ) =
+                            feed base ":s 734"
+
+                        lastNote notes =
+                            List.head (List.reverse notes)
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { nick = "sam", online = True, lastSeenMs = Nothing } ] on.watchList
+                        , \_ -> Expect.equal [ { nick = "sam", online = False, lastSeenMs = Just 9000 } ] off.watchList
+                        , \_ -> Expect.equal [ { nick = "sam", online = False, lastSeenMs = Just 9000 } ] kept.watchList
+                        , \_ -> Expect.equal (Just True) (Dict.get "bob" monOn.friends |> Maybe.map .online)
+                        , \_ -> Expect.equal (Just False) (Dict.get "bob" monOff.friends |> Maybe.map .online)
+                        , \_ -> Expect.equal (Just "MONITOR list is full (100 targets)") (lastNote full.notifications |> Maybe.map .text)
+                        , \_ -> Expect.equal (Just "MONITOR list is full") (lastNote bare.notifications |> Maybe.map .text)
+                        , \_ -> Expect.equal [] outFull
+                        ]
+                        ()
+            , test "nowon, myinfo, and metadata numerics fold" <|
+                \_ ->
+                    let
+                        base =
+                            { totpLive
+                                | watchList = [ { nick = "sam", online = False, lastSeenMs = Nothing } ]
+                            }
+
+                        ( nowon, _ ) =
+                            feed base ":s 604 kai sam"
+
+                        ( versioned, _ ) =
+                            feed totpLive ":s 004 kai irc.example Onyx-2 :more"
+
+                        ( versionEmpty, _ ) =
+                            feed totpLive ":s 004 kai"
+
+                        ( stored, _ ) =
+                            feed totpLive ":s 761 kai kai nick r :Kai Renamed"
+
+                        ( cleared, _ ) =
+                            feed stored ":s 766 kai kai nick :key not set"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ { nick = "sam", online = True, lastSeenMs = Nothing } ] nowon.watchList
+                        , \_ -> Expect.equal (Just "Onyx-2") versioned.serverVersion
+                        , \_ -> Expect.equal totpLive.serverVersion versionEmpty.serverVersion
+                        , \_ -> Expect.equal (Just "Kai Renamed") (Dict.get "kai" stored.userMetadata |> Maybe.andThen (Dict.get "nick"))
+                        , \_ -> Expect.equal Nothing (Dict.get "kai" cleared.userMetadata)
+                        ]
+                        ()
+            , test "monitor target lists parse all-or-nothing" <|
+                \_ ->
+                    let
+                        ( bad, _ ) =
+                            feed { totpLive | friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing } } ":s 730 kai :bob, bad nick"
+
+                        ( dup, _ ) =
+                            feed { totpLive | friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing } } ":s 731 kai :BOB,bob"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "a", "b" ] (parseMonitorTargets "a,b,a")
+                        , \_ -> Expect.equal [] (parseMonitorTargets "a, bad nick")
+                        , \_ -> Expect.equal [] (parseMonitorTargets (String.join "," (List.repeat 257 "a")))
+                        , \_ -> Expect.equal (Just False) (Dict.get "bob" bad.friends |> Maybe.map .online)
+                        , \_ -> Expect.equal (Just False) (Dict.get "bob" dup.friends |> Maybe.map .online)
+                        , \_ -> Expect.equal Nothing (parseMonitorLimit "007")
+                        , \_ -> Expect.equal (Just 1000000) (parseMonitorLimit "1000000")
+                        , \_ -> Expect.equal Nothing (parseMonitorLimit "1000001")
+                        ]
+                        ()
+            , test "registration syncs the contact union; clear reforks" <|
+                \_ ->
+                    let
+                        joining =
+                            { blank
+                                | connection = Offline
+                                , endpoint = Just "wss://irc.example"
+                                , accountName = Just "kai"
+                                , ourNick = "kai"
+                                , friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing }
+                                , watchList = [ { nick = "sam", online = False, lastSeenMs = Nothing } ]
+                            }
+
+                        ( live, out001 ) =
+                            feed joining ":irc.example 001 kai :welcome"
+
+                        sends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                out001
+
+                        ( _, outClear ) =
+                            syncMonitorContacts True
+                                { totpLive
+                                    | endpoint = Just "wss://irc.example"
+                                    , friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing }
+                                }
+
+                        clearSends =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        SendLine line ->
+                                            Just line
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outClear
+
+                        ( quiet, outQuiet ) =
+                            syncMonitorContacts False { totpLive | connection = Offline }
+
+                        contactReqs =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        FriendsRequest _ ->
+                                            True
+
+                                        WatchListRequest _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                out001
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "MONITOR + Bob\r\n" sends)
+                        , \_ -> Expect.equal True (List.member "MONITOR + sam\r\n" sends)
+                        , \_ -> Expect.equal 2 (List.length contactReqs)
+                        , \_ -> Expect.equal (Set.fromList [ "bob", "sam" ]) live.monitoredNicks
+                        , \_ -> Expect.equal [ "MONITOR C\r\n", "MONITOR + Bob\r\n" ] clearSends
+                        , \_ -> Expect.equal Set.empty quiet.monitoredNicks
+                        , \_ -> Expect.equal [] outQuiet
+                        ]
+                        ()
+            , test "DM open tracks presence; reconnect sync keeps extras" <|
+                \_ ->
+                    let
+                        live =
+                            { totpLive
+                                | connection = Live
+                                , friends = Dict.singleton "bob" { nick = "Bob", online = False, note = Nothing }
+                            }
+
+                        ( opened, openOut ) =
+                            selectChannel live "zed"
+
+                        openSends =
+                            List.map sendLineText openOut
+
+                        ( roomed, roomOut ) =
+                            selectChannel live "#c"
+
+                        ( resynced, resyncOut ) =
+                            syncMonitorContacts False { opened | connection = Live }
+
+                        resyncSends =
+                            List.map sendLineText resyncOut
+
+                        ( reforked, reforkOut ) =
+                            syncMonitorContacts True { opened | connection = Live }
+
+                        reforkSends =
+                            List.map sendLineText reforkOut
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member "MONITOR + zed\r\n" openSends)
+                        , \_ -> Expect.equal True (Set.member "zed" opened.monitoredNicks)
+                        , \_ -> Expect.equal [] roomOut
+                        , \_ -> Expect.equal False (Set.member "#c" roomed.monitoredNicks)
+                        , \_ -> Expect.equal True (List.member "MONITOR + Bob\r\n" resyncSends)
+                        , \_ -> Expect.equal True (List.member "MONITOR + zed\r\n" resyncSends)
+                        , \_ -> Expect.equal (Set.fromList [ "bob", "zed" ]) resynced.monitoredNicks
+                        , \_ -> Expect.equal [ "MONITOR C\r\n", "MONITOR + Bob\r\n" ] reforkSends
+                        , \_ -> Expect.equal (Set.singleton "bob") reforked.monitoredNicks
+                        ]
+                        ()
+            ]
+        , describe "web push machine"
+            [ test "toggle on probes before any permission prompt" <|
+                \_ ->
+                    let
+                        ( toggled, out ) =
+                            update WebPushToggle pushLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ WebPushProbe ] out
+                        , \_ -> Expect.equal True toggled.webPushBusy
+                        , \_ -> Expect.equal False toggled.webPushOn
+                        , \_ -> Expect.equal Nothing toggled.webPushError
+                        ]
+                        ()
+            , test "toggle is a no-op while busy" <|
+                \_ ->
+                    let
+                        ( toggled, _ ) =
+                            update WebPushToggle pushLive
+
+                        ( again, outAgain ) =
+                            update WebPushToggle toggled
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outAgain
+                        , \_ -> Expect.equal True again.webPushBusy
+                        ]
+                        ()
+            , test "toggle off unsubscribes at once" <|
+                \_ ->
+                    let
+                        ( off, out ) =
+                            update WebPushToggle { pushLive | webPushOn = True }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ WebPushDisable { serverUrl = "wss://irc.example", account = "kai" } ]
+                                out
+                        , \_ -> Expect.equal True off.webPushBusy
+                        , \_ -> Expect.equal True off.webPushOn
+                        ]
+                        ()
+            , test "probe success requests an enable with the server key" <|
+                \_ ->
+                    let
+                        ( toggled, _ ) =
+                            update WebPushToggle pushLive
+
+                        ( enabled, out ) =
+                            update (WebPushProbed { supported = True, permission = "granted" }) toggled
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ WebPushEnable { serverUrl = "wss://irc.example", account = "kai", vapidKey = pushVapid } ]
+                                out
+                        , \_ -> Expect.equal (Just True) enabled.webPushSupported
+                        ]
+                        ()
+            , test "probe failure latches an error and never prompts" <|
+                \_ ->
+                    let
+                        ( toggled, _ ) =
+                            update WebPushToggle pushLive
+
+                        ( failed, out ) =
+                            update (WebPushProbed { supported = False, permission = "denied" }) toggled
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal False failed.webPushBusy
+                        , \_ -> Expect.equal False (failed.webPushError == Nothing)
+                        ]
+                        ()
+            , test "enable success latches the bit" <|
+                \_ ->
+                    let
+                        ( toggled, _ ) =
+                            update WebPushToggle pushLive
+
+                        ( on, out ) =
+                            update (WebPushEnabled { ok = True, reason = Nothing }) toggled
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal True on.webPushOn
+                        , \_ -> Expect.equal False on.webPushBusy
+                        , \_ -> Expect.equal Nothing on.webPushError
+                        ]
+                        ()
+            , test "enable failure keeps the bit off with the reason" <|
+                \_ ->
+                    let
+                        ( toggled, _ ) =
+                            update WebPushToggle pushLive
+
+                        ( off, out ) =
+                            update (WebPushEnabled { ok = False, reason = Just "denied" }) toggled
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal False off.webPushOn
+                        , \_ -> Expect.equal (Just "denied") off.webPushError
+                        ]
+                        ()
+            , test "disable success clears the bit" <|
+                \_ ->
+                    let
+                        ( off, out ) =
+                            update (WebPushDisabled { ok = True, reason = Nothing }) { pushLive | webPushOn = True, webPushBusy = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal False off.webPushOn
+                        , \_ -> Expect.equal False off.webPushBusy
+                        ]
+                        ()
+            , test "recovery settles the bit silently" <|
+                \_ ->
+                    let
+                        ( recovered, outRecovered ) =
+                            update (WebPushRecovered { ok = True, reason = Nothing }) pushLive
+
+                        ( lost, outLost ) =
+                            update (WebPushRecovered { ok = False, reason = Just "gone" }) { pushLive | webPushOn = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True recovered.webPushOn
+                        , \_ -> Expect.equal [] outRecovered
+                        , \_ -> Expect.equal False lost.webPushOn
+                        , \_ -> Expect.equal [] outLost
+                        ]
+                        ()
+            , test "active check recovers an opted-in tombstone" <|
+                \_ ->
+                    let
+                        ( next, out ) =
+                            update (WebPushActiveState { active = False, intentDesired = True }) { pushLive | webPushOn = True }
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal
+                                [ WebPushRecover { serverUrl = "wss://irc.example", account = "kai", vapidKey = pushVapid } ]
+                                out
+                        , \_ -> Expect.equal False next.webPushOn
+                        ]
+                        ()
+            , test "active check rests when the endpoint is live" <|
+                \_ ->
+                    let
+                        ( next, out ) =
+                            update (WebPushActiveState { active = True, intentDesired = True }) { pushLive | webPushOn = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal True next.webPushOn
+                        ]
+                        ()
+            , test "active check never recovers while a toggle is in flight" <|
+                \_ ->
+                    let
+                        ( next, out ) =
+                            update (WebPushActiveState { active = False, intentDesired = True }) { pushLive | webPushOn = True, webPushBusy = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal False next.webPushOn
+                        ]
+                        ()
+            , test "login reconciles push only for opt-ins" <|
+                \_ ->
+                    let
+                        ( signedOut, outSignedOut ) =
+                            requestWebPushCheck blank
+
+                        ( optedOut, outOptedOut ) =
+                            requestWebPushCheck pushLive
+
+                        ( optedIn, outOptedIn ) =
+                            requestWebPushCheck { pushLive | webPushOn = True }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] outSignedOut
+                        , \_ -> Expect.equal False signedOut.webPushOn
+                        , \_ -> Expect.equal [] outOptedOut
+                        , \_ ->
+                            Expect.equal
+                                [ WebPushCheckActive { serverUrl = "wss://irc.example", account = "kai" } ]
+                                outOptedIn
+                        ]
+                        ()
+            ]
+        , describe "webhooks"
+            [ test "create sends WEBHOOK CREATE with the trimmed name" <|
+                \_ ->
+                    let
+                        ( created, out ) =
+                            update (WebhookCreate "#harbor") { stewardLive | webhookName = "  ci bot  " }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "WEBHOOK CREATE #harbor :ci bot\r\n" ] out
+                        , \_ -> Expect.equal "" created.stewardStatus
+                        ]
+                        ()
+            , test "create omits a blank name and slices long names" <|
+                \_ ->
+                    let
+                        ( unnamed, unnamedOut ) =
+                            update (WebhookCreate "#harbor") { stewardLive | webhookName = "   " }
+
+                        long =
+                            String.repeat 40 "n"
+
+                        ( sliced, slicedOut ) =
+                            update (WebhookCreate "#harbor") { stewardLive | webhookName = long }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "WEBHOOK CREATE #harbor\r\n" ] unnamedOut
+                        , \_ ->
+                            Expect.equal
+                                [ SendLine ("WEBHOOK CREATE #harbor " ++ String.repeat 32 "n" ++ "\r\n") ]
+                                slicedOut
+                        , \_ -> Expect.equal "" sliced.stewardStatus
+                        ]
+                        ()
+            , test "list sends WEBHOOK LIST" <|
+                \_ ->
+                    let
+                        ( listed, out ) =
+                            update (WebhookList "#harbor") stewardLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "WEBHOOK LIST #harbor\r\n" ] out
+                        , \_ -> Expect.equal "" listed.stewardStatus
+                        ]
+                        ()
+            , test "delete sends WEBHOOK DELETE and clears the id" <|
+                \_ ->
+                    let
+                        ( deleted, out ) =
+                            update (WebhookDelete "#harbor") { stewardLive | webhookDeleteId = "  wh_123  " }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ SendLine "WEBHOOK DELETE wh_123\r\n" ] out
+                        , \_ -> Expect.equal "" deleted.webhookDeleteId
+                        ]
+                        ()
+            , test "blank delete id sends nothing and keeps the draft" <|
+                \_ ->
+                    let
+                        ( kept, out ) =
+                            update (WebhookDelete "#harbor") { stewardLive | webhookDeleteId = "   " }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal "   " kept.webhookDeleteId
+                        ]
+                        ()
+            , test "offline and stranger verbs refuse into the panel status" <|
+                \_ ->
+                    let
+                        ( offline, offlineOut ) =
+                            update (WebhookList "#harbor") { stewardLive | connection = Offline }
+
+                        ( stranger, strangerOut ) =
+                            update (WebhookList "#harbor") { stewardLive | ourNick = "bob" }
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] offlineOut
+                        , \_ -> Expect.equal "Reconnect to change this room." offline.stewardStatus
+                        , \_ -> Expect.equal [] strangerOut
+                        , \_ -> Expect.equal "Only the owner can do that." stranger.stewardStatus
+                        ]
+                        ()
+            , test "WEBHOOK: notice lands in the service log, not chat" <|
+                \_ ->
+                    let
+                        ( logged, _ ) =
+                            feed blank ":server NOTICE me :WEBHOOK: created for #general - POST Discord webhook JSON to https://chat.example/api/webhooks/id/token"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.any (String.startsWith "Webhook: WEBHOOK: created for #general") logged.serviceLog)
+                        , \_ -> Expect.equal Dict.empty logged.channels
+                        ]
+                        ()
+            , test "peer DM naming webhook diverts to the service log" <|
+                \_ ->
+                    let
+                        ( logged, _ ) =
+                            feed blank ":alice!u@h NOTICE me :check the webhook"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.any (String.startsWith "Webhook: ") logged.serviceLog)
+                        ]
+                        ()
+            , test "channel webhook JSON notice flattens, plain notices pass through" <|
+                \_ ->
+                    let
+                        ( joined, _ ) =
+                            feed blank ":me!u@h JOIN #c"
+
+                        ( flat, _ ) =
+                            feed joined ":hook!bot@host NOTICE #c :{\"username\":\"DeployBot\",\"content\":\"Ship complete\",\"embeds\":[{\"title\":\"Release\",\"description\":\"v2\",\"fields\":[{\"name\":\"sha\",\"value\":\"deadbeef\"}]}]}"
+
+                        ( plain, _ ) =
+                            feed joined ":hook!bot@host NOTICE #c :just a normal notice"
+                    in
+                    Expect.all
+                        [ \_ ->
+                            Expect.equal True
+                                (List.any (String.contains "sha: deadbeef") (channelBodies flat))
+                        , \_ ->
+                            Expect.equal False
+                                (List.any (String.contains "{") (channelBodies flat))
+                        , \_ -> Expect.equal [ "just a normal notice" ] (channelBodies plain)
+                        ]
+                        ()
+            , test "webhookNotices reads back the newest four" <|
+                \_ ->
+                    let
+                        logged =
+                            { blank
+                                | serviceLog =
+                                    [ "Webhook: fourth"
+                                    , "Account: other"
+                                    , "Webhook: third"
+                                    , "Webhook: second"
+                                    , "Webhook: first"
+                                    , "Webhook: zeroth"
+                                    ]
+                            }
+                    in
+                    Expect.equal
+                        [ "Webhook: fourth", "Webhook: third", "Webhook: second", "Webhook: first" ]
+                        (webhookNotices logged)
+            ]
+        , describe "media binary fold"
+            [ test "valid datagrams forward to the host engine" <|
+                \_ ->
+                    let
+                        datagram =
+                            Cadence.encodeFrame
+                                { bandId = 64
+                                , streamId = 9
+                                , sequence = 3
+                                , timestamp = 9000
+                                , keyframe = True
+                                , codec = Cadence.CodecVox
+                                , payload = [ 7, 7 ]
+                                }
+                    in
+                    case datagram of
+                        Nothing ->
+                            Expect.fail "expected bytes"
+
+                        Just bytes ->
+                            let
+                                ( kept, out ) =
+                                    update (MediaBinaryReceived { bytes = bytes }) blank
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal [ MediaEngineFrame { bytes = bytes } ] out
+                                , \_ -> Expect.equal blank kept
+                                ]
+                                ()
+            , test "misshapen datagrams drop silently" <|
+                \_ ->
+                    let
+                        ( kept, out ) =
+                            update (MediaBinaryReceived { bytes = [ 1, 2, 3 ] }) blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal blank kept
+                        ]
+                        ()
+            ]
+        ]
+
+
+
+{-| Live, logged-in base for account-verb vectors (`blank` starts
+`Live` with no socket, so only the account is added). -}
+totpLive : Model
+totpLive =
+    { blank | accountName = Just "kai", ourNick = "kai" }
+
+
+{-| 65-byte uncompressed-point VAPID key (same vector as PushTest). -}
+pushVapid : String
+pushVapid =
+    "BAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0-P0A"
+
+
+{-| Live base with a server endpoint and a valid VAPID key for the
+web push machine vectors. -}
+pushLive : Model
+pushLive =
+    { totpLive
+        | endpoint = Just "wss://irc.example"
+        , isupport = Isupport.applyIsupportToken totpLive.isupport "VAPID" pushVapid
+    }
+
+
+{-| A socket-opened, registered model (publisher connected, waiting on
+the account). `blank` starts `Live` with no socket, so tests walk the
+real Offline → WsOpened → 001 path. -}
+publisherBase : Model
+publisherBase =
+    let
+        ( m0, _ ) =
+            update (WsOpened { url = "wss://irc.example" }) { blank | connection = Offline }
+
+        ( m1, _ ) =
+            feed m0 ":irc.example 001 me :welcome"
+    in
+    m1
+
+
+{-| A registered, account-bearing model waiting on the ports projection. -}
+publisherArmed : Model
+publisherArmed =
+    Tuple.first (feed publisherBase ":irc.example 900 me nick!u@h alice :You are now logged in as alice")
+
+
+{-| Well-formed ports projection: 32-byte nonzero signer, 65-byte
+`0x04` key, derived-id shape. -}
+testProjection : { signerPub : String, encryptionPub : String, deviceId : String }
+testProjection =
+    { signerPub = Base64Url.encode (1 :: List.repeat 31 0)
+    , encryptionPub = Base64Url.encode (4 :: List.repeat 64 7)
+    , deviceId = "ogc1-" ++ String.repeat 22 "A"
+    }
+
+
+{-| The armed model with the verified projection applied (first ADD sent). -}
+publisherSent : Model
+publisherSent =
+    Tuple.first (update (GroupPublisherIdentity (Just testProjection)) publisherArmed)
+
+
+{-| Pair keys for every welcome-open request in the outbounds. -}
+openKeys : List Outbound -> List String
+openKeys outbounds =
+    List.filterMap
+        (\outbound ->
+            case outbound of
+                GroupWelcomeOpen args ->
+                    Just args.key
+
+                _ ->
+                    Nothing
+        )
+        outbounds
+
+
+{-| Socket-opened, registered, account-bearing model with a trusted
+directory and our projected device id: the full runway for pair opens. -}
+welcomeBase : Model
+welcomeBase =
+    let
+        ( m1, _ ) =
+            feed publisherBase ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
+
+        ( m2, _ ) =
+            feed m1 (":irc.example NOTICE me :E2EEKEY DEVICE account=alice id=phone alg=onyx-ogc1-v1 key=" ++ oddWire)
+
+        ( m3, _ ) =
+            feed m2 ":irc.example NOTICE me :E2EEKEY END account=alice devices=1"
+
+        ( m4, _ ) =
+            update
+                (GroupDirectoryDerived
+                    { account = "alice"
+                    , rows =
+                        [ { deviceId = "phone"
+                          , directoryKey = Just oddSigner
+                          , derivedId = Just "ogc1-test"
+                          , trusted = True
+                          }
+                        ]
+                    }
+                )
+                m3
+
+        ( m5, _ ) =
+            update (GroupPublisherIdentity (Just testProjection)) m4
+    in
+    m5
+
+
+{-| A valid OGCMT2 commit body (epoch 0 → 1) for pair-open vectors. -}
+testCommitB64 : String
+testCommitB64 =
+    Maybe.withDefault ""
+        (GroupCommit.encodeGroupCommitBase64url
+            { priorEpoch = 0
+            , nextEpoch = 1
+            , priorCommitHash = List.repeat 32 0
+            , commitId = 1 :: List.repeat 31 0
+            , membershipDigest = 2 :: List.repeat 31 0
+            , newEpochKeyCommitment = 3 :: List.repeat 31 0
+            }
+        )
+
+
+{-| A well-framed (crypto-opaque) OGW1 welcome body for pair-open vectors. -}
+testWelcomeB64 : String
+testWelcomeB64 =
+    Base64Url.encode
+        (Base64Url.utf8Bytes "OGW1"
+            ++ [ 1 ]
+            ++ (4 :: List.repeat 64 9)
+            ++ List.repeat 12 7
+            ++ List.repeat 125 3
+        )
+
+
+{-| True for an `E2EEKEY ADD` send line. -}
+isAddLine : Outbound -> Bool
+isAddLine outbound =
+    case outbound of
+        SendLine line ->
+            String.startsWith "E2EEKEY ADD " line
+
+        _ ->
+            False
+
+
+{-| True for a scheduled-queue projection save. -}
+isScheduledSave : Outbound -> Bool
+isScheduledSave outbound =
+    case outbound of
+        ScheduledSave _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| True for a scheduled-queue fence request. -}
+isScheduledFenceRequest : Outbound -> Bool
+isScheduledFenceRequest outbound =
+    case outbound of
+        ScheduledFenceRequest _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| Run the full durable schedule flow (request, fence, add) for one row. -}
+scheduleQueued : Model -> ( Model, List Outbound )
+scheduleQueued base =
+    let
+        tag =
+            "sched-" ++ String.fromInt (round base.nowMs) ++ "-" ++ String.fromInt (base.scheduleSeq + 1)
+
+        ( requested, out1 ) =
+            update (ScheduleMessage { channel = "#c", text = "x", sendAt = 5000 }) base
+
+        ( fenced, out2 ) =
+            update (ScheduledFenceResult { tag = tag, ok = True, epoch = 0, generation = 0 }) requested
+
+        ( added, out3 ) =
+            update (ScheduledAddResult { id = tag, ok = True }) fenced
+    in
+    ( added, out1 ++ out2 ++ out3 )
+
+
+{-| One ports-side saved-search row as JSON. -}
+searchRow : String -> String -> String -> String -> Float -> Encode.Value
+searchRow id label query mode createdAt =
+    Encode.object
+        [ ( "id", Encode.string id )
+        , ( "label", Encode.string label )
+        , ( "query", Encode.string query )
+        , ( "mode", Encode.string mode )
+        , ( "createdAt", Encode.float createdAt )
+        ]
+
