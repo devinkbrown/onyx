@@ -10,9 +10,9 @@ import Dict
 import Emoji
 import Facepile
 import Topic
-import Html exposing (Html, a, audio, button, div, h2, img, input, li, p, section, small, span, strong, text, time, ul, video)
-import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, href, placeholder, preload, rel, src, style, tabindex, target, type_, value)
-import Html.Events exposing (on, onClick, onInput)
+import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
+import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
+import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Set exposing (Set)
 import Prefs
@@ -72,6 +72,8 @@ thread model =
                             div []
                                 [ facepileRow channel
                                 , topicFilterBar model channel
+                                , topicTools model channel
+                                , forumCards model channel
                                 , if win.hiddenBefore > 0 then
                                     div [ class "onyx-earlier" ]
                                         [ button
@@ -351,8 +353,7 @@ topicFilterBar : Model -> App.Channel -> Html Msg
 topicFilterBar model channel =
     let
         topics =
-            Topic.listTopics
-                (List.map (\m -> { topic = topicLabelOf m, at = m.at }) (List.reverse channel.messages))
+            Topic.listTopics (chronologicalTopicRows channel)
 
         active =
             App.activeChannelTopic model channel.name
@@ -371,6 +372,224 @@ topicFilterBar model channel =
                 [ text "All" ]
                 :: List.map (topicChip channel.name active) topics
             )
+
+
+{-| Topic create form plus the forum toggle (mirroring the
+`shell-topic-filter` tools: a validated new-topic submit and a
+pressed-state Forum switch; the pin and follow buttons arrive
+with the navigation-memory and follow slices).
+
+Like the filter bar, the whole tools row stays hidden until the
+channel has at least one topic.
+-}
+topicTools : Model -> App.Channel -> Html Msg
+topicTools model channel =
+    let
+        summaries =
+            Topic.summarizeTopics (chronologicalTopicRows channel)
+    in
+    if not model.prefs.topicTools || List.isEmpty summaries then
+        text ""
+
+    else
+        let
+            forumOpen =
+                Maybe.withDefault False (Dict.get (String.toLower channel.name) model.forumView)
+
+            canStart =
+                App.isValidTopicLabel (String.trim model.topicDraft)
+        in
+        div [ class "onyx-topic-tools" ]
+            [ Html.form [ class "shell-topic-create", onSubmit (App.TopicCreateSubmit channel.name) ]
+                [ label [ class "sr-only", for "shell-topic-create-input" ] [ text "New topic" ]
+                , input
+                    [ id "shell-topic-create-input"
+                    , class "shell-topic-create-input"
+                    , value model.topicDraft
+                    , placeholder "new topic"
+                    , attribute "maxlength" "50"
+                    , attribute "autocomplete" "off"
+                    , attribute "aria-label" "New topic"
+                    , onInput App.TopicDraftInput
+                    ]
+                    []
+                , button
+                    [ type_ "submit"
+                    , class "shell-topic-action"
+                    , disabled (not canStart)
+                    ]
+                    [ text "Start topic" ]
+                ]
+            , div [ class "shell-topic-actions" ]
+                ([ (if List.isEmpty summaries then
+                        text ""
+
+                    else
+                        button
+                            [ type_ "button"
+                            , class "shell-topic-action"
+                            , attribute "aria-pressed" (boolToString forumOpen)
+                            , onClick (App.ForumToggle channel.name)
+                            ]
+                            [ text "Forum" ]
+                   )
+                 ]
+                )
+            ]
+
+
+{-| Forum cards for every labelled conversation (mirroring the
+`shell-topic-forum` section: one card per summary with count,
+latest stamp, and preview, opening through the validated forum
+select; per-topic unread arrives with the read-ledger
+projector).
+-}
+forumCards : Model -> App.Channel -> Html Msg
+forumCards model channel =
+    let
+        forumOpen =
+            Maybe.withDefault False (Dict.get (String.toLower channel.name) model.forumView)
+
+        summaries =
+            Topic.summarizeTopics (chronologicalTopicRows channel)
+    in
+    if not model.prefs.topicTools || not forumOpen || List.isEmpty summaries then
+        text ""
+
+    else
+        section [ class "shell-topic-forum", attribute "aria-labelledby" "shell-topic-forum-title" ]
+            (h3 [ id "shell-topic-forum-title", class "sr-only" ] [ text "Topic forum" ]
+                :: List.map (forumCard model channel) summaries
+            )
+
+
+forumCard : Model -> App.Channel -> Topic.TopicSummary -> Html Msg
+forumCard model channel summary =
+    let
+        latest =
+            latestTopicMessage channel summary.topic
+
+        countLabel =
+            String.fromInt summary.count
+                ++ (if summary.count == 1 then
+                        " message"
+
+                    else
+                        " messages"
+                   )
+    in
+    article [ class "shell-topic-card" ]
+        [ button
+            [ type_ "button"
+            , class "shell-topic-card-main"
+            , onClick (App.ForumOpenTopic { channel = channel.name, topic = summary.topic })
+            , attribute "aria-label" ("Open topic " ++ summary.topic ++ ", " ++ countLabel)
+            ]
+            [ span [ class "shell-topic-card-title" ] [ text ("#" ++ summary.topic) ]
+            , span [ class "shell-topic-card-meta" ]
+                [ span [] [ text countLabel ]
+                , time
+                    [ datetime (App.millisToIso (toFloat summary.lastAt))
+                    , attribute "title" (App.millisToIso (toFloat summary.lastAt))
+                    ]
+                    [ text ("latest " ++ shortDayLabel model summary.lastAt) ]
+                ]
+            , case latest of
+                Nothing ->
+                    text ""
+
+                Just message ->
+                    span [ class "shell-topic-card-preview" ]
+                        [ span [ class "shell-topic-card-author" ] [ text message.from ]
+                        , span [] [ text (clippedTopicPreview (Maybe.withDefault message.body message.plaintext)) ]
+                        ]
+            ]
+        ]
+
+
+{-| Latest non-system row carrying a topic label
+(case-insensitive, mirroring `latestTopicMessage`).
+-}
+latestTopicMessage : App.Channel -> String -> Maybe App.ChatMessage
+latestTopicMessage channel topic =
+    let
+        key =
+            String.toLower topic
+    in
+    List.filter (\m -> not (isSystemRow m) && (topicLabelOf m |> Maybe.map String.toLower) == Just key) channel.messages
+        |> List.sortBy .at
+        |> List.reverse
+        |> List.head
+
+
+{-| Chronological topic rows for summaries (buffer order is
+newest-first; the oracle reads oldest-first for first-casing
+parity).
+-}
+chronologicalTopicRows : App.Channel -> List { topic : Maybe String, at : Int }
+chronologicalTopicRows channel =
+    List.map (\m -> { topic = topicLabelOf m, at = m.at }) (List.reverse channel.messages)
+
+
+{-| 110-char card preview clip (mirroring `clipped`). -}
+clippedTopicPreview : String -> String
+clippedTopicPreview preview =
+    if String.length preview > 110 then
+        String.left 110 preview ++ "..."
+
+    else
+        preview
+
+
+{-| Short latest stamp (`Jan 16`, mirroring the card
+`toLocaleDateString` month-short/day-numeric shape in fixed
+English).
+-}
+shortDayLabel : Model -> Int -> String
+shortDayLabel model at =
+    monthShort (Time.toMonth model.zone (Time.millisToPosix at))
+        ++ " "
+        ++ String.fromInt (Time.toDay model.zone (Time.millisToPosix at))
+
+
+monthShort : Time.Month -> String
+monthShort month =
+    case month of
+        Time.Jan ->
+            "Jan"
+
+        Time.Feb ->
+            "Feb"
+
+        Time.Mar ->
+            "Mar"
+
+        Time.Apr ->
+            "Apr"
+
+        Time.May ->
+            "May"
+
+        Time.Jun ->
+            "Jun"
+
+        Time.Jul ->
+            "Jul"
+
+        Time.Aug ->
+            "Aug"
+
+        Time.Sep ->
+            "Sep"
+
+        Time.Oct ->
+            "Oct"
+
+        Time.Nov ->
+            "Nov"
+
+        Time.Dec ->
+            "Dec"
 
 
 topicChip : String -> Maybe String -> String -> Html Msg

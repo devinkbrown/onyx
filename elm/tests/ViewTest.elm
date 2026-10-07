@@ -2818,6 +2818,68 @@ suite =
                                 |> Query.count (Expect.equal 0)
                         ]
                         ()
+            , test "topic tools create conversations and toggle the forum" <|
+                \_ ->
+                    let
+                        tagged =
+                            { blank | nowMs = 1000000 }
+                                |> (\m -> feed m ":me!u@h JOIN #c")
+                                |> (\m -> feed m ":alice!u@h JOIN #c")
+                                |> (\m -> feed m "@onyx/topic=Roadmap :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                        drafted =
+                            Tuple.first (update (TopicDraftInput "  Sprint  ") tagged)
+
+                        created =
+                            Tuple.first (update (TopicCreateSubmit "#c") drafted)
+
+                        badDraft =
+                            Tuple.first (update (TopicDraftInput "  ") tagged)
+
+                        refused =
+                            Tuple.first (update (TopicCreateSubmit "#c") badDraft)
+
+                        forumed =
+                            Tuple.first (update (ForumToggle "#c") tagged)
+
+                        cardOpened =
+                            Tuple.first
+                                (update (ForumOpenTopic { channel = "#c", topic = "roadmap" }) forumed)
+                    in
+                    Expect.all
+                        [ \_ ->
+                            query tagged
+                                |> Query.find [ Selector.tag "form", Selector.containing [ Selector.text "Start topic" ] ]
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Start topic" ] ]
+                                |> Query.has [ Selector.disabled True ]
+                        , \_ ->
+                            query drafted
+                                |> Query.find [ Selector.tag "form", Selector.containing [ Selector.text "Start topic" ] ]
+                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Start topic" ] ]
+                                |> Query.has [ Selector.disabled False ]
+                        , \_ ->
+                            Expect.equal "  Sprint  " drafted.topicDraft
+                        , \_ -> Expect.equal (Just "Sprint") (App.activeChannelTopic created "#c")
+                        , \_ -> Expect.equal "" created.topicDraft
+                        , \_ -> Expect.equal "  " refused.topicDraft
+                        , \_ -> Expect.equal Nothing (App.activeChannelTopic refused "#c")
+                        , \_ ->
+                            query forumed
+                                |> Query.find [ Selector.class "shell-topic-forum" ]
+                                |> Query.has [ Selector.text "#Roadmap", Selector.text "1 message", Selector.text "one" ]
+                        , \_ ->
+                            query forumed
+                                |> Query.find [ Selector.class "shell-topic-card-main" ]
+                                |> Event.simulate Event.click
+                                |> Event.expect (App.ForumOpenTopic { channel = "#c", topic = "Roadmap" })
+                        , \_ -> Expect.equal (Just "Roadmap") (App.activeChannelTopic cardOpened "#c")
+                        , \_ ->
+                            query cardOpened
+                                |> Query.findAll [ Selector.class "shell-topic-forum" ]
+                                |> Query.count (Expect.equal 0)
+                        ]
+                        ()
             , test "no facepile without channel members" <|
                 \_ ->
                     query blank

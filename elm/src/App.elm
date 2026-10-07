@@ -354,6 +354,8 @@ type alias Model =
     , userProfiles : Dict String Services.UserProfile
     , userProfileCard : Maybe { nick : String, channel : String }
     , moderationDraft : Maybe Moderation.Draft
+    , topicDraft : String
+    , forumView : Dict String Bool
     , threadPanel : Maybe { channel : String, parentId : Int }
     , moderationDesk : ModerationDeskForm
     , personSafety : Maybe { pending : PersonSafety.SafetyPending, reason : String, note : String }
@@ -2641,6 +2643,10 @@ type Msg
     | ThreadOpen { channel : String, parentId : Int }
     | ThreadClose
     | ThreadReplyParent { channel : String, parentId : Int }
+    | TopicDraftInput String
+    | TopicCreateSubmit String
+    | ForumToggle String
+    | ForumOpenTopic { channel : String, topic : String }
     | MessageEditRequested String String String
     | MessageDeleteRequested String String
     | OwnMetadataSet String String
@@ -3003,6 +3009,8 @@ init nick url =
     , moderationDraft = Nothing
     , moderationDesk = blankModerationDesk
     , threadPanel = Nothing
+    , topicDraft = ""
+    , forumView = Dict.empty
     , personSafety = Nothing
     , softIgnoreList = Set.empty
     , nickColorOverrides = Dict.empty
@@ -3449,6 +3457,8 @@ blank =
     , moderationDraft = Nothing
     , moderationDesk = blankModerationDesk
     , threadPanel = Nothing
+    , topicDraft = ""
+    , forumView = Dict.empty
     , personSafety = Nothing
     , softIgnoreList = Set.empty
     , nickColorOverrides = Dict.empty
@@ -38087,6 +38097,65 @@ update msg model =
 
                 Nothing ->
                     ( closed, [] )
+
+        TopicDraftInput draft ->
+            ( { model | topicDraft = draft }, [] )
+
+        TopicCreateSubmit channel ->
+            -- Start a named conversation (mirroring `startTopic`:
+            -- invalid labels keep the draft and the forum state,
+            -- valid labels select and clear the draft; the label
+            -- does not need to exist yet).
+            let
+                label =
+                    String.trim model.topicDraft
+            in
+            if not (isValidTopicLabel label) then
+                ( model, [] )
+
+            else
+                ( { model
+                    | activeChannelTopics = Dict.insert (String.toLower channel) label model.activeChannelTopics
+                    , forumView = Dict.remove (String.toLower channel) model.forumView
+                    , topicDraft = ""
+                  }
+                , []
+                )
+
+        ForumToggle channel ->
+            let
+                key =
+                    String.toLower channel
+
+                open =
+                    not (Maybe.withDefault False (Dict.get key model.forumView))
+            in
+            ( { model
+                | forumView =
+                    if open then
+                        Dict.insert key True model.forumView
+
+                    else
+                        Dict.remove key model.forumView
+              }
+            , []
+            )
+
+        ForumOpenTopic { channel, topic } ->
+            -- Open a topic from its forum card (mirroring
+            -- `openTopic`: validated select plus closing the forum;
+            -- the focus handoff stays a narrowing).
+            case resolveKnownChannelTopic model channel topic of
+                Just valid ->
+                    ( { model
+                        | activeChannelTopics = Dict.insert (String.toLower channel) valid model.activeChannelTopics
+                        , forumView = Dict.remove (String.toLower channel) model.forumView
+                      }
+                    , []
+                    )
+
+                Nothing ->
+                    ( { model | forumView = Dict.remove (String.toLower channel) model.forumView }, [] )
 
         ModerationConfirm ->
             -- Confirm re-validates and invalidates on disconnect or
