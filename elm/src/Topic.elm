@@ -23,9 +23,13 @@ raw where the oracle uses `localeCompare` (plain and base
 sensitivity); ASCII orders identically. Stamps are epoch
 milliseconds, so the oracle `lastAt` clone concern does not
 apply — Elm values are immutable. The unread projector covers
-the markerless reduction of `projectRoomTopicUnread` (no
-device ledger yet, so per-topic markers stay pending): rows at
-or newer than the room boundary count by normalized label.
+the markerless reduction of `projectRoomTopicUnread` (device
+cursors live in `TopicRead`; ports persistence and the App
+reconcile fold stay pending): rows at or newer than the room
+boundary count by normalized label.
+Marker-aware cursors live in `TopicRead` (exact-id projectors over
+oldest-first rows plus the parse/sanitize/mark/merge ledger cores);
+this projector stays the markerless reduction for badge display.
 Narrowings: buffers arrive newest-first where the oracle scans
 oldest-first (positions invert, results match); rows arrive
 already label-validated so invalid labels are skipped only when
