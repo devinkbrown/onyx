@@ -40,6 +40,28 @@ feed model line =
     Tuple.first (update (WsLineReceived line) model)
 
 
+{-| Allow one URL for the newest #c row (per-instance consent keys ride
+the row identity, so tests resolve the key off the rendered row). -}
+allowNewestRowUrl : Model -> String -> Model
+allowNewestRowUrl model url =
+    case Dict.get "#c" model.channels |> Maybe.andThen (.messages >> List.head) of
+        Just row ->
+            Tuple.first (update (PreviewImageAllow (previewConsentKey row url)) model)
+
+        Nothing ->
+            model
+
+
+newestRowKey : Model -> String -> String
+newestRowKey model url =
+    case Dict.get "#c" model.channels |> Maybe.andThen (.messages >> List.head) of
+        Just row ->
+            previewConsentKey row url
+
+        Nothing ->
+            url
+
+
 channelModel : Model
 channelModel =
     { blank | caps = [ "chathistory" ] }
@@ -249,7 +271,7 @@ suite =
                         }
 
                     allowed =
-                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/i.png") cached)
+                        allowNewestRowUrl cached "https://cdn.example.test/i.png"
                 in
                 Expect.all
                     [ \_ ->
@@ -290,7 +312,7 @@ suite =
                         { withMedia | origin = "https://app.example.test" }
 
                     allowed =
-                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/v.mp4") remote)
+                        allowNewestRowUrl remote "https://cdn.example.test/v.mp4"
                 in
                 Expect.all
                     [ \_ ->
@@ -301,7 +323,7 @@ suite =
                         query remote
                             |> Query.find [ Selector.class "shell-msg-media-consent" ]
                             |> Event.simulate Event.click
-                            |> Event.expect (PreviewImageAllow "https://cdn.example.test/v.mp4")
+                            |> Event.expect (PreviewImageAllow (newestRowKey remote "https://cdn.example.test/v.mp4"))
                     , \_ ->
                         query allowed
                             |> Query.find [ Selector.tag "video" ]
@@ -314,6 +336,34 @@ suite =
                             |> Query.hasNot [ Selector.class "shell-msg-media-consent" ]
                     ]
                     ()
+        , test "consent is per unfurl instance, not per URL" <|
+            \_ ->
+                let
+                    both =
+                        feed channelModel ":alice!u@h PRIVMSG #c :one https://cdn.example.test/v.mp4 x"
+                            |> (\m -> feed m ":bob!u@h PRIVMSG #c :two https://cdn.example.test/v.mp4 y")
+
+                    remote =
+                        { both | origin = "https://app.example.test" }
+
+                    allowed =
+                        allowNewestRowUrl remote "https://cdn.example.test/v.mp4"
+                in
+                Expect.all
+                    [ \_ ->
+                        query remote
+                            |> Query.findAll [ Selector.class "shell-msg-media-consent" ]
+                            |> Query.count (Expect.equal 2)
+                    , \_ ->
+                        query allowed
+                            |> Query.findAll [ Selector.class "shell-msg-media-consent" ]
+                            |> Query.count (Expect.equal 1)
+                    , \_ ->
+                        query allowed
+                            |> Query.findAll [ Selector.tag "video" ]
+                            |> Query.count (Expect.equal 1)
+                    ]
+                    ()
         , test "inline media unfurl renders deferred audio without preload" <|
             \_ ->
                 let
@@ -321,10 +371,7 @@ suite =
                         feed channelModel ":alice!u@h PRIVMSG #c :hear https://cdn.example.test/a.mp3 ok"
 
                     allowed =
-                        Tuple.first
-                            (update (PreviewImageAllow "https://cdn.example.test/a.mp3")
-                                { withMedia | origin = "https://app.example.test" }
-                            )
+                        allowNewestRowUrl { withMedia | origin = "https://app.example.test" } "https://cdn.example.test/a.mp3"
                 in
                 query allowed
                     |> Query.find [ Selector.tag "audio" ]
@@ -644,7 +691,7 @@ suite =
                         { remote | prefs = { p | linkPreviews = False } }
 
                     allowed =
-                        Tuple.first (update (PreviewImageAllow "https://cdn.example.test/v.mp4") remote)
+                        allowNewestRowUrl remote "https://cdn.example.test/v.mp4"
                 in
                 Expect.all
                     [ \_ ->

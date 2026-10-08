@@ -1915,9 +1915,9 @@ messageBody model m =
             []
     )
         ++ [ text presented.caption ]
-        ++ List.map (attachmentCard model) presented.attachments
-        ++ mediaUnfurls model presented
-        ++ [ previewCard model (App.displayBody m) ]
+        ++ List.map (attachmentCard model m) presented.attachments
+        ++ mediaUnfurls model m presented
+        ++ [ previewCard model m (App.displayBody m) ]
 
 
 {-| Reply context line (mirrors the oracle `shell-msg-reply` block:
@@ -1950,8 +1950,8 @@ the same sink policy as OG cards — auto-load for same-origin or
 link fallback once the element reports an error. Kind detection
 reuses `classifyAttachmentKind` (extension allowlist); `KindFile`
 stays fail-closed with no unfurl. -}
-mediaUnfurls : Model -> Upload.AttachmentPresentation -> List (Html Msg)
-mediaUnfurls model presented =
+mediaUnfurls : Model -> App.ChatMessage -> Upload.AttachmentPresentation -> List (Html Msg)
+mediaUnfurls model row presented =
     let
         privacy =
             App.liveUnfurlPrivacy model
@@ -1963,11 +1963,11 @@ mediaUnfurls model presented =
         []
 
     else
-        List.filterMap (mediaUnfurl model privacy attached) (Upload.extractHttpUrls presented.caption)
+        List.filterMap (mediaUnfurl model row privacy attached) (Upload.extractHttpUrls presented.caption)
 
 
-mediaUnfurl : Model -> Upload.UnfurlPrefs -> Set.Set String -> String -> Maybe (Html Msg)
-mediaUnfurl model privacy attached href =
+mediaUnfurl : Model -> App.ChatMessage -> Upload.UnfurlPrefs -> Set.Set String -> String -> Maybe (Html Msg)
+mediaUnfurl model row privacy attached href =
     if Set.member href attached then
         Nothing
 
@@ -1978,7 +1978,7 @@ mediaUnfurl model privacy attached href =
 
             kind ->
                 if Upload.isSameOriginHttpUrl model.origin href || Upload.isPreviewableUrl href privacy then
-                    Just (mediaElement model kind href)
+                    Just (mediaElement model row kind href)
 
                 else
                     Nothing
@@ -1989,17 +1989,17 @@ credential-free same-origin or public http(s) hosts may load;
 cross-origin stays behind consent; errors swap to the fallback
 link; images open the lightbox dialog, whose focus trap and
 return-focus live ports-side). -}
-mediaElement : Model -> Upload.AttachmentKind -> String -> Html Msg
-mediaElement model kind href =
+mediaElement : Model -> App.ChatMessage -> Upload.AttachmentKind -> String -> Html Msg
+mediaElement model row kind href =
     div [ class "shell-msg-media" ]
         [ if Set.member href model.previewMediaFailed then
             mediaFallback kind href
 
-          else if Upload.isSameOriginHttpUrl model.origin href || Set.member href model.previewImagesAllowed then
+          else if Upload.isSameOriginHttpUrl model.origin href || Set.member (App.previewConsentKey row href) model.previewImagesAllowed then
             mediaPlayer kind href
 
           else
-            mediaConsent kind href
+            mediaConsent row kind href
         ]
 
 
@@ -2073,8 +2073,8 @@ mediaPlayer kind href =
             text ""
 
 
-mediaConsent : Upload.AttachmentKind -> String -> Html Msg
-mediaConsent kind href =
+mediaConsent : App.ChatMessage -> Upload.AttachmentKind -> String -> Html Msg
+mediaConsent row kind href =
     let
         word =
             mediaKindWord kind
@@ -2087,7 +2087,7 @@ mediaConsent kind href =
     button
         [ type_ "button"
         , class "shell-msg-media-consent"
-        , onClick (App.PreviewImageAllow href)
+        , onClick (App.PreviewImageAllow (App.previewConsentKey row href))
         , attribute "aria-label" ("Load external " ++ word ++ " from " ++ host)
         ]
         [ span [] [ text ("Load external " ++ word) ]
@@ -2177,8 +2177,8 @@ mediaLightboxDialog model =
 canonical URL re-validated at the sink, cross-origin thumbnails
 behind an explicit consent click; same-origin thumbnails load
 directly). -}
-previewCard : Model -> String -> Html Msg
-previewCard model body =
+previewCard : Model -> App.ChatMessage -> String -> Html Msg
+previewCard model row body =
     let
         privacy =
             App.liveUnfurlPrivacy model
@@ -2195,7 +2195,7 @@ previewCard model body =
                 case Dict.get url model.linkPreviews of
                     Just (Just card) ->
                         if previewSafe model card then
-                            linkPreviewCard model card
+                            linkPreviewCard model row card
 
                         else
                             text ""
@@ -2224,8 +2224,8 @@ previewSafe model card =
         || Upload.isPreviewableUrl card.url (App.liveUnfurlPrivacy model)
 
 
-linkPreviewCard : Model -> Upload.LinkPreview -> Html Msg
-linkPreviewCard model card =
+linkPreviewCard : Model -> App.ChatMessage -> Upload.LinkPreview -> Html Msg
+linkPreviewCard model row card =
     let
         thumbnail =
             if String.isEmpty card.image then
@@ -2233,7 +2233,7 @@ linkPreviewCard model card =
 
             else if
                 Upload.isSameOriginHttpUrl model.origin card.image
-                    || Set.member card.image model.previewImagesAllowed
+                    || Set.member (App.previewConsentKey row card.image) model.previewImagesAllowed
             then
                 if Upload.isSameOriginHttpUrl model.origin card.image || Upload.isPreviewableUrl card.image Upload.previewSsrfOnly then
                     Just card.image
@@ -2294,7 +2294,7 @@ linkPreviewCard model card =
                         [ attribute "type" "button"
                         , class "shell-msg-preview-consent"
                         , attribute "aria-label" ("Load external preview image from " ++ previewHost card.image)
-                        , onClick (PreviewImageAllow card.image)
+                        , onClick (PreviewImageAllow (App.previewConsentKey row card.image))
                         ]
                         [ text "Load image" ]
 
@@ -2319,8 +2319,8 @@ the sink gate passes — first-party uploads are chat media, and
 cross-origin ones additionally honor the link-preview preference
 (whose consent click lives in the unfurl itself). Everything else
 renders a `FileChip` link. -}
-attachmentCard : Model -> Upload.ParsedAttachment -> Html Msg
-attachmentCard model attachment =
+attachmentCard : Model -> App.ChatMessage -> Upload.ParsedAttachment -> Html Msg
+attachmentCard model row attachment =
     let
         mediaKind =
             case attachment.kind of
@@ -2336,7 +2336,7 @@ attachmentCard model attachment =
     case mediaKind of
         Just kind ->
             if attachmentCanUnfurl model attachment.url then
-                mediaElement model kind attachment.url
+                mediaElement model row kind attachment.url
 
             else
                 fileChip attachment
