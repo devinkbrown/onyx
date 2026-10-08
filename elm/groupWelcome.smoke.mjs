@@ -202,3 +202,37 @@ test("missing recipient key stays locked", async () => {
   });
   assert.deepEqual([out.ok, out.reason], [false, "recipient-key-unavailable"]);
 });
+
+test("room keyring keeps the oldest epoch exactly at the cap", async () => {
+  const recipientRooms = OnyxPorts.createRoomCrypto(memDeps());
+  const room = "#keyring-cap";
+  assert.equal(await recipientRooms.provisionRoomKey(room, 1, nonzero32()), true);
+  const first = await recipientRooms.sealRoomMessage(room, "epoch one");
+  assert.equal(first.ok, true, "seal at epoch 1 must succeed");
+  for (let epoch = 2; epoch <= 8; epoch++) {
+    assert.equal(await recipientRooms.provisionRoomKey(room, epoch, nonzero32()), true);
+  }
+  const back = await recipientRooms.openRoomMessage(room, first.envelope);
+  assert.deepEqual([back.ok, back.plaintext], [true, "epoch one"], "epoch 1 survives exactly at the 8-epoch cap");
+});
+
+test("room keyring evicts the lowest epoch past 8", async () => {
+  const recipientRooms = OnyxPorts.createRoomCrypto(memDeps());
+  const room = "#keyring-evict";
+  assert.equal(await recipientRooms.provisionRoomKey(room, 1, nonzero32()), true);
+  const first = await recipientRooms.sealRoomMessage(room, "epoch one");
+  assert.equal(first.ok, true, "seal at epoch 1 must succeed");
+  for (let epoch = 2; epoch <= 9; epoch++) {
+    assert.equal(await recipientRooms.provisionRoomKey(room, epoch, nonzero32()), true);
+  }
+  const evicted = await recipientRooms.openRoomMessage(room, first.envelope);
+  assert.deepEqual(
+    [evicted.ok, evicted.reason],
+    [false, "session-not-provisioned"],
+    "the evicted epoch-1 envelope must no longer open"
+  );
+  const latest = await recipientRooms.sealRoomMessage(room, "epoch nine");
+  assert.equal(latest.ok, true, "seal must follow the promoted active epoch");
+  const back = await recipientRooms.openRoomMessage(room, latest.envelope);
+  assert.deepEqual([back.ok, back.plaintext], [true, "epoch nine"]);
+});

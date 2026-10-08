@@ -7649,6 +7649,9 @@ function fetchPublicFeed(url) {
   var GROUP_MAX_CIPHERTEXT_BYTES = GROUP_MAX_PLAINTEXT_BYTES + GROUP_TAG_BYTES;
   var GROUP_MAX_WIRE_BYTES = 4096;
   var GROUP_MAX_ROOM_BYTES = 256;
+  /* Epoch-key retention per room, mirroring `MAX_ROOM_EPOCHS` in
+     `src/lib/e2ee/groupKeyring.ts` (lowest-evicts past the cap). */
+  var GROUP_MAX_ROOM_EPOCHS = 8;
 
   function groupNormalizeRoom(room, TextEnc) {
     var norm = String(room).trim().toLowerCase();
@@ -7731,7 +7734,25 @@ function fetchPublicFeed(url) {
       return subtle.importKey("raw", rawBytes, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]).then(function (key) {
         var entry = roomMap(norm);
         entry.keys.set(epoch >>> 0, key);
-        if ((epoch >>> 0) > entry.active) entry.active = epoch >>> 0;
+        while (entry.keys.size > GROUP_MAX_ROOM_EPOCHS) {
+          var lowest = null;
+          entry.keys.forEach(function (_, e) {
+            if (lowest === null || e < lowest) lowest = e;
+          });
+          if (lowest === null) break;
+          entry.keys.delete(lowest);
+        }
+        // Promote active when a newer epoch lands; re-point to the
+        // highest retained epoch when eviction dropped the active one.
+        if ((epoch >>> 0) > entry.active && entry.keys.has(epoch >>> 0)) {
+          entry.active = epoch >>> 0;
+        } else if (!entry.keys.has(entry.active)) {
+          var highest = -1;
+          entry.keys.forEach(function (_, e) {
+            if (e > highest) highest = e;
+          });
+          entry.active = highest;
+        }
         return true;
       }).catch(function () { return false; });
     }
