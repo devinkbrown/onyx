@@ -26,6 +26,7 @@ import Html exposing (Html, button, div, form, input, li, p, section, small, spa
 import Html.Attributes exposing (attribute, class, disabled, id, maxlength, placeholder, title, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
+import Provenance exposing (Scope(..))
 import SavedSearches
 import Search
 
@@ -43,6 +44,21 @@ statusId =
 saveInputId : String
 saveInputId =
     "onyx-message-search-save-label"
+
+
+{-| Provenance badge (mirroring `ProvenanceBadge`: a `provenance-badge`
+span carrying `data-scope`, the subject-specific accessible label, and
+the scope description as its title; extra classes ride after the base
+class exactly like the oracle `class` prop). -}
+provenanceBadge : Scope -> String -> String -> Html Msg
+provenanceBadge scope subject extraClass =
+    span
+        [ class (String.trim ("provenance-badge " ++ extraClass))
+        , attribute "data-scope" (Provenance.scopeToString scope)
+        , attribute "aria-label" (Provenance.ariaLabel scope subject)
+        , title (Provenance.descriptionFor scope)
+        ]
+        [ text (Provenance.labelFor scope) ]
 
 
 {-| Input keys: Enter steps forward, Shift+Enter steps back, Escape
@@ -139,6 +155,7 @@ panel model =
                 [ span [ class "onyx-message-search__target-kicker" ] [ text "Searching in" ]
                 , text " "
                 , strong [] [ text target ]
+                , provenanceBadge Device "Visible message search" "onyx-message-search__provenance"
                 ]
             , div [ class "onyx-message-search__controls", attribute "role" "group", attribute "aria-label" "Search result navigation" ]
                 [ button
@@ -177,9 +194,8 @@ panel model =
 
 {-| Device recall terms: lexical pivots from the live matches
 (mirroring the `onyx-message-search__recall` group; a chip applies
-its term as the query, mirroring `applyRecallSuggestion`). The
-oracle's device-scope `ProvenanceBadge` has no Elm equivalent yet —
-the group label carries the device-recall semantics. -}
+its term as the query, mirroring `applyRecallSuggestion`; the
+device-scope badge leads the group like the oracle). -}
 recallSection : Model -> Html Msg
 recallSection model =
     case App.searchRecallTerms model of
@@ -192,7 +208,7 @@ recallSection model =
                 , attribute "role" "group"
                 , attribute "aria-label" "Device recall terms"
                 ]
-                (List.map recallChip terms)
+                (provenanceBadge Device "Search recall terms" "" :: List.map recallChip terms)
 
 
 recallChip : String -> Html Msg
@@ -209,8 +225,8 @@ recallChip term =
 `vault-search` section: shown only with hits; the resolved batch mode
 labels the section and the toggle cycles hybrid → exact → semantic
 like `VAULT_MODE_CYCLE`; a row opens its conversation at the hit's
-stamp). The oracle's `ProvenanceBadge` has no Elm equivalent — the
-section label carries the device-memory semantics. -}
+stamp). The device-scope badge rides the section bar like the
+oracle. -}
 vaultSection : Model -> Html Msg
 vaultSection model =
     case App.vaultHits model of
@@ -221,6 +237,7 @@ vaultSection model =
             div [ class "onyx-message-search__vault", attribute "data-testid" "vault-search" ]
                 [ div [ class "onyx-message-search__vault-bar" ]
                     [ strong [ class "onyx-message-search__section-title" ] [ text "Remembered elsewhere" ]
+                    , provenanceBadge Device "Device-memory message search" ""
                     , span [ class "onyx-message-search__vault-label" ] [ text "Saved on this device" ]
                     , span [ class "onyx-message-search__server-count" ]
                         [ text (String.fromInt (List.length hits) ++ " remembered · " ++ App.vaultSearchModeToString model.vaultSearchModeShown) ]
@@ -262,9 +279,8 @@ vaultRow model hit =
 block: gated on a non-empty query without the E2EE block while the
 deep search can run or has settled; the deep button runs over
 Ctrl+Enter; counts, errors, and limit notices mirror the oracle
-copy; rows open their conversation at the archived row). The
-oracle's server `ProvenanceBadge` has no Elm equivalent — the
-section title carries the archived-history semantics. -}
+copy; rows open their conversation at the archived row; the server-scope
+badge rides the section bar like the oracle). -}
 serverSection : Model -> String -> Html Msg
 serverSection model query =
     if String.isEmpty (String.trim query) || App.serverSearchBlockedByE2ee model then
@@ -277,6 +293,7 @@ serverSection model query =
         div [ class "onyx-message-search__server", attribute "data-testid" "server-search", attribute "aria-busy" (busyFlag (App.serverStatusForPanel model == App.ServerSearchPending)) ]
             [ div [ class "onyx-message-search__server-bar" ]
                 [ strong [ class "onyx-message-search__section-title" ] [ text "Archived history" ]
+                , provenanceBadge Server "Archived message search" ""
                 , button
                     [ type_ "button"
                     , class "onyx-message-search__deep"
@@ -424,6 +441,7 @@ savedSection model query =
         section [ class "onyx-message-search__saved", attribute "aria-label" "Saved searches" ]
             [ div [ class "onyx-message-search__saved-bar" ]
                 [ strong [ class "onyx-message-search__section-title" ] [ text "Saved searches" ]
+                , provenanceBadge Device "Saved searches" ""
                 , span [ class "onyx-message-search__vault-label" ] [ text "Saved on this device" ]
                 , span [ class "onyx-message-search__server-count" ]
                     [ text (String.fromInt (List.length model.savedSearches) ++ " saved") ]

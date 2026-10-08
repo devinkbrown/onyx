@@ -636,6 +636,115 @@ suite =
                     query channelModel
                         |> Query.hasNot [ Selector.class "onyx-message-search__recall" ]
             ]
+        , describe "provenance badges"
+            [ test "target row carries the device badge" <|
+                \_ ->
+                    let
+                        open =
+                            Tuple.first (update SearchOpen channelModel)
+                    in
+                    query open
+                        |> Query.find
+                            [ Selector.attribute (Attr.attribute "aria-label" "Visible message search provenance: This device. Computed locally in this browser from loaded or saved Onyx data.") ]
+                        |> Query.has
+                            [ Selector.class "provenance-badge"
+                            , Selector.class "onyx-message-search__provenance"
+                            , Selector.text "This device"
+                            , Selector.attribute (Attr.attribute "data-scope" "device")
+                            , Selector.attribute (Attr.attribute "title" "Computed locally in this browser from loaded or saved Onyx data.")
+                            ]
+            , test "saved section carries the device badge" <|
+                \_ ->
+                    let
+                        seeded =
+                            { channelModel
+                                | searchOpen = True
+                                , savedSearches =
+                                    [ { id = "s1"
+                                      , label = "Greetings"
+                                      , query = "hello"
+                                      , mode = SavedSearches.ExactMode
+                                      , createdAt = 0
+                                      }
+                                    ]
+                            }
+                    in
+                    query seeded
+                        |> Query.find
+                            [ Selector.attribute (Attr.attribute "aria-label" "Saved searches provenance: This device. Computed locally in this browser from loaded or saved Onyx data.") ]
+                        |> Query.has
+                            [ Selector.class "provenance-badge"
+                            , Selector.text "This device"
+                            , Selector.attribute (Attr.attribute "data-scope" "device")
+                            ]
+            , test "recall group leads with the device badge" <|
+                \_ ->
+                    let
+                        open =
+                            Tuple.first (update (SearchQuery { query = "hello" }) { channelModel | searchOpen = True })
+                    in
+                    query open
+                        |> Query.find
+                            [ Selector.attribute (Attr.attribute "aria-label" "Search recall terms provenance: This device. Computed locally in this browser from loaded or saved Onyx data.") ]
+                        |> Query.has
+                            [ Selector.class "provenance-badge"
+                            , Selector.text "This device"
+                            , Selector.attribute (Attr.attribute "data-scope" "device")
+                            ]
+            , test "remembered-elsewhere section carries the device badge" <|
+                \_ ->
+                    let
+                        hit =
+                            { id = "#b:9", from = "bob", text = "hello orchard", at = 1791115200000, target = "#b" }
+
+                        seeded =
+                            { channelModel
+                                | searchOpen = True
+                                , searchQuery = "hello"
+                                , vaultRawHits = [ hit ]
+                                , vaultStatus = VaultSearchDone
+                            }
+                    in
+                    query seeded
+                        |> Query.find
+                            [ Selector.attribute (Attr.attribute "aria-label" "Device-memory message search provenance: This device. Computed locally in this browser from loaded or saved Onyx data.") ]
+                        |> Query.has
+                            [ Selector.class "provenance-badge"
+                            , Selector.text "This device"
+                            , Selector.attribute (Attr.attribute "data-scope" "device")
+                            ]
+            , test "archived section carries the server badge" <|
+                \_ ->
+                    let
+                        hit =
+                            { id = "#c:9", from = "bob", text = "hello archived", at = 1791115200000, target = "#c" }
+
+                        seeded =
+                            { channelModel
+                                | searchOpen = True
+                                , searchQuery = "hello"
+                                , caps = [ "draft/search" ]
+                                , serverSearchTarget = "#c"
+                                , serverSearchQuery = "hello"
+                                , serverSearchStatus = ServerSearchDone
+                                , serverSearchResults = [ hit ]
+                            }
+                    in
+                    query seeded
+                        |> Query.find
+                            [ Selector.attribute (Attr.attribute "aria-label" "Archived message search provenance: This server. Computed by the connected Onyx/Onyx Server server from server-side history.") ]
+                        |> Query.has
+                            [ Selector.class "provenance-badge"
+                            , Selector.text "This server"
+                            , Selector.attribute (Attr.attribute "data-scope" "server")
+                            , Selector.attribute (Attr.attribute "title" "Computed by the connected Onyx/Onyx Server server from server-side history.")
+                            ]
+            , test "no device badge without vault hits" <|
+                \_ ->
+                    query { channelModel | searchOpen = True, searchQuery = "hello" }
+                        |> Query.hasNot
+                            [ Selector.attribute (Attr.attribute "aria-label" "Device-memory message search provenance: This device. Computed locally in this browser from loaded or saved Onyx data.") ]
+            ]
         , describe "slash search/history"
             [ test "registry resolves both verbs" <|
                 \_ ->
