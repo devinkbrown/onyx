@@ -22196,6 +22196,78 @@ suite =
                         ]
                         ()
             ]
+        , describe "ircx unhandled surface"
+            [ test "unhandled IRCX numerics surface in the service log like the oracle" <|
+                \_ ->
+                    let
+                        ( m800, out800 ) =
+                            feed ownerLive ":srv 800 kai :ISIRCX active"
+
+                        ( m811, out811 ) =
+                            feed ownerLive ":srv 811 kai #c :End of LISTX"
+
+                        ( m923, out923 ) =
+                            feed ownerLive ":srv 923 kai :Whisper controls here"
+
+                        headOf m =
+                            List.head m.serviceLog
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "ISIRCX active") (headOf m800)
+                        , \_ -> Expect.equal (Just "#c End of LISTX") (headOf m811)
+                        , \_ -> Expect.equal (Just "Whisper controls here") (headOf m923)
+                        , \_ -> Expect.equal [] out800
+                        , \_ -> Expect.equal [] out811
+                        , \_ -> Expect.equal [] out923
+                        , \_ -> Expect.equal ownerLive.channels m800.channels
+                        , \_ -> Expect.equal ownerLive.props m800.props
+                        , \_ -> Expect.equal ownerLive.access m800.access
+                        ]
+                        ()
+            , test "DATA, REQUEST, REPLY, and ISIRCX commands drop silently" <|
+                \_ ->
+                    let
+                        check line =
+                            let
+                                ( changed, out ) =
+                                    feed ownerLive line
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal [] out
+                                , \_ -> Expect.equal ownerLive.serviceLog changed.serviceLog
+                                , \_ -> Expect.equal ownerLive.channels changed.channels
+                                , \_ -> Expect.equal ownerLive.props changed.props
+                                , \_ -> Expect.equal ownerLive.access changed.access
+                                ]
+                                ()
+
+                        lines =
+                            [ ":alice!u@h DATA #c :payload"
+                            , ":alice!u@h REQUEST #c :probe"
+                            , ":alice!u@h REPLY #c :answer"
+                            , ":srv ISIRCX #c :query"
+                            ]
+                    in
+                    Expect.all (List.map (\line _ -> check line) lines) ()
+            , test "a labeled DATA command never resolves the pending label" <|
+                \_ ->
+                    let
+                        label =
+                            Labels.nextClientLabel 0 1
+
+                        ( pending, _ ) =
+                            labeledSend [ "labeled-response" ] "hi"
+
+                        ( dropped, out ) =
+                            feed pending ("@label=" ++ label ++ " :srv DATA #c :payload")
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [] out
+                        , \_ -> Expect.equal 1 (Dict.size dropped.pendingLabels)
+                        , \_ -> Expect.equal pending.serviceLog dropped.serviceLog
+                        ]
+                        ()
+            ]
         , describe "contact presence"
             [ test "friend verbs persist subscribe and release" <|
                 \_ ->
