@@ -17758,6 +17758,140 @@ suite =
                                         (GroupControl.getPair m4.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
                                 ]
                                 ()
+                    , test "the room table refuses a 65th room" <|
+                        \_ ->
+                            let
+                                commitFor n =
+                                    GroupControlVerified
+                                        { channel = "#room" ++ String.fromInt n
+                                        , epoch = 1
+                                        , signerB64 = oddSigner
+                                        , fromAccount = "alice"
+                                        , fromDevice = "phone"
+                                        , toAccount = Nothing
+                                        , toDevice = Nothing
+                                        , kind = "commit"
+                                        , payload = testCommitB64
+                                        , signatureValid = True
+                                        , trust = "pinned"
+                                        }
+
+                                fill model n =
+                                    if n <= 0 then
+                                        model
+
+                                    else
+                                        fill (Tuple.first (update (commitFor n) model)) (n - 1)
+
+                                filled =
+                                    fill welcomeBase 64
+
+                                ( refused, _ ) =
+                                    update (commitFor 65) filled
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal 64 (Dict.size refused.groupRooms)
+                                , \_ -> Expect.equal Nothing (Dict.get "#room65" refused.groupRooms)
+                                , \_ -> Expect.notEqual Nothing (Dict.get "#room1" refused.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        "Group control room table full; record for #room65 ignored."
+                                        (Maybe.withDefault "" (List.head refused.serviceLog))
+                                ]
+                                ()
+                    , test "the session table refuses a 65th install" <|
+                        \_ ->
+                            let
+                                installFor model n =
+                                    let
+                                        room =
+                                            "#inst" ++ String.fromInt n
+
+                                        ( m1, _ ) =
+                                            update
+                                                (GroupControlVerified
+                                                    { channel = room
+                                                    , epoch = 1
+                                                    , signerB64 = oddSigner
+                                                    , fromAccount = "alice"
+                                                    , fromDevice = "phone"
+                                                    , toAccount = Nothing
+                                                    , toDevice = Nothing
+                                                    , kind = "commit"
+                                                    , payload = testCommitB64
+                                                    , signatureValid = True
+                                                    , trust = "pinned"
+                                                    }
+                                                )
+                                                model
+
+                                        ( m2, out2 ) =
+                                            update
+                                                (GroupControlVerified
+                                                    { channel = room
+                                                    , epoch = 1
+                                                    , signerB64 = oddSigner
+                                                    , fromAccount = "alice"
+                                                    , fromDevice = "phone"
+                                                    , toAccount = Just "alice"
+                                                    , toDevice = Just testProjection.deviceId
+                                                    , kind = "welcome"
+                                                    , payload = testWelcomeB64
+                                                    , signatureValid = True
+                                                    , trust = "pinned"
+                                                    }
+                                                )
+                                                m1
+
+                                        key =
+                                            case openKeys out2 of
+                                                k :: _ ->
+                                                    k
+
+                                                _ ->
+                                                    ""
+                                    in
+                                    Tuple.first
+                                        (update (GroupWelcomeOpened { key = key, room = room, epoch = 1, ok = True, reason = "" }) m2)
+
+                                fill model n =
+                                    if n <= 0 then
+                                        model
+
+                                    else
+                                        fill (installFor model n) (n - 1)
+
+                                filled =
+                                    fill welcomeBase 64
+
+                                refused =
+                                    installFor filled 65
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal 64 (Dict.size refused.groupRooms)
+                                , \_ -> Expect.equal Nothing (Dict.get "#inst65" refused.groupRooms)
+                                , \_ -> Expect.equal -1 (installedGroupEpoch refused "#inst65")
+                                , \_ ->
+                                    Expect.equal
+                                        "Group control room table full; record for #inst65 ignored."
+                                        (Maybe.withDefault "" (List.head refused.serviceLog))
+                                ]
+                                ()
+                    , test "session admission needs a free slot" <|
+                        \_ ->
+                            let
+                                sessions =
+                                    Dict.fromList (List.map (\n -> ( "#s" ++ String.fromInt n, 1 )) (List.range 1 64))
+
+                                full =
+                                    { blank | groupInstalledEpochs = sessions }
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal False (sessionAdmissibleFor full "#new")
+                                , \_ -> Expect.equal True (sessionAdmissibleFor full "#s1")
+                                , \_ -> Expect.equal True (sessionAdmissibleFor blank "#new")
+                                ]
+                                ()
                     , test "a failed open rejects the room; locked stays locked" <|
                         \_ ->
                             let
