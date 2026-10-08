@@ -3929,6 +3929,102 @@ function fetchPublicFeed(url) {
         } catch (err) { /* Elm tore down — non-fatal */ }
       });
     }
+    /* Device-local topic read cursors (mirroring `topicReadLedger.ts`:
+       `onyx:topic-read-ledger:owner:<owner>` slots byte-matching
+       `deviceMemoryStorageKey`, the bare legacy key purged instead of
+       claimed, a 512 KiB read cap with no parse when over cap, and
+       bounded re-validation on every read and write. Elm owns
+       normalization (TopicRead); the bridge shape-checks rows and drops
+       extras, so forged port calls can only store metadata-shaped rows.
+       An emptied ledger removes the key. Only the latest requested owner
+       resolves, and its cross-tab writes re-send through
+       `topicReadLoaded`, mirroring the subscribe/publish path. */
+    var TOPIC_READ_BASE_KEY = "onyx:topic-read-ledger";
+    var TOPIC_READ_MAX_CHARS = 512 * 1024;
+    var TOPIC_READ_MAX_ROWS = 4096;
+    var topicReadPendingKey = null;
+    function topicReadOwnerKey(serverUrl, identity) {
+      if (typeof serverUrl !== "string" || !serverUrl) return null;
+      if (typeof identity !== "string" || !identity) return null;
+      try {
+        return TOPIC_READ_BASE_KEY + ":owner:" + encodeURIComponent(JSON.stringify([serverUrl, identity]));
+      } catch (err) { return null; }
+    }
+    function purgeLegacyTopicRead() {
+      try {
+        if (typeof window === "undefined" || !window.localStorage) return;
+        window.localStorage.removeItem(TOPIC_READ_BASE_KEY);
+      } catch (err) { /* storage unavailable — non-fatal */ }
+    }
+    function isTopicReadRow(row) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+      if (typeof row.channel !== "string" || typeof row.topic !== "string") return false;
+      if (typeof row.lastReadMessageId !== "string") return false;
+      return typeof row.lastReadAt === "number" && isFinite(row.lastReadAt);
+    }
+    function parseTopicReadSlot(raw) {
+      var rows = [];
+      if (!Array.isArray(raw)) return rows;
+      for (var i = 0; i < raw.length && i < TOPIC_READ_MAX_ROWS; i++) {
+        var row = raw[i];
+        if (!isTopicReadRow(row)) continue;
+        rows.push({
+          channel: row.channel,
+          topic: row.topic,
+          lastReadMessageId: row.lastReadMessageId,
+          lastReadAt: row.lastReadAt,
+        });
+      }
+      return rows;
+    }
+    function readTopicReadSlot(key) {
+      try {
+        if (typeof window === "undefined" || !window.localStorage) return [];
+        var raw = window.localStorage.getItem(key);
+        if (typeof raw !== "string") return [];
+        if (raw.length > TOPIC_READ_MAX_CHARS) return [];
+        return parseTopicReadSlot(JSON.parse(raw));
+      } catch (err) { return []; }
+    }
+    if (app.ports.topicReadSave) {
+      app.ports.topicReadSave.subscribe(function (req) {
+        var key = (req && topicReadOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key) return;
+        var rows = parseTopicReadSlot(req && req.markers);
+        try {
+          if (typeof window === "undefined" || !window.localStorage) return;
+          purgeLegacyTopicRead();
+          if (rows.length === 0) window.localStorage.removeItem(key);
+          else window.localStorage.setItem(key, JSON.stringify(rows));
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.topicReadRequest) {
+      app.ports.topicReadRequest.subscribe(function (req) {
+        var key = (req && topicReadOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || !app.ports.topicReadLoaded) return;
+        topicReadPendingKey = key;
+        purgeLegacyTopicRead();
+        var rows = readTopicReadSlot(key);
+        try {
+          app.ports.topicReadLoaded.send(rows);
+        } catch (err) { /* Elm tore down — non-fatal */ }
+      });
+    }
+    /* Cross-tab cursor coherence: another tab's write re-sends through
+       the loaded port for the latest requested owner only; Elm
+       re-validates fail-closed, so unrelated keys and payloads never
+       touch the ledger. */
+    if (app.ports.topicReadLoaded && typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("storage", function (event) {
+        try {
+          if (!topicReadPendingKey) return;
+          if (event && event.storageArea && event.storageArea !== window.localStorage) return;
+          if (!event || event.key !== topicReadPendingKey) return;
+          app.ports.topicReadLoaded.send(readTopicReadSlot(topicReadPendingKey));
+        } catch (err) { /* refresh is best-effort */ }
+      });
+    }
     /* Owner-scoped nick aliases (`onyx:nick-aliases:owner:<owner>`,
        mirroring `nickAliases.ts`): Elm owns validation/normalization,
        so the bridge only returns the stored JSON array verbatim —

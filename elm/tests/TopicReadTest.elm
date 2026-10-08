@@ -110,6 +110,34 @@ suite =
                 \_ ->
                     parse (Encode.list identity [ rawMarker "#room" "alpha" "m1" 1767261600000 ])
                         |> Expect.equal [ marker "#room" "alpha" "m1" 1767261600000 ]
+            , test "encodes only metadata fields and round-trips through the loader" <|
+                \_ ->
+                    let
+                        ledger =
+                            [ marker "#room" "beta" "b2" 150
+                            , marker "#room" "alpha" "a2" 100
+                            , marker "#room" "epoch" "m1" 1767261600000
+                            ]
+
+                        decoded =
+                            Encode.list identity
+                                [ Encode.object
+                                    [ ( "channel", Encode.string "#room" )
+                                    , ( "topic", Encode.string "gamma" )
+                                    , ( "lastReadMessageId", Encode.string "g1" )
+                                    , ( "lastReadAt", Encode.float 50 )
+                                    , ( "text", Encode.string "never stored" )
+                                    ]
+                                ]
+                                |> parse
+                    in
+                    Expect.all
+                        [ \_ ->
+                            parse (encodeTopicReadMarkers ledger)
+                                |> Expect.equal (sanitizeMarkers ledger)
+                        , \_ -> Expect.equal [ marker "#room" "gamma" "g1" 50 ] decoded
+                        ]
+                        ()
             ]
         , describe "bounds"
             [ test "retains the 256 newest markers with deterministic tie ordering" <|

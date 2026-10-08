@@ -4,6 +4,8 @@ module TopicRead exposing
     , TopicReadProjection
     , clearChannelTopicReads
     , countUnreadByTopic
+    , encodeTopicReadMarker
+    , encodeTopicReadMarkers
     , markAllTopicsRead
     , markTopicRead
     , markerDecoder
@@ -57,6 +59,7 @@ to 2^53) with `floor`, never `truncate`.
 
 import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 
 
 {-| One device-local read cursor. -}
@@ -372,6 +375,24 @@ insertNewest marker acc =
 
             else
                 acc
+
+
+{-| Encode one marker for the ports bridge (metadata fields only — the
+bridge shape-checks and the Elm loader re-validates). -}
+encodeTopicReadMarker : TopicReadMarker -> Encode.Value
+encodeTopicReadMarker marker =
+    Encode.object
+        [ ( "channel", Encode.string marker.channel )
+        , ( "topic", Encode.string marker.topic )
+        , ( "lastReadMessageId", Encode.string marker.lastReadMessageId )
+        , ( "lastReadAt", Encode.int marker.lastReadAt )
+        ]
+
+
+{-| Encode a ledger for the ports bridge. -}
+encodeTopicReadMarkers : List TopicReadMarker -> Encode.Value
+encodeTopicReadMarkers markers =
+    Encode.list encodeTopicReadMarker markers
 
 
 {-| Sanitize an untrusted persisted/portable ledger value into the canonical
