@@ -47,6 +47,7 @@ import View.Search exposing (panel)
 import View.Browser exposing (browser)
 import View.GuestClaim exposing (guestClaim)
 import View.Account exposing (accountPanel)
+import View.Media exposing (mediaPanel)
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
@@ -213,6 +214,7 @@ shell model =
                , scheduledSheet model
                , accountPanel model
                , pinsDrawer model
+               , mediaPanel model
                , profileSheet model
                , profileCard model
                , moderationReview model

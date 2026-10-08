@@ -39,6 +39,7 @@ topbar model =
             ]
             [ text "Search" ]
         , pinsToggle model
+        , mediaToggle model
         , div
             [ classList
                 [ ( "onyx-conn", True )
@@ -89,6 +90,37 @@ pinsToggle model =
         , onClick PinnedMessagesOpen
         ]
         [ text "Pins" ]
+
+
+{-| Conversation-media toggle (the ribbon overflow entry in the
+oracle: channel-gated, labelled for the active conversation). -}
+mediaToggle : Model -> Html Msg
+mediaToggle model =
+    let
+        label =
+            case model.activeChannel of
+                Nothing ->
+                    "Pictures, files, and links"
+
+                Just channel ->
+                    "Pictures, files, and links for " ++ channel
+    in
+    button
+        [ class "onyx-media-toggle"
+        , classList [ ( "onyx-media-toggle-open", model.mediaIndexOpen ) ]
+        , attribute "aria-pressed"
+            (if model.mediaIndexOpen then
+                "true"
+
+             else
+                "false"
+            )
+        , attribute "aria-label" label
+        , attribute "data-testid" "ribbon-room-media"
+        , disabled (model.activeChannel == Nothing)
+        , onClick MediaIndexOpen
+        ]
+        [ text "Media" ]
 
 
 {-| Own identity chip: the current nick, an `alias` badge while the

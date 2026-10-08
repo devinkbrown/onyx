@@ -19,6 +19,7 @@ import Json.Encode as Encode
 import Media
 import Moderation
 import Prefs
+import RoomMedia exposing (RoomMediaFilter(..))
 import Route
 import Test exposing (Test, describe, test)
 import Status
@@ -494,6 +495,173 @@ suite =
                     , \_ ->
                         query channelModel
                             |> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "pinned-messages") ]
+                    ]
+                    ()
+        , test "media panel lists links with tabs and badge" <|
+            \_ ->
+                let
+                    withLink =
+                        feed channelModel "@msgid=m9 :alice!u@h PRIVMSG #c :read https://example.test/story today"
+
+                    open =
+                        { withLink | mediaIndexOpen = True, mediaIndexTarget = "#c", mediaIndexVaultState = MediaVaultReady }
+                in
+                Expect.all
+                    [ \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "room-media-index") ]
+                            |> Query.has [ Selector.text "Pictures, files, and links" ]
+                    , \_ ->
+                        query open
+                            |> Query.has
+                                [ Selector.class "provenance-badge"
+                                , Selector.text "This device"
+                                , Selector.attribute (Attr.attribute "aria-label" "Conversation media index provenance: This device. Computed locally in this browser from loaded or saved Onyx data.")
+                                ]
+                    , \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "role" "tablist") ]
+                            |> Query.has [ Selector.text "Pictures", Selector.text "Files", Selector.text "Links" ]
+                    , \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-media-filter" "links") ]
+                            |> Query.has [ Selector.text "example.test" ]
+                    , \_ ->
+                        query open
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Jump to link example.test") ]
+                    , \_ ->
+                        query open
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-media-filter" "pictures") ]
+                            |> Query.has [ Selector.text "No pictures from this conversation are on this device." ]
+                    , \_ ->
+                        query channelModel
+                            |> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "room-media-index") ]
+                    ]
+                    ()
+        , test "media panel loading and error states" <|
+            \_ ->
+                let
+                    loading =
+                        { channelModel | mediaIndexOpen = True, mediaIndexTarget = "#c", mediaIndexVaultState = MediaVaultLoading }
+
+                    failed =
+                        { loading | mediaIndexVaultState = MediaVaultFailed }
+
+                    vaultRow =
+                        { id = "#c:7"
+                        , target = "#c"
+                        , from = "alice"
+                        , body = "https://vault.example/old"
+                        , at = 10
+                        , rowType = "msg"
+                        , deleted = False
+                        , redacted = False
+                        , replyTo = Nothing
+                        }
+
+                    partial =
+                        { failed | mediaIndexVault = [ vaultRow ] }
+                in
+                Expect.all
+                    [ \_ ->
+                        query loading
+                            |> Query.has [ Selector.text "Loading media from this device…" ]
+                    , \_ ->
+                        query failed
+                            |> Query.has [ Selector.text "Device history is unavailable. Showing media from the live conversation and any history recovered." ]
+                    , \_ ->
+                        query failed
+                            |> Query.find [ Selector.class "room-media-index-retry" ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MediaIndexRetry
+                    , \_ ->
+                        query partial
+                            |> Query.has [ Selector.text "Device history is incomplete. Showing live media and the history recovered so far; more history may exist." ]
+                    ]
+                    ()
+        , test "media picture consent gates cross-origin images" <|
+            \_ ->
+                let
+                    withPics =
+                        feed
+                            (feed channelModel "@msgid=p1 :alice!u@h PRIVMSG #c :[file: a.png] 4 KB https://app.example.test/pics/a.png")
+                            "@msgid=p2 :alice!u@h PRIVMSG #c :[file: b.png] 4 KB https://cdn.example/b.png"
+
+                    base =
+                        { withPics
+                            | origin = "https://app.example.test"
+                            , mediaIndexOpen = True
+                            , mediaIndexTarget = "#c"
+                            , mediaIndexVaultState = MediaVaultReady
+                        }
+
+                    allowed =
+                        { base | mediaPictureAllowed = Set.fromList [ "https://cdn.example/b.png" ] }
+                in
+                Expect.all
+                    [ \_ ->
+                        query base
+                            |> Query.find
+                                [ Selector.attribute (Attr.attribute "data-media-filter" "pictures")
+                                , Selector.containing [ Selector.attribute (Attr.attribute "src" "https://app.example.test/pics/a.png") ]
+                                ]
+                            |> Query.has [ Selector.text "a.png" ]
+                    , \_ ->
+                        query base
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Load external picture from cdn.example") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MediaPictureAllow { href = "https://cdn.example/b.png" })
+                    , \_ ->
+                        query allowed
+                            |> Query.hasNot [ Selector.text "Load picture" ]
+                    , \_ ->
+                        query allowed
+                            |> Query.find
+                                [ Selector.attribute (Attr.attribute "data-media-filter" "pictures")
+                                , Selector.containing [ Selector.attribute (Attr.attribute "src" "https://cdn.example/b.png") ]
+                                ]
+                            |> Query.has [ Selector.text "b.png" ]
+                    ]
+                    ()
+        , test "media file rows and tabs fold" <|
+            \_ ->
+                let
+                    withFile =
+                        feed channelModel "@msgid=f1 :alice!u@h PRIVMSG #c :[file: notes.pdf] 12 KB https://cdn.example/notes.pdf"
+
+                    open =
+                        { withFile | mediaIndexOpen = True, mediaIndexTarget = "#c", mediaIndexVaultState = MediaVaultReady }
+                in
+                Expect.all
+                    [ \_ ->
+                        query open
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Jump to file notes.pdf") ]
+                    , \_ ->
+                        query open
+                            |> Query.findAll [ Selector.attribute (Attr.attribute "role" "tab") ]
+                            |> Query.count (Expect.equal 3)
+                    , \_ ->
+                        query open
+                            |> Query.find
+                                [ Selector.class "room-media-index-filter"
+                                , Selector.containing [ Selector.text "Files" ]
+                                ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (MediaIndexFilter { filter = Files })
+                    ]
+                    ()
+        , test "media toggle opens the panel" <|
+            \_ ->
+                Expect.all
+                    [ \_ ->
+                        query channelModel
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]
+                            |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Pictures, files, and links for #c") ]
+                    , \_ ->
+                        query channelModel
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect MediaIndexOpen
                     ]
                     ()
         , test "same-origin preview thumbnails load without consent" <|
