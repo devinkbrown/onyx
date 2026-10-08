@@ -614,10 +614,10 @@ suite =
                 \_ ->
                     let
                         ( half, halfEvent ) =
-                            bufferDelivery blankPairBuffer (pairable Commit (deliveryPayload Commit))
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
 
                         ( full, fullEvent ) =
-                            bufferDelivery half (pairable Welcome (deliveryPayload Welcome))
+                            bufferDelivery 1000 half (pairable Welcome (deliveryPayload Welcome))
                     in
                     Expect.all
                         [ \_ -> Expect.equal True (isHalf halfEvent)
@@ -631,13 +631,13 @@ suite =
                 \_ ->
                     let
                         ( w1, _ ) =
-                            bufferDelivery blankPairBuffer (pairable Welcome (deliveryPayload Welcome))
+                            bufferDelivery 1000 blankPairBuffer (pairable Welcome (deliveryPayload Welcome))
 
                         ( w2, _ ) =
-                            bufferDelivery w1 (pairableWelcome "carol" "desk" (deliveryPayloadAlt Welcome))
+                            bufferDelivery 1000 w1 (pairableWelcome "carol" "desk" (deliveryPayloadAlt Welcome))
 
                         ( full, fullEvent ) =
-                            bufferDelivery w2 (pairable Commit (deliveryPayload Commit))
+                            bufferDelivery 1000 w2 (pairable Commit (deliveryPayload Commit))
                     in
                     Expect.all
                         [ \_ -> Expect.equal 1 (Dict.size full.pairs)
@@ -654,23 +654,23 @@ suite =
                 \_ ->
                     let
                         ( half, _ ) =
-                            bufferDelivery blankPairBuffer (pairable Commit (deliveryPayload Commit))
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
 
                         ( _, dupEvent ) =
-                            bufferDelivery half (pairable Commit (deliveryPayload Commit))
+                            bufferDelivery 1000 half (pairable Commit (deliveryPayload Commit))
                     in
                     Expect.equal True (isDuplicate dupEvent)
             , test "conflicting payloads quarantine the pair" <|
                 \_ ->
                     let
                         ( half, _ ) =
-                            bufferDelivery blankPairBuffer (pairable Commit (deliveryPayload Commit))
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
 
                         ( quar, quarEvent ) =
-                            bufferDelivery half (pairable Commit (deliveryPayloadAlt Commit))
+                            bufferDelivery 1000 half (pairable Commit (deliveryPayloadAlt Commit))
 
                         ( _, afterEvent ) =
-                            bufferDelivery quar (pairable Welcome (deliveryPayload Welcome))
+                            bufferDelivery 1000 quar (pairable Welcome (deliveryPayload Welcome))
                     in
                     Expect.all
                         [ \_ -> Expect.equal True (isEquivocated quarEvent)
@@ -687,7 +687,7 @@ suite =
                 \_ ->
                     let
                         ( buffer, event ) =
-                            bufferDelivery blankPairBuffer (pairable KeyPackage (deliveryPayload Commit))
+                            bufferDelivery 1000 blankPairBuffer (pairable KeyPackage (deliveryPayload Commit))
                     in
                     Expect.all
                         [ \_ -> Expect.equal True (isIgnored event)
@@ -704,7 +704,7 @@ suite =
                             else
                                 fill (n - 1)
                                     (Tuple.first
-                                        (bufferDelivery buf
+                                        (bufferDelivery 1000 buf
                                             { room = "#r" ++ String.fromInt n
                                             , kind = Commit
                                             , fromAccount = "alice"
@@ -722,7 +722,7 @@ suite =
                             fill maxHalfPairs blankPairBuffer
 
                         ( _, event ) =
-                            bufferDelivery full
+                            bufferDelivery 1000 full
                                 { room = "#overflow"
                                 , kind = Commit
                                 , fromAccount = "alice"
@@ -737,6 +737,82 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal maxHalfPairs (Dict.size full.pairs)
                         , \_ -> Expect.equal True (isFull event)
+                        ]
+                        ()
+            ]
+        , describe "half-pair expiry"
+            [ test "pairs younger than the TTL survive" <|
+                \_ ->
+                    let
+                        ( half, _ ) =
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
+
+                        swept =
+                            expireHalfPairs (1000 + halfPairTtlMs - 1) half
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (Dict.size swept.buffer.pairs)
+                        , \_ -> Expect.equal [] swept.expired
+                        ]
+                        ()
+            , test "pairs at the TTL boundary drop with their rooms" <|
+                \_ ->
+                    let
+                        ( half, _ ) =
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
+
+                        swept =
+                            expireHalfPairs (1000 + halfPairTtlMs) half
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 0 (Dict.size swept.buffer.pairs)
+                        , \_ -> Expect.equal [] swept.buffer.order
+                        , \_ -> Expect.equal [ "#secure" ] swept.expired
+                        ]
+                        ()
+            , test "expiry keeps fresh pairs and reports every stale room" <|
+                \_ ->
+                    let
+                        ( stale, _ ) =
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
+
+                        ( mixed, _ ) =
+                            bufferDelivery 40000 stale
+                                { room = "#fresh"
+                                , kind = Commit
+                                , fromAccount = "alice"
+                                , fromDevice = "phone"
+                                , toAccount = Nothing
+                                , toDevice = Nothing
+                                , payload = deliveryPayload Commit
+                                , signerB64 = "s"
+                                , epoch = 2
+                                }
+
+                        swept =
+                            expireHalfPairs (1000 + halfPairTtlMs) mixed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (Dict.size swept.buffer.pairs)
+                        , \_ -> Expect.equal [ "#secure" ] swept.expired
+                        , \_ -> Expect.equal [ "#fresh" ] (List.map .room (Dict.values swept.buffer.pairs))
+                        ]
+                        ()
+            , test "quarantine refreshes the intake stamp" <|
+                \_ ->
+                    let
+                        ( half, _ ) =
+                            bufferDelivery 1000 blankPairBuffer (pairable Commit (deliveryPayload Commit))
+
+                        ( quar, _ ) =
+                            bufferDelivery 20000 half (pairable Commit (deliveryPayloadAlt Commit))
+
+                        swept =
+                            expireHalfPairs (20000 + halfPairTtlMs - 1) quar
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (Dict.size swept.buffer.pairs)
+                        , \_ -> Expect.equal [] swept.expired
                         ]
                         ()
             ]

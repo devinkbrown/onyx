@@ -17591,6 +17591,30 @@ suite =
                                     update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just "ogc1-xxxxxxxxxxxxxxxxxxxxxx") "pinned") m1
                             in
                             Expect.equal [] out2
+                    , test "a commit aged past the half-pair TTL is swept and the room falls locked" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                aged =
+                                    { m1 | nowMs = m1.nowMs + toFloat GroupControl.halfPairTtlMs }
+
+                                ( m2, out2 ) =
+                                    update (GroupPublisherIdentity (Just testProjection)) aged
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal [] (openKeys out2)
+                                , \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomLocked, epoch = Just 1 })
+                                        (Dict.get "#secure" m2.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        Nothing
+                                        (GroupControl.getPair m2.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
+                                ]
+                                ()
                     , test "a successful install advances the projection and records the epoch" <|
                         \_ ->
                             let

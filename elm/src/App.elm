@@ -21188,6 +21188,50 @@ tryOpenPair model key =
                         ( model, [] )
 
 
+{-| Drop half-pairs older than the TTL (mirroring `expireHalfPairs`
+on intake: rooms the ledger still tracks fall back to
+recovery-required with an installed session, else locked — the
+expiry itself stays silent like the oracle bump, surfacing through
+the projection).
+-}
+sweepExpiredGroupPairs : Model -> Model
+sweepExpiredGroupPairs model =
+    let
+        swept =
+            GroupControl.expireHalfPairs (floor model.nowMs) model.groupPairs
+
+        fallBack rooms acc =
+            case rooms of
+                [] ->
+                    acc
+
+                room :: rest ->
+                    case Dict.get room acc.groupRooms of
+                        Nothing ->
+                            fallBack rest acc
+
+                        Just projection ->
+                            let
+                                status =
+                                    if Dict.member room acc.groupInstalledEpochs then
+                                        GroupControl.RoomRecoveryRequired
+
+                                    else
+                                        GroupControl.RoomLocked
+                            in
+                            fallBack rest
+                                { acc
+                                    | groupRooms =
+                                        Dict.insert room { status = status, epoch = projection.epoch } acc.groupRooms
+                                }
+    in
+    let
+        fallen =
+            fallBack swept.expired model
+    in
+    { fallen | groupPairs = swept.buffer }
+
+
 {-| Scan every buffered pair for an openable welcome. Idempotent:
 in-flight, foreign, half, and stale pairs are left alone. Runs when a
 pair becomes ready and when our device identity lands (projection or
@@ -21195,6 +21239,10 @@ ack), since the recipient gate needs it.
 -}
 tryOpenPairs : Model -> ( Model, List Outbound )
 tryOpenPairs model =
+    let
+        swept =
+            sweepExpiredGroupPairs model
+    in
     List.foldl
         (\key ( accModel, accFx ) ->
             let
@@ -21203,8 +21251,8 @@ tryOpenPairs model =
             in
             ( nextModel, accFx ++ fx )
         )
-        ( model, [] )
-        model.groupPairs.order
+        ( swept, [] )
+        swept.groupPairs.order
 
 
 {-| Fold a ports welcome-open verdict. A successful install advances
@@ -21268,7 +21316,7 @@ bufferPairable : Model -> String -> GroupControl.Pairable -> ( Model, List Outbo
 bufferPairable model room item =
     let
         ( pairs, event ) =
-            GroupControl.bufferDelivery model.groupPairs item
+            GroupControl.bufferDelivery (floor model.nowMs) model.groupPairs item
 
         buffered =
             { model | groupPairs = pairs }
@@ -21373,6 +21421,9 @@ backwards.
 foldGroupVerified : Model -> { channel : String, epoch : Int, signerB64 : String, fromAccount : String, fromDevice : String, toAccount : Maybe String, toDevice : Maybe String, kind : String, payload : String, signatureValid : Bool, trust : String } -> ( Model, List Outbound )
 foldGroupVerified model result =
     let
+        swept =
+            sweepExpiredGroupPairs model
+
         room =
             String.toLower result.channel
 
@@ -21380,7 +21431,7 @@ foldGroupVerified model result =
             groupInstallKey room result.epoch
 
         settled =
-            { model | groupControlInFlight = Set.remove key model.groupControlInFlight }
+            { swept | groupControlInFlight = Set.remove key swept.groupControlInFlight }
 
         prior =
             Dict.get room settled.groupRooms

@@ -24,6 +24,8 @@ module GroupControl exposing
     , PairRecord
     , blankPairBuffer
     , bufferDelivery
+    , expireHalfPairs
+    , halfPairTtlMs
     , getPair
     , kindFromString
     , maxHalfPairs
@@ -1303,6 +1305,15 @@ maxHalfPairs =
     128
 
 
+{-| Half-pair expiry budget in milliseconds (mirroring
+`GROUP_CONTROL_RUNTIME_DEFAULT_HALF_PAIR_TTL_MS`: a commit without
+its welcome, or vice versa, is dropped after 30s and its room falls
+back to locked/recovery-required). -}
+halfPairTtlMs : Int
+halfPairTtlMs =
+    30000
+
+
 {-| One buffered half: routing plus the opaque payload. Payloads are
 compared directly for duplicate/equivocation detection — the oracle's
 routing fingerprint is an optimization of the same equality relation,
@@ -1333,6 +1344,7 @@ type alias ControlPair =
     , commit : Maybe PairRecord
     , welcomes : Dict String PairRecord
     , quarantined : Bool
+    , seenAt : Int
     }
 
 
@@ -1421,9 +1433,9 @@ toPairRecord item =
     }
 
 
-quarantinePair : ControlPair -> ControlPair
-quarantinePair pair =
-    { pair | quarantined = True, commit = Nothing, welcomes = Dict.empty }
+quarantinePair : Int -> ControlPair -> ControlPair
+quarantinePair nowMs pair =
+    { pair | quarantined = True, commit = Nothing, welcomes = Dict.empty, seenAt = nowMs }
 
 
 insertPair : PairBuffer -> ControlPair -> PairBuffer
@@ -1455,13 +1467,41 @@ removePair buffer key =
     }
 
 
+{-| Drop half-pairs older than the TTL (mirroring `expireHalfPairs`:
+pairs whose intake stamp is at least `halfPairTtlMs` old go, newest
+first-survivors keep their order; `expired` names the rooms of the
+dropped pairs so the caller can fall them back to locked or
+recovery-required). -}
+expireHalfPairs : Int -> PairBuffer -> { buffer : PairBuffer, expired : List String }
+expireHalfPairs nowMs buffer =
+    let
+        step key ( keptPairs, keptOrder, expired ) =
+            case Dict.get key keptPairs of
+                Nothing ->
+                    ( keptPairs, keptOrder, expired )
+
+                Just pair ->
+                    if nowMs - pair.seenAt < halfPairTtlMs then
+                        ( keptPairs, keptOrder, expired )
+
+                    else
+                        ( Dict.remove key keptPairs
+                        , List.filter (\k -> k /= key) keptOrder
+                        , pair.room :: expired
+                        )
+    in
+    case List.foldl step ( buffer.pairs, buffer.order, [] ) buffer.order of
+        ( pairs, order, expired ) ->
+            { buffer = { pairs = pairs, order = order }, expired = List.reverse expired }
+
+
 {-| Buffer one trusted delivery. Duplicates coalesce, conflicting
 payloads under one key quarantine the pair (payloads dropped, key
 pinned — mirroring `quarantineHalfPair`), and a full buffer refuses
 new keys without evicting live pairs.
 -}
-bufferDelivery : PairBuffer -> Pairable -> ( PairBuffer, PairEvent )
-bufferDelivery buffer item =
+bufferDelivery : Int -> PairBuffer -> Pairable -> ( PairBuffer, PairEvent )
+bufferDelivery nowMs buffer item =
     if item.kind == KeyPackage then
         ( buffer, PairIgnored (pairBaseKey item.room item.fromAccount item.fromDevice item.epoch) )
 
@@ -1472,14 +1512,14 @@ bufferDelivery buffer item =
         in
         case Dict.get key buffer.pairs of
             Just pair ->
-                bufferIntoPair buffer pair item key
+                bufferIntoPair nowMs buffer pair item key
 
             Nothing ->
                 if Dict.size buffer.pairs >= maxHalfPairs then
                     ( buffer, PairFull key )
 
                 else
-                    bufferIntoPair buffer
+                    bufferIntoPair nowMs buffer
                         { key = key
                         , room = item.room
                         , sender = item.fromAccount
@@ -1488,13 +1528,14 @@ bufferDelivery buffer item =
                         , commit = Nothing
                         , welcomes = Dict.empty
                         , quarantined = False
+                        , seenAt = nowMs
                         }
                         item
                         key
 
 
-bufferIntoPair : PairBuffer -> ControlPair -> Pairable -> String -> ( PairBuffer, PairEvent )
-bufferIntoPair buffer pair item key =
+bufferIntoPair : Int -> PairBuffer -> ControlPair -> Pairable -> String -> ( PairBuffer, PairEvent )
+bufferIntoPair nowMs buffer pair item key =
     if pair.quarantined then
         ( buffer, PairEquivocated key )
 
@@ -1505,7 +1546,7 @@ bufferIntoPair buffer pair item key =
                     ( buffer, PairDuplicate key )
 
                 else
-                    ( insertPair buffer (quarantinePair pair), PairEquivocated key )
+                    ( insertPair buffer (quarantinePair nowMs pair), PairEquivocated key )
 
             Nothing ->
                 let
@@ -1532,7 +1573,7 @@ bufferIntoPair buffer pair item key =
                     ( buffer, PairDuplicate key )
 
                 else
-                    ( insertPair buffer (quarantinePair pair), PairEquivocated key )
+                    ( insertPair buffer (quarantinePair nowMs pair), PairEquivocated key )
 
             Nothing ->
                 let
