@@ -26,6 +26,7 @@ import Schedule
 import Services
 import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
+import RoomMedia exposing (RoomMediaFilter(..))
 import Moderation
 import Session
 import Set
@@ -17932,6 +17933,264 @@ suite =
                                 ()
                     ]
                 ]
+            ]
+        , describe "room media index"
+            [ test "open fetches vault rows for the active conversation" <|
+                \_ ->
+                    let
+                        base =
+                            joinFirst (joinFirst blank "me" "#c") "bob" "#c"
+
+                        ( joined, _ ) =
+                            feed base "@msgid=m1 :bob!u@h PRIVMSG #c :see https://news.example/story"
+
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") joined)
+
+                        ( opened, outs ) =
+                            update MediaIndexOpen selected
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True opened.mediaIndexOpen
+                        , \_ -> Expect.equal "#c" opened.mediaIndexTarget
+                        , \_ -> Expect.equal Pictures opened.mediaIndexFilter
+                        , \_ -> Expect.equal MediaVaultLoading opened.mediaIndexVaultState
+                        , \_ ->
+                            Expect.equal
+                                [ VaultFetch { target = "#c", limit = keepMessages } ]
+                                outs
+                        ]
+                        ()
+            , test "open without an active conversation stays shut" <|
+                \_ ->
+                    let
+                        ( opened, outs ) =
+                            update MediaIndexOpen blank
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False opened.mediaIndexOpen
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "filter switch, retry, and close fold" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( filtered, _ ) =
+                            update (MediaIndexFilter { filter = Links }) opened
+
+                        ( retried, retryOuts ) =
+                            update MediaIndexRetry filtered
+
+                        ( closed, _ ) =
+                            update MediaIndexClose retried
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Links filtered.mediaIndexFilter
+                        , \_ -> Expect.equal True filtered.mediaIndexOpen
+                        , \_ -> Expect.equal MediaVaultLoading retried.mediaIndexVaultState
+                        , \_ ->
+                            Expect.equal
+                                [ VaultFetch { target = "#c", limit = keepMessages } ]
+                                retryOuts
+                        , \_ -> Expect.equal False closed.mediaIndexOpen
+                        , \_ -> Expect.equal "" closed.mediaIndexTarget
+                        ]
+                        ()
+            , test "jump on a loaded row focuses and closes" <|
+                \_ ->
+                    let
+                        base =
+                            joinFirst blank "me" "#c"
+
+                        ( joined, _ ) =
+                            feed base "@msgid=m1 :bob!u@h PRIVMSG #c :see https://news.example/story"
+
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") joined)
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( jumped, outs ) =
+                            update (MediaIndexJump { messageId = "m1", at = 0 }) opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "m1") jumped.historyLanding
+                        , \_ -> Expect.equal False jumped.mediaIndexOpen
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "jump on an unloadable row travels to its stamp" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( jumped, outs ) =
+                            update (MediaIndexJump { messageId = "nope", at = 10 }) opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False jumped.mediaIndexOpen
+                        , \_ -> Expect.equal (Just { target = "#c", at = 10 }) jumped.pendingTravel
+                        , \_ -> Expect.equal True (not (List.isEmpty outs))
+                        ]
+                        ()
+            , test "vault responses claim rows for the open panel" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        vaultRow =
+                            { id = "#c:7"
+                            , target = "#c"
+                            , from = "bob"
+                            , body = "https://vault.example/old"
+                            , at = 10
+                            , rowType = "msg"
+                            , deleted = False
+                            , redacted = False
+                            , replyTo = Nothing
+                            }
+
+                        ( claimed, _ ) =
+                            update (VaultRowsReceived { target = "#c", rows = [ vaultRow ], status = "ok" }) opened
+
+                        index =
+                            mediaIndexFor claimed
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal MediaVaultReady claimed.mediaIndexVaultState
+                        , \_ -> Expect.equal 1 (List.length claimed.mediaIndexVault)
+                        , \_ -> Expect.equal 1 (List.length index.links)
+                        , \_ ->
+                            Expect.equal
+                                (Just "vault.example")
+                                (List.head index.links |> Maybe.andThen .domain)
+                        ]
+                        ()
+            , test "vault responses for other targets stay out of the panel" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( claimed, _ ) =
+                            update (VaultRowsReceived { target = "#other", rows = [], status = "ok" }) opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal MediaVaultLoading claimed.mediaIndexVaultState
+                        , \_ -> Expect.equal [] claimed.mediaIndexVault
+                        ]
+                        ()
+            , test "vault errors fail the panel fetch" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( claimed, _ ) =
+                            update (VaultRowsReceived { target = "#c", rows = [], status = "unavailable" }) opened
+                    in
+                    Expect.equal MediaVaultFailed claimed.mediaIndexVaultState
+            , test "owner-stale vault responses never paint" <|
+                \_ ->
+                    let
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") (joinFirst blank "me" "#c"))
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        stale =
+                            { opened | mediaIndexOwner = "someone-else" }
+
+                        vaultRow =
+                            { id = "#c:7"
+                            , target = "#c"
+                            , from = "bob"
+                            , body = "https://vault.example/old"
+                            , at = 10
+                            , rowType = "msg"
+                            , deleted = False
+                            , redacted = False
+                            , replyTo = Nothing
+                            }
+
+                        ( claimed, _ ) =
+                            update (VaultRowsReceived { target = "#c", rows = [ vaultRow ], status = "ok" }) stale
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal MediaVaultFailed claimed.mediaIndexVaultState
+                        , \_ -> Expect.equal [] claimed.mediaIndexVault
+                        ]
+                        ()
+            , test "selecting another room re-targets the open panel" <|
+                \_ ->
+                    let
+                        base =
+                            joinFirst (joinFirst blank "me" "#c") "me" "#d"
+
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") base)
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        ( switched, outs ) =
+                            update (ChannelSelect "#d") opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal True switched.mediaIndexOpen
+                        , \_ -> Expect.equal "#d" switched.mediaIndexTarget
+                        , \_ -> Expect.equal [] switched.mediaIndexVault
+                        , \_ -> Expect.equal True (List.member (VaultFetch { target = "#d", limit = keepMessages }) outs)
+                        ]
+                        ()
+            , test "the live index lists conversation links" <|
+                \_ ->
+                    let
+                        base =
+                            joinFirst blank "me" "#c"
+
+                        ( joined, _ ) =
+                            feed base "@msgid=m1 :bob!u@h PRIVMSG #c :see https://news.example/story"
+
+                        selected =
+                            Tuple.first (update (ChannelSelect "#c") joined)
+
+                        ( opened, _ ) =
+                            update MediaIndexOpen selected
+
+                        index =
+                            mediaIndexFor opened
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length index.links)
+                        , \_ ->
+                            Expect.equal
+                                (Just "https://news.example/story")
+                                (List.head index.links |> Maybe.map .href)
+                        ]
+                        ()
             ]
         , describe "raw slash fallthrough"
             [ test "text conveniences expand, everything else passes through" <|
