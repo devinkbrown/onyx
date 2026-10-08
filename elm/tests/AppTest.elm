@@ -22268,6 +22268,73 @@ suite =
                         ]
                         ()
             ]
+        , describe "session/vault paging"
+            [ test "history catch-up never sends AFTER or BETWEEN" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        joined =
+                            joinFirst { ownerLive | caps = [ "chathistory" ] } "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> step m "@msgid=m2;time=2026-10-04T12:00:01Z :alice!u@h PRIVMSG #c :two")
+
+                        ( openedFirst, oOuts ) =
+                            update (ChannelSelect "#c") joined
+
+                        ( _, rOuts ) =
+                            update ThreadShowEarlier { openedFirst | historyLoading = Set.empty }
+
+                        sentVerbs outs verb =
+                            List.any
+                                (\o ->
+                                    case o of
+                                        SendLine _ ->
+                                            String.contains ("CHATHISTORY " ++ verb) (sendLineText o)
+
+                                        _ ->
+                                            False
+                                )
+                                outs
+
+                        allOuts =
+                            rOuts ++ oOuts
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False (sentVerbs allOuts "AFTER")
+                        , \_ -> Expect.equal False (sentVerbs allOuts "BETWEEN")
+                        , \_ -> Expect.equal True (sentVerbs rOuts "BEFORE")
+                        ]
+                        ()
+            , test "vault reads stay windowed to the buffer cap" <|
+                \_ ->
+                    let
+                        joined =
+                            joinFirst ownerLive "kai" "#c"
+
+                        ( _, outs ) =
+                            update (ChannelSelect "#c") joined
+
+                        fetches =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        VaultFetch req ->
+                                            Just req.limit
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+                    in
+                    Expect.all
+                        -- 400 is `App.keepMessages` (unexposed): the vault
+                        -- window always matches the live buffer cap.
+                        [ \_ -> Expect.equal [ 400 ] fetches
+                        ]
+                        ()
+            ]
         , describe "contact presence"
             [ test "friend verbs persist subscribe and release" <|
                 \_ ->
