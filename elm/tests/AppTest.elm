@@ -17648,6 +17648,116 @@ suite =
                                         (Maybe.withDefault "" (List.head m3.serviceLog))
                                 ]
                                 ()
+                    , test "a post-install exact replay coalesces without regressing" <|
+                        \_ ->
+                            let
+                                ( m4, out4 ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") installedSecure
+                            in
+                            Expect.all
+                                [ \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomControlApplied, epoch = Just 1 })
+                                        (Dict.get "#secure" m4.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        Nothing
+                                        (GroupControl.getPair m4.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
+                                , \_ -> Expect.equal [] out4
+                                ]
+                                ()
+                    , test "a post-install divergent commit rejects the room" <|
+                        \_ ->
+                            let
+                                ( m4, out4 ) =
+                                    update (verifiedRecord "commit" testDivergentCommitB64 Nothing Nothing "pinned") installedSecure
+                            in
+                            Expect.all
+                                [ \_ ->
+                                    Expect.equal
+                                        (Just { status = GroupControl.RoomRejected, epoch = Just 1 })
+                                        (Dict.get "#secure" m4.groupRooms)
+                                , \_ ->
+                                    Expect.equal
+                                        Nothing
+                                        (GroupControl.getPair m4.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
+                                , \_ -> Expect.equal [] out4
+                                , \_ ->
+                                    Expect.equal
+                                        "Conflicting group records for #secure; rejected."
+                                        (Maybe.withDefault "" (List.head m4.serviceLog))
+                                ]
+                                ()
+                    , test "a re-delivery while the open is in flight coalesces" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( m2, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just testProjection.deviceId) "pinned") m1
+
+                                ( m3, out3 ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") m2
+                            in
+                            Expect.all
+                                [ \_ -> Expect.notEqual [] out2
+                                , \_ -> Expect.equal [] out3
+                                , \_ ->
+                                    Expect.equal
+                                        Nothing
+                                        (GroupControl.getPair m3.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
+                                , \_ -> Expect.equal m2.groupRooms m3.groupRooms
+                                ]
+                                ()
+                    , test "the completed cache keeps the newest 64 pairs" <|
+                        \_ ->
+                            let
+                                entry n =
+                                    { key = "k" ++ String.fromInt n
+                                    , attempt = { commitPayload = "c", welcomePayload = "w" }
+                                    }
+
+                                full =
+                                    List.foldl rememberCompletedGroupPair [] (List.map entry (List.range 1 70))
+                            in
+                            Expect.all
+                                [ \_ -> Expect.equal 64 (List.length full)
+                                , \_ -> Expect.equal (Just "k70") (Maybe.map .key (List.head full))
+                                , \_ -> Expect.equal False (List.any (\e -> e.key == "k1") full)
+                                , \_ -> Expect.equal True (List.any (\e -> e.key == "k7") full)
+                                ]
+                                ()
+                    , test "a retryable open failure does not memoize the pair" <|
+                        \_ ->
+                            let
+                                ( m1, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+                                ( m2, out2 ) =
+                                    update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just testProjection.deviceId) "pinned") m1
+
+                                key =
+                                    case openKeys out2 of
+                                        k :: _ ->
+                                            k
+
+                                        _ ->
+                                            ""
+
+                                ( m3, _ ) =
+                                    update (GroupWelcomeOpened { key = key, room = "#secure", epoch = 1, ok = False, reason = "recipient-key-unavailable" }) m2
+
+                                ( m4, _ ) =
+                                    update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") m3
+                            in
+                            Expect.all
+                                [ \_ ->
+                                    Expect.notEqual
+                                        Nothing
+                                        (GroupControl.getPair m4.groupPairs (GroupControl.pairBaseKey "#secure" "alice" "phone" 1))
+                                ]
+                                ()
                     , test "a failed open rejects the room; locked stays locked" <|
                         \_ ->
                             let
@@ -23698,6 +23808,44 @@ testWelcomeB64 =
             ++ List.repeat 12 7
             ++ List.repeat 125 3
         )
+
+
+{-| A divergent OGCMT2 commit for the same room/epoch (different
+commit id): post-install equivocation material. -}
+testDivergentCommitB64 : String
+testDivergentCommitB64 =
+    Maybe.withDefault ""
+        (GroupCommit.encodeGroupCommitBase64url
+            { priorEpoch = 0
+            , nextEpoch = 1
+            , priorCommitHash = List.repeat 32 0
+            , commitId = 9 :: List.repeat 31 0
+            , membershipDigest = 2 :: List.repeat 31 0
+            , newEpochKeyCommitment = 3 :: List.repeat 31 0
+            }
+        )
+
+
+{-| `#secure` carried through commit + welcome + successful open:
+control-applied with epoch 1 installed. -}
+installedSecure : Model
+installedSecure =
+    let
+        ( m1, _ ) =
+            update (verifiedRecord "commit" testCommitB64 Nothing Nothing "pinned") welcomeBase
+
+        ( m2, out2 ) =
+            update (verifiedRecord "welcome" testWelcomeB64 (Just "alice") (Just testProjection.deviceId) "pinned") m1
+
+        key =
+            case openKeys out2 of
+                k :: _ ->
+                    k
+
+                _ ->
+                    ""
+    in
+    Tuple.first (update (GroupWelcomeOpened { key = key, room = "#secure", epoch = 1, ok = True, reason = "" }) m2)
 
 
 {-| True for an `E2EEKEY ADD` send line. -}
