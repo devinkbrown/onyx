@@ -2216,6 +2216,34 @@ suite =
                     , \_ -> Expect.equal "" m4.composer
                     ]
                     ()
+        , test "a second send while uploading neither aborts nor duplicates" <|
+            \_ ->
+                let
+                    live =
+                        { blank | connection = Live, activeChannel = Just "#c", composer = "one" }
+
+                    ( m1, _ ) =
+                        update AttachPick live
+
+                    ( m2, _ ) =
+                        update (UploadPicked { key = "att-0", files = [ { name = "a.png", size = 10, mime = "image/png" } ] }) m1
+
+                    ( m3, sendOut ) =
+                        update ComposerSend m2
+
+                    ( m4, sendOut2 ) =
+                        update ComposerSend { m3 | composer = "two" }
+
+                    ( m5, doneOut ) =
+                        update (UploadDone { key = "att-0", index = 0, ok = True, status = 201, body = "{\"path\":\"/uploads/a.png\"}", contentType = Just "application/json" }) m4
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ UploadSend { key = "att-0", endpoint = "/upload", fieldName = "file", index = 0 } ] sendOut
+                    , \_ -> Expect.equal [] sendOut2
+                    , \_ -> Expect.equal True (List.member (SendLine "PRIVMSG #c :two[file: a.png] 10 B /uploads/a.png\r\n") doneOut)
+                    , \_ -> Expect.equal [] m5.attachments
+                    ]
+                    ()
         , test "UploadProgress moves only the uploading row" <|
             \_ ->
                 let
