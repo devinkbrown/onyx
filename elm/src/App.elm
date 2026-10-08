@@ -923,6 +923,7 @@ type Outbound
     | StudioStripShareParam
     | HistoryReplace { url : String }
     | StatsRevealInspector
+    | TopicChipFocus
     | GuidesProgressRequest
     | GuidesProgressStore { ids : List String }
     | HttpFetch { key : String, url : String }
@@ -32741,12 +32742,28 @@ foldChat model message isNotice =
                                                                 )
                                                                 |> (\m -> { m | messageSeq = m.messageSeq + 1 })
 
+                                                        -- A pinned forum re-opens on topic arrival
+                                                        -- (mirroring the forum effect: a pinned
+                                                        -- room with labeled rows forces the forum
+                                                        -- open, on delivery as on navigation).
+                                                        forumOpened =
+                                                            case Dict.get (String.toLower bucket) next.channels of
+                                                                Just ch ->
+                                                                    if isChannelName model bucket && forumPinnedFor next bucket && List.any (\row -> not (String.isEmpty row.topic)) ch.messages && Maybe.map String.toLower next.activeChannel == Just (String.toLower bucket) then
+                                                                        { next | forumView = Dict.insert (String.toLower bucket) True next.forumView }
+
+                                                                    else
+                                                                        next
+
+                                                                Nothing ->
+                                                                    next
+
                                                         counted =
                                                             if fate == DeliverNormal then
-                                                                trackUnread next bucket model.messageSeq sender resolvedBody rowHighlight (parseMessageTopic message.tags)
+                                                                trackUnread forumOpened bucket model.messageSeq sender resolvedBody rowHighlight (parseMessageTopic message.tags)
 
                                                             else
-                                                                next
+                                                                forumOpened
 
                                                         -- A row delivered into the selected named
                                                         -- conversation is already visible: only its
@@ -38712,16 +38729,27 @@ update msg model =
 
         ForumOpenTopic { channel, topic } ->
             -- Open a topic from its forum card (mirroring
-            -- `openTopic`: validated select plus closing the forum;
-            -- the focus handoff stays a narrowing).
+            -- `openTopic`: validated select plus closing the forum,
+            -- the consumed boundary persisted, and the focus handed
+            -- to the now-active filter chip via the focus port,
+            -- which runs after render like the oracle
+            -- `queueMicrotask`).
             case resolveKnownChannelTopic model channel topic of
                 Just valid ->
-                    ( { model
-                        | activeChannelTopics = Dict.insert (String.toLower channel) valid model.activeChannelTopics
-                        , forumView = Dict.remove (String.toLower channel) model.forumView
-                      }
-                    , []
-                    )
+                    let
+                        key =
+                            String.toLower channel
+
+                        opened =
+                            { model
+                                | activeChannelTopics = Dict.insert key valid model.activeChannelTopics
+                                , forumView = Dict.remove key model.forumView
+                            }
+
+                        ( marked, markOuts ) =
+                            markLatestChannelTopicRead opened channel valid
+                    in
+                    ( reconcileChannelTopicUnread marked key, markOuts ++ [ TopicChipFocus ] )
 
                 Nothing ->
                     ( { model | forumView = Dict.remove (String.toLower channel) model.forumView }, [] )

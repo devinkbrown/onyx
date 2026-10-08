@@ -16233,6 +16233,92 @@ suite =
                         , \_ -> Expect.equal [] outs
                         ]
                         ()
+            , test "forum card open marks, closes the forum, and hands off focus" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst { ownerLive | topicHistory = Dict.fromList [ ( "#c", [ "Alpha" ] ) ] } "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+
+                        ( opened, outs ) =
+                            update (ForumOpenTopic { channel = "#c", topic = "Alpha" }) seeded
+
+                        isSave o =
+                            case o of
+                                TopicReadSave _ ->
+                                    True
+
+                                _ ->
+                                    False
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "Alpha") (activeChannelTopic opened "#c")
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" opened.forumView)
+                        , \_ -> Expect.equal True (List.member TopicChipFocus outs)
+                        , \_ -> Expect.equal 1 (List.length (List.filter isSave outs))
+                        , \_ -> Expect.equal (Just "m1") (List.head opened.topicReadLedger |> Maybe.map .lastReadMessageId)
+                        ]
+                        ()
+            , test "pinned forum re-opens on topic arrival in the active room" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        pinned =
+                            joinFirst ownerLive "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> Tuple.first (update (ForumChannelToggle "#c") m))
+
+                        ( active, _ ) =
+                            update (ChannelSelect "#c") { pinned | forumView = Dict.empty }
+
+                        ( shut, _ ) =
+                            update (ForumToggle "#c") active
+
+                        ( arrived, _ ) =
+                            feed shut "@msgid=m2;time=2026-10-04T12:00:01Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :two"
+
+                        ( unpinnedActive, _ ) =
+                            update (ChannelSelect "#c")
+                                (joinFirst ownerLive "kai" "#c"
+                                    |> (\m -> step m "@msgid=m9;time=2026-10-04T12:00:09Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :nine")
+                                )
+
+                        ( plain, _ ) =
+                            feed unpinnedActive "@msgid=m8;time=2026-10-04T12:00:08Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :eight"
+
+                        ( closedElsewhere, _ ) =
+                            update (ForumToggle "#c") active
+
+                        other =
+                            { closedElsewhere | activeChannel = Just "#elsewhere" }
+
+                        ( away, _ ) =
+                            feed other "@msgid=m3;time=2026-10-04T12:00:02Z;onyx/topic=Gamma :alice!u@h PRIVMSG #c :three"
+
+                        ( unlabeledActive, _ ) =
+                            update (ChannelSelect "#d")
+                                (joinFirst ownerLive "kai" "#d"
+                                    |> (\m -> step m ":alice!u@h PRIVMSG #d :untagged")
+                                    |> (\m -> Tuple.first (update (ForumChannelToggle "#d") m))
+                                    |> (\m -> Tuple.first (update (ForumToggle "#d") m))
+                                )
+
+                        ( unlabeled, _ ) =
+                            feed unlabeledActive ":alice!u@h PRIVMSG #d :still untagged"
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (Dict.get "#c" shut.forumView)
+                        , \_ -> Expect.equal (Just True) (Dict.get "#c" arrived.forumView)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" plain.forumView)
+                        , \_ -> Expect.equal Nothing (Dict.get "#c" away.forumView)
+                        , \_ -> Expect.equal Nothing (Dict.get "#d" unlabeled.forumView)
+                        ]
+                        ()
             , test "whole-room select marks every topic at once" <|
                 \_ ->
                     let

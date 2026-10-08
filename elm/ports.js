@@ -4866,6 +4866,28 @@ function fetchPublicFeed(url) {
       });
     }
 
+    /* Forum-card focus handoff (mirroring `openTopic`: the forum card
+       disappears with the forum projection, so focus moves to the
+       now-active filter chip instead of falling back to the document
+       body. The port runs after Elm renders, like the oracle
+       `queueMicrotask`; missing chips (stale emits) no-op. */
+    if (app.ports.topicChipFocus) {
+      app.ports.topicChipFocus.subscribe(function () {
+        try {
+          if (typeof document === "undefined" || typeof document.querySelector !== "function") return;
+          var chip = document.querySelector(".topic-filter-bar .topic-chip.is-active");
+          if (!chip) return;
+          if (typeof chip.focus === "function") {
+            try {
+              chip.focus({ preventScroll: true });
+            } catch (err) {
+              chip.focus();
+            }
+          }
+        } catch (err) { /* focus handoff is best-effort */ }
+      });
+    }
+
     if (app.ports.httpFetch) {
       app.ports.httpFetch.subscribe(function (req) {
         var key = req && typeof req.key === "string" ? req.key : "";

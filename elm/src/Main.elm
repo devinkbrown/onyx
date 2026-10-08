@@ -299,6 +299,9 @@ port historyReplace : String -> Cmd msg
 
 port statsRevealInspector : () -> Cmd msg
 
+
+port topicChipFocus : () -> Cmd msg
+
 port appearanceRequest : () -> Cmd msg
 
 port appearanceStorePrefs : { json : String } -> Cmd msg
@@ -1237,6 +1240,9 @@ perform key outbound =
 
         App.StatsRevealInspector ->
             statsRevealInspector ()
+
+        App.TopicChipFocus ->
+            topicChipFocus ()
 
         App.GuidesProgressRequest ->
             guidesProgressRequest ()
