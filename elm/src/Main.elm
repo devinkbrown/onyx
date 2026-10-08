@@ -325,6 +325,15 @@ port topicHistoryRequest : { serverUrl : String, identity : String } -> Cmd msg
 port topicHistoryLoaded : (Decode.Value -> msg) -> Sub msg
 
 
+port topicReadSave : { serverUrl : String, identity : String, markers : Encode.Value } -> Cmd msg
+
+
+port topicReadRequest : { serverUrl : String, identity : String } -> Cmd msg
+
+
+port topicReadLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port nickAliasesRequest : { serverUrl : String, identity : String } -> Cmd msg
 
 
@@ -1073,6 +1082,12 @@ perform key outbound =
         App.TopicHistoryRequest req ->
             topicHistoryRequest req
 
+        App.TopicReadSave req ->
+            topicReadSave req
+
+        App.TopicReadRequest req ->
+            topicReadRequest req
+
         App.NickAliasesRequest req ->
             nickAliasesRequest req
 
@@ -1459,6 +1474,7 @@ subscriptions model =
         , scheduleParseResult App.ScheduleParseReceived
         , identityProfileLoaded App.IdentityProfileLoaded
         , topicHistoryLoaded App.TopicHistoryLoaded
+        , topicReadLoaded App.TopicReadLoaded
         , nickAliasesLoaded App.NickAliasesLoaded
         , friendsLoaded App.FriendsLoaded
         , watchListLoaded App.WatchListLoaded

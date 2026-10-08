@@ -70,6 +70,7 @@ import Set exposing (Set)
 import Translate
 import Spine
 import Time
+import TopicRead
 import Upload
 import Url
 import Transcript
@@ -621,6 +622,8 @@ type alias Model =
     , lastRosterPollMs : Float
     , topicHistory : Dict String (List String)
     , activeChannelTopics : Dict String String
+    , topicReadLedger : List TopicRead.TopicReadMarker
+    , topicReadOwner : Maybe DeviceMemoryOwner
     , serviceLog : List String
     , offlineMemo : Dict String OfflineMemoAgg
     , memoOrder : Int
@@ -950,6 +953,8 @@ type Outbound
     | IdentityProfileRequest { serverUrl : String, identity : String }
     | TopicHistorySave { serverUrl : String, identity : String, history : Encode.Value }
     | TopicHistoryRequest { serverUrl : String, identity : String }
+    | TopicReadSave { serverUrl : String, identity : String, markers : Encode.Value }
+    | TopicReadRequest { serverUrl : String, identity : String }
     | NickAliasesRequest { serverUrl : String, identity : String }
     | GuestClaimDismissSave { serverUrl : String, identity : String }
     | GuestClaimDismissRequest { serverUrl : String, identity : String }
@@ -2593,6 +2598,7 @@ type Msg
     | NotificationActivated String
     | NotificationsMarkedRead
     | TopicHistoryLoaded Decode.Value
+    | TopicReadLoaded Decode.Value
     | NickAliasesLoaded Decode.Value
     | FriendsLoaded Decode.Value
     | WatchListLoaded Decode.Value
@@ -3217,6 +3223,8 @@ init nick url =
     , lastRosterPollMs = 0
     , topicHistory = Dict.empty
     , activeChannelTopics = Dict.empty
+    , topicReadLedger = []
+    , topicReadOwner = Nothing
     , serviceLog = []
     , offlineMemo = Dict.empty
     , memoOrder = 0
@@ -3666,6 +3674,8 @@ blank =
     , lastRosterPollMs = 0
     , topicHistory = Dict.empty
     , activeChannelTopics = Dict.empty
+    , topicReadLedger = []
+    , topicReadOwner = Nothing
     , serviceLog = []
     , offlineMemo = Dict.empty
     , memoOrder = 0
@@ -5163,7 +5173,7 @@ foldLine model message =
             -- Server echo / GET reply / other-session relay (mirroring
             -- the read-marker arm): the stored marker re-derives
             -- unread state, or `*` drops it without touching counts.
-            ( foldMarkread model message.nick message.params, [] )
+            foldMarkread model message.nick message.params
 
         "EVENT" ->
             foldEvent model message
@@ -8892,6 +8902,8 @@ quarantineOwnerChange model =
             , personaOffers = []
             , topicHistory = Dict.empty
     , activeChannelTopics = Dict.empty
+    , topicReadLedger = []
+    , topicReadOwner = Nothing
             , nickAliases = []
             , friends = Dict.empty
             , watchList = []
@@ -10608,8 +10620,18 @@ setChannelNotify model channel level =
 
             else
                 { model | channelNotify = Dict.insert key level model.channelNotify }
+
+        -- Muting a room to `none` suppresses every row, so its counts
+        -- re-derive through the topic cursors (mirroring the oracle
+        -- `none` arm).
+        reconciled =
+            if level == "none" then
+                reconcileChannelTopicUnread updated key
+
+            else
+                updated
     in
-    ( updated
+    ( reconciled
     , [ ChannelNotifySave
             { entries =
                 List.map
@@ -19137,8 +19159,20 @@ requestIdentityProfile previous model =
                         ( { withCtcp | identityOverridesOwner = Just owner }
                         , [ IdentityOverridesRequest (identityOverridesKeysForOwner owner) ]
                         )
+                -- The device-local topic cursors ride the same owner
+                -- transition (same namespace, same staleness rule),
+                -- mirroring the owned ledger reads on connect, nick
+                -- change, and auth change.
+                ( withTopics, topicsOutbound ) =
+                    if withOverrides.topicReadOwner == Just owner then
+                        ( withOverrides, [] )
+
+                    else
+                        ( { withOverrides | topicReadOwner = Just owner }
+                        , [ TopicReadRequest { serverUrl = owner.serverUrl, identity = owner.identity } ]
+                        )
             in
-            ( withOverrides, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound ++ overridesOutbound )
+            ( withTopics, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound ++ overridesOutbound ++ topicsOutbound )
 
 
 {-| Set our custom-status expiry (mirroring `setCustomStatusExpiry`:
@@ -28708,11 +28742,11 @@ applyReadMarker model target iso =
 {-| Fold one inbound `MARKREAD` (mirroring the server-echo / GET-reply /
 other-session relay arm): only the server or our own nick acts; `*` (or
 a missing token) drops the stored marker without touching counts. -}
-foldMarkread : Model -> Maybe String -> List String -> Model
+foldMarkread : Model -> Maybe String -> List String -> ( Model, List Outbound )
 foldMarkread model maybeNick params =
     case params of
         [] ->
-            model
+            ( model, [] )
 
         target :: rest ->
             let
@@ -28725,16 +28759,16 @@ foldMarkread model maybeNick params =
                             String.toLower nick == String.toLower model.ourNick
             in
             if not self then
-                model
+                ( model, [] )
 
             else
                 case rest of
                     [] ->
-                        { model | readMarkers = Dict.remove (String.toLower target) model.readMarkers }
+                        ( { model | readMarkers = Dict.remove (String.toLower target) model.readMarkers }, [] )
 
                     token :: _ ->
                         if token == "*" then
-                            { model | readMarkers = Dict.remove (String.toLower target) model.readMarkers }
+                            ( { model | readMarkers = Dict.remove (String.toLower target) model.readMarkers }, [] )
 
                         else
                             let
@@ -28744,8 +28778,39 @@ foldMarkread model maybeNick params =
 
                                     else
                                         token
+
+                                -- A marker landing while a named conversation
+                                -- is open persists its consumed boundary
+                                -- first (mirroring the MARKREAD arm).
+                                ( marked, markOuts ) =
+                                    case activeMarkerTopic model target of
+                                        Just topic ->
+                                            markLatestChannelTopicRead model target topic
+
+                                        Nothing ->
+                                            ( model, [] )
                             in
-                            applyReadMarker model target iso
+                            ( applyReadMarker marked target iso, markOuts )
+
+
+{-| The open named conversation for a MARKREAD target, if the target is
+the active room with a topic selection. -}
+activeMarkerTopic : Model -> String -> Maybe String
+activeMarkerTopic model target =
+    let
+        key =
+            String.toLower target
+    in
+    case model.activeChannel of
+        Just active ->
+            if String.toLower active == key then
+                Dict.get key model.activeChannelTopics
+
+            else
+                Nothing
+
+        Nothing ->
+            Nothing
 
 
 {-| Record the local read position when a room opens (mirroring the
@@ -31060,14 +31125,25 @@ closePlainBatch model ref collector =
                     seen
 
         -- A stored server marker re-derives unread from the merged
-        -- replay (mirroring the post-merge re-derive arm).
-        remarked =
+        -- replay (mirroring the post-merge re-derive arm); an open
+        -- named conversation persists its consumed boundary first
+        -- (mirroring the batch-close arm).
+        ( remarked, remarkOuts ) =
             case Dict.get key counted.readMarkers of
                 Just iso ->
-                    applyReadMarker counted collector.target iso
+                    case activeMarkerTopic counted collector.target of
+                        Just topic ->
+                            let
+                                ( marked, markOuts ) =
+                                    markLatestChannelTopicRead counted collector.target topic
+                            in
+                            ( applyReadMarker marked collector.target iso, markOuts )
+
+                        Nothing ->
+                            ( applyReadMarker counted collector.target iso, [] )
 
                 Nothing ->
-                    counted
+                    ( counted, [] )
 
         -- Replayed membership lines merge into the buffer at
         -- their historical stamps (mirroring the `sysMsg`
@@ -31105,7 +31181,7 @@ closePlainBatch model ref collector =
 
       else
         exhausted
-    , out
+    , out ++ remarkOuts
     )
 
 
@@ -32671,10 +32747,22 @@ foldChat model message isNotice =
 
                                                             else
                                                                 next
+
+                                                        -- A row delivered into the selected named
+                                                        -- conversation is already visible: only its
+                                                        -- device cursor advances, then the parent
+                                                        -- room re-projects (mirroring the delivery
+                                                        -- arm; history merges never mark here).
+                                                        ( topicMarked, topicOuts ) =
+                                                            if fate == DeliverNormal && not model.historyMerging && isChannelName model bucket then
+                                                                markDeliveredTopicRead counted bucket sender resolvedBody rowHighlight (parseMessageTopic message.tags) (msgidOf message) (rowTime model message)
+
+                                                            else
+                                                                ( counted, [] )
                                                     in
                                                     let
                                                         ( marked, roomOuts ) =
-                                                            foldRoomEnvelope counted bucket effectiveBody model.messageSeq
+                                                            foldRoomEnvelope topicMarked bucket effectiveBody model.messageSeq
 
                                                         rowTopic =
                                                             parseMessageTopic message.tags
@@ -32713,7 +32801,7 @@ foldChat model message isNotice =
                                                             requestPreviewForBody recorded effectiveBody
                                                     in
                                                     ( previewed
-                                                    , openForEnvelope marked bucket effectiveBody model.messageSeq message ++ roomOuts ++ alertOuts ++ previewOuts
+                                                    , openForEnvelope marked bucket effectiveBody model.messageSeq message ++ topicOuts ++ roomOuts ++ alertOuts ++ previewOuts
                                                     )
 
                 _ ->
@@ -33120,6 +33208,307 @@ openPinnedForum model channel =
                     model
 
 
+{-| Buffer-scoped row id for the topic-read projector: the server msgid
+when the row carries one, otherwise a `row:<buffer id>` synthetic id.
+Synthetic ids never exact-match a stored marker across sessions (buffer
+ids restart), so those rows fall to the timestamp arm — the oracle
+missing-marker behavior — while unmarked topics count off the room
+boundary either way. Markers are only ever written from real msgids. -}
+topicReadRowId : ChatMessage -> String
+topicReadRowId row =
+    Maybe.withDefault ("row:" ++ String.fromInt row.id) row.msgid
+
+
+{-| Eligibility for the topic-read projection (mirroring
+`isEligibleChannelUnread`: the oracle's msg/action/notice/whisper gate
+reduces to msg/notice here — Elm folds actions into msg rows and has no
+whisper rows — own rows never count, `none` suppresses the room, and a
+mentions-only room admits only highlight-worthy rows). -}
+topicReadExcluded : Model -> String -> ChatMessage -> Bool
+topicReadExcluded model target row =
+    if row.msgType /= "msg" && row.msgType /= "notice" then
+        True
+
+    else if String.toLower row.from == String.toLower model.ourNick then
+        True
+
+    else
+        case notifyLevel model target of
+            "none" ->
+                True
+
+            "mentions" ->
+                not (row.highlight || isHighlightWorthy model row.body)
+
+            _ ->
+                False
+
+
+{-| One buffer row projected onto the ledger row shape (the exclusion and
+highlight classifications ride the flags, mirroring the caller predicates
+the oracle threads through `projectRoomTopicUnread`). -}
+topicReadRow : Model -> String -> ChatMessage -> TopicRead.TopicReadMessage
+topicReadRow model target row =
+    { id = topicReadRowId row
+    , topic = topicOrNothing row.topic
+    , at = row.at
+    , system = topicReadExcluded model target row
+    , highlight = row.highlight || isHighlightWorthy model row.body
+    }
+
+
+{-| Oldest-first index of the first row newer than an ISO read-marker
+stamp (mirroring the `readMarkers` arm of `roomUnreadBoundaryIndex`;
+unparseable stamps behave as no marker). -}
+topicReadMarkerIndex : String -> List ChatMessage -> Int
+topicReadMarkerIndex iso newestFirst =
+    case SavedSearches.parseIsoMillis iso of
+        Nothing ->
+            List.length newestFirst
+
+        Just markerMs ->
+            let
+                step row ( index, found ) =
+                    case found of
+                        Just _ ->
+                            ( index + 1, found )
+
+                        Nothing ->
+                            if toFloat row.at > markerMs then
+                                ( index + 1, Just index )
+
+                            else
+                                ( index + 1, Nothing )
+            in
+            Maybe.withDefault (List.length newestFirst) (Tuple.second (List.foldl step ( 0, Nothing ) (List.reverse newestFirst)))
+
+
+{-| Universal room boundary for markerless topics (mirroring
+`roomUnreadBoundaryIndex` without the override arm: the first-unread
+cursor wins, then the stored MARKREAD stamp, else the end of the list). -}
+topicReadBoundaryIndex : Model -> String -> Int
+topicReadBoundaryIndex model channel =
+    let
+        key =
+            String.toLower channel
+    in
+    case Dict.get key model.channels of
+        Nothing ->
+            0
+
+        Just ch ->
+            case Dict.get key model.firstUnreadId of
+                Just firstId ->
+                    Maybe.withDefault (List.length ch.messages) (threadRowIndex ch.messages firstId)
+
+                Nothing ->
+                    case Dict.get key model.readMarkers of
+                        Just iso ->
+                            topicReadMarkerIndex iso ch.messages
+
+                        Nothing ->
+                            List.length ch.messages
+
+
+{-| Re-project one room's unread state through the device-local topic
+cursors (mirroring `_reconcileChannelTopicUnread`: the whole open room
+uses the end of the buffer as its boundary, otherwise the room boundary
+is a universal lower bound; counts, highlights, and the first-unread
+cursor re-derive from the projection — Elm keeps no separate
+channelUnread/channelMentions maps or mention totals, those derive at
+render). -}
+reconcileChannelTopicUnread : Model -> String -> Model
+reconcileChannelTopicUnread model channel =
+    case Dict.get (String.toLower channel) model.channels of
+        Nothing ->
+            model
+
+        Just ch ->
+            let
+                key =
+                    String.toLower channel
+
+                wholeRoom =
+                    Maybe.map String.toLower model.activeChannel == Just key && Dict.get key model.activeChannelTopics == Nothing
+
+                fallback =
+                    if wholeRoom then
+                        List.length ch.messages
+
+                    else
+                        topicReadBoundaryIndex model key
+
+                rows =
+                    List.map (topicReadRow model key) (List.reverse ch.messages)
+
+                projection =
+                    TopicRead.projectRoomTopicUnread channel rows model.topicReadLedger fallback
+
+                cursor =
+                    case projection.earliestUnreadMessageId of
+                        Nothing ->
+                            Dict.remove key model.firstUnreadId
+
+                        Just earliest ->
+                            case List.filter (\row -> topicReadRowId row == earliest) ch.messages of
+                                found :: _ ->
+                                    Dict.insert key found.id model.firstUnreadId
+
+                                [] ->
+                                    Dict.remove key model.firstUnreadId
+            in
+            updateChannel model channel (\c -> { c | unread = projection.totalUnread, highlights = projection.highlightCount })
+                |> (\m -> { m | firstUnreadId = cursor })
+
+
+{-| Persist one topic mark when the device owner is known (mirroring the
+`markTopicRead` write: unchanged ledgers emit nothing). -}
+persistTopicReadMark : Model -> String -> String -> String -> Int -> ( Model, List Outbound )
+persistTopicReadMark model channel topic msgid atMs =
+    case deviceMemoryOwner model of
+        Nothing ->
+            ( model, [] )
+
+        Just owner ->
+            let
+                next =
+                    TopicRead.markTopicRead channel topic msgid atMs model.topicReadLedger
+            in
+            if next == model.topicReadLedger then
+                ( model, [] )
+
+            else
+                ( { model | topicReadLedger = next }
+                , [ TopicReadSave
+                        { serverUrl = owner.serverUrl
+                        , identity = owner.identity
+                        , markers = TopicRead.encodeTopicReadMarkers next
+                        }
+                  ]
+                )
+
+
+{-| Advance one topic to its newest countable row carrying a real msgid
+(mirroring `markLatestTopicRead`: buffers run newest-first, so the head
+of the filtered rows is the latest; rows without a msgid can never
+anchor an exact boundary, so they never move the cursor). -}
+markLatestChannelTopicRead : Model -> String -> String -> ( Model, List Outbound )
+markLatestChannelTopicRead model channel topic =
+    case Dict.get (String.toLower channel) model.channels of
+        Nothing ->
+            ( model, [] )
+
+        Just ch ->
+            let
+                wanted =
+                    String.toLower (String.trim topic)
+
+                latest =
+                    List.filter
+                        (\row ->
+                            not (topicReadExcluded model (String.toLower channel) row)
+                                && String.toLower row.topic == wanted
+                        )
+                        ch.messages
+                        |> List.filterMap
+                            (\row ->
+                                case row.msgid of
+                                    Just msgid ->
+                                        Just ( msgid, row.at )
+
+                                    Nothing ->
+                                        Nothing
+                            )
+                        |> List.head
+            in
+            case latest of
+                Nothing ->
+                    ( model, [] )
+
+                Just ( msgid, atMs ) ->
+                    persistTopicReadMark model channel topic msgid atMs
+
+
+{-| Advance every named topic to its latest countable row (mirroring the
+`navigate` whole-room arm: `markAllTopicsRead` over the loaded buffer
+with the ledger exclusion, so a later topic filter cannot resurrect
+rows already consumed in the All view). -}
+markAllChannelTopicsRead : Model -> String -> ( Model, List Outbound )
+markAllChannelTopicsRead model channel =
+    case ( Dict.get (String.toLower channel) model.channels, deviceMemoryOwner model ) of
+        ( Just ch, Just owner ) ->
+            let
+                rows =
+                    List.map (topicReadRow model (String.toLower channel)) (List.reverse ch.messages)
+
+                next =
+                    TopicRead.markAllTopicsRead channel rows model.topicReadLedger
+            in
+            if next == model.topicReadLedger then
+                ( model, [] )
+
+            else
+                ( { model | topicReadLedger = next }
+                , [ TopicReadSave
+                        { serverUrl = owner.serverUrl
+                        , identity = owner.identity
+                        , markers = TopicRead.encodeTopicReadMarkers next
+                        }
+                  ]
+                )
+
+        _ ->
+            ( model, [] )
+
+
+{-| Advance the selected named conversation for one delivered row
+(mirroring the delivery arm: the row is already visible, so only its
+device cursor advances, then the parent room re-projects so hidden
+sibling and untagged rows keep their state; rows without a msgid
+re-project without moving the cursor). -}
+markDeliveredTopicRead : Model -> String -> String -> String -> Bool -> Maybe String -> Maybe String -> Int -> ( Model, List Outbound )
+markDeliveredTopicRead model bucket sender resolvedBody rowHighlight rowTopic msgid atMs =
+    case ( Dict.get (String.toLower bucket) model.activeChannelTopics, rowTopic ) of
+        ( Just selected, Just label ) ->
+            if String.toLower (String.trim label) /= String.toLower (String.trim selected) then
+                ( model, [] )
+
+            else if String.toLower sender == String.toLower model.ourNick then
+                ( model, [] )
+
+            else
+                case notifyLevel model bucket of
+                    "none" ->
+                        ( reconcileChannelTopicUnread model bucket, [] )
+
+                    "mentions" ->
+                        if rowHighlight || isHighlightWorthy model resolvedBody then
+                            markDeliveredMark model bucket selected msgid atMs
+
+                        else
+                            ( reconcileChannelTopicUnread model bucket, [] )
+
+                    _ ->
+                        markDeliveredMark model bucket selected msgid atMs
+
+        _ ->
+            ( model, [] )
+
+
+markDeliveredMark : Model -> String -> String -> Maybe String -> Int -> ( Model, List Outbound )
+markDeliveredMark model bucket selected msgid atMs =
+    case msgid of
+        Just id ->
+            let
+                ( marked, outs ) =
+                    persistTopicReadMark model bucket selected id atMs
+            in
+            ( reconcileChannelTopicUnread marked bucket, outs )
+
+        Nothing ->
+            ( reconcileChannelTopicUnread model bucket, [] )
+
+
 {-| Open a conversation by name (the `ChannelSelect` body, shared with
 the deep-link join echo — see `firePendingDeepLinkJoin`). -}
 selectChannel : Model -> String -> ( Model, List Outbound )
@@ -33158,6 +33547,16 @@ selectChannel model name =
         -- conjuring a room.
         ( read, markOut ) =
             recordLocalReadMarker model name
+
+        -- A plain channel navigation persists every consumed
+        -- named-conversation boundary first (mirroring the
+        -- `navigate` whole-room arm); DMs carry no topics.
+        ( navigated, navOut ) =
+            if isChannelName model name then
+                markAllChannelTopicsRead read name
+
+            else
+                ( read, [] )
     in
     -- A new conversation restarts match navigation at the
     -- first hit and re-opens the live trailing window
@@ -33167,11 +33566,11 @@ selectChannel model name =
     -- the ban panel's connected-and-op fetch effect.
     let
         ( opened, banOut ) =
-            if read.connection == Live && isChannelOp read name then
-                requestBanList read name
+            if navigated.connection == Live && isChannelOp navigated name then
+                requestBanList navigated name
 
             else
-                ( read, [] )
+                ( navigated, [] )
 
         -- Opening a DM tracks the peer's presence via MONITOR
         -- (mirroring the oracle's `monitorAdd` on DM open; channels
@@ -33187,7 +33586,7 @@ selectChannel model name =
     -- The tail also swaps the per-target composer draft (the swap
     -- sets the channel, so the record update lives inside it).
     ( resetThreadWindow (clearOfflineMemo (swapComposerDraft watched name) name)
-    , fetch ++ keyFetch ++ markOut ++ banOut ++ watchOut
+    , fetch ++ keyFetch ++ markOut ++ navOut ++ banOut ++ watchOut
     )
 
 
@@ -34688,6 +35087,28 @@ update msg model =
             -- mirroring the oracle's `_loadOwnedTopicHistory` assignment.
             ( { model | topicHistory = parseTopicHistoryValue value }, [] )
 
+        TopicReadLoaded value ->
+            -- An owned-namespace load replaces the live ledger wholesale
+            -- (re-validated fail-closed), then re-projects every loaded
+            -- room the ledger names so badges agree with the cursors.
+            let
+                loaded =
+                    { model | topicReadLedger = TopicRead.parseTopicReadLedger value }
+
+                rooms =
+                    List.foldl
+                        (\marker acc ->
+                            if Dict.member marker.channel loaded.channels then
+                                Set.insert marker.channel acc
+
+                            else
+                                acc
+                        )
+                        Set.empty
+                        loaded.topicReadLedger
+            in
+            ( List.foldl (\channel acc -> reconcileChannelTopicUnread acc channel) loaded (Set.toList rooms), [] )
+
         NickAliasesLoaded value ->
             -- An owned-namespace load normalizes the list against the
             -- current canonical identity (fail-closed: a non-array
@@ -35809,12 +36230,30 @@ update msg model =
             in
             case topic of
                 Nothing ->
-                    ( { model | activeChannelTopics = Dict.remove key model.activeChannelTopics }, [] )
+                    -- Falling back to the whole room persists every
+                    -- consumed named boundary first (mirroring the
+                    -- `navigate` whole-room arm).
+                    let
+                        ( marked, markOuts ) =
+                            markAllChannelTopicsRead model channel
+                    in
+                    ( { marked | activeChannelTopics = Dict.remove key marked.activeChannelTopics }, markOuts )
 
                 Just requested ->
                     case resolveKnownChannelTopic model channel requested of
                         Just valid ->
-                            ( { model | activeChannelTopics = Dict.insert key valid model.activeChannelTopics }, [] )
+                            -- Selecting a named conversation persists its
+                            -- consumed boundary (mirroring
+                            -- `openExistingTopic`: mark latest, then
+                            -- re-project the parent room).
+                            let
+                                inserted =
+                                    { model | activeChannelTopics = Dict.insert key valid model.activeChannelTopics }
+
+                                ( marked, markOuts ) =
+                                    markLatestChannelTopicRead inserted channel valid
+                            in
+                            ( reconcileChannelTopicUnread marked key, markOuts )
 
                         Nothing ->
                             ( { model | activeChannelTopics = Dict.remove key model.activeChannelTopics }, [] )

@@ -31,6 +31,7 @@ import Session
 import Set
 import Test exposing (Test, describe, test)
 import Time
+import TopicRead
 import Wire exposing (SaslMechanism(..))
 
 
@@ -12422,6 +12423,7 @@ suite =
                                     , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
+                                , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12429,6 +12431,7 @@ suite =
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.contactsOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.ctcpOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityOverridesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.topicReadOwner
                         , \_ -> Expect.equal seeded.userActivities foreign.userActivities
                         , \_ -> Expect.equal [] foreignOuts
                         ]
@@ -12458,6 +12461,7 @@ suite =
                                     , nickColorsKey = Just "onyx:nick-colors:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
+                                , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12465,6 +12469,7 @@ suite =
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.contactsOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.ctcpOwner
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityOverridesOwner
+                        , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.topicReadOwner
                         ]
                         ()
             , test "818 rows project user STATUS and skip channels and other props" <|
@@ -16041,6 +16046,223 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal True (List.any sendLineIsModePlusB outs)
                         , \_ -> Expect.equal False (List.any sendLineIsModePlusB quiet)
+                        ]
+                        ()
+            ]
+        , describe "topic read ledger"
+            [ test "selecting a topic marks its latest msgid row and persists" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst { ownerLive | topicHistory = Dict.fromList [ ( "#c", [ "Alpha", "Beta" ] ) ] } "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> step m "@msgid=m2;time=2026-10-04T12:00:01Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :two")
+                                |> (\m -> step m "@msgid=m3;time=2026-10-04T12:00:02Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :three")
+
+                        ( selected, outs ) =
+                            update (ChannelTopicSelect { channel = "#c", topic = Just "Alpha" }) seeded
+
+                        unreadOf m =
+                            case Dict.get "#c" m.channels of
+                                Just ch ->
+                                    ch.unread
+
+                                Nothing ->
+                                    -1
+
+                        saves =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        TopicReadSave req ->
+                                            Just req
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+
+                        savedLedger req =
+                            Decode.decodeString Decode.value (Encode.encode 0 req.markers)
+                                |> Result.toMaybe
+                                |> Maybe.map TopicRead.parseTopicReadLedger
+                                |> Maybe.withDefault []
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 1 (List.length saves)
+                        , \_ -> Expect.equal (Just "wss://irc.example") (List.head saves |> Maybe.map .serverUrl)
+                        , \_ -> Expect.equal (Just "kai") (List.head saves |> Maybe.map .identity)
+                        , \_ -> Expect.equal selected.topicReadLedger (List.head saves |> Maybe.map savedLedger |> Maybe.withDefault [])
+                        , \_ -> Expect.equal [ "alpha" ] (List.map .topic selected.topicReadLedger)
+                        , \_ -> Expect.equal (Just "m3") (List.head selected.topicReadLedger |> Maybe.map .lastReadMessageId)
+                        , \_ -> Expect.equal 1 (unreadOf selected)
+                        ]
+                        ()
+            , test "delivery into the selected topic advances the cursor" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst { ownerLive | topicHistory = Dict.fromList [ ( "#c", [ "Alpha", "Beta" ] ) ] } "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> step m "@msgid=m2;time=2026-10-04T12:00:01Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :two")
+
+                        ( selected, _ ) =
+                            update (ChannelTopicSelect { channel = "#c", topic = Just "Alpha" }) seeded
+
+                        ( delivered, dOuts ) =
+                            feed selected "@msgid=m4;time=2026-10-04T12:00:03Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :four"
+
+                        ( sibled, sOuts ) =
+                            feed delivered "@msgid=m5;time=2026-10-04T12:00:04Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :five"
+
+                        saves outs =
+                            List.filterMap
+                                (\o ->
+                                    case o of
+                                        TopicReadSave _ ->
+                                            Just o
+
+                                        _ ->
+                                            Nothing
+                                )
+                                outs
+
+                        unreadOf m =
+                            case Dict.get "#c" m.channels of
+                                Just ch ->
+                                    ch.unread
+
+                                Nothing ->
+                                    -1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "m4") (List.head delivered.topicReadLedger |> Maybe.map .lastReadMessageId)
+                        , \_ -> Expect.equal 1 (List.length (saves dOuts))
+                        , \_ -> Expect.equal 1 (unreadOf delivered)
+                        , \_ -> Expect.equal (Just "m4") (List.head sibled.topicReadLedger |> Maybe.map .lastReadMessageId)
+                        , \_ -> Expect.equal 0 (List.length (saves sOuts))
+                        , \_ -> Expect.equal 2 (unreadOf sibled)
+                        ]
+                        ()
+            , test "muting a room to none re-projects its counts to zero" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst ownerLive "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+
+                        ( muted, outs ) =
+                            setChannelNotify seeded "#c" "none"
+
+                        unreadOf m =
+                            case Dict.get "#c" m.channels of
+                                Just ch ->
+                                    ch.unread
+
+                                Nothing ->
+                                    -1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal 0 (unreadOf muted)
+                        , \_ -> Expect.equal 1 (List.length outs)
+                        ]
+                        ()
+            , test "loaded ledgers replace and re-project named rooms" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst ownerLive "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> step m "@msgid=m2;time=2026-10-04T12:00:01Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :two")
+
+                        atOf msgid =
+                            case Dict.get "#c" seeded.channels of
+                                Just ch ->
+                                    List.filterMap
+                                        (\row ->
+                                            if row.msgid == Just msgid then
+                                                Just row.at
+
+                                            else
+                                                Nothing
+                                        )
+                                        ch.messages
+                                        |> List.head
+                                        |> Maybe.withDefault -1
+
+                                Nothing ->
+                                    -1
+
+                        payload =
+                            Encode.list identity
+                                [ Encode.object
+                                    [ ( "channel", Encode.string "#c" )
+                                    , ( "topic", Encode.string "Alpha" )
+                                    , ( "lastReadMessageId", Encode.string "m1" )
+                                    , ( "lastReadAt", Encode.int (atOf "m1") )
+                                    , ( "text", Encode.string "never stored" )
+                                    ]
+                                ]
+
+                        ( loaded, outs ) =
+                            update (TopicReadLoaded payload) seeded
+
+                        unreadOf m =
+                            case Dict.get "#c" m.channels of
+                                Just ch ->
+                                    ch.unread
+
+                                Nothing ->
+                                    -1
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "alpha" ] (List.map .topic loaded.topicReadLedger)
+                        , \_ -> Expect.equal 1 (unreadOf loaded)
+                        , \_ -> Expect.equal [] outs
+                        ]
+                        ()
+            , test "whole-room select marks every topic at once" <|
+                \_ ->
+                    let
+                        step acc line =
+                            Tuple.first (feed acc line)
+
+                        seeded =
+                            joinFirst ownerLive "kai" "#c"
+                                |> (\m -> step m "@msgid=m1;time=2026-10-04T12:00:00Z;onyx/topic=Alpha :alice!u@h PRIVMSG #c :one")
+                                |> (\m -> step m "@msgid=m2;time=2026-10-04T12:00:01Z;onyx/topic=Beta :alice!u@h PRIVMSG #c :two")
+
+                        ( opened, outs ) =
+                            update (ChannelSelect "#c") seeded
+
+                        saves =
+                            List.filter
+                                (\o ->
+                                    case o of
+                                        TopicReadSave _ ->
+                                            True
+
+                                        _ ->
+                                            False
+                                )
+                                outs
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal [ "beta", "alpha" ] (List.map .topic opened.topicReadLedger)
+                        , \_ -> Expect.equal 1 (List.length saves)
+                        , \_ -> Expect.equal (Just "#c") opened.activeChannel
                         ]
                         ()
             ]
