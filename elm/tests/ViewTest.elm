@@ -3785,7 +3785,7 @@ suite =
             , test "topbar calls button toggles the hub" <|
                 \_ ->
                 query blank
-                    |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Calls" ] ]
+                    |> Query.find [ Selector.class "onyx-calls-toggle" ]
                     |> Event.simulate Event.click
                     |> Event.expect ToggleCalls
             ]

@@ -52,6 +52,7 @@ import Modes
 import PersonSafety
 import MessageWindow
 import Multiline
+import Nav
 import Notify
 import Outbox
 import Passkey
@@ -530,6 +531,10 @@ type alias Model =
     , calls : Media.CallHub
     , callSelfMuted : Bool
     , callsOpen : Bool
+    -- v3/nav
+    , navSection : Nav.Id
+    , navDrawerOpen : Bool
+    , youHubOpen : Bool
     , navMenuOpen : Bool
     , navPath : String
     , roadmapPriority : Maybe String
@@ -2795,6 +2800,10 @@ type Msg
     | VisibilityChanged { visible : Bool, focused : Bool }
     | RequestNotifyPermission
     | ToggleCalls
+    -- v3/nav
+    | NavSelect Nav.Id
+    | YouHubClose
+    | YouHubGo Nav.YouAction
     | ToggleNavMenu
     | NavMenuEscape
     | SelectRoadmapPriority { state : String }
@@ -3165,6 +3174,10 @@ init nick url =
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callsOpen = False
+    -- v3/nav
+    , navSection = Nav.Home
+    , navDrawerOpen = False
+    , youHubOpen = False
     , navMenuOpen = False
     , navPath = ""
     , roadmapPriority = Nothing
@@ -3627,6 +3640,10 @@ blank =
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callsOpen = False
+    -- v3/nav
+    , navSection = Nav.Home
+    , navDrawerOpen = False
+    , youHubOpen = False
     , navMenuOpen = False
     , navPath = ""
     , roadmapPriority = Nothing
@@ -35020,8 +35037,12 @@ update msg model =
 
         ( settled, connectOut ) =
             settleConnectGate closed
+
+        -- v3/nav
+        navSettled =
+            Nav.reconcile (isChannelName settled) model.activeChannel settled
     in
-    ( settled, out ++ connectOut )
+    ( navSettled, out ++ connectOut )
 
 
 updateCore : Msg -> Model -> ( Model, List Outbound )
@@ -37563,6 +37584,16 @@ updateCore msg model =
 
         ToggleCalls ->
             ( { model | callsOpen = not model.callsOpen }, [] )
+
+        -- v3/nav
+        NavSelect id ->
+            navSelect id model
+
+        YouHubClose ->
+            ( { model | youHubOpen = False }, [] )
+
+        YouHubGo action ->
+            youHubGo action { model | youHubOpen = False }
 
         ReconnectNow ->
             reconnectNow model
@@ -41115,3 +41146,80 @@ mergeVaultAround model target anchor rows =
                                 , historyLanding = nearestRowId anchor rows
                             }
                        )
+
+
+
+-- v3/nav
+
+
+{-| Primary navigation select (`PrimaryNavigation` `onSelect`): Home
+deselects the conversation (the shell's empty state), Rooms / Messages
+pick the collection and toggle the mobile drawer, Calls toggles the
+existing calls hub, You toggles the hub sheet. Every location choice
+closes the hub. `update` reconciles the stored section afterwards.
+-}
+navSelect : Nav.Id -> Model -> ( Model, List Outbound )
+navSelect id model =
+    case id of
+        Nav.You ->
+            ( { model | youHubOpen = not model.youHubOpen }, [] )
+
+        Nav.Home ->
+            ( { model
+                | navSection = Nav.Home
+                , navDrawerOpen = False
+                , youHubOpen = False
+                , callsOpen = False
+                , activeChannel = Nothing
+                , searchOpen = False
+                , showPinnedMessages = False
+                , mediaIndexOpen = False
+                , messageMenu = Nothing
+                , reactionPicker = Nothing
+              }
+            , []
+            )
+
+        Nav.Calls ->
+            updateCore ToggleCalls { model | youHubOpen = False, navDrawerOpen = False }
+
+        _ ->
+            ( { model
+                | navSection = id
+                , navDrawerOpen = not (model.navSection == id && model.navDrawerOpen)
+                , youHubOpen = False
+                , callsOpen = False
+              }
+            , []
+            )
+
+
+{-| You hub entries (`YouSettings` / `YouHubNav`): the hub is already
+closed; Account opens the account panel when signed in, otherwise the
+guest-claim sheet ("Keep this name" — opened past a dismissed chip,
+like the oracle's `openClaimWithoutDisconnect`); route entries push the
+URL; Leave is the shell's existing disconnect.
+-}
+youHubGo : Nav.YouAction -> Model -> ( Model, List Outbound )
+youHubGo action model =
+    case ( action, Nav.youActionPath action ) of
+        ( _, Just path ) ->
+            ( model, [ PushUrl path ] )
+
+        ( Nav.YouAccount, _ ) ->
+            case model.accountName of
+                Just _ ->
+                    updateCore (SetAccountOpen True) model
+
+                Nothing ->
+                    if String.isEmpty (String.trim model.ourNick) then
+                        ( model, [] )
+
+                    else
+                        ( { model | guestClaimOpen = True, guestClaimError = Nothing }, [] )
+
+        ( Nav.YouLeave, _ ) ->
+            updateCore SessionDisconnect model
+
+        _ ->
+            ( model, [] )
