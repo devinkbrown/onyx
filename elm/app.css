@@ -1797,3 +1797,95 @@ html, body {
 .shell-msg-spoiler > summary::-webkit-details-marker { display: none; }
 .shell-msg-spoiler[open] > summary { display: none; }
 .shell-msg-emoji { font-size: 1.1em; }
+
+/* v3/home — Home briefing, first-hour coach, empty-room intro */
+.onyx-home { width: 100%; }
+.onyx-home-inner { max-width: 720px; margin: 0 auto; padding: 16px 0 32px; display: flex; flex-direction: column; gap: 16px; }
+.onyx-home-masthead { display: flex; flex-direction: column; gap: 6px; }
+.onyx-home-welcome { margin: 0; color: var(--onyx-dim); font-size: 13px; }
+.onyx-home-title { margin: 0; color: var(--onyx-text); font-size: 22px; font-weight: 600; }
+.onyx-home-caught-up, .onyx-home-summary, .onyx-home-privacy { margin: 0; color: var(--onyx-dim); font-size: 13px; }
+.onyx-home-privacy { color: var(--onyx-faint); font-size: 12px; }
+.onyx-home-announce:empty { display: none; }
+.onyx-home-announce { margin: 0; color: var(--onyx-accent); font-size: 13px; }
+.onyx-home-signal {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  padding: 10px 12px; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: 6px;
+}
+.onyx-home-signal-lead { margin: 0; font-size: 14px; color: var(--onyx-dim); }
+.onyx-home-signal-lead strong { color: var(--onyx-text); }
+.onyx-home-signal-metrics { display: flex; gap: 16px; margin: 0; }
+.onyx-home-signal-metrics div { display: flex; gap: 6px; align-items: baseline; }
+.onyx-home-signal-metrics dt { color: var(--onyx-faint); font-size: 12px; }
+.onyx-home-signal-metrics dd { margin: 0; color: var(--onyx-text); font-weight: 600; }
+.onyx-home-inbox, .onyx-home-outbox, .onyx-home-empty, .onyx-home-invite, .onyx-home-rooms {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: 6px;
+}
+.onyx-home-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.onyx-home-label { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--onyx-text); }
+.onyx-home-rooms h3, .onyx-home-tier h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.onyx-home-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.onyx-home-row {
+  width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px;
+  background: none; border: 0; border-radius: 6px; color: var(--onyx-text); text-align: left; cursor: pointer;
+}
+.onyx-home-row:hover, .onyx-home-room:hover { background: var(--onyx-panel-2); }
+.onyx-home-row:focus-visible, .onyx-home-room:focus-visible, .onyx-home-action:focus-visible,
+.onyx-home-caught-up-button:focus-visible, .onyx-coach-dismiss:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-home-avatar {
+  flex: none; width: 28px; height: 28px; display: grid; place-items: center;
+  border-radius: 6px; background: var(--onyx-panel-2); color: var(--onyx-dim); font-weight: 600; font-size: 13px;
+}
+.onyx-home-avatar-person { border-radius: 50%; }
+.onyx-home-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.onyx-home-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-unread .onyx-home-row-name { font-weight: 600; }
+.onyx-home-row-meta { color: var(--onyx-accent); font-size: 12px; }
+.onyx-home-unread {
+  flex: none; min-width: 22px; padding: 1px 6px; border-radius: 6px; text-align: center;
+  background: var(--onyx-panel-2); color: var(--onyx-text); font-size: 12px; font-weight: 600;
+}
+.is-mention .onyx-home-unread { background: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.onyx-home-caught-up-button, .onyx-home-action {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 6px;
+  color: var(--onyx-text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.onyx-home-count { color: var(--onyx-accent); font-weight: 600; }
+.onyx-home-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.onyx-home-empty-copy { margin: 0; color: var(--onyx-dim); }
+.onyx-home-outbox-warning, .onyx-home-outbox-queued { border-color: var(--onyx-warn); }
+.onyx-home-outbox-error { border-color: var(--onyx-bad); }
+.onyx-home-outbox-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.onyx-home-outbox-item { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; }
+.onyx-home-outbox-target { color: var(--onyx-text); font-weight: 600; }
+.onyx-home-outbox-age { color: var(--onyx-faint); }
+.onyx-home-room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+.onyx-home-room-group + .onyx-home-room-group { margin-top: 6px; }
+.onyx-home-room {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 0; padding: 8px 10px;
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 6px;
+  color: var(--onyx-text); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.onyx-home-room-mark { color: var(--onyx-faint); }
+.onyx-home-room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-home-room-mention { color: var(--onyx-accent); font-size: 12px; font-weight: 600; }
+.onyx-home-room-verb { color: var(--onyx-faint); font-size: 12px; }
+.onyx-coach {
+  position: relative; display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 40px 10px 12px; background: var(--onyx-panel); border: 1px solid var(--onyx-accent); border-radius: 6px; text-align: left;
+}
+.onyx-coach-eyebrow { color: var(--onyx-accent); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.onyx-coach-text { margin: 0; color: var(--onyx-text); font-size: 14px; }
+.onyx-coach-dismiss {
+  position: absolute; top: 6px; right: 6px; width: 32px; height: 32px;
+  background: none; border: 0; border-radius: 6px; color: var(--onyx-dim); cursor: pointer;
+}
+.onyx-feed-empty { margin: 8px 0 12px; }
+.onyx-feed-empty-title { margin: 0 0 4px; color: var(--onyx-text); font-weight: 600; }
+.onyx-feed-empty-body { margin: 0; color: var(--onyx-dim); }
+@media (max-width: 480px) {
+  .onyx-home-inner { padding-top: 8px; }
+  .onyx-home-room-grid { grid-template-columns: 1fr; }
+}

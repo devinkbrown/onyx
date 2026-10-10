@@ -39,13 +39,13 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.1 | Primary navigation: Home / Rooms / Messages / Calls / You (desktop rail + mobile bottom nav) | `PrimaryNavigation`, `navigation/shellNavigationModel` | M |
 | 1.2 | "You" entry for guests and accounts (settings hub: Account / This device / Help) | `YouSettings`, `YouHubNav`, `Account.tsx` guest branch | M |
 | 1.3 | Appearance reachable from the shell (link + in-shell sheet) | `AppearancePanel`, `ServerRail` | S |
-| 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
+| 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | **done** (v3/home; recaps/vault/resume narrowed) |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | M |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | S |
 | 1.7 | Quick switch (Ctrl+K) | `RoomSwitcherSheet` | S |
 | 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | S |
-| 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | S |
-| 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | S |
+| 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home: coach only; notify prompt todo) |
+| 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 
 ## Phase 2 — Messages that render like a modern chat
 

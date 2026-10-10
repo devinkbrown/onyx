@@ -39,6 +39,7 @@ import GroupDirectory
 import GroupEnvelope
 import GroupPublisher
 import GroupWelcome
+import Home
 import Invite
 import Guides
 import Ircx
@@ -765,6 +766,10 @@ type alias Model =
     , accountSessions : List Session.AccountSessionRow
     , accountSessionsPending : Bool
     , accountSessionsError : Maybe String
+
+    -- v3/home
+    , homeCoachDismissed : Bool
+    , homeCaughtUpAnnounce : String
     }
 
 
@@ -2773,6 +2778,10 @@ type Msg
     | EditCancel
     | ZoneReceived Time.Zone
     | ChannelSelect String
+      -- v3/home
+    | HomeMarkAllCaughtUp
+    | HomeCoachDismiss
+    | HomeInviteCopy
     | ChannelLinkClicked String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
@@ -2935,7 +2944,10 @@ init nick url =
         deepLink =
             parseDeepLinkQuery url.query
     in
-    { autoJoinChannels = []
+    { -- v3/home
+      homeCoachDismissed = False
+    , homeCaughtUpAnnounce = ""
+    , autoJoinChannels = []
     , channelColors = Dict.empty
     , scheduledMessages = []
     , scheduledProjectionDegraded = False
@@ -3397,7 +3409,10 @@ init nick url =
 {-| Blank model for tests (no navigation key needed). -}
 blank : Model
 blank =
-    { autoJoinChannels = []
+    { -- v3/home
+      homeCoachDismissed = False
+    , homeCaughtUpAnnounce = ""
+    , autoJoinChannels = []
     , channelColors = Dict.empty
     , scheduledMessages = []
     , scheduledProjectionDegraded = False
@@ -29801,6 +29816,78 @@ captureUnreadDivider model name =
             { model | viewUnreadDividerId = Dict.insert (String.toLower name) dividerId model.viewUnreadDividerId }
 
 
+-- v3/home
+
+
+{-| Home's projection of every open conversation (rooms + DMs). -}
+homeRooms : Model -> List Home.Room
+homeRooms model =
+    Home.projectRooms
+        (isChannelName model)
+        (\name -> Dict.member (String.toLower name) model.firstUnreadId)
+        (Dict.values model.channels)
+
+
+{-| "Mark all caught up" (mirroring the oracle `markAllCaughtUp`
+action): plan every conversation with unread activity and advance
+each through the per-target read marker; an empty plan is a no-op.
+The announce lands in `homeCaughtUpAnnounce` for the live region.
+-}
+homeMarkAllCaughtUp : Model -> ( Model, List Outbound )
+homeMarkAllCaughtUp model =
+    let
+        plan =
+            Home.planCatchUpAll (homeRooms model)
+    in
+    if plan.rooms == 0 then
+        ( model, [] )
+
+    else
+        let
+            ( marked, outs ) =
+                List.foldl
+                    (\t ( m, acc ) ->
+                        let
+                            ( next, out ) =
+                                recordLocalReadMarker m t.target
+                        in
+                        ( next, acc ++ out )
+                    )
+                    ( model, [] )
+                    plan.targets
+        in
+        ( { marked | homeCaughtUpAnnounce = Home.caughtUpAnnounce plan }, outs )
+
+
+{-| Invite link for Home's "Invite friends": the first joined room
+(A→Z), or a network-only invite when none (mirroring
+`openRoomInviteShare(inviteShareChannel())`).
+-}
+homeInviteUrl : Model -> String
+homeInviteUrl model =
+    let
+        channel =
+            Dict.values model.channels
+                |> List.map .name
+                |> List.filter (isChannelName model)
+                |> List.sortBy String.toLower
+                |> List.head
+                |> Maybe.withDefault ""
+    in
+    (Invite.buildInviteLink
+        { channel = channel
+        , guestName = Nothing
+        , at = Nothing
+        , topic = Nothing
+        , reader = False
+        , inviter = Nothing
+        , faces = []
+        }
+        { network = "Onyx", origin = inviteOrigin model, appOrigin = "/app/" }
+        model.nowMs
+    ).shareUrl
+
+
 recordLocalReadMarker : Model -> String -> ( Model, List Outbound )
 recordLocalReadMarker model name =
     case Dict.get (String.toLower name) model.channels of
@@ -37387,6 +37474,16 @@ updateCore msg model =
                         , [ SendLine (Wire.formatIrcLine "JOIN" [ channel ]) ]
                         )
 
+        -- v3/home
+        HomeMarkAllCaughtUp ->
+            homeMarkAllCaughtUp model
+
+        HomeCoachDismiss ->
+            ( { model | homeCoachDismissed = True }, [] )
+
+        HomeInviteCopy ->
+            ( model, [ ClipboardCopy { text = homeInviteUrl model, tag = "home-invite" } ] )
+
         ChannelSelect name ->
             -- A context switch dismisses the message menu and its
             -- translation with it, then re-opens a pinned forum
@@ -37970,6 +38067,21 @@ updateCore msg model =
 
             else if tag == "create-invite" then
                 ( foldCreateCopyResult model ok, [] )
+
+            -- v3/home
+            else if tag == "home-invite" then
+                ( addToast
+                    { variant = (if ok then ToastSuccess else ToastError)
+                    , title = (if ok then "Invite link copied" else "Copy failed")
+                    , description = (if ok then Just "Share it with a friend to bring them in." else Just "Allow clipboard access in this browser and try again.")
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    model.nowMs
+                    model
+                , []
+                )
 
             else if tag == "moment" then
                 -- Mirrors the menu's moment-link report copy verbatim.

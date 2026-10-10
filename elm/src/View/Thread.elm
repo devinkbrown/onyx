@@ -19,6 +19,7 @@ import Prefs
 import Time
 import Translate
 import Upload
+import View.Home
 import View.MessageText exposing (messageText)
 
 
@@ -27,10 +28,8 @@ thread model =
     section [ class "onyx-thread-pane" ]
         [ case model.activeChannel of
             Nothing ->
-                div [ class "onyx-empty" ]
-                    [ h2 [] [ text "Welcome to Onyx" ]
-                    , text "Join a channel from the rail to start reading."
-                    ]
+                -- v3/home
+                View.Home.home model
 
             Just name ->
                 case Dict.get (String.toLower name) model.channels of
@@ -39,10 +38,11 @@ thread model =
 
                     Just channel ->
                         if List.isEmpty channel.messages then
+                            -- v3/home
                             div [ class "onyx-empty" ]
                                 [ facepileRow channel
                                 , h2 [] [ text channel.name ]
-                                , text "No messages yet. Say hello."
+                                , View.Home.emptyRoomIntro model channel
                                 ]
 
                         else
