@@ -65,6 +65,8 @@ import View.Switcher
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
+-- v3/roomsettings
+import View.RoomSettings
 
 
 view : Model -> Browser.Document Msg
@@ -291,6 +293,8 @@ overlays model =
           else
             moderationReview model
         , moderationSheet model
+        -- v3/roomsettings
+        , View.RoomSettings.roomSettingsSheet model
         , operSheet model
         , personSafetySheet model
         , newMessageSheet model

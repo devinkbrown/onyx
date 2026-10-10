@@ -1,4 +1,4 @@
-module View.DmSafety exposing (convoHeader, inviteShareSheet)
+module View.DmSafety exposing (convoHeader, convoRows, inviteShareSheet)
 
 {-| v3/dmsafety — conversation header row and the Invite friends sheet.
 
@@ -27,23 +27,44 @@ import Set
 import View.Sheet as Sheet
 
 
-{-| The header row above the transcript for the active conversation. -}
+{-| The conversation's safety/invite trigger — rendered in the room
+header (v3/roomsettings moved it out of the transcript top): rooms get
+Invite friends; DMs get the E2EE posture chip and the Verify toggle.
+-}
 convoHeader : Model -> App.Channel -> Html Msg
 convoHeader model channel =
     if App.isChannelName model channel.name then
         roomHeader channel.name
 
     else
-        case App.activeDmPeer model of
-            Just peer ->
-                if String.toLower peer == String.toLower channel.name then
-                    dmHeader model peer
+        withPeer model channel (dmHeader model)
 
-                else
-                    text ""
 
-            Nothing ->
+{-| The in-flow DM rows that stay at the top of the transcript: the
+inline key-change review (never a toast) and the safety-number panel
+the header's Verify toggle controls.
+-}
+convoRows : Model -> App.Channel -> Html Msg
+convoRows model channel =
+    if App.isChannelName model channel.name then
+        text ""
+
+    else
+        withPeer model channel (dmRows model)
+
+
+withPeer : Model -> App.Channel -> (String -> Html Msg) -> Html Msg
+withPeer model channel render =
+    case App.activeDmPeer model of
+        Just peer ->
+            if String.toLower peer == String.toLower channel.name then
+                render peer
+
+            else
                 text ""
+
+        Nothing ->
+            text ""
 
 
 
@@ -99,17 +120,37 @@ dmHeader model peer =
                 ]
                 [ text DmSafety.dmVerifyAction ]
             ]
-        , if keyChanged then
-            keyChangeRow model peer keys
-
-          else
-            text ""
-        , if open then
-            safetyPanel model peer
-
-          else
-            text ""
         ]
+
+
+dmRows : Model -> String -> Html Msg
+dmRows model peer =
+    let
+        keys =
+            App.sealKeysFor model peer
+
+        keyChanged =
+            App.dmKeyChangedFor model peer
+
+        open =
+            DmSafety.isOpenFor peer model.dmSafety
+    in
+    if not keyChanged && not open then
+        text ""
+
+    else
+        div [ class "onyx-dmsafe onyx-dmsafe-rows" ]
+            [ if keyChanged then
+                keyChangeRow model peer keys
+
+              else
+                text ""
+            , if open then
+                safetyPanel model peer
+
+              else
+                text ""
+            ]
 
 
 stateChip : String -> HeaderState -> Html Msg
