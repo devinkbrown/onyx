@@ -2760,7 +2760,12 @@
     return {
       send: function (line) {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.send(line + "\r\n");
+          /* v3/ship: one CRLF per frame. Elm lines arrive already
+             terminated (`Wire.formatIrcLine`), so only bare lines get
+             one; appending blindly put an empty line after every
+             command (bundleBoot.smoke.mjs pins the framing). */
+          var text = String(line);
+          socket.send(/\r\n$/.test(text) ? text : text + "\r\n");
         }
       },
       close: function (code, reason) {

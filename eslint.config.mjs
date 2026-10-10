@@ -20,6 +20,7 @@ export default tseslint.config(
       '.zig-cache/**',
       'coverage/**',
       'dist/**',
+      'elm/dist-elm/**',
       'test-results/**',
       'public/opcodec_wasm.js',
       'public/sw.js',

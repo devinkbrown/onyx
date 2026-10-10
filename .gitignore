@@ -70,3 +70,6 @@ elm/elm-stuff/
 /zig-out/
 /.zig-cache/
 /native-sdk-package/
+
+# Elm static bundle (elm/tools/build.sh output; never deployed by hand)
+/elm/dist-elm/
