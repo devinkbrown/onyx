@@ -15,11 +15,13 @@ a nested form, so Enter in the composer still sends.
 -}
 
 import App exposing (Model, Msg(..))
+import ComposerAssist
 import Dict
+import Emoji
 import Html exposing (Html, button, div, form, input, label, p, progress, span, text)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
-import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Html.Events exposing (custom, on, onClick, onInput, onMouseEnter, onSubmit, preventDefaultOn)
 import Json.Decode as Decode
 import Outbox
 import Schedule
@@ -76,7 +78,7 @@ composer model =
           else
             text ""
         , input
-            [ type_ "text"
+            ([ type_ "text"
             , placeholder
                 (if not ready then
                     "Select a channel"
@@ -99,10 +101,15 @@ composer model =
                 )
             , value model.composer
             , onInput ComposerInput
-            , on "keydown" (escapeDecoder model)
+            , preventDefaultOn "keydown" (keyDecoder model)
             , disabled (not ready)
+            , attribute "id" "shell-composer-input"
             ]
+                ++ assistAria model
+            )
             []
+        , assistPopovers model
+        , emojiButton model ready
         , button
             [ type_ "submit"
             , disabled (not ready || not canSaveOrSend)
@@ -555,3 +562,226 @@ schedulePreset model index preset =
                 , title "The local time is still loading."
                 ]
                 [ text preset.label ]
+
+
+-- v3/composer
+
+
+{-| The composer keydown: suggestion-list keys and Tab nick
+completion first (preventDefault only when the assist layer claims
+the key, so Enter submits normally with no list open), then Escape
+closes the emoji picker, then the edit/reply Escape order. IME
+composition yields everything to the browser. -}
+keyDecoder : Model -> Decode.Decoder ( Msg, Bool )
+keyDecoder model =
+    Decode.field "isComposing" Decode.bool
+        |> Decode.andThen
+            (\composing ->
+                if composing then
+                    Decode.fail "ime"
+
+                else
+                    Decode.map5 ComposerAssist.Key
+                        (Decode.field "key" Decode.string)
+                        (optionalBool "shiftKey")
+                        (optionalBool "altKey")
+                        (optionalBool "ctrlKey")
+                        (optionalBool "metaKey")
+                        |> Decode.andThen
+                            (\key ->
+                                case ComposerAssist.keyIntent (App.composerAssistInputs model) model.composerAssist key of
+                                    Just intent ->
+                                        Decode.succeed ( ComposerAssistIntent intent, True )
+
+                                    Nothing ->
+                                        if key.key == "Escape" && model.composerAssist.emojiOpen then
+                                            Decode.succeed ( ComposerEmojiClose, True )
+
+                                        else
+                                            escapeDecoder model |> Decode.map (\msg -> ( msg, False ))
+                            )
+            )
+
+
+optionalBool : String -> Decode.Decoder Bool
+optionalBool field =
+    Decode.oneOf [ Decode.field field Decode.bool, Decode.succeed False ]
+
+
+{-| Combobox wiring on the composer input (mirroring the textarea's
+`aria-controls` / `aria-expanded` / `aria-autocomplete` /
+`aria-activedescendant` while a list is open). -}
+assistAria : Model -> List (Html.Attribute Msg)
+assistAria model =
+    case ComposerAssist.menuFor (App.composerAssistInputs model) model.composerAssist of
+        ComposerAssist.SlashMenu _ ->
+            [ attribute "aria-controls" "shell-command-menu"
+            , attribute "aria-expanded" "true"
+            , attribute "aria-autocomplete" "list"
+            , attribute "aria-activedescendant" ("shell-command-option-" ++ String.fromInt model.composerAssist.slashIndex)
+            ]
+
+        ComposerAssist.NickMenu _ _ ->
+            [ attribute "aria-controls" "shell-nick-menu"
+            , attribute "aria-expanded" "true"
+            , attribute "aria-autocomplete" "list"
+            , attribute "aria-activedescendant" ("shell-nick-option-" ++ String.fromInt model.composerAssist.nickIndex)
+            ]
+
+        ComposerAssist.NoMenu ->
+            [ attribute "aria-expanded" "false" ]
+
+
+{-| Slash suggestions, nick completions and the emoji picker
+(mirroring the composer popovers: same ids, roles, aria names and
+test ids). Rows keep focus in the input on mousedown. -}
+assistPopovers : Model -> Html Msg
+assistPopovers model =
+    let
+        menu =
+            ComposerAssist.menuFor (App.composerAssistInputs model) model.composerAssist
+
+        row id active onPick =
+            [ type_ "button"
+            , attribute "id" id
+            , class "shell-command-item"
+            , classList [ ( "shell-command-item--active", active ) ]
+            , attribute "role" "option"
+            , attribute "tabindex" "-1"
+            , attribute "aria-selected" (if active then "true" else "false")
+            , preventDefaultOn "mousedown" (Decode.succeed ( onPick, True ))
+            , onClick onPick
+            ]
+    in
+    if menu == ComposerAssist.NoMenu && not model.composerAssist.emojiOpen then
+        text ""
+
+    else
+    div [ class "shell-composer-popovers" ]
+        [ case menu of
+            ComposerAssist.SlashMenu commands ->
+                div
+                    [ attribute "id" "shell-command-menu"
+                    , class "shell-command-menu"
+                    , attribute "role" "listbox"
+                    , attribute "aria-label" "Slash command suggestions"
+                    ]
+                    (List.indexedMap
+                        (\index command ->
+                            button
+                                (row ("shell-command-option-" ++ String.fromInt index)
+                                    (index == model.composerAssist.slashIndex)
+                                    (ComposerAssistIntent (ComposerAssist.MenuPick index))
+                                    ++ [ onMouseEnter (ComposerAssistIntent (ComposerAssist.MenuHover index)) ]
+                                )
+                                [ span [ class "shell-command-usage" ] [ text command.usage ]
+                                , span [ class "shell-command-desc" ] [ text command.description ]
+                                ]
+                        )
+                        commands
+                    )
+
+            ComposerAssist.NickMenu _ matches ->
+                div
+                    [ attribute "id" "shell-nick-menu"
+                    , class "shell-command-menu shell-nick-menu"
+                    , attribute "role" "listbox"
+                    , attribute "aria-label" "Name completions"
+                    , attribute "data-testid" "composer-nick-menu"
+                    ]
+                    (List.indexedMap
+                        (\index nick ->
+                            button
+                                (row ("shell-nick-option-" ++ String.fromInt index)
+                                    (index == model.composerAssist.nickIndex)
+                                    (ComposerAssistIntent (ComposerAssist.MenuPick index))
+                                    ++ [ attribute "data-testid" ("composer-nick-option-" ++ nick)
+                                       , onMouseEnter (ComposerAssistIntent (ComposerAssist.MenuHover index))
+                                       ]
+                                )
+                                [ span [ class "shell-command-usage" ] [ text nick ]
+                                , span [ class "shell-command-desc" ] [ text "Complete nick" ]
+                                ]
+                        )
+                        matches
+                    )
+
+            ComposerAssist.NoMenu ->
+                text ""
+        , if model.composerAssist.emojiOpen then
+            emojiPicker model
+
+          else
+            text ""
+        ]
+
+
+emojiPicker : Model -> Html Msg
+emojiPicker model =
+    div
+        [ attribute "id" "shell-emoji-picker"
+        , class "shell-emoji-picker"
+        , attribute "role" "dialog"
+        , attribute "aria-modal" "false"
+        , attribute "aria-label" "Emoji picker"
+        , custom "keydown"
+            (Decode.field "key" Decode.string
+                |> Decode.andThen
+                    (\key ->
+                        if key == "Escape" then
+                            Decode.succeed { message = ComposerEmojiClose, stopPropagation = True, preventDefault = True }
+
+                        else
+                            Decode.fail "not-escape"
+                    )
+            )
+        ]
+        [ label [ class "sr-only", attribute "for" "shell-emoji-search" ] [ text "Search emoji" ]
+        , input
+            [ attribute "id" "shell-emoji-search"
+            , class "shell-emoji-search"
+            , value model.composerAssist.emojiQuery
+            , placeholder "Search emoji"
+            , attribute "aria-label" "Search emoji"
+            , autofocus True
+            , onInput ComposerEmojiQuery
+            ]
+            []
+        , div [ class "shell-emoji-grid", attribute "role" "listbox", attribute "aria-label" "Emoji results" ]
+            (List.map
+                (\entry ->
+                    button
+                        [ type_ "button"
+                        , class "shell-emoji-choice"
+                        , attribute "role" "option"
+                        , attribute "aria-label" ("Insert " ++ entry.shortcode)
+                        , onClick (ComposerEmojiInsert entry.emoji)
+                        ]
+                        [ text entry.emoji ]
+                )
+                (Emoji.searchEmojis model.composerAssist.emojiQuery 36)
+            )
+        ]
+
+
+emojiButton : Model -> Bool -> Html Msg
+emojiButton model ready =
+    button
+        ([ type_ "button"
+         , class "shell-composer-tool shell-composer-tool--emoji"
+         , attribute "data-composer-primary" "emoji"
+         , disabled (not ready)
+         , attribute "aria-label" "Insert emoji"
+         , attribute "aria-haspopup" "dialog"
+         , attribute "aria-expanded" (if model.composerAssist.emojiOpen then "true" else "false")
+         , title "Insert emoji"
+         , onClick ComposerEmojiToggle
+         ]
+            ++ (if model.composerAssist.emojiOpen then
+                    [ attribute "aria-controls" "shell-emoji-picker" ]
+
+                else
+                    []
+               )
+        )
+        [ span [ class "shell-composer-action-label" ] [ text "Emoji" ] ]
