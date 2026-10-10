@@ -5,8 +5,7 @@ reconnect banner. Room-scoped controls live in `View.RoomHeader`.
 -}
 
 import App exposing (Model, Msg(..), isGuestNick)
-import Dict
-import View.Notify exposing (notifySheetButton)
+import Avatar
 import View.Switcher exposing (paletteLauncher)
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
@@ -18,55 +17,82 @@ import View.Sheet as Sheet
 
 
 {-| v3/frame — the GLOBAL bar: brand, the Ctrl/Cmd+K launcher, the
-network-scoped entries (Calls, Alerts, the inbox bell, Operator), the
-connection pill, the identity chip (You) and Leave. Room-scoped
-actions live in `View.RoomHeader` at the top of the conversation
-column.
+network-scoped entries (the inbox bell, Operator), the connection
+state and the identity chip (You). Room-scoped actions live in
+`View.RoomHeader` at the top of the conversation column.
+
+v3/ui-mobile-shell — Calls lives in the primary nav only (no duplicate
+here); the Notifications settings and Leave moved into the You hub
+(`View.Nav.youHub`); the connection pill is a quiet dot while live and
+only speaks up (Connecting / Offline) when it matters. On phones the
+bar is one slim row — the page title (Rooms / Messages / Calls, the
+brand on Home), the launcher as a search icon and the bell — and it
+hides inside a conversation, where the room header (with its back
+control) is the only top row.
 -}
 topbar : Model -> Html Msg
 topbar model =
     header [ class "onyx-topbar" ]
-        ([ div [ class "onyx-brand" ]
+        [ div [ class "onyx-brand" ]
             [ span [ class "onyx-gem" ] []
             , h1 [] [ text "Onyx" ]
             ]
-         , div [ class "onyx-topbar-search" ] [ paletteLauncher model ]
-         , div [ class "onyx-topbar-global" ]
-            ([ button
-                [ class "onyx-calls-toggle"
-                , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]
-                , onClick ToggleCalls
-                ]
-                [ text "Calls" ]
-             , notifySheetButton model
-             , inbox model
-             ]
-                ++ View.ModDesk.operToggle model
-            )
-         , div
-            [ classList
-                [ ( "onyx-conn", True )
-                , ( "onyx-conn-live", model.connection == App.Live )
-                , ( "onyx-conn-connecting", model.connection == App.Registering )
-                ]
-            ]
-            [ span [ class "onyx-dot" ] []
-            , text (connectionLabel model)
-            ]
-         , identityChip model
-         , if model.connection == App.Live || model.autoReconnect then
-            button
-                [ class "onyx-leave"
-                , attribute "aria-label" "Disconnect from Onyx"
-                , attribute "data-testid" "session-disconnect"
-                , onClick SessionDisconnect
-                ]
-                [ text "Leave" ]
+        , case pageTitle model of
+            Just title ->
+                span [ class "onyx-topbar-title", attribute "aria-hidden" "true" ] [ text title ]
 
-           else
-            text ""
-         ]
-        )
+            Nothing ->
+                text ""
+        , div [ class "onyx-topbar-search" ] [ paletteLauncher model ]
+        , div [ class "onyx-topbar-global" ]
+            (View.ModDesk.operToggle model
+                ++ [ connectionPill model
+                   , inbox model
+                   , identityChip model
+                   ]
+            )
+        ]
+
+
+{-| The phone bar names the page it sits on (Home shows the brand). -}
+pageTitle : Model -> Maybe String
+pageTitle model =
+    if model.callsOpen then
+        Just "Calls"
+
+    else if model.navDrawerOpen && Nav.isCollection model.navSection then
+        Just (Nav.label model.navSection)
+
+    else
+        Nothing
+
+
+{-| Connection state: a dot while live (the words stay for assistive
+tech), the dot plus words while connecting or offline. -}
+connectionPill : Model -> Html Msg
+connectionPill model =
+    div
+        [ classList
+            [ ( "onyx-conn", True )
+            , ( "onyx-conn-live", model.connection == App.Live )
+            , ( "onyx-conn-connecting", model.connection == App.Registering )
+            , ( "onyx-conn-offline", model.connection == App.Offline )
+            ]
+        , attribute "title"
+            (case model.connection of
+                App.Live ->
+                    "Connected to Onyx"
+
+                App.Registering ->
+                    "Connecting to Onyx"
+
+                App.Offline ->
+                    "Offline — messages queue on this device"
+            )
+        ]
+        [ span [ class "onyx-dot", attribute "aria-hidden" "true" ] []
+        , span [ class "onyx-conn-label" ] [ text (connectionLabel model) ]
+        ]
 
 
 {-| Own identity chip: the current nick, an `alias` badge while the
@@ -82,7 +108,8 @@ identityChip model =
             isGuestNick model.ourNick
 
         inner =
-            [ span [ class "onyx-ident-nick" ] [ text model.ourNick ]
+            [ span [ class "onyx-face onyx-ident-avatar", attribute "aria-hidden" "true" ] [ text (Avatar.initials model.ourNick) ]
+            , span [ class "onyx-ident-nick" ] [ text model.ourNick ]
             , if model.currentNickIsAlias then
                 span [ class "onyx-ident-badge" ] [ text "alias" ]
 

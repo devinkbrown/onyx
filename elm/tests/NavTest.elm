@@ -432,11 +432,18 @@ viewSuite =
         , test "hub is absent while closed" <|
             \_ ->
                 query inRoom |> Query.hasNot [ Selector.attribute (attr "data-testid" "you-hub") ]
-        , test "existing topbar buttons stay" <|
+        , test "Calls is reachable from both navs, not duplicated in the topbar" <|
             \_ ->
-                query inRoom
-                    |> Query.has
-                        [ Selector.class "onyx-calls-toggle" ]
+                Expect.all
+                    [ \_ ->
+                        query inRoom
+                            |> Query.find [ Selector.attribute (attr "aria-label" "Mobile navigation") ]
+                            |> Query.find [ Selector.attribute (attr "data-section" "calls") ]
+                            |> Event.simulate Event.click
+                            |> Event.expect (NavSelect Nav.Calls)
+                    , \_ -> query inRoom |> Query.hasNot [ Selector.class "onyx-calls-toggle" ]
+                    ]
+                    ()
         ]
 
 

@@ -36149,6 +36149,7 @@ settleSteps =
     , settleStepStage -- v3/calls-c11
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
+    , settleStepShell -- v3/ui-mobile-shell
     ]
 
 
@@ -36207,6 +36208,28 @@ settleStepCallMedia _ _ ( m, outs ) =
 settleStepRoomMenu : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
 settleStepRoomMenu msg prior ( m, outs ) =
     ( settleRoomMenu msg prior m, outs )
+
+
+{-| v3/ui-mobile-shell — settings reached from the You hub
+(Notifications) replace the hub rather than stacking under it.
+-}
+settleStepShell : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepShell msg _ ( m, outs ) =
+    ( settleShell msg m, outs )
+
+
+settleShell : Msg -> Model -> Model
+settleShell msg after =
+    case msg of
+        NotifySheetOpen ->
+            if after.youHubOpen then
+                { after | youHubOpen = False }
+
+            else
+                after
+
+        _ ->
+            after
 
 
 settleStepRoomSettings : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -43957,7 +43980,9 @@ navSelect id model =
         _ ->
             ( { model
                 | navSection = id
-                , navDrawerOpen = not (model.navSection == id && model.navDrawerOpen)
+                , -- v3/ui-mobile-shell: with no conversation behind it the
+                  -- collection page stays open (a second tap is not "back").
+                  navDrawerOpen = model.activeChannel == Nothing || not (model.navSection == id && model.navDrawerOpen)
                 , youHubOpen = False
                 , callsOpen = False
               }

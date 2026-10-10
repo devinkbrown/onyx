@@ -440,7 +440,9 @@ headerTests =
         [ test "facepile, notify strip and Invite friends sit in the header, not the transcript" <|
             \_ ->
                 Expect.all
-                    [ \_ -> query member |> Query.find [ testid "room-header" ] |> Query.has [ Selector.class "onyx-facepile", testid "room-notify", testid "room-invite-friends" ]
+                    [ \_ -> query member |> Query.find [ testid "room-header" ] |> Query.has [ Selector.class "onyx-facepile" ]
+                    , -- v3/ui-mobile-shell: alerts + invite live in the header's More menu
+                      \_ -> query { member | roomMenuOpen = True } |> Query.find [ testid "room-header" ] |> Query.has [ testid "room-notify", testid "room-invite-friends" ]
                     , \_ -> query member |> Query.find [ Selector.class "onyx-thread-pane" ] |> Query.hasNot [ Selector.class "onyx-facepile" ]
                     , \_ -> query member |> Query.find [ Selector.class "onyx-thread-pane" ] |> Query.hasNot [ testid "room-notify" ]
                     ]

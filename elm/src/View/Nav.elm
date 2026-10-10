@@ -20,10 +20,13 @@ language tools and Advanced group live in later slices (4.1).
 -}
 
 import App exposing (Model, Msg(..))
+import Avatar
+import Dict
 import Html exposing (Html, button, div, h2, h3, nav, p, section, small, span, strong, text)
 import Html.Attributes exposing (attribute, class, classList, type_)
 import Html.Events exposing (onClick)
 import Nav
+import Sidebar
 import View.Account2
 import View.Sheet as Sheet
 -- v3/calls-c8
@@ -68,7 +71,7 @@ primaryNav model =
         , attribute "data-primary-navigation-variant" "desktop"
         ]
         (span [ class "onyx-primary-nav-context" ] [ text "Quick switch" ]
-            :: List.map (navButton Nav.Desktop) (navItems Nav.Desktop model)
+            :: List.map (navButton model Nav.Desktop) (navItems Nav.Desktop model)
         )
 
 
@@ -80,7 +83,7 @@ mobileNav model =
         , attribute "data-primary-navigation" ""
         , attribute "data-primary-navigation-variant" "mobile"
         ]
-        (List.map (navButton Nav.Mobile) (navItems Nav.Mobile model))
+        (List.map (navButton model Nav.Mobile) (navItems Nav.Mobile model))
 
 
 boolAttr : String -> Bool -> Html.Attribute msg
@@ -94,11 +97,55 @@ boolAttr name on =
         )
 
 
-navButton : Nav.Variant -> Nav.Item -> Html Msg
-navButton variant item =
+{-| v3/ui-mobile-shell — collection totals for the nav items: how many
+rooms (or DMs) have something new, and whether any of them mentions
+you (the accent glyph; plain unread stays neutral). -}
+attention : Model -> Nav.Id -> { count : Int, mention : Bool }
+attention model id =
+    let
+        inCollection channel =
+            case id of
+                Nav.Rooms ->
+                    App.isChannelName model channel.name
+
+                Nav.Messages ->
+                    not (App.isChannelName model channel.name)
+
+                _ ->
+                    False
+
+        waiting =
+            model.channels
+                |> Dict.values
+                |> List.filter (\c -> inCollection c && Sidebar.hasAttention c)
+    in
+    { count = List.length waiting, mention = List.any (\c -> c.highlights > 0) waiting }
+
+
+unreadSuffix : Nav.Id -> { count : Int, mention : Bool } -> String
+unreadSuffix id att =
+    if att.count == 0 then
+        ""
+
+    else
+        ", "
+            ++ String.fromInt att.count
+            ++ (if att.mention && id == Nav.Rooms then
+                    " with mentions"
+
+                else
+                    " unread"
+               )
+
+
+navButton : Model -> Nav.Variant -> Nav.Item -> Html Msg
+navButton model variant item =
     let
         mobile =
             variant == Nav.Mobile
+
+        att =
+            attention model item.id
 
         title =
             if mobile then
@@ -110,7 +157,7 @@ navButton variant item =
         optional =
             List.filterMap identity
                 [ if mobile then
-                    Just (attribute "aria-label" item.actionLabel)
+                    Just (attribute "aria-label" (item.actionLabel ++ unreadSuffix item.id att))
 
                   else
                     Nothing
@@ -149,13 +196,35 @@ navButton variant item =
          ]
             ++ optional
         )
-        [ span
-            [ class "onyx-nav-icon"
-            , attribute "data-icon" (Nav.idKey item.id)
-            , attribute "aria-hidden" "true"
+        [ span [ class "onyx-nav-glyph", attribute "aria-hidden" "true" ]
+            [ span
+                [ class "onyx-nav-icon"
+                , attribute "data-icon" (Nav.idKey item.id)
+                ]
+                []
+            , if att.count > 0 then
+                span
+                    [ classList [ ( "onyx-nav-badge", True ), ( "onyx-nav-badge--mention", att.mention ) ] ]
+                    [ text
+                        (if att.count > 9 then
+                            "9+"
+
+                         else
+                            String.fromInt att.count
+                        )
+                    ]
+
+              else
+                text ""
             ]
-            []
-        , span [ class "onyx-nav-label" ] [ text item.label ]
+        , span [ class "onyx-nav-label" ]
+            [ text item.label
+            , if not mobile && att.count > 0 then
+                span [ class "sr-only" ] [ text (unreadSuffix item.id att) ]
+
+              else
+                text ""
+            ]
         ]
 
 
@@ -194,7 +263,8 @@ youHub model =
             , attrs = [ attribute "data-testid" "you-hub", attribute "data-guest" (boolString guest) ]
             }
                 [ div [ class "onyx-you-head" ]
-                    [ div [ class "onyx-you-identity" ]
+                    [ span [ class "onyx-face onyx-you-avatar", attribute "aria-hidden" "true" ] [ text (Avatar.initials nick) ]
+                    , div [ class "onyx-you-identity" ]
                         [ h2 [ class "onyx-you-title" ] [ text "You" ]
                         , p [ class "onyx-you-nick", attribute "data-testid" "you-nick" ]
                             [ text
@@ -206,8 +276,7 @@ youHub model =
                                 )
                             ]
                         , p [ class "onyx-you-desc" ] [ text description ]
-                        , -- v3/account2
-                          View.Account2.youStatusBlock model
+                        , youConnection model
                         ]
                     , button
                         [ type_ "button"
@@ -216,8 +285,10 @@ youHub model =
                         , attribute "data-testid" "you-close"
                         , onClick YouHubClose
                         ]
-                        [ span [ attribute "aria-hidden" "true" ] [ text "✕" ] ]
+                        [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
                     ]
+                , -- v3/account2
+                  View.Account2.youStatusBlock model
                 , nav [ class "onyx-you-settings", attribute "aria-label" "You settings", attribute "data-testid" "you-settings" ]
                     [ p [ class "onyx-you-lede", attribute "role" "note" ]
                         [ text
@@ -228,7 +299,7 @@ youHub model =
                                 "Your account travels with you. Everything else here changes this device only."
                             )
                         ]
-                    , group "account" "Account" (Just "Sign-in, recovery, and account data. These choices travel with the account.")
+                    , group "account" "Account" Nothing
                         [ if guest then
                             entry
                                 { testId = "you-keep-name"
@@ -247,8 +318,22 @@ youHub model =
                                 , action = Nav.YouAccount
                                 }
                         ]
-                    , group "device" "This device" (Just "Notifications, privacy, reading, and hardware on this browser.")
-                        [ entry
+                    , group "device" "This device" Nothing
+                        [ -- v3/ui-mobile-shell: moved here from the global bar
+                          button
+                            [ type_ "button"
+                            , class "onyx-you-link"
+                            , attribute "data-testid" "shell-notifications"
+                            , attribute "aria-label" "Notifications"
+                            , attribute "aria-haspopup" "dialog"
+                            , onClick NotifySheetOpen
+                            ]
+                            [ span []
+                                [ strong [] [ text "Notifications" ]
+                                , small [] [ text "Alerts, sounds, keywords, and quiet hours" ]
+                                ]
+                            ]
+                        , entry
                             { testId = "you-settings-open-appearance"
                             , label = "Appearance"
                             , hint = "Look, text size, and motion"
@@ -300,10 +385,32 @@ youHub model =
                             , attribute "data-testid" "you-leave"
                             , onClick (YouHubGo Nav.YouLeave)
                             ]
-                            [ text "Leave" ]
+                            [ text "Leave Onyx" ]
                         ]
                     ]
                 ]
+
+
+{-| v3/ui-mobile-shell — the connection state (the global pill hides
+on phones). -}
+youConnection : Model -> Html Msg
+youConnection model =
+    let
+        ( key, words ) =
+            case model.connection of
+                App.Live ->
+                    ( "live", "Connected" )
+
+                App.Registering ->
+                    ( "connecting", "Connecting…" )
+
+                App.Offline ->
+                    ( "offline", "Offline — messages queue on this device" )
+    in
+    p [ class "onyx-you-conn", attribute "data-state" key, attribute "data-testid" "you-connection" ]
+        [ span [ class "onyx-you-conn-dot", attribute "aria-hidden" "true" ] []
+        , text words
+        ]
 
 
 boolString : Bool -> String

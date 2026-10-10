@@ -4,32 +4,35 @@ module View.RoomHeader exposing (jumpToggle, mediaToggle, pinsToggle, roomHeader
 (roadmap 3.1 direction: name, one-line topic, presence, overflow).
 
 Everything here is ROOM-scoped; network-scoped controls (palette
-launcher, Calls, Alerts, Operator, connection pill, You, Leave) stay in
-the global `View.Topbar`. Layout:
+launcher, the inbox, Operator, connection pill, You) stay in the
+global `View.Topbar`.
 
-  - the room name (`h2`) and its one-line topic;
-  - the call presence chip / status / Join call (`View.CallPresence`),
-    kept visible — never inside the overflow;
-  - Search (frequent, so it stays visible);
-  - a "More" disclosure (`aria-expanded`, `aria-controls`) that holds
-    Pins, Media, Jump to date and — for room moderators — Moderation.
-    Running an action closes it (`App.settleRoomMenu`); Escape closes it
-    through the one ordered overlay list (`App.escapeMsg`); a click
-    outside closes it through the transparent scrim.
+v3/ui-mobile-shell — ONE row on every viewport:
 
-The moved buttons keep their classes, test ids and accessible names.
+  - phones get a back control first (`room-back`, to the Rooms or
+    Messages page the conversation lives in — the conversation is a
+    pushed page there, and the global bar hides);
+  - the privacy glyph, the room name (`h2`) and its one-line topic
+    (desktop: the `More` / `Less` expander for long topics); a DM
+    shows its E2EE posture + Verify (`View.DmSafety.convoHeader`)
+    as the subtitle line instead;
+  - actions: the facepile (desktop), the call presence chip / Join
+    call (`View.CallPresence`, never inside the overflow), Search
+    (an icon; phones reach it through More), Members (rooms, where the
+    context rail is hidden: opens the members sheet) and the More
+    disclosure.
 
-v3/roomsettings finishes the header (roadmap 3.1 / 3.8):
-
-  - a privacy glyph before the name (words in its label, never mode
-    letters) and an expandable one-line topic (`More` / `Less`,
-    per-room, so it resets on room change);
-  - the facepile (rooms), moved here from the top of the transcript;
-  - a second row with the room notify strip (`room-notify`), the
-    Invite friends / DM safety trigger (`View.DmSafety.convoHeader`),
-    the scheduled-event line, the bridge badge and the group-control
-    mark — all moved or new, all keeping their test ids;
-  - "Room settings" as the first More action (`View.RoomSettings`).
+The More disclosure (`aria-expanded`, `aria-controls`; an anchored
+menu on desktop, a bottom action sheet on phones) holds the room's
+alert level (`room-notify`), Invite people (`room-invite-friends`),
+Room settings, Pins, Media, Jump to date, the time scrubber and — for
+room moderators — Moderation. Running an action closes it
+(`App.settleRoomMenu`); Escape closes it through the one ordered
+overlay list (`App.escapeMsg`); a click outside closes it through the
+scrim. The 3.8 room state (scheduled event, bridge badge, group-control
+mark) keeps a slim second line that only renders when one of them has
+something to say. Moved controls keep their classes, test ids and
+accessible names.
 
 -}
 
@@ -40,14 +43,16 @@ import Facepile
 import Html exposing (Html, button, div, h2, header, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, id, type_)
 import Html.Events exposing (onClick)
+import Nav
 import RoomSettings
+import Sidebar
+import View.CallDock -- v3/calls-c6
 import View.CallPresence
 import View.DmSafety
-import View.CallDock -- v3/calls-c6
 import View.ModDesk
 import View.Notify
-import View.RoomSettings
 import View.Polish -- v3/polish
+import View.RoomSettings
 
 
 roomHeader : Model -> Html Msg
@@ -72,21 +77,37 @@ roomHeader model =
                 [ class "onyx-room-header"
                 , attribute "aria-label" ("Conversation header for " ++ name)
                 , attribute "data-testid" "room-header"
+                , attribute "data-kind"
+                    (if isRoom then
+                        "room"
+
+                     else
+                        "dm"
+                    )
                 ]
-                [ div [ class "onyx-room-header-id" ]
+                [ backButton model name isRoom
+                , div [ class "onyx-room-header-id" ]
                     ((if isRoom then
                         [ privacyGlyph model name ]
 
                       else
-                        []
+                        [ dmAvatar name ]
                      )
-                        ++ [ h2 [ class "onyx-room-header-name" ] [ text name ] ]
-                        ++ (if isRoom then
-                                topicLine model name topic
+                        ++ [ div [ class "onyx-room-header-titles" ]
+                                (h2 [ class "onyx-room-header-name" ] [ text name ]
+                                    :: (if isRoom then
+                                            topicLine model name topic
 
-                            else
-                                []
-                           )
+                                        else
+                                            case channel of
+                                                Just ch ->
+                                                    [ div [ class "onyx-room-header-safety" ] [ View.DmSafety.convoHeader model ch ] ]
+
+                                                Nothing ->
+                                                    []
+                                       )
+                                )
+                           ]
                     )
                 , div [ class "onyx-room-header-actions" ]
                     [ case ( isRoom, channel ) of
@@ -97,15 +118,67 @@ roomHeader model =
                             text ""
                     , View.CallPresence.headerVoice model -- v3/calls-c1
                     , searchToggle model
-                    , moreMenu model
+                    , moreMenu model name isRoom channel
                     ]
-                , case channel of
-                    Just ch ->
-                        subRow model isRoom ch
+                , if isRoom then
+                    subRow model name
 
-                    Nothing ->
-                        text ""
+                  else
+                    text ""
                 ]
+
+
+{-| Phones: back to the collection the conversation lives in (the
+nav fold re-opens that page). The badge counts other conversations
+waiting. -}
+backButton : Model -> String -> Bool -> Html Msg
+backButton model name isRoom =
+    let
+        section =
+            Nav.sectionFor (App.isChannelName model) name
+
+        waiting =
+            model.channels
+                |> Dict.values
+                |> List.filter (\c -> String.toLower c.name /= String.toLower name && Sidebar.hasAttention c)
+                |> List.length
+
+        label =
+            "Back to "
+                ++ Nav.label section
+                ++ (if waiting > 0 then
+                        ", " ++ String.fromInt waiting ++ " with new messages"
+
+                    else
+                        ""
+                   )
+    in
+    button
+        [ type_ "button"
+        , class "onyx-room-back"
+        , attribute "aria-label" label
+        , attribute "title"
+            (if isRoom then
+                "Rooms"
+
+             else
+                "Messages"
+            )
+        , attribute "data-testid" "room-back"
+        , onClick (NavSelect section)
+        ]
+        [ span [ class "onyx-shi", attribute "data-icon" "back", attribute "aria-hidden" "true" ] []
+        , if waiting > 0 then
+            span [ class "onyx-room-back-count", attribute "aria-hidden" "true" ] [ text (String.fromInt waiting) ]
+
+          else
+            text ""
+        ]
+
+
+dmAvatar : String -> Html Msg
+dmAvatar name =
+    span [ class "onyx-face onyx-room-header-avatar", attribute "aria-hidden" "true" ] [ text (Avatar.initials name) ]
 
 
 {-| The active room's topic ("" when unset or unknown). -}
@@ -116,30 +189,37 @@ roomTopic model name =
         |> Maybe.withDefault ""
 
 
+icon : String -> Html msg
+icon name =
+    span [ class "onyx-shi", attribute "data-icon" name, attribute "aria-hidden" "true" ] []
+
+
 searchToggle : Model -> Html Msg
 searchToggle model =
     button
-        [ class "onyx-search-toggle onyx-room-header-btn"
+        [ class "onyx-search-toggle onyx-room-header-btn onyx-room-header-icon"
         , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
         , attribute "aria-pressed" (boolAttr model.searchOpen)
+        , attribute "title" "Search messages"
         , disabled (model.activeChannel == Nothing)
         , onClick SearchOpen
         ]
-        [ text "Search" ]
+        [ icon "search", span [ class "sr-only" ] [ text "Search" ] ]
 
 
-moreMenu : Model -> Html Msg
-moreMenu model =
+moreMenu : Model -> String -> Bool -> Maybe App.Channel -> Html Msg
+moreMenu model name isRoom channel =
     div [ class "onyx-room-more" ]
         ([ button
-            [ class "onyx-room-more-toggle onyx-room-header-btn"
+            [ class "onyx-room-more-toggle onyx-room-header-btn onyx-room-header-icon"
             , attribute "aria-label" "More room actions"
             , attribute "aria-expanded" (boolAttr model.roomMenuOpen)
             , attribute "aria-controls" "onyx-room-more-menu"
+            , attribute "title" "More"
             , attribute "data-testid" "room-more"
             , onClick RoomMenuToggle
             ]
-            [ text "More" ]
+            [ icon "more", span [ class "sr-only" ] [ text "More" ] ]
          ]
             ++ (if model.roomMenuOpen then
                     [ div
@@ -155,7 +235,39 @@ moreMenu model =
                         , attribute "aria-label" "Room actions"
                         , attribute "data-testid" "room-more-menu"
                         ]
-                        (View.RoomSettings.settingsToggle model
+                        ([ div [ class "onyx-room-more-head", attribute "aria-hidden" "true" ]
+                            [ span [ class "onyx-room-more-grip" ] []
+                            , span [ class "onyx-room-more-title" ] [ text name ]
+                            ]
+                         ]
+                            ++ (case ( isRoom, channel ) of
+                                    ( True, Just ch ) ->
+                                        [ div [ class "onyx-room-more-alerts" ] [ View.Notify.roomNotifyStrip model ch.name ] ]
+
+                                    _ ->
+                                        []
+                               )
+                            ++ [ button
+                                    [ type_ "button"
+                                    , class "onyx-room-more-search"
+                                    , onClick SearchOpen
+                                    ]
+                                    [ text "Search messages" ]
+                               ]
+                            ++ (if isRoom then
+                                    [ button
+                                        [ type_ "button"
+                                        , class "onyx-room-more-invite"
+                                        , attribute "data-testid" "room-invite-friends"
+                                        , onClick (InviteShareOpen name)
+                                        ]
+                                        [ text "Invite friends" ]
+                                    ]
+
+                                else
+                                    []
+                               )
+                            ++ View.RoomSettings.settingsToggle model
                             -- v3/roomsettings
                             ++ [ View.CallDock.dmCallItem model -- v3/calls-c6
                                , pinsToggle model
@@ -249,7 +361,7 @@ jumpToggle model =
         , disabled (model.activeChannel == Nothing)
         , onClick JumpToDateOpen
         ]
-        [ text "Jump" ]
+        [ text "Jump to date" ]
 
 
 boolAttr : Bool -> String
@@ -303,69 +415,68 @@ topicLine model name topic =
         long =
             String.length topic > topicExpandThreshold
     in
-    [ p
-        [ class "onyx-room-header-topic"
-        , classList [ ( "onyx-room-header-topic-open", expanded && long ) ]
-        , id "onyx-room-header-topic"
-        , attribute "title" topic
-        ]
-        [ text
-            (if String.isEmpty topic then
-                "No topic set"
-
-             else
-                topic
-            )
-        ]
-    ]
-        ++ (if long then
-                [ button
-                    [ type_ "button"
-                    , class "onyx-room-topic-toggle"
-                    , attribute "aria-expanded" (boolAttr expanded)
-                    , attribute "aria-controls" "onyx-room-header-topic"
-                    , attribute "aria-label"
-                        (if expanded then
-                            "Show less of the topic"
-
-                         else
-                            "Show the full topic"
-                        )
-                    , attribute "data-testid" "room-topic-toggle"
-                    , onClick (RoomSettingsMsg (RoomSettings.TopicExpandToggle name))
-                    ]
-                    [ text
-                        (if expanded then
-                            "Less"
-
-                         else
-                            "More"
-                        )
-                    ]
+    [ div [ class "onyx-room-header-topic-row" ]
+        ([ p
+            [ class "onyx-room-header-topic"
+            , classList
+                [ ( "onyx-room-header-topic-open", expanded && long )
+                , ( "onyx-room-header-topic-empty", String.isEmpty topic )
                 ]
-
-            else
-                []
-           )
-
-
-{-| Second header row: alerts, invite / DM safety, and the 3.8 room
-state (scheduled event, bridge badge, group-control mark).
--}
-subRow : Model -> Bool -> App.Channel -> Html Msg
-subRow model isRoom ch =
-    div [ class "onyx-room-header-sub" ]
-        (if isRoom then
-            [ View.Notify.roomNotifyStrip model ch.name
-            , View.DmSafety.convoHeader model ch
-            , View.RoomSettings.scheduledEventLine model ch.name
-            , View.RoomSettings.bridgeBadge model ch.name
-            , View.RoomSettings.groupControlMark model ch.name
+            , id "onyx-room-header-topic"
+            , attribute "title" topic
             ]
+            [ text
+                (if String.isEmpty topic then
+                    "No topic set"
 
-         else
-            [ View.DmSafety.convoHeader model ch ]
+                 else
+                    topic
+                )
+            ]
+         ]
+            ++ (if long then
+                    [ button
+                        [ type_ "button"
+                        , class "onyx-room-topic-toggle"
+                        , attribute "aria-expanded" (boolAttr expanded)
+                        , attribute "aria-controls" "onyx-room-header-topic"
+                        , attribute "aria-label"
+                            (if expanded then
+                                "Show less of the topic"
+
+                             else
+                                "Show the full topic"
+                            )
+                        , attribute "data-testid" "room-topic-toggle"
+                        , onClick (RoomSettingsMsg (RoomSettings.TopicExpandToggle name))
+                        ]
+                        [ text
+                            (if expanded then
+                                "Less"
+
+                             else
+                                "More"
+                            )
+                        ]
+                    ]
+
+                else
+                    []
+               )
         )
+    ]
+
+
+{-| The 3.8 room state line (scheduled event, bridge badge, group-
+control mark). Each part self-gates, so the line collapses (`:empty`)
+when none has anything to say. -}
+subRow : Model -> String -> Html Msg
+subRow model name =
+    div [ class "onyx-room-header-sub" ]
+        [ View.RoomSettings.scheduledEventLine model name
+        , View.RoomSettings.bridgeBadge model name
+        , View.RoomSettings.groupControlMark model name
+        ]
 
 
 {-| Overlapping avatar stack (mirroring the ribbon `Facepile`:

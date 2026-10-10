@@ -183,17 +183,18 @@ suite =
                             apply (RoomNotifyLevel { channel = "#c", level = "none" }) roomModel
                     in
                     Expect.all
-                        [ \_ ->
-                            query roomModel
+                        [ -- v3/ui-mobile-shell: the strip lives in the room header's More menu
+                      \_ ->
+                            query { roomModel | roomMenuOpen = True }
                                 |> Query.find [ testid "room-notify" ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Notifications for #c") ]
                         , \_ ->
-                            query muted
+                            query { muted | roomMenuOpen = True }
                                 |> Query.find [ testid "room-notify" ]
                                 |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "All messages") ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-checked" "false") ]
                         , \_ ->
-                            query muted
+                            query { muted | roomMenuOpen = True }
                                 |> Query.find [ testid "room-notify" ]
                                 |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Mute — you will not be tapped") ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-checked" "true") ]
@@ -406,7 +407,8 @@ suite =
                                 |> Query.find [ testid "notify-sheet" ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Notifications") ]
                         , \_ ->
-                            query blank
+                            -- v3/ui-mobile-shell: the entry moved into the You hub
+                            query { blank | youHubOpen = True }
                                 |> Query.find [ testid "shell-notifications" ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Notifications") ]
                         ]

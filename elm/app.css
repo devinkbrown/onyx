@@ -3772,15 +3772,8 @@ html { scroll-padding-block: var(--space-6); }
 
   .onyx-mobile-nav .onyx-nav-btn { flex: 1 1 0; min-width: 0; font-size: var(--text-xs); }
 
-  .onyx-topbar { flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
-  .onyx-topbar-search { order: 10; flex-basis: 100%; }
-  .onyx-topbar-global { flex-wrap: wrap; }
-  .onyx-topbar-global > button { padding: 0 var(--space-2); }
-  .onyx-brand h1 { font-size: var(--text-md); }
-
-  .onyx-room-header { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
-  .onyx-room-header-id { flex-direction: column; gap: 0; }
-  .onyx-room-header-actions { flex-wrap: wrap; justify-content: flex-end; }
+  /* Topbar, room header, rail and bottom-nav phone layout: see the
+     v3/ui-mobile-shell block in css/pol-shell.css. */
 
   .onyx-main > .onyx-thread-pane { padding: var(--space-2) var(--space-3); }
 
