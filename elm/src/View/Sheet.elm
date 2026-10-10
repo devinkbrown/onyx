@@ -9,6 +9,7 @@ module View.Sheet exposing
     , header
     , titleId
     , view
+    , viewPinned
     )
 
 {-| v3/frame — the ONE sheet/dialog primitive.
@@ -100,6 +101,20 @@ autofocus scope =
 
 view : Config msg -> List (Html msg) -> Html msg
 view cfg body =
+    render True cfg body
+
+
+{-| v3/calls-c6 — the same dialog without light dismiss: a backdrop
+click does nothing (a DM ring must never be declined by a stray
+click, spec §2.9). Escape still sends `onClose`.
+-}
+viewPinned : Config msg -> List (Html msg) -> Html msg
+viewPinned cfg body =
+    render False cfg body
+
+
+render : Bool -> Config msg -> List (Html msg) -> Html msg
+render lightDismiss cfg body =
     div
         ([ class (join "onyx-sheet-layer" cfg.layerClass)
          , attribute "data-placement" (placementKey cfg.placement)
@@ -107,11 +122,17 @@ view cfg body =
             ++ cfg.layerAttrs
         )
         [ div
-            [ class (join "onyx-sheet-backdrop" cfg.backdropClass)
-            , attribute "aria-hidden" "true"
-            , attribute "data-testid" (cfg.scope ++ "-backdrop")
-            , onClick cfg.onClose
-            ]
+            ([ class (join "onyx-sheet-backdrop" cfg.backdropClass)
+             , attribute "aria-hidden" "true"
+             , attribute "data-testid" (cfg.scope ++ "-backdrop")
+             ]
+                ++ (if lightDismiss then
+                        [ onClick cfg.onClose ]
+
+                    else
+                        []
+                   )
+            )
             []
         , section
             ([ class (join "onyx-sheet" cfg.panelClass)

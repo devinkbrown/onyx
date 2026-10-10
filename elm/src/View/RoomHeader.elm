@@ -27,6 +27,7 @@ import Html exposing (Html, button, div, h2, header, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, id)
 import Html.Events exposing (onClick)
 import View.CallPresence
+import View.CallDock -- v3/calls-c6
 import View.ModDesk
 
 
@@ -116,7 +117,8 @@ moreMenu model =
                         , attribute "aria-label" "Room actions"
                         , attribute "data-testid" "room-more-menu"
                         ]
-                        ([ pinsToggle model
+                        ([ View.CallDock.dmCallItem model -- v3/calls-c6
+                         , pinsToggle model
                          , mediaToggle model
                          , jumpToggle model
                          ]

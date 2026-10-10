@@ -26,6 +26,7 @@ import View.Appearance
 import View.Calls exposing (callsHub)
 -- v3/calls-c1
 import View.CallStage
+import View.CallDock -- v3/calls-c6
 import View.Download
 import View.Guides
 import View.Stats
@@ -263,7 +264,8 @@ appFrame model =
 overlays : Model -> Html Msg
 overlays model =
     div [ class "onyx-overlays" ]
-        [ toaster model
+        [ View.CallDock.pip model -- v3/calls-c6: floats under every sheet
+        , toaster model
         , stewardPanel model
         , guestClaimSheet model
         , browser model
@@ -295,4 +297,7 @@ overlays model =
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        -- v3/calls-c6: the DM ring is modal over everything
+        , View.CallDock.recoveryAnnouncer model
+        , View.CallDock.ringDialog model
         ]

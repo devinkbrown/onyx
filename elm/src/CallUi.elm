@@ -371,6 +371,7 @@ bannerFor :
         , media : MediaState
         , callBannerDismissed : Set String
         , callJoinTarget : Maybe String
+        , callRejoin : Maybe String
     }
     -> String
     -> Maybe Banner
@@ -383,6 +384,10 @@ bannerFor model room =
         Nothing
 
     else if model.calls.outcome == Just CallFailed && sameTarget model.callJoinTarget room then
+        Just BannerFailed
+
+    else if model.calls.outcome == Just CallDropped && sameTarget model.callRejoin room then
+        -- v3/calls-c6: a dropped call offers the same rejoin banner
         Just BannerFailed
 
     else if count > 0 && not (Set.member (String.toLower room) model.callBannerDismissed) then

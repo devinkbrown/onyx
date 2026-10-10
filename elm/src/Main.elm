@@ -225,6 +225,19 @@ port voiceLeave : { channel : String } -> Cmd msg
 port voiceMute : { muted : Bool } -> Cmd msg
 
 
+-- v3/calls-c6: DM ring commands (accept / reject / hangup / start) and
+-- the mini view's persisted position (`onyx:voice-pip-position`).
+
+
+port voiceRing : { verb : String, peer : String } -> Cmd msg
+
+
+port voicePipSave : { corner : String, x : Int, y : Int } -> Cmd msg
+
+
+port voicePipLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port vaultSearched : ({ rows : List App.VaultRow, status : String, seq : Int, mode : String } -> msg) -> Sub msg
 
 
@@ -1218,6 +1231,13 @@ perform key outbound =
         App.VoiceMute req ->
             voiceMute req
 
+        -- v3/calls-c6
+        App.VoiceRing req ->
+            voiceRing req
+
+        App.VoicePipSave req ->
+            voicePipSave req
+
         App.FollowedSave req ->
             followedSave req
 
@@ -1576,6 +1596,7 @@ subscriptions model =
         , studioEyeDropperResult App.StudioEyeDropperResult
         , studioCustomThemes App.StudioCustomThemesRefreshed
         , voiceCallHub App.CallHubSnapshot
+        , voicePipLoaded App.CallPipLoaded -- v3/calls-c6
         , mediaBinaryReceived App.MediaBinaryReceived
         , httpResult App.HttpResult
         , reclaimTimerFired App.ReclaimTimerFired

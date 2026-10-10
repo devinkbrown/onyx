@@ -54,6 +54,8 @@ import Status
 import Media
 -- v3/calls-c1
 import CallUi
+-- v3/calls-c6
+import CallDock
 import IdentityOverrides
 import Moderation
 import Modes
@@ -574,6 +576,15 @@ type alias Model =
     , callPrivacyOpen : Bool
     , callSecurityFeed : CallUi.SecurityFeed
     , callAnnouncer : CallUi.Announcer
+    -- v3/calls-c6
+    , callAccepting : Bool
+    , callAcceptError : Bool
+    , callRingSince : Maybe Float
+    , callPip : CallDock.PipPosition
+    , callWasReconnecting : Bool
+    , callRecoveryNote : String
+    , callRejoin : Maybe String
+    , callJoinError : Maybe CallDock.JoinError
     -- v3/nav
     , navSection : Nav.Id
     , navDrawerOpen : Bool
@@ -932,6 +943,9 @@ type Outbound
     | VoiceJoin { channel : String, video : Bool }
     | VoiceLeave { channel : String }
     | VoiceMute { muted : Bool }
+    -- v3/calls-c6
+    | VoiceRing { verb : String, peer : String }
+    | VoicePipSave { corner : String, x : Int, y : Int }
     | VaultExportRequest
     | VaultImportPick
     | RetentionPolicyRequest
@@ -3048,6 +3062,15 @@ type Msg
     | CallMoreClose
     | CallPrivacyOpen
     | CallPrivacyClose
+    -- v3/calls-c6
+    | CallAccept
+    | CallDecline
+    | CallCancel
+    | CallStart String
+    | CallPipCycle
+    | CallPipNudge { dx : Int, dy : Int, width : Int, height : Int, persist : Bool }
+    | CallPipDragEnd
+    | CallPipLoaded Decode.Value
     | SelectBoardTab String
     -- v3/roster
     | MemberFilterInput String
@@ -3407,6 +3430,15 @@ init nick url =
     , callPrivacyOpen = False
     , callSecurityFeed = CallUi.blankSecurityFeed
     , callAnnouncer = CallUi.blankAnnouncer
+    -- v3/calls-c6
+    , callAccepting = False
+    , callAcceptError = False
+    , callRingSince = Nothing
+    , callPip = CallDock.defaultPip
+    , callWasReconnecting = False
+    , callRecoveryNote = ""
+    , callRejoin = Nothing
+    , callJoinError = Nothing
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -3931,6 +3963,15 @@ blank =
     , callPrivacyOpen = False
     , callSecurityFeed = CallUi.blankSecurityFeed
     , callAnnouncer = CallUi.blankAnnouncer
+    -- v3/calls-c6
+    , callAccepting = False
+    , callAcceptError = False
+    , callRingSince = Nothing
+    , callPip = CallDock.defaultPip
+    , callWasReconnecting = False
+    , callRecoveryNote = ""
+    , callRejoin = Nothing
+    , callJoinError = Nothing
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -35816,8 +35857,93 @@ update msg model =
         -- v3/frame
         frameSettled =
             settleRoomMenu msg model callsSettled
+
+        -- v3/calls-c6
+        ( dockSettled, dockOut ) =
+            CallDock.settle { live = frameSettled.connection == Live, now = frameSettled.nowMs } model frameSettled
     in
-    ( frameSettled, out ++ connectOut ++ safetyOut )
+    ( dockSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
+
+
+-- v3/calls-c6
+{-| Fold the C6/C10 extras of one `voiceCallHub` snapshot: a rejected
+accept (`acceptFailed`) on the same ring, a classified join error on a
+failed idle snapshot, and codec / encoder failure toasts.
+-}
+callsC6Snapshot : Decode.Value -> Model -> Model
+callsC6Snapshot raw model =
+    let
+        kind =
+            CallDock.decodeErrorKind raw
+
+        accepted =
+            if model.calls.lifecycle == Media.RingingIn && CallDock.decodeAcceptFailed raw then
+                { model | callAccepting = False, callAcceptError = True }
+
+            else
+                model
+
+        classified =
+            if model.calls.lifecycle == Media.Idle && model.calls.outcome == Just Media.CallFailed then
+                { accepted | callJoinError = Maybe.andThen CallDock.joinErrorFromKind kind }
+
+            else
+                accepted
+    in
+    case Maybe.andThen CallDock.codecToast kind of
+        Just toast ->
+            addToast
+                { variant = ToastError
+                , title = toast.title
+                , description = Just toast.description
+                , duration = Nothing
+                , groupKey = Just ("voice-" ++ Maybe.withDefault "" kind)
+                , undo = Nothing
+                }
+                classified.nowMs
+                classified
+
+        Nothing ->
+            classified
+
+
+{-| Hang up a live DM call (ringing or in call): idle at once, with
+`CallEnded` when the call had been established.
+-}
+callsC6HangUp : Model -> ( Model, List Outbound )
+callsC6HangUp model =
+    let
+        peer =
+            String.trim model.calls.withPeer
+    in
+    if model.calls.lifecycle == Media.Idle || String.isEmpty peer then
+        ( model, [] )
+
+    else
+        ( { model
+            | calls =
+                { blankHub
+                    | outcome =
+                        if model.calls.startedAt /= Nothing then
+                            Just Media.CallEnded
+
+                        else
+                            Nothing
+                }
+            , callSelfMuted = False
+          }
+        , [ VoiceRing { verb = "hangup", peer = peer } ]
+        )
+
+
+callPipSaveOut : CallDock.PipPosition -> Outbound
+callPipSaveOut pos =
+    VoicePipSave { corner = CallDock.cornerWord pos.corner, x = pos.x, y = pos.y }
+
+
+blankHub : Media.CallHub
+blankHub =
+    Media.blankCallHub
 
 
 -- v3/calls-c1
@@ -40412,7 +40538,9 @@ updateCore msg model =
                         ( model, [] )
 
                 Nothing ->
-                    ( model, [] )
+                    -- v3/calls-c6: a DM call has no channel — hang up
+                    -- the peer (oracle `endDmCall`).
+                    callsC6HangUp model
 
         CallToggleMute ->
             -- Flip the local capture flag and tell the engine (the
@@ -40445,6 +40573,8 @@ updateCore msg model =
                         -- v3/calls-c1
                         , callSecurityFeed = CallUi.decodeSecurityFeed merged.lifecycle raw model.callSecurityFeed
                       }
+                        -- v3/calls-c6
+                        |> callsC6Snapshot raw
                     , []
                     )
 
@@ -40474,6 +40604,95 @@ updateCore msg model =
 
         CallPrivacyClose ->
             ( { model | callPrivacyOpen = False }, [] )
+
+        -- v3/calls-c6
+        CallAccept ->
+            -- Incoming DM ring (spec §2.9): one accept per ring, live
+            -- socket only; join muted by default like room joins.
+            if model.calls.lifecycle == Media.RingingIn && not model.callAccepting && model.connection == Live then
+                ( { model
+                    | callAccepting = True
+                    , callAcceptError = False
+                    , callSelfMuted = CallUi.joinMutedDefault
+                  }
+                , VoiceRing { verb = "accept", peer = model.calls.withPeer }
+                    :: (if CallUi.joinMutedDefault then
+                            [ VoiceMute { muted = True } ]
+
+                        else
+                            []
+                       )
+                )
+
+            else
+                ( model, [] )
+
+        CallDecline ->
+            -- Decline closes the dialog at once (oracle `rejectDmCall`
+            -- sets idle before the engine answers); no outcome.
+            if model.calls.lifecycle == Media.RingingIn then
+                ( { model | calls = Media.blankCallHub, callAccepting = False, callAcceptError = False }
+                , [ VoiceRing { verb = "reject", peer = model.calls.withPeer } ]
+                )
+
+            else
+                ( model, [] )
+
+        CallCancel ->
+            if model.calls.lifecycle == Media.RingingOut then
+                ( { model | calls = Media.blankCallHub }
+                , [ VoiceRing { verb = "hangup", peer = model.calls.withPeer } ]
+                )
+
+            else
+                ( model, [] )
+
+        CallStart peer ->
+            -- Start a DM voice call (oracle `startDmCall`): ringing_out
+            -- shows at once; the engine (or its absence → failed
+            -- outcome) settles it through the snapshot feed.
+            if CallDock.ringStartable { live = model.connection == Live, hub = model.calls, ourNick = model.ourNick, peer = peer } then
+                ( { model
+                    | calls = { blankHub | lifecycle = Media.RingingOut, withPeer = String.trim peer }
+                    , roomMenuOpen = False
+                    , callMoreOpen = False
+                    , callPrivacyOpen = False
+                  }
+                , [ VoiceRing { verb = "start", peer = String.trim peer } ]
+                )
+
+            else
+                ( model, [] )
+
+        CallPipCycle ->
+            let
+                pos =
+                    { corner = CallDock.nextCorner model.callPip.corner, x = 0, y = 0 }
+            in
+            ( { model | callPip = pos }, [ callPipSaveOut pos ] )
+
+        CallPipNudge n ->
+            let
+                pos =
+                    CallDock.nudge { dx = n.dx, dy = n.dy } { width = n.width, height = n.height } model.callPip
+            in
+            if pos == model.callPip then
+                ( model, [] )
+
+            else
+                ( { model | callPip = pos }
+                , if n.persist then
+                    [ callPipSaveOut pos ]
+
+                  else
+                    []
+                )
+
+        CallPipDragEnd ->
+            ( model, [ callPipSaveOut model.callPip ] )
+
+        CallPipLoaded raw ->
+            ( { model | callPip = CallDock.decodePipPosition raw }, [] )
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
@@ -42877,7 +43096,11 @@ overlayStack model =
             else
                 Nothing
         )
-        [ ( "media-lightbox", model.mediaLightbox /= Nothing, MediaLightboxClose )
+        [ -- v3/calls-c6: a DM ring is modal over everything; Escape
+          -- declines / cancels (spec §2.9)
+          ( "call-ring-in", model.calls.lifecycle == Media.RingingIn, CallDecline )
+        , ( "call-ring-out", model.calls.lifecycle == Media.RingingOut, CallCancel )
+        , ( "media-lightbox", model.mediaLightbox /= Nothing, MediaLightboxClose )
         , ( "shortcuts", model.shortcutsOpen, ShortcutsClose )
         , ( "palette", model.palette.open, PaletteClose )
         , ( "reaction-picker", model.reactionPicker /= Nothing, ReactionPickerClose )
