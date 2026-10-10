@@ -18,13 +18,14 @@ v3/ui-mobile-shell — ONE row on every viewport:
     as the subtitle line instead;
   - actions: the facepile (desktop), the call presence chip / Join
     call (`View.CallPresence`, never inside the overflow), Search
-    (an icon; phones reach it through More), Members (rooms, where the
-    context rail is hidden: opens the members sheet) and the More
-    disclosure.
+    (an icon; phones reach it through More), Members
+    (`View.Roster.membersToggle`, the v3/ui-roster people icon + count
+    that opens the member sheet where the context rail is hidden) and
+    the More disclosure.
 
 The More disclosure (`aria-expanded`, `aria-controls`; an anchored
 menu on desktop, a bottom action sheet on phones) holds the room's
-alert level (`room-notify`), Invite people (`room-invite-friends`),
+alert level (`room-notify`), Invite friends (`room-invite-friends`),
 Room settings, Pins, Media, Jump to date, the time scrubber and — for
 room moderators — Moderation. Running an action closes it
 (`App.settleRoomMenu`); Escape closes it through the one ordered

@@ -277,6 +277,8 @@ youHub model =
                             ]
                         , p [ class "onyx-you-desc" ] [ text description ]
                         , youConnection model
+                        , -- v3/account2
+                          View.Account2.youStatusBlock model
                         ]
                     , button
                         [ type_ "button"
@@ -287,8 +289,6 @@ youHub model =
                         ]
                         [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
                     ]
-                , -- v3/account2
-                  View.Account2.youStatusBlock model
                 , nav [ class "onyx-you-settings", attribute "aria-label" "You settings", attribute "data-testid" "you-settings" ]
                     [ p [ class "onyx-you-lede", attribute "role" "note" ]
                         [ text

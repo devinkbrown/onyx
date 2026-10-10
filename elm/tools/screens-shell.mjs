@@ -113,7 +113,7 @@ export default {
   },
   members: async (page, h) => {
     await join(page, h);
-    if (await clickVisible(page, ['[data-testid="room-members"]'], h)) {
+    if (await clickVisible(page, ['[data-testid="members-toggle"]'], h)) {
       // phones and tablets: the members sheet
     } else {
       const row = (await page.$$('.onyx-roster .onyx-member'))[3];
@@ -121,7 +121,7 @@ export default {
     }
   },
   // The iOS keyboard, emulated: Safari keeps the layout viewport and
-  // shrinks the visual one; ports.js then publishes these variables.
+  // shrinks the visual one; ports.js installViewportInsets publishes these.
   'room-keyboard': async (page, h) => {
     await join(page, h);
     await page.focus('#shell-composer-input').catch(() => {});
@@ -130,7 +130,7 @@ export default {
         const r = document.documentElement;
         r.style.setProperty('--kb-inset', '336px');
         r.style.setProperty('--vv-top', '0px');
-        r.style.setProperty('--vv-height', '508px');
+        r.style.setProperty('--vvh', '508px');
         r.setAttribute('data-kb', 'open');
       });
       await h.settle(page, 200);
