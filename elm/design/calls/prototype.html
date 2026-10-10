@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onyx Calls Prototype</title>
+<meta name="description" content="Static prototype of the Onyx v3 voice and video call surfaces (dark theme). No external scripts; the only JavaScript switches which state is shown.">
+<style>
+/* ---------- Onyx tokens (mirrors elm/app.css :root) ---------- */
+:root {
+  --onyx-bg: #0b0e12;
+  --onyx-panel: #12161c;
+  --onyx-panel-2: #181e27;
+  --onyx-line: #232b36;
+  --onyx-text: #e8e6e1;
+  --onyx-dim: #9aa3ad;
+  --onyx-faint: #5d6670;
+  --onyx-accent: #46c08a;
+  --onyx-accent-ink: #06281a;
+  --onyx-warn: #d9a13b;
+  --onyx-bad: #e5484d;
+  --r: 6px;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+/* Dark-only prototype: the same token set is declared for every scheme on purpose. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--onyx-bg);
+  color: var(--onyx-text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--onyx-text); outline-offset: 2px;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i.sm { width: 14px; height: 14px; }
+
+/* ---------- Review chrome ---------- */
+.review { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+.review-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 16px; }
+.review-head h1 { font-size: 20px; font-weight: 750; letter-spacing: -0.01em; margin: 0; }
+.review-head p { margin: 0; color: var(--onyx-dim); }
+.switcher { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 20px; padding: 0; list-style: none; }
+.switcher button {
+  border: 1px solid var(--onyx-line); border-radius: var(--r); padding: 6px 10px; color: var(--onyx-dim); font-weight: 600; font-size: 13px;
+}
+.switcher button[aria-pressed="true"] { background: var(--onyx-text); color: var(--onyx-bg); border-color: var(--onyx-text); }
+.frame { margin: 0 0 36px; }
+.frame[hidden] { display: none; }
+.frame > h2 { font-size: 13px; font-weight: 650; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 10px; }
+.frame > p.note { margin: 0 0 12px; color: var(--onyx-dim); max-width: 72ch; }
+.canvas { border: 1px solid var(--onyx-line); border-radius: var(--r); background: var(--onyx-panel); overflow: hidden; }
+.canvas.pad { padding: 16px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 880px) { .row2 { grid-template-columns: 1fr; } }
+
+/* ---------- Shared call primitives ---------- */
+.avatar {
+  display: inline-grid; place-items: center; border-radius: 50%; background: var(--onyx-panel-2);
+  color: var(--onyx-text); font-weight: 700; border: 1px solid var(--onyx-line); flex: none;
+}
+.avatar.lg { width: 72px; height: 72px; font-size: 24px; }
+.avatar.md { width: 40px; height: 40px; font-size: 15px; }
+.avatar.sm { width: 24px; height: 24px; font-size: 11px; }
+.pip { width: 8px; height: 8px; border-radius: 50%; background: var(--onyx-faint); display: inline-block; flex: none; }
+.pip[data-state="live"] { background: var(--onyx-accent); }
+.pip[data-state="ringing"], .pip[data-state="provisional"] { background: var(--onyx-warn); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 14px;
+  border-radius: var(--r); border: 1px solid var(--onyx-line); background: var(--onyx-panel-2); font-weight: 650; color: var(--onyx-text);
+}
+.btn.primary { background: var(--onyx-text); color: var(--onyx-bg); border-color: var(--onyx-text); }
+.btn.danger { background: var(--onyx-bad); color: #fff; border-color: var(--onyx-bad); }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.kicker { font-size: 12px; font-weight: 650; color: var(--onyx-faint); letter-spacing: 0.04em; text-transform: uppercase; }
+.mono { font-family: var(--font-mono); }
+.faces { display: inline-flex; }
+.faces .avatar { margin-left: -6px; border-color: var(--onyx-panel); }
+.faces .avatar:first-child { margin-left: 0; }
+
+/* ---------- Sidebar row + room header ---------- */
+.shell-mini { display: grid; grid-template-columns: 220px 1fr; min-height: 220px; }
+@media (max-width: 640px) { .shell-mini { grid-template-columns: 1fr; } .side { border-right: 0; border-bottom: 1px solid var(--onyx-line); } }
+.side { border-right: 1px solid var(--onyx-line); padding: 12px 8px; }
+.side .kicker { padding: 0 8px 6px; }
+.side-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r); color: var(--onyx-dim); }
+.side-row[aria-current="page"] { background: var(--onyx-panel-2); color: var(--onyx-text); font-weight: 650; }
+.side-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--onyx-dim); font-weight: 600; }
+.voice-count .pip { width: 6px; height: 6px; }
+.side-row[aria-current="page"] .voice-count { color: var(--onyx-text); }
+.room-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--onyx-line); flex-wrap: wrap; }
+.room-head .title { font-weight: 750; font-size: 15px; }
+.room-head .topic { color: var(--onyx-dim); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.voice-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: var(--r);
+  border: 1px solid var(--onyx-line); font-weight: 650; font-size: 13px; color: var(--onyx-text);
+}
+.voice-chip .status { color: var(--onyx-dim); font-weight: 500; }
+.voice-chip[data-active="true"] { border-color: var(--onyx-accent); }
+
+/* ---------- Join banner ---------- */
+.join-banner {
+  display: flex; align-items: center; gap: 14px; margin: 12px 14px; padding: 12px 14px;
+  border: 1px solid var(--onyx-line); border-radius: var(--r); background: var(--onyx-panel-2); flex-wrap: wrap;
+}
+.join-banner .copy { flex: 1; min-width: 200px; }
+.join-banner .copy strong { display: block; font-weight: 700; }
+.join-banner .copy span { color: var(--onyx-dim); }
+.join-banner .actions { display: flex; gap: 8px; flex: none; }
+.join-banner.failed { border-color: var(--onyx-warn); }
+
+/* ---------- Stage ---------- */
+.stage { position: relative; display: flex; flex-direction: column; background: var(--onyx-bg); min-height: 320px; }
+.stage-status { position: absolute; top: 10px; left: 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--onyx-dim); font-weight: 600; z-index: 2; margin: 0; }
+.stage-status .pip { width: 6px; height: 6px; }
+.stage-banner { margin: 36px 14px 0; padding: 10px 12px; border: 1px solid var(--onyx-warn); border-radius: var(--r); display: flex; align-items: center; gap: 10px; z-index: 2; flex-wrap: wrap; }
+.stage-banner strong { font-weight: 700; }
+.stage-banner span { color: var(--onyx-dim); }
+.stage-banner .btn { margin-left: auto; min-height: 30px; padding: 0 10px; }
+.stage-banner.bad { border-color: var(--onyx-bad); }
+
+/* voice-only */
+.voice-grid { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px 36px; padding: 44px 24px 28px; }
+.person { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 112px; }
+.person .ring { position: relative; border-radius: 50%; padding: 4px; border: 2px solid transparent; }
+.person[data-speaking="true"] .ring { border-color: var(--onyx-accent); }
+.person[data-hand="true"] .ring { border-color: var(--onyx-warn); }
+.person .badge {
+  position: absolute; right: -2px; bottom: -2px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); color: var(--onyx-dim);
+}
+.person .badge.hand { color: var(--onyx-warn); border-color: var(--onyx-warn); }
+.person .name { font-weight: 650; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person .sub { font-size: 12px; color: var(--onyx-faint); margin-top: -6px; }
+.person .ring::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--onyx-accent); opacity: 0; }
+.person[data-speaking="true"] .ring::after { animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { opacity: 0; transform: scale(0.96);} 50% { opacity: 0.6; transform: scale(1);} }
+@media (prefers-reduced-motion: reduce) {
+  .person[data-speaking="true"] .ring::after { animation: none; opacity: 0.6; }
+  * { transition: none !important; }
+}
+
+/* video grid */
+.video-grid { flex: 1; display: grid; gap: 8px; padding: 40px 12px 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; }
+.video-grid[data-count="1"] { grid-template-columns: 1fr; }
+.video-grid[data-count="2"] { grid-template-columns: repeat(2, 1fr); }
+.video-grid[data-count="3"], .video-grid[data-count="4"] { grid-template-columns: repeat(2, 1fr); }
+.video-grid[data-count="large"] { grid-template-columns: repeat(4, 1fr); }
+.tile {
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r); background: var(--onyx-panel-2); overflow: hidden;
+  border: 2px solid var(--onyx-line); display: grid; place-items: center; min-width: 0;
+}
+.tile[data-speaking="true"] { border-color: var(--onyx-accent); }
+.tile[data-hand="true"] { border-color: var(--onyx-warn); }
+.tile[data-pinned="true"] { border-color: var(--onyx-dim); }
+.tile .cam { position: absolute; inset: 0; background: #1d242e; }
+.tile .cam.b { background: #202a2a; }
+.tile .cam.c { background: #272431; }
+.tile .cam.d { background: #2a2420; }
+.tile .cam.screen { background: #0f1317; display: grid; place-items: center; color: var(--onyx-faint); font-weight: 650; }
+.tile .top { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; gap: 6px; align-items: center; z-index: 1; }
+.tile .spacer { flex: 1; }
+.tile .tag {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 7px; border-radius: var(--r); font-size: 11px; font-weight: 650;
+  background: color-mix(in srgb, var(--onyx-bg) 78%, transparent); color: var(--onyx-text); border: 1px solid var(--onyx-line);
+}
+.tile .tag.hand { color: var(--onyx-warn); border-color: var(--onyx-warn); }
+.tile .tag.off { color: var(--onyx-dim); }
+.tile .bottom { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 6px; z-index: 1; }
+.tile .nick { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--r); font-weight: 650; font-size: 12px;
+  background: color-mix(in srgb, var(--onyx-bg) 78%, transparent); border: 1px solid var(--onyx-line); max-width: 100%; overflow: hidden; white-space: nowrap; }
+.tile .nick .you { color: var(--onyx-dim); font-weight: 500; }
+.tile .bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+.tile .bars i { width: 3px; background: var(--onyx-faint); height: 4px; }
+.tile .bars i:nth-child(2) { height: 8px; } .tile .bars i:nth-child(3) { height: 12px; }
+.tile .bars[data-q="4"] i, .tile .bars[data-q="3"] i { background: var(--onyx-dim); }
+.tile .bars[data-q="2"] i:nth-child(-n+2) { background: var(--onyx-warn); }
+.tile .bars[data-q="1"] i:first-child { background: var(--onyx-bad); }
+.tile .talk { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+.tile .talk i { width: 3px; background: var(--onyx-accent); height: 5px; }
+.tile .talk i:nth-child(2) { height: 11px; } .tile .talk i:nth-child(3) { height: 8px; }
+
+/* speaker / screenshare layout */
+.speaker { flex: 1; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; padding: 40px 12px 12px; }
+.speaker .primary { aspect-ratio: auto; min-height: 260px; }
+.filmstrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.filmstrip .tile { width: 160px; flex: none; }
+.filmstrip .tile .nick { height: 20px; font-size: 11px; }
+
+/* ---------- Control bar ---------- */
+.bar {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 8px 12px;
+  border-top: 1px solid var(--onyx-line); background: var(--onyx-panel); min-height: 56px;
+}
+@media (max-width: 880px) { .bar { grid-template-columns: 1fr; } .bar .right { justify-content: flex-start; } }
+.bar .left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bar .left .where { font-weight: 750; white-space: nowrap; }
+.bar .left .timer { color: var(--onyx-dim); font-variant-numeric: tabular-nums; }
+.bar .left .people { color: var(--onyx-dim); white-space: nowrap; }
+.bar .center { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bar .right { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.cbtn {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 56px; height: 44px; border-radius: var(--r);
+  border: 1px solid transparent; color: var(--onyx-dim); font-size: 11px; font-weight: 650;
+}
+.cbtn:hover { background: var(--onyx-panel-2); }
+.cbtn[aria-pressed="true"] { background: var(--onyx-text); color: var(--onyx-bg); border-color: var(--onyx-text); }
+.cbtn[data-tone="warn"][aria-pressed="true"] { background: var(--onyx-warn); color: var(--onyx-accent-ink); border-color: var(--onyx-warn); }
+.cbtn.leave { background: var(--onyx-bad); color: #fff; border-color: var(--onyx-bad); margin-left: 6px; }
+.cbtn:disabled { opacity: 0.45; cursor: default; }
+.cbtn .cap { line-height: 1; }
+.sec-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: var(--r); border: 1px solid var(--onyx-line);
+  font-size: 12px; font-weight: 650; color: var(--onyx-dim);
+}
+.sec-chip[data-tone="ok"] { color: var(--onyx-text); }
+.sec-chip[data-tone="warn"] { color: var(--onyx-warn); border-color: var(--onyx-warn); }
+.sec-chip[data-tone="danger"] { color: var(--onyx-bad); border-color: var(--onyx-bad); }
+.cq { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--onyx-dim); font-weight: 600; }
+.cq .bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; }
+.cq .bars i { width: 3px; background: var(--onyx-faint); }
+.cq .bars i:nth-child(1){height:5px}.cq .bars i:nth-child(2){height:8px}.cq .bars i:nth-child(3){height:11px}.cq .bars i:nth-child(4){height:14px}
+.cq[data-tier="0"] .bars i { background: var(--onyx-dim); }
+.cq[data-tier="1"] .bars i:nth-child(-n+3) { background: var(--onyx-dim); }
+.cq[data-tier="2"] .bars i:nth-child(-n+2) { background: var(--onyx-warn); }
+.cq[data-tier="3"] .bars i:nth-child(1) { background: var(--onyx-bad); }
+.cq[data-tier="3"] { color: var(--onyx-bad); }
+.cq-prompt { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--onyx-line); background: var(--onyx-panel-2); font-size: 13px; flex-wrap: wrap; }
+.cq-prompt .btn { min-height: 28px; padding: 0 10px; }
+.cq-prompt .x { margin-left: auto; color: var(--onyx-dim); width: 28px; height: 28px; border-radius: var(--r); display: grid; place-items: center; }
+
+/* ---------- Overlays ---------- */
+.scrim { position: relative; min-height: 340px; display: grid; place-items: center; padding: 16px; }
+.dialog { width: min(380px, 100%); background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r); padding: 20px; }
+.dialog .kicker { margin-bottom: 8px; }
+.dialog h2 { margin: 0; font-size: 20px; font-weight: 750; letter-spacing: -0.01em; }
+.dialog p { margin: 6px 0 0; color: var(--onyx-dim); }
+.dialog .who { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; }
+.dialog .who strong { font-size: 16px; }
+.dialog .who span { color: var(--onyx-dim); display: block; font-size: 13px; }
+.dialog .actions { display: flex; gap: 8px; margin-top: 18px; }
+.dialog .actions .btn { flex: 1; min-height: 40px; }
+.dialog .meta { font-size: 12px; color: var(--onyx-faint); margin-top: 12px; display: flex; align-items: center; gap: 6px; }
+
+/* ---------- PiP ---------- */
+.pip-host { position: relative; min-height: 300px; background: var(--onyx-bg); }
+.pip-host .ghost-chat { padding: 16px; color: var(--onyx-faint); }
+.ghost-chat .line, .msgs .line { height: 10px; border-radius: 3px; background: var(--onyx-panel-2); margin: 10px 0; width: 60%; }
+.ghost-chat .line.s, .msgs .line.s { width: 35%; } .ghost-chat .line.l, .msgs .line.l { width: 80%; }
+.mini { position: absolute; right: 16px; bottom: 16px; width: min(300px, calc(100% - 32px)); background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r); }
+.mini .handle { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--onyx-line); cursor: grab; }
+.mini .handle .where { font-weight: 700; flex: 1; }
+.mini .handle .live { font-size: 12px; color: var(--onyx-dim); }
+.mini .handle .snap { width: 24px; height: 24px; border-radius: var(--r); display: grid; place-items: center; color: var(--onyx-dim); }
+.mini .body { display: flex; align-items: center; gap: 8px; padding: 10px; flex-wrap: wrap; }
+.mini .faces .avatar[data-speaking="true"] { outline: 2px solid var(--onyx-accent); }
+.mini .body .btn { min-height: 30px; padding: 0 10px; }
+.mini .body .btn.danger { margin-left: auto; }
+.mini .video { height: 110px; background: #1d242e; border-bottom: 1px solid var(--onyx-line); position: relative; }
+.mini .video .nick { position: absolute; left: 8px; bottom: 8px; font-size: 12px; font-weight: 650; }
+
+/* ---------- Sheet ---------- */
+.sheet { max-width: 440px; margin: 0 auto; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r); }
+.sheet header { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid var(--onyx-line); }
+.sheet header h2 { margin: 0; font-size: 17px; font-weight: 750; }
+.sheet header p { margin: 2px 0 0; color: var(--onyx-dim); }
+.sheet header .x { margin-left: auto; width: 32px; height: 32px; border-radius: var(--r); display: grid; place-items: center; color: var(--onyx-dim); flex: none; }
+.sheet .body { padding: 16px; }
+.sheet dl { margin: 0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+.sheet dt { font-size: 12px; font-weight: 650; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.sheet dd { margin: 2px 0 0; }
+.sheet .fp { font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.08em; padding: 10px 12px; border: 1px solid var(--onyx-line); border-radius: var(--r); display: inline-block; }
+.sheet .hint { color: var(--onyx-dim); font-size: 13px; margin: 14px 0 0; }
+.sheet .lvl { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--onyx-line); border-radius: var(--r); margin-bottom: 16px; }
+.sheet .lvl strong { display: block; }
+.sheet .lvl span { color: var(--onyx-dim); font-size: 13px; }
+.peer-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.peer-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--onyx-line); }
+.peer-list li .fp { font-size: 13px; padding: 4px 8px; margin-left: auto; letter-spacing: 0.05em; }
+.settings .field { display: grid; gap: 4px; margin-bottom: 14px; }
+.settings label { font-weight: 650; }
+.settings .desc { color: var(--onyx-dim); font-size: 13px; }
+.settings select, .settings input[type="range"] { width: 100%; }
+.settings select { background: var(--onyx-panel-2); color: var(--onyx-text); border: 1px solid var(--onyx-line); border-radius: var(--r); padding: 8px 10px; font: inherit; }
+.settings input[type="range"] { accent-color: var(--onyx-text); }
+.settings .check { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; font-weight: 650; }
+.settings .check input { margin-top: 4px; accent-color: var(--onyx-text); width: 16px; height: 16px; }
+.settings .check span { color: var(--onyx-dim); font-size: 13px; display: block; font-weight: 400; }
+.settings .key { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.settings .key .mono { padding: 6px 10px; border: 1px solid var(--onyx-line); border-radius: var(--r); min-width: 80px; text-align: center; }
+.settings h3 { font-size: 13px; font-weight: 650; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 10px; }
+.settings h3:first-child { margin-top: 0; }
+
+/* ---------- Captions / reactions / stage mode ---------- */
+.captions { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(620px, calc(100% - 24px)); z-index: 3; }
+.captions .line { display: flex; gap: 8px; padding: 6px 10px; background: color-mix(in srgb, var(--onyx-bg) 94%, transparent); border: 1px solid var(--onyx-line); border-radius: var(--r); font-size: 15px; margin-top: 4px; }
+.captions .line b { color: var(--onyx-dim); font-weight: 650; flex: none; }
+.captions .line.old { opacity: 0.75; }
+.react-float { position: absolute; right: 24px; bottom: 70px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--onyx-line); border-radius: var(--r); background: var(--onyx-panel); font-size: 13px; z-index: 3; }
+.react-float span { color: var(--onyx-dim); }
+.stage-mode { display: grid; grid-template-columns: 1fr 240px; }
+@media (max-width: 760px) { .stage-mode { grid-template-columns: 1fr; } .stage-mode aside { border-left: 0; border-top: 1px solid var(--onyx-line); } }
+.stage-mode aside { border-left: 1px solid var(--onyx-line); padding: 12px; }
+.stage-mode aside h3 { margin: 0 0 8px; font-size: 13px; }
+.stage-mode aside ul { list-style: none; margin: 0; padding: 0; }
+.stage-mode aside li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--onyx-line); }
+.stage-mode aside li .btn { margin-left: auto; min-height: 26px; padding: 0 8px; font-size: 12px; }
+.audience { padding: 12px 14px; border-top: 1px solid var(--onyx-line); display: flex; align-items: center; gap: 8px; color: var(--onyx-dim); font-size: 13px; flex-wrap: wrap; }
+.room-role { font-size: 12px; color: var(--onyx-faint); }
+
+/* ---------- Mobile frames ---------- */
+.phones { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.phone { width: 375px; max-width: 100%; height: 720px; border: 1px solid var(--onyx-line); border-radius: 18px; overflow: hidden; background: var(--onyx-bg); display: flex; flex-direction: column; position: relative; }
+.phone .statusbar { height: 28px; font-size: 11px; color: var(--onyx-faint); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+.phone .m-head { display: flex; align-items: center; gap: 10px; padding: 6px 16px 10px; }
+.phone .m-head .where { font-weight: 750; font-size: 16px; }
+.phone .m-head .timer { color: var(--onyx-dim); font-variant-numeric: tabular-nums; margin-left: auto; }
+.phone .m-stage { flex: 1; position: relative; display: flex; flex-direction: column; min-height: 0; }
+.phone .video-grid { padding: 0 12px 12px; grid-template-columns: repeat(2, 1fr); align-content: start; }
+.phone .tile { aspect-ratio: 3 / 4; }
+.phone .m-bar { display: flex; justify-content: space-between; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--onyx-line); background: var(--onyx-panel); }
+.phone .cbtn { width: 48px; height: 48px; gap: 0; }
+.phone .cbtn .cap { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.phone .cbtn.leave { margin: 0; }
+.phone .voice-grid { gap: 20px 16px; padding: 24px 16px; align-content: center; }
+.phone .person { width: 96px; }
+.phone .m-sec { display: flex; justify-content: center; gap: 8px; padding: 0 16px 8px; }
+.phone .m-incoming { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; background: var(--onyx-bg); text-align: center; }
+.phone .m-incoming .actions { display: flex; gap: 16px; margin-top: 40px; width: 100%; }
+.phone .m-incoming .actions .btn { flex: 1; min-height: 52px; font-size: 15px; }
+.phone .m-pip { position: absolute; right: 12px; top: 40px; width: 160px; background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--r); padding: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+.phone .m-pip .where { font-weight: 700; font-size: 12px; }
+.phone .m-pip .row { display: flex; gap: 6px; align-items: center; }
+.phone .m-pip .btn { min-height: 28px; padding: 0 8px; font-size: 12px; }
+.phone .m-join { margin: 0 12px 12px; flex-direction: column; align-items: stretch; }
+.phone .m-join .actions { flex-direction: column; width: 100%; }
+.phone .m-join .actions .btn { width: 100%; min-height: 44px; }
+.phone .msgs { flex: 1; padding: 8px 16px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M9 9v2a3 3 0 0 0 5.1 2.1M15 10V6a3 3 0 0 0-6 0M5 11a7 7 0 0 0 11.4 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3M8 21h8M4 4l16 16"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="m16 11 5-3v8l-5-3z"/></symbol>
+    <symbol id="i-cam-off" viewBox="0 0 24 24"><path d="M3 9v6a2 2 0 0 0 2 2h9M16 13V9a2 2 0 0 0-2-2H9M16 11l5-3v8M4 4l16 16"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M12 13V7M9 10l3-3 3 3"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V13M17 13v-1.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-2.5L5 11.5a1.5 1.5 0 0 1 2-2.2L8 10"/></symbol>
+    <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 10.5a2 2 0 0 0-3.5 1.5 2 2 0 0 0 3.5 1.5M17 10.5a2 2 0 0 0-3.5 1.5 2 2 0 0 0 3.5 1.5"/></symbol>
+    <symbol id="i-react" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 10h.01M15 10h.01"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+    <symbol id="i-leave" viewBox="0 0 24 24"><path d="M3 13c5-5 13-5 18 0l-2.5 2.5a2 2 0 0 1-2.4.3L13 14.5v-2.2a9 9 0 0 0-2 0v2.2l-3.1 1.3a2 2 0 0 1-2.4-.3z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-lock-open" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3 2 20h20zM12 10v4M12 17h.01"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3zM12 15v6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-corner" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="12" y="12" width="6" height="5" rx="1"/></symbol>
+  </defs>
+</svg>
+
+<div class="review">
+  <div class="review-head">
+    <h1>Onyx calls — v3 interface prototype</h1>
+    <p>Static states for review. Dark theme only. Copy is the oracle copy where it exists.</p>
+  </div>
+
+  <ul class="switcher" id="switcher" aria-label="Prototype states">
+    <li><button type="button" data-show="all" aria-pressed="true">Show all</button></li>
+    <li><button type="button" data-show="f-presence" aria-pressed="false">Presence + join</button></li>
+    <li><button type="button" data-show="f-voice" aria-pressed="false">Voice stage</button></li>
+    <li><button type="button" data-show="f-grid" aria-pressed="false">Video grid</button></li>
+    <li><button type="button" data-show="f-share" aria-pressed="false">Speaker + screenshare</button></li>
+    <li><button type="button" data-show="f-bar" aria-pressed="false">Control bar</button></li>
+    <li><button type="button" data-show="f-incoming" aria-pressed="false">Incoming / outgoing</button></li>
+    <li><button type="button" data-show="f-pip" aria-pressed="false">PiP</button></li>
+    <li><button type="button" data-show="f-degraded" aria-pressed="false">Reconnecting / poor</button></li>
+    <li><button type="button" data-show="f-security" aria-pressed="false">Security sheet</button></li>
+    <li><button type="button" data-show="f-settings" aria-pressed="false">Voice settings</button></li>
+    <li><button type="button" data-show="f-stage" aria-pressed="false">Stage mode</button></li>
+    <li><button type="button" data-show="f-mobile" aria-pressed="false">Mobile 375</button></li>
+  </ul>
+
+  <!-- 1. Presence + join -->
+  <section class="frame" id="f-presence">
+    <h2>1 · Room voice presence and pre-join banner</h2>
+    <p class="note">Voice is ambient: the sidebar row carries a count, the room header carries a chip with faces and the live status, and the banner is the only place that joins. Nothing here rings anyone.</p>
+    <div class="canvas">
+      <div class="shell-mini">
+        <nav class="side" aria-label="Rooms">
+          <div class="kicker">Rooms</div>
+          <div class="side-row"><span class="name">#lobby</span></div>
+          <div class="side-row" aria-current="page"><span class="name">#harbor</span><span class="voice-count" aria-label="3 in voice"><span class="pip" data-state="live"></span>3</span></div>
+          <div class="side-row"><span class="name">#builds</span><span class="voice-count" aria-label="1 in voice"><span class="pip"></span>1</span></div>
+          <div class="side-row"><span class="name">#night-shift</span></div>
+          <div class="kicker" style="margin-top:12px">Messages</div>
+          <div class="side-row"><span class="name">mara</span></div>
+        </nav>
+        <div>
+          <div class="room-head">
+            <span class="title">#harbor</span>
+            <span class="topic">weekly planning · notes in the pins</span>
+            <button type="button" class="voice-chip" aria-label="3 people in voice in #harbor, mara is speaking; join voice" title="mara, jun, tove · mara speaking">
+              <span class="pip" data-state="live"></span>
+              <span class="faces" aria-hidden="true"><span class="avatar sm">M</span><span class="avatar sm">J</span><span class="avatar sm">T</span></span>
+              <span>3 in voice</span><span class="status">· mara speaking</span>
+            </button>
+          </div>
+          <div class="join-banner" role="status">
+            <span class="faces" aria-hidden="true"><span class="avatar md">M</span></span>
+            <div class="copy"><strong>3 people are in voice.</strong><span>Join to listen; your microphone starts off until you unmute.</span></div>
+            <div class="actions">
+              <button type="button" class="btn ghost" aria-label="Join with video in #harbor"><svg class="i"><use href="#i-cam"/></svg>Join with video</button>
+              <button type="button" class="btn primary" aria-label="Join call in #harbor"><svg class="i"><use href="#i-mic"/></svg>Join call</button>
+            </div>
+          </div>
+          <div class="join-banner failed" role="status">
+            <svg class="i" style="color:var(--onyx-warn)"><use href="#i-warn"/></svg>
+            <div class="copy"><strong>Couldn't join. Try again.</strong><span>Your place in #harbor is kept.</span></div>
+            <div class="actions"><button type="button" class="btn">Try again</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Voice-only stage -->
+  <section class="frame" id="f-voice">
+    <h2>2 · Voice-only stage — 4 people, one speaking</h2>
+    <p class="note">Avatars at rest; the accent ring is the only use of the accent on the stage and means "audio from this person right now". Muted and raised-hand are badges, not colour on the avatar.</p>
+    <div class="canvas">
+      <div class="stage" role="region" aria-label="Voice call participants">
+        <p class="stage-status" role="status"><span class="pip" data-state="live"></span>Call is live · End-to-end encrypted</p>
+        <div class="voice-grid">
+          <div class="person" data-speaking="true" role="group" aria-label="mara, speaking"><div class="ring"><span class="avatar lg">M</span></div><span class="name">mara</span></div>
+          <div class="person" data-speaking="false" role="group" aria-label="jun, muted"><div class="ring"><span class="avatar lg">J</span><span class="badge" title="Muted"><svg class="i sm"><use href="#i-mic-off"/></svg></span></div><span class="name">jun</span></div>
+          <div class="person" data-speaking="false" data-hand="true" role="group" aria-label="tove, hand raised"><div class="ring"><span class="avatar lg">T</span><span class="badge hand" title="Hand raised"><svg class="i sm"><use href="#i-hand"/></svg></span></div><span class="name">tove</span></div>
+          <div class="person" data-speaking="false" role="group" aria-label="odalys (you)"><div class="ring"><span class="avatar lg">O</span></div><span class="name">odalys <span class="room-role">· you</span></span></div>
+        </div>
+        <div class="bar" role="toolbar" aria-label="Voice call controls">
+          <div class="left"><span class="where">#harbor</span><span class="timer" role="timer" aria-label="Call duration: 12 minutes 04 seconds">12:04</span><span class="people">· 4 people</span></div>
+          <div class="center" role="group" aria-label="Call controls">
+            <button type="button" class="cbtn" aria-label="Mute microphone" aria-pressed="false" aria-keyshortcuts="Control+Shift+M"><svg class="i"><use href="#i-mic"/></svg><span class="cap">Mute</span></button>
+            <button type="button" class="cbtn" aria-label="Turn on camera" aria-pressed="false" aria-keyshortcuts="Control+Shift+E"><svg class="i"><use href="#i-cam-off"/></svg><span class="cap">Camera</span></button>
+            <button type="button" class="cbtn" aria-label="Share screen" aria-pressed="false"><svg class="i"><use href="#i-screen"/></svg><span class="cap">Share</span></button>
+            <button type="button" class="cbtn" data-tone="warn" aria-label="Raise hand" aria-pressed="false"><svg class="i"><use href="#i-hand"/></svg><span class="cap">Hand</span></button>
+            <button type="button" class="cbtn" aria-label="Send a reaction" aria-haspopup="menu"><svg class="i"><use href="#i-react"/></svg><span class="cap">React</span></button>
+            <button type="button" class="cbtn" aria-label="Show live captions" aria-pressed="false"><svg class="i"><use href="#i-cc"/></svg><span class="cap">Captions</span></button>
+            <button type="button" class="cbtn" aria-label="More call tools" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-more"/></svg><span class="cap">More</span></button>
+            <button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button>
+          </div>
+          <div class="right">
+            <button type="button" class="sec-chip" data-tone="ok" aria-haspopup="dialog" aria-label="End-to-end encrypted — only people in this call can hear or see. Open call privacy details."><svg class="i sm"><use href="#i-lock"/></svg>End-to-end encrypted</button>
+            <span class="cq" data-tier="0" role="img" aria-label="Connection: Excellent"><span class="bars"><i></i><i></i><i></i><i></i></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Video grid -->
+  <section class="frame" id="f-grid">
+    <h2>3 · Video grid — 6 participants (3 columns)</h2>
+    <p class="note">16:9 tiles, 2px border that carries state: accent = speaking, warn = hand raised, dim = pinned. Name plate bottom-left, state tags top-left, per-tile quality bottom-right only when the engine reports it. Captions sit above the bar, never over it.</p>
+    <div class="canvas">
+      <div class="stage" role="region" aria-label="Video call participants">
+        <p class="stage-status" role="status"><span class="pip" data-state="live"></span>Call is live</p>
+        <div class="video-grid" data-count="6" style="padding-bottom:84px">
+          <div class="tile" role="group" aria-label="mara, speaking" data-speaking="true"><div class="cam"></div><div class="top"><span class="spacer"></span><button type="button" class="tag" aria-label="Pin mara to spotlight" title="Pin to spotlight"><svg class="i sm"><use href="#i-pin"/></svg></button></div><div class="bottom"><span class="nick">mara <span class="talk" aria-hidden="true"><i></i><i></i><i></i></span></span></div></div>
+          <div class="tile" role="group" aria-label="jun, muted"><div class="cam b"></div><div class="top"><span class="tag off"><svg class="i sm"><use href="#i-mic-off"/></svg>Muted</span></div><div class="bottom"><span class="nick">jun</span></div></div>
+          <div class="tile" role="group" aria-label="tove, hand raised" data-hand="true"><div class="cam c"></div><div class="top"><span class="tag hand"><svg class="i sm"><use href="#i-hand"/></svg>Hand raised</span></div><div class="bottom"><span class="nick">tove</span></div></div>
+          <div class="tile" role="group" aria-label="kit, camera off, Fair connection"><span class="avatar lg">K</span><div class="top"><span class="tag off"><svg class="i sm"><use href="#i-cam-off"/></svg>Camera off</span></div><div class="bottom"><span class="nick">kit</span><span class="spacer"></span><span class="bars" data-q="2" role="img" aria-label="Fair connection"><i></i><i></i><i></i></span></div></div>
+          <div class="tile" role="group" aria-label="rafe"><div class="cam d"></div><div class="bottom"><span class="nick">rafe</span></div></div>
+          <div class="tile" role="group" aria-label="odalys (you), muted"><div class="cam"></div><div class="top"><span class="tag off"><svg class="i sm"><use href="#i-mic-off"/></svg>Muted</span></div><div class="bottom"><span class="nick">odalys <span class="you">· you</span></span></div></div>
+        </div>
+        <div class="captions" aria-label="Live captions" role="log" aria-live="polite">
+          <div class="line old"><b>jun</b>I'll move the release notes into the pins after this.</div>
+          <div class="line"><b>mara</b>Sounds good — tove, you had your hand up?</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Speaker view + screenshare -->
+  <section class="frame" id="f-share">
+    <h2>4 · Speaker view with screenshare focused</h2>
+    <p class="note">A share always takes the primary slot; the speaker stays visible in the filmstrip with the accent border. The filmstrip scrolls horizontally and never wraps. A reaction floats as a small chip, not confetti.</p>
+    <div class="canvas">
+      <div class="stage" role="region" aria-label="Video call participants">
+        <p class="stage-status" role="status"><span class="pip" data-state="live"></span>mara is sharing their screen</p>
+        <div class="speaker">
+          <div class="tile primary" role="group" aria-label="mara's screen"><div class="cam screen">mara's screen</div><div class="top"><span class="tag"><svg class="i sm"><use href="#i-screen"/></svg>Screen</span><span class="spacer"></span><button type="button" class="tag" aria-label="Switch to grid layout" title="Grid"><svg class="i sm"><use href="#i-grid"/></svg></button></div><div class="bottom"><span class="nick">mara's screen</span></div></div>
+          <div class="filmstrip" role="list" aria-label="Other participants">
+            <div class="tile" role="listitem" aria-label="mara, speaking" data-speaking="true"><div class="cam"></div><div class="bottom"><span class="nick">mara</span></div></div>
+            <div class="tile" role="listitem" aria-label="jun, muted"><div class="cam b"></div><div class="bottom"><span class="nick">jun</span></div></div>
+            <div class="tile" role="listitem" aria-label="tove"><div class="cam c"></div><div class="bottom"><span class="nick">tove</span></div></div>
+            <div class="tile" role="listitem" aria-label="kit, camera off"><span class="avatar md">K</span><div class="bottom"><span class="nick">kit</span></div></div>
+            <div class="tile" role="listitem" aria-label="odalys (you)"><div class="cam"></div><div class="bottom"><span class="nick">you</span></div></div>
+          </div>
+        </div>
+        <div class="react-float" aria-hidden="true"><span class="avatar sm">T</span>tove <svg class="i sm"><use href="#i-hand"/></svg><span>raised a hand</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Control bar -->
+  <section class="frame" id="f-bar">
+    <h2>5 · In-call control bar — states</h2>
+    <p class="note">Top: unmuted, camera on, sharing, protected (hop) connection. Bottom (DM call): muted (filled), hand raised (warn fill), captions on, "Not end-to-end" chip, fair connection.</p>
+    <div class="canvas">
+      <div class="bar" role="toolbar" aria-label="Voice call controls">
+        <div class="left"><span class="where">#harbor</span><span class="timer" role="timer" aria-label="Call duration: 1 hour 02 minutes 18 seconds">1:02:18</span><span class="people">· 6 people</span></div>
+        <div class="center" role="group" aria-label="Call controls">
+          <button type="button" class="cbtn" aria-label="Mute microphone" aria-pressed="false"><svg class="i"><use href="#i-mic"/></svg><span class="cap">Mute</span></button>
+          <button type="button" class="cbtn" aria-label="Turn off camera" aria-pressed="true"><svg class="i"><use href="#i-cam"/></svg><span class="cap">Camera</span></button>
+          <button type="button" class="cbtn" aria-label="Stop sharing screen" aria-pressed="true"><svg class="i"><use href="#i-screen"/></svg><span class="cap">Sharing</span></button>
+          <button type="button" class="cbtn" data-tone="warn" aria-label="Raise hand" aria-pressed="false"><svg class="i"><use href="#i-hand"/></svg><span class="cap">Hand</span></button>
+          <button type="button" class="cbtn" aria-label="Send a reaction" aria-haspopup="menu"><svg class="i"><use href="#i-react"/></svg><span class="cap">React</span></button>
+          <button type="button" class="cbtn" aria-label="Show live captions" aria-pressed="false"><svg class="i"><use href="#i-cc"/></svg><span class="cap">Captions</span></button>
+          <button type="button" class="cbtn" aria-label="More call tools" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-more"/></svg><span class="cap">More</span></button>
+          <button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button>
+        </div>
+        <div class="right">
+          <button type="button" class="sec-chip" data-tone="ok" aria-haspopup="dialog" aria-label="Protected connection — encrypted to this server. Server operators can access call media. Open call privacy details."><svg class="i sm"><use href="#i-shield"/></svg>Protected connection</button>
+          <span class="cq" data-tier="1" role="img" aria-label="Connection: Good"><span class="bars"><i></i><i></i><i></i><i></i></span></span>
+        </div>
+      </div>
+      <div class="bar" role="toolbar" aria-label="Voice call controls" style="border-top:1px solid var(--onyx-line)">
+        <div class="left"><span class="where">mara</span><span class="timer" role="timer" aria-label="Call duration: 3 minutes 40 seconds">03:40</span><span class="people">· 2 people</span></div>
+        <div class="center" role="group" aria-label="Call controls">
+          <button type="button" class="cbtn" aria-label="Unmute microphone" aria-pressed="true"><svg class="i"><use href="#i-mic-off"/></svg><span class="cap">Unmute</span></button>
+          <button type="button" class="cbtn" aria-label="Turn on camera" aria-pressed="false"><svg class="i"><use href="#i-cam-off"/></svg><span class="cap">Camera</span></button>
+          <button type="button" class="cbtn" aria-label="Share screen" aria-pressed="false"><svg class="i"><use href="#i-screen"/></svg><span class="cap">Share</span></button>
+          <button type="button" class="cbtn" data-tone="warn" aria-label="Lower hand" aria-pressed="true"><svg class="i"><use href="#i-hand"/></svg><span class="cap">Hand</span></button>
+          <button type="button" class="cbtn" aria-label="Send a reaction" aria-haspopup="menu"><svg class="i"><use href="#i-react"/></svg><span class="cap">React</span></button>
+          <button type="button" class="cbtn" aria-label="Hide live captions" aria-pressed="true"><svg class="i"><use href="#i-cc"/></svg><span class="cap">Captions</span></button>
+          <button type="button" class="cbtn" aria-label="More call tools" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-more"/></svg><span class="cap">More</span></button>
+          <button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button>
+        </div>
+        <div class="right">
+          <button type="button" class="sec-chip" data-tone="warn" aria-haspopup="dialog" aria-label="Not end-to-end encrypted while outdated clients are present. Open call privacy details."><svg class="i sm"><use href="#i-lock-open"/></svg>Not end-to-end</button>
+          <span class="cq" data-tier="2" role="img" aria-label="Connection: Fair"><span class="bars"><i></i><i></i><i></i><i></i></span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Incoming / outgoing -->
+  <section class="frame" id="f-incoming">
+    <h2>6 · Incoming and outgoing DM call overlays</h2>
+    <p class="note">Modal dialog. Initial focus lands on Decline (least destructive) for incoming and on Cancel for outgoing. Escape declines / cancels. Clicking the scrim does nothing — a ring is never dismissed by accident.</p>
+    <div class="row2">
+      <div class="canvas scrim">
+        <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="inc-t" aria-describedby="inc-d">
+          <div class="kicker">Incoming voice call</div>
+          <h2 id="inc-t">Incoming call</h2>
+          <div class="who"><span class="avatar md">M</span><div><strong>mara</strong><span>Direct message</span></div></div>
+          <p id="inc-d">A voice call is waiting. Accept to join with your current audio settings, or decline to dismiss it.</p>
+          <div class="actions">
+            <button type="button" class="btn danger" aria-label="Decline call from mara"><svg class="i"><use href="#i-leave"/></svg>Decline</button>
+            <button type="button" class="btn primary" aria-label="Accept call from mara"><svg class="i"><use href="#i-phone"/></svg>Accept</button>
+          </div>
+          <p class="meta">Your microphone stays muted if Join muted is enabled.</p>
+        </div>
+      </div>
+      <div class="canvas scrim">
+        <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="out-t" aria-describedby="out-d">
+          <div class="kicker">Outgoing voice call</div>
+          <h2 id="out-t">Calling</h2>
+          <div class="who"><span class="avatar md">J</span><div><strong>jun</strong><span aria-live="polite">Waiting for them to answer.</span></div></div>
+          <p id="out-d">The call request is being sent. You can cancel before they answer.</p>
+          <div class="actions">
+            <button type="button" class="btn danger" aria-label="Cancel call to jun">Cancel</button>
+          </div>
+          <p class="meta"><span class="pip" data-state="ringing"></span> Ringing</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. PiP -->
+  <section class="frame" id="f-pip">
+    <h2>7 · Picture-in-picture while browsing another room</h2>
+    <p class="note">Appears only when the viewed room is not the call's room. Draggable by the handle; the corner button cycles the four corners (no-drag alternative) and arrow keys move it 16px (Shift 48px).</p>
+    <div class="canvas pip-host">
+      <div class="ghost-chat" aria-hidden="true"><div class="kicker">#builds</div><div class="line l"></div><div class="line"></div><div class="line s"></div><div class="line l"></div><div class="line"></div><div class="line s"></div></div>
+      <section class="mini" role="region" tabindex="0" aria-label="Mini voice view for #harbor">
+        <div class="handle"><span class="pip" data-state="live"></span><span class="where">#harbor</span><span class="live" aria-label="1 speaking">1 live</span><button type="button" class="snap" aria-label="Move mini view to next corner" title="Move to next corner"><svg class="i sm"><use href="#i-corner"/></svg></button></div>
+        <div class="video" aria-hidden="true"><span class="nick">mara</span></div>
+        <div class="body">
+          <span class="faces" aria-label="4 voice participants"><span class="avatar sm" data-speaking="true">M</span><span class="avatar sm">J</span><span class="avatar sm">T</span><span class="avatar sm">O</span></span>
+          <button type="button" class="btn" aria-pressed="false" aria-label="Mute microphone"><svg class="i sm"><use href="#i-mic"/></svg>Mute</button>
+          <button type="button" class="btn ghost" aria-label="Return to call in #harbor">Return</button>
+          <button type="button" class="btn danger" aria-label="Leave voice call">Leave</button>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- 8. Reconnecting / poor quality -->
+  <section class="frame" id="f-degraded">
+    <h2>8 · Reconnecting and poor-quality states</h2>
+    <p class="note">Left: the socket dropped mid-call; the stage keeps last-known tiles dimmed and the banner is honest about it. Right: tier 3 held for 2.5s with the camera on; the prompt offers one action.</p>
+    <div class="row2">
+      <div class="canvas">
+        <div class="stage" role="region" aria-label="Video call participants" style="min-height:300px">
+          <p class="stage-status" role="status"><span class="pip" data-state="provisional"></span>Reconnecting…</p>
+          <div class="stage-banner bad" role="alert"><svg class="i" style="color:var(--onyx-bad)"><use href="#i-warn"/></svg><div><strong>Connection lost.</strong> <span>Trying to rejoin #harbor — your place in the conversation is kept.</span></div><button type="button" class="btn">Leave</button></div>
+          <div class="video-grid" data-count="2" style="opacity:.55;padding-top:12px">
+            <div class="tile" role="group" aria-label="mara"><div class="cam"></div><div class="bottom"><span class="nick">mara</span></div></div>
+            <div class="tile" role="group" aria-label="odalys (you)"><div class="cam b"></div><div class="bottom"><span class="nick">odalys <span class="you">· you</span></span></div></div>
+          </div>
+          <div class="bar" role="toolbar" aria-label="Voice call controls">
+            <div class="left"><span class="where">#harbor</span><span class="timer">—</span></div>
+            <div class="center"><button type="button" class="cbtn" disabled aria-label="Mute microphone"><svg class="i"><use href="#i-mic"/></svg><span class="cap">Mute</span></button><button type="button" class="cbtn" disabled aria-label="Turn off camera"><svg class="i"><use href="#i-cam"/></svg><span class="cap">Camera</span></button><button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button></div>
+            <div class="right"><span class="sec-chip" data-tone="warn"><svg class="i sm"><use href="#i-lock-open"/></svg>Connecting…</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="canvas">
+        <div class="stage" role="region" aria-label="Video call participants" style="min-height:300px">
+          <p class="stage-status" role="status"><span class="pip" data-state="live"></span>Call is live · Protecting audio</p>
+          <div class="video-grid" data-count="2">
+            <div class="tile" role="group" aria-label="mara, speaking" data-speaking="true"><span class="avatar lg">M</span><div class="top"><span class="tag off"><svg class="i sm"><use href="#i-cam-off"/></svg>Video paused</span></div><div class="bottom"><span class="nick">mara</span></div></div>
+            <div class="tile" role="group" aria-label="odalys (you), Poor connection"><div class="cam b"></div><div class="bottom"><span class="nick">odalys <span class="you">· you</span></span><span class="spacer"></span><span class="bars" data-q="1" role="img" aria-label="Poor connection"><i></i><i></i><i></i></span></div></div>
+          </div>
+          <div class="cq-prompt" role="status"><svg class="i sm" style="color:var(--onyx-bad)"><use href="#i-warn"/></svg>Poor connection — turn off camera to keep audio clear.<button type="button" class="btn">Turn off camera</button><button type="button" class="x" aria-label="Dismiss connection tip"><svg class="i sm"><use href="#i-x"/></svg></button></div>
+          <div class="bar" role="toolbar" aria-label="Voice call controls">
+            <div class="left"><span class="where">#harbor</span><span class="timer">08:51</span></div>
+            <div class="center"><button type="button" class="cbtn" aria-label="Mute microphone" aria-pressed="false"><svg class="i"><use href="#i-mic"/></svg><span class="cap">Mute</span></button><button type="button" class="cbtn" aria-label="Turn off camera" aria-pressed="true"><svg class="i"><use href="#i-cam"/></svg><span class="cap">Camera</span></button><button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button></div>
+            <div class="right"><span class="cq" data-tier="3" role="img" aria-label="Connection: Poor"><span class="bars"><i></i><i></i><i></i><i></i></span>Poor</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Security sheet -->
+  <section class="frame" id="f-security">
+    <h2>9 · Call privacy sheet</h2>
+    <p class="note">Trust is shown, not shouted: one plain sentence, the media path, and fingerprints to compare out of band. The reserved "Privacy code" slot stays empty until the engine mints one.</p>
+    <div class="canvas pad">
+      <div class="sheet" role="dialog" aria-labelledby="sec-t" aria-describedby="sec-d">
+        <header><div><h2 id="sec-t">End-to-end encrypted call</h2><p id="sec-d">How this call is protected.</p></div><button type="button" class="x" aria-label="Close call privacy"><svg class="i"><use href="#i-x"/></svg></button></header>
+        <div class="body">
+          <div class="lvl"><svg class="i"><use href="#i-lock"/></svg><div><strong>End-to-end encrypted</strong><span>Only people in this call can hear or see.</span></div></div>
+          <dl>
+            <div><dt>Media path</dt><dd>End-to-end — only people in this call can hear or see.</dd></div>
+            <div><dt>Privacy code</dt><dd style="color:var(--onyx-dim)">Available when end-to-end media encryption is active.</dd></div>
+            <div><dt>Your media fingerprint</dt><dd><span class="fp">3Qm7 Kx9P 2bVe</span></dd></div>
+            <div><dt>People in this call</dt><dd>
+              <ul class="peer-list">
+                <li><span class="avatar sm">M</span>mara<span class="fp">8Hc2 Tn4Q 1zRw</span></li>
+                <li><span class="avatar sm">J</span>jun<span class="fp">5Yp1 Wd8K 7mLa</span></li>
+                <li><span class="avatar sm">T</span>tove<span class="fp" style="color:var(--onyx-dim)">Loading…</span></li>
+              </ul>
+            </dd></div>
+          </dl>
+          <p class="hint">Compare this code out of band to confirm your media identity. It does not prove end-to-end encryption by itself.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. Voice settings -->
+  <section class="frame" id="f-settings">
+    <h2>10 · Voice settings sheet</h2>
+    <div class="canvas pad">
+      <div class="sheet settings" role="dialog" aria-labelledby="vs-t">
+        <header><div><h2 id="vs-t">Voice settings</h2><p>Devices, activation, and signal processing.</p></div><button type="button" class="x" aria-label="Close voice settings"><svg class="i"><use href="#i-x"/></svg></button></header>
+        <div class="body">
+          <h3>Devices</h3>
+          <div class="field"><label for="p-mic">Microphone</label><select id="p-mic"><option>System microphone</option><option selected>Headset (USB)</option></select><span class="desc">Microphone used for calls and rooms.</span></div>
+          <div class="field"><label for="p-spk">Speakers</label><select id="p-spk"><option selected>System speaker</option></select><span class="desc">Speaker or headset for remote audio.</span></div>
+          <div class="field"><label for="p-cam">Camera</label><select id="p-cam"><option selected>System camera</option></select><span class="desc">Camera used when video is enabled.</span></div>
+          <div class="field"><label for="p-vol">Output volume</label><input id="p-vol" type="range" min="0" max="100" value="80"><span class="desc">80%</span></div>
+          <h3>Processing</h3>
+          <label class="check"><input type="checkbox" checked><div>Join muted<span>Start with your microphone off. Unmute when you are ready to speak.</span></div></label>
+          <label class="check"><input type="checkbox" checked><div>Voice activity<span>Transmit when speech is detected.</span></div></label>
+          <div class="field"><label for="p-sens">Sensitivity</label><select id="p-sens"><option>Low</option><option selected>Medium</option><option>High</option></select><span class="desc">Threshold for opening the voice gate.</span></div>
+          <label class="check"><input type="checkbox" checked><div>Noise suppression<span>Reduce constant background noise before sending.</span></div></label>
+          <label class="check"><input type="checkbox" checked><div>Echo cancellation<span>Prevent speaker output from returning into the microphone.</span></div></label>
+          <h3>Push to talk</h3>
+          <label class="check"><input type="checkbox"><div>Push to talk<span>Require a key press before transmitting.</span></div></label>
+          <div class="field"><span style="font-weight:650">Talk key</span><div class="key"><span class="mono" aria-live="polite">Space</span><button type="button" class="btn" aria-label="Capture push-to-talk key" aria-pressed="false">Capture key</button><button type="button" class="btn ghost" aria-label="Clear push-to-talk key">Clear</button></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. Stage mode -->
+  <section class="frame" id="f-stage">
+    <h2>11 · Stage mode — speakers vs audience, raised hands</h2>
+    <p class="note">Speakers are tiles; the audience is a facepile line, never a grid. The host sees the raised-hand queue as a side list. The security chip reads "Stage broadcast" — a stage is never presented as private.</p>
+    <div class="canvas">
+      <div class="stage-mode">
+        <div class="stage" role="region" aria-label="Voice call participants" style="min-height:280px">
+          <p class="stage-status" role="status"><span class="pip" data-state="live"></span>Stage is live · You are a speaker</p>
+          <div class="voice-grid">
+            <div class="person" data-speaking="true" role="group" aria-label="mara, speaking"><div class="ring"><span class="avatar lg">M</span></div><span class="name">mara</span><span class="sub">host</span></div>
+            <div class="person" role="group" aria-label="odalys (you)"><div class="ring"><span class="avatar lg">O</span></div><span class="name">odalys</span><span class="sub">you · speaker</span></div>
+          </div>
+          <div class="audience"><span class="faces" aria-hidden="true"><span class="avatar sm">J</span><span class="avatar sm">T</span><span class="avatar sm">K</span><span class="avatar sm">R</span></span><span>Audience · 23 listening · 2 raised hands</span><span class="sec-chip" data-tone="warn" style="margin-left:auto"><svg class="i sm"><use href="#i-shield"/></svg>Stage broadcast</span></div>
+        </div>
+        <aside aria-label="Raised hands">
+          <h3>Raised hands</h3>
+          <ul>
+            <li><span class="avatar sm">T</span>tove<button type="button" class="btn" aria-label="Invite tove to speak">Invite to speak</button></li>
+            <li><span class="avatar sm">K</span>kit<button type="button" class="btn" aria-label="Invite kit to speak">Invite to speak</button></li>
+          </ul>
+          <div class="stage-banner" role="alert" style="margin:12px 0 0"><div><strong>mara</strong> <span>invited you to speak.</span></div></div>
+          <div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="btn primary" style="flex:1">Accept</button><button type="button" class="btn ghost" style="flex:1">Decline</button></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. Mobile -->
+  <section class="frame" id="f-mobile">
+    <h2>12 · Mobile 375px</h2>
+    <p class="note">Left: in a video call (2-column 3:4 tiles, icon-only bar with 48px targets, Leave kept rightmost). Middle: browsing another room with the PiP card docked top-right and the pre-join banner. Right: incoming call takes the whole screen with Accept/Decline at thumb reach.</p>
+    <div class="phones">
+      <div class="phone" aria-label="Mobile in-call">
+        <div class="statusbar"><span>9:41</span><span>Onyx</span></div>
+        <div class="m-head"><span class="pip" data-state="live"></span><span class="where">#harbor</span><span class="timer">12:04</span></div>
+        <div class="m-sec"><span class="sec-chip" data-tone="ok"><svg class="i sm"><use href="#i-lock"/></svg>End-to-end encrypted</span><span class="cq" data-tier="1" role="img" aria-label="Connection: Good"><span class="bars"><i></i><i></i><i></i><i></i></span></span></div>
+        <div class="m-stage">
+          <div class="video-grid" data-count="4">
+            <div class="tile" data-speaking="true" role="group" aria-label="mara, speaking"><div class="cam"></div><div class="bottom"><span class="nick">mara</span></div></div>
+            <div class="tile" role="group" aria-label="jun, muted"><div class="cam b"></div><div class="top"><span class="tag off"><svg class="i sm"><use href="#i-mic-off"/></svg></span></div><div class="bottom"><span class="nick">jun</span></div></div>
+            <div class="tile" data-hand="true" role="group" aria-label="tove, hand raised"><div class="cam c"></div><div class="top"><span class="tag hand"><svg class="i sm"><use href="#i-hand"/></svg></span></div><div class="bottom"><span class="nick">tove</span></div></div>
+            <div class="tile" role="group" aria-label="odalys (you)"><div class="cam d"></div><div class="bottom"><span class="nick">you</span></div></div>
+          </div>
+          <div class="captions"><div class="line"><b>mara</b>tove, you had your hand up?</div></div>
+        </div>
+        <div class="m-bar" role="toolbar" aria-label="Voice call controls">
+          <button type="button" class="cbtn" aria-label="Mute microphone" aria-pressed="false"><svg class="i"><use href="#i-mic"/></svg><span class="cap">Mute</span></button>
+          <button type="button" class="cbtn" aria-label="Turn off camera" aria-pressed="true"><svg class="i"><use href="#i-cam"/></svg><span class="cap">Camera</span></button>
+          <button type="button" class="cbtn" data-tone="warn" aria-label="Raise hand" aria-pressed="false"><svg class="i"><use href="#i-hand"/></svg><span class="cap">Hand</span></button>
+          <button type="button" class="cbtn" aria-label="Hide live captions" aria-pressed="true"><svg class="i"><use href="#i-cc"/></svg><span class="cap">Captions</span></button>
+          <button type="button" class="cbtn" aria-label="More call tools" aria-haspopup="dialog"><svg class="i"><use href="#i-more"/></svg><span class="cap">More</span></button>
+          <button type="button" class="cbtn leave" aria-label="Leave voice call"><svg class="i"><use href="#i-leave"/></svg><span class="cap">Leave</span></button>
+        </div>
+      </div>
+
+      <div class="phone" aria-label="Mobile pre-join and PiP">
+        <div class="statusbar"><span>9:41</span><span>Onyx</span></div>
+        <div class="m-head"><span class="where">#builds</span></div>
+        <div class="m-pip" role="region" tabindex="0" aria-label="Mini voice view for #harbor">
+          <div class="row"><span class="pip" data-state="live"></span><span class="where">#harbor</span><span style="margin-left:auto;font-size:11px;color:var(--onyx-dim)">1 live</span></div>
+          <div class="row"><span class="faces"><span class="avatar sm" style="outline:2px solid var(--onyx-accent)">M</span><span class="avatar sm">J</span><span class="avatar sm">T</span></span></div>
+          <div class="row"><button type="button" class="btn" aria-label="Mute microphone"><svg class="i sm"><use href="#i-mic"/></svg></button><button type="button" class="btn ghost" aria-label="Return to call in #harbor">Return</button><button type="button" class="btn danger" aria-label="Leave voice call">Leave</button></div>
+        </div>
+        <div class="msgs" aria-hidden="true"><div class="line l"></div><div class="line"></div><div class="line s"></div><div class="line l"></div><div class="line"></div><div class="line s"></div><div class="line l"></div></div>
+        <div class="join-banner m-join" role="status">
+          <div class="copy"><strong>1 person is in voice.</strong><span>Join to listen; your microphone starts off until you unmute.</span></div>
+          <div class="actions"><button type="button" class="btn primary" aria-label="Join call in #builds"><svg class="i"><use href="#i-mic"/></svg>Join call</button><button type="button" class="btn ghost" aria-label="Join with video in #builds"><svg class="i"><use href="#i-cam"/></svg>Join with video</button></div>
+        </div>
+      </div>
+
+      <div class="phone" aria-label="Mobile incoming call">
+        <div class="statusbar"><span>9:41</span><span>Onyx</span></div>
+        <div class="m-incoming" role="dialog" aria-modal="true" aria-labelledby="m-inc-t" aria-describedby="m-inc-d">
+          <div class="kicker">Incoming voice call</div>
+          <span class="avatar lg" style="width:96px;height:96px;font-size:32px">M</span>
+          <h2 id="m-inc-t" style="margin:8px 0 0;font-size:24px;font-weight:750">mara</h2>
+          <p id="m-inc-d" style="color:var(--onyx-dim);margin:0">A voice call is waiting. Accept to join with your current audio settings, or decline to dismiss it.</p>
+          <div class="actions">
+            <button type="button" class="btn danger" aria-label="Decline call from mara"><svg class="i"><use href="#i-leave"/></svg>Decline</button>
+            <button type="button" class="btn primary" aria-label="Accept call from mara"><svg class="i"><use href="#i-phone"/></svg>Accept</button>
+          </div>
+          <p style="font-size:12px;color:var(--onyx-faint);margin:0">Your microphone stays muted if Join muted is enabled.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('#switcher button');
+  var frames = document.querySelectorAll('.frame');
+  function show(id) {
+    frames.forEach(function (f) { f.hidden = !(id === 'all' || f.id === id); });
+    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-show') === id)); });
+    try { localStorage.setItem('onyx:calls-proto-state', id); } catch (e) {}
+  }
+  buttons.forEach(function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-show')); }); });
+  var saved = null;
+  try { saved = localStorage.getItem('onyx:calls-proto-state'); } catch (e) {}
+  if (saved && (saved === 'all' || document.getElementById(saved))) show(saved);
+})();
+</script>
+</body>
+</html>
