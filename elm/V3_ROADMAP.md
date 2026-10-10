@@ -162,3 +162,19 @@ three alphabetised registry blocks (`-- FEATURE MODELS` / `-- FEATURE MSGS` /
 `-- FEATURE UPDATE`); one incoming `shortcut` port (ports.js owns scope rules) and one
 outgoing `dialog` focus port; per-feature CSS files; elm-review (`NoUnused.*`, no
 `import App` from `Feature/*`).
+
+## Phase 6 replaced by the calls design (2026-10-10)
+
+Spec + prototype: [design/calls/CALLS_DESIGN.md](design/calls/CALLS_DESIGN.md),
+[design/calls/prototype.html](design/calls/prototype.html). Slices C1–C12 (acceptance
+criteria in spec §6) supersede rows 6.1–6.7:
+
+C1 Presence + join banner (M) · C2 Voice-only stage + control bar v1 + announcer (M) ·
+C3 Security chip + privacy sheet (S) · C4 Camera/share/deafen commands + quality (M) ·
+C5 Video grid, tiles, layouts, dominant speaker (L) · C6 DM ring overlays (S) ·
+C7 PiP (M) · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
+C10 Reconnecting + classified errors (S) · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
+
+Open product questions are in spec §7 (mic chord vs room-mute chord, join-muted default,
+screen-share peers in ROSTER, wire for DEAFEN/RECORD, privacy code, fingerprint forwarding,
+ring timeout outcome).
