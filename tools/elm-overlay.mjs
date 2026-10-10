@@ -7,10 +7,13 @@
  *   node tools/elm-overlay.mjs <dist> <elm-dist>
  *
  * <elm-dist> is the output of elm/tools/build.sh (hashed app.*.js,
- * ports.*.js, app.*.css, css/*.css, index.html).
+ * voice.*.js, voice-worker.*.js, ports.*.js, app.*.css, css/*.css,
+ * index.html, opcodec_wasm.{js,wasm}).
  *
  * 1. Copies the hashed Elm assets to <dist>/assets/elm/ (the deploy's
- *    retained, cache-first asset tree).
+ *    retained, cache-first asset tree). The voice engine's codec is loaded
+ *    from the site root (/opcodec_wasm.js), which the Vite build already
+ *    serves from public/; the overlay verifies it is there.
  * 2. Rewrites every SPA document the Solid build/materialiser produced
  *    (any .html that loads the Vite entry `/assets/index-*.js`): the route's
  *    <head> metadata (title, description, OG/Twitter, ld+json, icons,
@@ -42,7 +45,7 @@ const assetOut = join(dist, 'assets', 'elm');
 mkdirSync(join(assetOut, 'css'), { recursive: true });
 const copied = [];
 for (const name of readdirSync(elmDist)) {
-  if (/^(app|ports)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
+  if (/^(app|ports|voice|voice-worker)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
     copyFileSync(join(elmDist, name), join(assetOut, name));
     copied.push(name);
   }
@@ -58,6 +61,15 @@ if (existsSync(cssDir)) {
 }
 if (!copied.some((n) => /^app\..*\.js$/.test(n))) fail('hashed app.*.js not found in elm dist');
 if (!copied.some((n) => /^ports\..*\.js$/.test(n))) fail('hashed ports.*.js not found in elm dist');
+if (!copied.some((n) => /^voice\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice.*.js (calls engine) not found in elm dist');
+if (!copied.some((n) => /^voice-worker\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice-worker.*.js not found in elm dist');
+// The engine loads its codec from the site root; Vite copies public/ there.
+for (const codec of ['opcodec_wasm.js', 'opcodec_wasm.wasm']) {
+  if (!existsSync(join(dist, codec))) {
+    if (!existsSync(join(elmDist, codec))) fail(`${codec} missing from both ${dist} and ${elmDist}`);
+    copyFileSync(join(elmDist, codec), join(dist, codec));
+  }
+}
 
 // 2. Elm document parts -------------------------------------------------
 const elmHtml = readFileSync(join(elmDist, 'index.html'), 'utf8');

@@ -410,6 +410,35 @@ export class CadenceVoxDecoder {
 // -------------------------------------------------------------------
 export type CadenceVisProfile = 'camera' | 'screen';
 
+/**
+ * True when an encoded cadencevis frame is an intra (key) frame. The shipped
+ * bitstream header is `[version 0x01][type][quality][u16 width][u16 height]…`
+ * where type 0x00 is intra and 0x01/0x02 are predicted frames; earlier builds
+ * marked keyframes with a leading 0xFF. Receivers only start a decoder on a
+ * frame flagged KEYFRAME, so testing for 0xFF alone left every remote camera
+ * blank against the current codec.
+ */
+export function isCadenceVisKeyframe(encoded: Uint8Array): boolean {
+  if (encoded.length === 0) return false;
+  if (encoded[0] === 0xff) return true;
+  return encoded.length >= 2 && encoded[0] === 0x01 && encoded[1] === 0x00;
+}
+
+/**
+ * Frame dimensions from a cadencevis header (`[0x01][type][quality]`
+ * `[u16 BE width][u16 BE height]`), or null for legacy / short frames. The
+ * encoder only accepts multiples of 16 and silently falls back down its size
+ * ladder, so receivers must size their decoder from the bitstream, not from
+ * an assumed profile.
+ */
+export function cadenceVisFrameSize(encoded: Uint8Array): { width: number; height: number } | null {
+  if (encoded.length < 7 || encoded[0] !== 0x01) return null;
+  const width = (encoded[3]! << 8) | encoded[4]!;
+  const height = (encoded[5]! << 8) | encoded[6]!;
+  if (width < 16 || height < 16 || width % 2 !== 0 || height % 2 !== 0) return null;
+  return { width, height };
+}
+
 export class CadenceVisEncoder {
   private m: EmModule;
   private handle: number;

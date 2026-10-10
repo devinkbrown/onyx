@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it, vi } from 'vitest';
 
-import { normalizeModule, type RawEmModule } from './OpcodecWasm';
+import { cadenceVisFrameSize, isCadenceVisKeyframe, normalizeModule, type RawEmModule } from './OpcodecWasm';
 
 // These tests cover the cwrap→ccall normalization that fixes the
 // "Codec unavailable" failures: the shipped opcodec Emscripten build exports
@@ -64,5 +64,37 @@ describe('normalizeModule', () => {
 
   it('throws when the module exposes neither ccall nor cwrap', () => {
     expect(() => normalizeModule(heaps() as RawEmModule)).toThrow(/neither ccall nor cwrap/);
+  });
+});
+
+// Header bytes captured from the shipped opcodec_wasm.wasm (64x64, q45):
+// `01 00 2d 00 40 00 40 00` for a forced intra frame, `01 01` / `01 02` for
+// predicted frames. The old 0xFF test flagged every frame as a delta, so no
+// receiver ever started a decoder.
+describe('isCadenceVisKeyframe', () => {
+  it('recognises the current intra header', () => {
+    expect(isCadenceVisKeyframe(new Uint8Array([0x01, 0x00, 0x2d, 0x00, 0x40, 0x00, 0x40, 0x00]))).toBe(true);
+  });
+  it('treats predicted frames as deltas', () => {
+    expect(isCadenceVisKeyframe(new Uint8Array([0x01, 0x01, 0x2d, 0x00, 0x40]))).toBe(false);
+    expect(isCadenceVisKeyframe(new Uint8Array([0x01, 0x02, 0x2d]))).toBe(false);
+  });
+  it('keeps the legacy 0xFF marker and rejects empty input', () => {
+    expect(isCadenceVisKeyframe(new Uint8Array([0xff, 0x10]))).toBe(true);
+    expect(isCadenceVisKeyframe(new Uint8Array([]))).toBe(false);
+    expect(isCadenceVisKeyframe(new Uint8Array([0x01]))).toBe(false);
+  });
+});
+
+// `01 00 2d 01 40 00 b0 00` = 320x176 (u16 big-endian), from the shipped codec.
+describe('cadenceVisFrameSize', () => {
+  it('reads big-endian width/height from the header', () => {
+    expect(cadenceVisFrameSize(new Uint8Array([0x01, 0x00, 0x2d, 0x01, 0x40, 0x00, 0xb0, 0x00]))).toEqual({ width: 320, height: 176 });
+    expect(cadenceVisFrameSize(new Uint8Array([0x01, 0x01, 0x2d, 0x05, 0x00, 0x02, 0xd0]))).toEqual({ width: 1280, height: 720 });
+  });
+  it('rejects legacy, short, and implausible headers', () => {
+    expect(cadenceVisFrameSize(new Uint8Array([0xff, 0x00, 0x2d, 0x01, 0x40, 0x00, 0xb0]))).toBeNull();
+    expect(cadenceVisFrameSize(new Uint8Array([0x01, 0x00, 0x2d, 0x01]))).toBeNull();
+    expect(cadenceVisFrameSize(new Uint8Array([0x01, 0x00, 0x2d, 0x00, 0x08, 0x00, 0x08]))).toBeNull();
   });
 });

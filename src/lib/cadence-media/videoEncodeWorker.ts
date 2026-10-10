@@ -53,7 +53,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { OpcodecWasm, CadenceVisEncoder, rgbaToYuv420 } from './OpcodecWasm';
+import { OpcodecWasm, CadenceVisEncoder, rgbaToYuv420, isCadenceVisKeyframe } from './OpcodecWasm';
 import type { CadenceVisProfile } from './OpcodecWasm';
 import type { NetworkQualityTier } from './types';
 
@@ -265,7 +265,7 @@ async function captureLoop(s: WorkerState): Promise<void> {
     }
     if (!encoded.length) continue;
 
-    const ftype: 'KEYFRAME' | 'FRAME' = encoded[0] === 0xFF ? 'KEYFRAME' : 'FRAME';
+    const ftype: 'KEYFRAME' | 'FRAME' = isCadenceVisKeyframe(encoded) ? 'KEYFRAME' : 'FRAME';
 
     /* Transfer the buffer to avoid a copy across the thread boundary.
      * Use the WindowPostMessageOptions overload so TypeScript accepts the

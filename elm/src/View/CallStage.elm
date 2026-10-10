@@ -578,8 +578,15 @@ moreTools model =
              else
                 "Deafen"
             )
-        , div [ class "onyx-call-more-share" ]
-            [ shareButton model "onyx-call-more-item" "call-more-share" ]
+        , -- v3/calls-engine: phones get Share only through More; where the
+          -- platform has no screen picker (iPhone/iPad WebKit, reported as
+          -- shareSupported = false) it is not offered at all.
+          if model.callLocal.shareSupported then
+            div [ class "onyx-call-more-share" ]
+                [ shareButton model "onyx-call-more-item" "call-more-share" ]
+
+          else
+            text ""
         , View.CallOverlays.moreReactItem model -- v3/calls-c8
         , moreItem
             [ attribute "aria-pressed" (boolAttr (model.callLayout == CallMedia.LayoutSpotlight))

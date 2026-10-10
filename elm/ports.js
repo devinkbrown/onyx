@@ -2207,6 +2207,10 @@
     if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "no_device";
     if (name === "CodecError" || name === "MediaCodecError") return "codec";
     if (name === "EncoderError") return "encoder";
+    /* v3/calls-engine: adapter-classified refusals (voice-core.ts). */
+    if (name === "AccountRequiredError") return "account";
+    if (name === "EncryptionKeyError") return "encryption";
+    if (name === "NotSupportedError") return "unsupported";
     return "other";
   }
   /* v3/calls-c4: engine-confirmed local media + quality on the same
@@ -2498,6 +2502,15 @@
         try { el.muted = true; } catch (err) { /* read-only in some hosts */ }
         if ((el.srcObject || null) !== stream) {
           try { el.srcObject = stream; } catch (err) { /* binding is best-effort */ }
+          /* v3/calls-engine: WebKit (iOS) only autoplays muted inline video
+             and still wants an explicit play() once a stream is bound. */
+          if (stream) {
+            try { el.playsInline = true; } catch (err) { /* attribute covers it */ }
+            try {
+              var started = el.play();
+              if (started && typeof started.then === "function") started.then(null, function () { /* retried on the next bind */ });
+            } catch (err) { /* play is best-effort */ }
+          }
         }
         /* Unbound placeholders stay hidden (CSS) so the avatar shows —
            never an empty black frame. Not observed: no rebind loop. */
@@ -2904,9 +2917,11 @@
   }
 
   /* Classify one socket message: "text" for the line buffer,
-     "forwarded" when bytes reached Elm, "dropped" for empty frames or
-     a missing port, "closed" when the socket was rejected. */
-  function mediaReceiveRaw(app, data, protocol, close) {
+     "forwarded" when bytes reached Elm, "engine" when the mounted voice
+     engine took them directly (optional `direct` sink), "dropped" for
+     empty frames or a missing port, "closed" when the socket was
+     rejected. */
+  function mediaReceiveRaw(app, data, protocol, close, direct) {
     var bytes = mediaToBytes(data);
     if (!bytes) return "text";
     if (protocol === MEDIA_TEXT_SUBPROTOCOL) {
@@ -2918,6 +2933,16 @@
       return "closed";
     }
     if (bytes.byteLength === 0) return "dropped";
+    /* v3/calls-engine: with an engine mounted, datagrams go straight to
+       it (zero-copy). Elm's binary fold only validated and forwarded to
+       this same engine, whose decodeCadenceFrame is the oracle check;
+       routing 60 fps video through Elm lists cost a full array copy per
+       frame each way. */
+    if (typeof direct === "function") {
+      try {
+        if (direct(bytes) === true) return "engine";
+      } catch (err) { /* fall back to the Elm path */ }
+    }
     if (!app.ports.mediaBinaryReceived) return "dropped";
     try {
       app.ports.mediaBinaryReceived.send({ bytes: Array.from(bytes) });
@@ -2995,7 +3020,87 @@
     }
   }
 
-  function connectSocket(app, url, sendPort, onClose) {
+  /* v3/calls-engine — the voice engine's socket seam. The Cadence engine
+     (window.OnyxVoiceEngine, elm/media/voice-engine.ts) rides the ONE
+     socket ports.js owns: it sends its own MEDIA lines and binary
+     datagrams through `attachTransport`, and sees every inbound line
+     (`receiveLine`) and datagram (`receiveMediaFrame`). Elm keeps its
+     own MEDIA folds (roster, captions, reactions) from the same lines;
+     the engine never re-sends what Elm sends (EVENT ADD MEDIA, REACT).
+     All hooks are optional: without an engine nothing changes. */
+  function createVoiceSeam(deps) {
+    var url = "";
+    var attached = null;
+    function engine() {
+      try {
+        var hook = deps.engine();
+        return (hook && typeof hook.receiveLine === "function") ? hook : null;
+      } catch (err) { return null; }
+    }
+    function liveSocket() {
+      try { return deps.socket(); } catch (err) { return null; }
+    }
+    function attach(hook) {
+      if (attached === hook || typeof hook.attachTransport !== "function") return;
+      attached = hook;
+      hook.attachTransport({
+        sendLine: function (line) {
+          var facade = liveSocket();
+          if (!facade || !facade.isOpen() || typeof line !== "string" || !line) return false;
+          facade.send(line);
+          return true;
+        },
+        sendBinary: function (bytes) {
+          var facade = liveSocket();
+          var raw = facade && facade.rawSocket ? facade.rawSocket() : null;
+          var size = bytes && typeof bytes.byteLength === "number" ? bytes.byteLength : 0;
+          if (!size || size > MEDIA_MAX_BINARY_BYTES) return false;
+          if (!mediaAdmitsBinary(raw) || !mediaHasCapacity(raw, size)) return false;
+          try {
+            raw.send(bytes);
+            return true;
+          } catch (err) {
+            return false;
+          }
+        },
+        url: function () { return url; }
+      });
+    }
+    return {
+      opened: function (socketUrl) {
+        url = typeof socketUrl === "string" ? socketUrl : "";
+        var hook = engine();
+        if (!hook) return;
+        attach(hook);
+        if (typeof hook.transportOpen === "function") {
+          try { hook.transportOpen(); } catch (err) { /* best-effort */ }
+        }
+      },
+      closed: function () {
+        var hook = engine();
+        if (hook && typeof hook.transportClosed === "function") {
+          try { hook.transportClosed(); } catch (err) { /* best-effort */ }
+        }
+      },
+      lines: function (batch) {
+        var hook = engine();
+        if (!hook || !batch) return;
+        for (var i = 0; i < batch.length; i += 1) {
+          try { hook.receiveLine(batch[i]); } catch (err) { /* one bad line never stops the tap */ }
+        }
+      },
+      binary: function (bytes) {
+        var hook = engine();
+        if (!hook || typeof hook.receiveMediaFrame !== "function") return false;
+        try { hook.receiveMediaFrame(bytes); } catch (err) { /* frame dropped */ }
+        return true;
+      }
+    };
+  }
+
+  /* `media` (optional, v3/calls-engine): { onOpen(), onBinary(bytes) }
+     — the voice engine's view of this socket (see createVoiceSeam). */
+  function connectSocket(app, url, sendPort, onClose, media) {
     var socket = null;
     try {
       socket = new WebSocket(url);
@@ -3008,13 +3113,16 @@
     try { socket.binaryType = "arraybuffer"; } catch (err) { /* text still flows */ }
     socket.addEventListener("open", function () {
       app.ports.wsOpened.send({ url: url });
+      if (media && typeof media.onOpen === "function") {
+        try { media.onOpen(); } catch (err) { /* engine attach is best-effort */ }
+      }
     });
     socket.addEventListener("message", function (event) {
       /* Binary frames carry media datagrams, not IRC lines: classify first
          so binary bytes can never pollute the text buffer. */
       if (mediaReceiveRaw(app, event.data, socket.protocol, function (code, reason) {
         try { socket.close(code, reason); } catch (err) { /* already closing */ }
-      }) !== "text") {
+      }, media && media.onBinary) !== "text") {
         return;
       }
       /* IRC-over-WebSocket: every text frame is a COMPLETE message and the
@@ -3781,16 +3889,30 @@ function fetchPublicFeed(url) {
 
     openVault(function (db) { vault = db; });
 
+    /* v3/calls-engine: the mounted voice engine shares this socket. */
+    var voiceSeam = createVoiceSeam({
+      socket: function () { return socket; },
+      engine: function () { return (typeof window !== "undefined") ? window.OnyxVoiceEngine : null; }
+    });
+
     app.ports.wsConnect.subscribe(function (req) {
+      /* The engine's call ends with the socket it rode on. */
+      voiceSeam.closed();
       socket.close();
       if (keepalive) keepalive.clear();
-      socket = connectSocket(app, req.url, function (batch) {
+      var mine = connectSocket(app, req.url, function (batch) {
         /* Receipt stamp: folds between Ticks (latency RTT) resolve
            against receipt ms, not the last tick. */
         app.ports.wsLines.send({ at: Date.now(), lines: batch });
+        if (socket === mine) voiceSeam.lines(batch);
       }, function () {
         if (keepalive) keepalive.clear();
+        if (socket === mine) voiceSeam.closed();
+      }, {
+        onOpen: function () { if (socket === mine) voiceSeam.opened(req.url); },
+        onBinary: function (bytes) { return socket === mine && voiceSeam.binary(bytes); }
       });
+      socket = mine;
       keepalive = createPingKeepalive(app, socket);
       keepalive.schedule();
     });
@@ -9943,6 +10065,7 @@ function fetchPublicFeed(url) {
     createMediaBinary: createMediaBinary,
     wireMediaBinary: wireMediaBinary,
     mediaReceiveRaw: mediaReceiveRaw,
+    createVoiceSeam: createVoiceSeam,
     mediaMaxBinaryBytes: MEDIA_MAX_BINARY_BYTES,
     createGroupWelcome: createGroupWelcome,
     wireGroupWelcome: wireGroupWelcome,

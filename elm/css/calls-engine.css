@@ -1,0 +1,123 @@
+/* v3/calls-engine — call surface polish once real calls run
+   (elm/media voice engine). Loaded last; overrides only call classes.
+
+   - The bar reflows by the STAGE's width (container queries), not the
+     viewport: the stage lives in the message column, whose width depends
+     on the rails. Wide: info | controls | chip. Narrow: info + chip on
+     one row, every control on one even row of >= 44px targets.
+   - Person cells top-align (a role line no longer pushes a neighbour down).
+   - Phone: the More menu is a bottom sheet; an expanded/fullscreen stage
+     is a full-screen call screen sized by 100dvh with safe-area insets
+     (iOS Safari, installed PWA); the docked bar drops the bottom inset it
+     only needs at the screen edge. */
+
+/* Container queries only above phone width: a size container is also a
+   containing block for position:fixed, which the phone bottom sheet and
+   the full-screen call screen need to escape. */
+@media (min-width: 641px) {
+  .onyx-call-stage { container: onyx-call / inline-size; }
+}
+
+.onyx-call-people { align-items: flex-start; }
+.onyx-call-person { justify-content: flex-start; }
+
+.onyx-call-bar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.onyx-call-bar-left { overflow: hidden; }
+.onyx-call-bar-right { min-width: 0; }
+.onyx-sec-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.onyx-cbtn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-cbtn-leave { width: 64px; }
+
+/* Medium stage: the chip keeps its icon (its aria-label carries the words). */
+@container onyx-call (max-width: 1000px) {
+  .onyx-sec-chip { width: 32px; padding: 0; justify-content: center; }
+  .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .onyx-call-bar-center { gap: 2px; }
+  .onyx-cbtn { width: 52px; }
+  /* The room is already named by the header and the stage status line. */
+  .onyx-call-where { display: none; }
+  .onyx-cbtn-leave { width: 60px; margin-left: var(--space-1); }
+}
+
+/* Narrow stage: two rows — info + status icons, then one even control row. */
+@container onyx-call (max-width: 760px) {
+  .onyx-call-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "left right" "center center";
+    row-gap: var(--space-2);
+  }
+  .onyx-call-bar-left { grid-area: left; gap: var(--space-2); font-size: var(--text-sm); }
+  .onyx-call-bar-right { grid-area: right; }
+  .onyx-call-bar-center {
+    grid-area: center; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(var(--target-min), 1fr);
+    gap: var(--space-1); justify-content: stretch;
+  }
+  .onyx-call-bar-center > .onyx-cbtn,
+  .onyx-call-more-wrap > .onyx-cbtn { width: 100%; min-width: var(--target-min); height: 48px; }
+  .onyx-call-more-wrap { min-width: 0; }
+  .onyx-cbtn-leave { width: 100%; margin-left: 0; }
+}
+
+@media (max-width: 640px) {
+  .onyx-sec-chip { width: 32px; padding: 0; justify-content: center; }
+  .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .onyx-call-bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "left right" "center center";
+    row-gap: var(--space-2);
+  }
+  .onyx-call-bar-left { grid-area: left; gap: var(--space-2); font-size: var(--text-sm); }
+  .onyx-call-bar-right { grid-area: right; }
+  .onyx-call-bar-center {
+    grid-area: center; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(var(--target-min), 1fr);
+    gap: var(--space-1); justify-content: stretch;
+  }
+  .onyx-call-bar-center > .onyx-cbtn,
+  .onyx-call-more-wrap > .onyx-cbtn { width: 100%; min-width: var(--target-min); height: 48px; }
+  .onyx-call-more-wrap { min-width: 0; }
+  .onyx-cbtn-leave { width: 100%; margin-left: 0; }
+  .onyx-sec-chip { width: var(--target-min); height: var(--target-min); }
+  /* Docked in the message column the bar is not at the screen edge. */
+  .onyx-call-bar { padding: var(--space-2) var(--space-2) var(--space-2); }
+  .onyx-cbtn { gap: 0; }
+
+  /* More → bottom sheet, thumb-reachable, 44px rows. */
+  .onyx-call-more {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: none; z-index: 60;
+    min-width: 0; max-height: 70dvh; overflow-y: auto;
+    padding: var(--space-2) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--radius) var(--radius) 0 0; border-width: 1px 0 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.45);
+  }
+  .onyx-call-more::before {
+    content: ""; display: block; width: 36px; height: 4px; margin: 0 auto var(--space-2);
+    border-radius: 2px; background: var(--onyx-line);
+  }
+  .onyx-call-more-item { min-height: var(--target-min); font-size: var(--text-md); }
+
+  /* Expanded / fullscreen on a phone = the full-screen call screen. */
+  .onyx-call-stage[data-size="expanded"],
+  .onyx-call-stage[data-size="fullscreen"] {
+    position: fixed; inset: 0; z-index: 50; margin: 0; border: 0; border-radius: 0;
+    height: 100vh; height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
+  }
+  .onyx-call-stage[data-size="expanded"] .onyx-call-people,
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-people { flex: 1 1 auto; align-content: center; overflow-y: auto; }
+  .onyx-call-stage[data-size="expanded"] .onyx-call-video,
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-video { flex: 1 1 auto; min-height: 0; }
+  .onyx-call-stage[data-size="expanded"] .onyx-call-bar,
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-bar {
+    border-radius: 0;
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-call-more { transition: none; }
+}

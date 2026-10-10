@@ -189,6 +189,19 @@ commands =
         , test "join with video starts with the camera intent" <|
             \_ ->
                 Expect.equal True (step (CallJoin { channel = "#harbor", video = True }) base).callLocal.camera
+        -- v3/calls-engine: iPhone/iPad WebKit report shareSupported = False;
+        -- the phone path to Share (More) must then not offer it at all.
+        , test "share unavailable: More menu does not offer Share" <|
+            \_ ->
+                let
+                    opened =
+                        inCall |> step (snapshot [ ( "shareSupported", Encode.bool False ) ]) |> step CallMoreToggle
+                in
+                Expect.all
+                    [ \_ -> query opened |> Query.findAll [ testid "call-more-share" ] |> Query.count (Expect.equal 0)
+                    , \_ -> query opened |> Query.find [ testid "deafen-button" ] |> Query.has [ aria "Deafen" ]
+                    ]
+                    ()
         , test "share unavailable: disabled with its own label, toggle inert" <|
             \_ ->
                 let

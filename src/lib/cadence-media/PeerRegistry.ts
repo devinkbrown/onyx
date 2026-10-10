@@ -3,6 +3,7 @@ import {
   CadenceVoxDecoder, CadenceVisDecoder,
   OpcodecWasm,
   yuv420ToRgba,
+  cadenceVisFrameSize,
   CADENCEVOX_FRAME_48K,
   type CadenceVoxQuality,
 } from './OpcodecWasm';
@@ -377,7 +378,17 @@ export class PeerRegistry {
   async decodeVideo(pm: PeerMedia, frame: Uint8Array, ftype: string): Promise<void> {
     if (!this.wasm || this.isDetached(pm)) return;
     const isKey = ftype === 'KEYFRAME';
-    const W = pm.videoW || this.videoW, H = pm.videoH || this.videoH;
+    // Size the decoder from the keyframe's own header (bounded), keep the
+    // established size for deltas, and only then fall back to the announced
+    // or default profile — the sender's encoder may have stepped down its
+    // size ladder (1920x1080 is not a legal cadencevis size).
+    const header = isKey ? cadenceVisFrameSize(frame) : null;
+    const W = header
+      ? Math.min(header.width, MAX_PEER_VIDEO_WIDTH)
+      : pm.vidDec && pm.lastKeyW ? pm.lastKeyW : (pm.videoW || this.videoW);
+    const H = header
+      ? Math.min(header.height, MAX_PEER_VIDEO_HEIGHT)
+      : pm.vidDec && pm.lastKeyH ? pm.lastKeyH : (pm.videoH || this.videoH);
 
     // Don't feed a delta frame into a non-existent decoder — the codec
     // needs a keyframe to establish its reference frame.
@@ -385,7 +396,14 @@ export class PeerRegistry {
 
     if (!pm.vidDec || (isKey && (pm.lastKeyW !== W || pm.lastKeyH !== H))) {
       this.safeDestroy(pm.vidDec);
-      pm.vidDec       = this.wasm.videoDecoder(W, H);
+      pm.vidDec = null;
+      try {
+        pm.vidDec = this.wasm.videoDecoder(W, H);
+      } catch {
+        const key = pm.state.nick.toLowerCase();
+        this.decodeErrors.set(key, (this.decodeErrors.get(key) ?? 0) + 1);
+        return;
+      }
       pm.lastKeyW     = W;
       pm.lastKeyH     = H;
       pm.vidImageData  = null;   // dimensions changed; cached ImageData is stale
@@ -410,6 +428,8 @@ export class PeerRegistry {
       pm.state.canvas = c;
       pm.state.hasVideo = true;
       this.onPeerStateChanged?.(pm.state);
+    } else if (pm.vidCanvas.width !== W || pm.vidCanvas.height !== H) {
+      pm.vidCanvas.width = W; pm.vidCanvas.height = H;
     }
     const ctx2 = pm.vidCanvas.getContext('2d');
     if (!ctx2) return;

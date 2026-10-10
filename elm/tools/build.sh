@@ -3,8 +3,11 @@
 #
 #   elm make --optimize src/Main.elm → dist-elm/app.js
 #   + index.html, app.css, css/*.css, ports.js copied alongside
+#   + voice engine: elm/media/build-voice.mjs bundles the Cadence media
+#     engine + window.OnyxVoiceEngine adapter (voice.js), its hashed video
+#     worker (voice-worker.<sha>.js) and the opcodec codec files
 #   + content hashes: every local <script src> / <link href> asset that
-#     index.html references (app.js, ports.js, app.css, css/*.css) is
+#     index.html references (app.js, voice.js, ports.js, app.css, css/*.css) is
 #     renamed to name.<sha256:12>.ext and the tag rewritten, so a deploy
 #     can cache assets immutably while index.html stays revalidated.
 #
@@ -34,9 +37,9 @@ if compgen -G "$ELM_DIR/css/*.css" >/dev/null; then
   cp "$ELM_DIR"/css/*.css "$OUT/css/"
 fi
 
-# Minify (Elm's own --optimize output is unminified): esbuild comes with the
-# repo's Vite toolchain. ESBUILD=<binary> overrides; without one the build
-# stays valid, just larger.
+# Minify (Elm's own --optimize output is unminified) and bundle the voice
+# engine: esbuild comes with the repo's Vite toolchain. ESBUILD=<binary>
+# overrides; without one the build fails (calls need the bundled engine).
 ESBUILD_BIN="${ESBUILD:-}"
 if [ -z "$ESBUILD_BIN" ]; then
   for root in "$ELM_DIR/.." "$(git -C "$ELM_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/.."; do
@@ -62,8 +65,12 @@ if [ -n "$ESBUILD_BIN" ]; then
     [ -f "$f" ] && "$ESBUILD_BIN" "$f" --minify --log-level=warning --outfile="$f" --allow-overwrite
   done
   echo "minified with $ESBUILD_BIN"
+  # Calls: the real media engine behind window.OnyxVoiceEngine. Without it
+  # every join fails closed, so the bundle is mandatory (fail the build).
+  node "$ELM_DIR/media/build-voice.mjs" "$ESBUILD_BIN" "$OUT"
 else
-  echo "warning: esbuild not found — shipping unminified (set ESBUILD=...)" >&2
+  echo "error: esbuild not found — the voice engine cannot be bundled (set ESBUILD=...)" >&2
+  exit 1
 fi
 
 node - "$OUT" <<'NODE'
@@ -91,7 +98,7 @@ html = html.replace(ref, (whole, lead, rel) => {
   return `${lead}="${hashed.get(rel)}"`;
 });
 
-for (const required of ["app.js", "ports.js", "app.css"]) {
+for (const required of ["app.js", "voice.js", "ports.js", "app.css"]) {
   if (!hashed.has(required)) throw new Error(`index.html no longer references ${required}`);
 }
 fs.writeFileSync(indexPath, html);
