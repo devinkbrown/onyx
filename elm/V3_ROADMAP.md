@@ -121,3 +121,30 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 - 2026-10-10 — Phase 0.1/0.2 connect gate landed (`c18b9591`).
 - 2026-10-10 — Phase 2.1–2.3 rich message text (links, mentions, channel jump, mIRC, code, quote, spoiler, emoji) landed.
+
+## Revised sequencing (Fable design research, 2026-10-10)
+
+Full report: [design/V3_DESIGN_DIRECTION.md](design/V3_DESIGN_DIRECTION.md). Diagnosis: the
+"very buggy" feel is **frame** quality (no shell grid, no focus management, unkeyed
+transcript), not feature count. Changes to the phases above:
+
+**v3 ship bar:** connect → Home → open room → send → DM → settings → appearance,
+keyboard-only and at 375px, with elm-program-test flows + Playwright + screenshots green.
+
+| New # | Item | Replaces / moves | Size |
+|---|---|---|---|
+| 0.6 | Playwright against the static Elm build (375 / 768 / 1280) | pulled from 7.4 | M |
+| 1.0 | Shell frame + tokens: Solid token ladder in `app.css`, responsive grid (nav rail / collection sidebar / main / context rail), sheet/dialog primitive with one focus-trap port, `role="log"` transcript container, 375px gate, visual-regression baselines | absorbs 7.1, 7.2, 7.6 | L |
+| 1.1→1.7 | Ctrl/Cmd+K becomes an action palette right after primary nav | 1.7 moved up | S |
+| 1.4a | Land on Home after connect; Home absorbs the catch-up digest | absorbs 2.7 | M |
+| 2.0 | Transcript engine: `Html.Keyed` + `Html.Lazy` rows, scroll anchoring port, unread divider, jump-to-latest, windowing past ~300 rows | new | L |
+| 2.0b | Density modes (Default / Compact) + grouping as view-model | new | S |
+| 3.1/3.5/3.6 | Room header, members, profile card come **before** 2.4–2.9 | reorder | — |
+| 8.x | Long tail: BlockKit (2.8), edit history (2.9), history import (4.5), Stage/Watch Together (6.7) | deferred | — |
+
+**Architecture rules adopted:** keep effects-as-data (`List Outbound`); new UI goes in
+`Feature/X.elm` modules (own `Model`/`Msg`/`update`/`view`) wired into `App` through
+three alphabetised registry blocks (`-- FEATURE MODELS` / `-- FEATURE MSGS` /
+`-- FEATURE UPDATE`); one incoming `shortcut` port (ports.js owns scope rules) and one
+outgoing `dialog` focus port; per-feature CSS files; elm-review (`NoUnused.*`, no
+`import App` from `Feature/*`).
