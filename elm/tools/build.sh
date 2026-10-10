@@ -34,6 +34,38 @@ if compgen -G "$ELM_DIR/css/*.css" >/dev/null; then
   cp "$ELM_DIR"/css/*.css "$OUT/css/"
 fi
 
+# Minify (Elm's own --optimize output is unminified): esbuild comes with the
+# repo's Vite toolchain. ESBUILD=<binary> overrides; without one the build
+# stays valid, just larger.
+ESBUILD_BIN="${ESBUILD:-}"
+if [ -z "$ESBUILD_BIN" ]; then
+  for root in "$ELM_DIR/.." "$(git -C "$ELM_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/.."; do
+    for cand in "$root"/node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild; do
+      if [ -x "$cand" ]; then ESBUILD_BIN="$cand"; break 2; fi
+    done
+  done
+fi
+if [ -n "$ESBUILD_BIN" ]; then
+  # Elm's IIFE ends `}(this));`, attaching Elm to the global object; esbuild
+  # treats a bare file as a module where top-level `this` is undefined, so
+  # pass globalThis explicitly before minifying.
+  node -e '
+    const fs = require("fs"); const f = process.argv[1];
+    const src = fs.readFileSync(f, "utf8"); const at = src.lastIndexOf("}(this));");
+    if (at < 0) { console.error("app.js: expected trailing }(this)); wrapper"); process.exit(1); }
+    fs.writeFileSync(f, src.slice(0, at) + "}(globalThis));" + src.slice(at + 9));
+  ' "$OUT/app.js"
+  for f in "$OUT/app.js" "$OUT/ports.js"; do
+    "$ESBUILD_BIN" "$f" --minify --target=es2017 --log-level=warning --outfile="$f" --allow-overwrite
+  done
+  for f in "$OUT/app.css" "$OUT"/css/*.css; do
+    [ -f "$f" ] && "$ESBUILD_BIN" "$f" --minify --log-level=warning --outfile="$f" --allow-overwrite
+  done
+  echo "minified with $ESBUILD_BIN"
+else
+  echo "warning: esbuild not found — shipping unminified (set ESBUILD=...)" >&2
+fi
+
 node - "$OUT" <<'NODE'
 const fs = require("fs");
 const path = require("path");
