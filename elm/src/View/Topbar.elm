@@ -9,6 +9,7 @@ import View.Notify exposing (notifySheetButton)
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import Nav
 
 
 topbar : Model -> Html Msg
@@ -178,22 +179,26 @@ identityChip model =
                 inner
 
         Nothing ->
-            -- The identity chip is the "You" affordance: a pending
-            -- reclaim wins, otherwise a signed-in nick opens Account.
-            case model.accountName of
-                Just _ ->
-                    button
-                        (attrs
-                            ++ [ class "onyx-ident-action"
-                               , attribute "aria-label" "Open account settings"
-                               , attribute "data-testid" "account-open"
-                               , onClick (SetAccountOpen True)
-                               ]
-                        )
-                        inner
+            -- v3/nav — the identity chip is the "You" affordance for
+            -- everyone (guests and accounts): a pending reclaim wins,
+            -- otherwise it opens the You hub.
+            button
+                (attrs
+                    ++ [ class "onyx-ident-you"
+                       , attribute "aria-label" "Open You"
+                       , attribute "aria-haspopup" "dialog"
+                       , attribute "aria-expanded"
+                            (if model.youHubOpen then
+                                "true"
 
-                Nothing ->
-                    div attrs inner
+                             else
+                                "false"
+                            )
+                       , attribute "data-testid" "you-open"
+                       , onClick (NavSelect Nav.You)
+                       ]
+                )
+                inner
 
 
 {-| Nick reclaim dialog, mirroring the connect form's GHOST reclaim:

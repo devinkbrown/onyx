@@ -18,7 +18,7 @@ import App exposing (Model, Msg, inviteCard)
 import Invite exposing (inviteTitle)
 import Browser
 import Html exposing (Html, div, main_)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (attribute, class)
 import Route
 import Guides exposing (surfaceForRoute, surfaceTitle)
 import View.About
@@ -54,6 +54,8 @@ import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Toast exposing (toaster)
+import View.Nav
+import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 
 
@@ -113,7 +115,7 @@ view model =
                                     [ connectGate model ]
 
                                 else
-                                    [ shell model ]
+                                    [ appFrame model ]
     }
 
 
@@ -179,6 +181,31 @@ documentTitle model =
 
                                 Nothing ->
                                     "Onyx"
+
+
+{-| v3/nav — the app frame: desktop primary rail, the shell, the
+mobile bottom bar (CSS picks one per width) and the You hub sheet.
+`data-nav-drawer` lets narrow layouts swap the thread for the rail
+while the Rooms / Messages drawer is open.
+-}
+appFrame : Model -> Html Msg
+appFrame model =
+    div
+        [ class "onyx-frame"
+        , attribute "data-nav" (Nav.idKey model.navSection)
+        , attribute "data-nav-drawer"
+            (if model.navDrawerOpen then
+                "true"
+
+             else
+                "false"
+            )
+        ]
+        [ View.Nav.primaryNav model
+        , shell model
+        , View.Nav.mobileNav model
+        , View.Nav.youHub model
+        ]
 
 
 shell : Model -> Html Msg
