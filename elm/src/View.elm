@@ -91,7 +91,7 @@ view model =
                     Nothing ->
                         case model.route of
                             Route.Landing ->
-                                [ landing model.landingBoardTab ]
+                                [ frame model "/" "Onyx home" Nothing [ landing model.landingBoardTab ] ]
 
                             Route.About ->
                                 View.About.route model

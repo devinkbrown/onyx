@@ -11,7 +11,7 @@ state; no focus juggling (buttons stay natively keyboard-reachable).
 -}
 
 import App exposing (Msg(..))
-import Html exposing (Html, a, dd, div, dl, dt, h1, h2, li, main_, nav, p, section, span, text, ul)
+import Html exposing (Html, a, dd, div, dl, dt, h1, h2, li, nav, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, href, id)
 import Html.Events exposing (onClick)
 
@@ -93,6 +93,8 @@ activeRoute tab =
 
 {-| The landing surface. The active board tab arrives as plain state;
 unknown ids fall back to the public room, never a blank panel.
+`View` renders it inside the public frame, whose `main` landmark
+carries the "Onyx home" name (so this is a plain container).
 -}
 landing : String -> Html Msg
 landing tab =
@@ -100,7 +102,7 @@ landing tab =
         active =
             activeRoute tab
     in
-    main_ [ class "onyx-landing", attribute "aria-label" "Onyx home" ]
+    div [ class "onyx-landing" ]
         [ section [ class "onyx-land-hero", attribute "aria-labelledby" "hero-heading" ]
             [ div [ class "onyx-land-copy" ]
                 [ h1 [ id "hero-heading", class "onyx-land-h1" ]
