@@ -14,6 +14,7 @@ module Stage exposing
     , foldSelfLeave
     , handLines
     , inviteLine
+    , recordInvite
     , isModerator
     , isSpeakerModes
     , joinLines
@@ -71,6 +72,7 @@ type alias StageState =
     , isSpeaker : Bool
     , handRaised : Bool
     , pendingInvite : Maybe String
+    , invited : List String
     }
 
 
@@ -82,6 +84,7 @@ blank =
     , isSpeaker = False
     , handRaised = False
     , pendingInvite = Nothing
+    , invited = []
     }
 
 
@@ -190,7 +193,31 @@ removeRaisedHand nick stage =
             stage
 
         Just safe ->
-            { stage | raisedHands = List.filter (not << sameKey safe) stage.raisedHands }
+            { stage
+                | raisedHands = List.filter (not << sameKey safe) stage.raisedHands
+                , invited = List.filter (not << sameKey safe) stage.invited
+            }
+
+
+{-| Host side: remember that WE invited `nick` to speak, so only an
+`ACCEPT_SPEAK` answering our own invite can earn `MODE +v` (a raised
+hand alone is attacker-controlled). Capped like the hand queue.
+-}
+recordInvite : String -> StageState -> StageState
+recordInvite nick stage =
+    case normalizeNick nick of
+        Nothing ->
+            stage
+
+        Just safe ->
+            if not stage.isHost || List.any (sameKey safe) stage.invited then
+                stage
+
+            else if List.length stage.invited >= maxRaisedHands then
+                stage
+
+            else
+                { stage | invited = stage.invited ++ [ safe ] }
 
 
 ctcp : String -> String -> String
@@ -391,13 +418,17 @@ foldCtcp input stage =
 
                                 "ACCEPT_SPEAK" ->
                                     let
-                                        hadHand =
-                                            List.any (sameKey sender) stage.raisedHands
+                                        -- Only an answer to an invite WE sent earns
+                                        -- voice: the hand queue is peer-controlled
+                                        -- (RAISE_HAND has no authority check), so a
+                                        -- raised hand alone must never voice anyone.
+                                        wasInvited =
+                                            List.any (sameKey sender) stage.invited
                                     in
                                     Just
                                         { stage = removeRaisedHand sender stage
                                         , lines =
-                                            if stage.isHost && hadHand then
+                                            if stage.isHost && wasInvited then
                                                 [ Wire.formatIrcLine "MODE" [ room, "+v", sender ] ]
 
                                             else
@@ -434,6 +465,7 @@ foldNick old new stage =
             { stage
                 | raisedHands = List.map swap stage.raisedHands
                 , pendingInvite = Maybe.map swap stage.pendingInvite
+                , invited = List.map swap stage.invited
             }
 
 

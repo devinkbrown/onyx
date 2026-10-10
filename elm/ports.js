@@ -4072,7 +4072,7 @@ function fetchPublicFeed(url) {
     var VOICE_PIP_KEY = "onyx:voice-pip-position";
     if (app.ports.voicePipSave) {
       app.ports.voicePipSave.subscribe(function (req) {
-        if (!req || typeof req.corner !== "string") return;
+        if (!req || typeof req.corner !== "string" || req.corner.length > 16) return;
         writeSlot(VOICE_PIP_KEY, JSON.stringify({ corner: req.corner, x: req.x | 0, y: req.y | 0 }));
       });
     }
@@ -6548,6 +6548,9 @@ function fetchPublicFeed(url) {
         try {
           var href = req && req.href ? String(req.href) : "";
           if (!href) return;
+          /* Sink gate (defence in depth): only http(s) / blob media may
+             become a live href — never javascript:/data:. */
+          if (!/^(https?:\/\/|blob:)/i.test(href)) return;
           var anchor = document.createElement("a");
           anchor.href = href;
           anchor.download = req && req.name ? String(req.name) : "image";
@@ -7451,7 +7454,13 @@ function fetchPublicFeed(url) {
     function withPinChain(recordKey, fn) {
       var tail = pinChains[recordKey] || Promise.resolve();
       var next = tail.then(fn, fn);
-      pinChains[recordKey] = next.catch(function () {});
+      var settled = next.catch(function () {});
+      pinChains[recordKey] = settled;
+      /* Drop the chain entry once it is the settled tail, so a peer that
+         rotates nicks cannot grow this map for the whole session. */
+      settled.then(function () {
+        if (pinChains[recordKey] === settled) delete pinChains[recordKey];
+      });
       return next;
     }
 

@@ -241,4 +241,76 @@ suite =
         , test "lookup line shape" <|
             \_ ->
                 Expect.equal 1 (keyGets [ SendLine (Wire.formatIrcLine "METADATA" [ "bob", "GET", "ocean.dm-key" ]) ])
+                , test "raw /notice and /privmsg to a designated peer are refused (no content on the wire)" <|
+            \_ ->
+                let
+                    designated =
+                        Tuple.first (feed opened (":s 761 me bob ocean.dm-key pub :" ++ Base64Url.encode (0x04 :: List.repeat 64 7)))
+
+                    run text =
+                        update ComposerSend { designated | activeChannel = Just "#c", composer = text }
+
+                    ( after, out ) =
+                        run "/notice bob secret"
+
+                    ( _, out2 ) =
+                        run "/privmsg bob secret"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (List.filter (\o -> o /= SendLine "") out ++ out2 |> List.filter isSend)
+                    , \_ -> Expect.equal "/notice bob secret" after.composer
+                    , \_ -> Expect.equal (Just (rawSlashLeakCopy "bob")) after.composerError
+                    ]
+                    ()
+        , test "raw /notice to an unresolved peer is refused too" <|
+            \_ ->
+                Tuple.second (update ComposerSend { opened | activeChannel = Just "#c", composer = "/notice bob secret" })
+                    |> List.filter isSend
+                    |> Expect.equal []
+        , test "raw non-content verbs still pass" <|
+            \_ ->
+                Tuple.second (update ComposerSend { opened | activeChannel = Just "#c", composer = "/away brb" })
+                    |> Expect.equal [ SendLine "AWAY brb\u{000D}\n" ]
+        , test "protected DMs offer no plaintext EDIT" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal True (plaintextWouldLeak opened "bob")
+                    , \_ -> Expect.equal False (plaintextWouldLeak { opened | dmKeyAnswered = Set.singleton "bob" } "bob")
+                    ]
+                    ()
+        , test "offline: with encrypted DMs on, even an answered peer never queues plaintext" <|
+            \_ ->
+                let
+                    ( _, out ) =
+                        sendHello { opened | connection = Offline, dmKeyAnswered = Set.singleton "bob" }
+                in
+                Expect.equal False
+                    (List.any
+                        (\o ->
+                            case o of
+                                OutboxQueue _ ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        out
+                    )
+        , test "a socket close resets answers and plaintext consent" <|
+            \_ ->
+                let
+                    ( closed, _ ) =
+                        update (WsClosed { clean = True, reason = "x" }) { opened | dmKeyAnswered = Set.singleton "bob", dmPlainConfirmed = Set.singleton "carol" }
+                in
+                Expect.equal ( Set.empty, Set.empty ) ( closed.dmKeyAnswered, closed.dmPlainConfirmed )
         ]
+
+
+isSend : Outbound -> Bool
+isSend o =
+    case o of
+        SendLine line ->
+            String.contains "secret" line
+
+        _ ->
+            False

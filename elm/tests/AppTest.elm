@@ -18250,7 +18250,11 @@ suite =
                         [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        , \_ -> Expect.equal [ SendLine "MSG bob hi\r\n" ] (send "/msg bob hi")
+                        -- v3/dm-key-hold: a raw content verb to an unresolved DM peer is refused.
+                        , \_ -> Expect.equal [] (send "/msg bob hi")
+                        , \_ ->
+                            Expect.equal [ SendLine "MSG bob hi\r\n" ]
+                                (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
                         , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
                         ]

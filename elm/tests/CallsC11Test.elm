@@ -206,7 +206,7 @@ ownership =
             \_ ->
                 let
                     queued =
-                        hosting |> withStage (\s -> { s | raisedHands = [ "alice" ] })
+                        hosting |> withStage (\s -> { s | raisedHands = [ "alice" ], invited = [ "alice" ] })
 
                     stray =
                         queued
@@ -223,6 +223,13 @@ ownership =
                     , \_ -> Expect.equal [] (feed ":alice!u@h PRIVMSG #stage :\u{0001}STAGE ACCEPT_SPEAK\u{0001}" stray).stage.raisedHands
                     ]
                     ()
+        , test "a raised hand alone never earns voice: ACCEPT_SPEAK without our invite sends no MODE" <|
+            \_ ->
+                hosting
+                    |> withStage (\s -> { s | raisedHands = [ "mallory" ] })
+                    |> feedOut ":mallory!u@h PRIVMSG #stage :\u{0001}STAGE ACCEPT_SPEAK\u{0001}"
+                    |> List.filter (\o -> o == line "MODE" [ "#stage", "+v", "mallory" ])
+                    |> Expect.equal []
         , test "an audience member never voices anyone" <|
             \_ ->
                 audience
