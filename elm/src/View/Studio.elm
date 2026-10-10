@@ -266,8 +266,6 @@ simpleChip ids activeId entry =
         ]
         [ span [ class "ap-theme-swatch", attribute "aria-hidden" "true" ]
             (List.map (\color -> span [ style "background" color ] []) entry.swatch)
-        , span [ class "ap-theme-swatch", attribute "aria-hidden" "true" ]
-            (List.map (\color -> span [ style "background" color ] []) entry.swatch)
         , span [ class "ap-theme-name" ] [ text entry.label ]
         ]
 
@@ -1000,7 +998,7 @@ preview =
         [ div [ class "ts-preview__bar" ]
             [ span [ class "ts-preview__bar-dot", style "background" "var(--shu)" ] []
             , span [ class "ts-preview__bar-dot", style "background" "var(--gold)" ] []
-            , span [ class "ts-preview__bar-dot", style "background" "var(--ok)" ] []
+            , span [ class "ts-preview__bar-dot", style "background" "var(--ok, #46c08a)" ] []
             , span [ class "ts-preview__bar-title" ] [ text "onyx — eshmaki.me" ]
             ]
         , div [ class "ts-preview__chrome", attribute "aria-hidden" "true" ]
@@ -1045,7 +1043,7 @@ preview =
                             , span [ class "ts-pv-msg__link" ] [ text "eshmaki.me/stats" ]
                             ]
                         ]
-                    , pvMsg "21:07" "var(--ok)" "onyx" "→ network: 2 homes linked, quorum ok" True
+                    , pvMsg "21:07" "var(--ok, #46c08a)" "onyx" "→ network: 2 homes linked, quorum ok" True
                     , pvMsg "21:09" "var(--shu)" "rei" "a coral light drifting through dark water" False
                     ]
                 , div [ class "ts-pv-actions" ]
@@ -1061,10 +1059,10 @@ preview =
                 ]
             , div [ class "ts-pv-members" ]
                 [ div [ class "ts-pv-members__head" ] [ text "people — 4" ]
-                , pvMember "var(--gold-bright)" "!" "aoi" "var(--ok)" False
-                , pvMember "var(--lapis-bright)" "@" "kain" "var(--ok)" False
-                , pvMember "var(--ok)" "+" "rei" "var(--warn)" False
-                , pvMember "" " " "mira" "var(--paper-mute)" True
+                , pvMember "var(--gold-bright)" "!" "aoi" "var(--ok, #46c08a)" False
+                , pvMember "var(--lapis-bright)" "@" "kain" "var(--ok, #46c08a)" False
+                , pvMember "var(--ok, #46c08a)" "+" "rei" "var(--warn, #d9a13b)" False
+                , pvMember "" " " "mira" "var(--paper-mute, #5d6670)" True
                 ]
             ]
         ]
