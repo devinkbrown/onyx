@@ -2417,6 +2417,10 @@
     push.onStreams = function (fn) {
       if (typeof fn === "function") listeners.push(fn);
     };
+    /* v3/calls-c9: the PTT runtime only arms while a call is live. */
+    push.inCall = function () {
+      return !!(last && last.state === "in_call");
+    };
     return push;
   }
 
@@ -3352,7 +3356,7 @@ function fetchPublicFeed(url) {
       );
     } catch (err) { return false; }
   }
-  var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker" };
+  var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker", c: "captions" /* v3/calls-c8 */ };
   function callKeysLive(doc) {
     if (!doc || !doc.querySelector) return false;
     try { return !!doc.querySelector('[data-call-keys="on"]'); } catch (err) { return false; }
@@ -3373,7 +3377,8 @@ function fetchPublicFeed(url) {
     /* v3/calls-c11 (C12) — call chords: Ctrl/Cmd+Shift+<letter>, only
        while a call is live (the always-mounted announcer carries
        `data-call-keys="on"`), never while typing, never under a
-       foreign modal. Push to talk (C9) is not handled here. */
+       foreign modal. Push to talk (C9) is the separate user-bound
+       single-key runtime (`createPushToTalk`), on the same scope rules. */
     if (mod && e.shiftKey && !e.altKey) {
       var chord = CALL_CHORDS[key.toLowerCase()];
       if (!chord) return null;
@@ -3601,6 +3606,156 @@ function fetchPublicFeed(url) {
   }
   /* Back-compat name for the palette slice's helper. */
   var installShortcutFocus = installOverlayFocus;
+  /* v3/calls-c9 — push to talk runtime (mirroring the oracle's
+     `useCadenceMedia` PTT effect + `eventMatchesPttKey`). The bound
+     key is the ONE single-key shortcut, user-chosen (WCAG 2.1.4), and
+     it rides the same scope rules as the `shortcut` port: never for a
+     key an earlier handler claimed, never during IME composition,
+     never in an editable field, never under a foreign modal, never
+     with Ctrl/Meta/Alt, never on auto-repeat — and only while a call
+     is live. keyup / window blur / a hidden page release the hold.
+     The engine is driven directly (pttPress / pttRelease); the
+     `notify` callback mirrors the held state into Elm. */
+  var VOICE_SETTINGS_KEY = "onyx:voice-settings";
+  var VOICE_SETTINGS_MAX = 8192;
+  function pttKeyMatches(eventKey, bound) {
+    if (typeof eventKey !== "string" || typeof bound !== "string" || !bound) return false;
+    if (bound === "Space") return eventKey === " " || eventKey === "Space" || eventKey === "Spacebar";
+    return eventKey === bound;
+  }
+  function voicePttSettings(raw) {
+    var on = !!(raw && raw.pushToTalk === true);
+    var key = (raw && typeof raw.pushToTalkKey === "string" && raw.pushToTalkKey.length > 0 && raw.pushToTalkKey.length <= 64)
+      ? raw.pushToTalkKey : null;
+    return { enabled: on && !!key, key: key };
+  }
+  function createPushToTalk(opts) {
+    var o = opts || {};
+    var settings = { enabled: false, key: null };
+    var held = false;
+    function engine() {
+      try { return typeof o.engine === "function" ? o.engine() : null; } catch (err) { return null; }
+    }
+    function live() {
+      try { return typeof o.isLive === "function" ? !!o.isLive() : false; } catch (err) { return false; }
+    }
+    function notify(name) {
+      try { if (typeof o.notify === "function") o.notify(name); } catch (err) { /* port gone */ }
+    }
+    function release() {
+      if (!held) return;
+      held = false;
+      var e = engine();
+      if (e && typeof e.pttRelease === "function") {
+        try { e.pttRelease(); } catch (err) { /* best-effort */ }
+      }
+      notify("ptt-up");
+    }
+    function onKeyDown(ev) {
+      if (!ev || !settings.enabled) return;
+      if (!pttKeyMatches(ev.key, settings.key)) return;
+      if (held) {
+        /* auto-repeat of the held key: keep Space from scrolling */
+        if (ev.repeat) { try { ev.preventDefault(); } catch (err) { /* best-effort */ } }
+        return;
+      }
+      if (ev.defaultPrevented || ev.isComposing || ev.keyCode === 229 || ev.repeat) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (!live()) return;
+      if (shortcutEditableTarget(ev.target)) return;
+      if (shortcutForeignModal(o.doc)) return;
+      held = true;
+      try { ev.preventDefault(); } catch (err) { /* best-effort */ }
+      var e = engine();
+      if (e && typeof e.pttPress === "function") {
+        try { e.pttPress(); } catch (err) { /* best-effort */ }
+      }
+      notify("ptt-down");
+    }
+    function onKeyUp(ev) {
+      if (!held || !ev || !pttKeyMatches(ev.key, settings.key)) return;
+      release();
+    }
+    function onVisibility() {
+      try { if (o.doc && o.doc.hidden) release(); } catch (err) { release(); }
+    }
+    return {
+      configure: function (raw) {
+        var next = voicePttSettings(raw);
+        if (next.enabled !== settings.enabled || next.key !== settings.key) release();
+        settings = next;
+        var e = engine();
+        if (e && typeof e.setPushToTalk === "function") {
+          try { e.setPushToTalk(settings.enabled); } catch (err) { /* best-effort */ }
+        }
+      },
+      onKeyDown: onKeyDown,
+      onKeyUp: onKeyUp,
+      onBlur: release,
+      onVisibility: onVisibility,
+      release: release,
+      held: function () { return held; },
+      install: function (win, doc) {
+        if (!win || typeof win.addEventListener !== "function") return;
+        win.addEventListener("keydown", onKeyDown);
+        win.addEventListener("keyup", onKeyUp);
+        win.addEventListener("blur", release);
+        if (doc && typeof doc.addEventListener === "function") doc.addEventListener("visibilitychange", onVisibility);
+      }
+    };
+  }
+  /* Apply stored voice prefs to a mounted engine (best-effort, only
+     the verbs the engine exposes). */
+  function applyVoiceSettings(engine, raw) {
+    if (!engine || !raw) return;
+    try {
+      if (typeof engine.setOutput === "function") {
+        engine.setOutput(typeof raw.outputDeviceId === "string" ? raw.outputDeviceId : null,
+          typeof raw.outputVolume === "number" ? raw.outputVolume : 80);
+      }
+    } catch (err) { /* best-effort */ }
+    try {
+      if (typeof engine.applyVoiceSettings === "function") engine.applyVoiceSettings(raw);
+    } catch (err) { /* best-effort */ }
+  }
+  function readVoiceSettings(storage) {
+    try {
+      if (!storage) return null;
+      var raw = storage.getItem(VOICE_SETTINGS_KEY);
+      if (typeof raw !== "string" || !raw || raw.length > VOICE_SETTINGS_MAX) return null;
+      var parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : null;
+    } catch (err) { return null; }
+  }
+  /* Device enumeration bridge (mirroring the oracle `loadDevices`):
+     the raw list + capability flags; Elm normalises labels and prunes
+     stale selections. Unavailable vs failed stay distinct. */
+  function voiceDevicesSnapshot(nav, engine) {
+    var md = nav && nav.mediaDevices;
+    var supported = {};
+    try { supported = (md && typeof md.getSupportedConstraints === "function") ? (md.getSupportedConstraints() || {}) : {}; } catch (err) { supported = {}; }
+    var caps = {
+      selectAudioOutput: !!(md && typeof md.selectAudioOutput === "function"),
+      noiseSuppression: supported.noiseSuppression === true,
+      echoCancellation: supported.echoCancellation === true,
+      voiceActivity: !!(engine && typeof engine.setVoiceActivity === "function")
+    };
+    if (!md || typeof md.enumerateDevices !== "function") {
+      return Promise.resolve({ kind: "devices", error: "unavailable", caps: caps });
+    }
+    return Promise.resolve()
+      .then(function () { return md.enumerateDevices(); })
+      .then(function (list) {
+        var devices = (Array.isArray(list) ? list : []).slice(0, 64).map(function (d) {
+          return {
+            deviceId: (d && typeof d.deviceId === "string") ? d.deviceId.slice(0, 600) : "",
+            kind: (d && typeof d.kind === "string") ? d.kind : "",
+            label: (d && typeof d.label === "string") ? d.label.slice(0, 300) : ""
+          };
+        });
+        return { kind: "devices", devices: devices, caps: caps };
+      }, function () { return { kind: "devices", error: "failed", caps: caps }; });
+  }
   function wireShortcuts(app) {
     if (!app || !app.ports || !app.ports.shortcut) return;
     if (typeof window === "undefined" || !window || !window.addEventListener) return;
@@ -3944,9 +4099,12 @@ function fetchPublicFeed(url) {
       voicePush.onStreams(voiceTiles.refresh);
       voiceTiles.refresh();
     }
+    /* v3/calls-c9: assigned by wireVoiceSettings (devices / choose-speaker). */
+    var voiceSettingsCommand = null;
     if (app.ports.voiceCommand) {
       app.ports.voiceCommand.subscribe(function (req) {
         var verb = (req && typeof req.verb === "string") ? req.verb : "";
+        if ((verb === "devices" || verb === "choose-speaker") && voiceSettingsCommand) { voiceSettingsCommand(req); return; }
         var on = !!(req && req.on);
         var channel = (req && typeof req.channel === "string" && req.channel) ? req.channel : undefined;
         var engine = voiceEngine();
@@ -4001,6 +4159,80 @@ function fetchPublicFeed(url) {
         }
       });
     }
+    /* v3/calls-c9 — voice settings bridge: `onyx:voice-settings`
+       persistence (Elm sanitises; the bridge stores what Elm wrote and
+       replays it at boot), the enumerateDevices / selectAudioOutput
+       bridge (a second `voiceCommand` subscriber for the "devices" and
+       "choose-speaker" verbs), engine application, and the PTT runtime
+       whose hold rides the shared `shortcut` port as ptt-down / ptt-up. */
+    (function wireVoiceSettings() {
+      var win = (typeof window !== "undefined") ? window : null;
+      var doc = (typeof document !== "undefined") ? document : null;
+      var nav = (typeof navigator !== "undefined") ? navigator : null;
+      var storage = null;
+      try { storage = (win && win.localStorage) ? win.localStorage : null; } catch (err) { storage = null; }
+      function feed(payload) {
+        try { if (app.ports.voiceSettingsFeed) app.ports.voiceSettingsFeed.send(payload); } catch (err) { /* port gone */ }
+      }
+      var ptt = createPushToTalk({
+        isLive: function () { return !!(voicePush && typeof voicePush.inCall === "function" && voicePush.inCall()); },
+        engine: voiceEngine,
+        notify: function (name) { if (app.ports.shortcut) app.ports.shortcut.send(name); },
+        doc: doc
+      });
+      var stored = readVoiceSettings(storage);
+      ptt.configure(stored);
+      applyVoiceSettings(voiceEngine(), stored);
+      if (stored && app.ports.voiceSettingsFeed) {
+        setTimeout(function () { feed({ kind: "prefs", prefs: stored }); }, 0);
+      }
+      if (app.ports.shortcut) ptt.install(win, doc);
+      if (app.ports.voicePrefsSave) {
+        app.ports.voicePrefsSave.subscribe(function (req) {
+          var json = (req && typeof req.json === "string") ? req.json : "";
+          if (!json || json.length > VOICE_SETTINGS_MAX) return;
+          var parsed = null;
+          try { parsed = JSON.parse(json); } catch (err) { return; }
+          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
+          try { if (storage) storage.setItem(VOICE_SETTINGS_KEY, json); } catch (err) { /* quota — non-fatal */ }
+          ptt.configure(parsed);
+          applyVoiceSettings(voiceEngine(), parsed);
+        });
+      }
+      if (app.ports.voiceSettingsFeed) {
+        try {
+          var md0 = nav && nav.mediaDevices;
+          if (md0 && typeof md0.addEventListener === "function") {
+            md0.addEventListener("devicechange", function () {
+              voiceDevicesSnapshot(nav, voiceEngine()).then(feed);
+            });
+          }
+        } catch (err) { /* devicechange is optional */ }
+      }
+      /* Routed from the ONE voiceCommand subscriber (below in C4's
+         handler) — a port keeps a single subscriber per bridge. */
+      voiceSettingsCommand = function (req) {
+          var verb = (req && typeof req.verb === "string") ? req.verb : "";
+          if (verb === "devices") {
+            voiceDevicesSnapshot(nav, voiceEngine()).then(feed);
+          } else if (verb === "choose-speaker") {
+            var md = nav && nav.mediaDevices;
+            if (!md || typeof md.selectAudioOutput !== "function") { feed({ kind: "output-error", name: "NotFoundError" }); return; }
+            var current = (req && typeof req.tile === "string" && req.tile) ? req.tile : "";
+            Promise.resolve()
+              .then(function () { return current ? md.selectAudioOutput({ deviceId: current }) : md.selectAudioOutput(); })
+              .then(function (d) {
+                if (!d || d.kind !== "audiooutput" || typeof d.deviceId !== "string" || !d.deviceId.trim()) {
+                  feed({ kind: "output-error", name: "invalid" });
+                  return;
+                }
+                feed({ kind: "output-chosen", deviceId: d.deviceId, label: typeof d.label === "string" ? d.label : "" });
+              }, function (err) {
+                feed({ kind: "output-error", name: (err && typeof err.name === "string") ? err.name : "" });
+              });
+          }
+      };
+    })();
     if (app.ports.appearanceStorePrefs) {
       app.ports.appearanceStorePrefs.subscribe(function (req) {
         if (req && typeof req.json === "string") writeSlot("onyx:preferences", req.json);
@@ -9609,6 +9841,14 @@ function fetchPublicFeed(url) {
       maxEntries: OUTBOX_MAX_ENTRIES,
       maxAgeMs: OUTBOX_MAX_AGE_MS
     },
+    /* v3/calls-c9 */
+    pushToTalk: {
+      create: createPushToTalk,
+      matches: pttKeyMatches,
+      settings: voicePttSettings,
+      storageKey: VOICE_SETTINGS_KEY
+    },
+    voiceDevices: voiceDevicesSnapshot,
     pingKeepalive: {
       create: createPingKeepalive,
       idleMs: PING_IDLE_MS,

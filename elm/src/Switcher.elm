@@ -631,19 +631,24 @@ shortcutGroups =
 {-| Call chords (spec §3.1). Every chord carries a modifier (WCAG
 2.1.4). Provisional (§7.1): the microphone takes Ctrl+Shift+M; the
 oracle's room-notification mute on that chord is not bound in this
-client. Captions (C8) and push to talk (C9) are not listed until they
-land.
+client. v3/calls-c8: Captions is Ctrl/Cmd+Shift+C; push to talk is the
+one single-key shortcut, user-bound in Voice settings (unset by default).
 -}
 callShortcutRows : List { chords : List String, description : String }
 callShortcutRows =
     [ { chords = [ "⌘⇧M", "Ctrl+Shift+M" ], description = "Mute / unmute microphone" }
     , { chords = [ "⌘⇧E", "Ctrl+Shift+E" ], description = "Turn camera on / off" }
-    , { chords = [ "⌘⇧H", "Ctrl+Shift+H" ], description = "Raise / lower hand (stage audience)" }
+    , { chords = [ "⌘⇧H", "Ctrl+Shift+H" ], description = "Raise / lower hand" }
+    -- v3/calls-c8
+    , { chords = [ "⌘⇧C", "Ctrl+Shift+C" ], description = "Show / hide live captions" }
     , { chords = [ "⌘⇧L", "Ctrl+Shift+L" ], description = "Leave call (asks first with more than 2 people)" }
     , { chords = [ "⌘⇧G", "Ctrl+Shift+G" ], description = "Cycle layout: grid, spotlight, screen share" }
     , { chords = [ "⌘⇧F", "Ctrl+Shift+F" ], description = "Cycle call stage size" }
     , { chords = [ "⌘⇧S", "Ctrl+Shift+S" ], description = "Announce who is speaking" }
     , { chords = [ "Esc" ], description = "Exit fullscreen call stage" }
+    -- v3/calls-c8: the ONLY single-key shortcut — off until you bind a
+    -- key yourself in Voice settings (WCAG 2.1.4: user-chosen, remappable)
+    , { chords = [ "Talk key" ], description = "Push to talk: hold the key you bind in Voice settings (off until set)" }
     ]
 
 

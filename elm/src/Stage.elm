@@ -513,6 +513,8 @@ type Chord
     | ChordLayout
     | ChordSize
     | ChordSpeaker
+    -- v3/calls-c8
+    | ChordCaptions
 
 
 chordFromName : String -> Maybe Chord
@@ -520,6 +522,10 @@ chordFromName name =
     case name of
         "mute" ->
             Just ChordMute
+
+        -- v3/calls-c8
+        "captions" ->
+            Just ChordCaptions
 
         "camera" ->
             Just ChordCamera

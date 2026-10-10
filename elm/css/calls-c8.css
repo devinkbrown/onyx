@@ -1,0 +1,133 @@
+/* v3/calls-c8 — calls C8 + C9 (CALLS_DESIGN.md §2.4, §2.10, §2.11,
+   §3.4, §2.18): Hand / React / Captions in the bar, the React menu,
+   reaction chips, the live captions plate, the push-to-talk hint and
+   the Voice settings sheet. Tokens only from app.css :root. The
+   accent keeps its one call meaning (live audio now) — nothing here
+   uses it except the shared focus ring. */
+
+/* Glyphs (CSS masks over currentColor, same recipe as .onyx-ci). */
+.onyx-ci[data-icon="react"] { --ci: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8.5 14.5a4.5 4.5 0 0 0 7 0M9 10h.01M15 10h.01'/%3E%3C/svg%3E"); }
+.onyx-ci[data-icon="cc"] { --ci: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='M10.5 10.2a2.5 2.5 0 1 0 0 3.6M17 10.2a2.5 2.5 0 1 0 0 3.6'/%3E%3C/svg%3E"); }
+
+/* C8 · bar additions */
+.onyx-call-bar { position: relative; }
+.onyx-cbtn-hand[aria-pressed="true"] { background: var(--onyx-warn); border-color: var(--onyx-warn); color: var(--onyx-bg); }
+.onyx-call-more-react { display: none; }
+.onyx-call-ptt {
+  display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--space-2);
+  border: 1px solid var(--onyx-line); border-radius: var(--radius);
+  color: var(--onyx-dim); font-size: var(--text-2xs); font-weight: 600; white-space: nowrap;
+}
+.onyx-call-ptt[data-held="true"] { color: var(--onyx-text); border-color: var(--onyx-text); }
+
+/* C8 · React menu: one row of 8, anchored above the bar centre */
+.onyx-call-react-menu {
+  position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%); z-index: 21;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); max-width: calc(100vw - 32px);
+  padding: var(--space-1); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel);
+}
+.onyx-call-react-item {
+  display: grid; place-items: center; width: 40px; height: 40px; padding: 0;
+  border: 1px solid transparent; border-radius: var(--radius); background: transparent;
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.onyx-call-react-item:hover, .onyx-call-react-item:focus-visible { background: var(--onyx-panel-2); }
+.onyx-call-react-item:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* C8 · reaction chips: bottom-right of the stage body, above the bar */
+.onyx-call-reactions { position: relative; height: 0; z-index: 3; }
+.onyx-call-reactions-stack {
+  position: absolute; right: var(--space-3); bottom: var(--space-2);
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none;
+}
+.onyx-call-reaction {
+  display: inline-flex; align-items: center; gap: 6px; max-width: min(280px, calc(100vw - 48px));
+  padding: var(--space-1) var(--space-2); border: 1px solid var(--onyx-line); border-radius: var(--radius);
+  background: var(--onyx-panel); color: var(--onyx-text); font-size: var(--text-sm);
+  animation: onyx-call-react-in var(--dur-fast) var(--ease) both;
+}
+.onyx-call-reaction .onyx-ci { width: 14px; height: 14px; color: var(--onyx-warn); }
+.onyx-call-reaction-nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.onyx-call-reaction-verb { color: var(--onyx-dim); white-space: nowrap; }
+.onyx-call-reaction-emoji { font-size: 16px; line-height: 1; }
+@keyframes onyx-call-react-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+.onyx-call-stage[data-motion="still"] .onyx-call-reaction { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .onyx-call-reaction { animation: none; }
+}
+
+/* C8 · live captions: 15px on a 94%-opaque --onyx-bg plate, in flow
+   above the bar (never over a control) */
+.onyx-call-captions {
+  align-self: center; width: min(620px, calc(100% - 24px)); margin: 0 auto var(--space-2);
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--onyx-line); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--onyx-bg) 94%, transparent); color: var(--onyx-text);
+}
+.onyx-call-captions[data-empty="true"] { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+.onyx-call-captions-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-1); font-size: var(--text-2xs); }
+.onyx-call-captions-title { font-weight: 650; color: var(--onyx-dim); text-transform: uppercase; letter-spacing: var(--tracking-kicker); }
+.onyx-call-captions-source { color: var(--onyx-dim); }
+.onyx-call-captions-source[data-live="false"] { color: var(--onyx-warn); }
+.onyx-call-captions-copy, .onyx-call-caption-translate {
+  min-height: var(--target-floor); padding: 0 var(--space-2); margin-left: auto;
+  border: 1px solid var(--onyx-line); border-radius: var(--radius); background: transparent;
+  color: var(--onyx-text); font: inherit; font-size: var(--text-2xs); font-weight: 600; cursor: pointer;
+}
+.onyx-call-captions-copy:disabled, .onyx-call-caption-translate:disabled { color: var(--onyx-faint); cursor: default; }
+.onyx-call-captions-state { color: var(--onyx-dim); }
+.onyx-call-captions-log { display: grid; gap: 2px; }
+.onyx-call-caption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); margin: 0; font-size: var(--text-md); line-height: var(--leading-snug); }
+/* Older lines: the TEXT mixes to 75% (≥ 4.5:1); the speaker name keeps
+   its full --onyx-dim so it never falls under 4.5:1 (CallsC8Test). */
+.onyx-call-caption[data-old="true"] .onyx-call-caption-text { color: color-mix(in srgb, var(--onyx-text) 75%, var(--onyx-bg)); }
+.onyx-call-caption-nick { flex: none; color: var(--onyx-dim); font-weight: 650; }
+.onyx-call-caption-text { min-width: 0; overflow-wrap: anywhere; }
+.onyx-call-caption-translate { margin-left: 0; }
+.onyx-call-caption-tr { flex-basis: 100%; color: var(--onyx-dim); font-size: var(--text-sm); }
+
+/* C9 · voice settings sheet */
+.onyx-voice-settings { width: min(520px, 100%); }
+.onyx-vs-body { display: grid; gap: var(--space-5); }
+.onyx-vs-section { display: grid; gap: var(--space-3); }
+.onyx-vs-title { margin: 0; font-size: var(--text-2xs); font-weight: 650; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: var(--tracking-kicker); }
+.onyx-vs-copy { margin: calc(-1 * var(--space-2)) 0 0; color: var(--onyx-dim); font-size: var(--text-sm); }
+.onyx-vs-field { display: grid; gap: var(--space-1); min-width: 0; }
+.onyx-vs-label { font-weight: 650; }
+.onyx-vs-desc { margin: 0; color: var(--onyx-dim); font-size: var(--text-sm); }
+.onyx-vs-error { margin: 0; color: var(--onyx-bad); font-size: var(--text-sm); }
+.onyx-vs-select {
+  width: 100%; min-width: 0; min-height: 40px; padding: 0 var(--space-2);
+  border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel-2);
+  color: var(--onyx-text); font: inherit;
+}
+.onyx-vs-select:disabled { color: var(--onyx-faint); }
+.onyx-vs-range { width: 100%; accent-color: var(--onyx-text); }
+.onyx-vs-output { display: grid; gap: var(--space-2); justify-items: start; }
+.onyx-vs-output > .onyx-vs-field { justify-self: stretch; }
+.onyx-vs-toggle { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
+.onyx-vs-toggle input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--onyx-text); }
+.onyx-vs-toggle-text { display: grid; gap: 2px; min-width: 0; }
+.onyx-vs-toggle-label { font-weight: 650; }
+.onyx-vs-key-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-2); }
+.onyx-vs-key-display { display: grid; gap: var(--space-1); }
+.onyx-vs-key {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 96px; min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line); border-radius: var(--radius); font-family: var(--font-mono);
+}
+.onyx-vs-key[data-capturing="true"] { border-color: var(--onyx-text); }
+.onyx-vs-btn { min-height: 36px; }
+.onyx-call-sheet-layer .onyx-voice-settings .onyx-call-sheet-head h2 { font-size: var(--text-lg); }
+
+/* 375px: React moves into More, captions show one line, the sheet's
+   key row stacks. Breakpoint 768px. */
+@media (max-width: 767px) {
+  .onyx-cbtn-react { display: none; }
+  .onyx-call-more-react { display: block; }
+  .onyx-call-caption[data-old="true"] { display: none; }
+  .onyx-call-captions { width: calc(100% - 16px); }
+  .onyx-call-captions-title { display: none; }
+  .onyx-call-ptt { display: none; }
+  .onyx-vs-key-row { align-items: stretch; }
+  .onyx-vs-key-display { flex: 1 1 100%; }
+  .onyx-vs-btn { flex: 1 1 0; min-height: var(--target-min); }
+}

@@ -533,7 +533,7 @@ chords =
                 Expect.all
                     [ \_ -> Expect.equal (Switcher.CallChord "mute") (Switcher.shortcutFromString "call-mute")
                     , \_ -> Expect.equal (Just Stage.ChordLayout) (Stage.chordFromName "layout")
-                    , \_ -> Expect.equal Nothing (Stage.chordFromName "captions")
+                    , \_ -> Expect.equal Nothing (Stage.chordFromName "confetti")
                     , \_ -> Expect.equal Switcher.UnknownShortcut (Switcher.shortcutFromString "mute")
                     ]
                     ()
@@ -580,11 +580,13 @@ chords =
                     , \_ -> Expect.equal [ VoiceLeave { channel = "#stage" } ] (Tuple.second (chord "leave" (audience |> inCallAt [ "me", "host" ])))
                     ]
                     ()
-        , test "hand chord drives the stage hand for the audience only" <|
+        , test "hand chord drives the stage hand for the audience, the voice hand otherwise (v3/calls-c8)" <|
             \_ ->
                 Expect.all
                     [ \_ -> Expect.equal [ line "PRIVMSG" [ "#stage", "\u{0001}STAGE RAISE_HAND\u{0001}" ] ] (Tuple.second (chord "hand" (audience |> inCallAt [ "me", "host" ])))
-                    , \_ -> Expect.equal [] (Tuple.second (chord "hand" (hosting |> inCallAt [ "me", "host" ])))
+                    , \_ -> Expect.equal [ SendLine "MEDIA REACT #stage ✋\r\n" ] (Tuple.second (chord "hand" (hosting |> inCallAt [ "me", "host" ])))
+                    , \_ -> Expect.equal True (Tuple.first (chord "hand" (hosting |> inCallAt [ "me", "host" ]))).callOverlay.handRaised
+                    , \_ -> Expect.equal True (Tuple.first (chord "captions" (hosting |> inCallAt [ "me", "host" ]))).callOverlay.captionsOn
                     ]
                     ()
         , test "layout chord cycles grid → spotlight → grid; size chord cycles the stage" <|
@@ -662,7 +664,9 @@ a11y =
                         List.concatMap (\g -> List.concatMap .chords g.rows) group
 
                     modifierless =
-                        List.filter (\c -> c /= "Esc" && not (String.contains "Ctrl+Shift+" c || String.startsWith "⌘⇧" c)) chordsListed
+                        -- v3/calls-c8: the user-bound talk key is the one
+                        -- single-key exception (WCAG 2.1.4: off until bound)
+                        List.filter (\c -> c /= "Esc" && c /= "Talk key" && not (String.contains "Ctrl+Shift+" c || String.startsWith "⌘⇧" c)) chordsListed
                 in
                 Expect.all
                     [ \_ -> Expect.equal 1 (List.length group)
@@ -670,7 +674,7 @@ a11y =
                     , \_ ->
                         Expect.equal True
                             (List.all (\c -> List.member c chordsListed)
-                                [ "Ctrl+Shift+M", "Ctrl+Shift+E", "Ctrl+Shift+H", "Ctrl+Shift+L", "Ctrl+Shift+G", "Ctrl+Shift+F", "Ctrl+Shift+S" ]
+                                [ "Ctrl+Shift+M", "Ctrl+Shift+E", "Ctrl+Shift+H", "Ctrl+Shift+L", "Ctrl+Shift+G", "Ctrl+Shift+F", "Ctrl+Shift+S", "Ctrl+Shift+C", "Talk key" ]
                             )
                     , \_ -> query (step ShortcutsOpen base) |> Query.find [ testid "shortcuts-overlay" ] |> Query.has [ Selector.text "Voice & Video", Selector.text "Mute / unmute microphone" ]
                     ]

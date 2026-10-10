@@ -61,6 +61,9 @@ import CallDock
 
 -- v3/calls-c4
 import CallMedia
+-- v3/calls-c8
+import CallCaptions
+import VoiceSettings
 -- v3/calls-c11
 import Stage
 import IdentityOverrides
@@ -607,6 +610,10 @@ type alias Model =
     , callPinned : Maybe String
     , callShareOptOut : Maybe String
     , callClockMs : Float
+    -- v3/calls-c8
+    , callOverlay : CallCaptions.Overlay
+    , voicePrefs : VoiceSettings.Prefs
+    , voiceSettings : VoiceSettings.State
     -- v3/calls-c11
     , stage : Stage.StageState
     , stageHandsOpen : Bool
@@ -1003,6 +1010,8 @@ type Outbound
     -- v3/calls-c4: the ONE call-media command port (camera / share /
     -- deafen / native PiP), spec §5.
     | VoiceCommand { verb : String, on : Bool, channel : String, tile : String }
+    -- v3/calls-c8: persist the voice prefs (`onyx:voice-settings`).
+    | VoicePrefsSave { json : String }
     | VaultExportRequest
     | VaultImportPick
     | RetentionPolicyRequest
@@ -3151,6 +3160,17 @@ type Msg
     | CallPin String
     | CallShareGrid String
     | CallPageSet Int
+    -- v3/calls-c8
+    | CallToggleHand
+    | CallToggleCaptions
+    | CallReactToggle
+    | CallReactClose
+    | CallReactFocus Int
+    | CallReact String
+    | CallCaptionsCopy
+    | CallCaptionTranslate String
+    | VoiceSettingsMsg VoiceSettings.Msg
+    | VoicePttShortcut String
     | CallNativePip String
     -- v3/calls-c11
     | StageStart String
@@ -3586,6 +3606,10 @@ init nick url =
     , callPinned = Nothing
     , callShareOptOut = Nothing
     , callClockMs = 0
+    -- v3/calls-c8
+    , callOverlay = CallCaptions.blankOverlay
+    , voicePrefs = VoiceSettings.defaultPrefs
+    , voiceSettings = VoiceSettings.blankState
     -- v3/calls-c11
     , stage = Stage.blank
     , stageHandsOpen = False
@@ -4162,6 +4186,10 @@ blank =
     , callPinned = Nothing
     , callShareOptOut = Nothing
     , callClockMs = 0
+    -- v3/calls-c8
+    , callOverlay = CallCaptions.blankOverlay
+    , voicePrefs = VoiceSettings.defaultPrefs
+    , voiceSettings = VoiceSettings.blankState
     -- v3/calls-c11
     , stage = Stage.blank
     , stageHandsOpen = False
@@ -36089,6 +36117,7 @@ settleSteps =
     , settleStepCallDock -- v3/calls-c6
     , settleStepStage -- v3/calls-c11
     , settleStepPolish -- v3/polish
+    , settleStepCallsC8 -- v3/calls-c8
     ]
 
 
@@ -36167,6 +36196,12 @@ settleStepPolish msg prior ( m, outs ) =
             polishSettle msg prior m
     in
     ( settled, outs ++ polishOut )
+
+
+-- v3/calls-c8
+settleStepCallsC8 : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepCallsC8 _ prior ( m, outs ) =
+    ( CallCaptions.settle prior m, outs )
 
 
 -- v3/calls-c6
@@ -36266,6 +36301,67 @@ callMediaTarget model =
 blankCallLocal : CallMedia.Local
 blankCallLocal =
     CallMedia.blankLocal
+
+
+-- v3/calls-c8
+{-| The shell clock the call overlay stamps with (the 200ms call
+clock while a call is up, else the 1s tick).
+-}
+callsC8Now : Model -> Float
+callsC8Now model =
+    max model.nowMs model.callClockMs
+
+
+{-| MEDIA REACT for the live room call (`Media.mediaReact`, the
+existing wire builder); nothing for a DM call or offline.
+-}
+callsC8ReactOut : Model -> String -> List Outbound
+callsC8ReactOut model emoji =
+    if model.connection /= Live then
+        []
+
+    else
+        model.calls.channel
+            |> Maybe.andThen (\channel -> Media.mediaReact channel emoji)
+            |> Maybe.map (\line -> [ SendLine line ])
+            |> Maybe.withDefault []
+
+
+callsC8CaptionTarget : Model -> Maybe String
+callsC8CaptionTarget model =
+    case model.calls.channel of
+        Just channel ->
+            Just channel
+
+        Nothing ->
+            model.activeChannel
+
+
+callsC8CaptionLines : Model -> List CallCaptions.CaptionLine
+callsC8CaptionLines model =
+    CallCaptions.captionLines
+        { captionsOn = model.callOverlay.captionsOn
+        , lifecycle = model.calls.lifecycle
+        , channel = model.calls.channel
+        , activeChannel = model.activeChannel
+        }
+        model.media
+
+
+callsC8Effect : VoiceSettings.Prefs -> VoiceSettings.Effect -> Outbound
+callsC8Effect prefs effect =
+    case effect of
+        VoiceSettings.SavePrefs ->
+            VoicePrefsSave { json = Encode.encode 0 (VoiceSettings.encodePrefs prefs) }
+
+        VoiceSettings.RequestDevices ->
+            VoiceCommand { verb = "devices", on = True, channel = "", tile = "" }
+
+        VoiceSettings.RequestSpeakerChooser ->
+            VoiceCommand { verb = "choose-speaker", on = True, channel = "", tile = Maybe.withDefault "" prefs.outputDeviceId }
+
+        VoiceSettings.FocusId id ->
+            PrefsFocus { id = id }
 
 
 {-| Post-update call-media settle (spec §2.6, §2.13): the
@@ -39607,6 +39703,18 @@ updateCore msg model =
             if List.member tag Account2.clipboardTags then
                 ( account2ClipboardResult tag ok model, [] )
 
+            -- v3/calls-c8
+            else if tag == CallCaptions.copyTag then
+                let
+                    overlay =
+                        model.callOverlay
+                in
+                if overlay.copy == CallCaptions.CopyBusy then
+                    ( { model | callOverlay = { overlay | copy = (if ok then CallCaptions.CopyDone else CallCaptions.CopyBlocked) } }, [] )
+
+                else
+                    ( model, [] )
+
             else if tag == "invite" then
                 if model.inviteCopy == CopyBusy then
                     ( { model | inviteCopy = (if ok then CopyCopied else CopyFailed) }, [] )
@@ -40990,7 +41098,7 @@ updateCore msg model =
                 -- provisional) and remember the room for the failed
                 -- banner.
                 ( { model
-                    | callSelfMuted = CallUi.joinMutedDefault
+                    | callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8: the stored pref
                     , callJoinTarget = Just channel
                     -- v3/calls-c4: camera intent from the join verb.
                     , callLocal = { blankCallLocal | camera = video, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported }
@@ -40999,7 +41107,7 @@ updateCore msg model =
                   }
                 , leaveFirst
                     ++ [ VoiceJoin { channel = channel, video = video } ]
-                    ++ (if CallUi.joinMutedDefault then
+                    ++ (if model.voicePrefs.muteOnJoin then
                             [ VoiceMute { muted = True } ]
 
                         else
@@ -41096,10 +41204,10 @@ updateCore msg model =
                 ( { model
                     | callAccepting = True
                     , callAcceptError = False
-                    , callSelfMuted = CallUi.joinMutedDefault
+                    , callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8
                   }
                 , VoiceRing { verb = "accept", peer = model.calls.withPeer }
-                    :: (if CallUi.joinMutedDefault then
+                    :: (if model.voicePrefs.muteOnJoin then
                             [ VoiceMute { muted = True } ]
 
                         else
@@ -41300,6 +41408,196 @@ updateCore msg model =
             else
                 ( model, [] )
 
+        -- v3/calls-c8
+        CallToggleHand ->
+            -- Oracle `toggleRaiseHand`: a local flag; raising also
+            -- sends (and echoes) a ✋ reaction — there is no lower
+            -- signal on the wire.
+            if model.calls.lifecycle /= Media.InCall then
+                ( model, [] )
+
+            else
+                let
+                    overlay =
+                        model.callOverlay
+
+                    raised =
+                        not overlay.handRaised
+
+                    flagged =
+                        { overlay | handRaised = raised, reactOpen = False }
+                in
+                if raised then
+                    ( { model
+                        | callOverlay = CallCaptions.recordLocalReaction (callsC8Now model) model.ourNick "✋" flagged
+                        , media = CallCaptions.selfHand True model.ourNick model.media
+                      }
+                    , callsC8ReactOut model "✋"
+                    )
+
+                else
+                    ( { model | callOverlay = flagged, media = CallCaptions.selfHand False model.ourNick model.media }, [] )
+
+        CallToggleCaptions ->
+            if model.calls.lifecycle == Media.Idle then
+                ( model, [] )
+
+            else
+                let
+                    overlay =
+                        model.callOverlay
+                in
+                ( { model | callOverlay = { overlay | captionsOn = not overlay.captionsOn, copy = CallCaptions.CopyIdle } }, [] )
+
+        CallReactToggle ->
+            -- The React menu needs a room call (MEDIA REACT names a
+            -- channel); a DM call has no reaction plane.
+            let
+                overlay =
+                    model.callOverlay
+
+                canOpen =
+                    model.calls.lifecycle == Media.InCall && model.calls.channel /= Nothing
+            in
+            ( { model
+                | callOverlay = { overlay | reactOpen = not overlay.reactOpen && canOpen, reactIndex = 0 }
+                , callMoreOpen = False
+              }
+            , []
+            )
+
+        CallReactClose ->
+            let
+                overlay =
+                    model.callOverlay
+            in
+            ( { model | callOverlay = { overlay | reactOpen = False } }, [] )
+
+        CallReactFocus index ->
+            let
+                overlay =
+                    model.callOverlay
+
+                clamped =
+                    clamp 0 (List.length CallCaptions.quickReactions - 1) index
+            in
+            ( { model | callOverlay = { overlay | reactIndex = clamped } }
+            , [ PrefsFocus { id = "call-react-" ++ String.fromInt clamped } ]
+            )
+
+        CallReact emoji ->
+            -- Oracle `sendCallReaction`: trim, reject empty, send, and
+            -- echo locally so the sender sees it at once.
+            let
+                overlay =
+                    model.callOverlay
+
+                trimmed =
+                    String.trim emoji
+
+                out =
+                    callsC8ReactOut model trimmed
+            in
+            if model.calls.lifecycle /= Media.InCall || List.isEmpty out then
+                ( { model | callOverlay = { overlay | reactOpen = False } }, [] )
+
+            else
+                ( { model | callOverlay = CallCaptions.recordLocalReaction (callsC8Now model) model.ourNick trimmed { overlay | reactOpen = False } }
+                , out
+                )
+
+        CallCaptionsCopy ->
+            let
+                overlay =
+                    model.callOverlay
+
+                body =
+                    CallCaptions.transcriptText (callsC8CaptionTarget model) model.media
+            in
+            if overlay.copy == CallCaptions.CopyBusy || String.isEmpty body then
+                ( model, [] )
+
+            else
+                ( { model | callOverlay = { overlay | copy = CallCaptions.CopyBusy } }
+                , [ ClipboardCopy { text = body, tag = CallCaptions.copyTag } ]
+                )
+
+        CallCaptionTranslate key ->
+            -- On-device translation of one visible caption line (the
+            -- shared translator path, namespaced ids; entries for
+            -- lines that scrolled away are dropped first so the map
+            -- stays bounded to the visible window).
+            let
+                visible =
+                    callsC8CaptionLines model
+
+                visibleIds =
+                    List.map (.key >> CallCaptions.captionTranslationId) visible
+
+                pruned =
+                    { model
+                        | translations =
+                            Dict.filter (\id _ -> not (String.startsWith "caption:" id) || List.member id visibleIds) model.translations
+                    }
+
+                tid =
+                    CallCaptions.captionTranslationId key
+            in
+            case List.head (List.filter (\l -> l.key == key) visible) of
+                Just line ->
+                    if not model.translationAvailable then
+                        ( pruned, [] )
+
+                    else
+                        case Dict.get tid pruned.translations of
+                            Just existing ->
+                                if existing.status == TranslationPending then
+                                    ( pruned, [] )
+
+                                else
+                                    startTranslation pruned tid line.text
+
+                            Nothing ->
+                                startTranslation pruned tid line.text
+
+                Nothing ->
+                    ( pruned, [] )
+
+        VoiceSettingsMsg sub ->
+            let
+                ( next, effects ) =
+                    VoiceSettings.update sub { prefs = model.voicePrefs, state = model.voiceSettings }
+
+                opened =
+                    case sub of
+                        VoiceSettings.Open ->
+                            True
+
+                        _ ->
+                            False
+            in
+            ( { model
+                | voicePrefs = next.prefs
+                , voiceSettings = next.state
+                , callMoreOpen = model.callMoreOpen && not opened
+                , youHubOpen = model.youHubOpen && not opened
+              }
+            , List.map (callsC8Effect next.prefs) effects
+            )
+
+        VoicePttShortcut name ->
+            -- The runtime PTT hold arrives on the shared `shortcut`
+            -- port (ports.js applies its scope rules and drives the
+            -- engine directly); the core only mirrors the held state.
+            case name of
+                "ptt-down" ->
+                    updateCore (VoiceSettingsMsg (VoiceSettings.PttHeld True)) model
+
+                "ptt-up" ->
+                    updateCore (VoiceSettingsMsg (VoiceSettings.PttHeld False)) model
+
+                _ ->
+                    ( model, [] )
         -- v3/calls-c11
         StageStart _ ->
             stageUpdate msg model
@@ -43920,7 +44218,10 @@ overlayStack model =
         , ( "message-menu", model.messageMenu /= Nothing, MessageMenuClose )
         , ( "person-safety", model.personSafety /= Nothing, SafetyClose )
         , ( "moderation-review", model.moderationDraft /= Nothing, ModerationCancel )
+        -- v3/calls-c8: the voice settings sheet and the React menu
+        , ( "voice-settings", model.voiceSettings.open, VoiceSettingsMsg VoiceSettings.Close )
         , ( "call-privacy", model.callPrivacyOpen, CallPrivacyClose )
+        , ( "call-react", model.callOverlay.reactOpen, CallReactClose )
         , ( "call-more", model.callMoreOpen, CallMoreClose )
         -- v3/calls-c4: Escape returns a fullscreen stage to compact.
         , ( "call-fullscreen", model.callStageSize == CallMedia.SizeFullscreen && model.calls.lifecycle /= Media.Idle, CallStageSizeSet CallMedia.SizeCompact )
@@ -45022,7 +45323,7 @@ settleStage model =
 only in an established call; while reconnecting only Leave works (the
 bar disables the rest the same way). Raise hand drives the stage hand
 when this call's room is a stage this client is in the audience of;
-outside a stage the voice hand lands with C8, so the chord is a no-op.
+outside a stage it toggles the C8 voice hand (v3/calls-c8).
 -}
 callChord : String -> Model -> ( Model, List Outbound )
 callChord name model =
@@ -45059,10 +45360,16 @@ callChord name model =
                                     stageUpdate StageHandToggle model
 
                                 else
-                                    ( model, [] )
+                                    -- v3/calls-c8: the voice hand
+                                    updateCore CallToggleHand model
 
                             Nothing ->
-                                ( model, [] )
+                                -- v3/calls-c8: a DM call's hand is local
+                                updateCore CallToggleHand model
+
+                    -- v3/calls-c8
+                    Stage.ChordCaptions ->
+                        updateCore CallToggleCaptions model
 
                     Stage.ChordLeave ->
                         if List.length roster > 2 then

@@ -184,11 +184,11 @@ criteria in spec §6) supersede rows 6.1–6.7:
 C1 Presence + join banner (M) **done** · C2 Voice-only stage + control bar v1 + announcer (M) **done** ·
 C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) ·
 C5 Video grid, tiles, layouts, dominant speaker (L) · C6 DM ring overlays (S) **done** ·
-C7 PiP (M) **done** · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
+C7 PiP (M) **done** · C8 Captions + reactions (M) **done** · C9 Voice settings + PTT (M) **done** ·
 C10 Reconnecting + classified errors (S) **done** · C11 Stage mode (L) **done** · C12 Shortcuts + a11y pass (S) **done**.
 C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) **done** ·
 C5 Video grid, tiles, layouts, dominant speaker (L) **done** · C6 DM ring overlays (S) ·
-C7 PiP (M) · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
+C7 PiP (M) · C8 Captions + reactions (M) **done** · C9 Voice settings + PTT (M) **done** ·
 C10 Reconnecting + classified errors (S) · C11 Stage mode (L) **done** · C12 Shortcuts + a11y pass (S) **done**.
 
 C1–C3 landed on `v3/calls-c1` (`CallUi`, `View.CallPresence`, `View.CallStage`; 45 `CallsC1Test`
