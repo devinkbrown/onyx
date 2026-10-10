@@ -18,6 +18,7 @@ control-plane fold is wired; engine/bytes stay behind ports), uploads.
 
 import Base64Url
 import Bitwise
+import Boost
 import Browser
 import Cadence
 import ComposerInject
@@ -345,6 +346,11 @@ type alias Model =
     , composerDrafts : Dict.Dict String String
     , messageMenu : Maybe { target : String, msgid : String, confirmDelete : Bool }
     , reactionPicker : Maybe { target : String, msgid : String, query : String }
+    -- v3/boost
+    , showJumpToDate : Bool
+    , jumpDate : String
+    , jumpTime : String
+    , jumpError : Maybe String
     , linkPreviewOrder : List String
     , previewImagesAllowed : Set String
     , messageSeq : Int
@@ -2764,6 +2770,14 @@ type Msg
     | ReactionPickerClose
     | ReactionPickerSearch String
     | ReactionPickerChoose String
+    -- v3/boost
+    | JumpToDateOpen
+    | JumpToDateClose
+    | JumpToDateInputDate String
+    | JumpToDateInputTime String
+    | JumpToDatePreset Int
+    | JumpToDateSubmit
+    | JumpToDateCopyMoment
     | MessageMenuDeleteAsk
     | MessageMenuCopy { target : String, msgid : String }
     | MessageSearchText { text : String }
@@ -3021,6 +3035,11 @@ init nick url =
     , composerDrafts = Dict.empty
     , messageMenu = Nothing
     , reactionPicker = Nothing
+    -- v3/boost
+    , showJumpToDate = False
+    , jumpDate = ""
+    , jumpTime = "12:00"
+    , jumpError = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -3483,6 +3502,11 @@ blank =
     , composerDrafts = Dict.empty
     , messageMenu = Nothing
     , reactionPicker = Nothing
+    -- v3/boost
+    , showJumpToDate = False
+    , jumpDate = ""
+    , jumpTime = "12:00"
+    , jumpError = Nothing
     , composerError = Nothing
     , composerAudience = Nothing
     , attachments = []
@@ -37022,6 +37046,73 @@ updateCore msg model =
 
                 Just open ->
                     Tuple.mapFirst (\m -> { m | reactionPicker = Nothing }) (sendReaction model open.target open.msgid emoji)
+
+        -- v3/boost
+        JumpToDateOpen ->
+            -- Opening seeds today at noon UTC (mirroring the
+            -- oracle sheet seeding defaults on open).
+            ( { model | showJumpToDate = True, jumpDate = Boost.formatUtcDate model.nowMs, jumpTime = "12:00", jumpError = Nothing }, [] )
+
+        JumpToDateClose ->
+            ( { model | showJumpToDate = False, jumpError = Nothing }, [] )
+
+        JumpToDateInputDate text ->
+            ( { model | jumpDate = text, jumpError = Nothing }, [] )
+
+        JumpToDateInputTime text ->
+            ( { model | jumpTime = text, jumpError = Nothing }, [] )
+
+        JumpToDatePreset daysAgo ->
+            ( { model | jumpDate = Boost.utcDateDaysAgo daysAgo model.nowMs, jumpTime = "12:00", jumpError = Nothing }, [] )
+
+        JumpToDateSubmit ->
+            -- Jumping reuses the time-travel machinery
+            -- (mirroring the oracle sheet `jump`: travel, then
+            -- close whatever the travel fold decided).
+            case model.activeChannel of
+                Nothing ->
+                    ( { model | jumpError = Just "Open a room or DM first." }, [] )
+
+                Just target ->
+                    case Boost.dateTimeAtUtc model.jumpDate model.jumpTime of
+                        Nothing ->
+                            ( { model | jumpError = Just "Enter a valid UTC date and time." }, [] )
+
+                        Just at ->
+                            Tuple.mapFirst
+                                (\traveled -> { traveled | showJumpToDate = False, jumpError = Nothing })
+                                (requestTravelTo model target at)
+
+        JumpToDateCopyMoment ->
+            -- Copying shares the menu moment-link path
+            -- (same `moment` clipboard tag and toasts).
+            case model.activeChannel of
+                Nothing ->
+                    ( { model | jumpError = Just "Open a room or DM first." }, [] )
+
+                Just target ->
+                    case Boost.dateTimeAtUtc model.jumpDate model.jumpTime of
+                        Nothing ->
+                            ( { model | jumpError = Just "Enter a valid UTC date and time." }, [] )
+
+                        Just at ->
+                            case Invite.buildMomentLink model.origin target at of
+                                Just link ->
+                                    ( model, [ ClipboardCopy { text = link, tag = "moment" } ] )
+
+                                Nothing ->
+                                    ( addToast
+                                        { variant = ToastError
+                                        , title = "Copy failed"
+                                        , description = Just "Moment link is unavailable."
+                                        , duration = Nothing
+                                        , groupKey = Nothing
+                                        , undo = Nothing
+                                        }
+                                        model.nowMs
+                                        model
+                                    , []
+                                    )
 
         MessageMenuDeleteAsk ->
             -- The destructive action arms a confirm step first

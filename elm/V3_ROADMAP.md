@@ -55,8 +55,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 2.2 | mIRC formatting (bold/italic/underline/colour/reset) | `MessageText` | M |
 | 2.3 | Markdown subset: inline code, code blocks, blockquote, spoiler | `MessageText` | M |
 | 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | M |
-| 2.5 | "Add a boost" on the boost bar | `BoostBar` | S |
-| 2.6 | Jump to date + time scrubber | `JumpToDateSheet`, `TimeScrubber` | M |
+| 2.5 | "Add a boost" on the boost bar | `BoostBar` | **done** (`boost` slice: ＋ opener per row into the existing reaction picker) |
+| 2.6 | Jump to date sheet (time scrubber stays todo) | `JumpToDateSheet` (+ `TimeScrubber` ahead) | **done** (`boost` slice: sheet + topbar entry over `requestTravelTo`; no scrubber yet) |
 | 2.7 | Catch-up: "Since you left" digest, mark caught up | `CatchUpSummary`, `SinceDigestCard` | M |
 | 2.8 | BlockKit structured-action modal + send review | `message/BlockKitModal` | M |
 | 2.9 | Local edit-history view, context trail | `MessageView` | M |
@@ -121,3 +121,4 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 - 2026-10-10 — Phase 0.1/0.2 connect gate landed (`c18b9591`).
 - 2026-10-10 — Phase 2.1–2.3 rich message text (links, mentions, channel jump, mIRC, code, quote, spoiler, emoji) landed.
+- 2026-10-10 — Phase 2.5–2.6 boost slice landed (Add-a-boost opener + jump-to-date sheet over `requestTravelTo`; time scrubber stays todo).

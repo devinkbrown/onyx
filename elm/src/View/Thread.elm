@@ -1845,8 +1845,19 @@ boostBar model target m =
 
         summary =
             App.summarizeBoosts groups model.prefs.reactionDensity
+
+        -- v3/boost: the oracle `onAdd` arm — a row with a msgid
+        -- offers the reaction picker even with no boosts yet
+        -- (hidden under counts-only density like the oracle).
+        addable =
+            case m.msgid of
+                Just _ ->
+                    model.prefs.reactionDensity /= Prefs.ReactionCountsOnly
+
+                Nothing ->
+                    False
     in
-    if summary.hidden || (List.isEmpty summary.chips && summary.overflow <= 0) then
+    if summary.hidden || ((List.isEmpty summary.chips && summary.overflow <= 0) && not addable) then
         text ""
 
     else
@@ -1859,6 +1870,20 @@ boostBar model target m =
 
                     else
                         []
+                   )
+                ++ (case ( addable, m.msgid ) of
+                        ( True, Just msgid ) ->
+                            [ button
+                                [ type_ "button"
+                                , class "boost-pill boost-add"
+                                , attribute "aria-label" "Add a boost"
+                                , onClick (App.ReactionPickerOpen { target = target, msgid = msgid })
+                                ]
+                                [ text "＋" ]
+                            ]
+
+                        _ ->
+                            []
                    )
             )
 

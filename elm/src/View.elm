@@ -37,6 +37,7 @@ import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
 import View.Bans exposing (banPanel)
+import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
 import View.Inbox exposing (inbox)
 import View.Trust exposing (trustPageForRoute)
@@ -220,6 +221,7 @@ shell model =
                , accountPanel model
                , pinsDrawer model
                , mediaPanel model
+               , jumpToDateSheet model
                , profileSheet model
                , profileCard model
                , moderationReview model

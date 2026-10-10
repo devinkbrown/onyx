@@ -1858,7 +1858,9 @@ suite =
                         Query.find [ Selector.class "boost-pill", Selector.class "you" ] q
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                     , \_ ->
-                        Query.find [ Selector.class "boost-pill" ] q
+                        -- v3/boost: the bar now also holds the "Add a boost"
+                        -- opener, so the chip is found by its `you` class.
+                        Query.find [ Selector.class "boost-pill", Selector.class "you" ] q
                             |> Event.simulate Event.click
                             |> Event.expect (ReactionSend "#c" "m1" "👍")
                     ]
