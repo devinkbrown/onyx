@@ -6667,6 +6667,9 @@ function fetchPublicFeed(url) {
       roomProvision: function (room, epoch, raw) { return rooms.provisionRoomKey(room, epoch, raw); }
     });
     wireGroupWelcome(app, groupWelcome);
+
+    /* v3/polish */
+    wirePolish(app);
   }
 
   var CEREMONY_TIMEOUT_MS = 120000;
@@ -9342,6 +9345,207 @@ function fetchPublicFeed(url) {
     }
   }
 
+  /* ── v3/polish: quiet-ask flags + PWA install/update bridge ──────────
+     Mirrors `src/lib/firstHour/firstHour.ts`, `firstRunNotify.ts` and
+     `src/pwa/addToHomeScreen.ts`: "1" markers under `onyx:*` keys, the
+     two-key visit memory (`onyx:a2hs-visit` local + `onyx:a2hs-session`
+     session) that makes a later visit "returning", a silent
+     `beforeinstallprompt` capture that is only ever `prompt()`ed from the
+     user's Add to Home Screen tap, and a service-worker update handoff.
+
+     The Elm build registers NO service worker of its own. Update
+     detection is honest: it only fires when an Onyx service worker
+     already controls this scope (e.g. the deployed `sw.js`) and a new
+     one is installed/waiting. With no registration nothing is ever
+     announced, so the banner never appears. Approving posts the oracle
+     `ONYX_SKIP_WAITING` message and reloads on `controllerchange`; with
+     no waiting worker it is a plain reload. */
+  var POLISH_FLAG_KEYS = [
+    "onyx:first-hour-seen",
+    "onyx:notify-first-send",
+    "onyx:notify-first-run-dismissed",
+    "onyx:a2hs-dismissed",
+    "onyx:a2hs-message-sent"
+  ];
+
+  function polishStorage(win, kind) {
+    try { return (win && win[kind]) || null; } catch (e) { return null; }
+  }
+
+  function polishReadFlag(storage, key) {
+    try { return !!storage && storage.getItem(key) === "1"; } catch (e) { return false; }
+  }
+
+  function polishWriteFlag(storage, key) {
+    try { if (storage) storage.setItem(key, "1"); } catch (e) { /* session-only */ }
+  }
+
+  function polishDetectPlatform(nav) {
+    var ua = "";
+    var platform = "";
+    var touch = 0;
+    try {
+      ua = (nav && nav.userAgent) || "";
+      platform = (nav && nav.platform) || "";
+      touch = (nav && nav.maxTouchPoints) || 0;
+    } catch (e) { /* brand-checked getters */ }
+    if (/iPad|iPhone|iPod/.test(ua)) return "ios";
+    if (platform === "MacIntel" && touch > 1) return "ios";
+    if (/Chrome|Chromium|Edg|OPR|SamsungBrowser/i.test(ua)) return "chromium";
+    return "other";
+  }
+
+  /* Boot flags for `App.polish` (index.html passes them as `polish`).
+     Also records this visit (oracle `rememberHomeScreenVisit`): the first
+     load of a browser session marks both keys and reports whether an
+     earlier session had visited. */
+  function polishFlags(env) {
+    env = env || {};
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var local = polishStorage(win, "localStorage");
+    var session = polishStorage(win, "sessionStorage");
+    var returning = false;
+    if (!polishReadFlag(session, "onyx:a2hs-session")) {
+      var hadVisit = polishReadFlag(local, "onyx:a2hs-visit");
+      polishWriteFlag(session, "onyx:a2hs-session");
+      polishWriteFlag(local, "onyx:a2hs-visit");
+      returning = hadVisit;
+    }
+    var standaloneDisplay = false;
+    try {
+      standaloneDisplay = !!(win && typeof win.matchMedia === "function" &&
+        win.matchMedia("(display-mode: standalone)").matches);
+    } catch (e) { standaloneDisplay = false; }
+    var navStandalone = null;
+    try {
+      if (nav && typeof nav.standalone === "boolean") navStandalone = nav.standalone;
+    } catch (e) { navStandalone = null; }
+    var sw = false;
+    try { sw = !!(nav && nav.serviceWorker); } catch (e) { sw = false; }
+    return {
+      firstHourSeen: polishReadFlag(local, "onyx:first-hour-seen"),
+      notifyFirstSend: polishReadFlag(local, "onyx:notify-first-send"),
+      notifyDismissed: polishReadFlag(local, "onyx:notify-first-run-dismissed"),
+      a2hsDismissed: polishReadFlag(local, "onyx:a2hs-dismissed"),
+      a2hsSent: polishReadFlag(local, "onyx:a2hs-message-sent"),
+      a2hsReturning: returning,
+      navigatorStandalone: navStandalone,
+      standaloneDisplay: standaloneDisplay,
+      platform: polishDetectPlatform(nav),
+      serviceWorker: sw
+    };
+  }
+
+  function wirePolish(app, env) {
+    env = env || {};
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var captured = null;
+
+    function send(event) {
+      try { if (app.ports.pwaEvent) app.ports.pwaEvent.send(event); } catch (e) { /* port gone */ }
+    }
+
+    if (app.ports.polishFlagSave) {
+      app.ports.polishFlagSave.subscribe(function (req) {
+        var key = req && req.key;
+        if (POLISH_FLAG_KEYS.indexOf(key) === -1) return;
+        polishWriteFlag(polishStorage(win, "localStorage"), key);
+      });
+    }
+
+    try {
+      if (win && typeof win.addEventListener === "function") {
+        win.addEventListener("beforeinstallprompt", function (event) {
+          if (!event || typeof event.preventDefault !== "function" || typeof event.prompt !== "function") return;
+          event.preventDefault();
+          captured = event;
+          send({ kind: "install-available" });
+        });
+      }
+    } catch (e) { /* no install events here */ }
+
+    if (app.ports.pwaInstallPrompt) {
+      app.ports.pwaInstallPrompt.subscribe(function () {
+        var event = captured;
+        captured = null;
+        if (!event) {
+          send({ kind: "install-outcome", outcome: "unavailable" });
+          return;
+        }
+        Promise.resolve()
+          .then(function () { return event.prompt(); })
+          .then(function () { return event.userChoice; })
+          .then(function (choice) {
+            send({ kind: "install-outcome", outcome: choice && choice.outcome === "accepted" ? "accepted" : "dismissed" });
+          })
+          .catch(function () {
+            send({ kind: "install-outcome", outcome: "unavailable" });
+          });
+      });
+    }
+
+    var container = null;
+    try { container = (nav && nav.serviceWorker) || null; } catch (e) { container = null; }
+    var announced = false;
+    function announce() {
+      if (announced) return;
+      announced = true;
+      send({ kind: "update-available" });
+    }
+    function getRegistration() {
+      try {
+        if (container && typeof container.getRegistration === "function") {
+          return Promise.resolve(container.getRegistration()).catch(function () { return null; });
+        }
+      } catch (e) { /* fall through */ }
+      return Promise.resolve(null);
+    }
+
+    getRegistration().then(function (reg) {
+      if (!reg) return;
+      if (reg.waiting && container.controller) announce();
+      if (typeof reg.addEventListener !== "function") return;
+      reg.addEventListener("updatefound", function () {
+        var worker = reg.installing;
+        if (!worker || typeof worker.addEventListener !== "function") return;
+        worker.addEventListener("statechange", function () {
+          if (worker.state === "installed" && container.controller) announce();
+        });
+      });
+    });
+
+    function reload() {
+      try { if (win && win.location) win.location.reload(); } catch (e) { /* nothing to reload */ }
+    }
+
+    if (app.ports.pwaUpdateApprove) {
+      app.ports.pwaUpdateApprove.subscribe(function () {
+        getRegistration().then(function (reg) {
+          var waiting = reg && reg.waiting;
+          if (!waiting || typeof waiting.postMessage !== "function") {
+            reload();
+            return;
+          }
+          var done = false;
+          if (container && typeof container.addEventListener === "function") {
+            container.addEventListener("controllerchange", function () {
+              if (done) return;
+              done = true;
+              reload();
+            });
+          }
+          waiting.postMessage({ type: "ONYX_SKIP_WAITING" });
+        });
+      });
+    }
+
+    return {
+      captured: function () { return captured; }
+    };
+  }
+
   global.OnyxPorts = {
     vaultStore: {
       put: vaultPut,
@@ -9480,6 +9684,9 @@ function fetchPublicFeed(url) {
     installVoicePipAssist: installVoicePipAssist,
     installOverlayFocusOnce: installOverlayFocusOnce,
     wireShortcuts: wireShortcuts,
+    /* v3/polish */
+    polishFlags: polishFlags,
+    wirePolish: wirePolish,
     memKV: memKV
   };
   if (typeof module !== "undefined" && module.exports) {

@@ -21,6 +21,7 @@ import Moderation
 import Prefs
 import RoomMedia exposing (RoomMediaFilter(..))
 import Route
+import Polish
 import Test exposing (Test, describe, test)
 import Status
 import Test.Html.Event as Event
@@ -3417,11 +3418,19 @@ suite =
             , test "composer send-later disables with reason and opens the picker" <|
                 \_ ->
                     let
+                        -- v3/polish: Send later lives in the More tools tray.
+                        trayOpen m =
+                            let
+                                p =
+                                    m.polish
+                            in
+                            { m | polish = { p | toolsOpen = True } }
+
                         noTarget =
-                            query blank
+                            query (trayOpen blank)
 
                         ready =
-                            query { blank | activeChannel = Just "#c", composer = "later" }
+                            query (trayOpen { blank | activeChannel = Just "#c", composer = "later" })
 
                         open =
                             query { blank | activeChannel = Just "#c", composer = "later", scheduleOpen = True, scheduleMinLocal = "2025-06-15T07:12" }
@@ -3432,11 +3441,11 @@ suite =
                     Expect.all
                         [ \_ ->
                             Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Send later" ] ] noTarget
-                                |> Query.has [ Selector.disabled True, Selector.attribute (Attr.title "Choose a room or message to schedule.") ]
+                                |> Query.has [ Selector.disabled True, Selector.containing [ Selector.text "Choose a room or message to schedule." ] ]
                         , \_ ->
                             Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Send later" ] ] ready
                                 |> Event.simulate Event.click
-                                |> Event.expect ScheduleOpen
+                                |> Event.expect (PolishMsg Polish.ToolsSchedule)
                         , \_ ->
                             Query.has
                                 [ Selector.text "In 15 minutes"

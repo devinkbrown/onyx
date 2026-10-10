@@ -1,0 +1,347 @@
+/* v3/polish — composer More tools tray, time scrubber, the quiet
+   first-run notifications / Add to Home Screen sheets, and the
+   update-available strip. Tokens only (app.css :root); the accent marks
+   the primary action, the current hour and the focus ring. */
+
+/* Composer: More tools ---------------------------------------------------- */
+
+.shell-composer-more-wrap { position: relative; flex: none; }
+
+.onyx-composer .shell-composer-tool--more {
+  flex: none;
+  min-height: var(--target-floor);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+  font-weight: 400;
+  padding: var(--space-2) var(--space-3);
+}
+
+.onyx-composer .shell-composer-tool--more[aria-expanded="true"] {
+  border-color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+}
+
+.onyx-composer .shell-composer-tool--more:disabled {
+  background: transparent;
+  color: var(--onyx-faint);
+}
+
+.shell-composer-tools {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 40;
+  width: min(300px, calc(100vw - 2 * var(--space-4)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  animation: polish-rise var(--dur-fast) var(--ease);
+}
+
+.onyx-composer .shell-composer-tools-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: var(--target-min);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.onyx-composer .shell-composer-tools-item:hover { background: var(--onyx-panel-2); }
+
+.onyx-composer .shell-composer-tools-item:disabled {
+  background: transparent;
+  color: var(--onyx-faint);
+  cursor: default;
+}
+
+.onyx-composer .shell-composer-tools-item:focus-visible,
+.onyx-composer .shell-composer-tools-action:focus-visible,
+.onyx-composer .shell-composer-tool--more:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.shell-composer-tools-item-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.shell-composer-tools-item-desc {
+  margin: 0;
+  font-size: var(--text-2xs);
+  color: var(--onyx-dim);
+}
+
+.shell-composer-tools-tip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+}
+
+.shell-composer-tools-kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--onyx-line);
+  border-radius: 4px;
+}
+
+.onyx-composer .shell-composer-tools-action {
+  align-self: flex-start;
+  min-height: var(--target-floor);
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-text);
+  font-weight: 400;
+}
+
+/* Time scrubber ----------------------------------------------------------- */
+
+.time-scrubber {
+  padding: var(--space-2) var(--space-4);
+  background: var(--onyx-panel);
+  border-bottom: 1px solid var(--onyx-line);
+}
+
+.time-scrubber__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.time-scrubber__main { flex: 1 1 260px; min-width: 0; }
+
+.time-scrubber__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--onyx-dim);
+}
+
+.time-scrubber__label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+
+.time-scrubber__status { flex: 1; min-width: 0; font-family: var(--font-mono); }
+
+.time-scrubber__ledger { color: var(--onyx-dim); }
+.time-scrubber__ledger:hover { color: var(--onyx-text); }
+
+.time-scrubber__close,
+.time-scrubber__copy {
+  min-height: var(--target-floor);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-2xs);
+  cursor: pointer;
+}
+
+.time-scrubber__close:hover,
+.time-scrubber__copy:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+.time-scrubber__track {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 2px;
+  height: 32px;
+}
+
+.time-scrubber__bar {
+  --scrub-heat: 0;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: var(--onyx-bg);
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.time-scrubber__bar-fill {
+  display: block;
+  width: 100%;
+  height: calc(8% + var(--scrub-heat) * 92%);
+  background: var(--onyx-line);
+  border-radius: 2px;
+}
+
+.time-scrubber__bar--live .time-scrubber__bar-fill { background: var(--onyx-dim); }
+.time-scrubber__bar--now .time-scrubber__bar-fill { background: var(--onyx-accent); }
+.time-scrubber__bar:hover .time-scrubber__bar-fill { background: var(--onyx-text); }
+
+.time-scrubber__bar:focus-visible,
+.time-scrubber__close:focus-visible,
+.time-scrubber__copy:focus-visible,
+.time-scrubber__date input:focus-visible,
+.time-scrubber__ledger:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.time-scrubber__date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-2xs);
+  color: var(--onyx-dim);
+}
+
+.time-scrubber__date input {
+  min-height: var(--target-floor);
+  padding: var(--space-1) var(--space-2);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  color-scheme: dark;
+  font: inherit;
+}
+
+/* Quiet sheets (first-run notify, Add to Home Screen) --------------------- */
+
+.polish-sheet .onyx-sheet-lede {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  color: var(--onyx-text);
+}
+
+.first-run-notify,
+.a2hs-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.first-run-notify__note,
+.a2hs-sheet__detail,
+.a2hs-sheet__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+}
+
+.first-run-notify__actions,
+.a2hs-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.polish-primary,
+.polish-ghost,
+.update-available button {
+  min-height: var(--target-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.polish-primary,
+.update-available button {
+  background: var(--onyx-accent);
+  border: 1px solid var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+}
+
+.polish-primary:disabled { opacity: 0.6; cursor: default; }
+
+.polish-ghost {
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-text);
+}
+
+.polish-primary:focus-visible,
+.polish-ghost:focus-visible,
+.update-available button:focus-visible {
+  outline: 2px solid var(--onyx-accent);
+  outline-offset: 2px;
+}
+
+/* Update available -------------------------------------------------------- */
+
+.update-available {
+  position: fixed;
+  z-index: 70;
+  left: max(var(--space-3), env(safe-area-inset-left, 0px));
+  right: max(var(--space-3), env(safe-area-inset-right, 0px));
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  color: var(--onyx-text);
+  font-size: var(--text-md);
+  animation: polish-rise var(--dur-base) var(--ease);
+}
+
+.update-available__message { flex: 1 1 16rem; min-width: 0; margin: 0; }
+
+@keyframes polish-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 767.98px) {
+  .update-available { bottom: calc(var(--mobile-nav-h) + var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+  .update-available button { flex-basis: 100%; }
+  .time-scrubber { padding: var(--space-2) var(--space-3); }
+  .time-scrubber__track { height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-composer-tools,
+  .update-available { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .update-available { border-color: CanvasText; box-shadow: none; }
+  .time-scrubber__bar-fill { background: CanvasText; }
+  .time-scrubber__bar--now .time-scrubber__bar-fill { background: Highlight; }
+}

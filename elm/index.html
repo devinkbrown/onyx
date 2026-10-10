@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Onyx</title>
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="css/polish.css">
 <link rel="stylesheet" href="css/account2.css">
 
 <link rel="stylesheet" href="css/roomsettings.css">
@@ -181,7 +182,8 @@
       dndUntil: dndUntil,
       sessionToken: resumeTokens.sessionToken,
       meshToken: resumeTokens.meshToken,
-      meshExpiresAtMs: resumeTokens.meshExpiresAtMs
+      meshExpiresAtMs: resumeTokens.meshExpiresAtMs,
+      polish: OnyxPorts.polishFlags ? OnyxPorts.polishFlags() : null
     }
   });
   OnyxPorts.wire(app);

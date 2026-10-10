@@ -122,6 +122,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Media
 import Nodes
+import Polish
 import Schedule
 import Switcher
 import Task
@@ -513,6 +514,22 @@ port notifyPermissionRequest : () -> Cmd msg
 
 
 port notifyPermissionChanged : (String -> msg) -> Sub msg
+
+
+-- v3/polish: "1" flag writes for the quiet asks, the captured install
+-- prompt, the service-worker update handoff, and their events.
+
+
+port polishFlagSave : { key : String } -> Cmd msg
+
+
+port pwaInstallPrompt : () -> Cmd msg
+
+
+port pwaUpdateApprove : () -> Cmd msg
+
+
+port pwaEvent : (Decode.Value -> msg) -> Sub msg
 
 
 port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
@@ -972,6 +989,9 @@ init rawFlags url key =
                 , dndUntil = dndUntil
                 , channelNotify = channelNotify
                 , connectGate = bootNick == Nothing
+                -- v3/polish: persisted quiet-ask flags + platform probes
+                , polish = Polish.fromFlags (decodeField "polish" Decode.value rawFlags)
+                , homeCoachDismissed = Polish.firstHourSeenFromFlags (decodeField "polish" Decode.value rawFlags)
                 , wsPin = wsPin
                 , starredChannels =
                     App.parseStarredChannels
@@ -1312,6 +1332,16 @@ perform key outbound =
         App.NotifyPermissionRequest ->
             notifyPermissionRequest ()
 
+        -- v3/polish
+        App.PolishFlagSave req ->
+            polishFlagSave req
+
+        App.PwaInstallPrompt ->
+            pwaInstallPrompt ()
+
+        App.PwaUpdateApprove ->
+            pwaUpdateApprove ()
+
         App.OfflineMemoNotice req ->
             offlineMemoNotice req
 
@@ -1563,6 +1593,8 @@ subscriptions model =
         , wsOpened App.WsOpened
         , wsClosed App.WsClosed
         , notifyPermissionChanged App.NotifyPermissionChanged
+        -- v3/polish
+        , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
