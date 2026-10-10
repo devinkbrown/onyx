@@ -40,8 +40,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.2 | "You" entry for guests and accounts (settings hub: Account / This device / Help) | `YouSettings`, `YouHubNav`, `Account.tsx` guest branch | M |
 | 1.3 | Appearance reachable from the shell (link + in-shell sheet) | `AppearancePanel`, `ServerRail` | S |
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
-| 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | M |
-| 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | S |
+| 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
+| 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
 | 1.7 | Quick switch (Ctrl+K) | `RoomSwitcherSheet` | S |
 | 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | S |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | S |
@@ -121,3 +121,4 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 - 2026-10-10 — Phase 0.1/0.2 connect gate landed (`c18b9591`).
 - 2026-10-10 — Phase 2.1–2.3 rich message text (links, mentions, channel jump, mIRC, code, quote, spoiler, emoji) landed.
+- 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
