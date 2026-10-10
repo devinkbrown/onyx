@@ -645,6 +645,21 @@ port dmPublishKey : () -> Cmd msg
 port e2eeDeviceIdentityRequest : () -> Cmd msg
 
 
+{-| v3/dmsafety — safety evidence over the pinned and presented peer
+key sets (`current` / `pending`), echoing the requested key set. -}
+port dmSafetyRequest : { peer : String, keys : List String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
+
+
+port dmSafetyResult : ({ peer : String, keys : List String, current : Maybe String, pending : Maybe String } -> msg) -> Sub msg
+
+
+{-| v3/dmsafety — explicit key-change acceptance: re-pin the exact set. -}
+port dmKeyAcceptRequest : { peer : String, keys : List String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
+
+
+port dmKeyAccepted : ({ peer : String, keys : List String, ok : Bool } -> msg) -> Sub msg
+
+
 port e2eeDeviceIdentity : ({ deviceId : String, publicKey : String } -> msg) -> Sub msg
 
 
@@ -1391,6 +1406,13 @@ perform key outbound =
         App.E2eeDeviceIdentityRequest ->
             e2eeDeviceIdentityRequest ()
 
+        -- v3/dmsafety
+        App.DmSafetyRequested args ->
+            dmSafetyRequest args
+
+        App.DmKeyAcceptRequested args ->
+            dmKeyAcceptRequest args
+
         App.RoomSealRequested args ->
             roomSealRequest args
 
@@ -1568,6 +1590,9 @@ subscriptions model =
         , dmSealFailed App.DmSealFailed
         , dmOpened App.DmOpenResult
         , dmOpenFailed App.DmOpenFailed
+        -- v3/dmsafety
+        , dmSafetyResult App.DmSafetyResult
+        , dmKeyAccepted App.DmKeyAccepted
         , roomSealed App.RoomSealed
         , roomSealFailed App.RoomSealFailed
         , roomOpened App.RoomOpenResult

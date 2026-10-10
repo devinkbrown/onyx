@@ -52,6 +52,7 @@ import View.GuestClaim exposing (guestClaim)
 import View.Account exposing (accountPanel)
 import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
+import View.DmSafety exposing (inviteShareSheet)
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
@@ -257,5 +258,6 @@ shell model =
                , moderationReview model
                , personSafetySheet model
                , newMessageSheet model
+               , inviteShareSheet model -- v3/dmsafety
                ]
         )

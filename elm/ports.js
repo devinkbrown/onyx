@@ -6336,6 +6336,47 @@ function fetchPublicFeed(url) {
       }).catch(function () { return null; });
     }
 
+    /* v3/dmsafety — safety evidence for the DM header / key-change row
+       (mirroring the oracle `loadSafetyNumber` + `loadPendingKeySafetyNumber`):
+       `current` binds our device key to the peer's PINNED set; `pending`
+       binds it to the presented set only when that set is not already
+       pinned. Raw keys never leave this layer; failures resolve null. */
+    function safetyEvidence(account, presentedKeys, owner) {
+      var none = { current: null, pending: null };
+      var presented = e2eeNormalizeKeys(Array.isArray(presentedKeys) ? presentedKeys : []);
+      var recordKey = pinRecordKey(account, owner);
+      if (!recordKey || !usable()) return Promise.resolve(none);
+      return Promise.all([
+        pinStore.get(recordKey),
+        deviceKeys().then(function (keys) { return keys ? exportPublicB64(keys) : null; })
+      ]).then(function (res) {
+        var raw = res[0];
+        var local = res[1];
+        if (!local || raw === undefined) return none;
+        var pinned = raw === null ? [] : (parsePinnedKeys(raw) || []);
+        var set = {};
+        pinned.forEach(function (k) { set[k] = true; });
+        var differs = presented.some(function (k) { return !set[k]; });
+        return Promise.all([
+          pinned.length > 0 ? safetyFor(local, pinned) : Promise.resolve(null),
+          differs && presented.length > 0 ? safetyFor(local, presented) : Promise.resolve(null)
+        ]).then(function (r) { return { current: r[0], pending: r[1] }; });
+      }).catch(function () { return none; });
+    }
+
+    /* v3/dmsafety — explicit user acceptance of a key change (mirroring
+       `acceptPeerKeyChange` → `pinPeerKeys`): re-pin the exact presented
+       set. Resolves false on any failure so the App stays fail-closed. */
+    function acceptKeys(account, presentedKeys, owner) {
+      var keys = e2eeNormalizeKeys(Array.isArray(presentedKeys) ? presentedKeys : []);
+      if (keys.length === 0) return Promise.resolve(false);
+      var recordKey = pinRecordKey(account, owner);
+      if (!recordKey) return Promise.resolve(false);
+      return withPinChain("seal:" + recordKey, function () {
+        return pinStore.set(recordKey, keys.length === 1 ? keys[0] : JSON.stringify({ v: 1, k: keys }));
+      }).then(function (ok) { return ok === true; }).catch(function () { return false; });
+    }
+
     function registryId(publicB64) {
       if (!e2eeValidPeerKey(publicB64)) return Promise.resolve(null);
       var raw = e2eeFromB64url(String(publicB64).trim());
@@ -6366,6 +6407,8 @@ function fetchPublicFeed(url) {
       sealToDevices: sealToDevices,
       openFrom: openFrom,
       safetyFor: safetyFor,
+      safetyEvidence: safetyEvidence,
+      acceptKeys: acceptKeys,
       registryId: registryId,
       publishKeys: publishKeys
     };
@@ -8279,6 +8322,24 @@ function fetchPublicFeed(url) {
     app.ports.dmPublishKey.subscribe(function () {
       e2ee.publishKeys(sendLine);
     });
+    /* v3/dmsafety — safety evidence + key-change acceptance. Results echo
+       the requested key set so Elm drops stale answers after a rotation. */
+    if (app.ports.dmSafetyRequest) {
+      app.ports.dmSafetyRequest.subscribe(function (req) {
+        e2ee.safetyEvidence(req.peer, req.keys, req.owner).then(function (ev) {
+          try {
+            app.ports.dmSafetyResult.send({ peer: req.peer, keys: req.keys, current: ev.current || null, pending: ev.pending || null });
+          } catch (err) { /* port gone */ }
+        });
+      });
+    }
+    if (app.ports.dmKeyAcceptRequest) {
+      app.ports.dmKeyAcceptRequest.subscribe(function (req) {
+        e2ee.acceptKeys(req.peer, req.keys, req.owner).then(function (ok) {
+          try { app.ports.dmKeyAccepted.send({ peer: req.peer, keys: req.keys, ok: ok }); } catch (err) { /* port gone */ }
+        });
+      });
+    }
     /* Manual "publish this device key" (Account panel): resolve the
        registry id + public point for `E2EEKEY ADD`. Any failure
        (unreadable store, missing crypto, bad key) reports empty legs

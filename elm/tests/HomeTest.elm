@@ -301,7 +301,7 @@ suite =
                                 >> Event.expect CreateRoomOpen
                             , Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "home-invite-friends") ]
                                 >> Event.simulate Event.click
-                                >> Event.expect HomeInviteCopy
+                                >> Event.expect (InviteShareOpen "")
                             ]
             , test "busy Home lists mentions and unread, opening via ChannelSelect" <|
                 \_ ->

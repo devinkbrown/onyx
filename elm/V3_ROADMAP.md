@@ -78,10 +78,10 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | M |
 | 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | L |
 | 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | **done** (`v3/notify`: room All/@/Mute strip in the thread header + Notifications sheet with desktop/sound/DND; quiet-hours schedule + calm presets narrowed out — no `App` state) |
-| 3.4 | Invite friends share sheet | `RoomInviteShare` | S |
+| 3.4 | Invite friends share sheet | `RoomInviteShare` | S · **done** (v3/dmsafety: sheet from Home + room header "Invite friends"; copy via `ClipboardCopy`; no native-share port) |
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M |
 | 3.6 | Profile card: Message / Report / moderation controls | `PeopleProfileCard` | S |
-| 3.7 | DM E2EE safety number + key-change banner | `DmSafetySheet`, `DmKeyChangeBanner` | M |
+| 3.7 | DM E2EE safety number + key-change banner | `DmSafetySheet`, `DmKeyChangeBanner` | M · **done** (v3/dmsafety: DM header posture chip + Verify panel + inline key-change row with accept/keep-locked; ports `dmSafetyRequest`/`dmKeyAcceptRequest`) |
 | 3.8 | Room insights strip, context rail, scheduled-event line, bridge badge, group-control mark | `RoomInsightsStrip`, `ContextRail`, `ScheduledEventLine`, `BridgeStatusBadge` | S each |
 | 3.9 | Harbor confirm sheet for room verbs | `HarborConfirmSheet` | S |
 

@@ -19,6 +19,7 @@ import Prefs
 import Time
 import Translate
 import Upload
+import View.DmSafety
 import View.Home
 import View.MessageText exposing (messageText)
 import View.Notify exposing (roomNotifyStrip)
@@ -41,7 +42,8 @@ thread model =
                         if List.isEmpty channel.messages then
                             -- v3/home
                             div [ class "onyx-empty" ]
-                                [ facepileRow channel
+                                [ View.DmSafety.convoHeader model channel -- v3/dmsafety
+                                , facepileRow channel
                                 , h2 [] [ text channel.name ]
                                 , View.Home.emptyRoomIntro model channel
                                 , roomNotifyStrip model channel.name
@@ -73,7 +75,8 @@ thread model =
                                         |> List.take win.rendered
                             in
                             div []
-                                [ facepileRow channel
+                                [ View.DmSafety.convoHeader model channel -- v3/dmsafety
+                                , facepileRow channel
                                 , roomNotifyStrip model channel.name
                                 , topicFilterBar model channel
                                 , topicTools model channel
