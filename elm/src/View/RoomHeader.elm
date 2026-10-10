@@ -47,6 +47,7 @@ import View.CallDock -- v3/calls-c6
 import View.ModDesk
 import View.Notify
 import View.RoomSettings
+import View.Polish -- v3/polish
 
 
 roomHeader : Model -> Html Msg
@@ -160,6 +161,7 @@ moreMenu model =
                                , pinsToggle model
                                , mediaToggle model
                                , jumpToggle model
+                               , View.Polish.scrubberToggle model -- v3/polish
                                ]
                             ++ View.ModDesk.moderationToggle model
                         )

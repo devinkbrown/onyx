@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx)
+module App exposing (AttachmentStatus(..), dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -38,6 +38,7 @@ import ThemeLook
 import ThemeTokens
 import Attribution
 import GroupControl
+import Polish
 import Push
 import Stewardship
 import GroupDirectory
@@ -869,6 +870,9 @@ type alias Model =
     , homeCoachDismissed : Bool
     , homeCaughtUpAnnounce : String
 
+    -- v3/polish
+    , polish : Polish.State
+
     -- v3/roster
     , memberFilter : String
 
@@ -1120,6 +1124,10 @@ type Outbound
     | ScheduleParseRequest { value : String }
     | NotifyAlert { title : String, body : String, tag : String, desktop : Bool, sound : Bool, volume : Float }
     | NotifyPermissionRequest
+      -- v3/polish
+    | PolishFlagSave { key : String }
+    | PwaInstallPrompt
+    | PwaUpdateApprove
     | OfflineMemoNotice { channel : String, count : Int, firstMsgId : Int }
     | TempBanTimerStart { key : String, delayMs : Int }
     | WhoisTimeoutStart { nick : String, gen : Int, delayMs : Int }
@@ -2968,6 +2976,8 @@ type Msg
     | HomeMarkAllCaughtUp
     | HomeCoachDismiss
     | HomeInviteCopy
+      -- v3/polish
+    | PolishMsg Polish.Msg
     | ChannelLinkClicked String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
@@ -3288,6 +3298,8 @@ init nick url =
     in
     { -- v3/home
       homeCoachDismissed = False
+    -- v3/polish
+    , polish = Polish.initial
     , homeCaughtUpAnnounce = ""
     , autoJoinChannels = []
     , channelColors = Dict.empty
@@ -3862,6 +3874,8 @@ blank : Model
 blank =
     { -- v3/home
       homeCoachDismissed = False
+    -- v3/polish
+    , polish = Polish.initialLive
     , homeCaughtUpAnnounce = ""
     , autoJoinChannels = []
     , channelColors = Dict.empty
@@ -5028,7 +5042,9 @@ foldLine model message =
                         -- `connected && recovering` gate; a 001 while
                         -- already live leaves the stamp untouched.
                         , backOnlineAt =
-                            if model.connection /= Live then
+                            -- v3/polish: only a recovery (a 001 after
+                            -- an earlier live session) says Back online.
+                            if model.connection /= Live && model.polish.hasBeenLive then
                                 model.nowMs
 
                             else
@@ -16802,11 +16818,17 @@ reconnectBanner model =
                 Nothing
 
         Registering ->
-            Just
-                { title = "Connecting…"
-                , detail = "Opening a secure session to Onyx Server."
-                , online = False
-                }
+            -- v3/polish: the first handshake is the connect gate's
+            -- job; the banner speaks only while recovering.
+            if model.polish.hasBeenLive then
+                Just
+                    { title = "Connecting…"
+                    , detail = "Opening a secure session to Onyx Server."
+                    , online = False
+                    }
+
+            else
+                Nothing
 
         Offline ->
             if model.reconnectDueMs > 0 || model.reconnectIn > 0 then
@@ -36038,7 +36060,13 @@ update : Msg -> Model -> ( Model, List Outbound )
 update msg model =
     let
         ( next, out ) =
-            updateCore msg model
+            -- v3/polish: scrubber pulse / copy results route first
+            case polishIntercept msg model of
+                Just handled ->
+                    handled
+
+                Nothing ->
+                    updateCore msg model
 
         -- A close ends any dial in flight (a socket that never opened
         -- included), so the form reports the failure instead of spinning.
@@ -36087,6 +36115,12 @@ update msg model =
             settleStage dockSettled
     in
     ( stageSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
+
+        -- v3/polish
+        ( polishSettled, polishOut ) =
+            polishSettle msg model dockSettled
+    in
+    ( polishSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut ++ polishOut )
 
 
 -- v3/calls-c6
@@ -38831,7 +38865,23 @@ updateCore msg model =
             homeMarkAllCaughtUp model
 
         HomeCoachDismiss ->
-            ( { model | homeCoachDismissed = True }, [] )
+            -- v3/polish: the dismissal persists in `onyx:first-hour-seen`
+            -- (mirroring `markFirstHourSeen`).
+            let
+                firstHour =
+                    model.polish
+            in
+            ( { model | homeCoachDismissed = True, polish = { firstHour | firstHourPersisted = True } }
+            , if firstHour.firstHourPersisted then
+                []
+
+              else
+                [ PolishFlagSave { key = Polish.firstHourSeenKey } ]
+            )
+
+        -- v3/polish
+        PolishMsg pmsg ->
+            polishUpdate pmsg model
 
         HomeInviteCopy ->
             ( model, [ ClipboardCopy { text = homeInviteUrl model, tag = "home-invite" } ] )
@@ -43852,6 +43902,9 @@ overlayStack model =
         , ( "scheduled", model.showScheduledMessages, SetShowScheduledMessages False )
         , ( "browse-rooms", model.browserOpen, BrowserClose )
         , ( "guest-claim", model.guestClaimOpen, GuestClaimClose )
+        -- v3/polish: the quiet asks
+        , ( "first-run-notify", firstRunNotifyOffered model, PolishMsg Polish.NotifyDismiss )
+        , ( "a2hs", a2hsOffered model, PolishMsg Polish.A2hsDismiss )
         , ( "steward", model.stewardRoom /= Nothing, StewardClose )
         , ( "you", model.youHubOpen, YouHubClose )
         , ( "inbox", model.showNotificationCenter, NotificationCenterClosed )
@@ -43859,6 +43912,9 @@ overlayStack model =
         , ( "dm-safety", model.dmSafety.openFor /= Nothing, DmSafetyClose )
         , ( "room-menu", model.roomMenuOpen, RoomMenuClose )
         , ( "search", model.searchOpen, SearchClose )
+        -- v3/polish
+        , ( "time-scrubber", model.polish.scrubber.open && polishScrubberRoom model /= Nothing, PolishMsg Polish.ScrubberClose )
+        , ( "composer-tools", model.polish.toolsOpen, PolishMsg Polish.ToolsClose )
         , ( "schedule", model.scheduleOpen, ScheduleClose )
         ]
 
@@ -45042,3 +45098,694 @@ cycleCallLayout model =
 
                 Nothing ->
                     { model | callLayout = CallMedia.LayoutGrid }
+
+
+-- v3/polish
+
+
+{-| The composer More-tools trigger id (focus returns here when the
+tray closes from Escape, mirroring `closeTools('trigger')`).
+-}
+polishToolsTriggerId : String
+polishToolsTriggerId =
+    "shell-composer-more"
+
+
+polishPulseKeyPrefix : String
+polishPulseKeyPrefix =
+    "scrubber-pulse-"
+
+
+polishCopyTag : String
+polishCopyTag =
+    "scrubber-moment"
+
+
+{-| The send-later gate the tray shares with the schedule popover. -}
+polishScheduleGate : Model -> { target : Maybe String, body : String, editing : Bool, attachmentsStaged : Bool }
+polishScheduleGate model =
+    { target = model.activeChannel
+    , body = model.composer
+    , editing = Maybe.andThen (activeEditFor model) model.activeChannel /= Nothing
+    , attachmentsStaged = not (List.isEmpty model.attachments)
+    }
+
+
+{-| A call is the Elm build's "current work" that defers an update
+reload (the oracle `updateCoordinator` active holders).
+-}
+polishWorkActive : Model -> Bool
+polishWorkActive model =
+    model.calls.lifecycle /= Media.Idle
+
+
+{-| The quiet first-run notifications ask (mirroring
+`FirstRunNotifyPrompt`): never while the Notifications sheet is open,
+never on an iOS Safari tab, only after a first send on this device.
+-}
+firstRunNotifyOffered : Model -> Bool
+firstRunNotifyOffered model =
+    not model.notifySheetOpen
+        && Polish.firstRunNotifyCopy model.polish.navigatorStandalone
+        /= Nothing
+        && Polish.shouldOfferFirstRunNotify
+            { sent = model.polish.notifyFirstSend
+            , dismissed = model.polish.notifyDismissed
+            , permission = model.notifyPermission
+            , surface = model.polish.surface
+            , hostNotifications = model.polish.hostNotifications
+            , navigatorStandalone = model.polish.navigatorStandalone
+            }
+
+
+{-| The day-2 Home Screen courtesy (mirroring `AddToHomeScreenSheet`).
+One quiet ask at a time: it waits while the notifications ask is up.
+-}
+a2hsOffered : Model -> Bool
+a2hsOffered model =
+    let
+        a =
+            model.polish.a2hs
+    in
+    not (firstRunNotifyOffered model)
+        && Polish.shouldOfferAddToHomeScreen
+            { engaged =
+                Polish.hasHomeScreenEngagement
+                    { sent = a.sent
+                    , returning = a.returning
+                    , joinedRoom = List.any (isChannelName model) (Dict.keys model.channels)
+                    }
+            , dismissed = a.dismissed
+            , standalone = a.standalone
+            , surface = model.polish.surface
+            , platform = a.platform
+            , hasCapturedPrompt = a.captured
+            }
+
+
+{-| The scrubber's room: the active conversation when it is a room. -}
+polishScrubberRoom : Model -> Maybe String
+polishScrubberRoom model =
+    case model.activeChannel of
+        Just name ->
+            if isChannelName model name then
+                Just name
+
+            else
+                Nothing
+
+        Nothing ->
+            Nothing
+
+
+setPolish : Polish.State -> Model -> Model
+setPolish polish model =
+    { model | polish = polish }
+
+
+setScrubber : Polish.Scrubber -> Model -> Model
+setScrubber scrubber model =
+    let
+        polish =
+            model.polish
+    in
+    { model | polish = { polish | scrubber = scrubber } }
+
+
+polishCloseTools : Model -> Model
+polishCloseTools model =
+    let
+        polish =
+            model.polish
+    in
+    { model | polish = { polish | toolsOpen = False } }
+
+
+polishUpdate : Polish.Msg -> Model -> ( Model, List Outbound )
+polishUpdate pmsg model =
+    let
+        polish =
+            model.polish
+
+        scrubber =
+            polish.scrubber
+    in
+    case pmsg of
+        Polish.ToolsToggle ->
+            -- Opening never stacks competing transient chrome
+            -- (mirroring `toggleTools`: emoji and schedule close).
+            if polish.toolsOpen then
+                ( polishCloseTools model, [] )
+
+            else if model.activeChannel == Nothing then
+                ( model, [] )
+
+            else
+                ( { model
+                    | polish = { polish | toolsOpen = True }
+                    , scheduleOpen = False
+                    , scheduleError = Nothing
+                    , composerAssist = ComposerAssist.closeEmoji model.composerAssist
+                  }
+                , []
+                )
+
+        Polish.ToolsClose ->
+            if polish.toolsOpen then
+                ( polishCloseTools model, [ PrefsFocus { id = polishToolsTriggerId } ] )
+
+            else
+                ( model, [] )
+
+        Polish.ToolsAttach ->
+            updateCore AttachPick (polishCloseTools model)
+
+        Polish.ToolsSchedule ->
+            if Schedule.canScheduleComposer (polishScheduleGate model) then
+                updateCore ScheduleOpen (polishCloseTools model)
+
+            else
+                ( model, [] )
+
+        Polish.ToolsJump ->
+            if model.activeChannel == Nothing then
+                ( model, [] )
+
+            else
+                updateCore JumpToDateOpen (polishCloseTools model)
+
+        Polish.ToolsEmoji ->
+            let
+                closed =
+                    polishCloseTools model
+            in
+            if model.activeChannel == Nothing || closed.composerAssist.emojiOpen then
+                ( closed, [] )
+
+            else
+                updateCore ComposerEmojiToggle closed
+
+        Polish.ToolsSlash ->
+            -- Command help only seeds a leading slash so the existing
+            -- suggestions can teach; nothing runs until Send.
+            if model.activeChannel == Nothing then
+                ( polishCloseTools model, [] )
+
+            else
+                let
+                    draft =
+                        if String.startsWith "/" model.composer then
+                            model.composer
+
+                        else
+                            "/" ++ model.composer
+
+                    ( typed, out ) =
+                        updateCore (ComposerInput draft) (polishCloseTools model)
+                in
+                ( typed, out ++ [ PrefsFocus { id = "shell-composer-input" } ] )
+
+        Polish.NotifyEnable ->
+            if polish.notifyBusy || not (firstRunNotifyOffered model) then
+                ( model, [] )
+
+            else
+                ( setPolish { polish | notifyBusy = True } model, [ NotifyPermissionRequest ] )
+
+        Polish.NotifyDismiss ->
+            polishDismissNotify model
+
+        Polish.A2hsAdd ->
+            let
+                a =
+                    polish.a2hs
+            in
+            if not a.captured then
+                polishDismissA2hs model
+
+            else
+                ( setPolish { polish | a2hs = { a | status = "Opening your browser’s install prompt…" } } model
+                , [ PwaInstallPrompt ]
+                )
+
+        Polish.A2hsDismiss ->
+            polishDismissA2hs model
+
+        Polish.PwaEventReceived raw ->
+            let
+                a =
+                    polish.a2hs
+
+                upd =
+                    polish.update
+            in
+            case Polish.decodePwaEvent raw of
+                Polish.InstallAvailable ->
+                    ( setPolish { polish | a2hs = { a | captured = True } } model, [] )
+
+                Polish.InstallOutcome outcome ->
+                    let
+                        status =
+                            Polish.a2hsOutcomeStatus outcome
+
+                        ( dismissed, out ) =
+                            polishDismissA2hs (setPolish { polish | a2hs = { a | captured = False, status = status } } model)
+                    in
+                    ( addToast
+                        { variant =
+                            if outcome == Polish.Accepted then
+                                ToastSuccess
+
+                            else
+                                ToastInfo
+                        , title = "Home Screen"
+                        , description = Just status
+                        , duration = Nothing
+                        , groupKey = Just "a2hs"
+                        , undo = Nothing
+                        }
+                        dismissed.nowMs
+                        dismissed
+                    , out
+                    )
+
+                Polish.UpdateAvailable ->
+                    ( setPolish { polish | update = { upd | available = True } } model, [] )
+
+                Polish.UnknownPwaEvent ->
+                    ( model, [] )
+
+        Polish.UpdateApprove ->
+            let
+                upd =
+                    polish.update
+            in
+            if not upd.available || upd.reloading then
+                ( model, [] )
+
+            else if polishWorkActive model then
+                ( setPolish { polish | update = { upd | approved = True } } model, [] )
+
+            else
+                ( setPolish { polish | update = { upd | approved = True, reloading = True } } model, [ PwaUpdateApprove ] )
+
+        Polish.ScrubberOpen ->
+            case polishScrubberRoom model of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    polishFetchPulse room
+                        (setScrubber
+                            { scrubber
+                                | open = True
+                                , channel = String.toLower room
+                                , date = Boost.formatUtcDate model.nowMs
+                                , followsToday = True
+                                , pulse = Nothing
+                                , roving = Polish.utcHour model.nowMs
+                                , moment = model.nowMs
+                                , copy = Polish.CopyIdle
+                                , copyFor = Nothing
+                            }
+                            { model | roomMenuOpen = False }
+                        )
+
+        Polish.ScrubberClose ->
+            ( setScrubber { scrubber | open = False, copy = Polish.CopyIdle, copyFor = Nothing } model, [] )
+
+        Polish.ScrubberHour hour ->
+            polishScrubberJump { scrubber | followsToday = False, roving = modBy 24 hour } scrubber.date hour model
+
+        Polish.ScrubberDate date ->
+            polishScrubberJump { scrubber | followsToday = False, date = date } date 12 model
+
+        Polish.ScrubberRove hour ->
+            let
+                next =
+                    modBy 24 hour
+            in
+            ( setScrubber { scrubber | roving = next } model
+            , [ PrefsFocus { id = "time-scrubber-hour-" ++ String.fromInt next } ]
+            )
+
+        Polish.ScrubberCopy ->
+            case polishScrubberRoom model of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    case Invite.buildMomentLink model.origin room scrubber.moment of
+                        Just link ->
+                            ( setScrubber { scrubber | copy = Polish.CopyIdle, copyFor = Just ( String.toLower room, scrubber.moment ) } model
+                            , [ ClipboardCopy { text = link, tag = polishCopyTag } ]
+                            )
+
+                        Nothing ->
+                            ( setScrubber { scrubber | copy = Polish.CopyFailed, copyFor = Nothing } model, [] )
+
+
+{-| Jump the active room to `date` at `hour`:00 UTC through the shared
+`requestTravelTo` fold. An invalid date only keeps the typed value.
+-}
+polishScrubberJump : Polish.Scrubber -> String -> Int -> Model -> ( Model, List Outbound )
+polishScrubberJump scrubber date hour model =
+    case ( polishScrubberRoom model, Boost.dateTimeAtUtc date (Polish.pad2 (clamp 0 23 hour) ++ ":00") ) of
+        ( Just room, Just at ) ->
+            requestTravelTo
+                (setScrubber { scrubber | moment = at, copy = Polish.CopyIdle, copyFor = Nothing } model)
+                room
+                at
+
+        _ ->
+            ( setScrubber scrubber model, [] )
+
+
+polishFetchPulse : String -> Model -> ( Model, List Outbound )
+polishFetchPulse room model =
+    let
+        scrubber =
+            model.polish.scrubber
+    in
+    case Stats.channelDetailUrl room of
+        Nothing ->
+            ( setScrubber { scrubber | loading = False, fetchedAt = model.nowMs } model, [] )
+
+        Just url ->
+            ( setScrubber { scrubber | loading = True, fetchedAt = model.nowMs } model
+            , [ HttpFetch { key = polishPulseKeyPrefix ++ Stats.channelToSlug room, url = url } ]
+            )
+
+
+polishDismissNotify : Model -> ( Model, List Outbound )
+polishDismissNotify model =
+    let
+        polish =
+            model.polish
+    in
+    if polish.notifyDismissed then
+        ( setPolish { polish | notifyBusy = False } model, [] )
+
+    else
+        ( setPolish { polish | notifyDismissed = True, notifyBusy = False } model
+        , [ PolishFlagSave { key = Polish.notifyDismissKey } ]
+        )
+
+
+polishDismissA2hs : Model -> ( Model, List Outbound )
+polishDismissA2hs model =
+    let
+        polish =
+            model.polish
+
+        a =
+            polish.a2hs
+    in
+    if a.dismissed then
+        ( model, [] )
+
+    else
+        ( setPolish { polish | a2hs = { a | dismissed = True } } model
+        , [ PolishFlagSave { key = Polish.a2hsDismissKey } ]
+        )
+
+
+{-| Results this slice owns, routed before `updateCore` so the shared
+HttpResult / ClipboardResult chains stay untouched.
+-}
+polishIntercept : Msg -> Model -> Maybe ( Model, List Outbound )
+polishIntercept msg model =
+    let
+        scrubber =
+            model.polish.scrubber
+    in
+    case msg of
+        HttpResult r ->
+            if String.startsWith polishPulseKeyPrefix r.key then
+                if r.key == polishPulseKeyPrefix ++ Stats.channelToSlug scrubber.channel then
+                    let
+                        pulse =
+                            if r.ok then
+                                Stats.decodeChannelPulse r.body
+                                    |> Maybe.map (\p -> { hours = List.map toFloat p.hours, total = p.total })
+
+                            else
+                                Nothing
+                    in
+                    Just ( setScrubber { scrubber | loading = False, pulse = pulse } model, [] )
+
+                else
+                    Just ( model, [] )
+
+            else
+                Nothing
+
+        ClipboardResult r ->
+            if r.tag == polishCopyTag then
+                -- A result for a moment or room that changed since the
+                -- copy started is retired (the oracle copy epoch).
+                if scrubber.copyFor == Just ( scrubber.channel, scrubber.moment ) then
+                    Just
+                        ( setScrubber
+                            { scrubber
+                                | copyFor = Nothing
+                                , copy =
+                                    if r.ok then
+                                        Polish.CopyCopied model.nowMs
+
+                                    else
+                                        Polish.CopyFailed
+                            }
+                            model
+                        , []
+                        )
+
+                else
+                    Just ( model, [] )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+{-| Post-update settle: the live latch, the first-send marks (and the
+emoji/tools close after a send), the notify answer, the scrubber clock
+and the deferred update reload.
+-}
+polishSettle : Msg -> Model -> Model -> ( Model, List Outbound )
+polishSettle msg before after =
+    let
+        p0 =
+            after.polish
+
+        latched =
+            if after.connection == Live && not p0.hasBeenLive then
+                { after | polish = { p0 | hasBeenLive = True } }
+
+            else
+                after
+
+        ( sent, sendOut ) =
+            case msg of
+                ComposerSend ->
+                    polishAfterSend before latched
+
+                _ ->
+                    ( latched, [] )
+
+        ( answered, notifyOut ) =
+            case msg of
+                NotifyPermissionChanged _ ->
+                    polishNotifyAnswered sent
+
+                _ ->
+                    ( sent, [] )
+
+        ( scrubbed, scrubOut ) =
+            polishSettleScrubber answered
+
+        ( reloaded, updateOut ) =
+            polishSettleUpdate scrubbed
+    in
+    ( reloaded, sendOut ++ notifyOut ++ scrubOut ++ updateOut )
+
+
+polishAfterSend : Model -> Model -> ( Model, List Outbound )
+polishAfterSend before after =
+    let
+        cleared =
+            not (String.isEmpty (String.trim before.composer))
+                && String.isEmpty (String.trim after.composer)
+                && after.composerError == Nothing
+    in
+    if not cleared then
+        ( after, [] )
+
+    else
+        let
+            polish =
+                after.polish
+
+            -- Every successful send closes the emoji picker and the
+            -- tools tray (mirroring `resetAfterSend`).
+            reset =
+                { after
+                    | composerAssist = ComposerAssist.closeEmoji after.composerAssist
+                    , polish = { polish | toolsOpen = False }
+                }
+
+            wasEdit =
+                Maybe.andThen (activeEditFor before) before.activeChannel /= Nothing
+        in
+        if wasEdit || not (Polish.isRealSend before.composer) then
+            ( reset, [] )
+
+        else
+            let
+                p =
+                    reset.polish
+
+                a =
+                    p.a2hs
+
+                marks =
+                    List.filterMap identity
+                        [ if p.firstHourPersisted then
+                            Nothing
+
+                          else
+                            Just (PolishFlagSave { key = Polish.firstHourSeenKey })
+                        , if p.notifyFirstSend then
+                            Nothing
+
+                          else
+                            Just (PolishFlagSave { key = Polish.notifyFirstSendKey })
+                        , if a.sent then
+                            Nothing
+
+                          else
+                            Just (PolishFlagSave { key = Polish.a2hsSentKey })
+                        ]
+            in
+            ( { reset
+                | homeCoachDismissed = True
+                , polish = { p | firstHourPersisted = True, notifyFirstSend = True, a2hs = { a | sent = True } }
+              }
+            , marks
+            )
+
+
+polishNotifyAnswered : Model -> ( Model, List Outbound )
+polishNotifyAnswered model =
+    if not model.polish.notifyBusy then
+        ( model, [] )
+
+    else
+        let
+            ( dismissed, out ) =
+                polishDismissNotify model
+
+            toast =
+                Polish.notifyArmedToast model.notifyPermission
+        in
+        ( addToast
+            { variant =
+                if toast.success then
+                    ToastSuccess
+
+                else
+                    ToastWarning
+            , title = toast.title
+            , description = Just toast.description
+            , duration = Nothing
+            , groupKey = Just "first-run-notify"
+            , undo = Nothing
+            }
+            dismissed.nowMs
+            dismissed
+        , out
+        )
+
+
+polishSettleScrubber : Model -> ( Model, List Outbound )
+polishSettleScrubber model =
+    let
+        s0 =
+            model.polish.scrubber
+
+        s1 =
+            case s0.copy of
+                Polish.CopyCopied at ->
+                    if model.nowMs - at >= Polish.copyResetMs then
+                        { s0 | copy = Polish.CopyIdle }
+
+                    else
+                        s0
+
+                _ ->
+                    s0
+
+        reset =
+            if s1 == s0 then
+                model
+
+            else
+                setScrubber s1 model
+    in
+    if not s1.open then
+        ( reset, [] )
+
+    else
+        case polishScrubberRoom reset of
+            Nothing ->
+                ( reset, [] )
+
+            Just room ->
+                if String.toLower room /= s1.channel then
+                    -- The room changed under an open scrubber: retire
+                    -- the old pulse and copy feedback, fetch the new.
+                    polishFetchPulse room
+                        (setScrubber
+                            { s1
+                                | channel = String.toLower room
+                                , pulse = Nothing
+                                , copy = Polish.CopyIdle
+                                , copyFor = Nothing
+                            }
+                            reset
+                        )
+
+                else if reset.nowMs - s1.fetchedAt >= Polish.pulseRefreshMs then
+                    -- The 60s refresh; an untouched date follows the
+                    -- current UTC day across midnight.
+                    polishFetchPulse room
+                        (setScrubber
+                            (if s1.followsToday then
+                                { s1 | date = Boost.formatUtcDate reset.nowMs }
+
+                             else
+                                s1
+                            )
+                            reset
+                        )
+
+                else
+                    ( reset, [] )
+
+
+polishSettleUpdate : Model -> ( Model, List Outbound )
+polishSettleUpdate model =
+    let
+        polish =
+            model.polish
+
+        upd =
+            polish.update
+    in
+    if upd.approved && not upd.reloading && not (polishWorkActive model) then
+        ( setPolish { polish | update = { upd | reloading = True } } model, [ PwaUpdateApprove ] )
+
+    else
+        ( model, [] )

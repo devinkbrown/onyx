@@ -70,6 +70,7 @@ import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
+import View.Polish -- v3/polish
 
 
 view : Model -> Browser.Document Msg
@@ -255,6 +256,7 @@ appFrame model =
                     [ rail model
                     , main_ [ class "onyx-main" ]
                         [ roomHeader model
+                        , View.Polish.timeScrubber model -- v3/polish
                         , thread model
                         , composer model
                         ]
@@ -316,5 +318,9 @@ overlays model =
         , View.Switcher.shortcutsOverlay model
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model
+        -- v3/polish: the quiet asks + the update strip
+        , View.Polish.updateBanner model
+        , View.Polish.firstRunNotify model
+        , View.Polish.addToHomeScreen model
         , View.CallDock.ringDialog model
         ]
