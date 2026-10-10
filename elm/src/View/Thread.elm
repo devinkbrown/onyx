@@ -13,11 +13,15 @@ import Topic
 import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
+import Html.Keyed
+import Html.Lazy
 import Json.Decode as Decode
 import Set exposing (Set)
 import Prefs
 import Time
 import Translate
+-- v3/transcript
+import TranscriptRows
 import Upload
 import View.Home
 import View.MessageText exposing (messageText)
@@ -38,107 +42,518 @@ thread model =
                         div [ class "onyx-empty" ] [ text "Select a channel." ]
 
                     Just channel ->
-                        if List.isEmpty channel.messages then
-                            -- v3/home
-                            div [ class "onyx-empty" ]
-                                [ facepileRow channel
-                                , h2 [] [ text channel.name ]
-                                , View.Home.emptyRoomIntro model channel
-                                , roomNotifyStrip model channel.name
-                                ]
-
-                        else
-                            let
-                                win =
-                                    App.threadWindowFor model channel
-
-                                chronological =
-                                    App.topicVisibleRows model channel.name (List.reverse channel.messages)
-                                        |> List.filter (notCollapsed model)
-
-                                rows =
-                                    chronological
-                                        |> List.drop win.start
-                                        |> List.take win.rendered
-
-                                dividerId =
-                                    Dict.get (String.toLower channel.name) model.viewUnreadDividerId
-
-                                parents =
-                                    App.threadParentIds channel.messages
-
-                                dayLabels =
-                                    dayDividerLabels model chronological
-                                        |> List.drop win.start
-                                        |> List.take win.rendered
-                            in
-                            div []
-                                [ facepileRow channel
-                                , roomNotifyStrip model channel.name
-                                , topicFilterBar model channel
-                                , topicTools model channel
-                                , forumCards model channel
-                                , if win.hiddenBefore > 0 then
-                                    div [ class "onyx-earlier" ]
-                                        [ button
-                                            [ class "onyx-earlier-button"
-                                            , onClick App.ThreadShowEarlier
-                                            , attribute "aria-label" ("Show earlier messages (" ++ String.fromInt win.hiddenBefore ++ " not shown)")
-                                            ]
-                                            [ text "Show earlier messages "
-                                            , span [ class "onyx-earlier-count" ] [ text (String.fromInt win.hiddenBefore) ]
-                                            ]
-                                        ]
-
-                                  else if App.isHistoryExhausted model channel.name then
-                                    div [ class "onyx-intro", attribute "data-testid" "channel-intro" ]
-                                        [ span [ class "onyx-intro-glyph", attribute "aria-hidden" "true" ]
-                                            [ text (String.left 1 channel.name) ]
-                                        , h2 [ class "onyx-intro-title" ] [ text channel.name ]
-                                        , text "This is the very beginning of the conversation."
-                                        ]
-
-                                  else
-                                    text ""
-                                , ul [ class "onyx-thread" ]
-                                    (List.concatMap
-                                        (\( ( prev, m ), label ) -> [ dividerAbove dividerId label m, messageRow model channel.name prev parents m ])
-                                        (List.map2 Tuple.pair
-                                            (List.map2 Tuple.pair (Nothing :: List.map Just rows) rows)
-                                            dayLabels
-                                        )
-                                    )
-                                , case App.typingLine model channel.name of
-                                    Nothing ->
-                                        text ""
-
-                                    Just line ->
-                                        div [ class "onyx-typing", attribute "aria-live" "polite" ] [ text line ]
-                                , if win.hiddenAfter > 0 then
-                                    div [ class "onyx-latest" ]
-                                        [ button
-                                            [ class "onyx-latest-button"
-                                            , onClick App.ThreadShowLatest
-                                            , attribute "aria-label" "Back to latest messages"
-                                            ]
-                                            [ text "Back to latest" ]
-                                        ]
-
-                                  else
-                                    text ""
-                                ]
+                        channelTranscript model channel
         , mediaLightboxDialog model
         , threadPanelDialog model
         ]
+
+
+{-| v3/transcript — one conversation: the header block, the keyed
+`role=log` transcript (present from first paint, even while the room
+is still empty, so the first message is announced as an addition),
+the typing line, and the latest controls. The frame is
+`display: contents`, so the log keeps the same DOM position across
+the empty → live transition and the scroll bridge never re-attaches.
+-}
+channelTranscript : Model -> App.Channel -> Html Msg
+channelTranscript model channel =
+    if List.isEmpty channel.messages then
+        div [ class "onyx-thread-frame" ]
+            [ -- v3/home
+              div [ class "onyx-empty" ]
+                [ facepileRow channel
+                , h2 [] [ text channel.name ]
+                , View.Home.emptyRoomIntro model channel
+                , roomNotifyStrip model channel.name
+                ]
+            , transcriptLog model channel.name []
+            , text ""
+            , text ""
+            , text ""
+            ]
+
+    else
+        let
+            win =
+                App.threadWindowFor model channel
+
+            chronological =
+                App.topicVisibleRows model channel.name (List.reverse channel.messages)
+                    |> List.filter (notCollapsed model)
+
+            rows =
+                chronological
+                    |> List.drop win.start
+                    |> List.take win.rendered
+
+            dayLabels =
+                dayDividerLabels model chronological
+                    |> List.drop win.start
+                    |> List.take win.rendered
+
+            views =
+                TranscriptRows.rowViews (rowEnv model channel) dayLabels rows
+        in
+        div [ class "onyx-thread-frame" ]
+            [ div []
+                [ facepileRow channel
+                , roomNotifyStrip model channel.name
+                , topicFilterBar model channel
+                , topicTools model channel
+                , forumCards model channel
+                , if win.hiddenBefore > 0 then
+                    div [ class "onyx-earlier" ]
+                        [ button
+                            [ class "onyx-earlier-button"
+                            , onClick App.ThreadShowEarlier
+                            , attribute "aria-label" ("Show earlier messages (" ++ String.fromInt win.hiddenBefore ++ " not shown)")
+                            ]
+                            [ text "Show earlier messages "
+                            , span [ class "onyx-earlier-count" ] [ text (String.fromInt win.hiddenBefore) ]
+                            ]
+                        ]
+
+                  else if App.isHistoryExhausted model channel.name then
+                    div [ class "onyx-intro", attribute "data-testid" "channel-intro" ]
+                        [ span [ class "onyx-intro-glyph", attribute "aria-hidden" "true" ]
+                            [ text (String.left 1 channel.name) ]
+                        , h2 [ class "onyx-intro-title" ] [ text channel.name ]
+                        , text "This is the very beginning of the conversation."
+                        ]
+
+                  else
+                    text ""
+                ]
+            , transcriptLog model channel.name (List.concat (List.map2 (rowEntries model channel.name) views rows))
+            , case App.typingLine model channel.name of
+                Nothing ->
+                    text ""
+
+                Just line ->
+                    div [ class "onyx-typing", attribute "aria-live" "polite" ] [ text line ]
+            , if win.hiddenAfter > 0 then
+                div [ class "onyx-latest" ]
+                    [ button
+                        [ class "onyx-latest-button"
+                        , onClick App.TranscriptJumpLatest
+                        , attribute "aria-label" "Back to latest messages"
+                        ]
+                        [ text "Back to latest" ]
+                    ]
+
+              else
+                text ""
+            , jumpLatestPill model channel win.hiddenAfter
+            ]
+
+
+{-| The live region (mirroring the oracle `shell-feed`: `role=log`,
+polite, "Message history"); `data-transcript-key` is what the
+`scrollPolicy` bridge anchors on.
+-}
+transcriptLog : Model -> String -> List ( String, Html Msg ) -> Html Msg
+transcriptLog model target entries =
+    let
+        compact =
+            model.prefs.transcriptDensity == Prefs.TranscriptCompact
+    in
+    div
+        [ classList [ ( "onyx-transcript", True ), ( "onyx-transcript--compact", compact ) ]
+        , attribute "role" "log"
+        , attribute "aria-live" "polite"
+        , attribute "aria-relevant" "additions"
+        , attribute "aria-label" "Message history"
+        , attribute "data-transcript-key" (TranscriptRows.scrollKey target)
+        , attribute "data-density" (Prefs.transcriptDensityToString model.prefs.transcriptDensity)
+        ]
+        [ Html.Keyed.node "ul" [ class "onyx-thread" ] entries ]
+
+
+{-| Render-constant inputs of the row view-model.
+-}
+rowEnv : Model -> App.Channel -> TranscriptRows.RowEnv App.ChatMessage
+rowEnv model channel =
+    { selfNick = model.ourNick
+    , density = model.prefs.transcriptDensity
+    , searchCurrentId = App.searchActiveId model
+    , unreadDividerId = Dict.get (String.toLower channel.name) model.viewUnreadDividerId
+    , threadParents = App.threadParentIds channel.messages
+    , uncertain =
+        \m ->
+            case m.outboxId of
+                Just oid ->
+                    List.member oid model.outboxUncertain
+
+                Nothing ->
+                    False
+    , menuButton = \m -> menuButtonApplies model channel.name m
+    }
+
+
+{-| Keyed entries for one row: its day divider, the unread divider
+when the boundary sits above it, then the row itself (keys come from
+`TranscriptRows.rowViews`, so they survive window shifts and history
+prepends).
+-}
+rowEntries : Model -> String -> TranscriptRows.RowView -> App.ChatMessage -> List ( String, Html Msg )
+rowEntries model target rv m =
+    (case rv.dayLabel of
+        Just label ->
+            [ ( "day:" ++ rv.key, dayDivider label ) ]
+
+        Nothing ->
+            []
+    )
+        ++ (if rv.unreadAbove then
+                [ ( "unread", unreadDivider ) ]
+
+            else
+                []
+           )
+        ++ [ ( rv.key, rowNode model target rv m ) ]
+
+
+dayDivider : String -> Html Msg
+dayDivider label =
+    div
+        [ class "onyx-day-divider"
+        , attribute "role" "separator"
+        , attribute "aria-label" label
+        ]
+        [ span [ class "onyx-day-divider-label" ] [ text label ] ]
+
+
+unreadDivider : Html Msg
+unreadDivider =
+    div
+        [ class "onyx-unread-divider"
+        , attribute "role" "separator"
+        , attribute "aria-label" "New messages"
+        , attribute "tabindex" "-1"
+        ]
+        [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
+
+
+{-| One row. System rows and plain rows are `Html.Lazy` thunks over
+reference-stable inputs only (the target name, the clock zone and
+preference records held in the model, our nick, the precomputed edit
+title, the packed row flags, and the message record itself), so an
+unrelated model update skips their view and diff entirely. Rows whose
+body reads further model state (link previews, inline media,
+attachment cards) or whose menu / picker is open render eagerly.
+-}
+rowNode : Model -> String -> TranscriptRows.RowView -> App.ChatMessage -> Html Msg
+rowNode model target rv m =
+    if rv.system then
+        Html.Lazy.lazy systemRow m
+
+    else
+        let
+            title =
+                if m.edited then
+                    editTitle model m
+
+                else
+                    ""
+        in
+        if TranscriptRows.needsRichRow { body = App.displayBody m, menuOpen = rowPopoverOpen model target m } then
+            richRow model target rv.flags title m
+
+        else
+            Html.Lazy.lazy7 quietRow target model.zone model.prefs model.ourNick title (TranscriptRows.flagsToBits rv.flags) m
+
+
+systemRow : App.ChatMessage -> Html Msg
+systemRow m =
+    div
+        [ class "onyx-system"
+        , attribute "data-event" m.msgType
+        , attribute "role" "article"
+        , attribute "tabindex" "-1"
+        , attribute "aria-label" m.body
+        ]
+        [ text m.body ]
+
+
+{-| Whether this row's message menu or reaction picker is open.
+-}
+rowPopoverOpen : Model -> String -> App.ChatMessage -> Bool
+rowPopoverOpen model target m =
+    case m.msgid of
+        Nothing ->
+            False
+
+        Just msgid ->
+            let
+                matches open =
+                    String.toLower open.target == String.toLower target && open.msgid == msgid
+            in
+            (Maybe.map matches model.messageMenu |> Maybe.withDefault False)
+                || (Maybe.map matches model.reactionPicker |> Maybe.withDefault False)
+
+
+type alias RowCtx =
+    { target : String
+    , zone : Time.Zone
+    , prefs : Prefs.Preferences
+    , ourNick : String
+    , editTitle : String
+    , flags : TranscriptRows.RowFlags
+    }
+
+
+{-| Lazy row: everything it reads arrives as an argument.
+-}
+quietRow : String -> Time.Zone -> Prefs.Preferences -> String -> String -> Int -> App.ChatMessage -> Html Msg
+quietRow target zone prefs ourNick title bits m =
+    let
+        flags =
+            TranscriptRows.flagsFromBits bits
+
+        presented =
+            Upload.extractAttachmentPresentation (App.displayBody m)
+    in
+    rowShell
+        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags }
+        ((case m.replyTo of
+            Just ref ->
+                [ replyContext ref ]
+
+            Nothing ->
+                []
+         )
+            ++ [ messageText ourNick presented.caption, text "" ]
+        )
+        (menuTrigger target m flags.menuButton False)
+        []
+        m
+
+
+{-| Eager row (link previews, media, open menu / picker).
+-}
+richRow : Model -> String -> TranscriptRows.RowFlags -> String -> App.ChatMessage -> Html Msg
+richRow model target flags title m =
+    rowShell
+        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags }
+        (messageBody model m)
+        (messageMenuButton model target m)
+        [ messageMenuPanel model target m
+        , reactionPickerPanel model target m
+        ]
+        m
+
+
+{-| The row chrome shared by lazy and eager rows. Default density
+groups (avatar + name on the first row of a group only); Compact is
+the IRC-heritage line: time, name inline, no avatar, never grouped.
+-}
+rowShell : RowCtx -> List (Html Msg) -> Html Msg -> List (Html Msg) -> App.ChatMessage -> Html Msg
+rowShell ctx body menuButton panels m =
+    let
+        flags =
+            ctx.flags
+
+        cont =
+            flags.continuation
+
+        withdrawn =
+            m.deleted || m.redacted
+
+        clock =
+            if m.at <= 0 then
+                text ""
+
+            else
+                time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
+                    [ text (App.formatRowClock ctx.zone ctx.prefs.clock m.at) ]
+
+        sender =
+            if cont then
+                text ""
+
+            else
+                strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
+
+        audience =
+            if cont then
+                text ""
+
+            else
+                case m.audience of
+                    Nothing ->
+                        text ""
+
+                    Just _ ->
+                        span
+                            [ class "onyx-audience"
+                            , attribute "title" (App.audienceTitle m.audience)
+                            ]
+                            [ text (App.audienceLabel m.audience) ]
+
+        avatar =
+            if cont || flags.compact then
+                text ""
+
+            else
+                div
+                    [ class "onyx-row-avatar"
+                    , attribute "aria-hidden" "true"
+                    , style "--nick-tint" (Avatar.nickTint m.from)
+                    ]
+                    [ Avatar.view
+                        { name = m.from
+                        , owner = flags.self
+                        , size = Avatar.Sm
+                        , extraClass = ""
+                        , hidden = True
+                        }
+                    ]
+
+        lead =
+            if flags.compact then
+                [ clock, sender, audience ]
+
+            else
+                [ avatar, sender, audience, clock ]
+    in
+    li
+        [ classList
+            [ ( "onyx-message", True )
+            , ( "onyx-message--compact", flags.compact )
+            , ( "onyx-continuation", cont )
+            , ( "onyx-whisper", m.whisper )
+            , ( "onyx-locked", App.messageLocked m )
+            , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
+            , ( "onyx-uncertain", flags.uncertain )
+            , ( "onyx-message-search-current", flags.searchCurrent )
+            , ( "onyx-mention", m.highlight && not withdrawn )
+            , ( "onyx-withdrawn", withdrawn )
+            ]
+        , attribute "role" "article"
+        , attribute "aria-label" (App.messageAccessibleLabel m)
+        ]
+        (lead
+            ++ [ span [ class "onyx-body" ] body
+               , if m.outboxId == Nothing && not m.pending then
+                    text ""
+
+                 else if flags.uncertain then
+                    span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
+
+                 else
+                    span [ class "onyx-pending-note" ] [ text " · queued" ]
+               , if m.edited && not withdrawn then
+                    span [ class "onyx-edited", attribute "title" ctx.editTitle ] [ text " · edited" ]
+
+                 else
+                    text ""
+               , boostBar ctx.ourNick ctx.prefs ctx.target m
+               , threadIndicator ctx.target flags.hasThread m
+               , menuButton
+               ]
+            ++ panels
+        )
+
+
+{-| Whether the row offers the message-actions trigger (offered only
+for rows with a server msgid, and only when at least one menu action
+applies).
+-}
+menuButtonApplies : Model -> String -> App.ChatMessage -> Bool
+menuButtonApplies model target m =
+    case m.msgid of
+        Nothing ->
+            False
+
+        Just _ ->
+            menuHasActions model target (App.capabilities (menuInput model target m)) || App.isChannelName model target
+
+
+{-| Per-message actions entry (mirrors the message menu trigger; the
+Elm shell uses text buttons where the oracle uses icon buttons, with
+the same accessible names). -}
+messageMenuButton : Model -> String -> App.ChatMessage -> Html Msg
+messageMenuButton model target m =
+    let
+        isOpen =
+            case ( model.messageMenu, m.msgid ) of
+                ( Just open, Just msgid ) ->
+                    String.toLower open.target == String.toLower target && open.msgid == msgid
+
+                _ ->
+                    False
+    in
+    menuTrigger target m (menuButtonApplies model target m) isOpen
+
+
+menuTrigger : String -> App.ChatMessage -> Bool -> Bool -> Html Msg
+menuTrigger target m applies isOpen =
+    case ( applies, m.msgid ) of
+        ( True, Just msgid ) ->
+            button
+                [ type_ "button"
+                , class "onyx-msg-menu-trigger"
+                , attribute "aria-label" ("Message actions for message from " ++ m.from)
+                , attribute "aria-expanded"
+                    (if isOpen then
+                        "true"
+
+                     else
+                        "false"
+                    )
+                , onClick (App.MessageMenuOpen { target = target, msgid = msgid })
+                ]
+                [ text "⋯" ]
+
+        _ ->
+            text ""
+
+
+{-| "Jump to latest" pill (mirroring the oracle `shell-jump-latest`:
+shown while scrolled up, with the count of rows that arrived since;
+the copy and accessible name are the oracle's).
+-}
+jumpLatestPill : Model -> App.Channel -> Int -> Html Msg
+jumpLatestPill model channel hiddenAfter =
+    case
+        TranscriptRows.jumpPill
+            { activeKey = TranscriptRows.scrollKey channel.name
+            , hiddenAfter = hiddenAfter
+            , rowTimes = List.map .at channel.messages
+            }
+            model.transcriptAway
+    of
+        Nothing ->
+            text ""
+
+        Just pill ->
+            button
+                [ type_ "button"
+                , classList
+                    [ ( "onyx-jump-latest", True )
+                    , ( "onyx-jump-latest--unread", pill.unreadBelow > 0 )
+                    ]
+                , attribute "aria-label" pill.label
+                , onClick App.TranscriptJumpLatest
+                ]
+                (if pill.unreadBelow > 0 then
+                    [ span [ class "onyx-jump-latest-count" ] [ text (String.fromInt pill.unreadBelow) ]
+                    , span [] [ text " new " ]
+                    , span [ attribute "aria-hidden" "true" ] [ text "↓" ]
+                    ]
+
+                 else
+                    [ span [] [ text "Jump to latest" ] ]
+                )
 
 
 {-| Replies affordance for messages with children (mirroring
 `ThreadIndicator`: offered wherever the row keeps its actions —
 full and continuation rows alike, never system rows).
 -}
-threadIndicator : String -> Set Int -> App.ChatMessage -> Html Msg
-threadIndicator target parents m =
-    if Set.member m.id parents then
+threadIndicator : String -> Bool -> App.ChatMessage -> Html Msg
+threadIndicator target hasThread m =
+    if hasThread then
         button
             [ type_ "button"
             , class "onyx-thread-indicator"
@@ -840,39 +1255,6 @@ notCollapsed model m =
         not (Set.member (String.toLower (String.trim m.from)) model.collapsedNicks)
 
 
-dividerAbove : Maybe Int -> Maybe String -> App.ChatMessage -> Html Msg
-dividerAbove dividerId dayLabel m =
-    div []
-        [ case dayLabel of
-            Nothing ->
-                text ""
-
-            Just label ->
-                div
-                    [ class "onyx-day-divider"
-                    , attribute "role" "separator"
-                    , attribute "aria-label" label
-                    ]
-                    [ span [ class "onyx-day-divider-label" ] [ text label ] ]
-        , case dividerId of
-            Just boundary ->
-                if m.id == boundary then
-                    div
-                        [ class "onyx-unread-divider"
-                        , attribute "role" "separator"
-                        , attribute "aria-label" "New messages"
-                        , attribute "tabindex" "-1"
-                        ]
-                        [ span [ class "onyx-unread-divider-label" ] [ text "New messages" ] ]
-
-                else
-                    text ""
-
-            Nothing ->
-                text ""
-        ]
-
-
 {-| Calendar day in the message clock zone (mirroring the
 `toDateString` day buckets the oracle boundaries compare).
 -}
@@ -1050,173 +1432,6 @@ branch itself stays pending).
 isSystemRow : App.ChatMessage -> Bool
 isSystemRow m =
     List.member m.msgType [ "join", "part", "quit", "kick", "mode", "topic", "nick", "system", "error" ]
-
-
-{-| Continuation grouping (mirroring `sameAuthorGroup`: the
-previous visible row from the same author, neither row systemic,
-within five minutes — continuation rows keep only the
-timestamp, body, and row actions).
--}
-isContinuation : App.ChatMessage -> App.ChatMessage -> Bool
-isContinuation prev m =
-    prev.from == m.from && not (isSystemRow prev) && not (isSystemRow m) && abs (m.at - prev.at) < 5 * 60 * 1000
-
-
-messageRow : Model -> String -> Maybe App.ChatMessage -> Set Int -> App.ChatMessage -> Html Msg
-messageRow model target prev parents m =
-    let
-        uncertainDelivery =
-            case m.outboxId of
-                Just oid ->
-                    List.member oid model.outboxUncertain
-
-                Nothing ->
-                    False
-
-        withdrawn =
-            m.deleted || m.redacted
-
-        cont =
-            case prev of
-                Just p ->
-                    isContinuation p m
-
-                Nothing ->
-                    False
-    in
-    if isSystemRow m then
-        div
-            [ class "onyx-system"
-            , attribute "data-event" m.msgType
-            , attribute "role" "article"
-            , attribute "tabindex" "-1"
-            , attribute "aria-label" m.body
-            ]
-            [ text m.body ]
-
-    else
-        li
-            [ classList
-                [ ( "onyx-message", True )
-                , ( "onyx-continuation", cont )
-                , ( "onyx-whisper", m.whisper )
-                , ( "onyx-locked", App.messageLocked m )
-                , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
-                , ( "onyx-uncertain", uncertainDelivery )
-                , ( "onyx-message-search-current", App.searchActiveId model == Just m.id )
-                , ( "onyx-mention", m.highlight && not withdrawn )
-                , ( "onyx-withdrawn", withdrawn )
-                ]
-            , attribute "role" "article"
-            , attribute "aria-label" (App.messageAccessibleLabel m)
-            ]
-            [ (if cont || isSystemRow m then
-                text ""
-
-             else
-                div
-                    [ class "onyx-row-avatar"
-                    , attribute "aria-hidden" "true"
-                    , style "--nick-tint" (Avatar.nickTint m.from)
-                    ]
-                    [ Avatar.view
-                        { name = m.from
-                        , owner = m.from == model.ourNick
-                        , size = Avatar.Sm
-                        , extraClass = ""
-                        , hidden = True
-                        }
-                    ]
-            )
-            , (if cont then
-                text ""
-
-               else
-                strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
-              )
-            , (if cont then
-                text ""
-
-               else
-                case m.audience of
-                    Nothing ->
-                        text ""
-
-                    Just _ ->
-                        span
-                            [ class "onyx-audience"
-                            , attribute "title" (App.audienceTitle m.audience)
-                            ]
-                            [ text (App.audienceLabel m.audience) ]
-              )
-            , if m.at <= 0 then
-                text ""
-
-              else
-                time [ class "onyx-ts", datetime (App.millisToIso (toFloat m.at)), attribute "aria-hidden" "true" ]
-                    [ text (App.formatRowClock model.zone model.prefs.clock m.at) ]
-            , span [ class "onyx-body" ] (messageBody model m)
-            , if m.outboxId == Nothing && not m.pending then
-                text ""
-
-              else if uncertainDelivery then
-                span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
-
-              else
-                span [ class "onyx-pending-note" ] [ text " · queued" ]
-            , if m.edited && not withdrawn then
-                span [ class "onyx-edited", attribute "title" (editTitle model m) ] [ text " · edited" ]
-
-              else
-                text ""
-            , boostBar model target m
-            , threadIndicator target parents m
-            , messageMenuButton model target m
-            , messageMenuPanel model target m
-            , reactionPickerPanel model target m
-            ]
-{-| Per-message actions entry (mirrors the message menu trigger:
-offered only for rows with a server msgid, and only when at least
-one menu action applies; the Elm shell uses text buttons where the
-oracle uses icon buttons, with the same accessible names). -}
-messageMenuButton : Model -> String -> App.ChatMessage -> Html Msg
-messageMenuButton model target m =
-    case m.msgid of
-        Nothing ->
-            text ""
-
-        Just msgid ->
-            let
-                caps =
-                    App.capabilities (menuInput model target m)
-            in
-            if not (menuHasActions model target caps || App.isChannelName model target) then
-                text ""
-
-            else
-                let
-                    isOpen =
-                        case model.messageMenu of
-                            Just open ->
-                                String.toLower open.target == String.toLower target && open.msgid == msgid
-
-                            Nothing ->
-                                False
-                in
-                button
-                    [ type_ "button"
-                    , class "onyx-msg-menu-trigger"
-                    , attribute "aria-label" ("Message actions for message from " ++ m.from)
-                    , attribute "aria-expanded"
-                        (if isOpen then
-                            "true"
-
-                         else
-                            "false"
-                        )
-                    , onClick (App.MessageMenuOpen { target = target, msgid = msgid })
-                    ]
-                    [ text "⋯" ]
 
 
 {-| Capability input for one thread row (server caps gate edit and
@@ -1840,14 +2055,14 @@ editTitle model m =
                     "Edited (" ++ String.fromInt (List.length revs) ++ " revisions)"
 
 
-boostBar : Model -> String -> App.ChatMessage -> Html Msg
-boostBar model target m =
+boostBar : String -> Prefs.Preferences -> String -> App.ChatMessage -> Html Msg
+boostBar ourNick prefs target m =
     let
         groups =
-            App.aggregateBoostGroups m.reactions model.ourNick
+            App.aggregateBoostGroups m.reactions ourNick
 
         summary =
-            App.summarizeBoosts groups model.prefs.reactionDensity
+            App.summarizeBoosts groups prefs.reactionDensity
 
         -- v3/boost: the oracle `onAdd` arm — a row with a msgid
         -- offers the reaction picker even with no boosts yet
@@ -1855,7 +2070,7 @@ boostBar model target m =
         addable =
             case m.msgid of
                 Just _ ->
-                    model.prefs.reactionDensity /= Prefs.ReactionCountsOnly
+                    prefs.reactionDensity /= Prefs.ReactionCountsOnly
 
                 Nothing ->
                     False
@@ -1865,7 +2080,7 @@ boostBar model target m =
 
     else
         div [ class "boost-bar", attribute "aria-label" "Boosts" ]
-            (List.map (boostChip model target m groups) summary.chips
+            (List.map (boostChip prefs target m groups) summary.chips
                 ++ (if summary.overflow > 0 then
                         [ span [ class "boost-pill boost-pill--more", attribute "aria-label" (String.fromInt summary.overflow ++ " more reaction types") ]
                             [ text ("+" ++ String.fromInt summary.overflow) ]
@@ -1891,8 +2106,8 @@ boostBar model target m =
             )
 
 
-boostChip : Model -> String -> App.ChatMessage -> List App.BoostGroup -> { emoji : String, count : Int, mine : Bool, label : String } -> Html Msg
-boostChip model target m groups chip =
+boostChip : Prefs.Preferences -> String -> App.ChatMessage -> List App.BoostGroup -> { emoji : String, count : Int, mine : Bool, label : String } -> Html Msg
+boostChip prefs target m groups chip =
     let
         group =
             List.filter (\g -> g.emoji == chip.emoji) groups |> List.head
@@ -1905,7 +2120,7 @@ boostChip model target m groups chip =
             , span [ class "boost-count" ] [ text (String.fromInt chip.count) ]
             ]
     in
-    case ( model.prefs.reactionDensity, m.msgid, group ) of
+    case ( prefs.reactionDensity, m.msgid, group ) of
         ( Prefs.ReactionCountsOnly, _, _ ) ->
             span [ class "boost-pill boost-pill--summary", attribute "aria-label" (String.fromInt chip.count ++ " total boosts") ] kids
 

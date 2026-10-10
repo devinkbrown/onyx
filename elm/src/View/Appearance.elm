@@ -42,6 +42,12 @@ densityLabels =
     [ ( Prefs.DensityCompact, "Compact" ), ( Prefs.DensityCozy, "Cozy" ), ( Prefs.DensityRoomy, "Roomy" ) ]
 
 
+-- v3/transcript
+transcriptDensityLabels : List ( Prefs.TranscriptDensity, String )
+transcriptDensityLabels =
+    [ ( Prefs.TranscriptDefault, "Default" ), ( Prefs.TranscriptCompact, "Compact" ) ]
+
+
 clockLabels : List ( Prefs.Clock, String )
 clockLabels =
     [ ( Prefs.Clock24h, "24-hour" ), ( Prefs.Clock12h, "12-hour" ) ]
@@ -149,6 +155,38 @@ view model =
                                 [ text label ]
                         )
                         densityLabels
+                    )
+                ]
+            -- v3/transcript — message layout (Default grouped rows with
+            -- avatars / Compact IRC-like lines).
+            , section [ class "ap-group" ]
+                [ h2 [ class "ap-glabel" ] [ text "Message layout" ]
+                , div [ class "ap-chips ap-chips--choices", attribute "role" "radiogroup", attribute "aria-label" "Message layout" ]
+                    (let
+                        ids =
+                            List.map (\( density, _ ) -> Prefs.transcriptDensityToString density) transcriptDensityLabels
+                     in
+                     List.map
+                        (\( density, label ) ->
+                            let
+                                value =
+                                    Prefs.transcriptDensityToString density
+
+                                isOn =
+                                    model.prefs.transcriptDensity == density
+                            in
+                            button
+                                [ Html.Attributes.type_ "button"
+                                , class ("ap-chip" ++ (if isOn then " on" else ""))
+                                , attribute "role" "radio"
+                                , attribute "aria-checked" (if isOn then "true" else "false")
+                                , tabindex (if isOn then 0 else -1)
+                                , on "keydown" (radioKey ids value)
+                                , onClick (AppearanceSetPref { key = "transcriptDensity", value = value })
+                                ]
+                                [ text label ]
+                        )
+                        transcriptDensityLabels
                     )
                 ]
             , section [ class "ap-group" ]

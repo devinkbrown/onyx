@@ -151,8 +151,8 @@ keyboard-only and at 375px, with elm-program-test flows + Playwright + screensho
 | 1.0 | Shell frame + tokens: Solid token ladder in `app.css`, responsive grid (nav rail / collection sidebar / main / context rail), sheet/dialog primitive with one focus-trap port, `role="log"` transcript container, 375px gate, visual-regression baselines | absorbs 7.1, 7.2, 7.6 | L |
 | 1.1→1.7 | Ctrl/Cmd+K becomes an action palette right after primary nav | 1.7 moved up | S · **done** (v3/switcher) |
 | 1.4a | Land on Home after connect; Home absorbs the catch-up digest | absorbs 2.7 | M |
-| 2.0 | Transcript engine: `Html.Keyed` + `Html.Lazy` rows, scroll anchoring port, unread divider, jump-to-latest, windowing past ~300 rows | new | L |
-| 2.0b | Density modes (Default / Compact) + grouping as view-model | new | S |
+| 2.0 | Transcript engine: `Html.Keyed` + `Html.Lazy` rows, scroll anchoring port, unread divider, jump-to-latest, windowing past ~300 rows | new | L · **done** (v3/transcript: keyed + lazy rows, `role=log`, `scrollPolicy`/`scrollState` bridge, Jump to latest pill; windowing stays the existing `threadWindowFor` + Show earlier, no spacer divs) |
+| 2.0b | Density modes (Default / Compact) + grouping as view-model | new | S · **done** (v3/transcript: `TranscriptRows` view-model, Appearance → Message layout) |
 | 3.1/3.5/3.6 | Room header, members, profile card come **before** 2.4–2.9 | reorder | — |
 | 8.x | Long tail: BlockKit (2.8), edit history (2.9), history import (4.5), Stage/Watch Together (6.7) | deferred | — |
 
