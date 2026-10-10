@@ -31,6 +31,10 @@
 #   ONYX_LIVE_OUT   Absolute path whose basename is `out` (default: $checkout/out).
 #                   When set, must already be absolute (raw relatives rejected).
 #                   Target must not itself be a symlink.
+#   ONYX_CLIENT     solid (default) or elm. With elm, the Elm v3 client
+#                   (elm/) is built and overlaid onto every SPA document
+#                   (tools/elm-overlay.mjs) after the normal Vite build, so
+#                   route metadata, feeds, sw.js and backups are unchanged.
 #   DEPLOY_DRY_RUN  Exactly 0 or 1 (default 0). If 1, build/stage/assert only —
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
@@ -786,6 +790,21 @@ deploy_main() {
   sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/" dist/sw.js
   grep -q "onyx-shell-${version}" dist/sw.js \
     || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
+
+  case "${ONYX_CLIENT:-solid}" in
+    solid) ;;
+    elm)
+      echo "==> ONYX_CLIENT=elm: building the Elm v3 client and overlaying SPA documents"
+      PATH="${ONYX_ELM_BIN_DIR:-/tmp}:${PATH}" ELM_HOME="${ELM_HOME:-/tmp/elmhome}" bash elm/tools/build.sh \
+        || { echo "FAIL: Elm build failed — NOT deploying"; exit 1; }
+      node tools/elm-overlay.mjs dist elm/dist-elm \
+        || { echo "FAIL: Elm overlay failed — NOT deploying"; exit 1; }
+      verify_public_title dist/index.html \
+        || { echo "FAIL: dist/index.html lost the authoritative public title in the Elm overlay"; exit 1; }
+      ;;
+    *)
+      echo "FAIL: ONYX_CLIENT must be solid or elm (got: ${ONYX_CLIENT})"; exit 1 ;;
+  esac
 
   # Build legacy landing only to harvest allowlisted support resources.
   echo "==> building legacy landing (allowlisted support resources only)"
