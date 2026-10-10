@@ -30,6 +30,7 @@ const ELM_JS_GLOBALS = {
   atob: 'readonly',
   btoa: 'readonly',
   clearTimeout: 'readonly',
+  console: 'readonly',
   crypto: 'readonly',
   document: 'readonly',
   fetch: 'readonly',
