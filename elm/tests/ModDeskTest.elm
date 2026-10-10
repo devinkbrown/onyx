@@ -425,7 +425,8 @@ suite =
                     in
                     Expect.all
                         [ \_ -> q |> Query.has [ Selector.text "Room safety", Selector.text "Room desk", Selector.text "You are a room moderator here." ]
-                        , \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Current room") ] |> Query.has [ Selector.text "#c" ]
+                        , -- v3/rx-sheets: the room rides in the pinned head as its subtitle
+                          \_ -> q |> Query.find [ Selector.class "onyx-moddesk-head" ] |> Query.find [ Selector.class "onyx-sheet-sub" ] |> Query.has [ Selector.text "#c" ]
                         , \_ -> q |> Query.findAll [ testId "ban-list-panel" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.findAll [ testId "desk-invite-form" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 1)

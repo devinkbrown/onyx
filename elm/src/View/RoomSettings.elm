@@ -100,14 +100,11 @@ roomSettingsSheet model =
                 , modal = True
                 , attrs = [ attribute "data-testid" "channel-settings" ]
                 }
-                [ Sheet.header
-                    { scope = scope
-                    , title = "Room settings"
-                    , closeLabel = "Close room settings"
-                    , onClose = rs RoomSettings.Close
-                    , closeTestId = Just "channel-settings-close"
-                    }
-                , p [ class "rset-room" ] [ text (String.dropLeft 1 room.name) ]
+                [ -- v3/rx-sheets: the room rides in the pinned head as its subtitle.
+                  Sheet.headerWith
+                    (Sheet.head { scope = scope, title = "Room settings", closeLabel = "Close room settings", onClose = rs RoomSettings.Close }
+                        |> (\h -> { h | subtitle = Just room.name, closeTestId = Just "channel-settings-close" })
+                    )
                 , contextLine ctx
                 , topicSection model ctx room
                 , notifySection model room

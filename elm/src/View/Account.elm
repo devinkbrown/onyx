@@ -1577,7 +1577,7 @@ dataSection model =
                     [ text "Save device history" ]
                 ]
             ]
-        , section [ class "onyx-account-section", id "acct-delete-account-title" ]
+        , section [ class "onyx-account-section onyx-danger-zone", id "acct-delete-account-title" ]
             ([ h3 [ class "onyx-account-section__title" ] [ text "Delete account" ]
              , p [ class "onyx-account-hint" ]
                 [ text "This removes your identity. Other people keep their own copies." ]

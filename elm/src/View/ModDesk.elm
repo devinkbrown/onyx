@@ -24,7 +24,7 @@ administrator"), never as mode letters.
 
 import App exposing (ConnectionState(..), Model, Msg(..), OperDeskIntent(..), isChannelOp)
 import EventReplay exposing (EventReplayEvent)
-import Html exposing (Html, button, code, details, div, dl, dd, dt, h2, h3, input, label, li, option, p, section, select, span, summary, text, ul)
+import Html exposing (Html, button, code, details, div, dl, dd, dt, h3, input, label, li, option, p, section, select, span, summary, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, for, id, maxlength, placeholder, selected, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
@@ -112,15 +112,11 @@ moderationSheet model =
                 , titleId = "moderation-cockpit-title"
                 , testId = "moderation-cockpit"
                 , closeLabel = "Close room desk"
+                , kicker = "Room safety"
+                , title = "Room desk"
+                , subtitle = Just channel
                 }
-                [ div [ class "onyx-moddesk-head" ]
-                    [ div []
-                        [ p [ class "onyx-moddesk-eyebrow" ] [ text "Room safety" ]
-                        , h2 [ id "moderation-cockpit-title" ] [ text "Room desk" ]
-                        ]
-                    , p [ class "onyx-moddesk-room", attribute "aria-label" "Current room" ] [ text channel ]
-                    ]
-                , p [ class "onyx-moddesk-role" ]
+                [ p [ class "onyx-moddesk-role" ]
                     [ text
                         (if isChannelOp model channel then
                             "You are a room moderator here."
@@ -138,7 +134,14 @@ moderationSheet model =
 
 
 type alias Frame =
-    { close : Msg, titleId : String, testId : String, closeLabel : String }
+    { close : Msg
+    , titleId : String
+    , testId : String
+    , closeLabel : String
+    , kicker : String
+    , title : String
+    , subtitle : Maybe String
+    }
 
 
 sheetFrame : Frame -> List (Html Msg) -> Html Msg
@@ -155,8 +158,20 @@ sheetFrame frame body =
         , modal = True
         , attrs = [ attribute "data-testid" frame.testId ]
         }
-            (div [ class "onyx-moddesk-bar" ]
-                [ Sheet.closeButton { label = frame.closeLabel, onClose = frame.close, testId = Nothing, extraClass = "onyx-moddesk-close" } ]
+            -- v3/rx-sheets: the shared pinned head (kicker, title, the
+            -- room as subtitle, the one close) for both desks.
+            (Sheet.headerWith
+                (Sheet.head { scope = frame.testId, title = frame.title, closeLabel = frame.closeLabel, onClose = frame.close }
+                    |> (\h ->
+                            { h
+                                | titleId = Just frame.titleId
+                                , kicker = Just frame.kicker
+                                , subtitle = frame.subtitle
+                                , closeClass = "onyx-moddesk-close"
+                                , headClass = "onyx-moddesk-head"
+                            }
+                       )
+                )
                 :: body
             )
 
@@ -172,6 +187,9 @@ operSheet model =
             , titleId = "oper-desk-title"
             , testId = "oper-sheet"
             , closeLabel = "Close operator desk"
+            , kicker = "Network"
+            , title = "Operator desk"
+            , subtitle = Nothing
             }
             [ operDesk model, eventConsole model ]
 
@@ -195,13 +213,7 @@ operDesk model =
             App.maxBroadcastLength - String.length (String.trim desk.broadcast)
     in
     section [ class "oper-desk", attribute "data-testid" "oper-desk", attribute "aria-labelledby" "oper-desk-title" ]
-        ([ div [ class "onyx-moddesk-head" ]
-            [ div []
-                [ p [ class "onyx-moddesk-eyebrow" ] [ text "Network" ]
-                , h2 [ id "oper-desk-title" ] [ text "Operator desk" ]
-                ]
-            ]
-         , dl [ class "onyx-moddesk-rail", attribute "aria-label" "Operator authority" ]
+        ([ dl [ class "onyx-moddesk-rail", attribute "aria-label" "Operator authority" ]
             [ div []
                 [ dt [] [ text "Role" ]
                 , dd [ attribute "data-testid" "oper-desk-role" ] [ text (OperDesk.roleLabel model.isNetworkAdmin) ]

@@ -204,6 +204,7 @@ type alias BanAddForm =
     , extPattern : String
     , extNegated : Bool
     , error : String
+    , reviewing : Bool -- v3/rx-sheets: a block is reviewed before it sends
     }
 
 
@@ -216,6 +217,7 @@ blankBanAdd =
     , extPattern = ""
     , extNegated = False
     , error = ""
+    , reviewing = False
     }
 
 
@@ -2801,6 +2803,8 @@ type Msg
     | BanAddExtPattern String
     | BanAddExtNegated Bool
     | BanAddSubmit String
+    | BanAddReview String -- v3/rx-sheets
+    | BanAddReviewCancel -- v3/rx-sheets
     | TempBanElapsed { key : String }
     | UnbanReviewRequested { channel : String, mask : String }
     | UnbanReviewConfirmed
@@ -20478,14 +20482,15 @@ requestTempBan model channel mask minutes =
                             )
 
 
-{-| Apply a ban-add field edit, clearing a stale submit error. -}
+{-| Apply a ban-add field edit, clearing a stale submit error and any
+staged review (an edited block is reviewed again before it sends). -}
 touchBanAdd : (BanAddForm -> BanAddForm) -> BanAddForm -> BanAddForm
 touchBanAdd edit form =
     let
         edited =
             edit form
     in
-    { edited | error = "" }
+    { edited | error = "", reviewing = False }
 
 
 {-| Resolve the ban-add form to a mask (raw trimmed text, or the
@@ -20516,33 +20521,30 @@ resolveBanAddMask form =
             Just mask
 
 
-{-| Submit the moderation-desk ban-add form (feeds the timed-ban
-core: bad minutes, an unresolvable mask, an unnormalizable entry,
-or an offline link all report into the form instead of sending). -}
-submitBanAdd : Model -> String -> ( Model, List Outbound )
-submitBanAdd model channel =
+{-| Check the moderation-desk ban-add form: bad minutes, an
+unresolvable mask, an unnormalizable entry or an offline link come
+back as the form error; otherwise the mask and minutes to send. -}
+validateBanAdd : Model -> Result String { mask : String, minutes : Int }
+validateBanAdd model =
     let
         form =
             model.banAdd
-
-        fail message =
-            ( { model | banAdd = { form | error = message } }, [] )
     in
     case String.toInt (String.trim form.minutes) of
         Nothing ->
-            fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+            Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
         Just minutes ->
             if minutes < 1 || minutes > maxTempBanMinutes then
-                fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+                Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
             else if model.connection /= Live then
-                fail "You are offline — reconnect to add blocks."
+                Err "You are offline — reconnect to add blocks."
 
             else
                 case resolveBanAddMask form of
                     Nothing ->
-                        fail
+                        Err
                             (if form.useExtBan then
                                 "That extended ban does not validate — check the type and pattern."
 
@@ -20553,14 +20555,48 @@ submitBanAdd model channel =
                     Just mask ->
                         case normalizeBanEntry mask Nothing Nothing of
                             Nothing ->
-                                fail "Enter a ban mask."
+                                Err "Enter a ban mask."
 
                             Just _ ->
-                                let
-                                    ( sent, out ) =
-                                        requestTempBan model channel mask minutes
-                                in
-                                ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
+                                Ok { mask = mask, minutes = minutes }
+
+
+{-| Submit the moderation-desk ban-add form (feeds the timed-ban
+core: bad minutes, an unresolvable mask, an unnormalizable entry,
+or an offline link all report into the form instead of sending). -}
+submitBanAdd : Model -> String -> ( Model, List Outbound )
+submitBanAdd model channel =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok ok ->
+            let
+                ( sent, out ) =
+                    requestTempBan model channel ok.mask ok.minutes
+            in
+            ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
+
+
+{-| v3/rx-sheets — stage the block for review (the desk's other bans
+already review first): a valid form shows the confirm row, an invalid
+one reports its error and sends nothing. -}
+reviewBanAdd : Model -> ( Model, List Outbound )
+reviewBanAdd model =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok _ ->
+            ( { model | banAdd = { form | error = "", reviewing = True } }, [] )
 
 
 {-| Fire a timed-ban unban (mirroring the oracle `fire`: an unknown
@@ -36165,7 +36201,43 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepRxSheets -- v3/rx-sheets
     ]
+
+
+-- v3/rx-sheets
+
+
+{-| One sheet at a time over the You hub: any overlay that opens while
+the hub is open (the reclaim dialog, Notifications, a ring, …) closes
+the hub, so the new sheet is the one topmost layer for paint, focus
+and Escape. The quiet asks (first-run notifications, Add to Home
+Screen) rise on their own and leave the hub alone. Only computed while
+the hub is open.
+-}
+settleStepRxSheets : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRxSheets _ prior ( next, outs ) =
+    if next.youHubOpen then
+        let
+            before =
+                List.map Tuple.first (overlayStack prior)
+
+            quiet =
+                [ "you", "first-run-notify", "a2hs" ]
+
+            opened =
+                overlayStack next
+                    |> List.map Tuple.first
+                    |> List.filter (\key -> not (List.member key before) && not (List.member key quiet))
+        in
+        if List.isEmpty opened then
+            ( next, outs )
+
+        else
+            ( { next | youHubOpen = False }, outs )
+
+    else
+        ( next, outs )
 
 
 settleStepConnect : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -37748,6 +37820,13 @@ updateCore msg model =
 
         BanAddSubmit channel ->
             submitBanAdd model channel
+
+        -- v3/rx-sheets
+        BanAddReview _ ->
+            reviewBanAdd model
+
+        BanAddReviewCancel ->
+            ( { model | banAdd = (\form -> { form | reviewing = False }) model.banAdd }, [] )
 
         TempBanElapsed req ->
             fireTempBan model req.key

@@ -311,7 +311,7 @@ closeSection model view =
         []
 
     else if model.stewardClosing then
-        [ section [ class "onyx-steward-section" ]
+        [ section [ class "onyx-steward-section onyx-danger-zone", attribute "data-testid" "steward-close-section" ]
             [ p [ class "onyx-steward-body" ] [ text (Stewardship.closeTitle view.channel) ]
             , div [ class "onyx-steward-actions" ]
                 [ button
@@ -331,7 +331,7 @@ closeSection model view =
         ]
 
     else
-        [ section [ class "onyx-steward-section" ]
+        [ section [ class "onyx-steward-section onyx-danger-zone", attribute "data-testid" "steward-close-section" ]
             [ h3 [ class "onyx-steward-label" ] [ text "Close this room" ]
             , p [ class "onyx-steward-body" ] [ text Stewardship.stewardshipCopy.closeBody ]
             , div [ class "onyx-steward-actions" ]
@@ -353,7 +353,7 @@ deleteSection model view =
         []
 
     else
-        [ section [ class "onyx-steward-section" ]
+        [ section [ class "onyx-steward-section onyx-danger-zone", attribute "data-testid" "steward-delete-section" ]
             ([ h3 [ class "onyx-steward-label" ] [ text "Delete this room" ]
              , p [ class "onyx-steward-body" ] [ text Stewardship.stewardshipCopy.deleteBody ]
              ]

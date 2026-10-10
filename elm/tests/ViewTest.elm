@@ -1574,7 +1574,8 @@ suite =
                         query carded
                             |> Query.find [ Selector.class "onyx-member-card" ]
                             |> Query.has
-                                [ Selector.attribute (Attr.attribute "role" "region")
+                                [ Selector.attribute (Attr.attribute "role" "dialog")
+                                , Selector.attribute (Attr.attribute "data-shortcut-scope" "member-card")
                                 , Selector.text "alice"
                                 , Selector.text "Guest"
                                 , Selector.text "Member"

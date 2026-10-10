@@ -120,18 +120,75 @@ addForm model channel live =
                  else
                     p [ class "moderation-cockpit__hint", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
                         [ text form.error ]
-               , div [ class "onyx-steward-actions" ]
-                    [ button
-                        [ class "onyx-steward-btn onyx-steward-btn-primary"
-                        , attribute "data-testid" "ban-add-submit"
-                        , disabled (not live)
-                        , onClick (BanAddSubmit channel)
+               , -- v3/rx-sheets: a block is reviewed before it sends, like
+                 -- the desk's other bans; editing a field re-arms the review.
+                 if form.reviewing then
+                    div
+                        [ class "moderation-review onyx-danger-confirm"
+                        , attribute "role" "group"
+                        , attribute "aria-label" "Confirm timed block"
+                        , attribute "data-testid" "ban-add-review"
                         ]
-                        [ text "Add block" ]
-                    ]
+                        [ p [] [ text (banAddReviewCopy form channel) ]
+                        , div [ class "onyx-steward-actions" ]
+                            [ button
+                                [ class "onyx-steward-btn onyx-steward-btn-danger"
+                                , attribute "data-testid" "ban-add-submit"
+                                , disabled (not live)
+                                , onClick (BanAddSubmit channel)
+                                ]
+                                [ text "Add block" ]
+                            , button
+                                [ class "onyx-steward-btn"
+                                , attribute "data-testid" "ban-add-cancel"
+                                , onClick BanAddReviewCancel
+                                ]
+                                [ text "Cancel" ]
+                            ]
+                        ]
+
+                 else
+                    div [ class "onyx-steward-actions" ]
+                        [ button
+                            [ class "onyx-steward-btn onyx-steward-btn-primary"
+                            , attribute "data-testid" "ban-add-review-open"
+                            , disabled (not live)
+                            , onClick (BanAddReview channel)
+                            ]
+                            [ text "Review block" ]
+                        ]
                ]
         )
     ]
+
+
+{-| The confirm line for a staged timed block. -}
+banAddReviewCopy : BanAddForm -> String -> String
+banAddReviewCopy form channel =
+    let
+        target =
+            if form.useExtBan then
+                Maybe.withDefault (String.trim form.extPattern) (extPreview form)
+
+            else
+                String.trim form.mask
+
+        minutes =
+            String.trim form.minutes
+    in
+    "Block "
+        ++ target
+        ++ " in "
+        ++ channel
+        ++ " for "
+        ++ minutes
+        ++ (if minutes == "1" then
+                " minute?"
+
+            else
+                " minutes?"
+           )
+        ++ " It lifts on its own when the time is up."
 
 
 extBuilder : BanAddForm -> List (Html Msg)

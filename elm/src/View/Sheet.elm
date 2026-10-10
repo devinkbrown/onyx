@@ -32,8 +32,10 @@ the APG dialog contract in one place:
     `shortcut` port's Escape (`App.escapeMsg`, the ordered overlay
     list) never closes a second overlay for the same key press.
 
-v3/ui-sheets — on phones (under 768px) every light-dismiss sheet is a
-true bottom sheet: a grab handle, a sticky head, internal scroll, the
+v3/ui-sheets — on phones every light-dismiss sheet is a
+true bottom sheet (v3/rx-sheets: under 600px wide; fold-open and
+tablets keep centred dialogs and side panels, short landscape windows
+get nearly full-height dialogs — see `css/ui-sheets.css`): a grab handle, a sticky head, internal scroll, the
 safe-area inset, and swipe-down-to-dismiss. The swipe needs no
 JavaScript: the layer is a `column-reverse` scroll container whose
 first child is the panel and whose last is a full-height spacer (see
@@ -60,7 +62,7 @@ import Json.Decode as Decode
 {-| Where the panel sits. `Center` is the default dialog; `Side` is a
 right-hand drawer on desktop; `Popover` drops from the top-right of the
 shell (under the global top bar) like a menu panel. All three become
-bottom sheets under 768px.
+bottom sheets under 600px.
 -}
 type Placement
     = Center
