@@ -353,21 +353,23 @@ layoutLines card =
         laneLines =
             case card.lane of
                 Download.Windows ->
-                    [ text "package root bin/onyx.exe + WebView2Loader.dll + resources" ]
+                    [ "package root bin/onyx.exe + WebView2Loader.dll + resources" ]
 
                 Download.Linux ->
-                    [ text "package root bin/onyx + resources/dist" ]
+                    [ "package root bin/onyx + resources/dist" ]
 
                 _ ->
                     []
-    in
-    laneLines
-        ++ (if card.hasInstallScript then
-                [ text "PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)" ]
+
+        scriptLines =
+            if card.hasInstallScript then
+                [ "PREFIX/bin/onyx + PREFIX/resources (default PREFIX=/usr/local)" ]
 
             else
                 []
-           )
+    in
+    -- One text run: two layout lines must never glue together.
+    [ text (String.join "; " (laneLines ++ scriptLines)) ]
 
 
 {-| A copy button with per-key state (mirroring the oracle `CopyButton`

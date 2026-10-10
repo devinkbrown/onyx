@@ -3824,7 +3824,8 @@ suite =
                         , \_ -> Query.has [ Selector.text "Meet people" ] q
                         , \_ -> Query.has [ Selector.text "More to explore" ] q
                         , \_ ->
-                            Query.find [ Selector.tag "a", Selector.containing [ Selector.text "Open Onyx" ] ] q
+                            Query.find [ Selector.class "onyx-land-cta" ] q
+                                |> Query.find [ Selector.tag "a", Selector.containing [ Selector.text "Open Onyx" ] ]
                                 |> Query.has [ Selector.attribute (Attr.href "/app/") ]
                         ]
                         ()
