@@ -2219,7 +2219,7 @@
      (0..3) and a screen-share refusal. Forwarded only when present;
      Elm folds them fail-closed (CallMedia.decodeLocal). */
   var VOICE_MEDIA_FIELDS = [
-    "camera", "screen", "deafened", "shareSupported", "pipSupported", "qualityTier", "screenError"
+    "camera", "screen", "deafened", "shareSupported", "pipSupported", "cameraSupported", "qualityTier", "screenError"
   ];
 
   function voiceFeedBlank() {
@@ -2305,7 +2305,14 @@
     try {
       pip = typeof document !== "undefined" && !!document && document.pictureInPictureEnabled === true;
     } catch (err) { pip = false; }
-    return { shareSupported: share, pipSupported: pip };
+    /* Camera follows the engine's own switch (off while the codec is too
+       heavy for the live SendQ); never offered without an engine. */
+    var camera = false;
+    try {
+      var eng = (typeof window !== "undefined") ? window.OnyxVoiceEngine : null;
+      camera = !!(eng && eng.videoEnabled === true);
+    } catch (err) { camera = false; }
+    return { shareSupported: share, pipSupported: pip, cameraSupported: camera };
   }
 
   var VOICE_PEER_KINDS = { voice: true, video: true, screen: true };

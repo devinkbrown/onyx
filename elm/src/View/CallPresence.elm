@@ -276,7 +276,11 @@ joinBanner model room =
                     , span [] [ text "Join to listen; your microphone starts off until you unmute." ]
                     ]
                 , div [ class "onyx-join-banner-actions" ]
-                    [ button
+                    [ if not model.callLocal.cameraSupported then
+                        text ""
+
+                      else
+                      button
                         [ type_ "button"
                         , class "onyx-call-btn onyx-call-btn-ghost"
                         , attribute "data-testid" "call-join-video"

@@ -171,6 +171,21 @@ commands =
                     , \_ -> query inCall |> Query.find [ testid "camera-button" ] |> Event.simulate Event.click |> Event.expect CallToggleCamera
                     ]
                     ()
+        , test "camera switched off by the engine: no camera button, flag survives idle" <|
+            \_ ->
+                let
+                    off =
+                        { inCall | callLocal = CallMedia.decodeLocal Media.InCall (Encode.object [ ( "cameraSupported", Encode.bool False ) ]) inCall.callLocal }
+
+                    idleAgain =
+                        CallMedia.decodeLocal Media.Idle (Encode.object [ ( "state", Encode.string "idle" ) ]) off.callLocal
+                in
+                Expect.all
+                    [ \_ -> query off |> Query.findAll [ testid "camera-button" ] |> Query.count (Expect.equal 0)
+                    , \_ -> Expect.equal False idleAgain.cameraSupported
+                    , \_ -> Expect.equal True (CallMedia.decodeLocal Media.InCall (Encode.object []) inCall.callLocal).cameraSupported
+                    ]
+                    ()
         , test "the engine answer overrides the optimistic camera flag" <|
             \_ ->
                 let

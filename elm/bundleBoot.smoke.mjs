@@ -213,6 +213,10 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
     /* v3/calls-engine: the voice engine mounts before ports.js wires it. */
     assert.ok(loader.fetched.some((f) => /^voice(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads the voice engine");
     assert.equal(typeof window.OnyxVoiceEngine?.joinVoice, "function", "window.OnyxVoiceEngine is mounted");
+    /* Video is switched off on the live network (codec too heavy for the
+       stock SendQ): the engine says so and refuses to start a camera. */
+    assert.equal(window.OnyxVoiceEngine.videoEnabled, false, "video is switched off");
+    assert.equal(await window.OnyxVoiceEngine.startCamera("#lounge"), false, "startCamera refuses while video is off");
     assert.deepEqual(errors, [], "boot runs without runtime errors");
 
     /* 1. Connect gate renders, no socket yet. */

@@ -432,7 +432,11 @@ controlBar model =
                         ]
                     ]
                 -- v3/calls-c4: camera + share (share moves into More <768px)
-                , cameraButton model
+                , if model.callLocal.cameraSupported then
+                    cameraButton model
+
+                  else
+                    text ""
                 , shareButton model "onyx-cbtn onyx-cbtn-share" "screenshare-button"
                 -- v3/calls-c8: hand / react / captions (React moves into More <768px)
                 , View.CallOverlays.handButton model reconnecting

@@ -93,5 +93,17 @@ declare const __ONYX_VIDEO_WORKER__: string;
   try { md?.addEventListener('devicechange', () => adapter.recover('route-change')); } catch { /* old WebKit */ }
   window.addEventListener('pointerdown', () => adapter.recover('gesture', true), { capture: true, passive: true });
 
+  // Video stays OFF on the live network for now: the cadencevis codec runs
+  // ~2 Mbit/s per camera, and the production node's stock 1 MiB SendQ can
+  // disconnect the OTHER people in the call. Voice is unaffected. Flip this
+  // once the codec is lighter or the SendQ is raised (the UI follows it via
+  // the `cameraSupported` capability).
+  const VIDEO_ENABLED = false;
+  const startCamera = adapter.startCamera.bind(adapter);
+  Object.assign(adapter, {
+    videoEnabled: VIDEO_ENABLED,
+    startCamera: (channel?: string) => (VIDEO_ENABLED ? startCamera(channel) : Promise.resolve(false)),
+  });
+
   window.OnyxVoiceEngine = adapter;
 })();

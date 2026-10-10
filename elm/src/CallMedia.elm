@@ -102,6 +102,7 @@ type alias Local =
     , deafened : Bool
     , shareSupported : Bool
     , pipSupported : Bool
+    , cameraSupported : Bool
     , shareStatus : String
     , tier : Maybe Int
     }
@@ -114,6 +115,7 @@ blankLocal =
     , deafened = False
     , shareSupported = False
     , pipSupported = False
+    , cameraSupported = True
     , shareStatus = ""
     , tier = Nothing
     }
@@ -219,9 +221,14 @@ decodeLocal lifecycle raw prev =
 
         pipSupported =
             flag "pipSupported" prev.pipSupported
+
+        -- Absent keeps the previous value (default True: older bridges);
+        -- the engine reports False while video is switched off.
+        cameraSupported =
+            flag "cameraSupported" prev.cameraSupported
     in
     if lifecycle == Idle then
-        { blankLocal | shareSupported = shareSupported, pipSupported = pipSupported }
+        { blankLocal | shareSupported = shareSupported, pipSupported = pipSupported, cameraSupported = cameraSupported }
 
     else
         let
@@ -294,6 +301,7 @@ decodeLocal lifecycle raw prev =
         , deafened = flag "deafened" prev.deafened
         , shareSupported = shareSupported
         , pipSupported = pipSupported
+        , cameraSupported = cameraSupported
         , shareStatus = status
         , tier = tier
         }
