@@ -3006,7 +3006,6 @@
     /* Binary media datagrams arrive as ArrayBuffers (never Blobs), so the
        bridge gets bytes synchronously — mirroring the oracle client. */
     try { socket.binaryType = "arraybuffer"; } catch (err) { /* text still flows */ }
-    var buffer = "";
     socket.addEventListener("open", function () {
       app.ports.wsOpened.send({ url: url });
     });
@@ -3018,9 +3017,12 @@
       }) !== "text") {
         return;
       }
-      buffer += String(event.data);
-      var lines = buffer.split("\r\n");
-      buffer = lines.pop();
+      /* IRC-over-WebSocket: every text frame is a COMPLETE message and the
+         live server sends it WITHOUT a trailing CRLF. Carrying an
+         unterminated tail across frames glued consecutive lines together
+         and stranded the last one (registration stalled after CAP LS).
+         Split each frame on any line break and flush every part. */
+      var lines = String(event.data).split(/\r?\n/);
       var batch = lines.filter(function (line) { return line.length > 0; });
       if (batch.length > 0) {
         sendPort(batch);

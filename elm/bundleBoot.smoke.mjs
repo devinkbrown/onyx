@@ -107,8 +107,8 @@ function installSocketStub(window, log) {
       this.dispatchEvent(new window.Event("open"));
     }
     serverSay(...lines) {
-      const ev = new window.MessageEvent("message", { data: lines.map((l) => l + "\r\n").join("") });
-      this.dispatchEvent(ev);
+      /* Like the live node: ONE line per text frame, NO trailing CRLF. */
+      for (const l of lines) this.dispatchEvent(new window.MessageEvent("message", { data: l }));
     }
     lines() {
       return this.sent.join("").split("\r\n").filter((l) => l.length > 0);
@@ -209,8 +209,19 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
     for (const frame of sock.sent) assert.match(frame, /^[^\r\n]+\r\n$/, "frame " + JSON.stringify(frame));
 
     /* 4. Welcome lands: the gate yields to the shell on Home. */
+    /* The live node's CAP LS 302 reply spans lines (`*` continuations);
+       the client must answer it, or registration stalls forever. */
     sock.serverSay(
-      ":onyx.test CAP * LS :message-tags server-time echo-message",
+      ":onyx.test CAP * LS * :message-tags server-time",
+      ":onyx.test CAP * LS :echo-message batch",
+    );
+    await tick(dom);
+    const capReq = sock.lines().find((l) => l.startsWith("CAP REQ"));
+    assert.ok(capReq, "client answers CAP LS with CAP REQ; sent: " + JSON.stringify(sock.lines()));
+    sock.serverSay(":onyx.test CAP * ACK :" + capReq.replace(/^CAP REQ :?/, ""));
+    await tick(dom);
+    assert.ok(sock.lines().includes("CAP END"), "CAP END after ACK; sent: " + JSON.stringify(sock.lines()));
+    sock.serverSay(
       ":onyx.test 001 kai :Welcome to Onyx kai",
       ":onyx.test 376 kai :End of MOTD",
     );
