@@ -63,7 +63,7 @@ function makeDom({ heights, clientHeight = 200, key = "#a", dividerAt = null }) 
     pane, rows, log, doc, listeners,
     append(h) { rows.push(bind(row(h))); },
     prepend(...hs) { rows.unshift(...hs.map((h) => bind(row(h)))); },
-    scrollTo(v) { pane.scrollTop = v; listeners.scroll && listeners.scroll(); },
+    scrollTo(v) { pane.scrollTop = v; if (listeners.scroll) listeners.scroll(); },
   };
 }
 

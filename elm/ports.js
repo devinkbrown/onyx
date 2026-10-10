@@ -1281,6 +1281,8 @@
 
   function scramNonce() {
     var arr = new Uint8Array(18);
+    // Node fallback for the smoke tests (no globalThis.crypto in old runtimes).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     var webcrypto = globalThis.crypto || (typeof require !== "undefined" ? require("crypto").webcrypto : null);
     webcrypto.getRandomValues(arr);
     return b64encodeBytes(arr).replace(/[+/=]/g, function (c) {
@@ -3523,7 +3525,7 @@ function fetchPublicFeed(url) {
         }
       } catch (err) { /* best-effort */ }
     }
-    try { doc.addEventListener && doc.addEventListener("keydown", trapTab); } catch (err) { /* no DOM events */ }
+    try { if (doc.addEventListener) doc.addEventListener("keydown", trapTab); } catch (err) { /* no DOM events */ }
     if (Mutation) {
       try {
         var observer = new Mutation(function () { settle(); });

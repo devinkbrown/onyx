@@ -18,7 +18,7 @@
      ONYX_ELM_DIST=<dir>        smoke a built dir (e.g. elm/dist-elm from
                                 tools/build.sh) instead of compiling
    Needs the repo jsdom devDependency. */
-/* global process, URL, Response */
+/* global Response */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -50,7 +50,7 @@ function assetRoot() {
     });
   } catch (err) {
     rmSync(out, { recursive: true, force: true });
-    throw new Error(`could not compile the bundle (put elm 0.19.1 on PATH, set ELM=..., or smoke a build with ONYX_ELM_DIST=...): ${err.message}`);
+    throw new Error(`could not compile the bundle (put elm 0.19.1 on PATH, set ELM=..., or smoke a build with ONYX_ELM_DIST=...): ${err.message}`, { cause: err });
   }
   return { dir: here, appJs, cleanup() { rmSync(out, { recursive: true, force: true }); } };
 }

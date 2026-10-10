@@ -49,10 +49,10 @@ function fakeDb(rows, opts) {
           const req = {};
           setTimeout(() => {
             req.result = rows.slice();
-            req.onsuccess && req.onsuccess();
+            if (req.onsuccess) req.onsuccess();
             setTimeout(() => {
-              if (options.abort) tx.onabort && tx.onabort();
-              else tx.oncomplete && tx.oncomplete();
+              if (options.abort) { if (tx.onabort) tx.onabort(); }
+              else if (tx.oncomplete) tx.oncomplete();
             }, 0);
           }, 0);
           return req;

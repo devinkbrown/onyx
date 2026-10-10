@@ -5,6 +5,47 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import solid from 'eslint-plugin-solid/configs/typescript';
 
+// Globals the Elm client JS uses (browser for ports.js, node for the
+// smoke suites); declared explicitly instead of pulling in `globals`.
+const ELM_JS_GLOBALS = {
+  AbortController: 'readonly',
+  Blob: 'readonly',
+  BroadcastChannel: 'readonly',
+  Buffer: 'readonly',
+  CryptoKey: 'readonly',
+  CustomEvent: 'readonly',
+  File: 'readonly',
+  FileReader: 'readonly',
+  FormData: 'readonly',
+  HTMLElement: 'readonly',
+  IDBKeyRange: 'readonly',
+  MutationObserver: 'readonly',
+  ResizeObserver: 'readonly',
+  TextDecoder: 'readonly',
+  TextEncoder: 'readonly',
+  URL: 'readonly',
+  URLSearchParams: 'readonly',
+  WebSocket: 'readonly',
+  XMLHttpRequest: 'readonly',
+  atob: 'readonly',
+  btoa: 'readonly',
+  clearTimeout: 'readonly',
+  crypto: 'readonly',
+  document: 'readonly',
+  fetch: 'readonly',
+  indexedDB: 'readonly',
+  localStorage: 'readonly',
+  location: 'readonly',
+  module: 'readonly',
+  navigator: 'readonly',
+  performance: 'readonly',
+  process: 'readonly',
+  requestAnimationFrame: 'readonly',
+  require: 'readonly',
+  setTimeout: 'readonly',
+  window: 'readonly',
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -21,6 +62,9 @@ export default tseslint.config(
       'coverage/**',
       'dist/**',
       'elm/dist-elm/**',
+      // Elm compiler cache and compiled bundles (regenerable, gitignored).
+      'elm/elm-stuff/**',
+      'elm/app.js',
       'test-results/**',
       'public/opcodec_wasm.js',
       'public/sw.js',
@@ -33,6 +77,14 @@ export default tseslint.config(
   {
     files: ['src/**/*.{ts,tsx}'],
     ...solid,
+  },
+  {
+    // Elm client JS: ports.js runs in the browser (and is loaded by the
+    // node smoke tests via require), the *.smoke.mjs suites run in node.
+    files: ['elm/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: ELM_JS_GLOBALS,
+    },
   },
   {
     rules: {
