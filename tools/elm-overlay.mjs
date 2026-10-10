@@ -66,6 +66,20 @@ const absolutize = (html) =>
 const elmHead = /<head>([\s\S]*?)<\/head>/i.exec(elmHtml)?.[1] ?? fail('elm index has no <head>');
 const elmStyles = (elmHead.match(/<link[^>]+rel="stylesheet"[^>]*>/gi) ?? []).map(absolutize);
 if (elmStyles.length === 0) fail('elm index has no stylesheets');
+// v3/ios: the device <meta> tags the Elm shell needs (viewport-fit=cover
+// for safe areas, standalone/PWA + status bar, theme colour, no phone-number
+// links) replace the route head's same-name tags. Fail closed if the Elm
+// head stops carrying the viewport the safe-area layout depends on.
+const DEVICE_META = ['viewport', 'theme-color', 'color-scheme', 'mobile-web-app-capable',
+  'apple-mobile-web-app-capable', 'apple-mobile-web-app-status-bar-style', 'apple-mobile-web-app-title',
+  'format-detection'];
+const metaName = (tag) => /\bname="([^"]+)"/i.exec(tag)?.[1]?.toLowerCase() ?? '';
+const elmMeta = (elmHead.match(/<meta\b[^>]*>/gi) ?? []).filter((tag) => DEVICE_META.includes(metaName(tag)));
+if (!elmMeta.some((tag) => metaName(tag) === 'viewport' && /viewport-fit=cover/.test(tag))) {
+  fail('elm index lacks <meta name="viewport" … viewport-fit=cover>');
+}
+const carryDeviceMeta = (head) =>
+  `${head.replace(/<meta\b[^>]*>\s*/gi, (tag) => (DEVICE_META.includes(metaName(tag)) ? '' : tag)).trimEnd()}\n    ${elmMeta.join('\n    ')}`;
 const elmBody = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(elmHtml)?.[1] ?? fail('elm index has no <body>');
 const bootBody = absolutize(elmBody);
 if (!bootBody.includes('Elm.Main.init')) fail('elm body lacks Elm.Main.init');
@@ -103,7 +117,7 @@ for (const file of htmlFiles(dist)) {
     .replace(/<script[^>]+type="module"[^>]*><\/script>/gi, '')
     .replace(/<link[^>]+rel="modulepreload"[^>]*>/gi, '')
     .replace(/<link[^>]+rel="stylesheet"[^>]+href="\/assets\/[^"]*"[^>]*>/gi, '');
-  const head = `${keptHead.trimEnd()}\n    ${elmStyles.join('\n    ')}\n  `;
+  const head = `${carryDeviceMeta(keptHead)}\n    ${elmStyles.join('\n    ')}\n  `;
   const out = html
     .replace(headMatch[0], `<head>${head}</head>`)
     .replace(/<body([^>]*)>[\s\S]*<\/body>/i, `<body$1>${bootBody}</body>`);

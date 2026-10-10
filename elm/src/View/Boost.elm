@@ -16,6 +16,7 @@ import Boost
 import Html exposing (Html, a, button, div, h2, input, label, p, text)
 import Html.Attributes exposing (attribute, class, disabled, for, href, id, type_, value)
 import Html.Events exposing (on, onClick, onInput)
+import View.Icon exposing (icon)
 import Json.Decode as Decode
 import Set
 import View.Sheet as Sheet
@@ -48,7 +49,7 @@ jumpToDateSheet model =
                         , attribute "aria-label" "Close jump to date"
                         , onClick JumpToDateClose
                         ]
-                        [ text "✕" ]
+                        [ icon "x" ]
                     ]
                 , div [ class "jump-to-date", attribute "data-testid" "jump-to-date-sheet" ]
                     [ sheetBody model ]

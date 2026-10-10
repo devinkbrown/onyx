@@ -22,7 +22,7 @@ Stats slice; nav arrows are text glyphs (the oracle inlines SVG).
 -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, button, div, form, input, li, p, section, small, span, strong, text, ul)
+import Html exposing (Html, button, details, div, form, input, li, p, section, small, span, strong, summary, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, id, maxlength, placeholder, title, type_, value)
 import Json.Decode
 import Html.Events exposing (on, onClick, onInput, onSubmit)
@@ -30,6 +30,7 @@ import Json.Decode as Decode
 import Provenance exposing (Scope(..))
 import SavedSearches
 import Search
+import View.Icon exposing (icon)
 
 
 inputId : String
@@ -122,7 +123,8 @@ panel model =
     in
     div [ class "onyx-message-search", attribute "role" "search", attribute "aria-label" "Message search", Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) panelKey) ]
         [ div [ class "onyx-message-search__surface" ]
-            [ div [ class "onyx-message-search__query-field" ]
+            [ icon "search"
+            , div [ class "onyx-message-search__query-field" ]
                 [ input
                     [ id inputId
                     , class "onyx-message-search__input"
@@ -149,7 +151,7 @@ panel model =
                 , title "Close search"
                 , onClick SearchClose
                 ]
-                [ text "×" ]
+                [ icon "x" ]
             ]
         , div [ class "onyx-message-search__body" ]
             [ div [ class "onyx-message-search__target", attribute "data-testid" "message-search-target" ]
@@ -167,7 +169,7 @@ panel model =
                     , disabled (count == 0)
                     , onClick SearchPrevious
                     ]
-                    [ text "↑" ]
+                    [ icon "chevron-up" ]
                 , button
                     [ type_ "button"
                     , class "onyx-message-search__button"
@@ -176,7 +178,7 @@ panel model =
                     , disabled (count == 0)
                     , onClick SearchNext
                     ]
-                    [ text "↓" ]
+                    [ icon "chevron-down" ]
                 ]
             , savedSection model query
             , recallSection model
@@ -430,51 +432,57 @@ panelKey =
             )
 
 
-{-| Saved searches: save-current row plus run/delete rows
-(mirroring the `onyx-message-search__saved` section; the row shows
-while saves exist or the query is runnable). -}
+{-| Saved searches: run/delete rows plus a save-current row
+(mirroring the `onyx-message-search__saved` section). v3/ui-messages:
+saving is progressive disclosure — a quiet "Save this search" summary
+that opens the name field — and with nothing saved yet the section is
+just that one line.
+-}
 savedSection : Model -> String -> Html Msg
 savedSection model query =
-    if List.isEmpty model.savedSearches && String.length query < 2 then
-        text ""
+    let
+        saveForm =
+            if String.length query >= 2 then
+                details [ class "onyx-message-search__save" ]
+                    [ summary [ class "onyx-message-search__save-toggle" ]
+                        [ icon "plus", span [] [ text "Save this search" ] ]
+                    , form [ class "onyx-message-search__save-form", onSubmit SearchSaveCurrent ]
+                        [ input
+                            [ id saveInputId
+                            , class "onyx-message-search__save-input"
+                            , value model.searchSaveName
+                            , maxlength Search.maxSaveLabelLength
+                            , placeholder "Name this device search"
+                            , attribute "aria-label" "Saved search name"
+                            , onInput (\name -> SearchSaveName { name = name })
+                            ]
+                            []
+                        , button
+                            [ type_ "submit"
+                            , class "onyx-message-search__deep"
+                            , disabled (String.isEmpty (String.trim model.searchSaveName))
+                            ]
+                            [ text "Save search" ]
+                        ]
+                    ]
+
+            else
+                text ""
+    in
+    if List.isEmpty model.savedSearches then
+        saveForm
 
     else
         section [ class "onyx-message-search__saved", attribute "aria-label" "Saved searches" ]
             [ div [ class "onyx-message-search__saved-bar" ]
                 [ strong [ class "onyx-message-search__section-title" ] [ text "Saved searches" ]
                 , provenanceBadge Device "Saved searches" ""
-                , span [ class "onyx-message-search__vault-label" ] [ text "Saved on this device" ]
                 , span [ class "onyx-message-search__server-count" ]
                     [ text (String.fromInt (List.length model.savedSearches) ++ " saved") ]
                 ]
-            , if String.length query >= 2 then
-                form [ class "onyx-message-search__save-form", onSubmit SearchSaveCurrent ]
-                    [ input
-                        [ id saveInputId
-                        , class "onyx-message-search__save-input"
-                        , value model.searchSaveName
-                        , maxlength Search.maxSaveLabelLength
-                        , placeholder "Name this device search"
-                        , attribute "aria-label" "Saved search name"
-                        , onInput (\name -> SearchSaveName { name = name })
-                        ]
-                        []
-                    , button
-                        [ type_ "submit"
-                        , class "onyx-message-search__deep"
-                        , disabled (String.isEmpty (String.trim model.searchSaveName))
-                        ]
-                        [ text "Save search" ]
-                    ]
-
-              else
-                text ""
-            , if List.isEmpty model.savedSearches then
-                text ""
-
-              else
-                ul [ class "onyx-message-search__saved-list", attribute "aria-label" "Saved search list" ]
-                    (List.map savedRow model.savedSearches)
+            , ul [ class "onyx-message-search__saved-list", attribute "aria-label" "Saved search list" ]
+                (List.map savedRow model.savedSearches)
+            , saveForm
             ]
 
 

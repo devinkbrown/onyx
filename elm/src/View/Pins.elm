@@ -8,6 +8,7 @@ import App exposing (Model, Msg(..))
 import Html exposing (Html, a, button, div, li, p, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, href)
 import Html.Events exposing (onClick)
+import View.Icon exposing (icon)
 import View.Sheet as Sheet
 
 
@@ -37,7 +38,7 @@ pinsDrawer model =
                         , attribute "aria-label" "Close pinned messages"
                         , onClick PinnedMessagesClose
                         ]
-                        [ text "✕" ]
+                        [ icon "x" ]
                     ]
                  ]
                     ++ contextBlock model
@@ -197,7 +198,7 @@ pinRow model channel id =
                 , attribute "title" "Unpin"
                 , onClick (PinnedMessageUnpin { channel = channel, messageId = id })
                 ]
-                [ text "×" ]
+                [ icon "x" ]
 
           else
             text ""

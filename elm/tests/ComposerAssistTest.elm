@@ -275,10 +275,32 @@ suite =
                     composerInput (channelModel |> typed "/j")
                         |> Event.simulate (Event.custom "keydown" (key "ArrowDown"))
                         |> Event.expect (ComposerAssistIntent (MenuMove 1))
-            , test "Enter with no list falls through to the form" <|
+            , test "Enter with no list sends (the field is a growing textarea)" <|
                 \_ ->
                     composerInput (channelModel |> typed "hello")
                         |> Event.simulate (Event.custom "keydown" (key "Enter"))
+                        |> Event.expect ComposerSend
+            , test "Shift+Enter with no list keeps the newline" <|
+                \_ ->
+                    composerInput (channelModel |> typed "hello")
+                        |> Event.simulate
+                            (Event.custom "keydown"
+                                (Encode.object
+                                    [ ( "key", Encode.string "Enter" )
+                                    , ( "isComposing", Encode.bool False )
+                                    , ( "shiftKey", Encode.bool True )
+                                    ]
+                                )
+                            )
+                        |> Event.toResult
+                        |> Expect.err
+            , test "Enter mid-composition yields to the IME" <|
+                \_ ->
+                    composerInput (channelModel |> typed "hello")
+                        |> Event.simulate
+                            (Event.custom "keydown"
+                                (Encode.object [ ( "key", Encode.string "Enter" ), ( "isComposing", Encode.bool True ) ])
+                            )
                         |> Event.toResult
                         |> Expect.err
             , test "nick list renders with the oracle test ids" <|

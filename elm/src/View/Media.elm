@@ -19,6 +19,7 @@ import App exposing (Model, Msg(..))
 import Html exposing (Html, a, button, div, img, li, p, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, href, rel, src, target, title, type_)
 import Html.Events exposing (on, onClick)
+import View.Icon exposing (icon)
 import Json.Decode as Decode
 import Provenance
 import RoomMedia exposing (RoomMediaFilter(..))
@@ -55,7 +56,7 @@ mediaPanel model =
                         , attribute "aria-label" "Close pictures, files, and links"
                         , onClick MediaIndexClose
                         ]
-                        [ text "✕" ]
+                        [ icon "x" ]
                     ]
                 , p [ class "room-media-index-desc" ]
                     [ text "From this conversation, indexed on this device. Selecting an item returns you to its message; links open the destination in a new tab." ]

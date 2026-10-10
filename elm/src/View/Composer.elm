@@ -18,7 +18,7 @@ import App exposing (Model, Msg(..))
 import ComposerAssist
 import Dict
 import Emoji
-import Html exposing (Html, button, div, form, input, label, p, progress, span, text)
+import Html exposing (Html, button, div, form, input, label, p, progress, span, text, textarea)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
 import Html.Events exposing (custom, on, onClick, onInput, onMouseEnter, onSubmit, preventDefaultOn)
@@ -26,6 +26,7 @@ import Json.Decode as Decode
 import Outbox
 import Polish
 import Schedule
+import View.Icon exposing (icon)
 import View.Polish
 
 
@@ -52,6 +53,9 @@ composer model =
         -- oracle `canSend` edit branch: nonempty draft, no staged
         -- attachments). The normal path keeps the existing
         -- ready-only gate; its own guards live in update.
+        hasDraft =
+            not (String.isEmpty (String.trim model.composer)) || not (List.isEmpty model.attachments)
+
         canSaveOrSend =
             case editingNow of
                 Nothing ->
@@ -62,78 +66,111 @@ composer model =
                         && List.isEmpty model.attachments
     in
     form [ class "onyx-composer", onSubmit ComposerSend ]
-        [ span [ class "onyx-composer-target" ]
+        [ -- The destination, for assistive tech (the field's placeholder
+          -- names it on screen; the room header names it too).
+          span [ class "onyx-composer-target" ]
             [ text (Maybe.withDefault "#" model.activeChannel) ]
         , replyBar model
         , editBar model
-        , if App.composerAudienceOffered model then
-            button
-                [ type_ "button"
-                , class "onyx-audience-toggle"
-                , classList [ ( "onyx-audience-toggle-set", model.composerAudience /= Nothing ) ]
-                , attribute "title" "Choose who sees this message"
-                , attribute "aria-label" ("Message audience: " ++ App.audienceLabel model.composerAudience)
-                , onClick ComposerAudienceCycle
-                ]
-                [ text (App.audienceLabel model.composerAudience) ]
-
-          else
-            text ""
-        , input
-            ([ type_ "text"
-            , placeholder
-                (if not ready then
-                    "Select a channel"
-
-                 else if editingNow /= Nothing then
-                    "Edit message"
-
-                 else if online then
-                    "Message"
-
-                 else
-                    "Offline — sends queue on this device"
-                )
-            , attribute "aria-label"
-                (if editingNow /= Nothing then
-                    "Edit message"
-
-                 else
-                    "Message"
-                )
-            , value model.composer
-            , onInput ComposerInput
-            , preventDefaultOn "keydown" (keyDecoder model)
-            , disabled (not ready)
-            , attribute "id" "shell-composer-input"
-            ]
-                ++ assistAria model
-            )
-            []
+        , conversation model
+        , stagedList model
         , assistPopovers model
-        , emojiButton model ready
-        , button
-            [ type_ "submit"
-            , disabled (not ready || not canSaveOrSend)
-            , attribute "aria-label"
-                (if editingNow /= Nothing then
-                    "Save edit"
 
-                 else
-                    "Send message"
-                )
-            ]
-            [ text
-                (if editingNow /= Nothing then
-                    "Save"
+        -- v3/ui-messages: one bar. Phone: [+ tools] [field] [emoji] [send];
+        -- wide: [attach] [field] [emoji] [tools] [send]. The tools tray
+        -- (View.Polish) also carries Attach, so phones drop the
+        -- separate attach button.
+        , div [ class "onyx-composer-bar" ]
+            [ attachButton model
+            , if App.composerAudienceOffered model then
+                button
+                    [ type_ "button"
+                    , class "onyx-audience-toggle"
+                    , classList [ ( "onyx-audience-toggle-set", model.composerAudience /= Nothing ) ]
+                    , attribute "title" "Choose who sees this message"
+                    , attribute "aria-label" ("Message audience: " ++ App.audienceLabel model.composerAudience)
+                    , onClick ComposerAudienceCycle
+                    ]
+                    [ text (App.audienceLabel model.composerAudience) ]
 
-                 else
-                    "Send"
+              else
+                text ""
+            , textarea
+                ([ attribute "rows" "1"
+                 , placeholder
+                    (if not ready then
+                        "Select a channel"
+
+                     else if editingNow /= Nothing then
+                        "Edit message"
+
+                     else if online then
+                        "Message " ++ Maybe.withDefault "" model.activeChannel
+
+                     else
+                        "Offline — sends queue on this device"
+                    )
+                 , attribute "aria-label"
+                    (if editingNow /= Nothing then
+                        "Edit message"
+
+                     else
+                        "Message"
+                    )
+                 , attribute "enterkeyhint" "send"
+                 , attribute "autocomplete" "off"
+                 , value model.composer
+                 , onInput ComposerInput
+                 , preventDefaultOn "keydown" (keyDecoder model)
+                 , disabled (not ready)
+                 , attribute "id" "shell-composer-input"
+                 , class "onyx-composer-field"
+                 ]
+                    ++ assistAria model
                 )
+                []
+            , emojiButton model ready
+            , -- v3/polish: Send later lives in the More tools tray; the
+              -- schedule popover still anchors to the composer.
+              View.Polish.moreTools model
+            , button
+                [ type_ "submit"
+                , class "onyx-composer-send"
+                , classList [ ( "onyx-composer-send--ready", ready && canSaveOrSend && hasDraft ) ]
+                , disabled (not ready || not canSaveOrSend)
+                , attribute "aria-label"
+                    (if editingNow /= Nothing then
+                        "Save edit"
+
+                     else
+                        "Send message"
+                    )
+                , title
+                    (if editingNow /= Nothing then
+                        "Save edit"
+
+                     else
+                        "Send"
+                    )
+                ]
+                [ icon
+                    (if editingNow /= Nothing then
+                        "check"
+
+                     else
+                        "send"
+                    )
+                , span [ class "onyx-composer-send-label" ]
+                    [ text
+                        (if editingNow /= Nothing then
+                            "Save"
+
+                         else
+                            "Send"
+                        )
+                    ]
+                ]
             ]
-        -- v3/polish: Send later moved into the More tools tray; the
-        -- schedule popover still anchors here.
-        , View.Polish.moreTools model
         , if model.scheduleOpen then
             div [ class "onyx-schedule" ] [ schedulePopover model ]
 
@@ -177,8 +214,6 @@ composer model =
                       else
                         text ""
                     ]
-        , attachments model
-        , conversation model
         ]
 
 
@@ -255,7 +290,7 @@ editBar model =
                     , attribute "aria-label" "Cancel edit"
                     , onClick App.EditCancel
                     ]
-                    [ text "×" ]
+                    [ icon "x" ]
                 ]
 
 
@@ -287,7 +322,7 @@ replyBar model =
                             , attribute "aria-label" "Cancel reply"
                             , onClick App.ReplyCancel
                             ]
-                            [ text "×" ]
+                            [ icon "x" ]
                         ]
 
 
@@ -300,12 +335,13 @@ clippedText text =
         text
 
 
-{-| Attachment staging (mirroring the composer attach surface:
-the button refuses in protected DMs with the draft kept, staged
-files list with per-file status, and failures surface the send
-copy). -}
-attachments : Model -> Html Msg
-attachments model =
+{-| Attachment staging (mirroring the composer attach surface: the
+button refuses in protected DMs with the draft kept, staged files
+list with per-file status, and failures surface the send copy). The
+attach button sits in the bar; the staged files list above it.
+-}
+attachButton : Model -> Html Msg
+attachButton model =
     let
         protected =
             case model.activeChannel of
@@ -322,19 +358,25 @@ attachments model =
             else
                 "Attach files (up to 5, 25 MB each)"
     in
-    div [ class "onyx-attachments" ]
-        ([ button
-            [ type_ "button"
-            , class "onyx-attach-open"
-            , disabled protected
-            , title hint
-            , attribute "aria-label" "Attach files"
-            , onClick AttachPick
-            ]
-            [ text "Attach" ]
-         ]
-            ++ List.map stagedRow model.attachments
-        )
+    button
+        [ type_ "button"
+        , class "onyx-attach-open"
+        , disabled (protected || model.activeChannel == Nothing)
+        , title hint
+        , attribute "aria-label" "Attach files"
+        , onClick AttachPick
+        ]
+        [ icon "attach" ]
+
+
+stagedList : Model -> Html Msg
+stagedList model =
+    if List.isEmpty model.attachments then
+        text ""
+
+    else
+        div [ class "onyx-attachments", attribute "aria-label" "Files to send", attribute "role" "group" ]
+            (List.map stagedRow model.attachments)
 
 
 {-| Named-conversation picker (mirroring the oracle topic
@@ -349,8 +391,17 @@ conversation model =
 
         Just channel ->
             let
+                -- v3/ui-messages: the registry also records the room's
+                -- own TOPIC lines; those are already in the header, so
+                -- only real conversation labels are offered here.
+                roomTopic =
+                    Dict.get (String.toLower channel) model.channels
+                        |> Maybe.map (.topic >> String.trim)
+                        |> Maybe.withDefault ""
+
                 options =
                     Maybe.withDefault [] (Dict.get (String.toLower channel) model.topicHistory)
+                        |> List.filter (\label -> App.isValidTopicLabel (String.trim label) && String.trim label /= roomTopic)
 
                 active =
                     App.activeChannelTopic model channel
@@ -466,7 +517,7 @@ schedulePopover model =
                 , attribute "aria-label" "Cancel scheduling"
                 , onClick ScheduleClose
                 ]
-                [ text "×" ]
+                [ icon "x" ]
             ]
         , div [ class "onyx-schedule-presets" ]
             (List.indexedMap (schedulePreset model) Schedule.schedulePresets)
@@ -574,7 +625,13 @@ keyDecoder model =
                                         Decode.succeed ( ComposerAssistIntent intent, True )
 
                                     Nothing ->
-                                        if key.key == "Escape" && model.composerAssist.emojiOpen then
+                                        if key.key == "Enter" && not key.shift && not key.alt && not key.ctrl && not key.meta then
+                                            -- v3/ui-messages: the field is a textarea (it
+                                            -- grows with the draft), so Enter sends
+                                            -- explicitly; Shift+Enter keeps a newline.
+                                            Decode.succeed ( ComposerSend, True )
+
+                                        else if key.key == "Escape" && model.composerAssist.emojiOpen then
                                             Decode.succeed ( ComposerEmojiClose, True )
 
                                         else if key.key == "Escape" && model.polish.toolsOpen then
@@ -768,4 +825,4 @@ emojiButton model ready =
                     []
                )
         )
-        [ span [ class "shell-composer-action-label" ] [ text "Emoji" ] ]
+        [ icon "emoji", span [ class "shell-composer-action-label" ] [ text "Emoji" ] ]

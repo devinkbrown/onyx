@@ -28,34 +28,38 @@
   color: var(--onyx-faint);
 }
 
+/* v3/ui-messages: the trigger is the composer's leading "+", so the
+   tray opens up and to the right of it; phones get a full-width sheet
+   over the composer (see the media query below). */
 .shell-composer-tools {
   position: absolute;
   bottom: calc(100% + var(--space-2));
-  right: 0;
+  left: 0;
   z-index: 40;
-  width: min(300px, calc(100vw - 2 * var(--space-4)));
+  width: min(320px, calc(100vw - 2 * var(--space-4)));
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  gap: 0;
+  padding: var(--space-1);
   background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  box-shadow: var(--elev-3);
   animation: polish-rise var(--dur-fast) var(--ease);
 }
 
 .onyx-composer .shell-composer-tools-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 1px;
   min-height: var(--target-min);
   width: 100%;
   padding: var(--space-2) var(--space-3);
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--onyx-text);
   font: inherit;
   font-weight: 400;
@@ -63,6 +67,24 @@
   text-decoration: none;
   cursor: pointer;
 }
+
+/* A leading icon per tool (mask glyphs from css/pol-thread.css). */
+.onyx-composer .shell-composer-tools-item::before {
+  content: "";
+  grid-row: 1 / span 2;
+  width: 20px;
+  height: 20px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--tool-glyph, var(--pt-i-plus)) center / contain no-repeat;
+  mask: var(--tool-glyph, var(--pt-i-plus)) center / contain no-repeat;
+}
+.onyx-composer .shell-composer-tools-item:disabled::before { background: var(--onyx-faint); }
+.onyx-composer .shell-composer-tools-item > * { grid-column: 2; }
+.shell-composer-tools-item[data-testid="composer-tools-attach"] { --tool-glyph: var(--pt-i-attach); }
+.shell-composer-tools-item[data-testid="composer-schedule"] { --tool-glyph: var(--pt-i-clock); }
+.shell-composer-tools-item[data-testid="composer-jump-to-date"] { --tool-glyph: var(--pt-i-calendar); }
+.shell-composer-tools-item[data-testid="composer-tools-emoji"] { --tool-glyph: var(--pt-i-emoji); }
+.shell-composer-tools-item[data-testid="composer-channel-ledger"] { --tool-glyph: var(--pt-i-chart); }
 
 .onyx-composer .shell-composer-tools-item:hover { background: var(--onyx-panel-2); }
 
@@ -92,13 +114,17 @@
 }
 
 .shell-composer-tools-tip {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--space-3);
   margin-top: var(--space-1);
   padding: var(--space-2) var(--space-3);
   border-top: 1px solid var(--onyx-line);
 }
+.shell-composer-tools-tip > .shell-composer-tools-item-title { grid-column: 1; }
+.shell-composer-tools-tip > .shell-composer-tools-item-desc { grid-column: 1; }
+.onyx-composer .shell-composer-tools-tip > .shell-composer-tools-action { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 
 .shell-composer-tools-kbd {
   font-family: var(--font-mono);
@@ -329,6 +355,19 @@
 }
 
 @media (max-width: 767.98px) {
+  /* The tray spans the composer as a bottom sheet over the transcript. */
+  .onyx-composer .shell-composer-more-wrap { position: static; }
+  .shell-composer-tools {
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    width: auto;
+    padding: var(--space-2) var(--space-2) var(--space-3);
+    border-width: 1px 0 0;
+    border-radius: 12px 12px 0 0;
+  }
+  .onyx-composer .shell-composer-tools-item { min-height: 52px; }
+  .shell-composer-tools-item-title { font-size: var(--text-md); }
   .update-available { bottom: calc(var(--mobile-nav-h) + var(--space-3) + env(safe-area-inset-bottom, 0px)); }
   .update-available button { flex-basis: 100%; }
   .time-scrubber { padding: var(--space-2) var(--space-3); }

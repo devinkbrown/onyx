@@ -17,6 +17,80 @@
   --pt-gutter: calc(2rem + var(--space-2) + var(--space-3));
 }
 
+/* ── 0. Icons ────────────────────────────────────────────────────────── */
+
+/* Stroke icons as CSS masks over inline SVG data URIs (View.Icon): no
+   glyph ever depends on the platform font. Each paints currentColor;
+   the control around it carries the accessible name. The --pt-i-*
+   properties are reusable from pseudo-elements (composer tools). */
+.pt-ico {
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  background: currentColor;
+  -webkit-mask: var(--pt-glyph) center / contain no-repeat;
+  mask: var(--pt-glyph) center / contain no-repeat;
+}
+
+:root {
+  --pt-i-react: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.5 12a8.5 8.5 0 1 1-7-8.37'/%3E%3Cpath d='M8.6 14.2a4.2 4.2 0 0 0 6.8 0M9 9.6h.01M15 9.6h.01M19 2.5v5M16.5 5h5'/%3E%3C/svg%3E");
+  --pt-i-emoji: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8.6 14.2a4.2 4.2 0 0 0 6.8 0M9 9.6h.01M15 9.6h.01'/%3E%3C/svg%3E");
+  --pt-i-reply: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 16.5 4.5 11.5l5-5'/%3E%3Cpath d='M4.5 11.5h10a5 5 0 0 1 5 5v2'/%3E%3C/svg%3E");
+  --pt-i-thread: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 9a2 2 0 0 1-2 2H6.5L3 14.5V4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2Z'/%3E%3Cpath d='M17.5 9H19a2 2 0 0 1 2 2v10l-3.5-3.5H12a2 2 0 0 1-2-2v-1'/%3E%3C/svg%3E");
+  --pt-i-more: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5' cy='12' r='1.6' fill='black' stroke='none'/%3E%3Ccircle cx='12' cy='12' r='1.6' fill='black' stroke='none'/%3E%3Ccircle cx='19' cy='12' r='1.6' fill='black' stroke='none'/%3E%3C/svg%3E");
+  --pt-i-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  --pt-i-attach: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m20.5 11.3-8.4 8.4a5.5 5.5 0 0 1-7.8-7.8l8.4-8.4a3.7 3.7 0 0 1 5.2 5.2l-8.4 8.4a1.8 1.8 0 0 1-2.6-2.6l7.7-7.7'/%3E%3C/svg%3E");
+  --pt-i-send: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.4 3.6a.6.6 0 0 0-.8.75l2.6 7.1a1.6 1.6 0 0 1 0 1.1l-2.6 7.1a.6.6 0 0 0 .8.75l16.3-8a.5.5 0 0 0 0-.9Z'/%3E%3Cpath d='M6.4 12H13'/%3E%3C/svg%3E");
+  --pt-i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+  --pt-i-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6 6 18'/%3E%3C/svg%3E");
+  --pt-i-arrow-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M6 13l6 6 6-6'/%3E%3C/svg%3E");
+  --pt-i-chevron-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E");
+  --pt-i-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --pt-i-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6'/%3E%3C/svg%3E");
+  --pt-i-file: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z'/%3E%3Cpath d='M14 3v5h5'/%3E%3C/svg%3E");
+  --pt-i-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+  --pt-i-calendar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2'/%3E%3Cpath d='M4 10h16M9 3v4M15 3v4'/%3E%3C/svg%3E");
+  --pt-i-chart: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4v16h16'/%3E%3Cpath d='M8 16v-4M12 16V8M16 16v-6'/%3E%3C/svg%3E");
+  --pt-i-slash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='3.5' width='17' height='17' rx='3'/%3E%3Cpath d='m14.5 7.5-5 9'/%3E%3C/svg%3E");
+  --pt-i-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Ccircle cx='9' cy='10' r='2'/%3E%3Cpath d='m21 16-5-5-9 9'/%3E%3C/svg%3E");
+  --pt-i-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1'/%3E%3Cpath d='M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1'/%3E%3C/svg%3E");
+  --pt-i-download: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M5 20h14'/%3E%3C/svg%3E");
+  --pt-i-pin: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2v.8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z'/%3E%3C/svg%3E");
+  --pt-i-hash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 9h14M5 15h14M10 4 8 20M16 4l-2 16'/%3E%3C/svg%3E");
+  --pt-i-people: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Cpath d='M15.5 4.7a3.5 3.5 0 0 1 0 6.6M17.5 14.3a6.5 6.5 0 0 1 4 5.7'/%3E%3C/svg%3E");
+  --pt-i-message: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4.5 3.5v-13.5a1 1 0 0 1 1-1Z'/%3E%3C/svg%3E");
+  --pt-i-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E");
+}
+.pt-ico[data-icon="react"] { --pt-glyph: var(--pt-i-react); }
+.pt-ico[data-icon="emoji"] { --pt-glyph: var(--pt-i-emoji); }
+.pt-ico[data-icon="reply"] { --pt-glyph: var(--pt-i-reply); }
+.pt-ico[data-icon="thread"] { --pt-glyph: var(--pt-i-thread); }
+.pt-ico[data-icon="more"] { --pt-glyph: var(--pt-i-more); }
+.pt-ico[data-icon="plus"] { --pt-glyph: var(--pt-i-plus); }
+.pt-ico[data-icon="attach"] { --pt-glyph: var(--pt-i-attach); }
+.pt-ico[data-icon="send"] { --pt-glyph: var(--pt-i-send); }
+.pt-ico[data-icon="check"] { --pt-glyph: var(--pt-i-check); }
+.pt-ico[data-icon="x"] { --pt-glyph: var(--pt-i-x); }
+.pt-ico[data-icon="arrow-down"] { --pt-glyph: var(--pt-i-arrow-down); }
+.pt-ico[data-icon="chevron-up"] { --pt-glyph: var(--pt-i-chevron-up); }
+.pt-ico[data-icon="chevron-down"] { --pt-glyph: var(--pt-i-chevron-down); }
+.pt-ico[data-icon="search"] { --pt-glyph: var(--pt-i-search); }
+.pt-ico[data-icon="file"] { --pt-glyph: var(--pt-i-file); }
+.pt-ico[data-icon="clock"] { --pt-glyph: var(--pt-i-clock); }
+.pt-ico[data-icon="calendar"] { --pt-glyph: var(--pt-i-calendar); }
+.pt-ico[data-icon="chart"] { --pt-glyph: var(--pt-i-chart); }
+.pt-ico[data-icon="slash"] { --pt-glyph: var(--pt-i-slash); }
+.pt-ico[data-icon="image"] { --pt-glyph: var(--pt-i-image); }
+.pt-ico[data-icon="link"] { --pt-glyph: var(--pt-i-link); }
+.pt-ico[data-icon="download"] { --pt-glyph: var(--pt-i-download); }
+.pt-ico[data-icon="pin"] { --pt-glyph: var(--pt-i-pin); }
+.pt-ico[data-icon="hash"] { --pt-glyph: var(--pt-i-hash); }
+.pt-ico[data-icon="people"] { --pt-glyph: var(--pt-i-people); }
+.pt-ico[data-icon="message"] { --pt-glyph: var(--pt-i-message); }
+.pt-ico[data-icon="lock"] { --pt-glyph: var(--pt-i-lock); }
+
 /* ── 1. Transcript rows ──────────────────────────────────────────────── */
 
 /* Grouped (default) density: avatar in a fixed gutter, name + time on
@@ -95,6 +169,8 @@
   background: color-mix(in oklab, var(--gold) 9%, transparent);
   box-shadow: inset 2px 0 0 var(--gold);
 }
+.onyx-message.onyx-mention,
+.onyx-message.onyx-message-search-current { border-radius: 0 var(--radius) var(--radius) 0; }
 
 .onyx-mention:hover,
 .onyx-mention:focus-within { background: color-mix(in oklab, var(--gold) 13%, transparent); }
@@ -110,29 +186,74 @@
   font-style: italic;
 }
 
-/* Row actions: on fine pointers the ⋯ trigger floats at the row's
-   top-right and appears on hover / keyboard focus; touch keeps it
-   inline and always visible. */
-.onyx-msg-menu-trigger {
-  min-width: var(--target-floor);
-  min-height: var(--target-floor);
+/* Rows are focusable (tabindex -1, never a tab stop) so a tap on touch
+   can reveal the actions; the focus ring stays for keyboard focus only. */
+.onyx-message:focus { outline: none; }
+.onyx-message:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-message--active { background: var(--pt-hover); }
+
+/* Quick actions: React · Reply · Thread · More, a small floating bar
+   over the row's top-right edge. Hidden until hover / keyboard focus
+   (fine pointers) or a tap (touch: the row takes focus); it stays up
+   while its row's menu or picker is open. Opacity keeps it in the
+   accessibility tree, so screen readers always reach it. */
+.onyx-row-actions {
+  position: absolute;
+  top: -14px;
+  right: var(--space-3);
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-micro) var(--ease);
 }
+.onyx-thread > .onyx-message:first-child > .onyx-row-actions,
+.onyx-day-divider + .onyx-message > .onyx-row-actions,
+.onyx-unread-divider + .onyx-message > .onyx-row-actions { top: 2px; }
 
-@media (hover: hover) and (pointer: fine) {
-  .onyx-message > .onyx-msg-menu-trigger {
-    position: absolute;
-    top: 2px;
-    right: var(--space-2);
-    margin: 0;
-    background: var(--onyx-panel);
-    border-color: var(--onyx-line);
-    opacity: 0;
-    transition: opacity var(--dur-micro) var(--ease);
-  }
+.onyx-message:hover > .onyx-row-actions,
+.onyx-message:focus-within > .onyx-row-actions,
+.onyx-message--active > .onyx-row-actions { opacity: 1; pointer-events: auto; }
 
-  .onyx-message:hover > .onyx-msg-menu-trigger,
-  .onyx-message:focus-within > .onyx-msg-menu-trigger,
-  .onyx-message > .onyx-msg-menu-trigger[aria-expanded='true'] { opacity: 1; }
+.onyx-row-action,
+.onyx-message .onyx-msg-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--onyx-dim);
+  cursor: pointer;
+}
+.onyx-row-action:hover,
+.onyx-message .onyx-msg-menu-trigger:hover,
+.onyx-message .onyx-msg-menu-trigger[aria-expanded='true'] { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: transparent; }
+.onyx-row-action:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* Touch: no hover, so nothing shows until the row is tapped; then the
+   bar carries comfortable targets. Long-press opens the menu directly
+   where the browser reports it (Thread.longPressMenu); links and images
+   keep their native callout. */
+@media (hover: none) {
+  .onyx-row-actions { top: -22px; right: var(--space-1); gap: 0; }
+  .onyx-row-action,
+  .onyx-message .onyx-msg-menu-trigger { width: 44px; height: 40px; }
+  .onyx-row-action .pt-ico,
+  .onyx-message .onyx-msg-menu-trigger .pt-ico { width: 20px; height: 20px; }
+  .onyx-message:hover:not(:focus-within):not(.onyx-message--active) { background: transparent; }
+  .onyx-message:hover:not(:focus-within):not(.onyx-message--active) > .onyx-row-actions { opacity: 0; pointer-events: none; }
 }
 
 /* Reaction picker light-dismiss layer (mirrors .onyx-msg-menu-backdrop). */
@@ -142,25 +263,188 @@
 /* Not a class: the Keyed-node key "unread" in Thread.rowEntries. */
 .unread { /* state hook: keyed entry id, styled via .onyx-unread-divider */ }
 
-/* Menu + reaction picker anchor under the row. */
+/* Message menu + reaction picker: anchored under the toolbar on wide
+   layouts; bottom sheets over a dim veil on phones. */
 .onyx-msg-menu-pop,
 .onyx-react-pop { display: block; }
 
 .onyx-msg-menu-pop .onyx-msg-menu,
-.onyx-react-pop .onyx-react-picker { box-shadow: var(--elev-3); }
+.onyx-react-pop .onyx-react-picker {
+  margin: 0;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-3);
+}
+.onyx-msg-menu-pop .onyx-msg-menu { gap: 0; padding: var(--space-1); max-width: none; }
+.onyx-msg-menu-head { display: none; }
+.onyx-frame .onyx-msg-menu .onyx-msg-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.onyx-msg-menu .onyx-msg-menu-item:hover,
+.onyx-msg-menu .onyx-msg-menu-item:focus-visible { background: var(--onyx-panel-2); }
+.onyx-msg-menu .onyx-msg-menu-item:disabled { color: var(--onyx-faint); cursor: default; background: transparent; }
+.onyx-msg-menu .onyx-msg-menu-item[aria-label$="for everyone"] { color: var(--onyx-bad); }
+/* The destructive step sits apart, under one hairline. */
+.onyx-msg-menu .onyx-msg-menu-item[aria-label$="for everyone"],
+.onyx-msg-menu .onyx-msg-menu-delete-confirm {
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--onyx-line);
+  border-radius: 0 0 4px 4px;
+}
+
+.onyx-react-pop .onyx-react-picker { padding: var(--space-2); gap: var(--space-2); max-width: none; }
+.onyx-react-pop .onyx-react-search {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.onyx-react-pop .onyx-react-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); max-height: 216px; overflow-y: auto; }
+.onyx-frame .onyx-react-pop .onyx-react-choice {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-height: 32px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+.onyx-react-pop .onyx-react-choice:hover,
+.onyx-react-pop .onyx-react-choice:focus-visible { background: var(--onyx-panel-2); }
 
 @media (min-width: 768px) {
   .onyx-msg-menu-pop,
   .onyx-react-pop {
     position: absolute;
-    top: calc(var(--target-floor) + 4px);
-    right: var(--space-2);
+    top: 20px;
+    right: var(--space-3);
     z-index: 41;
   }
 
-  .onyx-msg-menu-pop .onyx-msg-menu,
-  .onyx-react-pop .onyx-react-picker { margin: 0; width: 260px; }
+  .onyx-msg-menu-pop .onyx-msg-menu { width: 232px; }
+  .onyx-react-pop .onyx-react-picker { width: 312px; }
 }
+
+@media (max-width: 767.98px) {
+  .onyx-msg-menu-backdrop,
+  .onyx-react-backdrop { background: color-mix(in srgb, #000 55%, transparent); z-index: 70; }
+
+  .onyx-msg-menu-pop .onyx-msg-menu,
+  .onyx-react-pop .onyx-react-picker {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 71;
+    max-height: 78dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-2) var(--space-2) calc(var(--space-3) + var(--safe-bottom));
+    border-width: 1px 0 0;
+    border-radius: 12px 12px 0 0;
+    animation: onyx-sheet-in var(--dur-base) var(--ease);
+  }
+  .onyx-msg-menu-pop .onyx-msg-menu::before,
+  .onyx-react-pop .onyx-react-picker::before {
+    content: "";
+    flex: none;
+    align-self: center;
+    width: 36px;
+    height: 4px;
+    margin: 0 0 var(--space-2);
+    border-radius: var(--r-pill);
+    background: var(--onyx-line);
+  }
+  .onyx-msg-menu-head {
+    display: grid;
+    gap: 2px;
+    margin: 0 var(--space-2) var(--space-2);
+    padding: 0 0 var(--space-3);
+    border-bottom: 1px solid var(--onyx-line);
+    min-width: 0;
+  }
+  .onyx-msg-menu-head-from { font-size: var(--text-sm); font-weight: 650; }
+  .onyx-msg-menu-head-text { color: var(--onyx-dim); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .onyx-frame .onyx-msg-menu .onyx-msg-menu-item { min-height: var(--target-min); font-size: var(--text-md); }
+  .onyx-react-pop .onyx-react-search { min-height: var(--target-min); font-size: 16px; }
+  .onyx-react-pop .onyx-react-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); max-height: 40dvh; }
+  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 24px; }
+}
+
+/* Boosts: quiet pills under the body; ours reads heavier (never the
+   accent). The trailing add pill shows on row hover / focus with a fine
+   pointer and always on touch, and only once a row has boosts. */
+.onyx-message .boost-bar { gap: var(--space-1); margin-top: var(--space-1); }
+.onyx-frame .onyx-message .boost-pill {
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  gap: 6px;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+.onyx-message .boost-emoji { font-size: 15px; }
+.onyx-message .boost-count { color: var(--onyx-dim); font-size: var(--text-2xs); font-weight: 650; font-variant-numeric: tabular-nums; }
+.onyx-message button.boost-pill:hover { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
+.onyx-message .boost-pill.you {
+  background: color-mix(in oklab, var(--onyx-text) 9%, var(--onyx-panel));
+  border-color: color-mix(in oklab, var(--onyx-text) 34%, var(--onyx-line));
+}
+.onyx-message .boost-pill.you .boost-count { color: var(--onyx-text); }
+.onyx-frame .onyx-message .boost-add { width: 30px; justify-content: center; padding: 0; color: var(--onyx-dim); }
+.onyx-message .boost-add .pt-ico { width: 16px; height: 16px; }
+.onyx-message .boost-add:hover { color: var(--onyx-text); }
+
+@media (hover: hover) and (pointer: fine) {
+  .onyx-message .boost-add { opacity: 0; transition: opacity var(--dur-micro) var(--ease); }
+  .onyx-message:hover .boost-add,
+  .onyx-message:focus-within .boost-add { opacity: 1; }
+}
+
+/* "View thread": a quiet link-like line under the body. */
+.onyx-frame .onyx-message > .onyx-thread-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  margin-top: 2px;
+  padding: 0 var(--space-2) 0 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-message > .onyx-thread-indicator .pt-ico { width: 16px; height: 16px; }
+.onyx-message > .onyx-thread-indicator:hover { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-line); }
+
+/* Body text: chat measure + inline markers. */
+.onyx-message .onyx-body { color: var(--onyx-text); }
+.onyx-body > .onyx-edited,
+.onyx-body > .onyx-pending-note { margin-left: 2px; }
 
 /* ── 2. Dividers, intro, typing, window controls ─────────────────────── */
 
@@ -268,26 +552,74 @@
 }
 
 .onyx-typing {
-  padding: var(--space-1) var(--space-2) 0 var(--pt-gutter);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 22px;
+  padding: 2px var(--space-2) 0 var(--pt-gutter);
   color: var(--onyx-dim);
   font-size: var(--text-xs);
-  font-style: italic;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Three still dots (no looping motion in the shell). */
+.onyx-typing::before {
+  content: "";
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  -webkit-mask: var(--pt-i-more) center / contain no-repeat;
+  mask: var(--pt-i-more) center / contain no-repeat;
+}
 .onyx-transcript--compact ~ .onyx-typing { padding-left: 0; }
 
-/* Thread indicator sits on its own line under the body. */
-.onyx-message > .onyx-thread-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  border-radius: var(--radius);
-  font-weight: 600;
+/* Jump to latest: a floating pill at the bottom centre of the log. */
+.onyx-frame .onyx-jump-latest {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--space-3) 0 var(--space-3);
+  border-radius: var(--r-pill);
+  background: var(--onyx-panel-2);
+  border-color: var(--onyx-line);
+  box-shadow: var(--elev-3);
+  font-size: var(--text-sm);
 }
-.onyx-message > .onyx-thread-indicator:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-jump-latest .pt-ico { width: 16px; height: 16px; }
+.onyx-jump-latest:hover { border-color: var(--onyx-dim); }
+.onyx-frame .onyx-jump-latest--unread { color: var(--onyx-accent-ink); background: var(--onyx-accent); border-color: var(--onyx-accent); }
+.onyx-jump-latest--unread:hover { border-color: var(--onyx-accent); filter: brightness(1.06); }
+.onyx-jump-latest-count { font-weight: 750; }
+
+/* Empty room / DM: an intro card that offers the next step. */
+.onyx-room-intro {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  max-width: 40ch;
+  padding: var(--space-6) var(--space-4);
+}
+.onyx-room-intro-glyph,
+.onyx-room-intro-face {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: var(--space-1);
+  border-radius: 50%;
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-text);
+}
+.onyx-room-intro-face { background: transparent; border: 0; }
+.onyx-room-intro-face .onyx-avatar { width: 4rem; height: 4rem; font-size: 1.1rem; }
+.onyx-room-intro-glyph .pt-ico { width: 28px; height: 28px; }
+.onyx-room-intro .onyx-room-intro-title { margin: 0; font-size: var(--text-2xl); font-weight: 700; line-height: var(--leading-tight); overflow-wrap: anywhere; }
+.onyx-room-intro-topic { margin: 0; color: var(--onyx-dim); font-size: var(--text-md); line-height: var(--leading-body); }
+.onyx-room-intro .onyx-feed-empty { margin-top: var(--space-2); }
+.onyx-room-intro .onyx-feed-empty-title { margin: 0; color: var(--onyx-text); font-size: var(--text-md); font-weight: 650; }
+.onyx-room-intro .onyx-feed-empty-body { margin: var(--space-1) 0 0; color: var(--onyx-dim); font-size: var(--text-sm); }
 
 /* ── 3. Topic chips ──────────────────────────────────────────────────── */
 
@@ -296,24 +628,45 @@
 .topic-chip--all { font-weight: 600; }
 .topic-chip__label { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Topic tools fold into one quiet "Topics" line until opened. */
+details.onyx-topic-tools { display: block; padding: 0 0 var(--space-2); }
+details.onyx-topic-tools[open] { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.onyx-topic-tools-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  list-style: none;
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-topic-tools-toggle::-webkit-details-marker { display: none; }
+.onyx-topic-tools-toggle .pt-ico { width: 14px; height: 14px; }
+.onyx-topic-tools-toggle:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
+
 /* ── 4. Reply context, media, previews, files ────────────────────────── */
 
 .shell-msg-reply {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   max-width: min(36rem, 100%);
   margin: 0 0 2px;
-  padding: 1px 0 1px var(--space-2);
-  border-left: 2px solid var(--pt-seam);
   color: var(--onyx-dim);
   font-size: var(--text-sm);
+  line-height: var(--leading-snug);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.shell-msg-reply > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.shell-msg-reply > .pt-ico { width: 14px; height: 14px; color: var(--onyx-faint); transform: scaleY(-1); }
+.shell-msg-reply-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .shell-msg-reply-from { flex: none; color: var(--onyx-text); font-weight: 650; }
+.shell-msg-reply-from::before { content: "@"; color: var(--onyx-dim); font-weight: 500; }
 
 .shell-msg-media { display: block; margin-top: var(--space-1); max-width: 100%; }
 
@@ -336,7 +689,9 @@
   border-radius: var(--radius);
   background: var(--onyx-panel);
 }
-.shell-msg-media-img { max-height: 360px; width: auto; height: auto; object-fit: contain; }
+/* A fixed height reserves the box before the image loads (no jump in
+   a stuck-to-bottom log); width follows the image's aspect ratio. */
+.shell-msg-media-img { width: auto; height: 260px; max-height: none; object-fit: cover; }
 .shell-msg-media-video { max-height: 320px; }
 .shell-msg-media-audio { width: min(360px, 100%); }
 
@@ -515,31 +870,96 @@
 
 /* ── 6. Thread sheet ─────────────────────────────────────────────────── */
 
-.onyx-thread-head { align-items: center; padding-bottom: var(--space-2); border-bottom: 1px solid var(--onyx-line); }
-.onyx-thread-title { font-size: var(--text-lg); font-weight: 650; }
-.onyx-thread-close {
+/* Head: title + context line, an icon close at the far edge. The parent
+   sits on the panel-2 step; replies read like transcript rows; Reply
+   is the one primary action, pinned at the foot. */
+.onyx-thread-sheet { gap: 0; padding: 0; }
+.onyx-thread-sheet .onyx-thread-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--onyx-panel);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-thread-headings { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.onyx-thread-sheet .onyx-thread-title { margin: 0; font-size: var(--text-lg); font-weight: 650; line-height: var(--leading-tight); }
+.onyx-thread-sheet .onyx-thread-desc { margin: 0; color: var(--onyx-dim); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-thread-sheet .onyx-thread-close {
+  display: grid;
+  place-items: center;
   flex: none;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  font: inherit;
-  font-size: var(--text-sm);
-  color: var(--onyx-dim);
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
   background: transparent;
-  border: 1px solid var(--onyx-line);
+  border: 0;
   border-radius: var(--radius);
+  color: var(--onyx-dim);
   cursor: pointer;
 }
-.onyx-thread-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.onyx-thread-state--missing { padding: var(--space-3); border: 1px dashed var(--onyx-line); border-radius: var(--radius); margin: 0; }
-.onyx-thread-sheet .onyx-thread-msg { display: grid; gap: 2px; padding: var(--space-2) var(--space-3); background: var(--onyx-bg); }
-.onyx-thread-sheet .onyx-thread-msg + .onyx-thread-msg { margin-top: var(--space-2); }
-.onyx-thread-sheet .onyx-thread-msg-text { margin: 0; line-height: var(--leading-body); overflow-wrap: anywhere; }
-.onyx-thread-msg-meta { display: flex; align-items: baseline; gap: var(--space-2); }
+.onyx-thread-sheet .onyx-thread-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+.onyx-thread-sheet .onyx-thread-msg {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.onyx-thread-sheet .onyx-thread-msg--parent {
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.onyx-thread-msg-face { grid-row: 1 / span 2; padding-top: 2px; line-height: 0; }
+.onyx-thread-msg-face .onyx-avatar { box-shadow: 0 0 0 1px var(--nick-tint); }
+.onyx-thread-sheet .onyx-thread-msg-meta { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.onyx-thread-sheet .onyx-thread-msg-from { margin: 0; font-weight: 650; }
 .onyx-thread-msg-meta time { color: var(--onyx-dim); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-.onyx-thread-reply {
-  justify-self: start;
-  margin-top: var(--space-1);
-  min-height: var(--target-floor);
+.onyx-thread-sheet .onyx-thread-msg-text { margin: 0; font-size: var(--text-md); line-height: var(--leading-body); overflow-wrap: anywhere; }
+
+.onyx-thread-count {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) var(--space-4) var(--space-1);
+  color: var(--onyx-dim);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+.onyx-thread-count::after { content: ""; flex: 1; height: 1px; background: var(--onyx-line); }
+.onyx-thread-replies { min-height: 0; padding-bottom: var(--space-3); }
+.onyx-thread-sheet .onyx-thread-state { margin: var(--space-2) var(--space-4); color: var(--onyx-dim); font-size: var(--text-sm); }
+.onyx-thread-sheet .onyx-thread-state--missing { margin: var(--space-3); padding: var(--space-3); border: 1px dashed var(--onyx-line); border-radius: var(--radius); }
+
+.onyx-thread-foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + var(--safe-bottom));
+  background: var(--onyx-panel);
+  border-top: 1px solid var(--onyx-line);
+}
+.onyx-frame .onyx-thread-reply {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 36px;
   padding: 0 var(--space-3);
   font: inherit;
   font-size: var(--text-sm);
@@ -550,61 +970,160 @@
   border-radius: var(--radius);
   cursor: pointer;
 }
+.onyx-thread-reply .pt-ico { width: 16px; height: 16px; }
+.onyx-thread-reply:hover { filter: brightness(1.08); }
 
 /* ── 7. Composer ─────────────────────────────────────────────────────── */
 
-/* One wrapping flex row: context bar on top, then
-   [#target][Attach][audience][input][Emoji][Send][More], then the
-   staged files, errors, outbox state and the conversation picker. */
-.onyx-composer { flex-wrap: wrap; row-gap: var(--space-2); }
-.onyx-composer > * { order: 2; }
-.onyx-composer > .onyx-composer-target {
-  order: 1;
-  max-width: 10rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-sm);
+/* A column: context line (reply / edit), conversation chips, staged
+   files, then ONE bar — [+ tools] [attach] [field] [emoji] [send] —
+   then the schedule picker, errors and outbox state. The suggestion
+   popovers float above the whole composer. Phones drop the separate
+   attach button (the tools tray carries Attach). */
+.onyx-composer {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  background: var(--onyx-bg);
+  border-top: 0;
 }
-.onyx-composer > input { flex: 1 1 8rem; min-width: 0; min-height: var(--target-floor); }
-.onyx-composer > .shell-composer-context { order: 0; flex: 1 0 100%; }
-.onyx-composer > .onyx-composer-error,
-.onyx-composer > .onyx-outbox-chrome,
-.onyx-composer > .onyx-topic { order: 4; flex: 1 0 100%; }
 
-/* Attach button joins the tool row; staged files list under it. */
-.onyx-attachments { display: contents; }
-.onyx-composer .onyx-attach-open { order: 1; }
-.onyx-composer .onyx-attach-row { order: 3; flex: 1 0 100%; }
+/* The destination stays in the DOM for assistive tech and tests; the
+   field's placeholder names it on screen. */
+.onyx-composer > .onyx-composer-target {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
-.onyx-composer .shell-composer-tool,
-.onyx-composer .onyx-attach-open {
-  flex: none;
-  min-height: var(--target-floor);
-  padding: var(--space-2) var(--space-3);
-  background: transparent;
+.onyx-composer-bar {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px;
+  background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
+  transition: border-color var(--dur-micro) var(--ease);
+}
+.onyx-composer-bar:focus-within { border-color: color-mix(in oklab, var(--onyx-accent) 70%, var(--onyx-line)); }
+
+.onyx-composer-bar > .onyx-attach-open { order: 1; }
+.onyx-composer-bar > .onyx-audience-toggle { order: 2; align-self: center; margin: 0 var(--space-1); }
+.onyx-composer-bar > .onyx-composer-field { order: 3; }
+.onyx-composer-bar > .shell-composer-tool--emoji { order: 4; }
+.onyx-composer-bar > .shell-composer-more-wrap { order: 0; }
+.onyx-composer-bar > .onyx-composer-send { order: 5; }
+
+/* The field grows with the draft (field-sizing where supported; a
+   scrolling one-line box elsewhere), up to a calm cap. */
+.onyx-composer .onyx-composer-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 36px;
+  max-height: min(40vh, 220px);
+  margin: 0;
+  padding: 8px var(--space-2);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: 20px;
+  resize: none;
+  overflow-y: auto;
+  field-sizing: content;
+}
+.onyx-composer .onyx-composer-field:focus,
+.onyx-composer .onyx-composer-field:focus-visible { outline: none; border: 0; }
+.onyx-composer .onyx-composer-field::placeholder { color: var(--onyx-faint); }
+.onyx-composer .onyx-composer-field:disabled { color: var(--onyx-faint); cursor: not-allowed; }
+
+/* Bar buttons: quiet 36px icon squares. */
+.onyx-composer .onyx-composer-bar > button,
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
   color: var(--onyx-dim);
   font-weight: 400;
+  cursor: pointer;
 }
-.onyx-composer .shell-composer-tool:hover:not(:disabled),
-.onyx-composer .onyx-attach-open:hover:not(:disabled) { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.onyx-composer .onyx-attach-open:disabled { background: transparent; color: var(--onyx-faint); cursor: not-allowed; }
-.shell-composer-action-label { white-space: nowrap; }
+.onyx-composer .onyx-composer-bar > button:hover:not(:disabled),
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:hover:not(:disabled) { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-composer .onyx-composer-bar > button:disabled,
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:disabled { background: transparent; color: var(--onyx-faint); cursor: not-allowed; }
+.onyx-composer .onyx-composer-bar > button[aria-expanded='true'],
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool[aria-expanded='true'] { color: var(--onyx-text); background: var(--onyx-panel-2); border: 0; }
+.onyx-composer .onyx-composer-bar > button .pt-ico { width: 20px; height: 20px; }
+.onyx-composer .onyx-composer-bar > button > .shell-composer-action-label,
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool > .shell-composer-action-label,
+.onyx-composer .onyx-composer-send-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 
-.shell-nick-menu { max-height: 220px; }
+/* The More tools trigger (View.Polish) reads as "+": its word stays
+   for assistive tech, the icon is a mask on ::before. */
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  -webkit-mask: var(--pt-i-plus) center / contain no-repeat;
+  mask: var(--pt-i-plus) center / contain no-repeat;
+  transition: transform var(--dur-fast) var(--ease);
+}
+.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more[aria-expanded='true']::before { transform: rotate(45deg); }
 
+.onyx-composer .onyx-audience-toggle {
+  width: auto;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--onyx-line);
+  font-size: var(--text-xs);
+  font-weight: 650;
+}
+.onyx-composer .onyx-composer-bar > .onyx-audience-toggle { width: auto; height: 26px; padding: 0 var(--space-2); border: 1px solid var(--onyx-line); border-radius: var(--radius); }
+.onyx-composer .onyx-composer-bar > .onyx-audience-toggle-set { color: var(--onyx-text); border-color: var(--onyx-dim); }
+
+/* Send: neutral until there is something to send, then the primary
+   action (the accent's job). */
+.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready { background: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled) { background: var(--onyx-accent); color: var(--onyx-accent-ink); filter: brightness(1.08); }
+
+/* Reply / edit context: one slim line above the bar. */
 .shell-composer-context {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  border: 1px solid var(--onyx-line);
+  min-height: 28px;
+  padding: 0 0 0 var(--space-3);
   border-left: 2px solid var(--onyx-dim);
-  border-radius: var(--radius);
-  background: var(--onyx-bg);
   color: var(--onyx-dim);
 }
 .shell-composer-context--edit { border-left-color: var(--gold); }
@@ -625,14 +1144,12 @@
   min-height: 0;
   padding: 0;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  border: 0;
+  border-radius: 4px;
   color: var(--onyx-dim);
-  font-size: var(--text-lg);
-  font-weight: 400;
-  line-height: 1;
 }
-.onyx-composer .shell-composer-context-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-line); }
+.onyx-composer .shell-composer-context-close .pt-ico { width: 16px; height: 16px; }
+.onyx-composer .shell-composer-context-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
 
 .onyx-composer .onyx-composer-plain {
   min-height: var(--target-floor);
@@ -645,14 +1162,17 @@
 }
 .onyx-composer .onyx-composer-plain:hover { background: color-mix(in oklab, var(--onyx-warn) 12%, transparent); }
 
+.onyx-composer .onyx-composer-error { padding: 0 var(--space-1); }
+
 .onyx-outbox-chrome {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
+  padding: 0 var(--space-1);
 }
 .onyx-outbox-label { color: var(--onyx-dim); font-size: var(--text-sm); }
-.onyx-outbox-label::before { content: "●"; margin-right: 6px; color: var(--onyx-warn); font-size: 0.7em; vertical-align: 1px; }
+.onyx-outbox-label::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--onyx-warn); vertical-align: 1px; }
 .onyx-composer .onyx-outbox-chrome button {
   min-height: var(--target-floor);
   padding: 2px var(--space-3);
@@ -664,6 +1184,8 @@
 }
 .onyx-composer .onyx-outbox-chrome button:hover { background: var(--onyx-panel-2); }
 
+/* Staged files: compact cards above the bar. */
+.onyx-composer > .onyx-attachments { display: grid; gap: var(--space-1); }
 .onyx-attach-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -672,7 +1194,7 @@
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
-  background: var(--onyx-bg);
+  background: var(--onyx-panel);
 }
 .onyx-attach-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: 600; }
 .onyx-attach-status { color: var(--onyx-dim); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -695,7 +1217,7 @@
   accent-color: var(--onyx-accent);
 }
 
-/* Conversation picker (overrides the header `.onyx-topic` line). */
+/* Conversation picker: a quiet chip row (rooms with labelled topics). */
 .onyx-composer > .onyx-topic {
   display: flex;
   align-items: center;
@@ -703,6 +1225,7 @@
   gap: var(--space-2);
   overflow: visible;
   white-space: normal;
+  font-size: var(--text-sm);
 }
 .onyx-topic-active { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--onyx-text); font-weight: 600; }
 .onyx-topic-options { display: flex; flex-wrap: wrap; gap: var(--space-1); }
@@ -721,14 +1244,70 @@
 .onyx-composer .onyx-topic-option:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
 .onyx-composer .onyx-topic-option[aria-pressed='true'] { color: var(--onyx-text); border-color: var(--onyx-dim); background: var(--onyx-panel-2); font-weight: 600; }
 
-/* Phone: the input takes its own full-width line; tools sit under it
-   with Send pushed to the right edge. */
+/* Suggestions (slash / names / emoji): float above the composer,
+   aligned with the bar. */
+.onyx-composer > .shell-composer-popovers { left: var(--space-4); right: var(--space-4); bottom: calc(100% - var(--space-1)); }
+.onyx-composer .shell-command-menu,
+.onyx-composer .shell-emoji-picker { background: var(--onyx-panel); border-color: var(--onyx-line); box-shadow: var(--elev-3); }
+.onyx-composer .shell-command-menu { max-width: 560px; padding: var(--space-1); }
+.onyx-composer .shell-command-menu::before {
+  content: "Commands";
+  padding: var(--space-1) var(--space-2) var(--space-1);
+  color: var(--onyx-faint);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+.onyx-composer .shell-nick-menu::before { content: "People"; }
+.onyx-frame .onyx-composer .shell-command-item { min-height: 32px; align-items: center; border-radius: 4px; }
+.onyx-composer .shell-command-item:hover { background: var(--onyx-panel-2); }
+.onyx-composer .shell-command-item--active { background: var(--onyx-panel-2); box-shadow: inset 2px 0 0 var(--onyx-accent); }
+.onyx-composer .shell-command-usage { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; }
+.shell-nick-menu { max-height: 240px; }
+.onyx-composer .shell-nick-menu .shell-command-usage { font-family: inherit; font-size: var(--text-md); }
+.onyx-composer .shell-emoji-picker { width: min(340px, 100%); }
+.onyx-composer .shell-emoji-search {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); max-height: 220px; }
+.onyx-frame .onyx-composer .shell-emoji-choice { display: grid; place-items: center; aspect-ratio: 1; min-height: 36px; padding: 0; border: 0; border-radius: 4px; color: inherit; }
+
+/* Phone: one slim sticky row; 16px field text (no iOS zoom); 44px
+   targets; popovers and the tools tray span the composer as sheets. */
 @media (max-width: 767.98px) {
-  .onyx-composer { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
-  .onyx-composer > .onyx-composer-target { display: none; }
-  .onyx-composer > input { order: 1; flex: 1 0 100%; font-size: 16px; }
-  .onyx-composer .onyx-attach-open { order: 2; }
-  .onyx-composer button[type='submit'] { margin-left: auto; }
+  .onyx-composer { padding: var(--space-2) var(--space-2) var(--space-2); gap: var(--space-1); }
+  .onyx-composer-bar { gap: 0; padding: 2px; }
+  .onyx-composer .onyx-composer-bar > .onyx-attach-open { display: none; }
+  .onyx-composer .onyx-composer-field { min-height: 40px; padding: 10px var(--space-1); font-size: 16px; line-height: 20px; max-height: 30dvh; }
+  .onyx-composer .onyx-composer-bar > button,
+  .onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool { width: 42px; height: 40px; }
+  .onyx-composer .onyx-composer-bar > .onyx-audience-toggle { height: 28px; border-radius: var(--r-pill); }
+  .shell-composer-context { margin: 0 var(--space-2); }
+  .onyx-composer > .onyx-attachments,
+  .onyx-composer > .onyx-topic { margin: 0 var(--space-1); }
+
+  .onyx-composer > .shell-composer-popovers { left: 0; right: 0; bottom: 100%; gap: 0; }
+  .onyx-composer .shell-command-menu,
+  .onyx-composer .shell-emoji-picker {
+    width: 100%;
+    max-width: none;
+    border-width: 1px 0 0;
+    border-radius: 12px 12px 0 0;
+  }
+  .onyx-composer .shell-command-menu { max-height: 46dvh; }
+  .onyx-frame .onyx-composer .shell-command-item { min-height: var(--target-min); }
+  .onyx-composer .shell-command-desc { font-size: var(--text-sm); }
+  .onyx-composer .shell-emoji-search { min-height: 40px; font-size: 16px; }
+  .onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); max-height: 36dvh; }
+  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 24px; }
 }
 
 /* ── 8. Message search ───────────────────────────────────────────────── */
@@ -747,7 +1326,7 @@
 
 .onyx-message-search__surface {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
   padding: 2px 2px 2px var(--space-3);
@@ -755,7 +1334,9 @@
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
 }
-.onyx-message-search__surface:focus-within { border-color: var(--onyx-accent); }
+.onyx-message-search__surface > .pt-ico { width: 16px; height: 16px; color: var(--onyx-faint); }
+.onyx-message-search__surface:focus-within { border-color: color-mix(in oklab, var(--onyx-accent) 70%, var(--onyx-line)); }
+.onyx-message-search__button .pt-ico { width: 18px; height: 18px; }
 
 .onyx-message-search__query-field {
   display: grid;
@@ -903,7 +1484,25 @@
 }
 .onyx-message-search__recall-chip:hover { border-color: var(--onyx-dim); }
 
-.onyx-message-search__save-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); }
+.onyx-message-search__save-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); margin-top: var(--space-2); }
+.onyx-message-search__save { min-width: 0; }
+.onyx-message-search__save-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  list-style: none;
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-message-search__save-toggle::-webkit-details-marker { display: none; }
+.onyx-message-search__save-toggle .pt-ico { width: 14px; height: 14px; }
+.onyx-message-search__save-toggle:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-message-search__save[open] > .onyx-message-search__save-toggle .pt-ico { transform: rotate(45deg); }
 .onyx-message-search__save-input {
   min-width: 0;
   width: 100%;
@@ -1005,6 +1604,9 @@
 }
 .room-media-index-close:hover,
 .pins-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.room-media-index-close .pt-ico,
+.pins-close .pt-ico,
+.pins-item-unpin .pt-ico { width: 16px; height: 16px; }
 
 .room-media-index-desc { margin: calc(-1 * var(--space-2)) 0 0; color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-body); }
 
@@ -1163,6 +1765,7 @@
 .room-media-index-meta {
   display: flex;
   flex-wrap: wrap;
+  column-gap: 0.35em;
   min-width: 0;
   color: var(--onyx-dim);
   font-size: var(--text-xs);
@@ -1292,6 +1895,7 @@
   .onyx-intro-title { font-size: var(--text-xl); }
   .shell-msg-preview-thumb,
   .shell-msg-preview-consent { width: 56px; height: 56px; }
+  .shell-msg-media-img { height: 200px; }
   .room-media-index-filter,
   .room-media-index-jump,
   .room-media-index-close,
