@@ -1683,3 +1683,87 @@ html, body {
   background: color-mix(in oklab, var(--shu) 10%, transparent);
   color: var(--shu-bright);
 }
+
+/* Connect gate (mirrors src/app/connect.css structure). */
+
+.conn {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--onyx-bg);
+  color: var(--onyx-text);
+}
+.conn-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  padding: 28px 24px 20px;
+}
+.conn-brand { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+.conn-brand-name { font-weight: 700; letter-spacing: 0.02em; }
+.conn-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.conn-body { margin: 0 0 18px; color: var(--onyx-dim); }
+.conn-form { display: flex; flex-direction: column; gap: 12px; }
+.conn-field { display: flex; flex-direction: column; gap: 4px; }
+.conn-label { font-size: 12px; font-weight: 600; }
+.conn-input {
+  font: inherit;
+  color: var(--onyx-text);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.conn-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 1px; }
+.conn-input[aria-invalid="true"] { border-color: var(--onyx-bad); }
+.conn-input:disabled { opacity: 0.6; }
+.conn-hint { margin: 0; font-size: 12px; color: var(--onyx-faint); }
+.conn-error { margin: 0; font-size: 12px; color: var(--onyx-bad); }
+.conn-link {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--onyx-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.conn-strength { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--onyx-dim); }
+.conn-strength-bar { display: flex; gap: 3px; flex: 1; }
+.conn-strength-seg { flex: 1; height: 4px; border-radius: 2px; background: var(--onyx-line); }
+.conn-strength-on { background: var(--onyx-accent); }
+.conn-strength[data-score="1"] .conn-strength-on { background: var(--onyx-bad); }
+.conn-strength[data-score="2"] .conn-strength-on { background: var(--onyx-warn); }
+.conn-status { margin: 2px 0 0; min-height: 1.4em; font-size: 13px; color: var(--onyx-dim); }
+.conn-status-error { color: var(--onyx-bad); }
+.conn-status-busy { color: var(--onyx-text); }
+.conn-actions { display: flex; gap: 8px; }
+.conn-submit {
+  flex: 1;
+  font: inherit;
+  font-weight: 700;
+  color: var(--onyx-accent-ink);
+  background: var(--onyx-accent);
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.conn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.conn-cancel, .conn-alt-btn, .onyx-leave {
+  font: inherit;
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.conn-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--onyx-line); }
+.conn-alt-title { width: 100%; margin: 0; font-size: 12px; font-weight: 600; color: var(--onyx-faint); }
+.onyx-leave { padding: 4px 10px; font-size: 12px; }

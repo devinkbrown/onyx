@@ -780,9 +780,22 @@ decodeField field decoder raw =
 init : Decode.Value -> Url.Url -> Nav.Key -> ( Model, Cmd App.Msg )
 init rawFlags url key =
     let
+        -- An explicit `?nick=` keeps the dial-on-boot path (dev/e2e);
+        -- without one the connect gate owns the first dial.
+        bootNick =
+            decodeField "nick" Decode.string rawFlags
+                |> Maybe.map String.trim
+                |> Maybe.andThen
+                    (\n ->
+                        if String.isEmpty n then
+                            Nothing
+
+                        else
+                            Just n
+                    )
+
         nick =
-            Maybe.withDefault "guest"
-                (decodeField "nick" Decode.string rawFlags)
+            Maybe.withDefault "guest" bootNick
 
         -- `?ws=` pin (mirrors `VITE_IRC_WS`): present wins and
         -- disables probing; absent probes the registry.
@@ -886,6 +899,8 @@ init rawFlags url key =
                 , dndEnabled = dndEnabled
                 , dndUntil = dndUntil
                 , channelNotify = channelNotify
+                , connectGate = bootNick == Nothing
+                , wsPin = wsPin
                 , starredChannels =
                     App.parseStarredChannels
                         (Maybe.withDefault [] (decodeField "starredChannels" (Decode.list Decode.string) rawFlags))
@@ -923,13 +938,16 @@ init rawFlags url key =
       , navKey = key
       }
     , Cmd.batch
-        [ case wsPin of
-            Just pin ->
+        [ case ( bootNick, wsPin ) of
+            ( Nothing, _ ) ->
+                Cmd.none
+
+            ( Just _, Just pin ) ->
                 -- Pinned endpoint connects directly (mirrors the
                 -- `VITE_IRC_WS` leg of `selectBestNode`).
                 perform key (App.WsConnect { url = pin })
 
-            Nothing ->
+            ( Just _, Nothing ) ->
                 -- No pin: probe the registry ports-side, then
                 -- `NodesProbed` connects to the winner.
                 probeNodes
@@ -1018,6 +1036,15 @@ perform key outbound =
 
         App.WsDisconnect ->
             wsClose ()
+
+        App.ProbeNodes req ->
+            probeNodes
+                { nodes = Nodes.nodes
+                , pin = Nothing
+                , nick = req.nick
+                , timeoutMs = Nodes.defaultProbeTimeoutMs
+                , maxConcurrency = Nodes.defaultMaxConcurrency
+                }
 
         App.VaultPersist req ->
             vaultPut req

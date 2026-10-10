@@ -51,6 +51,17 @@ topbar model =
             , text (connectionLabel model)
             ]
         , identityChip model
+        , if model.connection == App.Live || model.autoReconnect then
+            button
+                [ class "onyx-leave"
+                , attribute "aria-label" "Disconnect from Onyx"
+                , attribute "data-testid" "session-disconnect"
+                , onClick SessionDisconnect
+                ]
+                [ text "Leave" ]
+
+          else
+            text ""
         ]
 
 

@@ -31,6 +31,7 @@ import View.Invite
 import View.Onyxos
 import View.Status
 import View.Composer exposing (composer)
+import View.Connect exposing (connectGate)
 import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
@@ -107,7 +108,11 @@ view model =
                                 View.Roadmap.route model
 
                             _ ->
-                                [ shell model ]
+                                if App.connectGateVisible model then
+                                    [ connectGate model ]
+
+                                else
+                                    [ shell model ]
     }
 
 

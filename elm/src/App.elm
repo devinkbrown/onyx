@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages)
+module App exposing (AttachmentStatus(..), ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -733,6 +733,9 @@ type alias Model =
     , guestClaimPasswordHeld : String
     , guestClaimIdentifyIssued : Bool
     , guestClaimError : Maybe String
+    , connectGate : Bool
+    , connectForm : ConnectForm
+    , wsPin : Maybe String
     , credentialCanonicalOnly : Bool
     , nowMs : Float
     , connectNick : String
@@ -834,6 +837,7 @@ type Outbound
     | LoadUrl String
     | WsConnect { url : String }
     | WsDisconnect
+    | ProbeNodes { nick : String }
     | UploadPick { key : String, accept : String, multiple : Bool }
     | UploadSend { key : String, endpoint : String, fieldName : String, index : Int }
     | PreviewFetch { key : String, endpoint : String, url : String }
@@ -2437,6 +2441,17 @@ type Msg
     | ReclaimSubmit
     | ToastDismiss String
     | ToastUndoFired String
+    | ConnectModeSet ConnectMode
+    | ConnectNickInput String
+    | ConnectPasswordInput String
+    | ConnectEmailInput String
+    | ConnectConfirmInput String
+    | ConnectRoomInput String
+    | ConnectRecoveryToggle
+    | ConnectRecoveryCodeInput String
+    | ConnectSubmit
+    | ConnectCancel
+    | SessionDisconnect
     | GuestClaimOpen
     | GuestClaimClose
     | GuestClaimDismiss
@@ -2994,6 +3009,9 @@ init nick url =
     , motdBuffer = ""
     , recoveryCodes = blankRecoveryCodes
     , pendingRecoveryLogin = Nothing
+    , connectGate = False
+    , connectForm = blankConnectForm
+    , wsPin = Nothing
     , accountActionError = Nothing
     , reclaimOpen = False
     , reclaimPassword = ""
@@ -3453,6 +3471,9 @@ blank =
     , motdBuffer = ""
     , recoveryCodes = blankRecoveryCodes
     , pendingRecoveryLogin = Nothing
+    , connectGate = False
+    , connectForm = blankConnectForm
+    , wsPin = Nothing
     , accountActionError = Nothing
     , reclaimOpen = False
     , reclaimPassword = ""
@@ -23319,6 +23340,568 @@ submitReclaim model =
                             )
 
 
+{- Connect gate, mirroring `src/app/Connect.tsx` (the first-run join
+screen in front of the shell).
+
+One primary path — join as a guest with a display name — with Sign in
+and Create account as secondary modes. The gate shows on the `/app`
+route until a socket is live, and keeps showing through the handshake
+(phase `ConnectConnecting`); once the session registers, auto-reconnect
+arms and a network drop keeps the shell (reconnect banner) instead of
+bouncing back here, exactly like the oracle's
+`connected || autoReconnect` switch. A deliberate disconnect disarms
+auto-reconnect and returns to the form.
+
+`connectGate` arms the gate: `Main` sets it when the page booted without
+an explicit `?nick=` (a pinned nick keeps the old dial-on-boot path for
+dev/e2e), and `SessionDisconnect` re-arms it.
+
+Modes reuse the existing folds rather than new wire paths:
+
+  - Guest: dial anonymously under the chosen nick.
+  - Sign in: hand the password to the ports-side SASL holder
+    (`SaslCredentialsStored`, never kept in Elm), then dial; CAP
+    negotiation runs PLAIN/SCRAM. The recovery-code path queues
+    `RECOVERYCODES LOGIN` for 001 (`requestRecoveryCodesLogin`).
+  - Create account: dial anonymously, then on 001 hand the captured
+    email/password to the guest-claim machine (REGISTER → optional
+    VERIFY → IDENTIFY on the live socket, never reconnecting), opening
+    its sheet so the verify step has a home.
+
+The optional Room field becomes the pending `?join=` target, fired on
+001 by `firePendingDeepLinkJoin`.
+
+Narrowings: remembered identities and "Stay signed in" are not offered
+(their secrets live in the ports-side credential store, which exposes no
+listing port yet); passkey sign-in is hidden like the oracle's
+`PRESENT_PASSKEY_SIGNIN = false`.
+-}
+type ConnectMode
+    = ConnectGuest
+    | ConnectSignIn
+    | ConnectRegister
+
+
+type ConnectPhase
+    = ConnectIdle
+    | ConnectConnecting
+    | ConnectError
+
+
+type alias ConnectForm =
+    { mode : ConnectMode
+    , nick : String
+    , password : String
+    , email : String
+    , confirm : String
+    , room : String
+    , recoveryOpen : Bool
+    , recoveryCode : String
+    , nickError : Maybe String
+    , passwordError : Maybe String
+    , emailError : Maybe String
+    , confirmError : Maybe String
+    , roomError : Maybe String
+    , attempted : Bool
+    , dialing : Bool
+    , pendingRegister : Maybe { email : String, password : String }
+    }
+
+
+blankConnectForm : ConnectForm
+blankConnectForm =
+    { mode = ConnectGuest
+    , nick = ""
+    , password = ""
+    , email = ""
+    , confirm = ""
+    , room = ""
+    , recoveryOpen = False
+    , recoveryCode = ""
+    , nickError = Nothing
+    , passwordError = Nothing
+    , emailError = Nothing
+    , confirmError = Nothing
+    , roomError = Nothing
+    , attempted = False
+    , dialing = False
+    , pendingRegister = Nothing
+    }
+
+
+connectGateVisible : Model -> Bool
+connectGateVisible model =
+    model.connectGate
+        && model.route
+        == Route.App
+        && model.connection
+        /= Live
+        && not model.autoReconnect
+
+
+{-| Mirrors the oracle `formPhase`: a dial in flight (probe or
+handshake) is connecting; a closed socket after an attempt is an error.
+-}
+connectPhase : Model -> ConnectPhase
+connectPhase model =
+    if model.connectForm.dialing || model.connection == Registering then
+        ConnectConnecting
+
+    else if model.connection == Offline && model.connectForm.attempted then
+        ConnectError
+
+    else
+        ConnectIdle
+
+
+connectModeCopy : ConnectMode -> { title : String, body : String }
+connectModeCopy mode =
+    case mode of
+        ConnectGuest ->
+            { title = "Join a room", body = "Choose a display name, then join." }
+
+        ConnectSignIn ->
+            { title = "Sign in", body = "Use the name and password for your account." }
+
+        ConnectRegister ->
+            { title = "Create account", body = "Keep your name and rooms. Email is optional and can be added later." }
+
+
+connectFieldLabel : ConnectMode -> String
+connectFieldLabel mode =
+    case mode of
+        ConnectRegister ->
+            "Account name"
+
+        ConnectGuest ->
+            "Display name"
+
+        ConnectSignIn ->
+            "Name"
+
+
+{-| Mirrors the oracle `submitLabel` for each mode and phase. -}
+connectSubmitLabel : ConnectMode -> ConnectPhase -> String
+connectSubmitLabel mode phase =
+    case phase of
+        ConnectConnecting ->
+            "Connecting…"
+
+        ConnectError ->
+            "Try again"
+
+        ConnectIdle ->
+            case mode of
+                ConnectGuest ->
+                    "Join"
+
+                ConnectSignIn ->
+                    "Sign in"
+
+                ConnectRegister ->
+                    "Create account"
+
+
+{-| Reactive status copy, mirroring the oracle `statusMsg`: failure
+types are distinguished, no server is ever named, and the nick is never
+blamed for a server-side failure.
+-}
+connectStatusMessage : Model -> String
+connectStatusMessage model =
+    let
+        err =
+            lastErrorText model
+
+        matches pattern =
+            case Regex.fromStringWith { caseInsensitive = True, multiline = False } pattern of
+                Just re ->
+                    Regex.contains re err
+
+                Nothing ->
+                    False
+    in
+    case connectPhase model of
+        ConnectConnecting ->
+            "Connecting to Onyx."
+
+        ConnectError ->
+            if matches "nickname is registered|registered nickname requires authentication" then
+                "That name belongs to an account. Sign in to use it."
+
+            else if nickInUse model then
+                "That name is already in use. Reclaim it, or pick another."
+
+            else if model.saslAccount /= Nothing && matches "password|auth|login|incorrect|credential|464|sasl" then
+                "That password was not accepted. Check it and sign in again."
+
+            else
+                "Couldn’t reach Onyx just now. Try again in a moment."
+
+        ConnectIdle ->
+            case model.connectForm.mode of
+                ConnectSignIn ->
+                    "Enter your name and password to continue."
+
+                ConnectRegister ->
+                    "Choose a name and password to create your account."
+
+                ConnectGuest ->
+                    "Choose a display name to join."
+
+
+connectShowReclaim : Model -> Bool
+connectShowReclaim model =
+    connectPhase model == ConnectError && nickInUse model
+
+
+{-| Mirrors `validateEmail`: optional, light shape check. -}
+validateConnectEmail : String -> Maybe String
+validateConnectEmail raw =
+    let
+        v =
+            String.trim raw
+
+        shape =
+            Regex.fromString "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+                |> Maybe.withDefault Regex.never
+    in
+    if String.isEmpty v then
+        Nothing
+
+    else if Regex.contains shape v then
+        Nothing
+
+    else
+        Just "Enter a valid email address."
+
+
+{-| Mirrors `validatePassword` (8-character floor). -}
+validateConnectPassword : String -> Maybe String
+validateConnectPassword value =
+    if String.isEmpty value then
+        Just "Password is required."
+
+    else if String.length value < guestClaimMinPassword then
+        Just ("Use at least " ++ String.fromInt guestClaimMinPassword ++ " characters.")
+
+    else
+        Nothing
+
+
+validateConnectConfirm : String -> String -> Maybe String
+validateConnectConfirm password confirm =
+    if String.isEmpty confirm then
+        Just "Confirm your password."
+
+    else if password /= confirm then
+        Just "Passwords do not match."
+
+    else
+        Nothing
+
+
+{-| Mirrors `passwordStrength`: a 0–4 score from length and
+character-class variety.
+-}
+passwordStrength : String -> { score : Int, label : String }
+passwordStrength value =
+    if String.isEmpty value then
+        { score = 0, label = "empty" }
+
+    else
+        let
+            point cond =
+                if cond then
+                    1
+
+                else
+                    0
+
+            raw =
+                point (String.length value >= guestClaimMinPassword)
+                    + point (String.length value >= 12)
+                    + point (String.any Char.isLower value && String.any Char.isUpper value)
+                    + point (String.any Char.isDigit value)
+                    + point (String.any (\c -> not (Char.isAlphaNum c)) value)
+
+            score =
+                clamp 0 4 raw
+
+            label =
+                case score of
+                    0 ->
+                        "weak"
+
+                    1 ->
+                        "weak"
+
+                    2 ->
+                        "fair"
+
+                    3 ->
+                        "good"
+
+                    _ ->
+                        "strong"
+        in
+        { score = score, label = label }
+
+
+{-| Mirrors the oracle `normalizeRoom`: blank is `Ok Nothing` (land on
+Home), a bare name gains its `#`, and anything the deep-link parser
+refuses is an error.
+-}
+normalizeConnectRoom : String -> Result () (Maybe String)
+normalizeConnectRoom raw =
+    let
+        trimmed =
+            String.trim raw
+    in
+    if String.isEmpty trimmed then
+        Ok Nothing
+
+    else
+        let
+            prefixed =
+                if String.startsWith "#" trimmed || String.startsWith "&" trimmed then
+                    trimmed
+
+                else
+                    "#" ++ trimmed
+        in
+        case parseDeepLinkJoin prefixed of
+            Just channel ->
+                Ok (Just channel)
+
+            Nothing ->
+                Err ()
+
+
+connectCanSubmit : Model -> Bool
+connectCanSubmit model =
+    let
+        form =
+            model.connectForm
+
+        nick =
+            String.trim form.nick
+    in
+    if connectPhase model == ConnectConnecting then
+        False
+
+    else
+        case form.mode of
+            ConnectGuest ->
+                not (String.isEmpty nick)
+
+            ConnectSignIn ->
+                not (String.isEmpty nick)
+                    && (if form.recoveryOpen then
+                            not (String.isEmpty (String.trim form.recoveryCode))
+
+                        else
+                            not (String.isEmpty form.password)
+                       )
+
+            ConnectRegister ->
+                Invite.nicknameError form.nick False
+                    == Nothing
+                    && validateConnectEmail form.email
+                    == Nothing
+                    && validateConnectPassword form.password
+                    == Nothing
+                    && validateConnectConfirm form.password form.confirm
+                    == Nothing
+
+
+setConnectForm : (ConnectForm -> ConnectForm) -> Model -> Model
+setConnectForm f model =
+    { model | connectForm = f model.connectForm }
+
+
+{-| Open a socket under `nick`: the `?ws=` pin dials directly (mirroring
+`VITE_IRC_WS`); otherwise the registry probe picks the node and
+`NodesProbed` dials the winner.
+-}
+dialConnect : Model -> String -> ( Model, List Outbound )
+dialConnect model nick =
+    ( { model | ourNick = nick } |> setConnectForm (\f -> { f | attempted = True, dialing = True })
+    , case model.wsPin of
+        Just pin ->
+            [ WsConnect { url = pin } ]
+
+        Nothing ->
+            [ ProbeNodes { nick = nick } ]
+    )
+
+
+{-| Submit the connect form, mirroring the oracle `handleSubmit` /
+`handleRegisterSubmit`.
+-}
+submitConnect : Model -> ( Model, List Outbound )
+submitConnect model =
+    let
+        form =
+            model.connectForm
+
+        nick =
+            String.trim form.nick
+
+        nickErr =
+            Invite.nicknameError nick False
+
+        clearSasl m =
+            { m | saslAccount = Nothing, saslPasswordHeld = False, saslClientCert = False }
+    in
+    if connectPhase model == ConnectConnecting || model.connection /= Offline then
+        ( model, [] )
+
+    else
+        case form.mode of
+            ConnectRegister ->
+                let
+                    eErr =
+                        validateConnectEmail form.email
+
+                    pErr =
+                        validateConnectPassword form.password
+
+                    cErr =
+                        validateConnectConfirm form.password form.confirm
+
+                    checked =
+                        setConnectForm
+                            (\f -> { f | nickError = nickErr, emailError = eErr, passwordError = pErr, confirmError = cErr })
+                            model
+                in
+                if nickErr /= Nothing || eErr /= Nothing || pErr /= Nothing || cErr /= Nothing then
+                    ( checked, [] )
+
+                else
+                    let
+                        staged =
+                            checked
+                                |> clearSasl
+                                |> setConnectForm
+                                    (\f ->
+                                        { f
+                                            | pendingRegister = Just { email = String.trim form.email, password = form.password }
+                                            , password = ""
+                                            , confirm = ""
+                                        }
+                                    )
+
+                        ( dialed, out ) =
+                            dialConnect staged nick
+                    in
+                    ( dialed, SaslCredentialsStored { account = "", password = "", hasClientCert = False } :: out )
+
+            _ ->
+                let
+                    withNick =
+                        setConnectForm (\f -> { f | nickError = nickErr }) model
+                in
+                if nickErr /= Nothing then
+                    ( withNick, [] )
+
+                else
+                    case normalizeConnectRoom form.room of
+                        Err () ->
+                            ( setConnectForm (\f -> { f | roomError = Just "Room names look like #lounge — no spaces or commas." }) withNick, [] )
+
+                        Ok room ->
+                            let
+                                roomed =
+                                    { withNick
+                                        | pendingDeepLinkJoin =
+                                            case room of
+                                                Just _ ->
+                                                    room
+
+                                                Nothing ->
+                                                    withNick.pendingDeepLinkJoin
+                                    }
+                                        |> setConnectForm (\f -> { f | roomError = Nothing })
+                            in
+                            if form.mode == ConnectGuest then
+                                let
+                                    ( dialed, out ) =
+                                        dialConnect (clearSasl roomed) nick
+                                in
+                                ( dialed, SaslCredentialsStored { account = "", password = "", hasClientCert = False } :: out )
+
+                            else if form.recoveryOpen then
+                                let
+                                    code =
+                                        String.filter (\c -> c /= '-' && c /= ' ') form.recoveryCode
+                                in
+                                if String.length code < 8 then
+                                    ( setConnectForm (\f -> { f | passwordError = Just "Enter a recovery code from your saved list." }) roomed, [] )
+
+                                else
+                                    let
+                                        ( queued, _ ) =
+                                            requestRecoveryCodesLogin (clearSasl roomed) nick form.recoveryCode
+
+                                        ( dialed, out ) =
+                                            dialConnect (setConnectForm (\f -> { f | passwordError = Nothing, recoveryCode = "" }) queued) nick
+                                    in
+                                    ( dialed, SaslCredentialsStored { account = "", password = "", hasClientCert = False } :: out )
+
+                            else if String.isEmpty form.password then
+                                ( setConnectForm (\f -> { f | passwordError = Just "Password is required to sign in." }) roomed, [] )
+
+                            else
+                                let
+                                    held =
+                                        { roomed | saslAccount = Just nick, saslPasswordHeld = True, saslClientCert = False }
+                                            |> setConnectForm (\f -> { f | passwordError = Nothing, password = "" })
+
+                                    ( dialed, out ) =
+                                        dialConnect held nick
+                                in
+                                ( dialed, SaslCredentialsStored { account = nick, password = form.password, hasClientCert = False } :: out )
+
+
+{-| Post-update settle for the connect gate: a socket that opened or
+closed ends the dial, and a session that just went live with a staged
+registration hands it to the guest-claim machine (REGISTER → VERIFY →
+IDENTIFY on the live socket). The password is moved, never kept on the
+form.
+-}
+settleConnectGate : Model -> ( Model, List Outbound )
+settleConnectGate model =
+    let
+        form =
+            model.connectForm
+
+        settled =
+            if form.dialing && model.connection /= Offline then
+                setConnectForm (\f -> { f | dialing = False }) model
+
+            else
+                model
+    in
+    case ( settled.connection, form.pendingRegister ) of
+        ( Live, Just reg ) ->
+            let
+                staged =
+                    { settled
+                        | guestClaimEmail = reg.email
+                        , guestClaimPassword = reg.password
+                        , guestClaimOpen = True
+                    }
+                        |> setConnectForm (\f -> { f | pendingRegister = Nothing })
+
+                ( claimed, out ) =
+                    submitGuestClaim staged
+            in
+            ( { claimed | guestClaimPassword = "" }, out )
+
+        _ ->
+            ( settled, [] )
+
+
 {- Guest claim flow, mirroring `GuestClaimPrompt.tsx` + the
 `registerAccount` / `verifyAccount` store actions: a guest (no authed
 account) already chatting gets a dismissible chip offering to keep the
@@ -34420,6 +35003,28 @@ settleAttachmentUpload model done =
 
 update : Msg -> Model -> ( Model, List Outbound )
 update msg model =
+    let
+        ( next, out ) =
+            updateCore msg model
+
+        -- A close ends any dial in flight (a socket that never opened
+        -- included), so the form reports the failure instead of spinning.
+        closed =
+            case msg of
+                WsClosed _ ->
+                    setConnectForm (\f -> { f | dialing = False }) next
+
+                _ ->
+                    next
+
+        ( settled, connectOut ) =
+            settleConnectGate closed
+    in
+    ( settled, out ++ connectOut )
+
+
+updateCore : Msg -> Model -> ( Model, List Outbound )
+updateCore msg model =
     case msg of
         LinkClicked urlRequest ->
             case urlRequest of
@@ -35346,6 +35951,69 @@ update msg model =
 
                 else
                     ( reverted, searchOut )
+
+        ConnectModeSet mode ->
+            if mode == model.connectForm.mode || connectPhase model == ConnectConnecting then
+                ( model, [] )
+
+            else
+                ( setConnectForm
+                    (\f ->
+                        { f
+                            | mode = mode
+                            , recoveryOpen = False
+                            , nickError = Nothing
+                            , passwordError = Nothing
+                            , emailError = Nothing
+                            , confirmError = Nothing
+                            , roomError = Nothing
+                        }
+                    )
+                    model
+                , []
+                )
+
+        ConnectNickInput value ->
+            ( setConnectForm (\f -> { f | nick = String.left 64 value, nickError = Nothing }) model, [] )
+
+        ConnectPasswordInput value ->
+            ( setConnectForm (\f -> { f | password = value, passwordError = Nothing }) model, [] )
+
+        ConnectEmailInput value ->
+            ( setConnectForm (\f -> { f | email = String.left 254 value, emailError = Nothing }) model, [] )
+
+        ConnectConfirmInput value ->
+            ( setConnectForm (\f -> { f | confirm = value, confirmError = Nothing }) model, [] )
+
+        ConnectRoomInput value ->
+            ( setConnectForm (\f -> { f | room = String.left 64 value, roomError = Nothing }) model, [] )
+
+        ConnectRecoveryToggle ->
+            ( setConnectForm (\f -> { f | recoveryOpen = not f.recoveryOpen, recoveryCode = "", passwordError = Nothing }) model, [] )
+
+        ConnectRecoveryCodeInput value ->
+            ( setConnectForm (\f -> { f | recoveryCode = String.left 64 value, passwordError = Nothing }) model, [] )
+
+        ConnectSubmit ->
+            submitConnect model
+
+        ConnectCancel ->
+            -- Abandon a dial in flight: the socket (if any) closes and the
+            -- form returns to idle rather than reporting a failure.
+            ( { model | autoReconnect = False }
+                |> setConnectForm (\f -> { f | dialing = False, attempted = False, pendingRegister = Nothing })
+            , [ WsDisconnect ]
+            )
+
+        SessionDisconnect ->
+            -- Deliberate disconnect, mirroring the oracle `disconnect`
+            -- behind the shell's Leave control: auto-reconnect disarms so
+            -- the close returns to the connect form instead of the
+            -- reconnect banner.
+            ( { model | autoReconnect = False, connectGate = True, reconnectIn = 0, reconnectDueMs = 0 }
+                |> setConnectForm (\f -> { f | dialing = False, attempted = False, pendingRegister = Nothing })
+            , [ WsDisconnect ]
+            )
 
         SaslCredentialsProvided { account, password, hasClientCert } ->
             -- A sign-in form hands the secret to the ports side, which
