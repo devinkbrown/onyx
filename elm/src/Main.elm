@@ -120,6 +120,7 @@ import Browser.Dom
 import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Media
 import Nodes
 import Schedule
 import Switcher
@@ -223,6 +224,13 @@ port voiceLeave : { channel : String } -> Cmd msg
 
 
 port voiceMute : { muted : Bool } -> Cmd msg
+
+
+-- v3/calls-c4: the ONE call-media command port and the per-peer feed.
+port voiceCommand : { verb : String, on : Bool, channel : String, tile : String } -> Cmd msg
+
+
+port voicePeerState : (Decode.Value -> msg) -> Sub msg
 
 
 port vaultSearched : ({ rows : List App.VaultRow, status : String, seq : Int, mode : String } -> msg) -> Sub msg
@@ -1218,6 +1226,10 @@ perform key outbound =
         App.VoiceMute req ->
             voiceMute req
 
+        -- v3/calls-c4
+        App.VoiceCommand req ->
+            voiceCommand req
+
         App.FollowedSave req ->
             followedSave req
 
@@ -1576,6 +1588,15 @@ subscriptions model =
         , studioEyeDropperResult App.StudioEyeDropperResult
         , studioCustomThemes App.StudioCustomThemesRefreshed
         , voiceCallHub App.CallHubSnapshot
+        -- v3/calls-c4: per-peer media flags, and a 200ms call clock
+        -- (only while a call is up) for the 400/800ms speaker hold and
+        -- the 2.5s quality hysteresis.
+        , voicePeerState App.CallPeerState
+        , if model.app.calls.lifecycle /= Media.Idle then
+            Time.every 200 (App.CallClock << toFloat << Time.posixToMillis)
+
+          else
+            Sub.none
         , mediaBinaryReceived App.MediaBinaryReceived
         , httpResult App.HttpResult
         , reclaimTimerFired App.ReclaimTimerFired

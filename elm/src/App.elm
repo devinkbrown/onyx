@@ -54,6 +54,8 @@ import Status
 import Media
 -- v3/calls-c1
 import CallUi
+-- v3/calls-c4
+import CallMedia
 import IdentityOverrides
 import Moderation
 import Modes
@@ -574,6 +576,18 @@ type alias Model =
     , callPrivacyOpen : Bool
     , callSecurityFeed : CallUi.SecurityFeed
     , callAnnouncer : CallUi.Announcer
+    -- v3/calls-c4
+    , callLocal : CallMedia.Local
+    , callQuality : CallMedia.Quality
+    , callPeers : Dict String CallMedia.Peer
+    , callSpeaker : CallMedia.Speaker
+    , callTileOrder : List String
+    , callPage : Int
+    , callLayout : CallMedia.Layout
+    , callStageSize : CallMedia.StageSize
+    , callPinned : Maybe String
+    , callShareOptOut : Maybe String
+    , callClockMs : Float
     -- v3/nav
     , navSection : Nav.Id
     , navDrawerOpen : Bool
@@ -932,6 +946,9 @@ type Outbound
     | VoiceJoin { channel : String, video : Bool }
     | VoiceLeave { channel : String }
     | VoiceMute { muted : Bool }
+    -- v3/calls-c4: the ONE call-media command port (camera / share /
+    -- deafen / native PiP), spec §5.
+    | VoiceCommand { verb : String, on : Bool, channel : String, tile : String }
     | VaultExportRequest
     | VaultImportPick
     | RetentionPolicyRequest
@@ -3048,6 +3065,21 @@ type Msg
     | CallMoreClose
     | CallPrivacyOpen
     | CallPrivacyClose
+    -- v3/calls-c4
+    | CallToggleCamera
+    | CallToggleShare
+    | CallToggleDeafen
+    | CallQualityPromptAct
+    | CallQualityPromptDismiss
+    | CallPeerState Decode.Value
+    | CallClock Float
+    | CallLayoutToggle
+    | CallStageSizeCycle
+    | CallStageSizeSet CallMedia.StageSize
+    | CallPin String
+    | CallShareGrid String
+    | CallPageSet Int
+    | CallNativePip String
     | SelectBoardTab String
     -- v3/roster
     | MemberFilterInput String
@@ -3407,6 +3439,18 @@ init nick url =
     , callPrivacyOpen = False
     , callSecurityFeed = CallUi.blankSecurityFeed
     , callAnnouncer = CallUi.blankAnnouncer
+    -- v3/calls-c4
+    , callLocal = CallMedia.blankLocal
+    , callQuality = CallMedia.blankQuality
+    , callPeers = Dict.empty
+    , callSpeaker = CallMedia.blankSpeaker
+    , callTileOrder = []
+    , callPage = 0
+    , callLayout = CallMedia.LayoutGrid
+    , callStageSize = CallMedia.SizeCompact
+    , callPinned = Nothing
+    , callShareOptOut = Nothing
+    , callClockMs = 0
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -3931,6 +3975,18 @@ blank =
     , callPrivacyOpen = False
     , callSecurityFeed = CallUi.blankSecurityFeed
     , callAnnouncer = CallUi.blankAnnouncer
+    -- v3/calls-c4
+    , callLocal = CallMedia.blankLocal
+    , callQuality = CallMedia.blankQuality
+    , callPeers = Dict.empty
+    , callSpeaker = CallMedia.blankSpeaker
+    , callTileOrder = []
+    , callPage = 0
+    , callLayout = CallMedia.LayoutGrid
+    , callStageSize = CallMedia.SizeCompact
+    , callPinned = Nothing
+    , callShareOptOut = Nothing
+    , callClockMs = 0
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -35815,9 +35871,156 @@ update msg model =
 
         -- v3/frame
         frameSettled =
-            settleRoomMenu msg model callsSettled
+            settleRoomMenu msg model mediaSettled
+
+        -- v3/calls-c4
+        mediaSettled =
+            settleCallMedia callsSettled
     in
     ( frameSettled, out ++ connectOut ++ safetyOut )
+
+
+-- v3/calls-c4
+{-| A media command needs an established-or-provisional call and a
+target (room or DM peer).
+-}
+callMediaTarget : Model -> Maybe String
+callMediaTarget model =
+    if model.calls.lifecycle == Media.InCall then
+        CallUi.callTarget model.calls
+
+    else
+        Nothing
+
+
+blankCallLocal : CallMedia.Local
+blankCallLocal =
+    CallMedia.blankLocal
+
+
+{-| Post-update call-media settle (spec §2.6, §2.13): the
+dominant-speaker fold, stable tile order, pin validity, page clamp and
+the quality hysteresis (with its one-shot ladder toast), all on the
+call clock. Idle resets the per-call state.
+-}
+settleCallMedia : Model -> Model
+settleCallMedia model =
+    if model.calls.lifecycle == Media.Idle then
+        if
+            Dict.isEmpty model.callPeers
+                && List.isEmpty model.callTileOrder
+                && model.callQuality == CallMedia.blankQuality
+                && model.callSpeaker == CallMedia.blankSpeaker
+                && model.callPinned == Nothing
+                && model.callShareOptOut == Nothing
+                && model.callPage == 0
+                && model.callStageSize == CallMedia.SizeCompact
+        then
+            model
+
+        else
+            { model
+                | callPeers = Dict.empty
+                , callTileOrder = []
+                , callQuality = CallMedia.blankQuality
+                , callSpeaker = CallMedia.blankSpeaker
+                , callPinned = Nothing
+                , callShareOptOut = Nothing
+                , callPage = 0
+                , callStageSize = CallMedia.SizeCompact
+            }
+
+    else
+        let
+            now =
+                max model.nowMs model.callClockMs
+
+            selfKey =
+                String.toLower model.ourNick
+
+            roster =
+                CallUi.callRoster model.media model.calls
+                    |> List.map String.toLower
+
+            peerSet pick =
+                model.callPeers
+                    |> Dict.filter (\_ p -> pick p)
+                    |> Dict.keys
+                    |> Set.fromList
+
+            speaking =
+                Set.union model.media.speaking (peerSet .speaking)
+
+            muted =
+                Set.union model.media.muted (peerSet .muted)
+                    |> (\s ->
+                            if model.callSelfMuted then
+                                Set.insert selfKey s
+
+                            else
+                                s
+                       )
+
+            present =
+                selfKey :: List.filter ((/=) selfKey) roster
+
+            speaker =
+                CallMedia.stepSpeaker now (CallMedia.speakerSamples present speaking muted) model.callSpeaker
+
+            order =
+                CallMedia.reconcileOrder
+                    { selfKey = selfKey
+                    , roster = roster
+                    , dominant = speaker.dominant
+                    , pinned = model.callPinned
+                    , speaking = speaking
+                    }
+                    model.callTileOrder
+
+            pinned =
+                model.callPinned
+                    |> Maybe.andThen
+                        (\p ->
+                            if List.member p order then
+                                Just p
+
+                            else
+                                Nothing
+                        )
+
+            ( quality, notice ) =
+                CallMedia.advanceQuality
+                    { nowMs = now, tier = model.callLocal.tier, camera = model.callLocal.camera }
+                    model.callQuality
+
+            settled =
+                { model
+                    | callSpeaker = speaker
+                    , callTileOrder = order
+                    , callPinned = pinned
+                    , callPage = CallMedia.clampPage (List.length order) model.callPage
+                    , callQuality = quality
+                }
+        in
+        case notice of
+            Just n ->
+                let
+                    copy =
+                        CallMedia.noticeCopy n
+                in
+                addToast
+                    { variant = ToastInfo
+                    , title = copy.title
+                    , description = Just copy.description
+                    , duration = Just 4500
+                    , groupKey = Just "call-quality"
+                    , undo = Nothing
+                    }
+                    now
+                    settled
+
+            Nothing ->
+                settled
 
 
 -- v3/calls-c1
@@ -40387,6 +40590,8 @@ updateCore msg model =
                 ( { model
                     | callSelfMuted = CallUi.joinMutedDefault
                     , callJoinTarget = Just channel
+                    -- v3/calls-c4: camera intent from the join verb.
+                    , callLocal = { blankCallLocal | camera = video, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported }
                     , callMoreOpen = False
                     , callPrivacyOpen = False
                   }
@@ -40444,6 +40649,8 @@ updateCore msg model =
                         , callSelfMuted = model.callSelfMuted && merged.lifecycle /= Media.Idle
                         -- v3/calls-c1
                         , callSecurityFeed = CallUi.decodeSecurityFeed merged.lifecycle raw model.callSecurityFeed
+                        -- v3/calls-c4
+                        , callLocal = CallMedia.decodeLocal merged.lifecycle raw model.callLocal
                       }
                     , []
                     )
@@ -40474,6 +40681,129 @@ updateCore msg model =
 
         CallPrivacyClose ->
             ( { model | callPrivacyOpen = False }, [] )
+
+        -- v3/calls-c4
+        CallToggleCamera ->
+            case callMediaTarget model of
+                Just target ->
+                    let
+                        local =
+                            model.callLocal
+
+                        next =
+                            not local.camera
+                    in
+                    ( { model | callLocal = { local | camera = next } }
+                    , [ VoiceCommand { verb = "camera", on = next, channel = target, tile = "" } ]
+                    )
+
+                Nothing ->
+                    ( model, [] )
+
+        CallToggleShare ->
+            case ( callMediaTarget model, CallMedia.requestShare model.callLocal ) of
+                ( Just target, Just ( local, on ) ) ->
+                    ( { model | callLocal = local, callShareOptOut = Nothing }
+                    , [ VoiceCommand { verb = "share", on = on, channel = target, tile = "" } ]
+                    )
+
+                _ ->
+                    ( model, [] )
+
+        CallToggleDeafen ->
+            -- Local-only (spec §7.4, provisional): the engine silences
+            -- remote playback; nothing claims the room heard it.
+            case callMediaTarget model of
+                Just target ->
+                    let
+                        local =
+                            model.callLocal
+
+                        next =
+                            not local.deafened
+                    in
+                    ( { model | callLocal = { local | deafened = next } }
+                    , [ VoiceCommand { verb = "deafen", on = next, channel = target, tile = "" } ]
+                    )
+
+                Nothing ->
+                    ( model, [] )
+
+        CallQualityPromptAct ->
+            let
+                consumed =
+                    { model | callQuality = CallMedia.consumePrompt model.callQuality }
+            in
+            if model.callLocal.camera then
+                update CallToggleCamera consumed
+
+            else
+                ( consumed, [] )
+
+        CallQualityPromptDismiss ->
+            ( { model | callQuality = CallMedia.consumePrompt model.callQuality }, [] )
+
+        CallPeerState raw ->
+            -- Per-peer media flags (spec §5 `voicePeerState`): a fresh
+            -- full map per payload, validated fail-closed; ignored
+            -- while idle so a late payload never paints a dead call.
+            if model.calls.lifecycle == Media.Idle then
+                ( model, [] )
+
+            else
+                case CallMedia.decodePeers raw of
+                    Just peers ->
+                        ( { model | callPeers = peers }, [] )
+
+                    Nothing ->
+                        ( model, [] )
+
+        CallClock now ->
+            ( { model | callClockMs = max model.callClockMs now }, [] )
+
+        CallLayoutToggle ->
+            ( { model
+                | callLayout =
+                    if model.callLayout == CallMedia.LayoutGrid then
+                        CallMedia.LayoutSpotlight
+
+                    else
+                        CallMedia.LayoutGrid
+              }
+            , []
+            )
+
+        CallStageSizeCycle ->
+            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize }, [] )
+
+        CallStageSizeSet size ->
+            ( { model | callStageSize = size }, [] )
+
+        CallPin key ->
+            -- Toggle; pinning implies spotlight, un-pinning keeps the
+            -- layout (oracle `pinParticipant`).
+            let
+                lower =
+                    String.toLower key
+            in
+            if model.callPinned == Just lower then
+                ( { model | callPinned = Nothing }, [] )
+
+            else
+                ( { model | callPinned = Just lower, callLayout = CallMedia.LayoutSpotlight, callShareOptOut = Nothing }, [] )
+
+        CallShareGrid shareId ->
+            ( { model | callShareOptOut = Just shareId, callLayout = CallMedia.LayoutGrid }, [] )
+
+        CallPageSet page ->
+            ( { model | callPage = CallMedia.clampPage (List.length model.callTileOrder) page }, [] )
+
+        CallNativePip tileId ->
+            if model.callLocal.pipSupported && model.calls.lifecycle == Media.InCall then
+                ( model, [ VoiceCommand { verb = "pip", on = True, channel = "", tile = tileId } ] )
+
+            else
+                ( model, [] )
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
@@ -42886,6 +43216,8 @@ overlayStack model =
         , ( "moderation-review", model.moderationDraft /= Nothing, ModerationCancel )
         , ( "call-privacy", model.callPrivacyOpen, CallPrivacyClose )
         , ( "call-more", model.callMoreOpen, CallMoreClose )
+        -- v3/calls-c4: Escape returns a fullscreen stage to compact.
+        , ( "call-fullscreen", model.callStageSize == CallMedia.SizeFullscreen && model.calls.lifecycle /= Media.Idle, CallStageSizeSet CallMedia.SizeCompact )
         , ( "reclaim", model.reclaimOpen, ReclaimClose )
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )

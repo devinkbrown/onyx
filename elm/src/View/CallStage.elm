@@ -13,8 +13,11 @@ and C3 security chip + call privacy sheet (`CALLS_DESIGN.md` §2.4,
 
 Bar v1 carries Mute, More (one stub item: "Open voice settings",
 disabled until C9) and Leave in the centre; where / timer / people on
-the left; the security chip on the right. Camera / share / hand /
-react / captions arrive with C4/C8 — the centre group is the seam.
+the left; the security chip on the right. v3/calls-c4 adds Camera and
+Share to the centre (Share moves into More <768px), Deafen / layout /
+stage size to More, the connection pip to the right zone, the
+quality prompt above the bar and the video stage (`View.CallVideo`);
+hand / react / captions arrive with C8.
 
 Narrowings: icons are CSS-mask glyphs (`.onyx-ci`); the stage is
 docked in the message column (not a fixed mobile bottom bar); the
@@ -27,13 +30,16 @@ import App exposing (Model, Msg(..))
 import CallUi
 import Dict
 import Html exposing (Html, button, dd, div, dl, dt, h2, li, p, section, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, id, type_)
+import Html.Attributes exposing (attribute, class, disabled, id, title, type_)
 import Json.Decode
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 import Media exposing (HubPresentation(..))
 import Prefs
 import View.CallPresence exposing (callIcon, joinBanner)
+-- v3/calls-c4
+import CallMedia
+import View.CallVideo
 import View.Sheet as Sheet
 
 
@@ -136,12 +142,48 @@ voiceStage model =
 
         density =
             CallUi.stageDensity count
+
+        -- v3/calls-c4
+        videoMode =
+            View.CallVideo.active model
+
+        suffix =
+            View.CallVideo.statusSuffix model
+
+        statusText =
+            (case ( suffix.share, presentation ) of
+                ( Just sharing, HubEstablished ) ->
+                    sharing
+
+                _ ->
+                    CallUi.stageStatus model.calls (Maybe.map .label (security model))
+            )
+                ++ (if suffix.protecting && presentation /= HubIdle then
+                        " · Protecting audio"
+
+                    else
+                        ""
+                   )
     in
     section
         [ class "onyx-call-stage"
         , attribute "role" "region"
-        , attribute "aria-label" "Voice call participants"
-        , attribute "data-mode" "audio"
+        , attribute "aria-label"
+            (if videoMode then
+                "Video call participants"
+
+             else
+                "Voice call participants"
+            )
+        , attribute "data-mode"
+            (if videoMode then
+                "video"
+
+             else
+                "audio"
+            )
+        , attribute "data-layout" (CallMedia.viewWord (View.CallVideo.stageView model))
+        , attribute "data-size" (CallMedia.sizeWord model.callStageSize)
         , attribute "data-motion" (motionWord model)
         , attribute "data-testid" "voice-stage"
         ]
@@ -152,9 +194,13 @@ voiceStage model =
             , attribute "data-testid" "voice-stage-state"
             ]
             [ span [ class "onyx-call-pip", attribute "data-state" (presentationPip presentation) ] []
-            , text (CallUi.stageStatus model.calls (Maybe.map .label (security model)))
+            , text statusText
             ]
-        , case density of
+        , if videoMode then
+            View.CallVideo.stageBody model
+
+          else
+          case density of
             CallUi.DensityCollapsed ->
                 div [ class "onyx-call-people onyx-call-people-collapsed" ]
                     [ span [ class "onyx-call-faces", attribute "aria-hidden" "true" ]
@@ -181,6 +227,7 @@ voiceStage model =
                         )
                     ]
                     (List.map personCell everyone)
+        , View.CallVideo.qualityPrompt model
         , controlBar model
         ]
 
@@ -322,6 +369,9 @@ controlBar model =
                             )
                         ]
                     ]
+                -- v3/calls-c4: camera + share (share moves into More <768px)
+                , cameraButton model
+                , shareButton model "onyx-cbtn onyx-cbtn-share" "screenshare-button"
                 , div [ class "onyx-call-more-wrap" ]
                     [ button
                         [ type_ "button"
@@ -334,7 +384,7 @@ controlBar model =
                         ]
                         [ callIcon "more", span [ class "onyx-cbtn-cap" ] [ text "More" ] ]
                     , if model.callMoreOpen then
-                        moreTools
+                        moreTools model
 
                       else
                         text ""
@@ -348,15 +398,93 @@ controlBar model =
                     ]
                     [ callIcon "leave", span [ class "onyx-cbtn-cap" ] [ text "Leave" ] ]
                 ]
-            , div [ class "onyx-call-bar-right" ] [ securityChip model ]
+            , div [ class "onyx-call-bar-right" ] [ securityChip model, View.CallVideo.qualityPip model ]
+            -- v3/calls-c4
+            , span
+                [ class "sr-only"
+                , attribute "role" "status"
+                , attribute "aria-live" "polite"
+                , attribute "aria-atomic" "true"
+                , attribute "data-testid" "screenshare-status"
+                ]
+                [ text model.callLocal.shareStatus ]
             ]
+
+
+-- v3/calls-c4
+cameraButton : Model -> Html Msg
+cameraButton model =
+    let
+        on =
+            model.callLocal.camera
+    in
+    button
+        [ type_ "button"
+        , class "onyx-cbtn"
+        , attribute "data-testid" "camera-button"
+        , attribute "aria-pressed" (boolAttr on)
+        , attribute "aria-label"
+            (if on then
+                "Turn off camera"
+
+             else
+                "Turn on camera"
+            )
+        , disabled (model.calls.lifecycle /= Media.InCall)
+        , onClick CallToggleCamera
+        ]
+        [ callIcon
+            (if on then
+                "cam"
+
+             else
+                "cam-off"
+            )
+        , span [ class "onyx-cbtn-cap" ] [ text "Camera" ]
+        ]
+
+
+shareButton : Model -> String -> String -> Html Msg
+shareButton model cls testid =
+    let
+        local =
+            model.callLocal
+
+        label =
+            CallMedia.shareLabel local
+    in
+    button
+        ([ type_ "button"
+         , class cls
+         , attribute "data-testid" testid
+         , attribute "aria-pressed" (boolAttr (local.share == CallMedia.ShareOn))
+         , attribute "aria-label" label
+         , title label
+         , disabled (CallMedia.shareDisabled local || model.calls.lifecycle /= Media.InCall)
+         , onClick CallToggleShare
+         ]
+            ++ (if local.share == CallMedia.SharePending then
+                    [ attribute "aria-busy" "true" ]
+
+                else
+                    []
+               )
+        )
+        [ callIcon "screen"
+        , span [ class "onyx-cbtn-cap onyx-call-more-cap" ] [ text (CallMedia.shareCaption local) ]
+        ]
+
+
+moreItem : List (Html.Attribute Msg) -> String -> String -> Html Msg
+moreItem attrs icon label =
+    button ([ type_ "button", class "onyx-call-more-item" ] ++ attrs) [ callIcon icon, text label ]
 
 
 {-| More call tools (§2.4) — v1 carries the Settings stub only; the
 seam for deafen / record / invite / layout / stage size (C4/C5/C9).
 -}
-moreTools : Html Msg
-moreTools =
+moreTools : Model -> Html Msg
+moreTools model =
     div
         [ class "onyx-call-more"
         , attribute "role" "dialog"
@@ -365,10 +493,46 @@ moreTools =
         , attribute "data-testid" "call-more-tools"
         , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (escapeTo CallMoreClose))
         ]
-        [ button
+        [ -- v3/calls-c4
+          moreItem
+            [ attribute "data-initial-focus" "true"
+            , attribute "aria-pressed" (boolAttr model.callLocal.deafened)
+            , attribute "aria-label"
+                (if model.callLocal.deafened then
+                    "Undeafen"
+
+                 else
+                    "Deafen"
+                )
+            , attribute "data-testid" "deafen-button"
+            , onClick CallToggleDeafen
+            ]
+            "deafen"
+            (if model.callLocal.deafened then
+                "Undeafen"
+
+             else
+                "Deafen"
+            )
+        , div [ class "onyx-call-more-share" ]
+            [ shareButton model "onyx-call-more-item" "call-more-share" ]
+        , moreItem
+            [ attribute "aria-pressed" (boolAttr (model.callLayout == CallMedia.LayoutSpotlight))
+            , attribute "data-testid" "layout-button"
+            , onClick CallLayoutToggle
+            ]
+            "grid"
+            (CallMedia.layoutToggleLabel model.callLayout)
+        , moreItem
+            [ attribute "aria-pressed" (boolAttr (model.callStageSize /= CallMedia.SizeCompact))
+            , attribute "data-testid" "stage-size-button"
+            , onClick CallStageSizeCycle
+            ]
+            "expand"
+            (CallMedia.stageSizeLabel model.callStageSize)
+        , button
             [ type_ "button"
             , class "onyx-call-more-item"
-            , attribute "data-initial-focus" "true"
             , attribute "aria-label" "Open voice settings"
             , attribute "aria-disabled" "true"
             , attribute "data-testid" "call-more-settings"

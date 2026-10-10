@@ -142,6 +142,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
 - 2026-10-10 — Calls C1–C3 (presence + join banner, voice-only stage + bar v1 + announcer, security chip + privacy sheet) landed (`v3/calls-c1`).
 - 2026-10-10 — 1.0 shell frame + tokens landed (`v3/frame`): token ladder, one frame grid, `View.Sheet` primitive, one overlay focus mechanism, one Escape order, global topbar + room header with More menu (24 `FrameTest` vectors + `overlayFocus.smoke.mjs` 8/8).
+- 2026-10-10 — Calls C4–C5 (camera/share/deafen commands + connection quality; video grid, tiles, spotlight/screenshare, dominant speaker, paging of 16) landed (`v3/calls-c4`).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 
@@ -177,14 +178,19 @@ Spec + prototype: [design/calls/CALLS_DESIGN.md](design/calls/CALLS_DESIGN.md),
 criteria in spec §6) supersede rows 6.1–6.7:
 
 C1 Presence + join banner (M) **done** · C2 Voice-only stage + control bar v1 + announcer (M) **done** ·
-C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) ·
-C5 Video grid, tiles, layouts, dominant speaker (L) · C6 DM ring overlays (S) ·
+C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) **done** ·
+C5 Video grid, tiles, layouts, dominant speaker (L) **done** · C6 DM ring overlays (S) ·
 C7 PiP (M) · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
 C10 Reconnecting + classified errors (S) · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
 
 C1–C3 landed on `v3/calls-c1` (`CallUi`, `View.CallPresence`, `View.CallStage`; 45 `CallsC1Test`
 vectors). Join-muted-on, the reserved Privacy-code slot and snapshot-carried peer fingerprints
 ship as provisional answers to §7.2/§7.5/§7.6.
+
+C4–C5 landed on `v3/calls-c4` (`CallMedia`, `View.CallVideo`, `css/calls-c4.css`; one
+`voiceCommand` port + one `voicePeerState` port; 34 `CallsC4Test` vectors +
+`voiceTiles.smoke.mjs` 12/12). Deafen stays local-only (§7.4) and remote `kind = screen` peers
+force the screenshare layout (§7.3) as provisional answers.
 
 Open product questions are in spec §7 (mic chord vs room-mute chord, join-muted default,
 screen-share peers in ROSTER, wire for DEAFEN/RECORD, privacy code, fingerprint forwarding,
