@@ -16,6 +16,7 @@ seal/open, SCRAM/WebAuthn ceremonies, WebRTC media legs (the `Media`
 control-plane fold is wired; engine/bytes stay behind ports), uploads.
 -}
 
+import Account2
 import Base64Url
 import Bitwise
 import Boost
@@ -847,6 +848,22 @@ type alias Model =
 
     -- v3/frame
     , roomMenuOpen : Bool
+
+    -- v3/account2
+    , peopleOpen : Bool
+    , peopleFriendDraft : String
+    , peopleWatchDraft : String
+    , peopleNotice : Maybe String
+    , statusEditing : Maybe String
+    , statusExpiryChoice : String
+    , statusError : Maybe String
+    , sessionsRevokeConfirm : Bool
+    , themeShareOpen : Bool
+    , themeShareInput : String
+    , themeShareCopy : Account2.CopyStatus
+    , portableImport : String
+    , portableStatus : Maybe String
+    , portableError : Maybe String
     }
 
 
@@ -3086,6 +3103,36 @@ type Msg
     | ShortcutsOpen
     | ShortcutsClose
     | ShortcutPressed Switcher.Shortcut
+    -- v3/account2
+    | PeopleOpen
+    | PeopleClose
+    | PeopleFriendDraft String
+    | PeopleWatchDraft String
+    | PeopleFriendAdd
+    | PeopleWatchAdd
+    | PeopleFriendRemove String
+    | PeopleWatchRemove String
+    | PeopleMessage String
+    | StatusEditStart
+    | StatusEditInput String
+    | StatusExpiryChoose String
+    | StatusEditCancel
+    | StatusEditSave
+    | StatusClear
+    | SessionsRevokeOthersAsk
+    | SessionsRevokeOthersCancel
+    | SessionsRevokeOthersConfirm
+    | ThemeShareOpen
+    | ThemeShareClose
+    | ThemeShareInput String
+    | ThemeShareImport
+    | ThemeShareCopy
+    | PortableExportDownload
+    | PortableExportCopy
+    | PortableImportInput String
+    | PortableImportSubmit
+    | SessionReclaimDismiss
+    | SessionReclaimSignIn
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3664,6 +3711,22 @@ init nick url =
 
     -- v3/frame
     , roomMenuOpen = False
+
+    -- v3/account2
+    , peopleOpen = False
+    , peopleFriendDraft = ""
+    , peopleWatchDraft = ""
+    , peopleNotice = Nothing
+    , statusEditing = Nothing
+    , statusExpiryChoice = "never"
+    , statusError = Nothing
+    , sessionsRevokeConfirm = False
+    , themeShareOpen = False
+    , themeShareInput = ""
+    , themeShareCopy = Account2.CopyIdle
+    , portableImport = ""
+    , portableStatus = Nothing
+    , portableError = Nothing
     }
 
 
@@ -4188,6 +4251,22 @@ blank =
 
     -- v3/frame
     , roomMenuOpen = False
+
+    -- v3/account2
+    , peopleOpen = False
+    , peopleFriendDraft = ""
+    , peopleWatchDraft = ""
+    , peopleNotice = Nothing
+    , statusEditing = Nothing
+    , statusExpiryChoice = "never"
+    , statusError = Nothing
+    , sessionsRevokeConfirm = False
+    , themeShareOpen = False
+    , themeShareInput = ""
+    , themeShareCopy = Account2.CopyIdle
+    , portableImport = ""
+    , portableStatus = Nothing
+    , portableError = Nothing
     }
 
 
@@ -39002,7 +39081,11 @@ updateCore msg model =
             -- Results route by tag (the port echoes the request tag),
             -- so independent copy buttons never steal each other's
             -- result. A stale result for a non-busy consumer is ignored.
-            if tag == "invite" then
+            -- v3/account2
+            if List.member tag Account2.clipboardTags then
+                ( account2ClipboardResult tag ok model, [] )
+
+            else if tag == "invite" then
                 if model.inviteCopy == CopyBusy then
                     ( { model | inviteCopy = (if ok then CopyCopied else CopyFailed) }, [] )
 
@@ -40558,6 +40641,163 @@ updateCore msg model =
                 starChannel model name
 
         -- v3/frame
+        -- v3/account2
+        PeopleOpen ->
+            ( { model | peopleOpen = True, youHubOpen = False, peopleNotice = Nothing }, [] )
+
+        PeopleClose ->
+            ( { model | peopleOpen = False, peopleNotice = Nothing }, [] )
+
+        PeopleFriendDraft value ->
+            ( { model | peopleFriendDraft = String.left (maxContactNickLength + 8) value, peopleNotice = Nothing }, [] )
+
+        PeopleWatchDraft value ->
+            ( { model | peopleWatchDraft = String.left (maxContactNickLength + 8) value, peopleNotice = Nothing }, [] )
+
+        PeopleFriendAdd ->
+            peopleAdd True model
+
+        PeopleWatchAdd ->
+            peopleAdd False model
+
+        PeopleFriendRemove nick ->
+            requestFriendRemove model nick
+
+        PeopleWatchRemove nick ->
+            requestWatchRemove model nick
+
+        PeopleMessage nick ->
+            updateCore (MemberMessage nick) { model | peopleOpen = False }
+
+        StatusEditStart ->
+            ( { model
+                | statusEditing =
+                    Just
+                        (if Account2.statusExpired model.customStatusExpiry model.nowMs then
+                            ""
+
+                         else
+                            model.customStatus
+                        )
+                , statusExpiryChoice = "never"
+                , statusError = Nothing
+              }
+            , []
+            )
+
+        StatusEditInput value ->
+            ( { model | statusEditing = Just (String.left (maxCustomStatusLength + 1) value), statusError = Nothing }, [] )
+
+        StatusExpiryChoose choice ->
+            ( { model | statusExpiryChoice = choice }, [] )
+
+        StatusEditCancel ->
+            ( { model | statusEditing = Nothing, statusError = Nothing }, [] )
+
+        StatusEditSave ->
+            statusSave (Maybe.withDefault "" model.statusEditing) model
+
+        StatusClear ->
+            statusSave "" model
+
+        SessionsRevokeOthersAsk ->
+            if List.isEmpty (Session.otherAttachedSessions model.accountSessions) then
+                ( model, [] )
+
+            else
+                ( { model | sessionsRevokeConfirm = True }, [] )
+
+        SessionsRevokeOthersCancel ->
+            ( { model | sessionsRevokeConfirm = False }, [] )
+
+        SessionsRevokeOthersConfirm ->
+            List.foldl
+                (\row ( m, out ) ->
+                    let
+                        ( next, more ) =
+                            updateCore (SessionDropRequested { index = row.index }) m
+                    in
+                    ( next, out ++ more )
+                )
+                ( { model | sessionsRevokeConfirm = False }, [] )
+                (Session.otherAttachedSessions model.accountSessions)
+
+        ThemeShareOpen ->
+            ( { model | themeShareOpen = True, youHubOpen = False, themeShareInput = "", themeShareCopy = Account2.CopyIdle }, [] )
+
+        ThemeShareClose ->
+            ( { model | themeShareOpen = False, themeShareInput = "", themeShareCopy = Account2.CopyIdle }, [] )
+
+        ThemeShareInput value ->
+            ( { model | themeShareInput = String.left (Studio.maxThemeShareCodeLength * 2) value }, [] )
+
+        ThemeShareImport ->
+            case Studio.decodeThemeShare ThemeTokens.themeIds (Account2.extractThemeCode model.themeShareInput) of
+                Nothing ->
+                    ( model, [] )
+
+                Just parsed ->
+                    let
+                        ( created, persisted ) =
+                            Studio.addCustomTheme ThemeTokens.themeIds model.studioCustoms parsed.name parsed.base parsed.overrides
+
+                        imported =
+                            { model
+                                | studioCustoms = persisted
+                                , customThemes = studioCustomRefs persisted
+                                , themeId = created.id
+                                , themeShareOpen = False
+                                , themeShareInput = ""
+                                , themeShareCopy = Account2.CopyIdle
+                            }
+                    in
+                    ( imported
+                    , [ StudioStoreCustomThemes { json = encodeStudioCustoms persisted }
+                      , AppearanceStoreTheme { id = created.id }
+                      , appearanceApplyFor imported
+                      ]
+                    )
+
+        ThemeShareCopy ->
+            case Account2.shareUrl model.themeId model.studioCustoms model.origin of
+                Nothing ->
+                    ( { model | themeShareCopy = Account2.CopyFailed }, [] )
+
+                Just url ->
+                    ( { model | themeShareCopy = Account2.CopyIdle }, [ ClipboardCopy { text = url, tag = "theme-share" } ] )
+
+        PortableExportDownload ->
+            case portableExport model of
+                Nothing ->
+                    ( { model | portableError = Just "Sign in before exporting residence data.", portableStatus = Nothing }, [] )
+
+                Just json ->
+                    ( { model | portableStatus = Just "Residence file downloaded (no secrets included).", portableError = Nothing }
+                    , [ AccountDownload { filename = Account2.portableFilename (millisToIso model.nowMs), json = json } ]
+                    )
+
+        PortableExportCopy ->
+            case portableExport model of
+                Nothing ->
+                    ( { model | portableError = Just "Sign in before exporting residence data.", portableStatus = Nothing }, [] )
+
+                Just json ->
+                    ( { model | portableStatus = Nothing, portableError = Nothing }
+                    , [ ClipboardCopy { text = json, tag = "portable-copy" } ]
+                    )
+
+        PortableImportInput value ->
+            ( { model | portableImport = String.left (Account2.maxPortableChars + 1) value }, [] )
+
+        PortableImportSubmit ->
+            portableImportRun model
+
+        SessionReclaimDismiss ->
+            ( { model | sessionReclaim = Nothing }, [] )
+
+        SessionReclaimSignIn ->
+            updateCore SessionDisconnect { model | sessionReclaim = Nothing }
+
         RoomMenuToggle ->
             ( { model | roomMenuOpen = not model.roomMenuOpen }, [] )
 
@@ -42898,6 +43138,9 @@ overlayStack model =
         , ( "pins", model.showPinnedMessages, PinnedMessagesClose )
         , ( "prefs", model.prefsOpen, PrefsClose )
         , ( "notify", model.notifySheetOpen, NotifySheetClose )
+        -- v3/account2
+        , ( "theme-share", model.themeShareOpen, ThemeShareClose )
+        , ( "people", model.peopleOpen, PeopleClose )
         , ( "account", model.accountOpen, SetAccountOpen False )
         , ( "scheduled", model.showScheduledMessages, SetShowScheduledMessages False )
         , ( "browse-rooms", model.browserOpen, BrowserClose )
@@ -43276,3 +43519,183 @@ prefsDraftsDiscardConfirm model =
                 ( prefsDiscardDrafts (List.map Tuple.first drafts) model
                 , [ PrefsFocus { id = "pref-discard-drafts-trigger" } ]
                 )
+
+
+
+-- v3/account2
+
+
+{-| Add a friend (`friend = True`) or a WATCH entry from the People
+sheet draft. The verbs (`requestFriendAdd` / `requestWatchAdd`) stay
+the only writers; this wrapper only explains a refusal the verbs keep
+silent (no owner, bad name, duplicate, full list) and clears the draft
+on success.
+-}
+peopleAdd : Bool -> Model -> ( Model, List Outbound )
+peopleAdd friend model =
+    let
+        draft =
+            if friend then
+                model.peopleFriendDraft
+
+            else
+                model.peopleWatchDraft
+
+        notice copy =
+            ( { model | peopleNotice = Just copy }, [] )
+    in
+    case ( deviceMemoryOwner model, normalizeContactNick draft ) of
+        ( Nothing, _ ) ->
+            notice "Connect first to keep a list of people."
+
+        ( _, Nothing ) ->
+            notice "Enter a valid name."
+
+        ( Just _, Just clean ) ->
+            let
+                key =
+                    String.toLower clean
+            in
+            if friend && Dict.member key model.friends then
+                notice (clean ++ " is already a friend.")
+
+            else if not friend && List.any (\entry -> String.toLower entry.nick == key) model.watchList then
+                notice (clean ++ " is already on your watch list.")
+
+            else if friend && Dict.size model.friends >= maxContacts then
+                notice "Your friends list is full."
+
+            else if not friend && List.length model.watchList >= maxContacts then
+                notice "Your watch list is full."
+
+            else if friend then
+                let
+                    ( next, out ) =
+                        requestFriendAdd model clean
+                in
+                ( { next | peopleFriendDraft = "", peopleNotice = Nothing }, out )
+
+            else
+                let
+                    ( next, out ) =
+                        requestWatchAdd model clean
+                in
+                ( { next | peopleWatchDraft = "", peopleNotice = Nothing }, out )
+
+
+{-| Save (or clear, with "") our custom status plus the chosen expiry.
+The expiry lands first so the status write persists both together;
+clearing the status also clears its expiry.
+-}
+statusSave : String -> Model -> ( Model, List Outbound )
+statusSave draft model =
+    case ( normalizeCustomStatus draft, deviceMemoryOwner model ) of
+        ( Nothing, _ ) ->
+            ( { model | statusError = Just ("Keep it under " ++ String.fromInt maxCustomStatusLength ++ " characters, on one line.") }, [] )
+
+        ( _, Nothing ) ->
+            ( { model | statusError = Just "Connect first to set a status." }, [] )
+
+        ( Just clean, Just _ ) ->
+            let
+                expiry =
+                    if String.isEmpty clean then
+                        Nothing
+
+                    else
+                        Account2.expiryFor model.statusExpiryChoice model.nowMs
+
+                ( withExpiry, expiryOut ) =
+                    setCustomStatusExpiry model expiry
+
+                ( withStatus, statusOut ) =
+                    setCustomStatus withExpiry clean
+            in
+            ( { withStatus | statusEditing = Nothing, statusError = Nothing }, expiryOut ++ statusOut )
+
+
+{-| The residence document for this owner (mirroring
+`PortableIdentitySection.exportDoc`: refused without a device-memory
+owner). Favorites come from the starred rooms; this client keeps no
+folders or quiet hours.
+-}
+portableExport : Model -> Maybe String
+portableExport model =
+    case deviceMemoryOwner model of
+        Nothing ->
+            Nothing
+
+        Just _ ->
+            Just
+                (Account2.serializePortable
+                    { preferences =
+                        Decode.decodeString Decode.value (Prefs.encodePreferences model.prefs)
+                            |> Result.withDefault Encode.null
+                    , bookmarks = Set.toList model.starredChannels
+                    , networkHint = Just "Onyx"
+                    , exportedAt = millisToIso model.nowMs
+                    }
+                )
+
+
+{-| Import a residence document (mirroring `onImport`: fail closed on
+a bad document; otherwise replace the favorites with the file's).
+Preferences are exported but — as in the oracle — never imported.
+-}
+portableImportRun : Model -> ( Model, List Outbound )
+portableImportRun model =
+    if deviceMemoryOwner model == Nothing then
+        ( { model | portableError = Just "Sign in before importing residence data.", portableStatus = Nothing }, [] )
+
+    else
+        case Account2.parsePortable (\s -> parseIso8601Ms s /= Nothing) model.portableImport of
+            Nothing ->
+                ( { model | portableError = Just "Invalid residence file — wrong kind, secrets present, or corrupt JSON.", portableStatus = Nothing }, [] )
+
+            Just doc ->
+                let
+                    starred =
+                        List.foldl (\channel m -> Tuple.first (starChannel m channel))
+                            { model | starredChannels = Set.empty }
+                            doc.bookmarks
+                in
+                ( { starred
+                    | portableImport = ""
+                    , portableStatus = Just (Account2.portableImportStatus doc (Set.size starred.starredChannels))
+                    , portableError = Nothing
+                  }
+                , starredSaveOut starred
+                )
+
+
+{-| Route a clipboard receipt this slice owns. A theme-share receipt
+after the sheet closed is stale and ignored.
+-}
+account2ClipboardResult : String -> Bool -> Model -> Model
+account2ClipboardResult tag ok model =
+    if tag == "theme-share" then
+        if model.themeShareOpen then
+            { model
+                | themeShareCopy =
+                    if ok then
+                        Account2.CopyDone
+
+                    else
+                        Account2.CopyFailed
+            }
+
+        else
+            model
+
+    else
+        { model
+            | portableStatus =
+                Just
+                    (if ok then
+                        "Residence JSON copied to clipboard."
+
+                     else
+                        "Clipboard copy failed — use Download instead."
+                    )
+            , portableError = Nothing
+        }

@@ -22,6 +22,7 @@ import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
+import View.Account2
 import View.Sheet as Sheet
 
 
@@ -73,6 +74,8 @@ accountPanel model =
                             , recoverySection model
                             , passkeysSection model
                             , devicesSection model
+                            , -- v3/account2
+                              View.Account2.portableSection model
                             , sessionSection model
                             , capsSection model
                             , retentionSection model
@@ -95,6 +98,7 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-recovery-title" ] [ text "Recovery" ]
         , a [ class "onyx-account-nav__item", href "#acct-passkeys-title" ] [ text "Passkeys" ]
         , a [ class "onyx-account-nav__item", href "#acct-sessions-title" ] [ text "Devices" ]
+        , a [ class "onyx-account-nav__item", href "#acct-portable-title" ] [ text "Residence" ]
         , a [ class "onyx-account-nav__item", href "#acct-session-title" ] [ text "Session" ]
         , a [ class "onyx-account-nav__item", href "#acct-caps-title" ] [ text "Capabilities" ]
         , a [ class "onyx-account-nav__item", href "#acct-history-title" ] [ text "History" ]
@@ -187,6 +191,9 @@ devicesSection model =
                 , onClick SessionListRequested
                 ]
                 [ text "Refresh" ]
+
+            -- v3/account2
+            , View.Account2.revokeOthers model
             ]
          ]
             ++ pendingNote model.accountSessionsPending "Loading sessions…"

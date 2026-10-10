@@ -1,0 +1,167 @@
+/* v3/account2 — session reclaim banner, revoke-others confirm, portable
+   residence, theme share/import sheet, You hub status block, People sheet,
+   sidebar friend presence. Tokens come from :root in app.css. */
+
+.a2-sheet { width: min(520px, 100%); }
+.a2-body { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--pad-panel); overflow-y: auto; }
+.a2-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.a2-heading { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--onyx-text); }
+.a2-hint { margin: 0; font-size: var(--text-xs); color: var(--onyx-dim); line-height: var(--leading-snug); }
+.a2-faint { color: var(--onyx-faint); font-size: var(--text-xs); }
+.a2-label { font-size: var(--text-xs); color: var(--onyx-dim); }
+.a2-error { margin: 0; font-size: var(--text-xs); color: var(--onyx-bad); }
+.a2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.a2-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.a2-row--between { justify-content: space-between; }
+.a2-row--fill { flex-wrap: nowrap; }
+.a2-row--fill > .a2-input { flex: 1 1 auto; min-width: 0; }
+
+.a2-input,
+.a2-select,
+.a2-textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: var(--target-floor);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.a2-textarea { width: 100%; font-family: var(--font-mono); font-size: var(--text-xs); resize: vertical; }
+.a2-input:focus-visible,
+.a2-select:focus-visible,
+.a2-textarea:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.a2-textarea[aria-invalid="true"] { border-color: var(--onyx-bad); }
+
+.a2-btn,
+.a2-link {
+  min-height: var(--target-floor);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.a2-link { border-color: transparent; color: var(--onyx-dim); }
+.a2-btn:hover,
+.a2-link:hover { border-color: var(--onyx-dim); }
+.a2-btn:focus-visible,
+.a2-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.a2-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.a2-btn--primary { border-color: var(--onyx-accent); background: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.a2-btn--danger { border-color: var(--onyx-bad); color: var(--onyx-bad); }
+
+.a2-ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+}
+.a2-ready__label { font-size: var(--text-2xs); letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-dim); }
+.a2-ready__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.a2-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.a2-confirm__copy { margin: 0; font-size: var(--text-xs); color: var(--onyx-text); }
+.a2-portable .a2-row { margin-bottom: var(--space-2); }
+
+/* Session reclaim banner (mirrors session-reclaim-banner.css). */
+.a2-reclaim {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--onyx-line);
+  background: var(--onyx-panel);
+  color: var(--onyx-text);
+  font-size: var(--text-sm);
+  min-width: 0;
+}
+.a2-reclaim--alert { border-left: 3px solid var(--onyx-warn); }
+.a2-reclaim__glyph { flex: none; color: var(--onyx-dim); }
+.a2-reclaim--alert .a2-reclaim__glyph { color: var(--onyx-warn); }
+.a2-reclaim__text { display: flex; flex-wrap: wrap; gap: 0 var(--space-2); flex: 1 1 auto; min-width: 0; }
+.a2-reclaim__title { font-weight: 600; }
+.a2-reclaim__detail { color: var(--onyx-dim); }
+.a2-reclaim__signin,
+.a2-reclaim__dismiss {
+  flex: none;
+  min-height: var(--target-floor);
+  min-width: var(--target-floor);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-text);
+  font: inherit;
+  cursor: pointer;
+}
+.a2-reclaim__signin { border-color: var(--onyx-accent); background: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.a2-reclaim__dismiss { border-color: transparent; color: var(--onyx-dim); }
+.a2-reclaim__signin:focus-visible,
+.a2-reclaim__dismiss:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* You hub status block. */
+.a2-status { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.a2-status__current { align-items: flex-start; }
+.a2-status__text { flex: 1 1 auto; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.a2-status__form { display: flex; flex-direction: column; gap: var(--space-2); }
+.a2-dnd {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-pill);
+  font-size: var(--text-2xs);
+  color: var(--onyx-warn);
+}
+
+/* People sheet. */
+.a2-add { display: flex; flex-direction: column; gap: var(--space-1); }
+.a2-list { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.a2-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--onyx-line);
+  min-width: 0;
+}
+.a2-person__copy { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.a2-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--onyx-dim);
+  background: transparent;
+}
+.a2-dot[data-online="true"] { border-color: var(--onyx-text); background: var(--onyx-text); }
+.onyx-rail-avatar { position: relative; }
+.a2-dot--avatar { position: absolute; right: -2px; bottom: -2px; box-shadow: 0 0 0 2px var(--onyx-panel); }
+
+@media (max-width: 767.98px) {
+  .a2-row--fill { flex-wrap: wrap; }
+  .a2-person { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2-btn,
+  .a2-link { transition: none; }
+}

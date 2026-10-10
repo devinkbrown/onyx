@@ -30,7 +30,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 0.2 | Leave / disconnect returns to the gate | `ServerRail` disconnect | **done** (`c18b9591`) |
 | 0.3 | Remembered identities + "Stay signed in" (needs a ports listing seam over `onyx:credentials`) | `Connect.tsx`, `lib/credentials.ts` | todo |
 | 0.4 | Invite preview aside when arriving via `?join=` | `Connect.tsx` `conn-context` | todo |
-| 0.5 | Session-expired "Sign in again" banner | `SessionReclaimBanner` | todo |
+| 0.5 | Session-expired "Sign in again" banner | `SessionReclaimBanner` | **done** (v3/account2: four-phase banner in the shell notices strip) |
 
 ## Phase 1 — Shell skeleton that feels like Onyx
 
@@ -95,11 +95,11 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 4.1 | Device preferences panel: display, accessibility, conversation, history & data, vault, drafts, queued sends | `PreferencesPanel` | L · **done** (v3/prefs; `App & tools`, density, local-history toggle, clear-* controls narrowed — see COVERAGE) |
 | 4.2 | Mention keywords, ignored users, smart mute, room folders | `KeywordListControl`, `IgnoredUsersControl`, `SmartMuteSection`, `ChannelOrganizationSection` | **partial** (`v3/notify`: keywords + ignored users done in the Notifications sheet; smart mute + room folders todo) |
-| 4.3 | Revoke other devices | `SessionsDevicesSection` | S |
-| 4.4 | Portable identity export/import | `PortableIdentitySection` | S |
+| 4.3 | Revoke other devices | `SessionsDevicesSection` | S · **done** (v3/account2: bulk revoke with inline confirm; per-row drop already ported) |
+| 4.4 | Portable identity export/import | `PortableIdentitySection` | S · **done** (v3/account2: non-secret residence file — favorites only; no folders / quiet hours state, see COVERAGE) |
 | 4.5 | History import (Discord / bot / vault) | `HistoryImportControls` | M |
-| 4.6 | Theme share/import by code or link dialog | `ThemeImportDialog` | S |
-| 4.7 | Friends / watch list, custom status, DND UI (logic already in `App`) | `App` folds | M |
+| 4.6 | Theme share/import by code or link dialog | `ThemeImportDialog` | S · **done** (v3/account2: sheet from the You hub and `/appearance`) |
+| 4.7 | Friends / watch list, custom status, DND UI (logic already in `App`) | `App` folds | M · **done** (v3/account2: People sheet, You hub status/presence/DND block, friend presence on sidebar DM rows; expiry shown, not timer-enforced) |
 
 ## Phase 5 — Moderation and operators
 
@@ -189,3 +189,4 @@ ship as provisional answers to §7.2/§7.5/§7.6.
 Open product questions are in spec §7 (mic chord vs room-mute chord, join-muted default,
 screen-share peers in ROSTER, wire for DEAFEN/RECORD, privacy code, fingerprint forwarding,
 ring timeout outcome).
+- 2026-10-10 — Phase 0.5 + 4.3 / 4.4 / 4.6 / 4.7 account completeness landed (v3/account2).

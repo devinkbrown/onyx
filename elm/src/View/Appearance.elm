@@ -23,6 +23,7 @@ import Json.Decode as Decode
 import Prefs
 import ThemeLook
 import Translate
+import View.Account2
 import View.Studio
 
 
@@ -264,7 +265,11 @@ view model =
                     ]
                 , div [ class "ap-studio__body" ]
                     [ section [ class "ap-group" ]
-                        [ h2 [ class "ap-glabel" ] [ text "All looks" ]
+                        [ div [ class "a2-row a2-row--between" ]
+                            [ h2 [ class "ap-glabel" ] [ text "All looks" ]
+                            , -- v3/account2
+                              button [ Html.Attributes.type_ "button", class "a2-link", attribute "aria-haspopup" "dialog", attribute "data-testid" "appearance-theme-share", onClick ThemeShareOpen ] [ text "Share / import" ]
+                            ]
                         , div [ class "ap-chips", attribute "role" "radiogroup", attribute "aria-label" "All looks" ]
                             (List.map (themeChip model) (ThemeLook.themeMeta |> List.map (\meta -> { id = meta.id, label = meta.label, title = meta.description, swatch = meta.swatch })) ++ List.map (themeChip model) (List.map (\custom -> { id = custom.id, label = custom.name, title = "Saved look", swatch = [ "var(--lapis)", "var(--gold)", "var(--shu)" ] }) model.customThemes))
                         ]
@@ -296,6 +301,9 @@ view model =
                     ]
                 ]
             ]
+
+        -- v3/account2
+        , View.Account2.themeShareSheet model
         ]
 
 
