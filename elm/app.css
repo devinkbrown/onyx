@@ -2491,3 +2491,57 @@ html, body {
   border: 1px solid var(--onyx-line); border-radius: 6px; padding: 8px 14px; cursor: pointer;
 }
 .jump-to-date__ledger { font-size: 13px; color: var(--onyx-dim); }
+
+/* v3/roster — header count, filter, avatar + presence, role words, row actions */
+.onyx-roster-head { align-items: baseline; display: flex; gap: 8px; justify-content: space-between; }
+.onyx-roster-head h2 { margin-bottom: 8px; }
+.onyx-roster-count { color: var(--onyx-dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.onyx-roster-filter { margin: 4px 0 8px; }
+.onyx-roster-filter-input {
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 4px 8px;
+  width: 100%;
+}
+.onyx-roster-filter-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -2px; }
+.onyx-roster-empty { color: var(--onyx-dim); font-size: 13px; margin: 8px 0; }
+.onyx-roster .onyx-member { align-items: center; flex-wrap: wrap; min-height: 36px; }
+.onyx-roster .onyx-member.onyx-away { opacity: 1; }
+.onyx-member-avatar-slot { flex: none; position: relative; }
+.onyx-member-presence-dot {
+  background: var(--onyx-dim);
+  border: 2px solid var(--onyx-panel);
+  border-radius: 50%;
+  bottom: -1px;
+  height: 8px;
+  position: absolute;
+  right: -1px;
+  width: 8px;
+}
+.onyx-member-presence-dot--away { background: var(--onyx-panel); box-shadow: inset 0 0 0 2px var(--onyx-faint); }
+.onyx-roster .onyx-member-prefix { color: var(--onyx-faint); font-weight: 400; }
+.onyx-member-identity { display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; }
+.onyx-member-identity .onyx-member-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-away .onyx-member-nick { color: var(--onyx-dim); font-style: italic; }
+.onyx-member-role { color: var(--onyx-dim); font-size: 11px; padding: 0 6px; }
+.onyx-member-row-actions { display: flex; gap: 4px; margin-left: auto; }
+.onyx-member-row-actions .onyx-member-profile { margin-left: 0; }
+.onyx-member-message {
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 24px;
+  padding: 2px 8px;
+}
+.onyx-member-message:hover { background: var(--onyx-panel-2); }
+.onyx-member-action--primary { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.onyx-member-action--primary:hover { background: var(--onyx-accent); filter: brightness(1.08); }

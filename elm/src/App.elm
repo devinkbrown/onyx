@@ -793,6 +793,9 @@ type alias Model =
     , homeCoachDismissed : Bool
     , homeCaughtUpAnnounce : String
 
+    -- v3/roster
+    , memberFilter : String
+
     -- v3/sidebar
     , sidebarFilter : String
     , sidebarUnreadOnly : Bool
@@ -2947,6 +2950,8 @@ type Msg
     | CallHubChanged Media.CallHub
     | CallHubSnapshot Decode.Value
     | SelectBoardTab String
+    -- v3/roster
+    | MemberFilterInput String
     -- v3/sidebar
     | SidebarFilterInput String
     | SidebarUnreadOnlyToggle
@@ -3493,6 +3498,8 @@ init nick url =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    -- v3/roster
+    , memberFilter = ""
     -- v3/sidebar
     , sidebarFilter = ""
     , sidebarUnreadOnly = False
@@ -3981,6 +3988,8 @@ blank =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    -- v3/roster
+    , memberFilter = ""
     -- v3/sidebar
     , sidebarFilter = ""
     , sidebarUnreadOnly = False
@@ -39702,6 +39711,12 @@ updateCore msg model =
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
+
+        -- v3/roster
+        MemberFilterInput value ->
+            -- Local nick-substring filter (mirroring the roster
+            -- `memberFilter` signal); never touches the wire.
+            ( { model | memberFilter = value }, [] )
 
         -- v3/sidebar
         SidebarFilterInput value ->

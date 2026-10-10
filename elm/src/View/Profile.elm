@@ -563,7 +563,8 @@ cardFor model nick channel =
                     ]
                     [ button
                         [ attribute "type" "button"
-                        , class "onyx-member-action"
+                        , class "onyx-member-action onyx-member-action--primary"
+                        , attribute "data-testid" "member-card-message"
                         , attribute "aria-label" ("Send DM to " ++ nick)
                         , onClick (App.MemberMessage nick)
                         ]
@@ -571,6 +572,7 @@ cardFor model nick channel =
                     , button
                         [ attribute "type" "button"
                         , class "onyx-member-action"
+                        , attribute "data-testid" "member-card-mention"
                         , attribute "aria-label" ("Mention " ++ nick ++ " in the composer")
                         , onClick (App.MemberMention { nick = nick, channel = channel })
                         ]
@@ -579,6 +581,7 @@ cardFor model nick channel =
                         button
                             [ attribute "type" "button"
                             , class "onyx-member-action"
+                            , attribute "data-testid" "member-card-block"
                             , attribute "aria-label" ("Unblock " ++ nick ++ " on this device")
                             , onClick (App.UnignoreUser (String.trim nick))
                             ]
@@ -588,6 +591,7 @@ cardFor model nick channel =
                         button
                             [ attribute "type" "button"
                             , class "onyx-member-action"
+                            , attribute "data-testid" "member-card-block"
                             , attribute "aria-label" ("Block " ++ nick ++ " on this device")
                             , onClick (App.SafetyOpenBlock { nick = nick, guest = account == Nothing })
                             ]
@@ -595,6 +599,7 @@ cardFor model nick channel =
                     , button
                         [ attribute "type" "button"
                         , class "onyx-member-action"
+                        , attribute "data-testid" "member-card-report"
                         , attribute "aria-label" ("Report " ++ nick)
                         , onClick (App.SafetyOpenReport { nick = nick, guest = account == Nothing })
                         ]
