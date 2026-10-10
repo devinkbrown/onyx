@@ -150,7 +150,79 @@ async function openMembers(page, h) {
   }
 }
 
+/* iPhone 15 emulation. There is no WebKit here, so this is Chromium in
+   iPhone geometry (390x844, DPR 3, touch) with an iPhone Safari UA, and
+   the safe-area insets shimmed through the --safe-* tokens (env() is 0 in
+   Chromium). The keyboard is simulated by publishing what the ports.js
+   visualViewport bridge would (--vvh, --kb-inset, data-kb) and painting a
+   keyboard-sized block where iOS would draw it. */
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+async function iphone(page) {
+  await page.addInitScript((ua) => {
+    Object.defineProperty(globalThis.Navigator.prototype, 'userAgent', { get: () => ua });
+    Object.defineProperty(globalThis.Navigator.prototype, 'platform', { get: () => 'iPhone' });
+    Object.defineProperty(globalThis.Navigator.prototype, 'maxTouchPoints', { get: () => 5 });
+  }, IPHONE_UA);
+}
+async function safeAreas(page, insets) {
+  const css = Object.entries(insets).map(([k, v]) => `--safe-${k}: ${v}px;`).join(' ');
+  await page.addStyleTag({ content: `:root { ${css} }` });
+  // A sketch of the hardware: Dynamic Island + home indicator.
+  await page.evaluate(({ top, bottom, left }) => {
+    const mk = (style) => { const d = document.createElement('div'); d.setAttribute('aria-hidden', 'true'); d.style.cssText = `position:fixed;z-index:2147483647;pointer-events:none;${style}`; document.body.appendChild(d); };
+    if (top) mk(`top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000`);
+    if (left) mk(`left:0;top:50%;transform:translateY(-50%);width:37px;height:126px;border-radius:20px;background:#000`);
+    if (bottom) mk(`bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:#e8e6e1`);
+  }, insets);
+}
+async function keyboard(page, px = 336) {
+  await page.evaluate((kb) => {
+    const root = document.documentElement;
+    root.style.setProperty('--vvh', `${globalThis.innerHeight - kb}px`);
+    root.style.setProperty('--kb-inset', `${kb}px`);
+    root.setAttribute('data-kb', 'open');
+    const k = document.createElement('div');
+    k.setAttribute('aria-hidden', 'true');
+    k.textContent = 'keyboard (simulated)';
+    k.style.cssText = `position:fixed;left:0;right:0;bottom:0;height:${kb}px;z-index:2147483646;background:#2b2d31;color:#8a8f98;font:14px system-ui;display:grid;place-items:center;pointer-events:none`;
+    document.body.appendChild(k);
+  }, px);
+}
+
 export default {
+  'ios-room': async (page, h) => {
+    if (isPhone(page)) await iphone(page);
+    await room(page, h);
+    if (isPhone(page)) await safeAreas(page, { top: 59, bottom: 34 });
+    await h.settle(page, 300);
+  },
+
+  'ios-keyboard': async (page, h) => {
+    if (isPhone(page)) await iphone(page);
+    await room(page, h);
+    if (isPhone(page)) await safeAreas(page, { top: 59, bottom: 34 });
+    await page.click('#shell-composer-input');
+    await page.fill('#shell-composer-input', 'on my way, saving seats');
+    if (isPhone(page)) await keyboard(page);
+    await h.settle(page, 400);
+  },
+
+  'ios-members': async (page, h) => {
+    if (isPhone(page)) await iphone(page);
+    await room(page, h, { rich: true, big: true });
+    if (isPhone(page)) await safeAreas(page, { top: 59, bottom: 34 });
+    await openMembers(page, h);
+  },
+
+  'ios-landscape': async (page, h) => {
+    const phone = isPhone(page);
+    if (phone) { await iphone(page); await page.setViewportSize({ width: 844, height: 390 }); }
+    await room(page, h);
+    if (phone) await safeAreas(page, { left: 59, right: 59, bottom: 21 });
+    await h.settle(page, 300);
+  },
+
+
   'roster': async (page, h) => { await room(page, h); await openMembers(page, h); },
 
   'roster-big': async (page, h) => { await room(page, h, { rich: true, big: true }); await openMembers(page, h); },

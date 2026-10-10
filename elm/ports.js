@@ -9808,6 +9808,76 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* v3/ios — the keyboard and visual-viewport bridge. iOS Safari (and
+     Chrome on Android since 108) shrink only the *visual* viewport when
+     the on-screen keyboard opens: `innerHeight` and `100dvh` stay put,
+     so a bottom-anchored composer would sit under the keyboard. This
+     publishes two custom properties on :root, rAF-throttled:
+
+       --kb-inset  px of the layout viewport the keyboard covers (0 when
+                   closed; small toolbar jitter under 80px reads as 0)
+       --vvh       the visual viewport height in px
+       --vv-top    how far Safari panned the visual viewport while the
+                   keyboard is up (0 otherwise), so the shell can follow
+
+     plus `data-kb="open"` on <html> while a keyboard is up. Pinch-zoom
+     (scale != 1) leaves the last values alone, so zooming never resizes
+     the app. Returns { measure, stop } or null without a visualViewport. */
+  function installViewportInsets(win) {
+    var w = win || global;
+    var vv = w && w.visualViewport;
+    var doc = w && w.document;
+    var root = doc && doc.documentElement;
+    if (!vv || !root || !root.style || typeof vv.addEventListener !== "function") return null;
+    var raf = typeof w.requestAnimationFrame === "function"
+      ? function (fn) { w.requestAnimationFrame(fn); }
+      : function (fn) { setTimeout(fn, 16); };
+    var pending = false;
+    var last = { kb: -1, h: -1, top: -1 };
+
+    function measure() {
+      pending = false;
+      var scale = typeof vv.scale === "number" ? vv.scale : 1;
+      if (Math.abs(scale - 1) > 0.01) return last;
+      var layout = w.innerHeight || root.clientHeight || 0;
+      var height = Math.max(0, Math.round(vv.height || 0));
+      var covered = Math.round(layout - (height + (vv.offsetTop || 0)));
+      var kb = covered >= 80 ? covered : 0;
+      if (height > 0 && height !== last.h) root.style.setProperty("--vvh", height + "px");
+      var top = kb > 0 ? Math.max(0, Math.round(vv.offsetTop || 0)) : 0;
+      if (kb !== last.kb) {
+        root.style.setProperty("--kb-inset", kb + "px");
+        if (typeof root.setAttribute === "function") root.setAttribute("data-kb", kb > 0 ? "open" : "closed");
+      }
+      if (top !== last.top) root.style.setProperty("--vv-top", top + "px");
+      last = { kb: kb, h: height > 0 ? height : last.h, top: top };
+      return last;
+    }
+
+    function schedule() {
+      if (pending) return;
+      pending = true;
+      raf(measure);
+    }
+
+    vv.addEventListener("resize", schedule);
+    vv.addEventListener("scroll", schedule);
+    if (typeof w.addEventListener === "function") w.addEventListener("orientationchange", schedule);
+    measure();
+    return {
+      measure: measure,
+      stop: function () {
+        vv.removeEventListener("resize", schedule);
+        vv.removeEventListener("scroll", schedule);
+        if (typeof w.removeEventListener === "function") w.removeEventListener("orientationchange", schedule);
+      }
+    };
+  }
+
+  if (global.document && global.visualViewport) {
+    try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
+  }
+
   global.OnyxPorts = {
     vaultStore: {
       put: vaultPut,
@@ -9923,6 +9993,7 @@ function fetchPublicFeed(url) {
       capabilities: voiceCapabilities
     },
     wire: wire,
+    installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
     VAULT_KEEP: VAULT_KEEP,

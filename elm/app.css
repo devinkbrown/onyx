@@ -94,6 +94,27 @@
   --context-w: 240px;
   --mobile-nav-h: 56px;
   --composer-h: 64px;
+
+  /* v3/ios — device geometry. Safe-area insets (notch / Dynamic Island,
+     home indicator, landscape sides) as tokens, so every surface reads
+     one name and screenshot tooling can shim them. The keyboard pair is
+     published by ports.js (installViewportInsets, visualViewport, rAF-
+     throttled): --kb-inset is the px the on-screen keyboard covers (0
+     when closed; <html data-kb="open"> while it is up), --vvh the visual
+     viewport height in px, --vv-top how far Safari panned it while the
+     keyboard is up. Without the bridge --vvh is 100dvh (100vh where dvh
+     is unknown) — never raw 100vh on iOS. css/pol-ios.css applies them. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --kb-inset: 0px;
+  --vv-top: 0px;
+  --vvh: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root { --vvh: 100dvh; }
 }
 
 /* Identity avatars (mirrors src/primitives avatar rules). */
