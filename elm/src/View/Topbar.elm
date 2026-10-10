@@ -162,7 +162,10 @@ reclaimDialog model =
                     , modal = True
                     , attrs = []
                     }
-                        [ p [ class "onyx-reclaim-lead" ]
+                        [ -- v3/ui-sheets: the shared sheet head (title + close).
+                          Sheet.headerWith
+                            (Sheet.head { scope = "reclaim", title = "Take your name back", closeLabel = "Close reclaim", onClose = ReclaimClose })
+                        , p [ class "onyx-reclaim-lead" ]
                             [ text "Enter the account password for "
                             , b [] [ text target ]
                             , text " to take this name back."

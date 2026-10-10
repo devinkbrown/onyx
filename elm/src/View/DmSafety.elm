@@ -225,7 +225,7 @@ safetyPanel model peer =
                     , attribute "aria-label" "Close safety number"
                     , onClick DmSafetyClose
                     ]
-                    [ text "×" ]
+                    [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
                 ]
             , p [ id "dm-safety-guidance", class "onyx-dmsafe-copy" ]
                 [ text
@@ -328,7 +328,7 @@ keyChangeRow model peer keys =
         , div [ class "onyx-keychange-head" ]
             [ div [ class "onyx-keychange-lede" ]
                 [ span [ class "onyx-keychange-kicker" ]
-                    [ span [ attribute "aria-hidden" "true" ] [ text "⚠ " ], text "Review needed" ]
+                    [ span [ class "ui-icon ui-icon--alert", attribute "aria-hidden" "true" ] [], text "Review needed" ]
                 , h2 [ id "dm-keychange-title", class "onyx-keychange-title" ]
                     [ span [ class "onyx-keychange-peer" ] [ text peer ], text "'s device identity changed" ]
                 , p [ class "onyx-keychange-sub" ]
@@ -462,20 +462,10 @@ inviteShareSheet model =
                 , modal = True
                 , attrs = [ attribute "aria-describedby" "invite-share-description" ]
                 }
-                    [ div [ class "onyx-newmsg-header" ]
-                        [ div [ class "onyx-newmsg-mark", attribute "aria-hidden" "true" ] [ text "✦" ]
-                        , div []
-                            [ h2 [ id "invite-share-title" ] [ text "Invite friends" ]
-                            , p [ id "invite-share-description", class "onyx-newmsg-help" ] [ text heading ]
-                            ]
-                        , button
-                            [ type_ "button"
-                            , class "onyx-newmsg-close"
-                            , attribute "aria-label" "Close invite friends"
-                            , onClick InviteShareClose
-                            ]
-                            [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
-                        ]
+                    [ Sheet.headerWith
+                        (Sheet.head { scope = "room-invite-share", title = "Invite friends", closeLabel = "Close invite friends", onClose = InviteShareClose }
+                            |> (\h -> { h | titleId = Just "invite-share-title", subtitle = Just heading, subtitleId = Just "invite-share-description" })
+                        )
                     , p [ class "onyx-invshare-copy" ] [ text InviteShare.introCopy ]
                     , p [ class "onyx-newmsg-help", attribute "role" "status" ]
                         [ text (InviteShare.contextCopy (model.connection == Live)) ]

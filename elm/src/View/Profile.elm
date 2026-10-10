@@ -54,17 +54,10 @@ sheetFor model nick =
         , modal = True
         , attrs = []
         }
-            [ div [ class "onyx-profile-head" ]
-                [ h2 [ class "onyx-profile-title" ] [ text ("Profile: " ++ shown) ]
-                , p [ class "onyx-profile-desc" ] [ text "Live network identity and presence details." ]
-                , button
-                    [ attribute "type" "button"
-                    , class "onyx-profile-close"
-                    , attribute "aria-label" "Close member profile"
-                    , onClick App.WhoisClose
-                    ]
-                    [ text "Close" ]
-                ]
+            [ Sheet.headerWith
+                (Sheet.head { scope = "profile", title = shown, closeLabel = "Close member profile", onClose = App.WhoisClose }
+                    |> (\h -> { h | kicker = Just "Profile", subtitle = Just "Live network identity and presence details." })
+                )
             , profileSummary shown info
             , profileStatus info
             , profileDetails shown info

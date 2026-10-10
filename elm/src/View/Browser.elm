@@ -59,17 +59,10 @@ browser model =
             , modal = True
             , attrs = []
             }
-                [ div [ class "chb-head" ]
-                    [ h2 [ class "chb-title" ] [ text "Browse rooms" ]
-                    , p [ class "chb-desc" ] [ text "Public rooms with people in them." ]
-                    , button
-                        [ type_ "button"
-                        , class "chb-close"
-                        , attribute "aria-label" "Close room browser"
-                        , onClick BrowserClose
-                        ]
-                        [ text "×" ]
-                    ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "browse-rooms", title = "Browse rooms", closeLabel = "Close room browser", onClose = BrowserClose }
+                        |> (\h -> { h | subtitle = Just "Public rooms with people in them." })
+                    )
                 , div [ class "chb-toolbar", attribute "role" "search", attribute "aria-label" "Room directory search" ]
                     [ input
                         [ class "chb-filter"

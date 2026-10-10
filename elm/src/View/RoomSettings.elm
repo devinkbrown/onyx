@@ -969,7 +969,7 @@ scheduledEventLine model channel =
                                     , attribute "data-testid" "scheduled-event-clear"
                                     , onClick (rs RoomSettings.EventClear)
                                     ]
-                                    [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
+                                    [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
                                 ]
 
                             else

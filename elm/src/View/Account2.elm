@@ -114,7 +114,7 @@ reclaimBanner model =
                     , attribute "aria-label" "Dismiss"
                     , onClick SessionReclaimDismiss
                     ]
-                    [ text "×" ]
+                    [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
                 ]
 
 
