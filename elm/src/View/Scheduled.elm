@@ -17,6 +17,7 @@ import Html exposing (Html, a, button, div, li, p, span, strong, text, time, ul)
 import Html.Attributes exposing (attribute, class, href, type_)
 import Html.Events exposing (onClick)
 import Schedule
+import View.Sheet as Sheet
 
 
 scheduledSheet : Model -> Html Msg
@@ -35,8 +36,18 @@ scheduledSheet model =
             connected =
                 model.connection == App.Live
         in
-        div [ class "onyx-scheduled-wrap" ]
-            [ div [ class "onyx-scheduled", attribute "role" "dialog", attribute "aria-label" "Scheduled messages" ]
+        Sheet.view
+            { scope = "scheduled"
+            , label = Sheet.Labelled "Scheduled messages"
+            , onClose = SetShowScheduledMessages False
+            , placement = Sheet.Center
+            , layerClass = "onyx-scheduled-wrap"
+            , panelClass = "onyx-scheduled"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = []
+            }
                 [ div [ class "onyx-scheduled-head" ]
                     [ span [ class "onyx-scheduled-title" ] [ text "Scheduled messages" ]
                     , button
@@ -59,7 +70,6 @@ scheduledSheet model =
                     ul [ class "onyx-scheduled-list", attribute "aria-label" "Pending scheduled messages" ]
                         (List.map (scheduledRow model now connected) rows)
                 ]
-            ]
 
 
 scheduledRow : Model -> Int -> Bool -> Schedule.ScheduledMessage -> Html Msg

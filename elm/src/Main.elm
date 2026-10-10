@@ -117,7 +117,6 @@ import App
 import Attribution
 import Browser
 import Browser.Dom
-import Browser.Events
 import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -1515,48 +1514,11 @@ update msg model =
 subscriptions : Model -> Sub App.Msg
 subscriptions model =
     Sub.batch
-        [ Browser.Events.onKeyDown
-            (Decode.field "key" Decode.string
-                |> Decode.andThen
-                    (\key ->
-                        if key == "Escape" then
-                            -- Search closes before the transient schedule
-                            -- chrome, which closes before the sheet, which
-                            -- closes before the nav menu (mirroring the
-                            -- panels' Escape-to-close over page chrome).
-                            if model.app.mediaLightbox /= Nothing then
-                                Decode.succeed App.MediaLightboxClose
-
-                            else if model.app.searchOpen then
-                                Decode.succeed App.SearchClose
-
-                            else if model.app.scheduleOpen then
-                                Decode.succeed App.ScheduleClose
-
-                            else if model.app.notifySheetOpen then
-                                Decode.succeed App.NotifySheetClose
-
-                            else if model.app.prefsOpen then
-                                -- v3/prefs
-                                Decode.succeed App.PrefsClose
-
-                            else if model.app.accountOpen then
-                                Decode.succeed (App.SetAccountOpen False)
-
-                            else if model.app.showScheduledMessages then
-                                Decode.succeed (App.SetShowScheduledMessages False)
-
-                            else if model.app.stewardRoom /= Nothing then
-                                Decode.succeed App.StewardClose
-
-                            else
-                                Decode.succeed App.NavMenuEscape
-
-                        else
-                            Decode.fail "not-escape"
-                    )
-            )
-        , wsLines App.WsBatchReceived
+        [ -- v3/frame: Escape arrives ONLY through the `shortcut` port
+          -- (ports.js `classifyShortcut`, never for a key a sheet already
+          -- claimed) and resolves through `App.escapeMsg`, the ordered
+          -- overlay list — no second Escape chain here.
+          wsLines App.WsBatchReceived
         , nodesProbed App.NodesProbed
         , uploadPicked App.UploadPicked
         , uploadDone App.UploadDone

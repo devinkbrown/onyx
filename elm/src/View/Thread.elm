@@ -12,6 +12,7 @@ import Facepile
 import Topic
 import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
+import Json.Decode
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Html.Keyed
 import Html.Lazy
@@ -30,6 +31,7 @@ import View.MessageText exposing (messageText)
 import View.Notify exposing (roomNotifyStrip)
 -- v3/calls-c1
 import View.CallStage
+import View.Sheet as Sheet
 
 
 thread : Model -> Html Msg
@@ -630,18 +632,18 @@ threadPanelDialog model =
                                 Nothing ->
                                     []
                     in
-                    div [ class "onyx-thread-pop" ]
-                        [ div
-                            [ class "onyx-thread-backdrop"
-                            , onClick App.ThreadClose
-                            ]
-                            []
-                        , div
-                            [ class "onyx-thread-sheet"
-                            , attribute "role" "dialog"
-                            , attribute "aria-label" "Thread"
-                            , on "keydown" threadEscapeDecoder
-                            ]
+                    Sheet.view
+                        { scope = "thread"
+                        , label = Sheet.Labelled "Thread"
+                        , onClose = App.ThreadClose
+                        , placement = Sheet.Side
+                        , layerClass = "onyx-thread-pop"
+                        , panelClass = "onyx-thread-sheet"
+                        , backdropClass = "onyx-thread-backdrop"
+                        , layerAttrs = []
+                        , modal = True
+                        , attrs = []
+                        }
                             [ div [ class "onyx-thread-head" ]
                                 [ h2 [ class "onyx-thread-title" ] [ text "Thread" ]
                                 , p [ class "onyx-thread-desc" ] [ text "Replies to this message" ]
@@ -710,30 +712,6 @@ threadPanelDialog model =
                                         )
                                 ]
                             ]
-                        ]
-
-
-{-| Escape dismisses the thread panel (same IME-yielding shape
-as the card decoder). -}
-threadEscapeDecoder : Decode.Decoder Msg
-threadEscapeDecoder =
-    Decode.field "isComposing" Decode.bool
-        |> Decode.andThen
-            (\composing ->
-                if composing then
-                    Decode.fail "ime"
-
-                else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key == "Escape" then
-                                    Decode.succeed App.ThreadClose
-
-                                else
-                                    Decode.fail "not-escape"
-                            )
-            )
 
 
 {-| Overlapping avatar stack for the conversation head
@@ -1523,7 +1501,7 @@ messageMenuPanel model target m =
                                 [ class "onyx-msg-menu"
                                 , attribute "role" "menu"
                                 , attribute "aria-label" ("More actions for " ++ actionTarget)
-                                , on "keydown" (menuEscapeDecoder model)
+                                , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (menuEscapeDecoder model))
                                 ]
                             (List.filterMap identity
                                 [ if caps.canReply then
@@ -1964,7 +1942,7 @@ reactionPickerPanel model target m =
                                 [ class "onyx-react-picker"
                                 , attribute "role" "dialog"
                                 , attribute "aria-label" ("Choose reaction for " ++ actionTarget)
-                                , on "keydown" (pickerEscapeDecoder model)
+                                , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (pickerEscapeDecoder model))
                                 ]
                                 [ input
                                     [ type_ "text"

@@ -8,6 +8,7 @@ import App exposing (Model, Msg(..))
 import Html exposing (Html, a, button, div, li, p, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, href)
 import Html.Events exposing (onClick)
+import View.Sheet as Sheet
 
 
 pinsDrawer : Model -> Html Msg
@@ -16,14 +17,18 @@ pinsDrawer model =
         text ""
 
     else
-        div [ class "onyx-pins-veil" ]
-            [ div
-                [ class "pins-panel"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "Pinned messages"
-                , attribute "data-testid" "pinned-messages"
-                ]
+        Sheet.view
+            { scope = "pins"
+            , label = Sheet.Labelled "Pinned messages"
+            , onClose = PinnedMessagesClose
+            , placement = Sheet.Side
+            , layerClass = ""
+            , panelClass = "pins-panel"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "data-testid" "pinned-messages" ]
+            }
                 ([ div [ class "pins-head" ]
                     [ span [ class "pins-title" ] [ text "Pinned messages" ]
                     , button
@@ -39,7 +44,6 @@ pinsDrawer model =
                     ++ feedbackBlock model
                     ++ [ pinsList model ]
                 )
-            ]
 
 
 contextBlock : Model -> List (Html Msg)

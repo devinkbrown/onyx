@@ -473,7 +473,8 @@ suite =
                         query { open | isOper = False }
                             |> Query.hasNot [ Selector.text "Unpin message" ]
                     , \_ ->
-                        query open
+                        -- v3/frame: Pins moved into the room header's More menu.
+                        query { open | roomMenuOpen = True }
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-pins") ]
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "2 pinned messages") ]
                     ]
@@ -657,11 +658,13 @@ suite =
             \_ ->
                 Expect.all
                     [ \_ ->
-                        query channelModel
+                        -- v3/frame: Media moved into the room header's More menu.
+                        query { channelModel | roomMenuOpen = True }
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]
                             |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Pictures, files, and links for #c") ]
                     , \_ ->
-                        query channelModel
+                        -- v3/frame: Media moved into the room header's More menu.
+                        query { channelModel | roomMenuOpen = True }
                             |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "ribbon-room-media") ]
                             |> Event.simulate Event.click
                             |> Event.expect MediaIndexOpen

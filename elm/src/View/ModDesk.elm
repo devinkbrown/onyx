@@ -1,4 +1,4 @@
-module View.ModDesk exposing (deskToggles, moderationSheet, operSheet)
+module View.ModDesk exposing (deskToggles, moderationSheet, moderationToggle, operSheet, operToggle)
 
 {-| v3/moddesk — the moderation cockpit and the operator desk as sheets.
 
@@ -31,54 +31,64 @@ import Json.Decode as Decode
 import OperDesk
 import View.Bans exposing (banPanel)
 import View.Profile exposing (moderationReview)
+import View.Sheet as Sheet
 
 
 {-| Topbar entries. Each renders only for the authority it opens. -}
 deskToggles : Model -> Html Msg
 deskToggles model =
-    let
-        roomButton =
-            case model.activeChannel of
-                Just channel ->
-                    if isChannelOp model channel then
-                        [ button
-                            [ type_ "button"
-                            , class "onyx-moddesk-toggle"
-                            , attribute "aria-pressed" (boolAttr model.moderationOpen)
-                            , attribute "aria-label" ("Moderation for " ++ channel)
-                            , attribute "data-testid" "moderation-open"
-                            , onClick ModerationSheetOpen
-                            ]
-                            [ text "Moderation" ]
-                        ]
-
-                    else
-                        []
-
-                Nothing ->
-                    []
-
-        operButton =
-            if model.isOper then
-                [ button
-                    [ type_ "button"
-                    , class "onyx-moddesk-toggle"
-                    , attribute "aria-pressed" (boolAttr model.operDeskOpen)
-                    , attribute "data-testid" "oper-desk-open"
-                    , onClick OperDeskOpen
-                    ]
-                    [ text "Operator" ]
-                ]
-
-            else
-                []
-    in
-    case roomButton ++ operButton of
+    case moderationToggle model ++ operToggle model of
         [] ->
             text ""
 
         buttons ->
             span [ class "onyx-moddesk-toggles" ] buttons
+
+
+{-| v3/frame — the room-scoped Moderation entry (the room header's
+More menu); empty unless we moderate the active room.
+-}
+moderationToggle : Model -> List (Html Msg)
+moderationToggle model =
+    case model.activeChannel of
+        Just channel ->
+            if isChannelOp model channel then
+                [ button
+                    [ type_ "button"
+                    , class "onyx-moddesk-toggle"
+                    , attribute "aria-pressed" (boolAttr model.moderationOpen)
+                    , attribute "aria-label" ("Moderation for " ++ channel)
+                    , attribute "data-testid" "moderation-open"
+                    , onClick ModerationSheetOpen
+                    ]
+                    [ text "Moderation" ]
+                ]
+
+            else
+                []
+
+        Nothing ->
+            []
+
+
+{-| v3/frame — the network-scoped Operator entry (the global topbar);
+empty unless we are a server operator.
+-}
+operToggle : Model -> List (Html Msg)
+operToggle model =
+    if model.isOper then
+        [ button
+            [ type_ "button"
+            , class "onyx-moddesk-toggle"
+            , attribute "aria-pressed" (boolAttr model.operDeskOpen)
+            , attribute "data-testid" "oper-desk-open"
+            , onClick OperDeskOpen
+            ]
+            [ text "Operator" ]
+        ]
+
+    else
+        []
 
 
 boolAttr : Bool -> String
@@ -88,7 +98,6 @@ boolAttr on =
 
     else
         "false"
-
 
 
 -- MODERATION SHEET
@@ -134,22 +143,18 @@ type alias Frame =
 
 sheetFrame : Frame -> List (Html Msg) -> Html Msg
 sheetFrame frame body =
-    div [ class "onyx-moddesk" ]
-        [ div
-            [ class "onyx-moddesk-backdrop"
-            , attribute "role" "presentation"
-            , onClick frame.close
-            ]
-            []
-        , section
-            [ class "onyx-moddesk-sheet"
-            , attribute "role" "dialog"
-            , attribute "aria-modal" "true"
-            , attribute "aria-labelledby" frame.titleId
-            , attribute "data-testid" frame.testId
-            , attribute "tabindex" "-1"
-            , on "keydown" (escapeDecoder frame.close)
-            ]
+    Sheet.view
+        { scope = frame.testId
+        , label = Sheet.LabelledBy frame.titleId
+        , onClose = frame.close
+        , placement = Sheet.Side
+        , layerClass = "onyx-moddesk"
+        , panelClass = "onyx-moddesk-sheet"
+        , backdropClass = "onyx-moddesk-backdrop"
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "data-testid" frame.testId ]
+        }
             (button
                 [ type_ "button"
                 , class "onyx-moddesk-close"
@@ -159,23 +164,6 @@ sheetFrame frame body =
                 [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
                 :: body
             )
-        ]
-
-
-escapeDecoder : Msg -> Decode.Decoder Msg
-escapeDecoder close =
-    Decode.map2 Tuple.pair
-        (Decode.field "key" Decode.string)
-        (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
-        |> Decode.andThen
-            (\( key, composing ) ->
-                if key == "Escape" && not composing then
-                    Decode.succeed close
-
-                else
-                    Decode.fail "ignored"
-            )
-
 
 
 -- OPERATOR SHEET
@@ -458,7 +446,6 @@ reviewBlock live desk =
                     ]
                 ]
             ]
-
 
 
 -- EVENT CONSOLE

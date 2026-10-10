@@ -16,6 +16,7 @@ import App exposing (Model, Msg(..), RoomSkin, canFinishCreateRoom, createShareU
 import Html exposing (Html, button, details, div, fieldset, form, h2, h3, input, label, legend, li, p, span, summary, text, ul)
 import Html.Attributes exposing (attribute, checked, class, disabled, placeholder, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput, onSubmit)
+import View.Sheet as Sheet
 
 
 formation : Model -> Html Msg
@@ -30,12 +31,18 @@ formation model =
         canEnter =
             canFinishCreateRoom model.createSharedInvite && channel /= Nothing
     in
-    div [ class "chb-veil" ]
-        [ div
-            [ class "chb"
-            , attribute "role" "dialog"
-            , attribute "aria-label" "Start a room"
-            ]
+    Sheet.view
+        { scope = "start-room"
+        , label = Sheet.Labelled "Start a room"
+        , onClose = CreateRoomClose
+        , placement = Sheet.Center
+        , layerClass = "chb-veil"
+        , panelClass = "chb"
+        , backdropClass = ""
+        , layerAttrs = []
+        , modal = True
+        , attrs = []
+        }
             [ div [ class "chb-head" ]
                 [ h2 [ class "chb-title" ] [ text "Start a room" ]
                 , p [ class "chb-desc" ] [ text "Name it, share the invite with a few people, and walk in together." ]
@@ -229,7 +236,6 @@ formation model =
                     ]
                 ]
             ]
-        ]
 
 
 hangSuffix : String -> String

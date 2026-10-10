@@ -1,6 +1,7 @@
 module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, topbar)
 
-{-| Shell top bar: brand mark, active-channel topic, connection pill.
+{-| Shell top bar (global scope) + the reclaim dialog and the
+reconnect banner. Room-scoped controls live in `View.RoomHeader`.
 -}
 
 import App exposing (Model, Msg(..), isGuestNick)
@@ -12,47 +13,37 @@ import Html.Attributes exposing (attribute, class, classList, disabled, for, id,
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Nav
 import View.ModDesk
--- v3/calls-c1
-import View.CallPresence
+import View.Inbox exposing (inbox)
+import View.Sheet as Sheet
 
 
+{-| v3/frame — the GLOBAL bar: brand, the Ctrl/Cmd+K launcher, the
+network-scoped entries (Calls, Alerts, the inbox bell, Operator), the
+connection pill, the identity chip (You) and Leave. Room-scoped
+actions live in `View.RoomHeader` at the top of the conversation
+column.
+-}
 topbar : Model -> Html Msg
 topbar model =
     header [ class "onyx-topbar" ]
-        [ div [ class "onyx-brand" ]
+        ([ div [ class "onyx-brand" ]
             [ span [ class "onyx-gem" ] []
             , h1 [] [ text "Onyx" ]
             ]
-        , div [ class "onyx-topic" ] [ text (activeTopic model) ]
-        , paletteLauncher model
-        -- v3/calls-c1
-        , View.CallPresence.headerVoice model
-        , button
-            [ class "onyx-calls-toggle"
-            , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]
-            , onClick ToggleCalls
-            ]
-            [ text "Calls" ]
-        , button
-            [ class "onyx-search-toggle"
-            , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
-            , attribute "aria-pressed"
-                (if model.searchOpen then
-                    "true"
-
-                 else
-                    "false"
-                )
-            , disabled (model.activeChannel == Nothing)
-            , onClick SearchOpen
-            ]
-            [ text "Search" ]
-        , pinsToggle model
-        , mediaToggle model
-        , notifySheetButton model
-        , jumpToggle model
-        , View.ModDesk.deskToggles model
-        , div
+         , div [ class "onyx-topbar-search" ] [ paletteLauncher model ]
+         , div [ class "onyx-topbar-global" ]
+            ([ button
+                [ class "onyx-calls-toggle"
+                , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]
+                , onClick ToggleCalls
+                ]
+                [ text "Calls" ]
+             , notifySheetButton model
+             , inbox model
+             ]
+                ++ View.ModDesk.operToggle model
+            )
+         , div
             [ classList
                 [ ( "onyx-conn", True )
                 , ( "onyx-conn-live", model.connection == App.Live )
@@ -62,8 +53,8 @@ topbar model =
             [ span [ class "onyx-dot" ] []
             , text (connectionLabel model)
             ]
-        , identityChip model
-        , if model.connection == App.Live || model.autoReconnect then
+         , identityChip model
+         , if model.connection == App.Live || model.autoReconnect then
             button
                 [ class "onyx-leave"
                 , attribute "aria-label" "Disconnect from Onyx"
@@ -72,93 +63,10 @@ topbar model =
                 ]
                 [ text "Leave" ]
 
-          else
+           else
             text ""
-        ]
-
-
-{-| Pinned-messages toggle (the ribbon overflow entry in the
-oracle: channel-gated, labeled with the live pin count). -}
-pinsToggle : Model -> Html Msg
-pinsToggle model =
-    let
-        count =
-            case model.activeChannel of
-                Nothing ->
-                    0
-
-                Just channel ->
-                    List.length (App.channelPins model channel)
-
-        label =
-            if count > 0 then
-                String.fromInt count ++ " pinned message" ++ (if count == 1 then "" else "s")
-
-            else
-                "Pinned messages"
-    in
-    button
-        [ class "onyx-pins-toggle"
-        , classList [ ( "onyx-pins-toggle-open", model.showPinnedMessages ) ]
-        , attribute "aria-pressed"
-            (if model.showPinnedMessages then
-                "true"
-
-             else
-                "false"
-            )
-        , attribute "aria-label" label
-        , attribute "data-testid" "ribbon-pins"
-        , disabled (model.activeChannel == Nothing)
-        , onClick PinnedMessagesOpen
-        ]
-        [ text "Pins" ]
-
-
-{-| Conversation-media toggle (the ribbon overflow entry in the
-oracle: channel-gated, labelled for the active conversation). -}
-mediaToggle : Model -> Html Msg
-mediaToggle model =
-    let
-        label =
-            case model.activeChannel of
-                Nothing ->
-                    "Pictures, files, and links"
-
-                Just channel ->
-                    "Pictures, files, and links for " ++ channel
-    in
-    button
-        [ class "onyx-media-toggle"
-        , classList [ ( "onyx-media-toggle-open", model.mediaIndexOpen ) ]
-        , attribute "aria-pressed"
-            (if model.mediaIndexOpen then
-                "true"
-
-             else
-                "false"
-            )
-        , attribute "aria-label" label
-        , attribute "data-testid" "ribbon-room-media"
-        , disabled (model.activeChannel == Nothing)
-        , onClick MediaIndexOpen
-        ]
-        [ text "Media" ]
-
-
-{-| Jump-to-date toggle (the discoverable time-travel entry in the
-oracle: channel-gated, opening the date sheet for the active
-conversation). -}
-jumpToggle : Model -> Html Msg
-jumpToggle model =
-    button
-        [ class "onyx-jump-toggle"
-        , attribute "aria-label" "Jump to date"
-        , attribute "data-testid" "topbar-jump-to-date"
-        , disabled (model.activeChannel == Nothing)
-        , onClick JumpToDateOpen
-        ]
-        [ text "Jump" ]
+         ]
+        )
 
 
 {-| Own identity chip: the current nick, an `alias` badge while the
@@ -242,12 +150,18 @@ reclaimDialog model =
                 text ""
 
             Just target ->
-                div [ class "onyx-reclaim-veil" ]
-                    [ div
-                        [ class "onyx-reclaim"
-                        , attribute "role" "dialog"
-                        , attribute "aria-label" ("Reclaim the nick " ++ target)
-                        ]
+                Sheet.view
+                    { scope = "reclaim"
+                    , label = Sheet.Labelled ("Reclaim the nick " ++ target)
+                    , onClose = ReclaimClose
+                    , placement = Sheet.Center
+                    , layerClass = "onyx-reclaim-veil"
+                    , panelClass = "onyx-reclaim"
+                    , backdropClass = ""
+                    , layerAttrs = []
+                    , modal = True
+                    , attrs = []
+                    }
                         [ p [ class "onyx-reclaim-lead" ]
                             [ text "Enter the account password for "
                             , b [] [ text target ]
@@ -262,6 +176,7 @@ reclaimDialog model =
                                 , placeholder "account password"
                                 , attribute "autocomplete" "current-password"
                                 , value model.reclaimPassword
+                                , Sheet.autofocus "reclaim"
                                 , onInput ReclaimPasswordInput
                                 ]
                                 []
@@ -281,7 +196,6 @@ reclaimDialog model =
                                 ]
                             ]
                         ]
-                    ]
 
 
 identityTitle : Model -> Bool -> String
@@ -356,22 +270,3 @@ connectionLabel model =
 
         App.Live ->
             "Live"
-
-
-activeTopic : Model -> String
-activeTopic model =
-    case model.activeChannel of
-        Nothing ->
-            "No channel selected"
-
-        Just name ->
-            case Dict.get (String.toLower name) model.channels of
-                Nothing ->
-                    name
-
-                Just channel ->
-                    if String.isEmpty channel.topic then
-                        channel.name ++ " — no topic set"
-
-                    else
-                        channel.name ++ " — " ++ channel.topic

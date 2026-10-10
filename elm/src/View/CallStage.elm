@@ -28,11 +28,13 @@ import CallUi
 import Dict
 import Html exposing (Html, button, dd, div, dl, dt, h2, li, p, section, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, id, type_)
+import Json.Decode
 import Html.Events exposing (on, onClick)
 import Json.Decode as Decode
 import Media exposing (HubPresentation(..))
 import Prefs
 import View.CallPresence exposing (callIcon, joinBanner)
+import View.Sheet as Sheet
 
 
 {-| The call surface at the top of the message column: the stage +
@@ -361,7 +363,7 @@ moreTools =
         , attribute "aria-label" "More call tools"
         , attribute "data-call-dialog" "more"
         , attribute "data-testid" "call-more-tools"
-        , on "keydown" (escapeTo CallMoreClose)
+        , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (escapeTo CallMoreClose))
         ]
         [ button
             [ type_ "button"
@@ -457,25 +459,23 @@ privacySheet model =
                         |> List.map String.toLower
                         |> List.filter (\k -> k /= selfKey)
             in
-            div [ class "onyx-call-sheet-layer" ]
-                [ div
-                    [ class "onyx-call-sheet-backdrop"
-                    , attribute "role" "presentation"
-                    , onClick CallPrivacyClose
-                    ]
-                    []
-                , section
-                    [ class "onyx-call-sheet onyx-call-privacy-sheet"
-                    , attribute "role" "dialog"
-                    , attribute "aria-modal" "true"
-                    , attribute "aria-labelledby" "call-privacy-title"
-                    , attribute "aria-describedby" "call-privacy-sub"
+            Sheet.view
+                { scope = "call-privacy"
+                , label = Sheet.LabelledBy "call-privacy-title"
+                , onClose = CallPrivacyClose
+                , placement = Sheet.Center
+                , layerClass = "onyx-call-sheet-layer"
+                , panelClass = "onyx-call-sheet onyx-call-privacy-sheet"
+                , backdropClass = "onyx-call-sheet-backdrop"
+                , layerAttrs = []
+                , modal = True
+                , attrs =
+                    [ attribute "aria-describedby" "call-privacy-sub"
                     , attribute "data-call-dialog" "privacy"
                     , attribute "data-testid" "call-privacy-sheet"
                     , attribute "data-privacy-level" (CallUi.levelWord sec.level)
-                    , attribute "tabindex" "-1"
-                    , on "keydown" (escapeTo CallPrivacyClose)
                     ]
+                }
                     [ div [ class "onyx-call-sheet-head" ]
                         [ div []
                             [ h2 [ id "call-privacy-title" ] [ text (CallUi.privacyTitle sec.level) ]
@@ -562,7 +562,6 @@ privacySheet model =
                             [ text "Compare this code out of band to confirm your media identity. It does not prove end-to-end encryption by itself." ]
                         ]
                     ]
-                ]
 
         _ ->
             text ""

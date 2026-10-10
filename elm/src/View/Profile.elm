@@ -10,6 +10,7 @@ import Avatar
 import Dict
 import Html exposing (Html, a, button, code, dd, details, div, dl, dt, h2, input, label, li, p, section, small, span, summary, text, textarea, time, ul)
 import Html.Attributes exposing (attribute, checked, class, datetime, disabled, for, href, id, maxlength, tabindex, type_, value)
+import Json.Decode
 import Html.Events exposing (on, onCheck, onClick, onInput)
 import Json.Decode as Decode
 import Modes
@@ -18,6 +19,7 @@ import PersonSafety
 import Prefs
 import Services
 import Set
+import View.Sheet as Sheet
 
 
 {-| The open WHOIS sheet, or nothing when no sheet is showing. -}
@@ -40,18 +42,18 @@ sheetFor model nick =
         info =
             App.whoisInfoFor model nick
     in
-    div [ class "onyx-profile-pop" ]
-        [ div
-            [ class "onyx-profile-backdrop"
-            , onClick App.WhoisClose
-            ]
-            []
-        , div
-            [ class "onyx-profile-sheet"
-            , attribute "role" "dialog"
-            , attribute "aria-label" ("Profile: " ++ shown)
-            , on "keydown" profileEscapeDecoder
-            ]
+    Sheet.view
+        { scope = "profile"
+        , label = Sheet.Labelled ("Profile: " ++ shown)
+        , onClose = App.WhoisClose
+        , placement = Sheet.Side
+        , layerClass = "onyx-profile-pop"
+        , panelClass = "onyx-profile-sheet"
+        , backdropClass = "onyx-profile-backdrop"
+        , layerAttrs = []
+        , modal = True
+        , attrs = []
+        }
             [ div [ class "onyx-profile-head" ]
                 [ h2 [ class "onyx-profile-title" ] [ text ("Profile: " ++ shown) ]
                 , p [ class "onyx-profile-desc" ] [ text "Live network identity and presence details." ]
@@ -67,7 +69,6 @@ sheetFor model nick =
             , profileStatus info
             , profileDetails shown info
             ]
-        ]
 
 
 {-| Summary: avatar, display nick, services account, and the bot badge. -}
@@ -497,7 +498,7 @@ cardFor model nick channel =
             ([ class "onyx-member-card"
              , attribute "role" "region"
              , attribute "aria-labelledby" (cardId ++ "-name")
-             , on "keydown" cardEscapeDecoder
+             , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) cardEscapeDecoder)
              ]
                 ++ (case described of
                         Just target ->
@@ -765,29 +766,6 @@ cardEscapeDecoder =
             )
 
 
-{-| Escape dismisses the sheet (same IME-yielding shape as the
-menu and picker decoders). -}
-profileEscapeDecoder : Decode.Decoder Msg
-profileEscapeDecoder =
-    Decode.field "isComposing" Decode.bool
-        |> Decode.andThen
-            (\composing ->
-                if composing then
-                    Decode.fail "ime"
-
-                else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key == "Escape" then
-                                    Decode.succeed App.WhoisClose
-
-                                else
-                                    Decode.fail "not-escape"
-                            )
-            )
-
-
 {-| Card moderation controls (mirroring the oracle `showRoomModeration`
 / `showIrcRoleControls` gates: room op, not self, and the experience
 mode publishing kick (room actions) or op (role controls)). -}
@@ -917,19 +895,18 @@ moderationReview model =
                         ( Nothing, Just _ ) ->
                             ""
             in
-            div [ class "onyx-profile-pop" ]
-                [ div
-                    [ class "onyx-profile-backdrop"
-                    , onClick App.ModerationCancel
-                    ]
-                    []
-                , div
-                    [ class "onyx-moderation-review"
-                    , attribute "role" "dialog"
-                    , attribute "aria-label" title
-                    , attribute "aria-describedby" "moderation-review-desc"
-                    , on "keydown" reviewEscapeDecoder
-                    ]
+            Sheet.view
+                { scope = "moderation-review"
+                , label = Sheet.Labelled title
+                , onClose = App.ModerationCancel
+                , placement = Sheet.Center
+                , layerClass = "onyx-profile-pop"
+                , panelClass = "onyx-moderation-review"
+                , backdropClass = "onyx-profile-backdrop"
+                , layerAttrs = []
+                , modal = True
+                , attrs = [ attribute "aria-describedby" "moderation-review-desc" ]
+                }
                     [ h2 [ class "onyx-moderation-title" ] [ text title ]
                     , p [ class "onyx-moderation-desc", attribute "id" "moderation-review-desc" ]
                         [ text "Nothing is sent until you confirm." ]
@@ -996,30 +973,6 @@ moderationReview model =
                             [ text (Maybe.map .confirmLabel review |> Maybe.withDefault "Confirm") ]
                         ]
                     ]
-                ]
-
-
-{-| Escape cancels the review (same IME-yielding shape as the
-other decoders). -}
-reviewEscapeDecoder : Decode.Decoder Msg
-reviewEscapeDecoder =
-    Decode.field "isComposing" Decode.bool
-        |> Decode.andThen
-            (\composing ->
-                if composing then
-                    Decode.fail "ime"
-
-                else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key == "Escape" then
-                                    Decode.succeed App.ModerationCancel
-
-                                else
-                                    Decode.fail "not-escape"
-                            )
-            )
 
 
 {-| Quiet safety confirm for Block plus the honest #root report
@@ -1100,23 +1053,18 @@ safetyReason current ( reason, labelText ) =
 {-| Shared safety dialog chrome. -}
 safetyShell : String -> String -> String -> Bool -> List (Html Msg) -> String -> Msg -> String -> Msg -> String -> Html Msg
 safetyShell kind title body guest extra dismissLabel dismissMsg confirmLabel confirmMsg confirmTestId =
-    div [ class "person-safety", attribute "role" "presentation", attribute "data-testid" "person-safety" ]
-        [ div
-            [ class "person-safety__backdrop"
-            , attribute "aria-hidden" "true"
-            , onClick dismissMsg
-            ]
-            []
-        , section
-            [ class "person-safety__panel"
-            , attribute "role" "dialog"
-            , attribute "aria-modal" "true"
-            , attribute "aria-labelledby" "person-safety-title"
-            , attribute "aria-describedby" "person-safety-body"
-            , tabindex -1
-            , attribute "data-kind" kind
-            , on "keydown" safetyEscapeDecoder
-            ]
+    Sheet.view
+        { scope = "person-safety"
+        , label = Sheet.LabelledBy "person-safety-title"
+        , onClose = dismissMsg
+        , placement = Sheet.Center
+        , layerClass = "person-safety"
+        , panelClass = "person-safety__panel"
+        , backdropClass = "person-safety__backdrop"
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "aria-describedby" "person-safety-body", attribute "data-kind" kind ]
+        }
             ([ h2 [ attribute "id" "person-safety-title", class "person-safety__title" ] [ text title ]
              , p [ attribute "id" "person-safety-body", class "person-safety__body" ] [ text body ]
              ]
@@ -1145,27 +1093,4 @@ safetyShell kind title body guest extra dismissLabel dismissMsg confirmLabel con
                         ]
                    ]
             )
-        ]
 
-
-{-| Escape dismisses the safety sheet (same IME-yielding shape as
-the other decoders). -}
-safetyEscapeDecoder : Decode.Decoder Msg
-safetyEscapeDecoder =
-    Decode.field "isComposing" Decode.bool
-        |> Decode.andThen
-            (\composing ->
-                if composing then
-                    Decode.fail "ime"
-
-                else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key == "Escape" then
-                                    Decode.succeed App.SafetyClose
-
-                                else
-                                    Decode.fail "not-escape"
-                            )
-            )

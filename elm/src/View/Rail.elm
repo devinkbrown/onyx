@@ -16,6 +16,7 @@ import App exposing (Channel, Model, Msg(..))
 import Dict
 import Html exposing (Html, button, div, input, label, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, for, id, placeholder, style, tabindex, type_, value)
+import Json.Decode
 import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
@@ -131,7 +132,7 @@ filterBar model derived =
             , attribute "spellcheck" "false"
             , value model.sidebarFilter
             , onInput SidebarFilterInput
-            , on "keydown" (filterEscape derived.filterActive)
+            , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (filterEscape derived.filterActive))
             ]
             []
          , button

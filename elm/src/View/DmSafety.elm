@@ -19,10 +19,12 @@ import Dict
 import DmSafety exposing (HeaderState(..))
 import Html exposing (Html, button, div, h2, node, p, section, small, span, strong, text)
 import Html.Attributes exposing (attribute, class, disabled, id, type_)
+import Json.Decode
 import Html.Events exposing (on, onClick)
 import InviteShare
 import Json.Decode as Decode
 import Set
+import View.Sheet as Sheet
 
 
 {-| The header row above the transcript for the active conversation. -}
@@ -166,7 +168,7 @@ safetyPanel model peer =
         , attribute "role" "region"
         , attribute "aria-labelledby" "dm-safety-title"
         , attribute "aria-describedby" "dm-safety-guidance"
-        , on "keydown" (escapeDecoder DmSafetyClose)
+        , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (escapeDecoder DmSafetyClose))
         ]
         [ div [ class "onyx-dmsafe-seal", attribute "aria-hidden" "true" ]
             [ span [] [ text "DM" ], span [] [ text (DmSafety.sealDeviceLabel count) ] ]
@@ -407,22 +409,18 @@ inviteShareSheet model =
                             |> Maybe.map (.topic >> String.trim)
                             |> Maybe.withDefault ""
             in
-            div [ class "onyx-newmsg onyx-invshare", attribute "data-testid" "room-invite-share" ]
-                [ div
-                    [ class "onyx-newmsg-backdrop"
-                    , attribute "role" "presentation"
-                    , onClick InviteShareClose
-                    ]
-                    []
-                , section
-                    [ class "onyx-newmsg-sheet"
-                    , attribute "role" "dialog"
-                    , attribute "aria-modal" "true"
-                    , attribute "aria-labelledby" "invite-share-title"
-                    , attribute "aria-describedby" "invite-share-description"
-                    , attribute "tabindex" "-1"
-                    , on "keydown" (escapeDecoder InviteShareClose)
-                    ]
+            Sheet.view
+                { scope = "room-invite-share"
+                , label = Sheet.LabelledBy "invite-share-title"
+                , onClose = InviteShareClose
+                , placement = Sheet.Center
+                , layerClass = "onyx-newmsg onyx-invshare"
+                , panelClass = "onyx-newmsg-sheet"
+                , backdropClass = "onyx-newmsg-backdrop"
+                , layerAttrs = [ attribute "data-testid" "room-invite-share" ]
+                , modal = True
+                , attrs = [ attribute "aria-describedby" "invite-share-description" ]
+                }
                     [ div [ class "onyx-newmsg-header" ]
                         [ div [ class "onyx-newmsg-mark", attribute "aria-hidden" "true" ] [ text "✦" ]
                         , div []
@@ -474,7 +472,6 @@ inviteShareSheet model =
                         ]
                         [ text sheet.status ]
                     ]
-                ]
 
 
 

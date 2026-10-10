@@ -3,8 +3,8 @@
    and preventDefaults; Escape is always delivered (never prevented);
    `?` / `/` only outside editable fields with no Ctrl/Meta/Alt; IME
    composition and already-claimed keys are never taken; a foreign
-   modal dialog owns the keyboard except for Escape. Also covers the
-   overlay focus helper (focus in, Tab wrap, restore to opener).
+   modal dialog owns the keyboard except for Escape. The overlay focus
+   helper lives in overlayFocus.smoke.mjs.
    Run with:
      node --test elm/shortcut.smoke.mjs
    (from the repo root). Zero dependencies beyond node itself. */
@@ -105,7 +105,10 @@ test("the foreign-modal probe excludes our own scoped overlays", () => {
   const seen = [];
   const doc = { querySelector: (sel) => { seen.push(sel); return null; } };
   classifyShortcut(key({ ctrlKey: true }), doc);
-  assert.match(seen[0], /:not\(\[data-shortcut-scope\]\)/);
+  // v3/frame: every sheet now carries a scope (View.Sheet), so only the
+  // palette's own layers are exempt; any other modal sheet owns the keys.
+  assert.match(seen[0], /:not\(\[data-shortcut-scope="palette"\]\)/);
+  assert.match(seen[0], /:not\(\[data-shortcut-scope="shortcuts"\]\)/);
 });
 
 test("unrelated keys are ignored", () => {
@@ -156,48 +159,8 @@ test("no shortcut port means no listener, no crash", () => {
   }
 });
 
-function node(name, log) {
-  return {
-    name,
-    disabled: false,
-    isConnected: true,
-    getAttribute: () => null,
-    focus() { log.push(name); doc.activeElement = this; },
-  };
-}
-let doc;
-
-test("overlay focus: focus in, Tab wraps, restore to opener", () => {
-  const log = [];
-  const opener = node("opener", log);
-  const field = node("input", log);
-  const close = node("close", log);
-  let mounted = null;
-  const keyListeners = [];
-  doc = {
-    activeElement: opener,
-    addEventListener(name, fn) { if (name === "keydown") keyListeners.push(fn); },
-    querySelector(sel) {
-      if (!mounted) return null;
-      if (sel === "[data-onyx-autofocus]") return field;
-      if (sel === "[data-shortcut-scope]") return mounted;
-      return null;
-    },
-  };
-  const focus = installShortcutFocus(doc, null);
-  mounted = { querySelectorAll: () => [field, close], contains: (n) => n === field || n === close };
-  focus.settle();
-  assert.equal(doc.activeElement, field);
-  doc.activeElement = close;
-  const tab = key({ key: "Tab" });
-  keyListeners[0](tab);
-  assert.equal(tab.prevented, true);
-  assert.equal(doc.activeElement, field);
-  const back = key({ key: "Tab", shiftKey: true });
-  keyListeners[0](back);
-  assert.equal(doc.activeElement, close);
-  mounted = null;
-  focus.settle();
-  assert.equal(doc.activeElement, opener);
-  assert.deepEqual(log, ["input", "input", "close", "opener"]);
+/* The overlay focus helper (focus in, Tab wrap, restore, stacking)
+   is covered with a real DOM in overlayFocus.smoke.mjs. */
+test("installShortcutFocus is the generalised overlay helper", () => {
+  assert.equal(installShortcutFocus, globalThis.OnyxPorts.installOverlayFocus);
 });

@@ -18,6 +18,7 @@ import Html exposing (Html, button, div, h2, h3, input, label, li, option, p, se
 import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, value)
 import Html.Events exposing (onClick, onInput)
 import Stewardship
+import View.Sheet as Sheet
 
 
 {-| Roster-header entry: opens Room care for rooms in the 3–30 band
@@ -70,13 +71,18 @@ stewardPanel model =
 
 panelShell : Model -> StewardView -> String -> List (Html Msg) -> Html Msg
 panelShell model view title body =
-    div [ class "onyx-steward-wrap" ]
-        [ section
-            [ class "onyx-steward"
-            , attribute "role" "dialog"
-            , attribute "aria-label" (title ++ " " ++ view.channel)
-            , attribute "data-testid" "steward-panel"
-            ]
+    Sheet.view
+        { scope = "steward"
+        , label = Sheet.Labelled (title ++ " " ++ view.channel)
+        , onClose = StewardClose
+        , placement = Sheet.Center
+        , layerClass = "onyx-steward-wrap"
+        , panelClass = "onyx-steward"
+        , backdropClass = ""
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "data-testid" "steward-panel" ]
+        }
             ([ div [ class "onyx-steward-head" ]
                 [ span [ class "onyx-steward-title" ] [ text title ]
                 , span [ class "onyx-steward-room" ] [ text view.channel ]
@@ -91,7 +97,6 @@ panelShell model view title body =
              ]
                 ++ body
             )
-        ]
 
 
 statusLine : Model -> List (Html Msg)
