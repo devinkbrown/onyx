@@ -57,6 +57,7 @@ import View.Profile exposing ( moderationReview, personSafetySheet, profileCard,
 import View.Thread exposing (thread)
 import View.Toast exposing (toaster)
 import View.Nav
+import View.Switcher
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 
@@ -207,6 +208,9 @@ appFrame model =
         , shell model
         , View.Nav.mobileNav model
         , View.Nav.youHub model
+        -- v3/switcher
+        , View.Switcher.palette model
+        , View.Switcher.shortcutsOverlay model
         ]
 
 

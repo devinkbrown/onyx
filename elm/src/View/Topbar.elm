@@ -6,6 +6,7 @@ module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, to
 import App exposing (Model, Msg(..), isGuestNick)
 import Dict
 import View.Notify exposing (notifySheetButton)
+import View.Switcher exposing (paletteLauncher)
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -20,6 +21,7 @@ topbar model =
             , h1 [] [ text "Onyx" ]
             ]
         , div [ class "onyx-topic" ] [ text (activeTopic model) ]
+        , paletteLauncher model
         , button
             [ class "onyx-calls-toggle"
             , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]

@@ -118,6 +118,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Nodes
 import Schedule
+import Switcher
 import Task
 import Time
 import Url
@@ -473,6 +474,11 @@ port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
 
 
 port searchHotkey : (() -> msg) -> Sub msg
+
+
+{-| v3/switcher — the one global keyboard port: `ports.js` owns the
+scope rules and sends a short shortcut name. -}
+port shortcut : (String -> msg) -> Sub msg
 
 
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
@@ -1499,6 +1505,7 @@ subscriptions model =
         , notifyPermissionChanged App.NotifyPermissionChanged
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , searchHotkey (\_ -> App.SearchHotkey)
+        , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
         , retentionPolicyLoaded App.RetentionPolicyLoaded
         , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived

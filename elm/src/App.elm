@@ -75,6 +75,7 @@ import Session
 import Set exposing (Set)
 import Translate
 import Spine
+import Switcher
 import Time
 import TopicRead
 import Upload
@@ -798,6 +799,10 @@ type alias Model =
     , sidebarUnreadOnly : Bool
     , newMessageOpen : Bool
     , newMessageRecipient : String
+
+    -- v3/switcher
+    , palette : Switcher.Palette
+    , shortcutsOpen : Bool
     }
 
 
@@ -2956,6 +2961,17 @@ type Msg
     | NewMessageClose
     | NewMessageInput String
     | NewMessageSubmit
+    -- v3/switcher
+    | PaletteOpen
+    | PaletteClose
+    | PaletteInput String
+    | PaletteMove Int
+    | PaletteHover Int
+    | PaletteRun Int
+    | PaletteSubmit
+    | ShortcutsOpen
+    | ShortcutsClose
+    | ShortcutPressed Switcher.Shortcut
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3498,6 +3514,9 @@ init nick url =
     , sidebarUnreadOnly = False
     , newMessageOpen = False
     , newMessageRecipient = ""
+    -- v3/switcher
+    , palette = Switcher.closed
+    , shortcutsOpen = False
     }
 
 
@@ -3986,6 +4005,9 @@ blank =
     , sidebarUnreadOnly = False
     , newMessageOpen = False
     , newMessageRecipient = ""
+    -- v3/switcher
+    , palette = Switcher.closed
+    , shortcutsOpen = False
     }
 
 
@@ -39726,6 +39748,37 @@ updateCore msg model =
             else
                 starChannel model name
 
+        -- v3/switcher
+        PaletteOpen ->
+            switcherUpdate msg model
+
+        PaletteClose ->
+            switcherUpdate msg model
+
+        PaletteInput _ ->
+            switcherUpdate msg model
+
+        PaletteMove _ ->
+            switcherUpdate msg model
+
+        PaletteHover _ ->
+            switcherUpdate msg model
+
+        PaletteRun _ ->
+            switcherUpdate msg model
+
+        PaletteSubmit ->
+            switcherUpdate msg model
+
+        ShortcutsOpen ->
+            switcherUpdate msg model
+
+        ShortcutsClose ->
+            switcherUpdate msg model
+
+        ShortcutPressed _ ->
+            switcherUpdate msg model
+
         NewMessageOpen ->
             ( { model | newMessageOpen = True, newMessageRecipient = "" }, [] )
 
@@ -41753,3 +41806,164 @@ setComposerDraft model draft =
                 , composerError = Nothing
                 , composerDrafts = Dict.insert (String.toLower current) draft model.composerDrafts
             }
+
+
+
+-- v3/switcher
+
+
+{-| Palette rows for the current model: joined rooms, DMs, actions. -}
+paletteEntries : Model -> List Switcher.Entry
+paletteEntries model =
+    Switcher.entries (isChannelName model) model.activeChannel (Dict.values model.channels)
+
+
+{-| Ranked palette rows in display (= navigation) order. -}
+paletteMatches : Model -> List Switcher.Matched
+paletteMatches model =
+    Switcher.matches model.palette.query (paletteEntries model)
+
+
+{-| Global shell keys only act inside the connected app shell (never on
+public pages or behind the connect gate). -}
+shellKeysLive : Model -> Bool
+shellKeysLive model =
+    model.route == Route.App && not (connectGateVisible model)
+
+
+{-| Palette + shortcuts overlay transitions. The overlay stack is model
+state, so Escape is pure: it closes the shortcuts overlay first, then
+the palette, and is a no-op with neither open. Running a row closes the
+palette and re-enters `updateCore` with the existing intent.
+-}
+switcherUpdate : Msg -> Model -> ( Model, List Outbound )
+switcherUpdate msg model =
+    let
+        palette =
+            model.palette
+
+        count =
+            List.length (paletteMatches model)
+
+        open m =
+            if shellKeysLive m then
+                ( { m | palette = { open = True, query = "", active = 0 }, shortcutsOpen = False }, [] )
+
+            else
+                ( m, [] )
+
+        closePalette m =
+            { m | palette = Switcher.closed }
+    in
+    case msg of
+        PaletteOpen ->
+            open model
+
+        PaletteClose ->
+            ( closePalette model, [] )
+
+        PaletteInput query ->
+            ( { model | palette = { palette | query = query, active = 0 } }, [] )
+
+        PaletteMove delta ->
+            ( { model | palette = { palette | active = Switcher.move delta count (Switcher.clampActive count palette.active) } }, [] )
+
+        PaletteHover index ->
+            ( { model | palette = { palette | active = Switcher.clampActive count index } }, [] )
+
+        PaletteRun index ->
+            runPaletteEntry index model
+
+        PaletteSubmit ->
+            runPaletteEntry (Switcher.clampActive count palette.active) model
+
+        ShortcutsOpen ->
+            if shellKeysLive model then
+                ( { model | shortcutsOpen = True, palette = Switcher.closed }, [] )
+
+            else
+                ( model, [] )
+
+        ShortcutsClose ->
+            ( { model | shortcutsOpen = False }, [] )
+
+        ShortcutPressed shortcut ->
+            case shortcut of
+                Switcher.TogglePalette ->
+                    if palette.open then
+                        ( closePalette model, [] )
+
+                    else
+                        open model
+
+                Switcher.OpenPalette ->
+                    if palette.open then
+                        ( model, [] )
+
+                    else
+                        open model
+
+                Switcher.ShowShortcuts ->
+                    switcherUpdate ShortcutsOpen model
+
+                Switcher.Dismiss ->
+                    if model.shortcutsOpen then
+                        ( { model | shortcutsOpen = False }, [] )
+
+                    else if palette.open then
+                        ( closePalette model, [] )
+
+                    else
+                        ( model, [] )
+
+                Switcher.UnknownShortcut ->
+                    ( model, [] )
+
+        _ ->
+            ( model, [] )
+
+
+runPaletteEntry : Int -> Model -> ( Model, List Outbound )
+runPaletteEntry index model =
+    case List.head (List.drop index (paletteMatches model)) of
+        Nothing ->
+            ( model, [] )
+
+        Just matched ->
+            let
+                shut =
+                    { model | palette = Switcher.closed }
+            in
+            case matched.entry.target of
+                Switcher.GoRoom name ->
+                    updateCore (ChannelSelect name) shut
+
+                Switcher.GoDm name ->
+                    updateCore (ChannelSelect name) shut
+
+                Switcher.Do Switcher.BrowseRooms ->
+                    updateCore BrowserOpen shut
+
+                Switcher.Do Switcher.StartRoom ->
+                    updateCore CreateRoomOpen shut
+
+                Switcher.Do Switcher.NewConversation ->
+                    updateCore NewMessageOpen shut
+
+                Switcher.Do Switcher.JumpToDate ->
+                    updateCore JumpToDateOpen shut
+
+                Switcher.Do Switcher.Notifications ->
+                    updateCore NotifySheetOpen shut
+
+                Switcher.Do Switcher.Appearance ->
+                    youHubGo Nav.YouAppearance shut
+
+                Switcher.Do Switcher.YouHub ->
+                    ( { shut | youHubOpen = True }, [] )
+
+                Switcher.Do Switcher.KeyboardShortcuts ->
+                    ( { shut | shortcutsOpen = True }, [] )
+
+                Switcher.Do Switcher.Leave ->
+                    updateCore SessionDisconnect shut
