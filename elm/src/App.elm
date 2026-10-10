@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx)
+module App exposing (AttachmentStatus(..), dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -63,6 +63,8 @@ import CallMedia
 -- v3/calls-c8
 import CallCaptions
 import VoiceSettings
+-- v3/calls-c11
+import Stage
 import IdentityOverrides
 import Moderation
 import Modes
@@ -611,6 +613,10 @@ type alias Model =
     , callOverlay : CallCaptions.Overlay
     , voicePrefs : VoiceSettings.Prefs
     , voiceSettings : VoiceSettings.State
+    -- v3/calls-c11
+    , stage : Stage.StageState
+    , stageHandsOpen : Bool
+    , callLeaveConfirm : Bool
     -- v3/nav
     , navSection : Nav.Id
     , navDrawerOpen : Bool
@@ -831,6 +837,11 @@ type alias Model =
     , connectGate : Bool
     , connectForm : ConnectForm
     , wsPin : Maybe String
+    -- v3/dm-key-hold
+    , dmKeyPending : Dict String Float
+    , dmKeyAnswered : Set String
+    , dmPlainConfirmed : Set String
+    , dmKeyHold : Maybe String
     , credentialCanonicalOnly : Bool
     , nowMs : Float
     , connectNick : String
@@ -2614,6 +2625,8 @@ type Msg
     | ConnectSubmit
     | ConnectCancel
     | SessionDisconnect
+    -- v3/dm-key-hold
+    | DmSendUnencrypted String
     | GuestClaimOpen
     | GuestClaimClose
     | GuestClaimDismiss
@@ -3149,6 +3162,20 @@ type Msg
     | VoiceSettingsMsg VoiceSettings.Msg
     | VoicePttShortcut String
     | CallNativePip String
+    -- v3/calls-c11
+    | StageStart String
+    | StageEnd
+    | StageJoinAudience String
+    | StageLeave
+    | StageHandToggle
+    | StageInvite String
+    | StageDismissHand String
+    | StageAccept
+    | StageDecline
+    | StageHandsOpen
+    | StageHandsClose
+    | CallLeaveConfirmClose
+    | CallLeaveConfirmed
     | SelectBoardTab String
     -- v3/roster
     | MemberFilterInput String
@@ -3360,6 +3387,11 @@ init nick url =
     , connectGate = False
     , connectForm = blankConnectForm
     , wsPin = Nothing
+    -- v3/dm-key-hold
+    , dmKeyPending = Dict.empty
+    , dmKeyAnswered = Set.empty
+    , dmPlainConfirmed = Set.empty
+    , dmKeyHold = Nothing
     , accountActionError = Nothing
     , reclaimOpen = False
     , reclaimPassword = ""
@@ -3566,6 +3598,10 @@ init nick url =
     , callOverlay = CallCaptions.blankOverlay
     , voicePrefs = VoiceSettings.defaultPrefs
     , voiceSettings = VoiceSettings.blankState
+    -- v3/calls-c11
+    , stage = Stage.blank
+    , stageHandsOpen = False
+    , callLeaveConfirm = False
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -3929,6 +3965,11 @@ blank =
     , connectGate = False
     , connectForm = blankConnectForm
     , wsPin = Nothing
+    -- v3/dm-key-hold
+    , dmKeyPending = Dict.empty
+    , dmKeyAnswered = Set.empty
+    , dmPlainConfirmed = Set.empty
+    , dmKeyHold = Nothing
     , accountActionError = Nothing
     , reclaimOpen = False
     , reclaimPassword = ""
@@ -4135,6 +4176,10 @@ blank =
     , callOverlay = CallCaptions.blankOverlay
     , voicePrefs = VoiceSettings.defaultPrefs
     , voiceSettings = VoiceSettings.blankState
+    -- v3/calls-c11
+    , stage = Stage.blank
+    , stageHandsOpen = False
+    , callLeaveConfirm = False
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -5581,7 +5626,7 @@ foldLine model message =
             ( logNumeric model message, [] )
 
         "401" ->
-            fold401 model message
+            fold401 (settleDmKeyNoSuchNick model message) message
 
         "403" ->
             foldErrorNumeric model message
@@ -5802,7 +5847,7 @@ foldLine model message =
                     foldStandardReply model message
 
         "FAIL" ->
-            foldStandardReply model message
+            foldStandardReply (settleDmKeyFail model message) message
 
         "WARN" ->
             foldStandardReply model message
@@ -8916,6 +8961,7 @@ foldMetadata model message unset =
             else if String.toLower rawKey == "ocean.dm-key" then
                 let
                     next =
+                        settleDmKeyReply nickKey value
                         { model
                             | dmDirectory =
                                 DmCipher.applySingleKey nickKey
@@ -8928,6 +8974,7 @@ foldMetadata model message unset =
             else if String.toLower rawKey == "ocean.dm-keys" then
                 let
                     next =
+                        settleDmKeyReply nickKey value
                         { model
                             | dmDirectory =
                                 DmCipher.applyKeyList nickKey
@@ -10493,6 +10540,14 @@ sendComposerText : Model -> String -> ( Model, List Outbound )
 sendComposerText model target =
     if model.connection /= Live && offlineSealRefused model target then
         refuseOfflineSeal model target
+
+    else if model.connection /= Live && not (String.startsWith "/" model.composer) && dmKeyUnresolved model target then
+        -- v3/dm-key-hold: an unconfirmed DM never queues as plaintext.
+        refuseOfflineSeal model target
+
+    else if model.connection == Live && dmKeyUnresolved model target then
+        -- v3/dm-key-hold: hold until the peer's key lookup answers.
+        holdUnresolvedDm model target
 
     else if model.connection /= Live && not (String.startsWith "/" model.composer) then
         -- Offline plain message: queue durably via ports and
@@ -12139,6 +12194,8 @@ dispatchableScheduledRow model row =
         || Set.member (String.toLower row.channel) model.props.synced
     )
         && roomEncryptionPolicy model row.channel /= RequiredPolicy
+        -- v3/dm-key-hold: a DM row waits for its peer's key lookup.
+        && not (dmKeyUnresolved model row.channel)
 
 
 {-| Whether the sheet shows the room-protection hold for a row
@@ -36016,7 +36073,8 @@ update msg model =
         closed =
             case msg of
                 WsClosed _ ->
-                    setConnectForm (\f -> { f | dialing = False }) next
+                    -- v3/dm-key-hold: in-flight key lookups die with the socket.
+                    setConnectForm (\f -> { f | dialing = False }) { next | dmKeyPending = Dict.empty }
 
                 _ ->
                     next
@@ -36052,9 +36110,13 @@ update msg model =
         ( dockSettled, dockOut ) =
             CallDock.settle { live = roomSettingsSettled.connection == Live, now = roomSettingsSettled.nowMs } model roomSettingsSettled
 
+        -- v3/calls-c11
+        stageSettled =
+            settleStage dockSettled
+
         -- v3/calls-c8
         overlaySettled =
-            CallCaptions.settle model dockSettled
+            CallCaptions.settle model stageSettled
     in
     ( overlaySettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
 
@@ -37240,6 +37302,7 @@ updateCore msg model =
 
                 ( dispatched, dispatchOut ) =
                     fireScheduledDispatch pinged
+                        |> withScheduledDmLookups
 
                 -- A lapsed residence proof re-signs on the 1s Tick
                 -- (standing in for the oracle's refresh timer).
@@ -37358,6 +37421,17 @@ updateCore msg model =
                 |> setConnectForm (\f -> { f | dialing = False, attempted = False, pendingRegister = Nothing })
             , [ WsDisconnect ]
             )
+
+        -- v3/dm-key-hold
+        DmSendUnencrypted peer ->
+            -- Explicit, per-peer consent to send without encryption
+            -- while the key lookup is unanswered; the held draft sends.
+            updateCore ComposerSend
+                { model
+                    | dmPlainConfirmed = Set.insert (String.toLower peer) model.dmPlainConfirmed
+                    , dmKeyHold = Nothing
+                    , composerError = Nothing
+                }
 
         SessionDisconnect ->
             -- Deliberate disconnect, mirroring the oracle `disconnect`
@@ -41425,6 +41499,45 @@ updateCore msg model =
 
                 _ ->
                     ( model, [] )
+        -- v3/calls-c11
+        StageStart _ ->
+            stageUpdate msg model
+
+        StageEnd ->
+            stageUpdate msg model
+
+        StageJoinAudience _ ->
+            stageUpdate msg model
+
+        StageLeave ->
+            stageUpdate msg model
+
+        StageHandToggle ->
+            stageUpdate msg model
+
+        StageInvite _ ->
+            stageUpdate msg model
+
+        StageDismissHand _ ->
+            stageUpdate msg model
+
+        StageAccept ->
+            stageUpdate msg model
+
+        StageDecline ->
+            stageUpdate msg model
+
+        StageHandsOpen ->
+            stageUpdate msg model
+
+        StageHandsClose ->
+            stageUpdate msg model
+
+        CallLeaveConfirmClose ->
+            ( { model | callLeaveConfirm = False }, [] )
+
+        CallLeaveConfirmed ->
+            updateCore CallLeave { model | callLeaveConfirm = False }
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
@@ -43170,6 +43283,8 @@ foldParsed model parsed =
 
                     ( next, outbound ) =
                         foldLine filed parsed
+                            -- v3/calls-c11
+                            |> foldStageWire parsed
                 in
                 -- A dropped self-echo never reaches the vault: the optimistic send
                 -- already persisted it, and a second row would fork history.
@@ -43911,6 +44026,10 @@ switcherUpdate msg model =
                         Nothing ->
                             updateCore NavMenuEscape model
 
+                -- v3/calls-c11 (C12): call chords
+                Switcher.CallChord name ->
+                    callChord name model
+
                 Switcher.UnknownShortcut ->
                     ( model, [] )
 
@@ -44007,6 +44126,9 @@ overlayStack model =
         , ( "call-more", model.callMoreOpen, CallMoreClose )
         -- v3/calls-c4: Escape returns a fullscreen stage to compact.
         , ( "call-fullscreen", model.callStageSize == CallMedia.SizeFullscreen && model.calls.lifecycle /= Media.Idle, CallStageSizeSet CallMedia.SizeCompact )
+        -- v3/calls-c11
+        , ( "call-leave-confirm", model.callLeaveConfirm && model.calls.lifecycle /= Media.Idle, CallLeaveConfirmClose )
+        , ( "stage-hands", stageHandsSheetOpen model, StageHandsClose )
         , ( "reclaim", model.reclaimOpen, ReclaimClose )
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
@@ -44721,3 +44843,506 @@ settleRoomSettings msg model =
 
         _ ->
             { model | roomSettings = settled }
+
+
+-- v3/dm-key-hold
+
+
+{-| A DM whose peer key lookup has not been answered while encrypted
+DMs are on. Sending would otherwise fall through to plaintext before the
+`ocean.dm-key` reply lands (the open-then-send race); such a DM is held
+instead. A peer that answered "no key" stays sendable in the clear (the
+header shows "Not encrypted"), and the user may explicitly opt one peer
+into plaintext for the session (`DmSendUnencrypted`).
+-}
+dmKeyUnresolved : Model -> String -> Bool
+dmKeyUnresolved model target =
+    let
+        key =
+            String.toLower target
+    in
+    model.e2eeDms
+        && not (String.isEmpty (String.trim target))
+        && not (isChannelName model target)
+        && not (dmDesignated model target)
+        && not (Set.member key model.dmKeyAnswered)
+        && not (Set.member key model.dmPlainConfirmed)
+
+
+dmKeyLookupRetryMs : Float
+dmKeyLookupRetryMs =
+    10000
+
+
+{-| Ask for the peer's `ocean.dm-key`, at most once per retry window. -}
+requestDmKeyLookup : Model -> String -> ( Model, List Outbound )
+requestDmKeyLookup model target =
+    let
+        key =
+            String.toLower target
+
+        recent =
+            case Dict.get key model.dmKeyPending of
+                Just at ->
+                    model.nowMs - at < dmKeyLookupRetryMs
+
+                Nothing ->
+                    False
+    in
+    if model.connection /= Live || recent then
+        ( model, [] )
+
+    else
+        ( { model | dmKeyPending = Dict.insert key model.nowMs model.dmKeyPending }
+        , [ SendLine (Wire.formatIrcLine "METADATA" [ target, "GET", "ocean.dm-key" ]) ]
+        )
+
+
+holdDmCopy : String -> String
+holdDmCopy peer =
+    "Checking whether " ++ peer ++ " can receive encrypted messages. Your message is kept — send again in a moment, or send it unencrypted."
+
+
+{-| Refuse a send to an unresolved DM: keep the draft, (re)request the
+key, and surface the hold with the explicit plaintext choice. -}
+holdUnresolvedDm : Model -> String -> ( Model, List Outbound )
+holdUnresolvedDm model target =
+    let
+        ( asked, out ) =
+            requestDmKeyLookup model target
+    in
+    ( { asked | composerError = Just (holdDmCopy target), dmKeyHold = Just target }, out )
+
+
+{-| A `761`/`766` reply for a peer's DM key. It settles the lookup only
+when it is definitive: an empty value (no key) or a key the directory
+accepted (the peer is now designated, so sends seal). A malformed key
+leaves the lookup unresolved, so a garbled reply can never unlock
+plaintext; the user can still consent explicitly. -}
+settleDmKeyReply : String -> String -> Model -> Model
+settleDmKeyReply key value model =
+    if String.isEmpty (String.trim value) || dmDesignated model key then
+        markDmKeyAnswered key model
+
+    else
+        model
+
+
+{-| A lookup answered (key, key list, or definitively no key): clear the
+pending entry and any matching hold notice. -}
+markDmKeyAnswered : String -> Model -> Model
+markDmKeyAnswered key model =
+    let
+        held =
+            Maybe.map String.toLower model.dmKeyHold == Just key
+    in
+    { model
+        | dmKeyAnswered = Set.insert key model.dmKeyAnswered
+        , dmKeyPending = Dict.remove key model.dmKeyPending
+        , dmKeyHold =
+            if held then
+                Nothing
+
+            else
+                model.dmKeyHold
+        , composerError =
+            if held then
+                Nothing
+
+            else
+                model.composerError
+    }
+
+
+{-| `FAIL METADATA KEY_NOT_SET|TARGET_INVALID <target> ...` settles a
+pending lookup as "no key". Other codes (rate limits, permissions) leave
+it unresolved so nothing downgrades on a transient error. -}
+settleDmKeyFail : Model -> Wire.IrcMessage -> Model
+settleDmKeyFail model message =
+    case message.params of
+        "METADATA" :: code :: context ->
+            if code == "KEY_NOT_SET" || code == "TARGET_INVALID" then
+                List.foldl
+                    (\param acc ->
+                        if Dict.member (String.toLower param) acc.dmKeyPending then
+                            markDmKeyAnswered (String.toLower param) acc
+
+                        else
+                            acc
+                    )
+                    model
+                    context
+
+            else
+                model
+
+        _ ->
+            model
+
+
+{-| `401 <me> <nick>` for a pending lookup: the peer does not exist, so
+there is no key to wait for (the send itself will fail visibly). -}
+settleDmKeyNoSuchNick : Model -> Wire.IrcMessage -> Model
+settleDmKeyNoSuchNick model message =
+    case message.params of
+        _ :: nick :: _ ->
+            if Dict.member (String.toLower nick) model.dmKeyPending then
+                markDmKeyAnswered (String.toLower nick) model
+
+            else
+                model
+
+        _ ->
+            model
+
+
+{-| Scheduled DM rows held by `dispatchableScheduledRow` trigger their
+peer's lookup (rate-limited), so they dispatch once it answers. -}
+withScheduledDmLookups : ( Model, List Outbound ) -> ( Model, List Outbound )
+withScheduledDmLookups ( model, outs ) =
+    List.foldl
+        (\row ( acc, accOuts ) ->
+            if dmKeyUnresolved acc row.channel then
+                let
+                    ( asked, out ) =
+                        requestDmKeyLookup acc row.channel
+                in
+                ( asked, accOuts ++ out )
+
+            else
+                ( acc, accOuts )
+        )
+        ( model, outs )
+        model.scheduledMessages
+
+-- v3/calls-c11
+
+
+{-| Stage-mode transitions (C11, `Stage` holds the wire rules). Every
+send waits for a live socket — the oracle's `admitRaw` refuses a
+closed socket the same way — and starting a stage needs channel-op
+standing, since the server would refuse `MODE +m` anyway.
+-}
+stageUpdate : Msg -> Model -> ( Model, List Outbound )
+stageUpdate msg model =
+    let
+        live =
+            model.connection == Live
+
+        apply ( next, lines ) =
+            ( { model | stage = next }, List.map SendLine lines )
+    in
+    case msg of
+        StageStart room ->
+            if live && isChannelOp model room then
+                case Stage.startLines room of
+                    Just started ->
+                        apply started
+
+                    Nothing ->
+                        ( model, [] )
+
+            else
+                ( model, [] )
+
+        StageEnd ->
+            if model.stage.isHost then
+                apply (Stage.endLines model.stage)
+                    |> Tuple.mapFirst (\m -> { m | stageHandsOpen = False })
+
+            else
+                ( model, [] )
+
+        StageJoinAudience room ->
+            if live then
+                case Stage.joinLines { member = Dict.member (String.toLower room) model.channels } room of
+                    Just joined ->
+                        apply joined
+
+                    Nothing ->
+                        ( model, [] )
+
+            else
+                ( model, [] )
+
+        StageLeave ->
+            apply (Stage.leaveLines model.stage)
+                |> Tuple.mapFirst (\m -> { m | stageHandsOpen = False })
+
+        StageHandToggle ->
+            if live && not model.stage.isSpeaker then
+                apply (Stage.handLines (not model.stage.handRaised) model.stage)
+
+            else
+                ( model, [] )
+
+        StageInvite nick ->
+            if live && model.stage.isHost then
+                ( model, List.map SendLine (Stage.inviteLine nick model.stage) )
+
+            else
+                ( model, [] )
+
+        StageDismissHand nick ->
+            -- Local only: Onyx Server has no deny verb for a raised
+            -- hand, so dismissing clears the row from this host's queue.
+            ( { model | stage = Stage.removeRaisedHand nick model.stage }, [] )
+
+        StageAccept ->
+            if live && model.stage.pendingInvite /= Nothing then
+                apply (Stage.acceptLines model.stage)
+
+            else
+                ( model, [] )
+
+        StageDecline ->
+            apply (Stage.declineLines model.stage)
+
+        StageHandsOpen ->
+            ( { model | stageHandsOpen = True }, [] )
+
+        StageHandsClose ->
+            ( { model | stageHandsOpen = False }, [] )
+
+        _ ->
+            ( model, [] )
+
+
+{-| The 375px raised-hands sheet is open (host, live stage, queue). -}
+stageHandsSheetOpen : Model -> Bool
+stageHandsSheetOpen model =
+    model.stageHandsOpen && model.stage.isHost && model.stage.channel /= Nothing
+
+
+{-| Fold the stage side of one live wire line after `foldLine` (the row
+itself is already swallowed as a CTCP wrapper there): inbound STAGE
+CTCP, NICK renames, and our own PART / KICK from the stage room.
+-}
+foldStageWire : Wire.IrcMessage -> ( Model, List Outbound ) -> ( Model, List Outbound )
+foldStageWire parsed ( model, out ) =
+    if model.historyMerging || model.stage.channel == Nothing then
+        ( model, out )
+
+    else
+        let
+            sender =
+                Maybe.withDefault "" parsed.nick
+
+            isSelf name =
+                String.toLower name == String.toLower model.ourNick
+        in
+        case ( parsed.command, parsed.params ) of
+            ( "PRIVMSG", target :: body :: _ ) ->
+                let
+                    memberModes nick =
+                        model.stage.channel
+                            |> Maybe.andThen (\room -> Dict.get (String.toLower room) model.channels)
+                            |> Maybe.andThen (\ch -> Dict.get (String.toLower nick) ch.members)
+                            |> Maybe.map .modes
+                in
+                case
+                    Stage.foldCtcp
+                        { ourNick = model.ourNick
+                        , sender = sender
+                        , target = target
+                        , body = body
+                        , memberModes = memberModes
+                        }
+                        model.stage
+                of
+                    Just folded ->
+                        let
+                            announcer =
+                                model.callAnnouncer
+
+                            announced =
+                                case ( folded.raised, model.stage.isHost ) of
+                                    ( Just nick, True ) ->
+                                        { announcer | message = nick ++ " raised a hand" }
+
+                                    _ ->
+                                        announcer
+                        in
+                        ( { model | stage = folded.stage, callAnnouncer = announced }
+                        , out ++ List.map SendLine folded.lines
+                        )
+
+                    Nothing ->
+                        ( model, out )
+
+            ( "NICK", new :: _ ) ->
+                ( { model | stage = Stage.foldNick sender new model.stage }, out )
+
+            ( "PART", rooms :: _ ) ->
+                if isSelf sender then
+                    ( { model | stage = List.foldl Stage.foldSelfLeave model.stage (String.split "," rooms) }, out )
+
+                else
+                    ( { model | stage = Stage.removeRaisedHand sender model.stage }, out )
+
+            ( "KICK", room :: victim :: _ ) ->
+                if isSelf victim then
+                    ( { model | stage = Stage.foldSelfLeave room model.stage }, out )
+
+                else
+                    ( { model | stage = Stage.removeRaisedHand victim model.stage }, out )
+
+            ( "QUIT", _ ) ->
+                ( { model | stage = Stage.removeRaisedHand sender model.stage }, out )
+
+            _ ->
+                ( model, out )
+
+
+{-| Close the stage / leave-confirm overlays once they have nothing to
+show (call idle, host authority gone).
+-}
+settleStage : Model -> Model
+settleStage model =
+    let
+        confirmed =
+            if model.callLeaveConfirm && model.calls.lifecycle == Media.Idle then
+                { model | callLeaveConfirm = False }
+
+            else
+                model
+    in
+    if confirmed.stageHandsOpen && not (stageHandsSheetOpen confirmed && not (List.isEmpty confirmed.stage.raisedHands)) then
+        { confirmed | stageHandsOpen = False }
+
+    else
+        confirmed
+
+
+{-| C12 call chords from the `shortcut` port (`call-<name>`). Active
+only in an established call; while reconnecting only Leave works (the
+bar disables the rest the same way). Raise hand drives the stage hand
+when this call's room is a stage this client is in the audience of;
+outside a stage it toggles the C8 voice hand (v3/calls-c8).
+-}
+callChord : String -> Model -> ( Model, List Outbound )
+callChord name model =
+    let
+        reconnecting =
+            CallDock.reconnecting model.calls (model.connection == Live)
+
+        roster =
+            CallUi.callRoster model.media model.calls
+    in
+    case Stage.chordFromName name of
+        Nothing ->
+            ( model, [] )
+
+        Just chord ->
+            if model.calls.lifecycle /= Media.InCall then
+                ( model, [] )
+
+            else if reconnecting && chord /= Stage.ChordLeave then
+                ( model, [] )
+
+            else
+                case chord of
+                    Stage.ChordMute ->
+                        updateCore CallToggleMute model
+
+                    Stage.ChordCamera ->
+                        updateCore CallToggleCamera model
+
+                    Stage.ChordHand ->
+                        case model.calls.channel of
+                            Just room ->
+                                if Stage.activeFor model.stage room && not model.stage.isSpeaker then
+                                    stageUpdate StageHandToggle model
+
+                                else
+                                    -- v3/calls-c8: the voice hand
+                                    updateCore CallToggleHand model
+
+                            Nothing ->
+                                -- v3/calls-c8: a DM call's hand is local
+                                updateCore CallToggleHand model
+
+                    -- v3/calls-c8
+                    Stage.ChordCaptions ->
+                        updateCore CallToggleCaptions model
+
+                    Stage.ChordLeave ->
+                        if List.length roster > 2 then
+                            ( { model | callLeaveConfirm = True }, [] )
+
+                        else
+                            updateCore CallLeave model
+
+                    Stage.ChordLayout ->
+                        ( cycleCallLayout model, [] )
+
+                    Stage.ChordSize ->
+                        updateCore CallStageSizeCycle model
+
+                    Stage.ChordSpeaker ->
+                        let
+                            peerSpeaking =
+                                Dict.foldl
+                                    (\k p acc ->
+                                        if p.speaking then
+                                            k :: acc
+
+                                        else
+                                            acc
+                                    )
+                                    []
+                                    model.callPeers
+
+                            speaking =
+                                Set.union model.media.speaking (Set.fromList peerSpeaking)
+
+                            names =
+                                roster
+                                    |> List.filter (\k -> Set.member (String.toLower k) speaking)
+                                    |> List.map (callDisplayName model)
+
+                            announcer =
+                                model.callAnnouncer
+                        in
+                        ( { model | callAnnouncer = { announcer | message = Stage.speakingAnnouncement names } }, [] )
+
+
+{-| Ctrl+Shift+G: grid → spotlight → (screenshare when one is live) →
+grid (spec §3.1).
+-}
+cycleCallLayout : Model -> Model
+cycleCallLayout model =
+    let
+        shareId =
+            CallMedia.buildTiles
+                { ourNick = model.ourNick
+                , order = model.callTileOrder
+                , media = model.media
+                , peers = model.callPeers
+                , local = model.callLocal
+                , selfMuted = model.callSelfMuted
+                , pinned = model.callPinned
+                , displayName = callDisplayName model
+                , roleOf = \_ -> Nothing
+                }
+                |> .shares
+                |> List.head
+                |> Maybe.map .id
+
+        current =
+            CallMedia.resolveView { layout = model.callLayout, shareId = shareId, optOut = model.callShareOptOut }
+    in
+    case current of
+        CallMedia.ViewScreenshare ->
+            { model | callShareOptOut = shareId, callLayout = CallMedia.LayoutGrid }
+
+        CallMedia.ViewGrid ->
+            { model | callLayout = CallMedia.LayoutSpotlight }
+
+        CallMedia.ViewSpotlight ->
+            case shareId of
+                Just _ ->
+                    { model | callShareOptOut = Nothing }
+
+                Nothing ->
+                    { model | callLayout = CallMedia.LayoutGrid }

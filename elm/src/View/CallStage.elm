@@ -23,7 +23,7 @@ hand / react / captions arrive with C8.
 Narrowings: icons are CSS-mask glyphs (`.onyx-ci`); the stage is
 docked in the message column (not a fixed mobile bottom bar); the
 connection-quality pip waits for C4's `qualityTier`; keyboard chords
-and `aria-keyshortcuts` wait for C12.
+and `aria-keyshortcuts` land with C12 (v3/calls-c11).
 
 -}
 
@@ -46,6 +46,8 @@ import View.CallDock -- v3/calls-c6
 -- v3/calls-c8
 import View.CallOverlays
 import View.VoiceSettings
+-- v3/calls-c11
+import View.StageMode
 
 
 {-| The call surface at the top of the message column: the stage +
@@ -66,7 +68,13 @@ roomCallSurface model target =
 
 security : Model -> Maybe CallUi.Security
 security model =
-    CallUi.resolveSecurity model.calls.lifecycle model.callSecurityFeed
+    let
+        feed =
+            model.callSecurityFeed
+    in
+    -- v3/calls-c11: a live stage is a broadcast, never a private call
+    CallUi.resolveSecurity model.calls.lifecycle
+        { feed | stageMode = feed.stageMode || View.StageMode.callStageRoom model /= Nothing }
 
 
 displayName : Model -> String -> String
@@ -139,8 +147,9 @@ voiceStage model =
         presentation =
             Media.classifyHubPresentation model.calls.lifecycle model.calls.startedAt
 
+        -- v3/calls-c11: on a stage only speakers get cells / tiles
         everyone =
-            people model
+            List.filter (\p_ -> View.StageMode.onStage model p_.key) (people model)
 
         count =
             List.length everyone
@@ -161,7 +170,13 @@ voiceStage model =
                     sharing
 
                 _ ->
-                    CallUi.stageStatus model.calls (Maybe.map .label (security model))
+                    -- v3/calls-c11
+                    case ( presentation, View.StageMode.statusOverride model ) of
+                        ( HubEstablished, Just stageLine ) ->
+                            stageLine
+
+                        _ ->
+                            CallUi.stageStatus model.calls (Maybe.map .label (security model))
             )
                 ++ (if suffix.protecting && presentation /= HubIdle then
                         " · Protecting audio"
@@ -242,6 +257,7 @@ voiceStage model =
                         )
                     ]
                     (List.map personCell everyone)
+        , View.StageMode.audienceLine model -- v3/calls-c11
         -- v3/calls-c8: reaction chips + live captions, docked above
         -- the bar (never over a control)
         , View.CallOverlays.reactionChips model
@@ -344,6 +360,18 @@ controlBar model =
 
         muted =
             model.callSelfMuted
+
+        -- v3/calls-c11
+        leaveButton =
+            button
+                [ type_ "button"
+                , class "onyx-cbtn onyx-cbtn-leave"
+                , attribute "data-testid" "call-leave"
+                , attribute "aria-label" "Leave voice call"
+                , attribute "aria-keyshortcuts" View.StageMode.keys.leave
+                , onClick CallLeave
+                ]
+                [ callIcon "leave", span [ class "onyx-cbtn-cap" ] [ text "Leave" ] ]
     in
     if presentation == HubIdle then
         text ""
@@ -367,10 +395,14 @@ controlBar model =
                 , View.VoiceSettings.pttHint model -- v3/calls-c8
                 ]
             , div [ class "onyx-call-bar-center", attribute "role" "group", attribute "aria-label" "Call controls" ]
+              <|
+                -- v3/calls-c11: the stage audience gets Hand / Leave stage
+                Maybe.withDefault
                 [ button
                     [ type_ "button"
                     , class "onyx-cbtn"
                     , attribute "data-testid" "call-mute"
+                    , attribute "aria-keyshortcuts" View.StageMode.keys.mute -- v3/calls-c11
                     , disabled reconnecting -- v3/calls-c6
                     , attribute "aria-pressed" (boolAttr muted)
                     , attribute "aria-label"
@@ -424,15 +456,10 @@ controlBar model =
                       else
                         text ""
                     ]
-                , button
-                    [ type_ "button"
-                    , class "onyx-cbtn onyx-cbtn-leave"
-                    , attribute "data-testid" "call-leave"
-                    , attribute "aria-label" "Leave voice call"
-                    , onClick CallLeave
-                    ]
-                    [ callIcon "leave", span [ class "onyx-cbtn-cap" ] [ text "Leave" ] ]
+                , View.StageMode.endStageButton model -- v3/calls-c11
+                , leaveButton
                 ]
+                (View.StageMode.audienceBarCenter model leaveButton)
             , div [ class "onyx-call-bar-right" ] [ securityChip model, View.CallVideo.qualityPip model ]
             , View.CallOverlays.reactMenu model -- v3/calls-c8
             -- v3/calls-c4
@@ -458,6 +485,7 @@ cameraButton model =
         [ type_ "button"
         , class "onyx-cbtn"
         , attribute "data-testid" "camera-button"
+        , attribute "aria-keyshortcuts" View.StageMode.keys.camera -- v3/calls-c11
         , attribute "aria-pressed" (boolAttr on)
         , attribute "aria-label"
             (if on then
@@ -556,6 +584,7 @@ moreTools model =
         , moreItem
             [ attribute "aria-pressed" (boolAttr (model.callLayout == CallMedia.LayoutSpotlight))
             , attribute "data-testid" "layout-button"
+            , attribute "aria-keyshortcuts" View.StageMode.keys.layout -- v3/calls-c11
             , onClick CallLayoutToggle
             ]
             "grid"
@@ -563,6 +592,7 @@ moreTools model =
         , moreItem
             [ attribute "aria-pressed" (boolAttr (model.callStageSize /= CallMedia.SizeCompact))
             , attribute "data-testid" "stage-size-button"
+            , attribute "aria-keyshortcuts" View.StageMode.keys.size -- v3/calls-c11
             , onClick CallStageSizeCycle
             ]
             "expand"
@@ -771,5 +801,13 @@ announcer model =
         , attribute "aria-live" "polite"
         , attribute "aria-atomic" "true"
         , attribute "data-testid" "call-status-announcer"
+        -- v3/calls-c11 (C12): ports.js forwards call chords only while on
+        , attribute "data-call-keys"
+            (if model.calls.lifecycle == Media.InCall then
+                "on"
+
+             else
+                "off"
+            )
         ]
         [ text model.callAnnouncer.message ]

@@ -9180,11 +9180,14 @@ suite =
                     , \_ -> Expect.equal [ "Encryption unavailable" ] (List.map .title m2.toasts)
                     ]
                     ()
-        , test "plain DM still sends plaintext" <|
+        , test "plain DM sends plaintext once the peer answered no key" <|
             \_ ->
                 let
-                    ( m1, _ ) =
+                    ( m0, _ ) =
                         update (ChannelSelect "bob") blank
+
+                    ( m1, _ ) =
+                        feed m0 ":s 766 me bob ocean.dm-key :key not set"
 
                     ( _, outbound ) =
                         update ComposerSend { m1 | composer = "hello" }
@@ -19120,7 +19123,8 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal False (dispatchableScheduledRow ircxBase (mkRow "#c"))
                         , \_ -> Expect.equal True (dispatchableScheduledRow syncedBase (mkRow "#c"))
-                        , \_ -> Expect.equal True (dispatchableScheduledRow ircxBase (mkRow "bob"))
+                        , \_ -> Expect.equal False (dispatchableScheduledRow ircxBase (mkRow "bob"))
+                        , \_ -> Expect.equal True (dispatchableScheduledRow { ircxBase | dmKeyAnswered = Set.singleton "bob" } (mkRow "bob"))
                         , \_ -> Expect.equal True (dispatchableScheduledRow ownerBase (mkRow "#c"))
                         , \_ -> Expect.equal False (dispatchableScheduledRow requiredBase (mkRow "#c"))
                         , \_ -> Expect.equal True (dispatchableScheduledRow designatedBase (mkRow "bob"))

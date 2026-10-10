@@ -29,13 +29,23 @@ import View.Home
 import View.MessageText exposing (messageText)
 -- v3/calls-c1
 import View.CallStage
+-- v3/calls-c11
+import View.StageMode
 import View.Sheet as Sheet
 
 
 thread : Model -> Html Msg
 thread model =
     section [ class "onyx-thread-pane" ]
-        [ -- v3/calls-c1
+        [ -- v3/calls-c11: the room's stage strip (self-gates per room),
+          -- above the call surface like the oracle StagePanel
+          case model.activeChannel of
+            Just target ->
+                View.StageMode.panel model target
+
+            Nothing ->
+                text ""
+        , -- v3/calls-c1
           case model.activeChannel of
             Just target ->
                 View.CallStage.roomCallSurface model target

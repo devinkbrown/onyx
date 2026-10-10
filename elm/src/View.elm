@@ -28,6 +28,8 @@ import View.Calls exposing (callsHub)
 import View.CallStage
 -- v3/calls-c8
 import View.VoiceSettings
+-- v3/calls-c11
+import View.StageMode
 import View.CallDock -- v3/calls-c6
 import View.Download
 import View.Guides
@@ -307,6 +309,9 @@ overlays model =
         , View.CallStage.privacySheet model
         , View.VoiceSettings.sheet model -- v3/calls-c8
         , View.CallStage.announcer model
+        -- v3/calls-c11
+        , View.StageMode.handsSheet model
+        , View.StageMode.leaveConfirm model
         , reclaimDialog model
         , View.Nav.youHub model
         -- v3/switcher

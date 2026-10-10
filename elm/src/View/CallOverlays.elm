@@ -67,6 +67,7 @@ handButton model reconnecting =
         [ type_ "button"
         , class "onyx-cbtn onyx-cbtn-hand"
         , attribute "data-testid" "raise-hand-button"
+        , attribute "aria-keyshortcuts" "Control+Shift+H Meta+Shift+H"
         , attribute "aria-pressed" (boolAttr raised)
         , attribute "aria-label" (CallCaptions.handLabel raised)
         , disabled (reconnecting || not (inCall model))
@@ -110,6 +111,7 @@ captionsButton model reconnecting =
         [ type_ "button"
         , class "onyx-cbtn"
         , attribute "data-testid" "captions-button"
+        , attribute "aria-keyshortcuts" "Control+Shift+C Meta+Shift+C"
         , attribute "aria-pressed" (boolAttr on)
         , attribute "aria-label"
             (if on then

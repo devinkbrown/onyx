@@ -3356,6 +3356,11 @@ function fetchPublicFeed(url) {
       );
     } catch (err) { return false; }
   }
+  var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker", c: "captions" /* v3/calls-c8 */ };
+  function callKeysLive(doc) {
+    if (!doc || !doc.querySelector) return false;
+    try { return !!doc.querySelector('[data-call-keys="on"]'); } catch (err) { return false; }
+  }
   function classifyShortcut(e, doc) {
     if (!e || e.defaultPrevented) return null;
     if (e.isComposing || e.keyCode === 229) return null;
@@ -3368,6 +3373,19 @@ function fetchPublicFeed(url) {
     if (key.toLowerCase() === "k" && mod && !e.altKey && !e.shiftKey) {
       if (shortcutForeignModal(doc)) return null;
       return { name: "palette-toggle", prevent: true };
+    }
+    /* v3/calls-c11 (C12) — call chords: Ctrl/Cmd+Shift+<letter>, only
+       while a call is live (the always-mounted announcer carries
+       `data-call-keys="on"`), never while typing, never under a
+       foreign modal. Push to talk (C9) is the separate user-bound
+       single-key runtime (`createPushToTalk`), on the same scope rules. */
+    if (mod && e.shiftKey && !e.altKey) {
+      var chord = CALL_CHORDS[key.toLowerCase()];
+      if (!chord) return null;
+      if (shortcutEditableTarget(e.target)) return null;
+      if (shortcutForeignModal(doc)) return null;
+      if (!callKeysLive(doc)) return null;
+      return { name: "call-" + chord, prevent: true };
     }
     if (mod || e.altKey) return null;
     if (key !== "?" && key !== "/") return null;
@@ -4081,9 +4099,12 @@ function fetchPublicFeed(url) {
       voicePush.onStreams(voiceTiles.refresh);
       voiceTiles.refresh();
     }
+    /* v3/calls-c9: assigned by wireVoiceSettings (devices / choose-speaker). */
+    var voiceSettingsCommand = null;
     if (app.ports.voiceCommand) {
       app.ports.voiceCommand.subscribe(function (req) {
         var verb = (req && typeof req.verb === "string") ? req.verb : "";
+        if ((verb === "devices" || verb === "choose-speaker") && voiceSettingsCommand) { voiceSettingsCommand(req); return; }
         var on = !!(req && req.on);
         var channel = (req && typeof req.channel === "string" && req.channel) ? req.channel : undefined;
         var engine = voiceEngine();
@@ -4188,8 +4209,9 @@ function fetchPublicFeed(url) {
           }
         } catch (err) { /* devicechange is optional */ }
       }
-      if (app.ports.voiceCommand) {
-        app.ports.voiceCommand.subscribe(function (req) {
+      /* Routed from the ONE voiceCommand subscriber (below in C4's
+         handler) — a port keeps a single subscriber per bridge. */
+      voiceSettingsCommand = function (req) {
           var verb = (req && typeof req.verb === "string") ? req.verb : "";
           if (verb === "devices") {
             voiceDevicesSnapshot(nav, voiceEngine()).then(feed);
@@ -4209,8 +4231,7 @@ function fetchPublicFeed(url) {
                 feed({ kind: "output-error", name: (err && typeof err.name === "string") ? err.name : "" });
               });
           }
-        });
-      }
+      };
     })();
     if (app.ports.appearanceStorePrefs) {
       app.ports.appearanceStorePrefs.subscribe(function (req) {
