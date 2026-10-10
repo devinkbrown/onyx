@@ -3777,14 +3777,16 @@ suite =
                             query { blank | callsOpen = True, calls = calls }
                     in
                     Expect.all
+                        -- v3/calls-c1: an established call shows the stage
+                        -- and its bar inline.
                         [ \_ ->
                             q
-                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Mute" ] ]
+                                |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Mute microphone") ]
                                 |> Event.simulate Event.click
                                 |> Event.expect CallToggleMute
                         , \_ ->
                             q
-                                |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Leave call" ] ]
+                                |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Leave voice call") ]
                                 |> Event.simulate Event.click
                                 |> Event.expect CallLeave
                         ]

@@ -12,6 +12,8 @@ import Html.Attributes exposing (attribute, class, classList, disabled, for, id,
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Nav
 import View.ModDesk
+-- v3/calls-c1
+import View.CallPresence
 
 
 topbar : Model -> Html Msg
@@ -23,6 +25,8 @@ topbar model =
             ]
         , div [ class "onyx-topic" ] [ text (activeTopic model) ]
         , paletteLauncher model
+        -- v3/calls-c1
+        , View.CallPresence.headerVoice model
         , button
             [ class "onyx-calls-toggle"
             , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]

@@ -16,11 +16,14 @@ Hard rules, mirroring the oracle:
 
 -}
 
-import App exposing (Msg(..))
+import App exposing (Model, Msg(..))
 import Html exposing (Html, button, div, h1, header, main_, p, span, strong, text)
 import Html.Attributes exposing (attribute, class)
 import Html.Events exposing (onClick)
 import Media exposing (CallHub, HubPresentation(..))
+-- v3/calls-c1
+import View.CallPresence
+import View.CallStage
 
 
 presentationOf : CallHub -> HubPresentation
@@ -157,11 +160,21 @@ actionNote presentation canReturn =
 call plus a target; otherwise the primary button reveals the rooms.
 An idle hub with an open conversation offers voice/video join (the
 join resolves through the engine feed, so a missing engine lands as
-a failed outcome); a live call offers mute + leave.
+a failed outcome); a provisional call offers mute + leave; an
+established call shows the voice stage and its bar inline (v3/calls-c1).
 -}
-callsHub : CallHub -> Maybe String -> Bool -> Html Msg
-callsHub hub activeChannel selfMuted =
+callsHub : Model -> Html Msg
+callsHub model =
     let
+        hub =
+            model.calls
+
+        activeChannel =
+            model.activeChannel
+
+        selfMuted =
+            model.callSelfMuted
+
         presentation =
             presentationOf hub
 
@@ -245,7 +258,15 @@ callsHub hub activeChannel selfMuted =
 
             _ ->
                 text ""
-        , if presentation == HubProvisional || presentation == HubEstablished then
+        -- v3/calls-c1: an established call shows its stage inline,
+        -- so "Return to call" and the stage are the same place; any
+        -- other state lists the rooms that have voice.
+        , if presentation == HubEstablished then
+            View.CallStage.voiceStage model
+
+          else
+            View.CallPresence.roomsWithVoice model
+        , if presentation == HubProvisional then
             div [ class "onyx-calls-controls" ]
                 [ button
                     [ class "onyx-calls-mute"
