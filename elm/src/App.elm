@@ -80,6 +80,8 @@ import TopicRead
 import Upload
 import Url
 import Transcript
+-- v3/transcript
+import TranscriptRows
 import VaultImport
 import Webhook
 import Wire
@@ -423,6 +425,8 @@ type alias Model =
     , channelJoinPrompt : Maybe { channel : String, error : String }
     , firstUnreadId : Dict String Int
     , viewUnreadDividerId : Dict String Int
+    -- v3/transcript — scrolled-away state from the `scrollState` bridge.
+    , transcriptAway : Maybe TranscriptRows.Away
     , historyMerging : Bool
     , readMarkers : Dict String String
     , lastReadAt : Dict String Int
@@ -970,6 +974,8 @@ type Outbound
     | HistoryReplace { url : String }
     | StatsRevealInspector
     | TopicChipFocus
+    -- v3/transcript — scroll anchoring bridge (`scrollPolicy` port).
+    | TranscriptScroll { action : String, key : String }
     | GuidesProgressRequest
     | GuidesProgressStore { ids : List String }
     | HttpFetch { key : String, url : String }
@@ -2020,6 +2026,10 @@ prefKeyForValue value =
     if Prefs.fontScaleFromString value /= Nothing then
         "fontScale"
 
+    -- v3/transcript
+    else if Prefs.transcriptDensityFromString value /= Nothing then
+        "transcriptDensity"
+
     else
         "density"
 
@@ -2836,6 +2846,9 @@ type Msg
     | PinnedMessagePin { channel : String, messageId : String }
     | PinnedMessageUnpin { channel : String, messageId : String }
     | ThreadShowLatest
+    -- v3/transcript
+    | TranscriptScrolled { key : String, atBottom : Bool }
+    | TranscriptJumpLatest
     | IgnoreUser String
     | UnignoreUser String
     | MuteDm String
@@ -3198,6 +3211,8 @@ init nick url =
     , channelJoinPrompt = Nothing
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
+    -- v3/transcript
+    , transcriptAway = Nothing
     , historyMerging = False
     , readMarkers = Dict.empty
     , lastReadAt = Dict.empty
@@ -3686,6 +3701,8 @@ blank =
     , channelJoinPrompt = Nothing
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
+    -- v3/transcript
+    , transcriptAway = Nothing
     , historyMerging = False
     , readMarkers = Dict.empty
     , lastReadAt = Dict.empty
@@ -37885,6 +37902,43 @@ updateCore msg model =
                     resetThreadWindow model
             in
             ( { trailed | ignoreUnreadAnchor = True }, [] )
+
+        -- v3/transcript
+        TranscriptScrolled report ->
+            -- Fold one `scrollState` report: the newest row time of
+            -- the reported conversation is the "new below" baseline.
+            let
+                latestAt =
+                    Dict.get report.key model.channels
+                        |> Maybe.andThen (.messages >> List.head)
+                        |> Maybe.map .at
+                        |> Maybe.withDefault 0
+
+                next =
+                    TranscriptRows.awayAfterReport report latestAt model.transcriptAway
+            in
+            if next == model.transcriptAway then
+                ( model, [] )
+
+            else
+                ( { model | transcriptAway = next }, [] )
+
+        TranscriptJumpLatest ->
+            -- The "Jump to latest" pill: trailing window (like
+            -- `ThreadShowLatest`), clear the away state, and ask the
+            -- bridge to pin the log to the bottom.
+            let
+                trailed =
+                    resetThreadWindow model
+            in
+            ( { trailed | ignoreUnreadAnchor = True, transcriptAway = Nothing }
+            , case model.activeChannel of
+                Just name ->
+                    [ TranscriptScroll { action = "bottom", key = TranscriptRows.scrollKey name } ]
+
+                Nothing ->
+                    []
+            )
 
         IgnoreUser _ ->
             foldBlocklistAction model msg

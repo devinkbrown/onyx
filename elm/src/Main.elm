@@ -302,6 +302,17 @@ port statsRevealInspector : () -> Cmd msg
 
 port topicChipFocus : () -> Cmd msg
 
+
+{-| v3/transcript — the one scroll-anchoring bridge: `scrollPolicy`
+asks ports.js to act on the transcript log (`bottom` = jump to
+latest); `scrollState` reports whether the reader is pinned to the
+bottom of the keyed `role=log` transcript. Stick-to-bottom and
+history-prepend anchoring run ports-side on every render. -}
+port scrollPolicy : { action : String, key : String } -> Cmd msg
+
+
+port scrollState : ({ key : String, atBottom : Bool } -> msg) -> Sub msg
+
 port appearanceRequest : () -> Cmd msg
 
 port appearanceStorePrefs : { json : String } -> Cmd msg
@@ -1283,6 +1294,10 @@ perform key outbound =
         App.TopicChipFocus ->
             topicChipFocus ()
 
+        -- v3/transcript
+        App.TranscriptScroll req ->
+            scrollPolicy req
+
         App.GuidesProgressRequest ->
             guidesProgressRequest ()
 
@@ -1522,6 +1537,8 @@ subscriptions model =
         , scheduleParseResult App.ScheduleParseReceived
         , identityProfileLoaded App.IdentityProfileLoaded
         , topicHistoryLoaded App.TopicHistoryLoaded
+        -- v3/transcript
+        , scrollState App.TranscriptScrolled
         , topicReadLoaded App.TopicReadLoaded
         , nickAliasesLoaded App.NickAliasesLoaded
         , friendsLoaded App.FriendsLoaded

@@ -6,6 +6,7 @@ module Prefs exposing
     , Preferences
     , ReactionDensity(..)
     , SceneMotion(..)
+    , TranscriptDensity(..)
     , Width(..)
     , clockFromString
     , clockToString
@@ -34,6 +35,9 @@ module Prefs exposing
     , sceneMotionStorageKey
     , sceneMotionToString
     , sceneMotions
+    , transcriptDensities
+    , transcriptDensityFromString
+    , transcriptDensityToString
     , updatePreference
     , widthFromString
     , widthToString
@@ -106,6 +110,47 @@ type Width
 type Clock
     = Clock24h
     | Clock12h
+
+
+{-| v3/transcript — message layout density (design direction "Density":
+Default = grouped rows with avatars; Compact = no avatars, name inline,
+IRC-like). Orthogonal to the spacing `Density` above; Elm-only
+(the oracle has no IRC layout), stored in the same `onyx:preferences`
+record under `transcriptDensity` as `grouped` / `irc` (distinct from
+the spacing values so the Appearance radio-key fold can tell the two
+groups apart by value).
+-}
+type TranscriptDensity
+    = TranscriptDefault
+    | TranscriptCompact
+
+
+transcriptDensities : List TranscriptDensity
+transcriptDensities =
+    [ TranscriptDefault, TranscriptCompact ]
+
+
+transcriptDensityToString : TranscriptDensity -> String
+transcriptDensityToString density =
+    case density of
+        TranscriptDefault ->
+            "grouped"
+
+        TranscriptCompact ->
+            "irc"
+
+
+transcriptDensityFromString : String -> Maybe TranscriptDensity
+transcriptDensityFromString raw =
+    case raw of
+        "grouped" ->
+            Just TranscriptDefault
+
+        "irc" ->
+            Just TranscriptCompact
+
+        _ ->
+            Nothing
 
 
 type ReactionDensity
@@ -376,6 +421,7 @@ type alias Preferences =
     , watchTogether : Bool
     , reactionDensity : ReactionDensity
     , experienceMode : ExperienceMode
+    , transcriptDensity : TranscriptDensity
     }
 
 
@@ -401,6 +447,7 @@ defaultPreferences =
     , watchTogether = False
     , reactionDensity = ReactionFull
     , experienceMode = ExperienceStandard
+    , transcriptDensity = TranscriptDefault
     }
 
 
@@ -571,6 +618,7 @@ preferencesFromValue raw =
     , watchTogether = boolField "watchTogether" raw defaults.watchTogether
     , reactionDensity = stringField "reactionDensity" raw |> Maybe.andThen reactionDensityFromString |> Maybe.withDefault defaults.reactionDensity
     , experienceMode = stringField "experienceMode" raw |> Maybe.andThen experienceModeFromString |> Maybe.withDefault defaults.experienceMode
+    , transcriptDensity = stringField "transcriptDensity" raw |> Maybe.andThen transcriptDensityFromString |> Maybe.withDefault defaults.transcriptDensity
     }
 
 
@@ -650,6 +698,7 @@ encodePreferences prefs =
             , ( "watchTogether", Encode.bool prefs.watchTogether )
             , ( "reactionDensity", Encode.string (reactionDensityToString prefs.reactionDensity) )
             , ( "experienceMode", Encode.string (experienceModeToString prefs.experienceMode) )
+            , ( "transcriptDensity", Encode.string (transcriptDensityToString prefs.transcriptDensity) )
             ]
         )
 
@@ -669,6 +718,9 @@ updatePreference prefs key value =
 
         "reduceMotion" ->
             { prefs | reduceMotion = value == "true" }
+
+        "transcriptDensity" ->
+            { prefs | transcriptDensity = transcriptDensityFromString value |> Maybe.withDefault prefs.transcriptDensity }
 
         "clock" ->
             { prefs | clock = clockFromString value |> Maybe.withDefault prefs.clock }

@@ -2783,6 +2783,198 @@ function fetchPublicFeed(url) {
     .then(function (outcome) { return finish(outcome); })
     .catch(function () { return finish({ ok: false, status: 0, body: "" }); });
 }
+  /* v3/transcript — the one scroll-anchoring bridge (roadmap 2.0).
+     Elm renders the transcript as a keyed `role=log` list
+     (`.onyx-transcript[data-transcript-key]`) inside the scrolling
+     `.onyx-thread-pane`. After every render (MutationObserver) and
+     every height change (ResizeObserver: images, previews) the
+     scroller either keeps the reader pinned to the bottom (when they
+     were at the bottom) or keeps the first visible row at the same
+     on-screen offset (history prepends, window growth). A new log or
+     a conversation switch lands on the unread divider, else the
+     bottom. `scrollState { key, atBottom }` reports pinned/away on
+     change only, so Elm can show the "Jump to latest" pill;
+     `scrollPolicy { action: "bottom" }` jumps (instant, after the
+     render that the same update scheduled). Mirrors the oracle
+     `checkScroll` threshold (80px) and its divider-first open. */
+  var TRANSCRIPT_BOTTOM_THRESHOLD = 80;
+  var TRANSCRIPT_DIVIDER_MARGIN = 48;
+
+  function createTranscriptScroller(env) {
+    var doc = env.doc;
+    var send = env.send;
+    var raf = env.raf || function (fn) { fn(); };
+    var log = null;
+    var pane = null;
+    var key = null;
+    var resizeObs = null;
+    var state = { atBottom: true, anchor: null, anchorTop: 0 };
+    var reported = null;
+
+    function paneOf(el) {
+      var found = typeof el.closest === "function" ? el.closest(".onyx-thread-pane") : null;
+      return found || el.parentElement || el;
+    }
+
+    function topOf(el) {
+      return el.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+    }
+
+    function distance() {
+      return pane.scrollHeight - pane.scrollTop - pane.clientHeight;
+    }
+
+    function findAnchor() {
+      var list = log.querySelector("ul") || log;
+      var rows = list.children || [];
+      for (var i = 0; i < rows.length; i += 1) {
+        var r = rows[i].getBoundingClientRect();
+        var paneTop = pane.getBoundingClientRect().top;
+        if (r.bottom - paneTop > 0) return rows[i];
+      }
+      return null;
+    }
+
+    function report() {
+      if (!reported || reported.key !== key || reported.atBottom !== state.atBottom) {
+        reported = { key: key, atBottom: state.atBottom };
+        try { send({ key: key, atBottom: state.atBottom }); } catch (err) { /* best-effort */ }
+      }
+    }
+
+    function record() {
+      if (!log || !pane) return;
+      state.atBottom = distance() < TRANSCRIPT_BOTTOM_THRESHOLD;
+      state.anchor = state.atBottom ? null : findAnchor();
+      state.anchorTop = state.anchor ? topOf(state.anchor) : 0;
+      report();
+    }
+
+    function pinBottom() {
+      pane.scrollTop = pane.scrollHeight;
+    }
+
+    function settle() {
+      if (!log || !pane) return;
+      if (state.atBottom) {
+        pinBottom();
+      } else if (state.anchor && log.contains(state.anchor)) {
+        var delta = topOf(state.anchor) - state.anchorTop;
+        if (delta !== 0) pane.scrollTop = pane.scrollTop + delta;
+      }
+      record();
+    }
+
+    function onScroll() {
+      record();
+    }
+
+    function detach() {
+      if (pane && typeof pane.removeEventListener === "function") {
+        pane.removeEventListener("scroll", onScroll);
+      }
+      if (resizeObs) {
+        try { resizeObs.disconnect(); } catch (err) { /* ignore */ }
+      }
+      log = null;
+      pane = null;
+      key = null;
+    }
+
+    function attach(found) {
+      detach();
+      if (!found) return;
+      log = found;
+      pane = paneOf(found);
+      key = found.getAttribute("data-transcript-key") || "";
+      if (typeof pane.addEventListener === "function") {
+        pane.addEventListener("scroll", onScroll, { passive: true });
+      }
+      if (env.ResizeObserver) {
+        try {
+          resizeObs = new env.ResizeObserver(function () { settle(); });
+          resizeObs.observe(log.querySelector("ul") || log);
+        } catch (err) { resizeObs = null; }
+      }
+      var divider = log.querySelector(".onyx-unread-divider");
+      if (divider) {
+        pane.scrollTop = Math.max(0, pane.scrollTop + topOf(divider) - TRANSCRIPT_DIVIDER_MARGIN);
+      } else {
+        pinBottom();
+      }
+      reported = null;
+      record();
+    }
+
+    /* One render happened (or the pane resized). */
+    function sync() {
+      var found = doc.querySelector('.onyx-transcript[role="log"]');
+      if (found !== log || (found && found.getAttribute("data-transcript-key") !== key)) {
+        attach(found);
+        return;
+      }
+      settle();
+    }
+
+    function policy(req) {
+      if (!req || req.action !== "bottom") return;
+      state.atBottom = true;
+      state.anchor = null;
+      raf(function () {
+        sync();
+        if (!pane) return;
+        state.atBottom = true;
+        pinBottom();
+        record();
+      });
+    }
+
+    return {
+      sync: sync,
+      policy: policy,
+      onScroll: onScroll,
+      state: function () {
+        return { key: key, atBottom: state.atBottom, attached: !!log };
+      }
+    };
+  }
+
+  function wireTranscriptScroll(app, env) {
+    if (!app.ports.scrollPolicy && !app.ports.scrollState) return null;
+    var e = env || {};
+    var doc = e.doc || (typeof document !== "undefined" ? document : null);
+    var MO = e.MutationObserver || (typeof MutationObserver !== "undefined" ? MutationObserver : null);
+    if (!doc || typeof doc.querySelector !== "function") return null;
+    var scroller = createTranscriptScroller({
+      doc: doc,
+      send: function (s) {
+        if (app.ports.scrollState) app.ports.scrollState.send(s);
+      },
+      raf: e.raf || (typeof requestAnimationFrame === "function"
+        ? function (fn) { requestAnimationFrame(fn); }
+        : function (fn) { setTimeout(fn, 0); }),
+      ResizeObserver: e.ResizeObserver || (typeof ResizeObserver !== "undefined" ? ResizeObserver : null)
+    });
+    if (app.ports.scrollPolicy) {
+      app.ports.scrollPolicy.subscribe(function (req) {
+        try { scroller.policy(req); } catch (err) { /* best-effort */ }
+      });
+    }
+    if (MO && doc.body) {
+      try {
+        new MO(function () {
+          try { scroller.sync(); } catch (err) { /* best-effort */ }
+        }).observe(doc.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["data-transcript-key"]
+        });
+      } catch (err) { /* no observer: the jump pill still works */ }
+    }
+    return scroller;
+  }
+
   function wire(app) {
     var socket = { send: function () {}, close: function () {}, isOpen: function () { return false; }, rawSocket: function () { return null; } };
     var vault = null;
@@ -4891,6 +5083,9 @@ function fetchPublicFeed(url) {
        now-active filter chip instead of falling back to the document
        body. The port runs after Elm renders, like the oracle
        `queueMicrotask`; missing chips (stale emits) no-op. */
+    /* v3/transcript — scroll anchoring bridge. */
+    wireTranscriptScroll(app);
+
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
         try {
@@ -8400,6 +8595,8 @@ function fetchPublicFeed(url) {
       next: voiceFeedNext
     },
     wire: wire,
+    createTranscriptScroller: createTranscriptScroller,
+    wireTranscriptScroll: wireTranscriptScroll,
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,

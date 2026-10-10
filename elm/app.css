@@ -2491,3 +2491,46 @@ html, body {
   border: 1px solid var(--onyx-line); border-radius: 6px; padding: 8px 14px; cursor: pointer;
 }
 .jump-to-date__ledger { font-size: 13px; color: var(--onyx-dim); }
+
+/* v3/transcript — keyed role=log transcript, jump pill, density.
+   The frame is display:contents so the log keeps one DOM position
+   across empty → live; native scroll anchoring is off because the
+   `scrollPolicy` bridge owns stick-to-bottom and prepend anchoring. */
+
+.onyx-thread-pane { overflow-anchor: none; }
+.onyx-thread-frame { display: contents; }
+.onyx-transcript { min-width: 0; }
+
+.onyx-jump-latest {
+  position: sticky;
+  bottom: 8px;
+  align-self: center;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--onyx-text);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.onyx-jump-latest--unread { color: var(--onyx-accent-ink); background: var(--onyx-accent); border-color: var(--onyx-accent); }
+.onyx-jump-latest:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-jump-latest-count { font-variant-numeric: tabular-nums; }
+
+/* Compact: the IRC-heritage line — time, name inline, no avatar. */
+.onyx-transcript--compact .onyx-thread { gap: 0; }
+.onyx-message--compact { padding: 1px 0; line-height: 1.45; }
+.onyx-message--compact .onyx-ts {
+  color: var(--onyx-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
+}
+.onyx-message--compact .onyx-sender { margin-right: 6px; }
