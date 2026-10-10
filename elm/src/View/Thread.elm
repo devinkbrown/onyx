@@ -14,6 +14,7 @@ import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, 
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
+import PrefsPanel
 import Set exposing (Set)
 import Prefs
 import Time
@@ -1088,6 +1089,7 @@ messageRow model target prev parents m =
         div
             [ class "onyx-system"
             , attribute "data-event" m.msgType
+            , Html.Attributes.hidden (PrefsPanel.hidesEvent model.prefs.hideEvents m.msgType)
             , attribute "role" "article"
             , attribute "tabindex" "-1"
             , attribute "aria-label" m.body

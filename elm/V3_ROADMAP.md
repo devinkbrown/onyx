@@ -89,7 +89,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 | # | Surface | Oracle | Size |
 |---|---|---|---|
-| 4.1 | Device preferences panel: display, accessibility, conversation, history & data, vault, drafts, queued sends | `PreferencesPanel` | L |
+| 4.1 | Device preferences panel: display, accessibility, conversation, history & data, vault, drafts, queued sends | `PreferencesPanel` | L · **done** (v3/prefs; `App & tools`, density, local-history toggle, clear-* controls narrowed — see COVERAGE) |
 | 4.2 | Mention keywords, ignored users, smart mute, room folders | `KeywordListControl`, `IgnoredUsersControl`, `SmartMuteSection`, `ChannelOrganizationSection` | **partial** (`v3/notify`: keywords + ignored users done in the Notifications sheet; smart mute + room folders todo) |
 | 4.3 | Revoke other devices | `SessionsDevicesSection` | S |
 | 4.4 | Portable identity export/import | `PortableIdentitySection` | S |
@@ -134,6 +134,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 3.3 + 4.2 (keywords/ignored/DND) notification settings landed (`v3/notify`).
 - 2026-10-10 — Phase 1.1–1.3 primary navigation (rail + bottom bar), You hub for guests and accounts, Appearance link landed (v3/nav).
 - 2026-10-10 — Phase 2.5–2.6 boost slice landed (Add-a-boost opener + jump-to-date sheet over `requestTravelTo`; time scrubber stays todo).
+- 2026-10-10 — Phase 4.1 device Preferences sheet (You hub → This device → Preferences): Display / Conversation / History & data / Import & export / Accessibility tabs, queued-send + room-draft discard with count re-confirmation, new `outboxReview` port (v3/prefs; 47 `PrefsPanelTest` vectors + `prefsOutbox.smoke.mjs`).
 - 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
 
 ## Revised sequencing (Fable design research, 2026-10-10)

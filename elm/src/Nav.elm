@@ -205,6 +205,7 @@ type YouAction
     | YouAbout
     | YouStatus
     | YouLeave
+    | YouPreferences
 
 
 {-| Route-backed hub entries navigate in-app (`PushUrl`). -}

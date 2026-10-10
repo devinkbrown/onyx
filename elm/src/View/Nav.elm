@@ -246,6 +246,13 @@ youHub model =
                             , popup = False
                             , action = Nav.YouAppearance
                             }
+                        , entry
+                            { testId = "you-settings-open-preferences"
+                            , label = "Preferences"
+                            , hint = "Display, accessibility, history, and queued sends"
+                            , popup = True
+                            , action = Nav.YouPreferences
+                            }
                         ]
                     , group "help" "Help" Nothing
                         [ entry

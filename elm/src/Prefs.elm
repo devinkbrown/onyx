@@ -682,5 +682,21 @@ updatePreference prefs key value =
         "httpsOnly" ->
             { prefs | httpsOnly = value == "true" }
 
+        -- v3/prefs — Preferences sheet keys.
+        "hideEvents" ->
+            { prefs | hideEvents = value == "true" }
+
+        "reduceTransparency" ->
+            { prefs | reduceTransparency = value == "true" }
+
+        "highContrast" ->
+            { prefs | highContrast = value == "true" }
+
+        "readerMode" ->
+            { prefs | readerMode = value == "true" }
+
+        "width" ->
+            { prefs | width = widthFromString value |> Maybe.withDefault prefs.width }
+
         _ ->
             prefs

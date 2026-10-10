@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates)
+module App exposing (AttachmentStatus(..), ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, prefsRoomDrafts)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -28,6 +28,7 @@ import DmCipher
 import Download
 import GroupCommit
 import Prefs
+import PrefsPanel
 import Stats
 import Studio
 import Theme
@@ -589,6 +590,16 @@ type alias Model =
     , statsShare : StatsShare
     , prefs : Prefs.Preferences
     , prefsReady : Bool
+    -- v3/prefs — device Preferences sheet.
+    , prefsOpen : Bool
+    , prefsCategory : PrefsPanel.Category
+    , prefsResetAnnouncement : String
+    , prefsOutboxConfirm : Maybe Int
+    , prefsOutboxBusy : Bool
+    , prefsOutboxStatus : Maybe PrefsPanel.Status
+    , prefsDraftsConfirm : Maybe Int
+    , prefsDraftsStatus : Maybe PrefsPanel.Status
+    , prefsTransferStatus : Maybe String
     , sceneMotion : Prefs.SceneMotion
     , themeId : String
     , customThemes : List ThemeLook.CustomThemeRef
@@ -890,6 +901,9 @@ type Outbound
     | OutboxQueue { target : String, text : String }
     | OutboxFlush { labeled : Bool }
     | OutboxRetryTimer { delayMs : Int }
+    -- v3/prefs — read (and optionally delete) durable outbox rows.
+    | OutboxReview { discard : List String, tag : String }
+    | PrefsFocus { id : String }
     | PingObserved
     | SessionTokenStored { kind : String, token : String, expiresAt : Maybe Int, server : String, nick : String }
     | SessionTokensCleared { server : String, nick : String }
@@ -2899,6 +2913,27 @@ type Msg
     | AppearanceSetPref { key : String, value : String }
     | AppearanceToggleReduceMotion
     | AppearanceToggleSceneMotion
+    -- v3/prefs — device Preferences sheet.
+    | PrefsOpen
+    | PrefsClose
+    | PrefsSelectCategory PrefsPanel.Category
+    | PrefsCategoryKey { current : PrefsPanel.Category, key : String }
+    | PrefsTogglePref String
+    | PrefsSetSceneMotion String
+    | PrefsReset
+    | PrefsVaultExport
+    | PrefsVaultImport
+    | PrefsOutboxRemove String
+    | PrefsOutboxDiscardAsk
+    | PrefsOutboxDiscardCancel
+    | PrefsOutboxDiscardConfirm
+    | PrefsOutboxReviewed { removed : List String, rows : List OutboxEntry, ok : Bool, tag : String }
+    | PrefsDraftDiscard String
+    | PrefsDraftsDiscardAsk
+    | PrefsDraftsDiscardCancel
+    | PrefsDraftsDiscardConfirm
+    | PrefsFocusDone
+    | PrefsSegmentKey { focusId : String } Msg
     | AppearanceSetTheme { id : String }
     | AppearanceStageBackground { id : String }
     | AppearancePreviewBackground { id : String }
@@ -3303,6 +3338,16 @@ init nick url =
     , statsShare = StatsShareIdle
     , prefs = Prefs.defaultPreferences
     , prefsReady = False
+    -- v3/prefs — device Preferences sheet (both constructors).
+    , prefsOpen = False
+    , prefsCategory = PrefsPanel.Display
+    , prefsResetAnnouncement = ""
+    , prefsOutboxConfirm = Nothing
+    , prefsOutboxBusy = False
+    , prefsOutboxStatus = Nothing
+    , prefsDraftsConfirm = Nothing
+    , prefsDraftsStatus = Nothing
+    , prefsTransferStatus = Nothing
     , sceneMotion = Prefs.SceneAdaptive
     , themeId = ThemeLook.defaultThemeId
     , customThemes = []
@@ -3791,6 +3836,16 @@ blank =
     , statsShare = StatsShareIdle
     , prefs = Prefs.defaultPreferences
     , prefsReady = False
+    -- v3/prefs — device Preferences sheet (both constructors).
+    , prefsOpen = False
+    , prefsCategory = PrefsPanel.Display
+    , prefsResetAnnouncement = ""
+    , prefsOutboxConfirm = Nothing
+    , prefsOutboxBusy = False
+    , prefsOutboxStatus = Nothing
+    , prefsDraftsConfirm = Nothing
+    , prefsDraftsStatus = Nothing
+    , prefsTransferStatus = Nothing
     , sceneMotion = Prefs.SceneAdaptive
     , themeId = ThemeLook.defaultThemeId
     , customThemes = []
@@ -35660,7 +35715,12 @@ updateCore msg model =
             ( navigated, navOut ++ [ VaultFetchAround { target = String.toLower target, at = at, limit = keepMessages } ] )
 
         VaultExported { targets, messages } ->
-            ( logService model
+            ( logService
+                -- v3/prefs — the Preferences sheet echoes the export result.
+                { model
+                    | prefsTransferStatus =
+                        Just ("Exported " ++ PrefsPanel.countLabel messages "message" ++ " from " ++ PrefsPanel.countLabel targets "conversation" ++ ".")
+                }
                 ("Vault exported (" ++ String.fromInt messages ++ " messages, " ++ String.fromInt targets ++ " targets).")
             , []
             )
@@ -38889,6 +38949,99 @@ updateCore msg model =
               ]
             )
 
+        -- v3/prefs — device Preferences sheet.
+        PrefsOpen ->
+            prefsOpen model
+
+        PrefsClose ->
+            ( prefsClose model, [] )
+
+        PrefsSelectCategory category ->
+            ( { model | prefsCategory = category }, [] )
+
+        PrefsCategoryKey { current, key } ->
+            case PrefsPanel.categoryAfterKey current key of
+                Just next ->
+                    ( { model | prefsCategory = next }, [ PrefsFocus { id = "pref-category-tab-" ++ PrefsPanel.categoryId next } ] )
+
+                Nothing ->
+                    ( model, [] )
+
+        PrefsTogglePref key ->
+            prefsTogglePref key model
+
+        PrefsSetSceneMotion raw ->
+            prefsSetSceneMotion raw model
+
+        PrefsReset ->
+            prefsReset model
+
+        PrefsVaultExport ->
+            ( { model | prefsTransferStatus = Just "Preparing export…" }, [ VaultExportRequest ] )
+
+        PrefsVaultImport ->
+            ( model, [ VaultImportPick ] )
+
+        PrefsOutboxRemove id ->
+            if model.prefsOutboxBusy || not (List.any (\row -> row.id == id) model.outbox) then
+                ( model, [] )
+
+            else
+                ( { model | prefsOutboxBusy = True, prefsOutboxStatus = Nothing }, [ OutboxReview { discard = [ id ], tag = "one" } ] )
+
+        PrefsOutboxDiscardAsk ->
+            if model.prefsOutboxBusy || List.isEmpty model.outbox then
+                ( model, [] )
+
+            else
+                ( { model | prefsOutboxConfirm = Just (List.length model.outbox), prefsOutboxStatus = Nothing }
+                , [ OutboxReview { discard = [], tag = "refresh" }, PrefsFocus { id = "pref-discard-queued-confirm" } ]
+                )
+
+        PrefsOutboxDiscardCancel ->
+            ( { model | prefsOutboxConfirm = Nothing, prefsOutboxStatus = Just { message = PrefsPanel.queuedKeptCopy, failure = False } }
+            , [ PrefsFocus { id = "pref-discard-queued-trigger" } ]
+            )
+
+        PrefsOutboxDiscardConfirm ->
+            prefsOutboxDiscardConfirm model
+
+        PrefsOutboxReviewed result ->
+            prefsOutboxReviewed result model
+
+        PrefsDraftDiscard target ->
+            ( prefsDiscardDrafts [ target ] model, [] )
+
+        PrefsDraftsDiscardAsk ->
+            case prefsRoomDrafts model of
+                [] ->
+                    ( model, [] )
+
+                drafts ->
+                    ( { model | prefsDraftsConfirm = Just (List.length drafts), prefsDraftsStatus = Nothing }
+                    , [ PrefsFocus { id = "pref-discard-drafts-confirm" } ]
+                    )
+
+        PrefsDraftsDiscardCancel ->
+            ( { model | prefsDraftsConfirm = Nothing, prefsDraftsStatus = Just { message = PrefsPanel.roomDraftsKeptCopy, failure = False } }
+            , [ PrefsFocus { id = "pref-discard-drafts-trigger" } ]
+            )
+
+        PrefsDraftsDiscardConfirm ->
+            prefsDraftsDiscardConfirm model
+
+        PrefsFocusDone ->
+            ( model, [] )
+
+        PrefsSegmentKey { focusId } inner ->
+            -- Roving radio groups: run the selection, then move focus
+            -- to the newly checked radio (mirroring `Segmented`).
+            let
+                ( selected, out ) =
+                    updateCore inner model
+            in
+            ( selected, out ++ [ PrefsFocus { id = focusId } ] )
+
         AppearanceSetTheme { id } ->
             -- Unknown ids (including forged events) never apply.
             case ThemeLook.normalizeThemeId id model.customThemes of
@@ -41695,6 +41848,10 @@ youHubGo action model =
         ( Nav.YouLeave, _ ) ->
             updateCore SessionDisconnect model
 
+        -- v3/prefs
+        ( Nav.YouPreferences, _ ) ->
+            prefsOpen model
+
         _ ->
             ( model, [] )
 
@@ -41753,3 +41910,326 @@ setComposerDraft model draft =
                 , composerError = Nothing
                 , composerDrafts = Dict.insert (String.toLower current) draft model.composerDrafts
             }
+
+
+-- v3/prefs
+
+
+{-| Open the device Preferences sheet and refresh the durable outbox
+mirror so `Queued sends` reflects storage, not only the last flush.
+-}
+prefsOpen : Model -> ( Model, List Outbound )
+prefsOpen model =
+    ( { model | prefsOpen = True, prefsResetAnnouncement = "" }
+    , [ OutboxReview { discard = [], tag = "refresh" } ]
+    )
+
+
+{-| Closing disarms every staged confirmation (mirroring the oracle's
+unmount retiring its operation epochs).
+-}
+prefsClose : Model -> Model
+prefsClose model =
+    { model
+        | prefsOpen = False
+        , prefsOutboxConfirm = Nothing
+        , prefsOutboxStatus = Nothing
+        , prefsDraftsConfirm = Nothing
+        , prefsDraftsStatus = Nothing
+        , prefsTransferStatus = Nothing
+    }
+
+
+{-| Current value of a boolean preference the sheet toggles. -}
+prefsBoolValue : String -> Prefs.Preferences -> Maybe Bool
+prefsBoolValue key prefs =
+    case key of
+        "hideEvents" ->
+            Just prefs.hideEvents
+
+        "reduceMotion" ->
+            Just prefs.reduceMotion
+
+        "reduceTransparency" ->
+            Just prefs.reduceTransparency
+
+        "highContrast" ->
+            Just prefs.highContrast
+
+        "readerMode" ->
+            Just prefs.readerMode
+
+        _ ->
+            Nothing
+
+
+{-| Flip one boolean preference through the shared `AppearanceSetPref`
+fold, so storage + DOM application stay in one place.
+-}
+prefsTogglePref : String -> Model -> ( Model, List Outbound )
+prefsTogglePref key model =
+    case prefsBoolValue key model.prefs of
+        Just current ->
+            updateCore
+                (AppearanceSetPref
+                    { key = key
+                    , value =
+                        if current then
+                            "false"
+
+                        else
+                            "true"
+                    }
+                )
+                model
+
+        Nothing ->
+            ( model, [] )
+
+
+{-| `Background motion` segmented control (mirroring `setSceneMotion`;
+unknown ids keep the current motion).
+-}
+prefsSetSceneMotion : String -> Model -> ( Model, List Outbound )
+prefsSetSceneMotion raw model =
+    case Prefs.parseSceneMotion raw of
+        Just next ->
+            if next == model.sceneMotion then
+                ( model, [] )
+
+            else
+                let
+                    updated =
+                        { model | sceneMotion = next }
+                in
+                ( updated
+                , [ AppearanceStoreSceneMotion { value = Prefs.sceneMotionToString next }
+                  , appearanceApplyFor updated
+                  ]
+                )
+
+        Nothing ->
+            ( model, [] )
+
+
+{-| `Reset to defaults` (mirroring `resetAllPreferences`: preferences
+and scene motion return to their defaults). The announcement alternates
+a trailing no-break space so a repeated reset re-announces.
+-}
+prefsReset : Model -> ( Model, List Outbound )
+prefsReset model =
+    let
+        base =
+            "Preferences reset to defaults."
+
+        updated =
+            { model
+                | prefs = Prefs.defaultPreferences
+                , sceneMotion = Prefs.SceneAdaptive
+                , prefsResetAnnouncement =
+                    if model.prefsResetAnnouncement == base then
+                        base ++ "\u{00A0}"
+
+                    else
+                        base
+            }
+    in
+    ( updated
+    , [ AppearanceStorePrefs { json = Prefs.encodePreferences Prefs.defaultPreferences }
+      , AppearanceStoreSceneMotion { value = Prefs.sceneMotionToString Prefs.SceneAdaptive }
+      , appearanceApplyFor updated
+      ]
+    )
+
+
+{-| `Discard all queued sends` re-checks the staged count first
+(mirroring `confirmDiscard`: a drifted count re-stages and asks again;
+nothing is deleted until the counts agree).
+-}
+prefsOutboxDiscardConfirm : Model -> ( Model, List Outbound )
+prefsOutboxDiscardConfirm model =
+    case model.prefsOutboxConfirm of
+        Nothing ->
+            ( model, [] )
+
+        Just staged ->
+            let
+                current =
+                    List.length model.outbox
+            in
+            if model.prefsOutboxBusy then
+                ( model, [] )
+
+            else if current /= staged then
+                ( { model
+                    | prefsOutboxConfirm = Just current
+                    , prefsOutboxStatus = Just { message = PrefsPanel.queuedCountChangedCopy current, failure = False }
+                  }
+                , []
+                )
+
+            else
+                ( { model | prefsOutboxBusy = True, prefsOutboxStatus = Nothing }
+                , [ OutboxReview { discard = List.map .id model.outbox, tag = "all" } ]
+                )
+
+
+{-| Fold a ports-side outbox review. `rows` is the storage truth of
+still-unsent rows; removed ids also drop their thread placeholders and
+uncertain marks. `tag` says which request this settles: `refresh`
+(listing only), `one` (per-row remove), or `all` (confirmed discard —
+reported only once storage reads back empty).
+-}
+prefsOutboxReviewed : { removed : List String, rows : List OutboxEntry, ok : Bool, tag : String } -> Model -> ( Model, List Outbound )
+prefsOutboxReviewed { removed, rows, ok, tag } model =
+    let
+        keepPlaceholder message =
+            case message.outboxId of
+                Just oid ->
+                    not (List.member oid removed)
+
+                Nothing ->
+                    True
+
+        settled =
+            { model
+                | channels =
+                    if List.isEmpty removed then
+                        model.channels
+
+                    else
+                        Dict.map (\_ c -> { c | messages = List.filter keepPlaceholder c.messages }) model.channels
+                , outbox =
+                    if ok then
+                        rows
+
+                    else
+                        List.filter (\row -> not (List.member row.id removed)) model.outbox
+                , outboxUncertain = List.filter (\id -> not (List.member id removed)) model.outboxUncertain
+            }
+    in
+    case tag of
+        "all" ->
+            if ok && List.isEmpty rows then
+                ( { settled
+                    | prefsOutboxBusy = False
+                    , prefsOutboxConfirm = Nothing
+                    , prefsOutboxStatus = Just { message = PrefsPanel.discardedQueuedCopy (List.length removed), failure = False }
+                  }
+                , [ PrefsFocus { id = "pref-discard-queued-trigger" } ]
+                )
+
+            else if ok then
+                ( { settled
+                    | prefsOutboxBusy = False
+                    , prefsOutboxConfirm = Just (List.length rows)
+                    , prefsOutboxStatus = Just { message = PrefsPanel.queuedCountChangedCopy (List.length rows), failure = False }
+                  }
+                , []
+                )
+
+            else
+                ( { settled
+                    | prefsOutboxBusy = False
+                    , prefsOutboxStatus = Just { message = PrefsPanel.queuedDiscardFailedCopy, failure = True }
+                  }
+                , []
+                )
+
+        "one" ->
+            ( { settled
+                | prefsOutboxBusy = False
+                , prefsOutboxConfirm = Nothing
+                , prefsOutboxStatus =
+                    if ok && not (List.isEmpty removed) then
+                        Just { message = PrefsPanel.discardedQueuedCopy (List.length removed), failure = False }
+
+                    else
+                        Just { message = "Could not verify that the queued send was discarded. It may still be on this device.", failure = True }
+              }
+            , []
+            )
+
+        _ ->
+            ( settled, [] )
+
+
+{-| Room drafts on this device: stashed per-target drafts plus the live
+composer when the open conversation is a room.
+-}
+prefsRoomDrafts : Model -> List ( String, String )
+prefsRoomDrafts model =
+    PrefsPanel.roomDrafts
+        (Maybe.map (\target -> ( target, model.composer )) model.activeChannel)
+        model.composerDrafts
+
+
+{-| Drop the given room drafts (lower-cased targets); clears the live
+composer when the open room is among them. DM drafts are never touched.
+-}
+prefsDiscardDrafts : List String -> Model -> Model
+prefsDiscardDrafts targets model =
+    let
+        keys =
+            targets
+                |> List.map String.toLower
+                |> List.filter PrefsPanel.isRoomDraftTarget
+
+        activeHit =
+            case model.activeChannel of
+                Just active ->
+                    List.member (String.toLower active) keys
+
+                Nothing ->
+                    False
+
+        removed =
+            List.length (List.filter (\( target, _ ) -> List.member target keys) (prefsRoomDrafts model))
+    in
+    { model
+        | composerDrafts = List.foldl Dict.remove model.composerDrafts keys
+        , composer =
+            if activeHit then
+                ""
+
+            else
+                model.composer
+        , prefsDraftsConfirm = Nothing
+        , prefsDraftsStatus =
+            if removed > 0 then
+                Just { message = PrefsPanel.roomDraftsDiscardedCopy removed, failure = False }
+
+            else
+                model.prefsDraftsStatus
+    }
+
+
+{-| `Discard room drafts` confirm, with the same count re-check as the
+queued-send card.
+-}
+prefsDraftsDiscardConfirm : Model -> ( Model, List Outbound )
+prefsDraftsDiscardConfirm model =
+    case model.prefsDraftsConfirm of
+        Nothing ->
+            ( model, [] )
+
+        Just staged ->
+            let
+                drafts =
+                    prefsRoomDrafts model
+
+                current =
+                    List.length drafts
+            in
+            if current /= staged then
+                ( { model
+                    | prefsDraftsConfirm = Just current
+                    , prefsDraftsStatus = Just { message = "Local draft count changed to " ++ String.fromInt current ++ ". Review the updated count and confirm again.", failure = False }
+                  }
+                , []
+                )
+
+            else
+                ( prefsDiscardDrafts (List.map Tuple.first drafts) model
+                , [ PrefsFocus { id = "pref-discard-drafts-trigger" } ]
+                )
