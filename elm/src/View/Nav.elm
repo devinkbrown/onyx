@@ -24,6 +24,7 @@ import Html exposing (Html, button, div, h2, h3, nav, p, section, small, span, s
 import Html.Attributes exposing (attribute, class, classList, type_)
 import Html.Events exposing (onClick)
 import Nav
+import View.Account2
 import View.Sheet as Sheet
 
 
@@ -203,6 +204,8 @@ youHub model =
                                 )
                             ]
                         , p [ class "onyx-you-desc" ] [ text description ]
+                        , -- v3/account2
+                          View.Account2.youStatusBlock model
                         ]
                     , button
                         [ type_ "button"
@@ -257,6 +260,10 @@ youHub model =
                             , popup = True
                             , action = Nav.YouPreferences
                             }
+
+                        -- v3/account2
+                        , (View.Account2.youEntries model).people
+                        , (View.Account2.youEntries model).themeShare
                         ]
                     , group "help" "Help" Nothing
                         [ entry

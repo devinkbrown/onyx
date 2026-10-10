@@ -22,6 +22,7 @@ import Json.Decode as Decode
 import Set
 import Sidebar
 -- v3/calls-c1
+import View.Account2
 import View.CallPresence
 
 
@@ -361,7 +362,10 @@ dmRow model channel =
                 , ( "onyx-rail-has-unread", channel.unread > 0 && not active )
                 ]
             , attribute "aria-label"
-                (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline })
+                (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline }
+                    -- v3/account2
+                    ++ View.Account2.friendPresenceLabel model channel.name
+                )
             , attribute "aria-current"
                 (if active then
                     "location"
@@ -371,7 +375,16 @@ dmRow model channel =
                 )
             , onClick (ChannelSelect channel.name)
             ]
-            [ span [ class "onyx-rail-avatar", attribute "aria-hidden" "true" ] [ text initial ]
+            [ span [ class "onyx-rail-avatar", attribute "aria-hidden" "true" ]
+                [ text initial
+                , -- v3/account2
+                  case View.Account2.friendPresence model channel.name of
+                    Just online ->
+                        span [ class "a2-dot a2-dot--avatar", attribute "data-online" (if online then "true" else "false"), attribute "data-testid" "sidebar-dm-friend" ] []
+
+                    Nothing ->
+                        text ""
+                ]
             , span [ class "onyx-rail-copy" ]
                 [ span [ class "onyx-rail-name" ] [ text channel.name ]
                 , case preview of

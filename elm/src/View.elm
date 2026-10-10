@@ -58,6 +58,7 @@ import View.Prefs exposing (prefsSheet)
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
+import View.Account2
 import View.Toast exposing (toaster)
 import View.Nav
 import View.Switcher
@@ -227,7 +228,11 @@ appFrame model =
         ([ View.Nav.primaryNav model
          , topbar model
          , div [ class "onyx-notices" ]
-            ([ reconnectBanner model, guestClaimChip model ]
+            ([ reconnectBanner model
+             , -- v3/account2
+               View.Account2.reclaimBanner model
+             , guestClaimChip model
+             ]
                 ++ (if model.searchOpen then
                         [ panel model ]
 
@@ -269,6 +274,9 @@ overlays model =
         , browser model
         , scheduledSheet model
         , accountPanel model
+        , -- v3/account2
+          View.Account2.peopleSheet model
+        , View.Account2.themeShareSheet model
         , notifySheet model
         , prefsSheet model
         , pinsDrawer model
