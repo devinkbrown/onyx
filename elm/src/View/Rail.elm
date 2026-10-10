@@ -10,20 +10,44 @@ line, time, device-key warning and the calm offline-memo stamp) with a
 Section/sort/filter derivation lives in `Sidebar`; this module only
 renders it. Roving arrow-key focus, folders and the Activity entry stay
 with later slices (see COVERAGE).
+
+v3/ui-mobile-shell — Rooms and Messages are separate collections
+(`data-collection`): the selected nav collection shows only its own
+sections (Home shows both). Every section stays in the DOM; CSS hides
+the other collection. On desktop this is the 280px collection sidebar
+(dense single-line room rows, DM rows with their preview); under
+768px it is the full-screen Rooms / Messages page (64px rows with a
+room tile or a face, the topic / preview line, time and badge, a
+16px search field so iOS never zooms).
 -}
 
 import App exposing (Channel, Model, Msg(..))
+import Avatar
 import Dict
-import Html exposing (Html, button, div, input, label, li, p, section, span, text, ul)
+import Html exposing (Html, button, div, h2, input, label, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, for, id, placeholder, style, tabindex, type_, value)
-import Json.Decode
-import Html.Events exposing (on, onClick, onInput)
+import Html.Events exposing (onClick, onInput)
 import Json.Decode as Decode
+import Nav
 import Set
 import Sidebar
 -- v3/calls-c1
 import View.Account2
 import View.CallPresence
+
+
+{-| Which collection the sidebar shows. -}
+collection : Model -> String
+collection model =
+    case model.navSection of
+        Nav.Rooms ->
+            "rooms"
+
+        Nav.Messages ->
+            "messages"
+
+        _ ->
+            "all"
 
 
 rail : Model -> Html Msg
@@ -40,9 +64,30 @@ rail model =
 
         canStar =
             App.deviceMemoryOwner model /= Nothing
+
+        which =
+            collection model
     in
-    section [ class "onyx-rail", attribute "aria-label" "Room navigation" ]
-        ([ filterBar model derived ]
+    section
+        [ class "onyx-rail"
+        , attribute "aria-label" "Room navigation"
+        , attribute "data-collection" which
+        ]
+        ([ h2 [ class "onyx-rail-title" ]
+            [ text
+                (case which of
+                    "rooms" ->
+                        "Rooms"
+
+                    "messages" ->
+                        "Messages"
+
+                    _ ->
+                        "Conversations"
+                )
+            ]
+         , filterBar model which derived
+         ]
             ++ (if derived.filterEmpty then
                     [ p
                         [ class "onyx-rail-filter-empty"
@@ -59,14 +104,14 @@ rail model =
                     []
 
                 else
-                    [ div [ class "onyx-rail-section", attribute "data-testid" "sidebar-favorites" ]
+                    [ div [ class "onyx-rail-section onyx-rail-section--rooms", attribute "data-testid" "sidebar-favorites" ]
                         [ p [ class "onyx-rail-label", id "sidebar-favorites-label" ] [ text "Favorites" ]
                         , ul [ attribute "role" "list", attribute "aria-labelledby" "sidebar-favorites-label" ]
                             (List.map (roomRow model canStar) derived.favorites)
                         ]
                     ]
                )
-            ++ [ div [ class "onyx-rail-section", attribute "data-testid" "sidebar-channels" ]
+            ++ [ div [ class "onyx-rail-section onyx-rail-section--rooms", attribute "data-testid" "sidebar-channels" ]
                     [ p [ class "onyx-rail-label", id "sidebar-channels-label" ] [ text "Rooms" ]
                     , ul [ attribute "role" "list", attribute "aria-label" "Joined rooms" ]
                         (if List.isEmpty derived.rooms && derived.roomsJoined == 0 then
@@ -78,17 +123,15 @@ rail model =
                             List.map (roomRow model canStar) derived.rooms
                         )
                     ]
-               , div [ class "onyx-rail-section", attribute "data-testid" "sidebar-dms" ]
+               , div [ class "onyx-rail-section onyx-rail-section--dms", attribute "data-testid" "sidebar-dms" ]
                     [ div [ class "onyx-rail-section-heading" ]
                         [ p [ class "onyx-rail-label", id "sidebar-dms-label" ] [ text "Messages" ]
-                        , button
-                            [ type_ "button"
-                            , class "onyx-rail-new"
-                            , attribute "data-testid" "new-conversation"
-                            , attribute "aria-label" "New conversation"
-                            , onClick NewMessageOpen
-                            ]
-                            [ span [ attribute "aria-hidden" "true" ] [ text "+" ], text " New" ]
+                        , -- on the Messages page it sits in the filter row instead
+                          if which == "messages" then
+                            text ""
+
+                          else
+                            newConversation
                         ]
                     , if List.isEmpty derived.dms then
                         p [ class "onyx-rail-empty" ] [ text "No messages yet. Open a person to start one." ]
@@ -97,45 +140,82 @@ rail model =
                         ul [ attribute "role" "list", attribute "aria-labelledby" "sidebar-dms-label" ]
                             (List.map (dmRow model) derived.dms)
                     ]
-               , button
-                    [ type_ "button"
-                    , onClick App.BrowserOpen
-                    , class "onyx-rail-browse"
-                    , attribute "data-testid" "sidebar-browse-rooms"
+               , div [ class "onyx-rail-foot", attribute "role" "group", attribute "aria-label" "Find or start a room" ]
+                    [ button
+                        [ type_ "button"
+                        , onClick App.BrowserOpen
+                        , class "onyx-rail-browse"
+                        , attribute "data-testid" "sidebar-browse-rooms"
+                        ]
+                        [ span [ class "onyx-shi", attribute "data-icon" "compass", attribute "aria-hidden" "true" ] []
+                        , text "Browse rooms"
+                        ]
+                    , button
+                        [ type_ "button"
+                        , onClick App.CreateRoomOpen
+                        , class "onyx-rail-browse onyx-rail-start"
+                        , attribute "data-testid" "sidebar-start-room"
+                        ]
+                        [ span [ class "onyx-shi", attribute "data-icon" "plus", attribute "aria-hidden" "true" ] []
+                        , text "Start a room"
+                        ]
                     ]
-                    [ text "Browse rooms" ]
-               , button
-                    [ type_ "button"
-                    , onClick App.CreateRoomOpen
-                    , class "onyx-rail-browse"
-                    , attribute "data-testid" "sidebar-start-room"
-                    ]
-                    [ text "Start a room" ]
                ]
         )
 
 
-filterBar : Model -> Sidebar.Sections -> Html Msg
-filterBar model derived =
+newConversation : Html Msg
+newConversation =
+    button
+        [ type_ "button"
+        , class "onyx-rail-new"
+        , attribute "data-testid" "new-conversation"
+        , attribute "aria-label" "New conversation"
+        , attribute "title" "New conversation"
+        , onClick NewMessageOpen
+        ]
+        [ span [ class "onyx-shi", attribute "data-icon" "compose", attribute "aria-hidden" "true" ] []
+        , span [ class "onyx-rail-new-label" ] [ text "New" ]
+        ]
+
+
+filterBar : Model -> String -> Sidebar.Sections -> Html Msg
+filterBar model which derived =
     div
         [ class "onyx-rail-filter"
         , classList [ ( "onyx-rail-filter-on", derived.filterActive ) ]
         , attribute "role" "search"
         ]
         ([ label [ class "sr-only", for "sidebar-filter-input" ] [ text "Filter rooms" ]
-         , input
-            [ id "sidebar-filter-input"
-            , class "onyx-rail-filter-input"
-            , type_ "search"
-            , attribute "data-testid" "sidebar-filter"
-            , placeholder "Filter rooms"
-            , attribute "autocomplete" "off"
-            , attribute "spellcheck" "false"
-            , value model.sidebarFilter
-            , onInput SidebarFilterInput
-            , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (filterEscape derived.filterActive))
+         , span [ class "onyx-rail-filter-field" ]
+            [ span [ class "onyx-shi onyx-rail-filter-icon", attribute "data-icon" "search", attribute "aria-hidden" "true" ] []
+            , input
+                [ id "sidebar-filter-input"
+                , class "onyx-rail-filter-input"
+                , type_ "search"
+                , attribute "data-testid" "sidebar-filter"
+                , placeholder
+                    (case which of
+                        "rooms" ->
+                            "Find a room"
+
+                        "messages" ->
+                            "Find a conversation"
+
+                        _ ->
+                            "Find a room or person"
+                    )
+                , attribute "autocomplete" "off"
+                , attribute "spellcheck" "false"
+                , attribute "enterkeyhint" "search"
+                , attribute "autocapitalize" "off"
+                , attribute "autocorrect" "off"
+                , value model.sidebarFilter
+                , onInput SidebarFilterInput
+                , Html.Events.preventDefaultOn "keydown" (Decode.map (\escMsg -> ( escMsg, True )) (filterEscape derived.filterActive))
+                ]
+                []
             ]
-            []
          , button
             [ type_ "button"
             , class "onyx-rail-filter-unread"
@@ -163,6 +243,12 @@ filterBar model derived =
                         ]
                         [ text "Clear" ]
                     ]
+
+                else
+                    []
+               )
+            ++ (if which == "messages" then
+                    [ newConversation ]
 
                 else
                     []
@@ -211,10 +297,35 @@ badge channel =
                 , classList [ ( "onyx-rail-mention", channel.highlights > 0 ) ]
                 , attribute "aria-hidden" "true"
                 ]
-                [ text count ]
+                [ text
+                    (if channel.highlights > 0 then
+                        "@" ++ count
+
+                     else
+                        count
+                    )
+                ]
 
         Nothing ->
             text ""
+
+
+{-| The room's tile letter (`#lounge` → `L`). -}
+tileLetter : String -> String
+tileLetter name =
+    let
+        bare =
+            String.trim name
+                |> String.toList
+                |> List.filter Char.isAlphaNum
+                |> String.fromList
+    in
+    case String.uncons bare of
+        Just ( c, _ ) ->
+            String.toUpper (String.fromChar c)
+
+        Nothing ->
+            "#"
 
 
 roomRow : Model -> Bool -> Channel -> Html Msg
@@ -227,17 +338,19 @@ roomRow model canStar channel =
             Sidebar.isStarred model.starredChannels channel.name
 
         stamp =
-            if Sidebar.hasAttention channel then
-                ""
-
-            else
-                Sidebar.activityStamp model.nowMs (Sidebar.channelActivityMs channel)
+            Sidebar.activityStamp model.nowMs (Sidebar.channelActivityMs channel)
 
         topic =
             String.trim channel.topic
+
+        color =
+            Dict.get (String.toLower channel.name) model.channelColors
     in
     li []
-        [ div [ class "onyx-rail-row" ]
+        [ div
+            [ class "onyx-rail-row"
+            , classList [ ( "onyx-rail-row--starred", starred ) ]
+            ]
             ([ button
                 [ type_ "button"
                 , class "onyx-rail-item"
@@ -255,35 +368,48 @@ roomRow model canStar channel =
                     )
                 , onClick (ChannelSelect channel.name)
                 ]
-                [ case Dict.get (String.toLower channel.name) model.channelColors of
-                    Just color ->
+                [ span
+                    [ class "onyx-rail-tile"
+                    , attribute "aria-hidden" "true"
+                    ]
+                    [ text (tileLetter channel.name) ]
+                , case color of
+                    Just c ->
                         span
                             [ class "onyx-rail-color"
                             , attribute "data-testid" "sidebar-channel-color"
                             , attribute "aria-hidden" "true"
-                            , style "background-color" color
+                            , style "background-color" c
                             ]
                             []
 
                     Nothing ->
                         text ""
                 , span [ class "onyx-rail-copy" ]
-                    [ span [ class "onyx-rail-name" ] [ text channel.name ]
-                    , if String.isEmpty topic then
-                        text ""
+                    [ span [ class "onyx-rail-line" ]
+                        [ span [ class "onyx-rail-name" ] [ text channel.name ]
+                        , if String.isEmpty stamp then
+                            text ""
 
-                      else
-                        span [ class "onyx-rail-sub", attribute "aria-hidden" "true" ] [ text topic ]
-                    ]
-                , span [ class "onyx-rail-meta" ]
-                    [ if String.isEmpty stamp then
-                        text ""
+                          else
+                            span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text stamp ]
+                        ]
+                    , span [ class "onyx-rail-line onyx-rail-line--sub" ]
+                        [ span [ class "onyx-rail-sub", attribute "aria-hidden" "true" ]
+                            [ text
+                                (if String.isEmpty topic then
+                                    "No topic yet"
 
-                      else
-                        span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text stamp ]
-                    -- v3/calls-c1
-                    , View.CallPresence.railCount model channel.name
-                    , badge channel
+                                 else
+                                    topic
+                                )
+                            ]
+                        , span [ class "onyx-rail-meta" ]
+                            [ -- v3/calls-c1
+                              View.CallPresence.railCount model channel.name
+                            , badge channel
+                            ]
+                        ]
                     ]
                 ]
              ]
@@ -301,16 +427,28 @@ roomRow model canStar channel =
                                     "Add " ++ channel.name ++ " to favorites"
                                 )
                             , attribute "aria-pressed" (boolAttr starred)
+                            , attribute "title"
+                                (if starred then
+                                    "Remove from favorites"
+
+                                 else
+                                    "Add to favorites"
+                                )
                             , tabindex -1
                             , onClick (SidebarStarToggle channel.name)
                             ]
-                            [ text
-                                (if starred then
-                                    "★"
+                            [ span
+                                [ class "onyx-shi"
+                                , attribute "data-icon"
+                                    (if starred then
+                                        "star-on"
 
-                                 else
-                                    "☆"
-                                )
+                                     else
+                                        "star"
+                                    )
+                                , attribute "aria-hidden" "true"
+                                ]
+                                []
                             ]
                         ]
 
@@ -340,18 +478,6 @@ dmRow model channel =
 
         stamp =
             Sidebar.activityStamp model.nowMs (Sidebar.dmActivityMs channel)
-
-        initial =
-            String.trim channel.name
-                |> String.left 1
-                |> String.toUpper
-                |> (\s ->
-                        if String.isEmpty s then
-                            "?"
-
-                        else
-                            s
-                   )
     in
     li []
         [ button
@@ -375,53 +501,68 @@ dmRow model channel =
                 )
             , onClick (ChannelSelect channel.name)
             ]
-            [ span [ class "onyx-rail-avatar", attribute "aria-hidden" "true" ]
-                [ text initial
+            [ span [ class "onyx-face onyx-rail-avatar", attribute "aria-hidden" "true" ]
+                [ text (Avatar.initials channel.name)
                 , -- v3/account2
                   case View.Account2.friendPresence model channel.name of
                     Just online ->
-                        span [ class "a2-dot a2-dot--avatar", attribute "data-online" (if online then "true" else "false"), attribute "data-testid" "sidebar-dm-friend" ] []
+                        span
+                            [ class "a2-dot a2-dot--avatar"
+                            , attribute "data-online"
+                                (if online then
+                                    "true"
+
+                                 else
+                                    "false"
+                                )
+                            , attribute "data-testid" "sidebar-dm-friend"
+                            ]
+                            []
 
                     Nothing ->
                         text ""
                 ]
             , span [ class "onyx-rail-copy" ]
-                [ span [ class "onyx-rail-name" ] [ text channel.name ]
-                , case preview of
-                    Just line ->
-                        span
-                            [ class "onyx-rail-sub onyx-rail-preview"
-                            , attribute "data-testid" "sidebar-dm-preview"
-                            , attribute "aria-hidden" "true"
-                            ]
-                            [ text line ]
-
-                    Nothing ->
+                [ span [ class "onyx-rail-line" ]
+                    [ span [ class "onyx-rail-name" ] [ text channel.name ]
+                    , if String.isEmpty stamp then
                         text ""
-                ]
-            , span [ class "onyx-rail-meta" ]
-                [ if String.isEmpty stamp then
-                    text ""
 
-                  else
-                    span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text stamp ]
-                , if keyChanged then
-                    span
-                        [ class "onyx-rail-keywarn"
-                        , attribute "data-testid" "sidebar-dm-keywarn"
-                        , attribute "title" "Device key changed"
-                        , attribute "aria-hidden" "true"
+                      else
+                        span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text stamp ]
+                    ]
+                , span [ class "onyx-rail-line onyx-rail-line--sub" ]
+                    [ case preview of
+                        Just line ->
+                            span
+                                [ class "onyx-rail-sub onyx-rail-preview"
+                                , attribute "data-testid" "sidebar-dm-preview"
+                                , attribute "aria-hidden" "true"
+                                ]
+                                [ text line ]
+
+                        Nothing ->
+                            span [ class "onyx-rail-sub", attribute "aria-hidden" "true" ] [ text "No messages yet" ]
+                    , span [ class "onyx-rail-meta" ]
+                        [ if keyChanged then
+                            span
+                                [ class "onyx-rail-keywarn"
+                                , attribute "data-testid" "sidebar-dm-keywarn"
+                                , attribute "title" "Device key changed"
+                                , attribute "aria-hidden" "true"
+                                ]
+                                [ span [ class "onyx-shi", attribute "data-icon" "warn" ] [] ]
+
+                          else
+                            text ""
+                        , if offline > 0 then
+                            span [ class "onyx-rail-offline", attribute "aria-hidden" "true" ] [ text (Sidebar.offlineStamp offline) ]
+
+                          else
+                            text ""
+                        , badge channel
                         ]
-                        [ text "⚠" ]
-
-                  else
-                    text ""
-                , if offline > 0 then
-                    span [ class "onyx-rail-offline", attribute "aria-hidden" "true" ] [ text (Sidebar.offlineStamp offline) ]
-
-                  else
-                    text ""
-                , badge channel
+                    ]
                 ]
             ]
         ]

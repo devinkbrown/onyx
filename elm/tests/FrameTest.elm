@@ -193,17 +193,29 @@ suite =
                         ()
             ]
         , describe "topbar vs. room header"
-            [ test "the global bar keeps the launcher, Calls, Alerts, the pill and You" <|
+            [ test "the global bar keeps the launcher, the inbox, the pill and You" <|
                 \_ ->
                     query room
                         |> Query.find [ Selector.class "onyx-topbar" ]
                         |> Query.has
-                            [ Selector.class "onyx-calls-toggle"
-                            , testId "shell-notifications"
+                            [ testId "palette-launcher"
                             , testId "inbox-bell"
                             , Selector.class "onyx-conn"
                             , testId "you-open"
                             ]
+            , test "v3/ui-mobile-shell: Calls lives in the nav only; Notifications and Leave in You" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            query room
+                                |> Query.find [ Selector.class "onyx-topbar" ]
+                                |> Query.hasNot [ Selector.class "onyx-calls-toggle", testId "shell-notifications", testId "session-disconnect" ]
+                        , \_ ->
+                            query { room | youHubOpen = True }
+                                |> Query.find [ testId "you-hub" ]
+                                |> Query.has [ testId "shell-notifications", testId "you-leave", testId "you-connection" ]
+                        ]
+                        ()
             , test "room-scoped actions are not in the global bar" <|
                 \_ ->
                     query { room | roomMenuOpen = True }

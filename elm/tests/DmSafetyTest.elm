@@ -240,7 +240,8 @@ safetyPanel =
                 Expect.all
                     [ \_ -> query dm |> Query.has [ testid "dm-safety-verify" ]
                     , \_ -> query room |> Query.hasNot [ testid "dm-safety-verify" ]
-                    , \_ -> query room |> Query.has [ testid "room-invite-friends" ]
+                    , -- v3/ui-mobile-shell: Invite lives in the room header's More menu
+                      \_ -> query { room | roomMenuOpen = True } |> Query.has [ testid "room-invite-friends" ]
                     , \_ -> query dm |> Query.hasNot [ testid "room-invite-friends" ]
                     ]
                     ()
@@ -497,7 +498,8 @@ inviteShare =
             \_ ->
                 Expect.all
                     [ \_ ->
-                        query room
+                        -- v3/ui-mobile-shell: from the room header's More menu
+                        query { room | roomMenuOpen = True }
                             |> Query.find [ testid "room-invite-friends" ]
                             |> Event.simulate Event.click
                             |> Event.expect (InviteShareOpen "#lounge")

@@ -25,6 +25,7 @@ import Html.Attributes exposing (attribute, class, classList, id, tabindex, type
 import Html.Events exposing (onClick)
 import Outbox
 import Stats
+import View.GuestClaim exposing (guestClaimChip)
 
 
 {-| Every open conversation, projected for Home. -}
@@ -90,14 +91,9 @@ home model =
                     ]
                     [ text model.homeCaughtUpAnnounce ]
                 ]
-            , coach model Home.HomeNext
-            , if inbox.empty then
-                text ""
-
-              else
-                inboxSection plan inbox
-            , outboxSection model connected
-            , if inbox.empty then
+            , -- v3/ui-mobile-shell: one clear next step first (the quiet
+              -- state's Browse / Start), then the quieter asks.
+              if inbox.empty then
                 quietSection
                     { caughtUp = caughtUpEmpty
                     , connected = connected
@@ -110,7 +106,12 @@ home model =
                     }
 
               else
-                text ""
+                inboxSection plan inbox
+            , -- v3/ui-mobile-shell: the guest "Keep the name" ask lives on
+              -- Home (and in the You hub), never as a strip over a room.
+              guestClaimChip model
+            , coach model Home.HomeNext
+            , outboxSection model connected
             , if Home.showInviteFriends { connected = connected, roomCount = List.length joined, dmCount = List.length dms } then
                 inviteSection model
 
@@ -300,8 +301,8 @@ quietSection input =
         [ p [ class "onyx-home-empty-copy" ]
             [ text (Home.quietDescription { caughtUp = input.caughtUp, connected = input.connected }) ]
         , div [ class "onyx-home-actions", attribute "role" "group", attribute "aria-label" "Find or start a room" ]
-            [ button [ type_ "button", class "onyx-home-action", onClick BrowserOpen ] [ text "Browse rooms" ]
-            , button [ type_ "button", class "onyx-home-action", onClick CreateRoomOpen ] [ text "Start a room" ]
+            [ button [ type_ "button", class "onyx-home-action onyx-home-action--primary", onClick BrowserOpen ] [ text "Browse rooms" ]
+            , button [ type_ "button", class "onyx-home-action onyx-home-action--quiet", onClick CreateRoomOpen ] [ text "Start a room" ]
             ]
         ]
 
@@ -312,7 +313,7 @@ inviteSection model =
         [ p [ class "onyx-home-empty-copy" ] [ text "Onyx is better with your people. Copy an invite link and send it to a friend." ]
         , button
             [ type_ "button"
-            , class "onyx-home-action"
+            , class "onyx-home-action onyx-home-action--quiet"
             , attribute "data-testid" "home-invite-friends"
             -- v3/dmsafety: opens the share sheet (was a direct copy).
             , onClick (InviteShareOpen (App.homeInviteChannel model))
@@ -399,7 +400,7 @@ coach model surface =
                     , attribute "data-testid" "first-hour-coach-dismiss"
                     , onClick HomeCoachDismiss
                     ]
-                    [ span [ attribute "aria-hidden" "true" ] [ text "✕" ] ]
+                    [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
                 ]
 
 

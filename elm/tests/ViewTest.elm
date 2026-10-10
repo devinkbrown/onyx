@@ -18,6 +18,7 @@ import Isupport
 import Json.Encode as Encode
 import Media
 import Moderation
+import Nav
 import Prefs
 import RoomMedia exposing (RoomMediaFilter(..))
 import Route
@@ -3899,12 +3900,13 @@ suite =
                                 |> Event.expect CallLeave
                         ]
                         ()
-            , test "topbar calls button toggles the hub" <|
+            , test "the nav Calls button toggles the hub" <|
                 \_ ->
                 query blank
-                    |> Query.find [ Selector.class "onyx-calls-toggle" ]
+                    |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Primary") ]
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-section" "calls") ]
                     |> Event.simulate Event.click
-                    |> Event.expect ToggleCalls
+                    |> Event.expect (NavSelect Nav.Calls)
             ]
         , describe "landing"
             [ test "landing renders hero, trust, board, and shelf" <|

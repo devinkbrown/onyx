@@ -54,7 +54,7 @@ import View.Roster exposing (roster)
 import View.Scheduled exposing (scheduledSheet)
 import View.Search exposing (panel)
 import View.Browser exposing (browser)
-import View.GuestClaim exposing (guestClaimChip, guestClaimSheet)
+import View.GuestClaim exposing (guestClaimSheet)
 import View.Account exposing (accountPanel)
 import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
@@ -211,7 +211,10 @@ The conversation column stacks the room header, the transcript pane
 and the composer. Under 768px the grid collapses to one column: the
 sidebar replaces the conversation while the Rooms / Messages drawer is
 open (`data-nav-drawer`), the context rail hides, and the bottom nav
-takes the last row. Every overlay (sheets, palette, toasts, the You
+takes the last row —
+except inside a conversation (`data-convo`), which is a pushed page:
+the global bar and the bottom nav step aside and the room header's
+back control returns to the list. Every overlay (sheets, palette, toasts, the You
 hub) mounts in `.onyx-overlays`, outside the grid flow.
 -}
 appFrame : Model -> Html Msg
@@ -233,6 +236,20 @@ appFrame model =
              else
                 "false"
             )
+        , -- v3/ui-mobile-shell: a conversation is showing (phones push it
+          -- as its own page: no global bar, no bottom nav, a back control)
+          attribute "data-convo"
+            (case ( model.activeChannel, model.callsOpen ) of
+                ( Just name, False ) ->
+                    if App.isChannelName model name then
+                        "room"
+
+                    else
+                        "dm"
+
+                _ ->
+                    "false"
+            )
         ]
         ([ View.Nav.primaryNav model
          , topbar model
@@ -240,7 +257,8 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
-             , guestClaimChip model
+
+             -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
                 ++ (if model.searchOpen then
                         [ panel model ]

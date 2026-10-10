@@ -28,8 +28,9 @@ guestClaim model =
     div [] [ guestClaimChip model, guestClaimSheet model ]
 
 
-{-| v3/frame — the in-flow "Keep the name" chip (the frame's notices
-row). -}
+{-| v3/frame — the "Keep the name" chip. v3/ui-mobile-shell: a compact,
+dismissible banner on Home (the You hub keeps "Keep this name" too);
+it never sits over a conversation. -}
 guestClaimChip : Model -> Html Msg
 guestClaimChip model =
     if guestClaimVisible model then
@@ -61,10 +62,13 @@ chip model =
         , attribute "aria-label" "Keep this name"
         , attribute "data-testid" "guest-claim"
         ]
-        [ p [ class "guest-claim-chip__text" ]
-            [ text "Keep "
-            , b [ class "guest-claim-chip__nick" ] [ text nick ]
-            , text "?"
+        [ span [ class "guest-claim-chip__icon onyx-shi", attribute "data-icon" "key", attribute "aria-hidden" "true" ] []
+        , p [ class "guest-claim-chip__text" ]
+            [ span [ class "guest-claim-chip__line" ]
+                [ text "Keep the name "
+                , b [ class "guest-claim-chip__nick" ] [ text nick ]
+                ]
+            , span [ class "guest-claim-chip__hint" ] [ text "Register it so it stays yours. You stay connected." ]
             ]
         , div [ class "guest-claim-chip__actions" ]
             [ button
@@ -74,15 +78,16 @@ chip model =
                 , attribute "aria-label" "Keep this name"
                 , onClick GuestClaimOpen
                 ]
-                [ text "Keep" ]
+                [ text "Keep name" ]
             , button
                 [ type_ "button"
                 , class "guest-claim-chip__dismiss"
                 , attribute "aria-label" "Dismiss keep-name prompt"
+                , attribute "title" "Not now"
                 , attribute "data-testid" "guest-claim-dismiss"
                 , onClick GuestClaimDismiss
                 ]
-                [ span [ attribute "aria-hidden" "true" ] [ text "✕" ] ]
+                [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
             ]
         ]
 
