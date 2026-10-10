@@ -40,6 +40,8 @@ import Html.Events exposing (onClick)
 import Html.Keyed as Keyed
 import Set
 import View.CallPresence exposing (callIcon)
+-- v3/calls-c11
+import View.StageMode
 
 
 boolAttr : Bool -> String
@@ -113,6 +115,8 @@ order model =
 
 tiles : Model -> { people : List Tile, shares : List Tile }
 tiles model =
+    -- v3/calls-c11: the stage audience never gets tiles
+    (\t -> { t | people = List.filter (\tile -> View.StageMode.onStage model tile.key) t.people }) <|
     CallMedia.buildTiles
         { ourNick = model.ourNick
         , order = order model
@@ -257,7 +261,7 @@ grid model t =
                     , onClick (CallPageSet (page - 1))
                     ]
                     [ callIcon "chevron-left" ]
-                , span [ attribute "aria-live" "polite" ]
+                , span [ attribute "aria-live" "polite", attribute "aria-atomic" "true" ] -- v3/calls-c11 a11y pass
                     [ text ("Page " ++ String.fromInt (page + 1) ++ " of " ++ String.fromInt pages) ]
                 , button
                     [ type_ "button"

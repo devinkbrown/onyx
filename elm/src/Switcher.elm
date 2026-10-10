@@ -566,6 +566,8 @@ type Shortcut
     | OpenPalette
     | ShowShortcuts
     | Dismiss
+      -- v3/calls-c11 (C12): `call-<name>` modifier chords
+    | CallChord String
     | UnknownShortcut
 
 
@@ -585,7 +587,11 @@ shortcutFromString raw =
             Dismiss
 
         _ ->
-            UnknownShortcut
+            if String.startsWith "call-" raw then
+                CallChord (String.dropLeft 5 raw)
+
+            else
+                UnknownShortcut
 
 
 
@@ -614,6 +620,30 @@ shortcutGroups =
       , rows =
             [ { chords = [ "⌘F", "Ctrl+F" ], description = "Search messages" } ]
       }
+
+    -- v3/calls-c11 (C12): active only in a live call, never while typing
+    , { group = "Voice & Video"
+      , rows = callShortcutRows
+      }
+    ]
+
+
+{-| Call chords (spec §3.1). Every chord carries a modifier (WCAG
+2.1.4). Provisional (§7.1): the microphone takes Ctrl+Shift+M; the
+oracle's room-notification mute on that chord is not bound in this
+client. Captions (C8) and push to talk (C9) are not listed until they
+land.
+-}
+callShortcutRows : List { chords : List String, description : String }
+callShortcutRows =
+    [ { chords = [ "⌘⇧M", "Ctrl+Shift+M" ], description = "Mute / unmute microphone" }
+    , { chords = [ "⌘⇧E", "Ctrl+Shift+E" ], description = "Turn camera on / off" }
+    , { chords = [ "⌘⇧H", "Ctrl+Shift+H" ], description = "Raise / lower hand (stage audience)" }
+    , { chords = [ "⌘⇧L", "Ctrl+Shift+L" ], description = "Leave call (asks first with more than 2 people)" }
+    , { chords = [ "⌘⇧G", "Ctrl+Shift+G" ], description = "Cycle layout: grid, spotlight, screen share" }
+    , { chords = [ "⌘⇧F", "Ctrl+Shift+F" ], description = "Cycle call stage size" }
+    , { chords = [ "⌘⇧S", "Ctrl+Shift+S" ], description = "Announce who is speaking" }
+    , { chords = [ "Esc" ], description = "Exit fullscreen call stage" }
     ]
 
 

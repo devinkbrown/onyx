@@ -3352,6 +3352,11 @@ function fetchPublicFeed(url) {
       );
     } catch (err) { return false; }
   }
+  var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker" };
+  function callKeysLive(doc) {
+    if (!doc || !doc.querySelector) return false;
+    try { return !!doc.querySelector('[data-call-keys="on"]'); } catch (err) { return false; }
+  }
   function classifyShortcut(e, doc) {
     if (!e || e.defaultPrevented) return null;
     if (e.isComposing || e.keyCode === 229) return null;
@@ -3364,6 +3369,18 @@ function fetchPublicFeed(url) {
     if (key.toLowerCase() === "k" && mod && !e.altKey && !e.shiftKey) {
       if (shortcutForeignModal(doc)) return null;
       return { name: "palette-toggle", prevent: true };
+    }
+    /* v3/calls-c11 (C12) — call chords: Ctrl/Cmd+Shift+<letter>, only
+       while a call is live (the always-mounted announcer carries
+       `data-call-keys="on"`), never while typing, never under a
+       foreign modal. Push to talk (C9) is not handled here. */
+    if (mod && e.shiftKey && !e.altKey) {
+      var chord = CALL_CHORDS[key.toLowerCase()];
+      if (!chord) return null;
+      if (shortcutEditableTarget(e.target)) return null;
+      if (shortcutForeignModal(doc)) return null;
+      if (!callKeysLive(doc)) return null;
+      return { name: "call-" + chord, prevent: true };
     }
     if (mod || e.altKey) return null;
     if (key !== "?" && key !== "/") return null;

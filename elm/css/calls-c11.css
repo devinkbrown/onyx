@@ -1,0 +1,191 @@
+/* v3/calls-c11 — C11 stage mode (spec §2.16, oracle StagePanel) and the
+   C12 accessibility pass over every call surface (spec §3.2–3.4, §6).
+   Tokens come from app.css :root. Accent stays reserved for the live pip,
+   the speaking ring and the focus ring; a raised hand is warn. */
+
+/* ---------- C11 · stage strip (room capability, under the header) ---------- */
+
+.onyx-stage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  min-width: 0;
+}
+
+.onyx-stage-panel[data-active="true"] { border-color: var(--onyx-warn); }
+
+.onyx-stage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+.onyx-stage-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-dim);
+}
+
+.onyx-stage-title .onyx-ci { width: 14px; height: 14px; }
+
+.onyx-stage-hint {
+  flex: 1 1 18rem;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+}
+
+.onyx-stage-availability {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  font-size: var(--text-2xs);
+  color: var(--onyx-dim);
+}
+
+.onyx-stage-panel[data-availability="unavailable"] .onyx-stage-availability { color: var(--onyx-warn); border-color: var(--onyx-warn); }
+
+.onyx-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onyx-stage-actions .onyx-call-btn { max-width: 100%; white-space: normal; }
+
+.onyx-stage-invite {
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-warn);
+  border-radius: var(--radius);
+}
+
+.onyx-stage-invite p { margin: 0 0 var(--space-2); }
+
+/* Host queue: inline list at ≥768px, a "M raised hands" opener below. */
+.onyx-stage-hands {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onyx-stage-hand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--onyx-line);
+  min-width: 0;
+}
+
+.onyx-stage-hand-nick {
+  flex: 1 1 6rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-floor); padding: 0 var(--space-2); font-size: var(--text-sm); }
+
+.onyx-stage-hands-open { display: none; }
+
+.onyx-stage-hands-sheet-list { padding: 0 var(--space-4) var(--space-4); }
+
+/* ---------- C11 · stage inside the call ---------- */
+
+.onyx-stage-audience {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+}
+
+.onyx-cbtn.onyx-cbtn-wide { width: auto; min-width: 56px; padding: 0 var(--space-2); }
+
+.onyx-cbtn[data-tone="warn"][aria-pressed="true"] {
+  background: var(--onyx-warn);
+  border-color: var(--onyx-warn);
+  color: var(--onyx-bg);
+}
+
+/* ---------- C12 · leave confirmation ---------- */
+
+.onyx-sheet.onyx-call-leave-confirm { width: min(380px, 100%); }
+
+.onyx-call-leave-confirm h2 { margin: 0 0 var(--space-2); font-size: var(--text-lg); font-weight: 750; }
+
+.onyx-call-leave-confirm p { margin: 0 0 var(--space-4); }
+
+.onyx-call-leave-confirm .onyx-stage-actions { justify-content: flex-end; }
+
+/* ---------- C12 · a11y pass over every call surface ---------- */
+
+/* WCAG 2.5.8: every call control at least 24×24 (the frame floor covers
+   height inside .onyx-frame only; overlays and the PiP sit outside it). */
+:where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-pip-card, .onyx-call-sheet,
+  .onyx-join-banner, .onyx-calls, .onyx-header-voice, .onyx-stage-panel, .onyx-sheet.onyx-call-ring) :where(button) {
+  min-width: var(--target-floor);
+  min-height: var(--target-floor);
+}
+
+/* Visible focus on every call control (spec §3.2). */
+:where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-sheet, .onyx-stage-panel, .onyx-header-voice,
+  .onyx-join-banner) :where(button):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Reduced motion (spec §3.4): the in-app "still" scene setting stops the
+   same motion the OS preference does — tile reflow, the speaking halo,
+   PiP glides and sheet entrances on call dialogs. */
+.onyx-call-stage[data-motion="still"] .onyx-tile,
+.onyx-call-stage[data-motion="still"] .onyx-tile-video { transition: none; }
+
+.onyx-call-stage[data-motion="still"] .onyx-call-ring::after { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-call-ring::after,
+  .onyx-tile,
+  .onyx-tile-video,
+  .onyx-call-pip-card,
+  .onyx-call-sheet,
+  .onyx-sheet.onyx-call-ring,
+  .onyx-stage-panel { animation: none; transition: none; }
+}
+
+/* ---------- 375px ---------- */
+
+@media (max-width: 767.98px) {
+  .onyx-stage-panel { margin: var(--space-3) var(--space-3) 0; }
+  .onyx-stage-queue .onyx-stage-hands { display: none; }
+  .onyx-stage-hands-open { display: inline-flex; min-height: var(--target-min); }
+  .onyx-stage-actions .onyx-call-btn { flex: 1 1 auto; min-height: var(--target-min); }
+  .onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-min); }
+}
+
+@media (max-width: 640px) {
+  .onyx-cbtn.onyx-cbtn-wide { width: 48px; min-width: 48px; padding: 0; }
+}

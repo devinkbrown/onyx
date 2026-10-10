@@ -60,6 +60,8 @@ import CallDock
 
 -- v3/calls-c4
 import CallMedia
+-- v3/calls-c11
+import Stage
 import IdentityOverrides
 import Moderation
 import Modes
@@ -604,6 +606,10 @@ type alias Model =
     , callPinned : Maybe String
     , callShareOptOut : Maybe String
     , callClockMs : Float
+    -- v3/calls-c11
+    , stage : Stage.StageState
+    , stageHandsOpen : Bool
+    , callLeaveConfirm : Bool
     -- v3/nav
     , navSection : Nav.Id
     , navDrawerOpen : Bool
@@ -3129,6 +3135,20 @@ type Msg
     | CallShareGrid String
     | CallPageSet Int
     | CallNativePip String
+    -- v3/calls-c11
+    | StageStart String
+    | StageEnd
+    | StageJoinAudience String
+    | StageLeave
+    | StageHandToggle
+    | StageInvite String
+    | StageDismissHand String
+    | StageAccept
+    | StageDecline
+    | StageHandsOpen
+    | StageHandsClose
+    | CallLeaveConfirmClose
+    | CallLeaveConfirmed
     | SelectBoardTab String
     -- v3/roster
     | MemberFilterInput String
@@ -3542,6 +3562,10 @@ init nick url =
     , callPinned = Nothing
     , callShareOptOut = Nothing
     , callClockMs = 0
+    -- v3/calls-c11
+    , stage = Stage.blank
+    , stageHandsOpen = False
+    , callLeaveConfirm = False
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -4107,6 +4131,10 @@ blank =
     , callPinned = Nothing
     , callShareOptOut = Nothing
     , callClockMs = 0
+    -- v3/calls-c11
+    , stage = Stage.blank
+    , stageHandsOpen = False
+    , callLeaveConfirm = False
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -36023,8 +36051,12 @@ update msg model =
         -- v3/calls-c6
         ( dockSettled, dockOut ) =
             CallDock.settle { live = roomSettingsSettled.connection == Live, now = roomSettingsSettled.nowMs } model roomSettingsSettled
+
+        -- v3/calls-c11
+        stageSettled =
+            settleStage dockSettled
     in
-    ( dockSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
+    ( stageSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
 
 
 -- v3/calls-c6
@@ -41130,6 +41162,46 @@ updateCore msg model =
             else
                 ( model, [] )
 
+        -- v3/calls-c11
+        StageStart _ ->
+            stageUpdate msg model
+
+        StageEnd ->
+            stageUpdate msg model
+
+        StageJoinAudience _ ->
+            stageUpdate msg model
+
+        StageLeave ->
+            stageUpdate msg model
+
+        StageHandToggle ->
+            stageUpdate msg model
+
+        StageInvite _ ->
+            stageUpdate msg model
+
+        StageDismissHand _ ->
+            stageUpdate msg model
+
+        StageAccept ->
+            stageUpdate msg model
+
+        StageDecline ->
+            stageUpdate msg model
+
+        StageHandsOpen ->
+            stageUpdate msg model
+
+        StageHandsClose ->
+            stageUpdate msg model
+
+        CallLeaveConfirmClose ->
+            ( { model | callLeaveConfirm = False }, [] )
+
+        CallLeaveConfirmed ->
+            updateCore CallLeave { model | callLeaveConfirm = False }
+
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
 
@@ -42874,6 +42946,8 @@ foldParsed model parsed =
 
                     ( next, outbound ) =
                         foldLine filed parsed
+                            -- v3/calls-c11
+                            |> foldStageWire parsed
                 in
                 -- A dropped self-echo never reaches the vault: the optimistic send
                 -- already persisted it, and a second row would fork history.
@@ -43615,6 +43689,10 @@ switcherUpdate msg model =
                         Nothing ->
                             updateCore NavMenuEscape model
 
+                -- v3/calls-c11 (C12): call chords
+                Switcher.CallChord name ->
+                    callChord name model
+
                 Switcher.UnknownShortcut ->
                     ( model, [] )
 
@@ -43708,6 +43786,9 @@ overlayStack model =
         , ( "call-more", model.callMoreOpen, CallMoreClose )
         -- v3/calls-c4: Escape returns a fullscreen stage to compact.
         , ( "call-fullscreen", model.callStageSize == CallMedia.SizeFullscreen && model.calls.lifecycle /= Media.Idle, CallStageSizeSet CallMedia.SizeCompact )
+        -- v3/calls-c11
+        , ( "call-leave-confirm", model.callLeaveConfirm && model.calls.lifecycle /= Media.Idle, CallLeaveConfirmClose )
+        , ( "stage-hands", stageHandsSheetOpen model, StageHandsClose )
         , ( "reclaim", model.reclaimOpen, ReclaimClose )
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
@@ -44422,3 +44503,330 @@ settleRoomSettings msg model =
 
         _ ->
             { model | roomSettings = settled }
+
+
+-- v3/calls-c11
+
+
+{-| Stage-mode transitions (C11, `Stage` holds the wire rules). Every
+send waits for a live socket — the oracle's `admitRaw` refuses a
+closed socket the same way — and starting a stage needs channel-op
+standing, since the server would refuse `MODE +m` anyway.
+-}
+stageUpdate : Msg -> Model -> ( Model, List Outbound )
+stageUpdate msg model =
+    let
+        live =
+            model.connection == Live
+
+        apply ( next, lines ) =
+            ( { model | stage = next }, List.map SendLine lines )
+    in
+    case msg of
+        StageStart room ->
+            if live && isChannelOp model room then
+                case Stage.startLines room of
+                    Just started ->
+                        apply started
+
+                    Nothing ->
+                        ( model, [] )
+
+            else
+                ( model, [] )
+
+        StageEnd ->
+            if model.stage.isHost then
+                apply (Stage.endLines model.stage)
+                    |> Tuple.mapFirst (\m -> { m | stageHandsOpen = False })
+
+            else
+                ( model, [] )
+
+        StageJoinAudience room ->
+            if live then
+                case Stage.joinLines { member = Dict.member (String.toLower room) model.channels } room of
+                    Just joined ->
+                        apply joined
+
+                    Nothing ->
+                        ( model, [] )
+
+            else
+                ( model, [] )
+
+        StageLeave ->
+            apply (Stage.leaveLines model.stage)
+                |> Tuple.mapFirst (\m -> { m | stageHandsOpen = False })
+
+        StageHandToggle ->
+            if live && not model.stage.isSpeaker then
+                apply (Stage.handLines (not model.stage.handRaised) model.stage)
+
+            else
+                ( model, [] )
+
+        StageInvite nick ->
+            if live && model.stage.isHost then
+                ( model, List.map SendLine (Stage.inviteLine nick model.stage) )
+
+            else
+                ( model, [] )
+
+        StageDismissHand nick ->
+            -- Local only: Onyx Server has no deny verb for a raised
+            -- hand, so dismissing clears the row from this host's queue.
+            ( { model | stage = Stage.removeRaisedHand nick model.stage }, [] )
+
+        StageAccept ->
+            if live && model.stage.pendingInvite /= Nothing then
+                apply (Stage.acceptLines model.stage)
+
+            else
+                ( model, [] )
+
+        StageDecline ->
+            apply (Stage.declineLines model.stage)
+
+        StageHandsOpen ->
+            ( { model | stageHandsOpen = True }, [] )
+
+        StageHandsClose ->
+            ( { model | stageHandsOpen = False }, [] )
+
+        _ ->
+            ( model, [] )
+
+
+{-| The 375px raised-hands sheet is open (host, live stage, queue). -}
+stageHandsSheetOpen : Model -> Bool
+stageHandsSheetOpen model =
+    model.stageHandsOpen && model.stage.isHost && model.stage.channel /= Nothing
+
+
+{-| Fold the stage side of one live wire line after `foldLine` (the row
+itself is already swallowed as a CTCP wrapper there): inbound STAGE
+CTCP, NICK renames, and our own PART / KICK from the stage room.
+-}
+foldStageWire : Wire.IrcMessage -> ( Model, List Outbound ) -> ( Model, List Outbound )
+foldStageWire parsed ( model, out ) =
+    if model.historyMerging || model.stage.channel == Nothing then
+        ( model, out )
+
+    else
+        let
+            sender =
+                Maybe.withDefault "" parsed.nick
+
+            isSelf name =
+                String.toLower name == String.toLower model.ourNick
+        in
+        case ( parsed.command, parsed.params ) of
+            ( "PRIVMSG", target :: body :: _ ) ->
+                let
+                    memberModes nick =
+                        model.stage.channel
+                            |> Maybe.andThen (\room -> Dict.get (String.toLower room) model.channels)
+                            |> Maybe.andThen (\ch -> Dict.get (String.toLower nick) ch.members)
+                            |> Maybe.map .modes
+                in
+                case
+                    Stage.foldCtcp
+                        { ourNick = model.ourNick
+                        , sender = sender
+                        , target = target
+                        , body = body
+                        , memberModes = memberModes
+                        }
+                        model.stage
+                of
+                    Just folded ->
+                        let
+                            announcer =
+                                model.callAnnouncer
+
+                            announced =
+                                case ( folded.raised, model.stage.isHost ) of
+                                    ( Just nick, True ) ->
+                                        { announcer | message = nick ++ " raised a hand" }
+
+                                    _ ->
+                                        announcer
+                        in
+                        ( { model | stage = folded.stage, callAnnouncer = announced }
+                        , out ++ List.map SendLine folded.lines
+                        )
+
+                    Nothing ->
+                        ( model, out )
+
+            ( "NICK", new :: _ ) ->
+                ( { model | stage = Stage.foldNick sender new model.stage }, out )
+
+            ( "PART", rooms :: _ ) ->
+                if isSelf sender then
+                    ( { model | stage = List.foldl Stage.foldSelfLeave model.stage (String.split "," rooms) }, out )
+
+                else
+                    ( { model | stage = Stage.removeRaisedHand sender model.stage }, out )
+
+            ( "KICK", room :: victim :: _ ) ->
+                if isSelf victim then
+                    ( { model | stage = Stage.foldSelfLeave room model.stage }, out )
+
+                else
+                    ( { model | stage = Stage.removeRaisedHand victim model.stage }, out )
+
+            ( "QUIT", _ ) ->
+                ( { model | stage = Stage.removeRaisedHand sender model.stage }, out )
+
+            _ ->
+                ( model, out )
+
+
+{-| Close the stage / leave-confirm overlays once they have nothing to
+show (call idle, host authority gone).
+-}
+settleStage : Model -> Model
+settleStage model =
+    let
+        confirmed =
+            if model.callLeaveConfirm && model.calls.lifecycle == Media.Idle then
+                { model | callLeaveConfirm = False }
+
+            else
+                model
+    in
+    if confirmed.stageHandsOpen && not (stageHandsSheetOpen confirmed && not (List.isEmpty confirmed.stage.raisedHands)) then
+        { confirmed | stageHandsOpen = False }
+
+    else
+        confirmed
+
+
+{-| C12 call chords from the `shortcut` port (`call-<name>`). Active
+only in an established call; while reconnecting only Leave works (the
+bar disables the rest the same way). Raise hand drives the stage hand
+when this call's room is a stage this client is in the audience of;
+outside a stage the voice hand lands with C8, so the chord is a no-op.
+-}
+callChord : String -> Model -> ( Model, List Outbound )
+callChord name model =
+    let
+        reconnecting =
+            CallDock.reconnecting model.calls (model.connection == Live)
+
+        roster =
+            CallUi.callRoster model.media model.calls
+    in
+    case Stage.chordFromName name of
+        Nothing ->
+            ( model, [] )
+
+        Just chord ->
+            if model.calls.lifecycle /= Media.InCall then
+                ( model, [] )
+
+            else if reconnecting && chord /= Stage.ChordLeave then
+                ( model, [] )
+
+            else
+                case chord of
+                    Stage.ChordMute ->
+                        updateCore CallToggleMute model
+
+                    Stage.ChordCamera ->
+                        updateCore CallToggleCamera model
+
+                    Stage.ChordHand ->
+                        case model.calls.channel of
+                            Just room ->
+                                if Stage.activeFor model.stage room && not model.stage.isSpeaker then
+                                    stageUpdate StageHandToggle model
+
+                                else
+                                    ( model, [] )
+
+                            Nothing ->
+                                ( model, [] )
+
+                    Stage.ChordLeave ->
+                        if List.length roster > 2 then
+                            ( { model | callLeaveConfirm = True }, [] )
+
+                        else
+                            updateCore CallLeave model
+
+                    Stage.ChordLayout ->
+                        ( cycleCallLayout model, [] )
+
+                    Stage.ChordSize ->
+                        updateCore CallStageSizeCycle model
+
+                    Stage.ChordSpeaker ->
+                        let
+                            peerSpeaking =
+                                Dict.foldl
+                                    (\k p acc ->
+                                        if p.speaking then
+                                            k :: acc
+
+                                        else
+                                            acc
+                                    )
+                                    []
+                                    model.callPeers
+
+                            speaking =
+                                Set.union model.media.speaking (Set.fromList peerSpeaking)
+
+                            names =
+                                roster
+                                    |> List.filter (\k -> Set.member (String.toLower k) speaking)
+                                    |> List.map (callDisplayName model)
+
+                            announcer =
+                                model.callAnnouncer
+                        in
+                        ( { model | callAnnouncer = { announcer | message = Stage.speakingAnnouncement names } }, [] )
+
+
+{-| Ctrl+Shift+G: grid → spotlight → (screenshare when one is live) →
+grid (spec §3.1).
+-}
+cycleCallLayout : Model -> Model
+cycleCallLayout model =
+    let
+        shareId =
+            CallMedia.buildTiles
+                { ourNick = model.ourNick
+                , order = model.callTileOrder
+                , media = model.media
+                , peers = model.callPeers
+                , local = model.callLocal
+                , selfMuted = model.callSelfMuted
+                , pinned = model.callPinned
+                , displayName = callDisplayName model
+                , roleOf = \_ -> Nothing
+                }
+                |> .shares
+                |> List.head
+                |> Maybe.map .id
+
+        current =
+            CallMedia.resolveView { layout = model.callLayout, shareId = shareId, optOut = model.callShareOptOut }
+    in
+    case current of
+        CallMedia.ViewScreenshare ->
+            { model | callShareOptOut = shareId, callLayout = CallMedia.LayoutGrid }
+
+        CallMedia.ViewGrid ->
+            { model | callLayout = CallMedia.LayoutSpotlight }
+
+        CallMedia.ViewSpotlight ->
+            case shareId of
+                Just _ ->
+                    { model | callShareOptOut = Nothing }
+
+                Nothing ->
+                    { model | callLayout = CallMedia.LayoutGrid }
