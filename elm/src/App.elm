@@ -34671,6 +34671,13 @@ foldChat model message isNotice =
             else if not isNotice && isLiveSelfEcho model message then
                 ( model, [] )
 
+            else if isNotice && message.nick == Nothing && not (Maybe.withDefault False (Maybe.map (isChannelName model) (List.head message.params))) then
+                -- Server-origin NOTICE to us (prefix is the server name,
+                -- e.g. the welcome "secured… / mesh… / connecting from…"
+                -- lines): network chrome, not a conversation. Service
+                -- log only — never a DM row or a "Needs you" item.
+                ( logService model (trailingParam message.params), [] )
+
             else
                 case message.params of
                 target :: body :: _ ->

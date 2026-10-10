@@ -21532,16 +21532,16 @@ suite =
                         , \_ -> Expect.equal (Just "kai") surfaced.keytransReplyAccount
                         , \_ ->
                             Expect.equal False
-                                (List.any (String.contains "KEYTRANS") stray.serviceLog)
+                                (List.any (String.contains "Account: KEYTRANS") stray.serviceLog)
                         , \_ ->
                             Expect.equal False
                                 (List.any (String.contains "KEYTRANS") nicked.serviceLog)
                         , \_ ->
                             Expect.equal False
-                                (List.any (String.contains "KEYTRANSFER") headless.serviceLog)
+                                (List.any (String.contains "Account: KEYTRANSFER") headless.serviceLog)
                         , \_ ->
                             Expect.equal False
-                                (List.any (String.contains "hello there") otherBody.serviceLog)
+                                (List.any (String.contains "Account: hello there") otherBody.serviceLog)
                         ]
                         ()
             , test "keytrans builders render the verbs" <|
@@ -21638,8 +21638,8 @@ suite =
                                     removed.serviceLog
                                 )
                         , \_ -> Expect.equal (Just "kai") listed.certReplyAccount
-                        , \_ -> Expect.equal False (List.any (String.contains "CERTLIST") stray.serviceLog)
-                        , \_ -> Expect.equal False (List.any (String.contains "CERTS revoked") certs.serviceLog)
+                        , \_ -> Expect.equal False (List.any (String.contains "Account: CERTLIST") stray.serviceLog)
+                        , \_ -> Expect.equal False (List.any (String.contains "Account: CERTS revoked") certs.serviceLog)
                         ]
                         ()
             ]
