@@ -2783,6 +2783,137 @@ function fetchPublicFeed(url) {
     .then(function (outcome) { return finish(outcome); })
     .catch(function () { return finish({ ok: false, status: 0, body: "" }); });
 }
+  /* v3/switcher — the ONE global keyboard port. ports.js owns the
+     scope rules (mirroring useKeyboardShortcuts `isEditableTarget`):
+     Ctrl/Cmd+K and Escape work everywhere (inputs included); `?` and
+     `/` only outside editable fields, without Ctrl/Meta/Alt. IME
+     composition and keys an earlier handler already claimed are never
+     taken. A foreign modal dialog (one not marked
+     `data-shortcut-scope`) owns the keyboard, Escape aside. Returns
+     `{ name, prevent }` or null. */
+  function shortcutEditableTarget(target) {
+    if (!target || typeof target !== "object") return false;
+    try {
+      if (target.closest && target.closest("[data-spotlight-ignore]")) return true;
+    } catch (err) { /* detached */ }
+    var tag = typeof target.tagName === "string" ? target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || tag === "select") return true;
+    if (target.isContentEditable === true) return true;
+    try {
+      if (target.getAttribute && target.getAttribute("role") === "textbox") return true;
+    } catch (err) { /* best-effort */ }
+    return false;
+  }
+  function shortcutForeignModal(doc) {
+    if (!doc || !doc.querySelector) return false;
+    try {
+      return !!doc.querySelector('[role="dialog"][aria-modal="true"]:not([data-shortcut-scope])');
+    } catch (err) { return false; }
+  }
+  function classifyShortcut(e, doc) {
+    if (!e || e.defaultPrevented) return null;
+    if (e.isComposing || e.keyCode === 229) return null;
+    var key = typeof e.key === "string" ? e.key : "";
+    var mod = !!(e.ctrlKey || e.metaKey);
+    if (key === "Escape") {
+      if (mod || e.altKey || e.shiftKey) return null;
+      return { name: "escape", prevent: false };
+    }
+    if (key.toLowerCase() === "k" && mod && !e.altKey && !e.shiftKey) {
+      if (shortcutForeignModal(doc)) return null;
+      return { name: "palette-toggle", prevent: true };
+    }
+    if (mod || e.altKey) return null;
+    if (key !== "?" && key !== "/") return null;
+    if (shortcutEditableTarget(e.target)) return null;
+    if (shortcutForeignModal(doc)) return null;
+    return key === "?" ? { name: "shortcuts", prevent: true } : { name: "palette", prevent: true };
+  }
+  /* Focus for the palette / shortcuts overlay (APG dialog): when an
+     element marked `data-onyx-autofocus` mounts, remember the opener
+     and focus it; Tab wraps inside its `data-shortcut-scope` dialog;
+     when the last one unmounts, focus returns to the opener. A swap
+     palette -> shortcuts keeps the original opener. */
+  function installShortcutFocus(doc, Mutation) {
+    if (!doc || !doc.querySelector) return null;
+    var current = null;
+    var opener = null;
+    function settle() {
+      var el = null;
+      try { el = doc.querySelector("[data-onyx-autofocus]"); } catch (err) { el = null; }
+      if (el && el !== current) {
+        if (!current) {
+          try { opener = doc.activeElement || null; } catch (err) { opener = null; }
+        }
+        current = el;
+        try { el.focus({ preventScroll: true }); } catch (err) {
+          try { el.focus(); } catch (ignored) { /* best-effort */ }
+        }
+      } else if (!el && current) {
+        current = null;
+        var back = opener;
+        opener = null;
+        try {
+          if (back && back.isConnected !== false && back.focus) back.focus({ preventScroll: true });
+        } catch (err) { /* best-effort */ }
+      }
+    }
+    function trapTab(e) {
+      if (!e || e.key !== "Tab" || e.defaultPrevented) return;
+      var root = null;
+      try { root = doc.querySelector("[data-shortcut-scope]"); } catch (err) { root = null; }
+      if (!root || !root.querySelectorAll) return;
+      var items = Array.prototype.filter.call(
+        root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+        function (node) { return !node.disabled && node.getAttribute("aria-hidden") !== "true"; }
+      );
+      if (items.length === 0) return;
+      var first = items[0];
+      var last = items[items.length - 1];
+      var active = doc.activeElement;
+      var inside = root.contains ? root.contains(active) : true;
+      try {
+        if (e.shiftKey && (active === first || !inside)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !inside)) {
+          e.preventDefault();
+          first.focus();
+        }
+      } catch (err) { /* best-effort */ }
+    }
+    try { doc.addEventListener && doc.addEventListener("keydown", trapTab); } catch (err) { /* no DOM events */ }
+    if (Mutation) {
+      try {
+        var observer = new Mutation(function () { settle(); });
+        observer.observe(doc.body || doc.documentElement, { childList: true, subtree: true });
+      } catch (err) { /* observation unavailable */ }
+    }
+    return { settle: settle, trapTab: trapTab };
+  }
+  function wireShortcuts(app) {
+    if (!app || !app.ports || !app.ports.shortcut) return;
+    if (typeof window === "undefined" || !window || !window.addEventListener) return;
+    var doc = typeof document !== "undefined" ? document : null;
+    window.addEventListener("keydown", function (e) {
+      var hit = classifyShortcut(e, doc);
+      if (!hit) return;
+      if (hit.prevent) {
+        try { e.preventDefault(); } catch (err) { /* best-effort */ }
+      }
+      try { app.ports.shortcut.send(hit.name); } catch (err) { /* port gone */ }
+    });
+    try {
+      if (doc && !doc.__onyxShortcutFocus) {
+        doc.__onyxShortcutFocus = true;
+        var Mutation =
+          (typeof MutationObserver !== "undefined" && MutationObserver)
+          || (window.MutationObserver || null);
+        installShortcutFocus(doc, Mutation);
+      }
+    } catch (err) { /* focus management is best-effort */ }
+  }
+
   function wire(app) {
     var socket = { send: function () {}, close: function () {}, isOpen: function () { return false; }, rawSocket: function () { return null; } };
     var vault = null;
@@ -4445,6 +4576,8 @@ function fetchPublicFeed(url) {
         try { app.ports.searchHotkey.send(null); } catch (err) { /* best-effort */ }
       });
     }
+    /* v3/switcher — global shortcut port (palette, `?`, Escape). */
+    wireShortcuts(app);
     /* Image lightbox dialog focus (mirroring `createDialogFocus` for
        `MessageImageLightbox`: while the lightbox dialog is mounted the
        background is isolated and scroll-locked, Tab cycles inside the
@@ -8421,6 +8554,9 @@ function fetchPublicFeed(url) {
     mediaMaxBinaryBytes: MEDIA_MAX_BINARY_BYTES,
     createGroupWelcome: createGroupWelcome,
     wireGroupWelcome: wireGroupWelcome,
+    classifyShortcut: classifyShortcut,
+    installShortcutFocus: installShortcutFocus,
+    wireShortcuts: wireShortcuts,
     memKV: memKV
   };
   if (typeof module !== "undefined" && module.exports) {

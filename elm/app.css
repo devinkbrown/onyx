@@ -2545,3 +2545,204 @@ html, body {
 .onyx-member-message:hover { background: var(--onyx-panel-2); }
 .onyx-member-action--primary { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); }
 .onyx-member-action--primary:hover { background: var(--onyx-accent); filter: brightness(1.08); }
+
+/* v3/switcher — Ctrl/Cmd+K action palette (mirrors chat/spotlight)
+   and the "?" keyboard-shortcuts overlay (mirrors ShortcutsOverlay).
+   One accent use: the highlighted option's edge. Sheets alone carry
+   the short cool shadow; entrance motion only, none when reduced. */
+.onyx-palette-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  flex: none;
+}
+.onyx-palette-launcher:hover { color: var(--onyx-text); }
+.onyx-palette-launcher:focus-visible,
+.onyx-spotlight-close:focus-visible,
+.onyx-shortcuts-close:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 1px; }
+.onyx-palette-kbd,
+.onyx-spotlight-foot kbd,
+.shortcuts-overlay__kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.onyx-spotlight,
+.onyx-shortcuts {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  padding: 12vh 16px 16px;
+  box-sizing: border-box;
+}
+.onyx-spotlight-backdrop,
+.onyx-shortcuts-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 55%); }
+.onyx-spotlight-panel,
+.onyx-shortcuts-sheet {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(70vh, 560px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  box-shadow: 0 12px 32px rgb(0 8 16 / 45%);
+  animation: onyx-switcher-in 160ms ease-out;
+}
+.onyx-spotlight-panel:focus,
+.onyx-shortcuts-sheet:focus { outline: none; }
+@keyframes onyx-switcher-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onyx-spotlight-panel, .onyx-shortcuts-sheet { animation: none; }
+}
+.onyx-spotlight-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-spotlight-sigil { color: var(--onyx-faint); font-size: 16px; }
+.onyx-spotlight-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: 15px;
+  padding: 6px 0;
+}
+.onyx-spotlight-input:focus { outline: none; }
+.onyx-spotlight-close,
+.onyx-shortcuts-close {
+  min-width: 32px;
+  min-height: 32px;
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.onyx-spotlight-status {
+  margin: 0;
+  padding: 6px 12px 0;
+  color: var(--onyx-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onyx-spotlight-results {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  flex: 1;
+  min-height: 0;
+}
+.onyx-spotlight-group + .onyx-spotlight-group { margin-top: 6px; }
+.onyx-spotlight-section {
+  display: block;
+  padding: 6px 8px 4px;
+  color: var(--onyx-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.onyx-spotlight-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font-size: 14px;
+}
+.onyx-spotlight-option[aria-selected="true"] {
+  background: var(--onyx-panel-2);
+  border-left-color: var(--onyx-accent);
+}
+.onyx-spotlight-icon { width: 16px; flex: none; color: var(--onyx-faint); text-align: center; }
+.onyx-spotlight-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-spotlight-title mark { background: transparent; color: var(--onyx-text); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.onyx-spotlight-hint {
+  flex: 0 1 auto;
+  max-width: 45%;
+  color: var(--onyx-dim);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onyx-spotlight-empty { display: grid; gap: 4px; padding: 24px 12px; text-align: center; }
+.onyx-spotlight-empty-text { font-size: 14px; }
+.onyx-spotlight-empty-sub { color: var(--onyx-dim); font-size: 13px; }
+.onyx-spotlight-foot {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--onyx-line);
+  color: var(--onyx-faint);
+  font-size: 11px;
+}
+.onyx-spotlight-foot kbd { margin-right: 2px; }
+
+.onyx-shortcuts-sheet { padding: 16px; gap: 10px; overflow-y: auto; }
+.onyx-shortcuts-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.onyx-shortcuts-header h2 { font-size: 16px; margin: 0; }
+.onyx-shortcuts-description { margin: 0; color: var(--onyx-dim); font-size: 13px; }
+.shortcuts-overlay { display: grid; gap: 14px; }
+.shortcuts-overlay__group-name {
+  margin: 0 0 6px;
+  color: var(--onyx-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.shortcuts-overlay__rows { display: grid; gap: 2px; }
+.shortcuts-overlay__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--onyx-line);
+  font-size: 13px;
+}
+.shortcuts-overlay__desc { min-width: 0; }
+.shortcuts-overlay__keys { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.shortcuts-overlay__sep { color: var(--onyx-faint); font-size: 11px; }
+
+@media (max-width: 719.98px) {
+  .onyx-palette-kbd { display: none; }
+  .onyx-spotlight, .onyx-shortcuts { padding: 8px; align-items: start; }
+  .onyx-spotlight-panel, .onyx-shortcuts-sheet { max-height: calc(100dvh - 16px); }
+  .onyx-spotlight-hint { display: none; }
+}

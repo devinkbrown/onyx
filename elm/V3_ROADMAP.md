@@ -49,8 +49,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
-| 1.7 | Quick switch (Ctrl+K) | `RoomSwitcherSheet` | S |
-| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | S |
+| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; no recents / time grammar) |
+| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port, rows narrowed to handled chords) |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home: coach only; notify prompt todo) |
 | 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 
@@ -149,7 +149,7 @@ keyboard-only and at 375px, with elm-program-test flows + Playwright + screensho
 |---|---|---|---|
 | 0.6 | Playwright against the static Elm build (375 / 768 / 1280) | pulled from 7.4 | M |
 | 1.0 | Shell frame + tokens: Solid token ladder in `app.css`, responsive grid (nav rail / collection sidebar / main / context rail), sheet/dialog primitive with one focus-trap port, `role="log"` transcript container, 375px gate, visual-regression baselines | absorbs 7.1, 7.2, 7.6 | L |
-| 1.1→1.7 | Ctrl/Cmd+K becomes an action palette right after primary nav | 1.7 moved up | S |
+| 1.1→1.7 | Ctrl/Cmd+K becomes an action palette right after primary nav | 1.7 moved up | S · **done** (v3/switcher) |
 | 1.4a | Land on Home after connect; Home absorbs the catch-up digest | absorbs 2.7 | M |
 | 2.0 | Transcript engine: `Html.Keyed` + `Html.Lazy` rows, scroll anchoring port, unread divider, jump-to-latest, windowing past ~300 rows | new | L |
 | 2.0b | Density modes (Default / Compact) + grouping as view-model | new | S |
