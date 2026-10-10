@@ -67,7 +67,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | M |
 | 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | L |
-| 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | M |
+| 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | **done** (`v3/notify`: room All/@/Mute strip in the thread header + Notifications sheet with desktop/sound/DND; quiet-hours schedule + calm presets narrowed out — no `App` state) |
 | 3.4 | Invite friends share sheet | `RoomInviteShare` | S |
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M |
 | 3.6 | Profile card: Message / Report / moderation controls | `PeopleProfileCard` | S |
@@ -80,7 +80,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | # | Surface | Oracle | Size |
 |---|---|---|---|
 | 4.1 | Device preferences panel: display, accessibility, conversation, history & data, vault, drafts, queued sends | `PreferencesPanel` | L |
-| 4.2 | Mention keywords, ignored users, smart mute, room folders | `KeywordListControl`, `IgnoredUsersControl`, `SmartMuteSection`, `ChannelOrganizationSection` | S each |
+| 4.2 | Mention keywords, ignored users, smart mute, room folders | `KeywordListControl`, `IgnoredUsersControl`, `SmartMuteSection`, `ChannelOrganizationSection` | **partial** (`v3/notify`: keywords + ignored users done in the Notifications sheet; smart mute + room folders todo) |
 | 4.3 | Revoke other devices | `SessionsDevicesSection` | S |
 | 4.4 | Portable identity export/import | `PortableIdentitySection` | S |
 | 4.5 | History import (Discord / bot / vault) | `HistoryImportControls` | M |
@@ -121,6 +121,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 - 2026-10-10 — Phase 0.1/0.2 connect gate landed (`c18b9591`).
 - 2026-10-10 — Phase 2.1–2.3 rich message text (links, mentions, channel jump, mIRC, code, quote, spoiler, emoji) landed.
+- 2026-10-10 — Phase 3.3 + 4.2 (keywords/ignored/DND) notification settings landed (`v3/notify`).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 

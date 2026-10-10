@@ -3012,6 +3012,7 @@ suite =
                                 |> Query.count (Expect.equal 2)
                         , \_ ->
                             query tagged
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
                                 |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
@@ -3025,6 +3026,7 @@ suite =
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
                             query cleared
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
                                 |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
