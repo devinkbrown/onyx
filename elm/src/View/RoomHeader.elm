@@ -47,6 +47,7 @@ import View.CallDock -- v3/calls-c6
 import View.ModDesk
 import View.Notify
 import View.RoomSettings
+import View.Roster
 import View.Polish -- v3/polish
 
 
@@ -95,6 +96,7 @@ roomHeader model =
 
                         _ ->
                             text ""
+                    , View.Roster.membersToggle model -- v3/ui-roster: narrow layouts open the member sheet
                     , View.CallPresence.headerVoice model -- v3/calls-c1
                     , searchToggle model
                     , moreMenu model

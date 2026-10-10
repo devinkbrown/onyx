@@ -101,6 +101,38 @@ suite =
                         |> Roster.totalCount
                         |> Expect.equal 0
             ]
+        , describe "Roster.presenceGroups (v3/ui-roster)"
+            [ test "here stays in its role section, plain members read Online, away gathers last" <|
+                \_ ->
+                    let
+                        away nick modes =
+                            { nick = nick, modes = Set.fromList (String.toList modes), away = True }
+
+                        groups =
+                            Roster.groupMembers order prefix
+                                [ user "zoe" "o", away "amy" "o", user "bob" "", away "cal" "v", away "abe" "", user "dee" "v" ]
+                                |> Roster.presenceGroups
+                    in
+                    Expect.all
+                        [ \g -> Expect.equal [ "op", "voice", "member", "away" ] (List.map .key g)
+                        , \g -> Expect.equal [ "Ops", "Voice", "Online", "Away" ] (List.map .label g)
+                        , \g -> Expect.equal [ [ "zoe" ], [ "dee" ], [ "bob" ], [ "abe", "amy", "cal" ] ] (List.map nicksOf g)
+                        ]
+                        groups
+            , test "a role whose members are all away drops out; no away means no Away section" <|
+                \_ ->
+                    let
+                        allAway =
+                            Roster.groupMembers order prefix [ { nick = "op1", modes = Set.fromList [ 'o' ], away = True }, user "m" "" ]
+                                |> Roster.presenceGroups
+
+                        allHere =
+                            Roster.groupMembers order prefix [ user "op1" "o", user "m" "" ]
+                                |> Roster.presenceGroups
+                    in
+                    Expect.equal ( [ "member", "away" ], [ "op", "member" ] )
+                        ( List.map .key allAway, List.map .key allHere )
+            ]
         , describe "Roster.filterGroups"
             [ test "trimmed, case-insensitive nick substring; empty groups drop out" <|
                 \_ ->
@@ -209,6 +241,35 @@ suite =
                             , Query.findAll [ Selector.attribute (Attr.attribute "aria-label" "Message me") ]
                                 >> Query.count (Expect.equal 0)
                             ]
+            , test "rows are one button that opens the member card" <|
+                \_ ->
+                    rosterOf room
+                        |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View member card for alice") ]
+                        |> Event.simulate Event.click
+                        |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
+            , test "the list is a popover sheet the room header can open" <|
+                \_ ->
+                    Expect.all
+                        [ \_ ->
+                            rosterOf room
+                                |> Query.has [ Selector.attribute (Attr.attribute "popover" "auto"), Selector.id "onyx-members" ]
+                        , \_ ->
+                            query room
+                                |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "members-toggle") ]
+                                |> Query.has
+                                    [ Selector.attribute (Attr.attribute "popovertarget" "onyx-members")
+                                    , Selector.attribute (Attr.attribute "aria-label" "Members, 4 people")
+                                    ]
+                        ]
+                        ()
+            , test "a small room folds the filter behind a search icon" <|
+                \_ ->
+                    Expect.all
+                        [ \_ -> rosterOf room |> Query.has [ Selector.class "onyx-mlist-find" ]
+                        , \_ -> rosterOf room |> Query.hasNot [ Selector.class "onyx-roster-filter--open" ]
+                        , \_ -> rosterOf (step (MemberFilterInput "al") room) |> Query.has [ Selector.class "onyx-roster-filter--open" ]
+                        ]
+                        ()
             , test "MemberMessage selects the DM" <|
                 \_ ->
                     step (MemberMessage "alice") room

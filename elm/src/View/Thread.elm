@@ -26,6 +26,7 @@ import TranscriptRows
 import Upload
 import View.DmSafety
 import View.Home
+import View.Icon exposing (icon)
 import View.MessageText exposing (messageText)
 -- v3/calls-c1
 import View.CallStage
@@ -80,11 +81,22 @@ channelTranscript : Model -> App.Channel -> Html Msg
 channelTranscript model channel =
     if List.isEmpty channel.messages then
         div [ class "onyx-thread-frame" ]
-            [ -- v3/home
-              div [ class "onyx-empty" ]
+            [ -- v3/home; v3/ui-messages: a room / DM intro card
+              div [ class "onyx-empty onyx-room-intro" ]
                 [ -- v3/roomsettings: the trigger, facepile and notify strip live in the room header
                   View.DmSafety.convoRows model channel
-                , h2 [] [ text channel.name ]
+                , if App.isChannelName model channel.name then
+                    span [ class "onyx-room-intro-glyph", attribute "aria-hidden" "true" ] [ icon "hash" ]
+
+                  else
+                    span [ class "onyx-room-intro-face", attribute "aria-hidden" "true" ]
+                        [ Avatar.view { name = channel.name, owner = False, size = Avatar.Md, extraClass = "", hidden = True } ]
+                , h2 [ class "onyx-room-intro-title" ] [ text channel.name ]
+                , if String.isEmpty (String.trim channel.topic) then
+                    text ""
+
+                  else
+                    p [ class "onyx-room-intro-topic" ] [ text channel.topic ]
                 , View.Home.emptyRoomIntro model channel
                 ]
             , transcriptLog model channel.name []
@@ -321,6 +333,7 @@ type alias RowCtx =
     , ourNick : String
     , editTitle : String
     , flags : TranscriptRows.RowFlags
+    , active : Bool
     }
 
 
@@ -336,7 +349,7 @@ quietRow target zone prefs ourNick title bits m =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
     rowShell
-        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags }
+        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags, active = False }
         ((case m.replyTo of
             Just ref ->
                 [ replyContext ref ]
@@ -346,7 +359,7 @@ quietRow target zone prefs ourNick title bits m =
          )
             ++ [ messageText ourNick presented.caption, text "" ]
         )
-        (menuTrigger target m flags.menuButton False)
+        (rowActions target prefs m flags.menuButton False)
         []
         m
 
@@ -356,13 +369,109 @@ quietRow target zone prefs ourNick title bits m =
 richRow : Model -> String -> TranscriptRows.RowFlags -> String -> App.ChatMessage -> Html Msg
 richRow model target flags title m =
     rowShell
-        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags }
+        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m }
         (messageBody model m)
         (messageMenuButton model target m)
         [ messageMenuPanel model target m
         , reactionPickerPanel model target m
         ]
         m
+
+
+{-| The row's quick actions (v3/ui-messages): React, Reply, Reply in
+thread, then the existing "Message actions" menu trigger. On fine
+pointers the toolbar floats over the row's top edge on hover / focus;
+on touch it stays out of sight until the row is tapped (the row is
+focusable, so `:focus-within` reveals it) or long-pressed (which opens
+the menu directly). The three shortcuts sit outside the tab order —
+every one of them is also in the menu, which is one tab stop per row —
+unless no menu applies, in which case they take the stops themselves.
+-}
+rowActions : String -> Prefs.Preferences -> App.ChatMessage -> Bool -> Bool -> Html Msg
+rowActions target prefs m menuApplies menuOpen =
+    case m.msgid of
+        Nothing ->
+            text ""
+
+        Just msgid ->
+            let
+                live =
+                    not (m.deleted || m.redacted)
+
+                stop =
+                    if menuApplies then
+                        [ tabindex -1 ]
+
+                    else
+                        []
+
+                quick key label msg =
+                    button
+                        ([ type_ "button"
+                         , class "onyx-row-action"
+                         , attribute "data-row-action" key
+                         , attribute "aria-label" label
+                         , attribute "title" label
+                         , onClick msg
+                         ]
+                            ++ stop
+                        )
+                        [ icon key ]
+
+                shortcuts =
+                    (if live && prefs.reactionDensity /= Prefs.ReactionCountsOnly then
+                        [ quick "react" "Add a boost" (App.ReactionPickerOpen { target = target, msgid = msgid }) ]
+
+                     else
+                        []
+                    )
+                        ++ (if live then
+                                [ quick "reply" "Reply" (App.ReplyArm { target = target, msgid = msgid })
+                                , quick "thread" "Reply in thread" (App.ThreadOpen { channel = target, parentId = m.id })
+                                ]
+
+                            else
+                                []
+                           )
+            in
+            if List.isEmpty shortcuts && not menuApplies then
+                text ""
+
+            else
+                div
+                    [ class "onyx-row-actions"
+                    , attribute "role" "toolbar"
+                    , attribute "aria-label" ("Actions for message from " ++ m.from)
+                    ]
+                    (shortcuts ++ [ menuTrigger target m menuApplies menuOpen ])
+
+
+{-| Long-press on touch opens the message menu (Chrome reports the
+press as a `contextmenu` PointerEvent with `pointerType: "touch"`).
+Mouse right-clicks and anything over a link, image, player or field
+keep the browser's own menu.
+-}
+longPressMenu : String -> App.ChatMessage -> Bool -> List (Html.Attribute Msg)
+longPressMenu target m applies =
+    case ( applies, m.msgid ) of
+        ( True, Just msgid ) ->
+            [ Html.Events.preventDefaultOn "contextmenu"
+                (Decode.map2 Tuple.pair
+                    (Decode.oneOf [ Decode.field "pointerType" Decode.string, Decode.succeed "" ])
+                    (Decode.oneOf [ Decode.at [ "target", "tagName" ] Decode.string, Decode.succeed "" ])
+                    |> Decode.andThen
+                        (\( pointer, tag ) ->
+                            if pointer == "touch" && not (List.member (String.toUpper tag) [ "A", "IMG", "VIDEO", "AUDIO", "INPUT", "TEXTAREA", "BUTTON", "SUMMARY" ]) then
+                                Decode.succeed ( App.MessageMenuOpen { target = target, msgid = msgid }, True )
+
+                            else
+                                Decode.fail "native menu"
+                        )
+                )
+            ]
+
+        _ ->
+            []
 
 
 {-| The row chrome shared by lazy and eager rows. Default density
@@ -439,7 +548,7 @@ rowShell ctx body menuButton panels m =
                 [ avatar, sender, audience, clock ]
     in
     li
-        [ classList
+        ([ classList
             [ ( "onyx-message", True )
             , ( "onyx-message--compact", flags.compact )
             , ( "onyx-continuation", cont )
@@ -450,25 +559,35 @@ rowShell ctx body menuButton panels m =
             , ( "onyx-message-search-current", flags.searchCurrent )
             , ( "onyx-mention", m.highlight && not withdrawn )
             , ( "onyx-withdrawn", withdrawn )
+            , ( "onyx-message--active", ctx.active )
             ]
         , attribute "role" "article"
         , attribute "aria-label" (App.messageAccessibleLabel m)
+
+        -- v3/ui-messages: focusable (never a tab stop) so a tap on touch
+        -- reveals the row's actions through :focus-within.
+        , tabindex -1
         ]
+            ++ longPressMenu ctx.target m flags.menuButton
+        )
         (lead
-            ++ [ span [ class "onyx-body" ] body
-               , if m.outboxId == Nothing && not m.pending then
-                    text ""
+            ++ [ span [ class "onyx-body" ]
+                    (body
+                        ++ [ if m.outboxId == Nothing && not m.pending then
+                                text ""
 
-                 else if flags.uncertain then
-                    span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
+                             else if flags.uncertain then
+                                span [ class "onyx-pending-note" ] [ text " · delivery uncertain" ]
 
-                 else
-                    span [ class "onyx-pending-note" ] [ text " · queued" ]
-               , if m.edited && not withdrawn then
-                    span [ class "onyx-edited", attribute "title" ctx.editTitle ] [ text " · edited" ]
+                             else
+                                span [ class "onyx-pending-note" ] [ text " · queued" ]
+                           , if m.edited && not withdrawn then
+                                span [ class "onyx-edited", attribute "title" ctx.editTitle ] [ text " · edited" ]
 
-                 else
-                    text ""
+                             else
+                                text ""
+                           ]
+                    )
                , boostBar ctx.ourNick ctx.prefs ctx.target m
                , threadIndicator ctx.target flags.hasThread m
                , menuButton
@@ -491,9 +610,9 @@ menuButtonApplies model target m =
             menuHasActions model target (App.capabilities (menuInput model target m)) || App.isChannelName model target
 
 
-{-| Per-message actions entry (mirrors the message menu trigger; the
-Elm shell uses text buttons where the oracle uses icon buttons, with
-the same accessible names). -}
+{-| Per-message actions entry for eager rows: the quick-action toolbar
+with the menu trigger's open state (mirrors the message menu trigger:
+icon buttons with the oracle accessible names). -}
 messageMenuButton : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuButton model target m =
     let
@@ -505,7 +624,7 @@ messageMenuButton model target m =
                 _ ->
                     False
     in
-    menuTrigger target m (menuButtonApplies model target m) isOpen
+    rowActions target model.prefs m (menuButtonApplies model target m) isOpen
 
 
 menuTrigger : String -> App.ChatMessage -> Bool -> Bool -> Html Msg
@@ -514,7 +633,8 @@ menuTrigger target m applies isOpen =
         ( True, Just msgid ) ->
             button
                 [ type_ "button"
-                , class "onyx-msg-menu-trigger"
+                , class "onyx-msg-menu-trigger onyx-row-action"
+                , attribute "data-row-action" "more"
                 , attribute "aria-label" ("Message actions for message from " ++ m.from)
                 , attribute "aria-expanded"
                     (if isOpen then
@@ -523,9 +643,10 @@ menuTrigger target m applies isOpen =
                      else
                         "false"
                     )
+                , attribute "title" "More actions"
                 , onClick (App.MessageMenuOpen { target = target, msgid = msgid })
                 ]
-                [ text "⋯" ]
+                [ icon "more" ]
 
         _ ->
             text ""
@@ -560,12 +681,14 @@ jumpLatestPill model channel hiddenAfter =
                 ]
                 (if pill.unreadBelow > 0 then
                     [ span [ class "onyx-jump-latest-count" ] [ text (String.fromInt pill.unreadBelow) ]
-                    , span [] [ text " new " ]
-                    , span [ attribute "aria-hidden" "true" ] [ text "↓" ]
+                    , span [] [ text " new" ]
+                    , icon "arrow-down"
                     ]
 
                  else
-                    [ span [] [ text "Jump to latest" ] ]
+                    [ span [] [ text "Jump to latest" ]
+                    , icon "arrow-down"
+                    ]
                 )
 
 
@@ -582,8 +705,8 @@ threadIndicator target hasThread m =
             , attribute "aria-label" ("Open thread for message " ++ String.fromInt m.id)
             , onClick (App.ThreadOpen { channel = target, parentId = m.id })
             ]
-            [ span [ attribute "aria-hidden" "true" ] [ text "⌥" ]
-            , text " thread"
+            [ icon "thread"
+            , span [] [ text "View thread" ]
             ]
 
     else
@@ -651,15 +774,27 @@ threadPanelDialog model =
                         , attrs = []
                         }
                             [ div [ class "onyx-thread-head" ]
-                                [ h2 [ class "onyx-thread-title" ] [ text "Thread" ]
-                                , p [ class "onyx-thread-desc" ] [ text "Replies to this message" ]
+                                [ div [ class "onyx-thread-headings" ]
+                                    [ h2 [ class "onyx-thread-title" ] [ text "Thread" ]
+                                    , p [ class "onyx-thread-desc" ]
+                                        [ text
+                                            (case parent of
+                                                Just par ->
+                                                    "Replies to " ++ par.from ++ " in " ++ panel.channel
+
+                                                Nothing ->
+                                                    "Replies to this message"
+                                            )
+                                        ]
+                                    ]
                                 , button
                                     [ attribute "type" "button"
                                     , class "onyx-thread-close"
                                     , attribute "aria-label" "Close thread"
+                                    , attribute "title" "Close thread"
                                     , onClick App.ThreadClose
                                     ]
-                                    [ text "Close" ]
+                                    [ icon "x" ]
                                 ]
                             , case parent of
                                 Nothing ->
@@ -668,32 +803,37 @@ threadPanelDialog model =
 
                                 Just par ->
                                     div
-                                        [ class "onyx-thread-msg"
+                                        [ class "onyx-thread-msg onyx-thread-msg--parent"
                                         , attribute "aria-label" ("Thread parent: " ++ App.messageAccessibleLabel par)
                                         ]
-                                        [ div [ class "onyx-thread-msg-meta" ]
-                                            [ span [ class "onyx-thread-msg-from" ] [ text par.from ]
+                                        [ threadMsgFace par
+                                        , div [ class "onyx-thread-msg-meta" ]
+                                            [ span [ class "onyx-thread-msg-from", style "color" (Avatar.nickTint par.from) ] [ text par.from ]
                                             , time [ datetime (App.millisToIso (toFloat par.at)), attribute "aria-hidden" "true" ]
                                                 [ text (App.formatRowClock model.zone model.prefs.clock par.at) ]
                                             ]
                                         , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody par) ]
-                                        , case par.msgid of
-                                            Just _ ->
-                                                if par.deleted || par.redacted then
-                                                    text ""
-
-                                                else
-                                                    button
-                                                        [ type_ "button"
-                                                        , class "onyx-thread-reply"
-                                                        , onClick (App.ThreadReplyParent { channel = panel.channel, parentId = panel.parentId })
-                                                        ]
-                                                        [ text "Reply" ]
-
-                                            Nothing ->
-                                                text ""
                                         ]
-                            , div [ attribute "role" "log", attribute "aria-label" ("Thread replies to message " ++ String.fromInt panel.parentId) ]
+                            , if parent == Nothing then
+                                text ""
+
+                              else
+                                div [ class "onyx-thread-count", attribute "aria-hidden" "true" ]
+                                    [ span []
+                                        [ text
+                                            (case List.length replies of
+                                                0 ->
+                                                    "No replies yet"
+
+                                                1 ->
+                                                    "1 reply"
+
+                                                n ->
+                                                    String.fromInt n ++ " replies"
+                                            )
+                                        ]
+                                    ]
+                            , div [ class "onyx-thread-replies", attribute "role" "log", attribute "aria-label" ("Thread replies to message " ++ String.fromInt panel.parentId) ]
                                 [ if List.isEmpty replies then
                                     p [ class "onyx-thread-state", attribute "role" "status" ]
                                         [ text "No replies loaded yet." ]
@@ -706,18 +846,49 @@ threadPanelDialog model =
                                                     [ class "onyx-thread-msg"
                                                     , attribute "aria-label" ("Thread reply: " ++ App.messageAccessibleLabel msg)
                                                     ]
-                                                    [ div [ class "onyx-thread-msg-meta" ]
-                                                        [ span [ class "onyx-thread-msg-from" ] [ text msg.from ]
+                                                    [ threadMsgFace msg
+                                                    , div [ class "onyx-thread-msg-meta" ]
+                                                        [ span [ class "onyx-thread-msg-from", style "color" (Avatar.nickTint msg.from) ] [ text msg.from ]
                                                         , time [ datetime (App.millisToIso (toFloat msg.at)), attribute "aria-hidden" "true" ]
                                                             [ text (App.formatRowClock model.zone model.prefs.clock msg.at) ]
                                                         ]
                                                     , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody msg) ]
                                                     ]
                                             )
-                                            replies
+                                            (List.reverse replies)
                                         )
                                 ]
+                            , case parent of
+                                Just par ->
+                                    case par.msgid of
+                                        Just _ ->
+                                            if par.deleted || par.redacted then
+                                                text ""
+
+                                            else
+                                                div [ class "onyx-thread-foot" ]
+                                                    [ button
+                                                        [ type_ "button"
+                                                        , class "onyx-thread-reply"
+                                                        , onClick (App.ThreadReplyParent { channel = panel.channel, parentId = panel.parentId })
+                                                        ]
+                                                        [ icon "reply", span [] [ text "Reply" ] ]
+                                                    ]
+
+                                        Nothing ->
+                                            text ""
+
+                                Nothing ->
+                                    text ""
                             ]
+
+
+{-| A thread row's face (the transcript's small avatar, decorative —
+the row's accessible label already names the author). -}
+threadMsgFace : App.ChatMessage -> Html Msg
+threadMsgFace msg =
+    span [ class "onyx-thread-msg-face", attribute "aria-hidden" "true", style "--nick-tint" (Avatar.nickTint msg.from) ]
+        [ Avatar.view { name = msg.from, owner = False, size = Avatar.Sm, extraClass = "", hidden = True } ]
 
 
 {-| Named-conversation filter chips (mirroring
@@ -804,8 +975,12 @@ topicTools model channel =
                         Nothing ->
                             "Follow room"
         in
-        div [ class "onyx-topic-tools" ]
-            [ Html.form [ class "shell-topic-create", onSubmit (App.TopicCreateSubmit channel.name) ]
+        -- v3/ui-messages: progressive disclosure — the tools fold into
+        -- one quiet "Topics" line at the top of the history.
+        Html.node "details"
+            [ class "onyx-topic-tools" ]
+            [ Html.node "summary" [ class "onyx-topic-tools-toggle" ] [ icon "hash", span [] [ text "Topics" ] ]
+            , Html.form [ class "shell-topic-create", onSubmit (App.TopicCreateSubmit channel.name) ]
                 [ label [ class "sr-only", for "shell-topic-create-input" ] [ text "New topic" ]
                 , input
                     [ id "shell-topic-create-input"
@@ -1439,7 +1614,11 @@ messageMenuPanel model target m =
                                 , attribute "aria-label" ("More actions for " ++ actionTarget)
                                 , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) (menuEscapeDecoder model))
                                 ]
-                            (List.filterMap identity
+                            (div [ class "onyx-msg-menu-head", attribute "aria-hidden" "true" ]
+                                [ span [ class "onyx-msg-menu-head-from" ] [ text m.from ]
+                                , span [ class "onyx-msg-menu-head-text" ] [ text (clippedReplyPreview (App.displayBody m)) ]
+                                ]
+                                :: List.filterMap identity
                                 [ if caps.canReply then
                                     Just
                                         (menuItem ("Reply to " ++ m.from)
@@ -1992,18 +2171,20 @@ boostBar ourNick prefs target m =
         summary =
             App.summarizeBoosts groups prefs.reactionDensity
 
-        -- v3/boost: the oracle `onAdd` arm — a row with a msgid
-        -- offers the reaction picker even with no boosts yet
-        -- (hidden under counts-only density like the oracle).
+        -- v3/boost: the oracle `onAdd` arm (hidden under counts-only
+        -- density like the oracle). v3/ui-messages: the empty-row arm
+        -- moved into the row's quick actions ("Add a boost"), so the
+        -- bar only exists once a row has boosts, and its trailing pill
+        -- adds another one.
         addable =
             case m.msgid of
                 Just _ ->
-                    prefs.reactionDensity /= Prefs.ReactionCountsOnly
+                    prefs.reactionDensity /= Prefs.ReactionCountsOnly && not (m.deleted || m.redacted)
 
                 Nothing ->
                     False
     in
-    if summary.hidden || ((List.isEmpty summary.chips && summary.overflow <= 0) && not addable) then
+    if summary.hidden || (List.isEmpty summary.chips && summary.overflow <= 0) then
         text ""
 
     else
@@ -2022,10 +2203,11 @@ boostBar ourNick prefs target m =
                             [ button
                                 [ type_ "button"
                                 , class "boost-pill boost-add"
-                                , attribute "aria-label" "Add a boost"
+                                , attribute "aria-label" "Add another boost"
+                                , attribute "title" "Add a boost"
                                 , onClick (App.ReactionPickerOpen { target = target, msgid = msgid })
                                 ]
-                                [ text "＋" ]
+                                [ icon "react" ]
                             ]
 
                         _ ->
@@ -2097,8 +2279,9 @@ sender plus the sanitized preview clipped to 80 chars). -}
 replyContext : App.ReplyRef -> Html Msg
 replyContext ref =
     div [ class "shell-msg-reply", attribute "aria-label" ("Replying to " ++ ref.from) ]
-        [ span [ class "shell-msg-reply-from" ] [ text ref.from ]
-        , span [] [ text (clippedReplyPreview ref.text) ]
+        [ icon "reply"
+        , span [ class "shell-msg-reply-from" ] [ text ref.from ]
+        , span [ class "shell-msg-reply-text" ] [ text (clippedReplyPreview ref.text) ]
         ]
 
 
@@ -2339,7 +2522,7 @@ mediaLightboxDialog model =
                             , attribute "aria-label" "Close"
                             , onClick App.MediaLightboxClose
                             ]
-                            [ text "×" ]
+                            [ icon "x" ]
                         ]
                     ]
                 ]
