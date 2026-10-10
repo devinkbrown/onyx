@@ -44,8 +44,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  min-height: var(--target-min);
-  padding: 0 clamp(16px, 5vw, 48px);
+  min-height: 56px;
+  padding: env(safe-area-inset-top) clamp(16px, 5vw, 48px) 0;
   font-size: var(--text-sm);
   color: var(--onyx-dim);
   background: var(--onyx-bg);
@@ -65,10 +65,11 @@
 
 .ap-bar a:hover { color: var(--onyx-text); }
 
-/* Current location: the one accent in the bar. */
+/* Page title: weight, not the accent (the accent marks actions). */
 .ap-tag {
-  color: var(--onyx-accent);
-  font-weight: 600;
+  color: var(--onyx-text);
+  font-size: var(--text-md);
+  font-weight: 700;
 }
 
 .ap-wrap {
@@ -231,35 +232,55 @@
 
 /* ── 3. Switch rows (privacy, motion) ──────────────────────────────── */
 
+/* iOS-style inset grouped list: one rounded group, hairline separators
+   inset from the leading edge, the switch at the trailing edge. */
 .ap-choice-toggles {
-  display: grid;
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 34rem;
   min-width: 0;
+  overflow: hidden;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 10px;
 }
 
 .ap-choice-toggle {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   width: 100%;
-  min-height: var(--target-min);
+  min-height: 52px;
   padding: var(--space-3) var(--space-4);
   font: inherit;
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--onyx-text);
   text-align: left;
-  background: var(--onyx-panel);
-  border: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-fast) var(--ease);
 }
 
-.ap-choice-toggle:hover { border-color: var(--onyx-faint); }
+.ap-choice-toggle + .ap-choice-toggle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--space-4);
+  border-top: 1px solid var(--onyx-line);
+}
+
+@media (hover: hover) { .ap-choice-toggle:hover { background: color-mix(in oklab, var(--onyx-panel-2) 60%, transparent); } }
+.ap-choice-toggle:active { background: var(--onyx-panel-2); }
+.ap-choice-toggle:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -2px; }
 
 .ap-choice-toggle > span { min-width: 0; overflow-wrap: anywhere; }
 
@@ -272,26 +293,47 @@
   color: var(--onyx-dim);
 }
 
-/* On/Off readout: a neutral pill — weight + ground carry the state. */
+/* On/Off readout drawn as a switch (track + knob). The text stays in
+   the DOM; role=switch + aria-checked carry the state to AT. Monochrome:
+   "on" is the bright track, never the accent. */
 .ap-choice-toggle > b {
+  position: relative;
   justify-self: end;
-  min-width: 3rem;
-  padding: 2px var(--space-2);
-  font-size: var(--text-xs);
-  font-weight: 650;
-  letter-spacing: var(--tracking-kicker);
-  text-align: center;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--onyx-faint);
+  flex: none;
+  width: 51px;
+  height: 31px;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
   border-radius: var(--r-pill);
 }
-
+.ap-choice-toggle > b::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: var(--onyx-dim);
+  box-shadow: 0 1px 3px color-mix(in oklab, #000 40%, transparent);
+}
 .ap-choice-toggle[aria-checked='true'] > b {
-  color: var(--onyx-text);
-  background: var(--onyx-panel-2);
-  border-color: var(--onyx-dim);
+  background: var(--onyx-text);
+  border-color: var(--onyx-text);
+}
+.ap-choice-toggle[aria-checked='true'] > b::after { transform: translateX(20px); background: var(--onyx-bg); }
+@media (forced-colors: active) {
+  .ap-choice-toggle > b { border-color: ButtonText; }
+  .ap-choice-toggle > b::after { background: ButtonText; forced-color-adjust: none; }
+  .ap-choice-toggle[aria-checked='true'] > b { background: Highlight; forced-color-adjust: none; }
+  .ap-choice-toggle[aria-checked='true'] > b::after { background: HighlightText; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ap-choice-toggle > b,
+  .ap-choice-toggle > b::after { transition: transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease); }
 }
 
 /* ── 4. Local language tools ───────────────────────────────────────── */
@@ -1700,8 +1742,16 @@
 
 /* ── 16. Late additions: bar links, choice rows, stage seam ───────── */
 
-.ap-back { font-weight: 600; color: var(--onyx-text); }
-.ap-home { color: var(--onyx-dim); }
+.ap-back { gap: var(--space-1); font-weight: 600; color: var(--onyx-text); }
+.ap-back-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 6l-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 6l-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.ap-home { color: var(--onyx-dim); font-weight: 600; }
 
 /* Text size / density / layout / clock: short, equal-width choices. */
 .ap-chips--choices .ap-chip { min-width: 6.5rem; justify-content: center; }
@@ -1714,4 +1764,21 @@
 @media (max-width: 480px) {
   .ap-chips--choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); }
   .ap-chips--choices .ap-chip { min-width: 0; }
+}
+
+/* ── 17. Touch (iOS) ───────────────────────────────────────────────── */
+
+.ap :where(a, button, summary, select, input, label) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ap :is(.ap-chip, .ap-theme-chip, .ts-theme-chip, .background-picker__card, .ts-scheme-toggle__btn, .ts-studio .onyx-button,
+  .ts-studio .onyx-tabs__trigger, .ts-audit__fix):active { background: var(--onyx-panel-2); }
+.ap .ap-bar a:active { color: var(--onyx-text); }
+
+@media (max-width: 768px), (pointer: coarse) {
+  /* 16px inputs: iOS Safari never zooms on focus; the shell's
+     --kb-inset keeps a focused field above the keyboard. */
+  .ap :is(select, input:not([type='range']):not([type='color'])),
+  .ap .ap-translation-target select,
+  .ts-save-input,
+  .ts-studio .onyx-field__input { font-size: max(1rem, 16px); scroll-margin-bottom: calc(120px + var(--kb-inset, 0px)); }
+  .ap-bar a { min-height: var(--target-min); }
 }

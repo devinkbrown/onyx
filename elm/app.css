@@ -1858,77 +1858,127 @@ html, body {
   color: var(--shu-bright);
 }
 
-/* Connect gate (mirrors src/app/connect.css structure). */
+/* Connect gate (mirrors src/app/connect.css structure).
+   v3/ui-public: the front door. Desktop = one calm card centred on the
+   ground; phone (<=520px) = full-bleed column from the top, 48px fields
+   at 16px (no iOS zoom), and inputs keep the Join button in view when
+   the keyboard scrolls them (scroll-margin). */
 
 .conn {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: var(--space-6) var(--space-4);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: max(var(--space-8), env(safe-area-inset-top)) var(--space-5) max(var(--space-6), env(safe-area-inset-bottom));
   background: var(--onyx-bg);
   color: var(--onyx-text);
 }
 .conn-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
-  padding: 28px var(--space-6) var(--space-5);
+  border-radius: 10px;
+  box-shadow: var(--elev-2);
+  padding: 36px 40px 32px;
 }
-.conn-brand { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 18px; }
-.conn-brand-name { font-weight: 700; letter-spacing: 0.02em; }
-.conn-title { margin: 0 0 var(--space-1); font-size: var(--text-2xl); font-weight: 700; }
-.conn-body { margin: 0 0 18px; color: var(--onyx-dim); }
-.conn-form { display: flex; flex-direction: column; gap: var(--space-3); }
-.conn-field { display: flex; flex-direction: column; gap: var(--space-1); }
-.conn-label { font-size: var(--text-2xs); font-weight: 600; }
+.conn-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--target-min);
+  margin: -8px 0 var(--space-6) -4px;
+  padding: 0 4px;
+  color: var(--onyx-text);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+.conn-brand .conn-brand-mark { width: 32px; height: 32px; }
+.conn-brand-name { font-size: 1.125rem; font-weight: 700; letter-spacing: -0.01em; }
+.conn-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.conn-body { margin: var(--space-2) 0 var(--space-6); color: var(--onyx-dim); font-size: var(--text-md); line-height: var(--leading-body); }
+.conn-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.conn-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.conn-label { font-size: var(--text-sm); font-weight: 650; color: var(--onyx-text); }
 .conn-input {
+  width: 100%;
+  min-height: 48px;
   font: inherit;
+  font-size: 1rem;
   color: var(--onyx-text);
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
-  padding: 9px 10px;
+  padding: 0 14px;
+  scroll-margin-block: 96px 168px;
 }
-.conn-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 1px; }
+.conn-input::placeholder { color: var(--onyx-faint); opacity: 1; }
+.conn-input:hover:not(:disabled) { border-color: color-mix(in oklab, var(--onyx-dim) 45%, var(--onyx-line)); }
+.conn-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -1px; border-color: var(--onyx-accent); }
 .conn-input[aria-invalid="true"] { border-color: var(--onyx-bad); }
 .conn-input:disabled { opacity: 0.6; }
-.conn-hint { margin: 0; font-size: var(--text-2xs); color: var(--onyx-faint); }
-.conn-error { margin: 0; font-size: var(--text-2xs); color: var(--onyx-bad); }
+.conn-hint { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-faint); }
+.conn-error { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-bad); }
 .conn-link {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: calc(-1 * var(--space-2));
   background: none;
   border: 0;
   padding: 0;
   font: inherit;
-  font-size: var(--text-2xs);
-  color: var(--onyx-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--onyx-dim);
   cursor: pointer;
   text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
-.conn-strength { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-2xs); color: var(--onyx-dim); }
+.conn-link:hover:not(:disabled) { color: var(--onyx-text); }
+.conn-strength { display: flex; align-items: center; gap: var(--space-2); margin-top: calc(-1 * var(--space-2)); font-size: var(--text-2xs); color: var(--onyx-dim); }
 .conn-strength-bar { display: flex; gap: 3px; flex: 1; }
 .conn-strength-seg { flex: 1; height: 4px; border-radius: 2px; background: var(--onyx-line); }
 .conn-strength-on { background: var(--onyx-accent); }
 .conn-strength[data-score="1"] .conn-strength-on { background: var(--onyx-bad); }
 .conn-strength[data-score="2"] .conn-strength-on { background: var(--onyx-warn); }
-.conn-status { margin: 2px 0 0; min-height: 1.4em; font-size: var(--text-sm); color: var(--onyx-dim); }
+.conn-status { margin: calc(-1 * var(--space-1)) 0 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
+/* Idle copy repeats the lede: keep it for screen readers only. */
+.conn-status-idle { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .conn-status-error { color: var(--onyx-bad); }
 .conn-status-busy { color: var(--onyx-text); }
-.conn-actions { display: flex; gap: var(--space-2); }
+.conn-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .conn-submit {
   flex: 1;
+  min-height: 48px;
   font: inherit;
+  font-size: var(--text-md);
   font-weight: 700;
   color: var(--onyx-accent-ink);
   background: var(--onyx-accent);
   border: 0;
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 0 var(--space-4);
   cursor: pointer;
 }
-.conn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.conn-submit:hover:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 88%, var(--onyx-text)); }
+.conn-submit:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-submit:disabled {
+  color: color-mix(in oklab, var(--onyx-text) 50%, transparent);
+  background: color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2));
+  cursor: not-allowed;
+}
 .conn-cancel, .conn-alt-btn, .onyx-leave {
   font: inherit;
   color: var(--onyx-text);
@@ -1938,8 +1988,49 @@ html, body {
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
 }
-.conn-alt { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--onyx-line); }
-.conn-alt-title { width: 100%; margin: 0; font-size: var(--text-2xs); font-weight: 600; color: var(--onyx-faint); }
+.conn-cancel { min-height: 48px; padding: 0 var(--space-5); font-weight: 600; }
+.conn-alt { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--onyx-line); }
+.conn-alt-title { margin: 0 0 var(--space-3); font-size: var(--text-sm); font-weight: 600; color: var(--onyx-dim); }
+.conn-alt-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+.conn-alt-btn { min-height: var(--target-min); padding: 0 var(--space-3); background: transparent; font-weight: 650; }
+.conn-alt-btn:hover:not(:disabled) { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
+.conn-alt-btn:disabled { opacity: 0.5; cursor: default; }
+.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-brand:focus-visible, .conn-foot a:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--space-5); }
+.conn-foot a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  color: var(--onyx-faint);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.conn-foot a:hover { color: var(--onyx-text); }
+.conn :where(a, button, input, label) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.conn-submit:active:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 80%, var(--onyx-bg)); }
+.conn-alt-btn:active:not(:disabled), .conn-cancel:active { background: var(--onyx-panel-2); }
+.conn-link:active, .conn-foot a:active { color: var(--onyx-text); }
+@media (max-width: 520px) {
+  /* --kb-inset (written by the shell) lifts the column above the iOS
+     keyboard so the focused field and Join stay reachable. */
+  .conn { justify-content: flex-start; gap: var(--space-6); padding: max(var(--space-3), env(safe-area-inset-top)) 0 calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px)); }
+  .conn-input { scroll-margin-bottom: calc(168px + var(--kb-inset, 0px)); }
+  .conn-link { min-height: var(--target-min); }
+  .conn-card { max-width: none; padding: 0 var(--space-5); background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+  .conn-brand { margin: 0 0 var(--space-8) -4px; }
+  .conn-title { font-size: 2rem; }
+  .conn-foot { margin-top: auto; padding: 0 var(--space-5); }
+}
+@media (max-width: 520px) and (max-height: 600px) {
+  .conn-brand { margin-bottom: var(--space-3); }
+  .conn-title { font-size: 1.5rem; }
+  .conn-body { margin-bottom: var(--space-4); }
+  .conn-form { gap: var(--space-3); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .conn-input, .conn-submit, .conn-alt-btn, .conn-foot a { transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+}
 .onyx-leave { padding: var(--space-1) 10px; font-size: var(--text-2xs); }
 
 /* Rich message text (mirrors shell/message MessageText rules). */

@@ -203,7 +203,7 @@ feedTimeline model state stateKey =
                 [ span [ class "label" ] [ text "Signal path" ]
                 , h2 [ id "stats-feed-timeline-heading" ] [ text "Three checks before a claim" ]
                 ]
-            , p [ class "stats-feed-cadence" ] [ span [ attribute "aria-hidden" "true" ] [ text "↻" ], text " auto-check · 30 sec" ]
+            , p [ class "stats-feed-cadence" ] [ span [ class "pub-refresh", attribute "aria-hidden" "true" ] [], text " auto-check · 30 sec" ]
             ]
         , ol [ class "stats-feed-timeline-list", attribute "aria-label" "Public stats feed checks" ]
             (List.map
@@ -403,7 +403,7 @@ overviewSection model state _ =
                             ]
                         , div [ class "r-cta" ]
                             [ a [ class "r-btn primary", href (Stats.roomDeepLink room.channel room.lastActive) ]
-                                [ text "Join the conversation ", span [ attribute "aria-hidden" "true" ] [ text "→" ] ]
+                                [ text "Join the conversation ", span [ class "pub-arrow", attribute "aria-hidden" "true" ] [] ]
                             ]
                         ]
             ]
@@ -438,7 +438,7 @@ inspectorSection model =
 
               else
                 a [ class "r-btn primary stats-inspector-open", href (Stats.roomDeepLink room 0) ]
-                    [ text "Open room ", span [ attribute "aria-hidden" "true" ] [ text "→" ] ]
+                    [ text "Open room ", span [ class "pub-arrow", attribute "aria-hidden" "true" ] [] ]
             ]
         , case statsMatchingDetail model of
             Nothing ->
