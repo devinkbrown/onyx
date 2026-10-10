@@ -2239,3 +2239,63 @@ html, body {
 }
 
 .onyx-composer .shell-composer-tool--emoji[aria-expanded="true"] { border-color: var(--onyx-accent); color: var(--onyx-text); }
+
+/* Boost bar (mirrors src/shell/BoostBar.css): quiet pill row under rows. */
+.boost-bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; max-width: 100%; }
+.boost-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: inherit; font-size: 12px; color: var(--onyx-text);
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 6px;
+  padding: 2px 8px; cursor: pointer; max-width: 100%;
+}
+.boost-pill.you { border-color: var(--onyx-accent); }
+.boost-emoji { line-height: 1; }
+.boost-count { color: var(--onyx-dim); }
+.boost-pill--more, .boost-pill--summary { cursor: default; }
+.boost-add { color: var(--onyx-dim); }
+
+/* Jump-to-date sheet (mirrors src/shell/JumpToDateSheet.css): centered
+   dialog over a dim veil; single-column fields fit 375px widths. */
+.onyx-jump-veil {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(4, 6, 9, 0.72);
+}
+.onyx-jump-backdrop { position: fixed; inset: 0; }
+.jump-to-date-sheet {
+  position: relative; width: min(400px, 100%); max-height: calc(100vh - 32px); overflow-y: auto;
+  background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: 6px; padding: 20px;
+}
+.jump-to-date-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.jump-to-date-title { margin: 0; font-size: 16px; }
+.jump-to-date-close {
+  font: inherit; color: var(--onyx-dim); background: none;
+  border: 1px solid var(--onyx-line); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+}
+.jump-to-date__description, .jump-to-date__hint { font-size: 13px; color: var(--onyx-dim); margin: 0 0 12px; }
+.jump-to-date__empty, .jump-to-date__notice { font-size: 13px; color: var(--onyx-text); margin: 0 0 12px; }
+.jump-to-date__presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.jump-to-date__preset {
+  font: inherit; font-size: 13px; color: var(--onyx-text);
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 6px;
+  padding: 6px 12px; cursor: pointer;
+}
+.jump-to-date__fields { display: grid; gap: 12px; margin-bottom: 12px; }
+.jump-to-date__field label { display: block; font-size: 12px; font-weight: 600; color: var(--onyx-dim); margin-bottom: 6px; }
+.jump-to-date__field input {
+  width: 100%; font: inherit; color: var(--onyx-text); color-scheme: dark;
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 6px; padding: 8px 10px;
+}
+.jump-to-date__field .jump-to-date__hint { margin: 6px 0 0; font-size: 12px; }
+.jump-to-date__error { font-size: 13px; color: var(--onyx-bad); margin: 0 0 12px; }
+.jump-to-date__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jump-to-date__jump {
+  font: inherit; font-weight: 600; color: var(--onyx-accent-ink);
+  background: var(--onyx-accent); border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer;
+}
+.jump-to-date__jump:disabled, .jump-to-date__copy:disabled { opacity: 0.45; cursor: not-allowed; }
+.jump-to-date__copy {
+  font: inherit; color: var(--onyx-text); background: none;
+  border: 1px solid var(--onyx-line); border-radius: 6px; padding: 8px 14px; cursor: pointer;
+}
+.jump-to-date__ledger { font-size: 13px; color: var(--onyx-dim); }

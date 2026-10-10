@@ -61,6 +61,9 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | **done** (v3/composer; More tools tray still todo) |
 | 2.5 | "Add a boost" on the boost bar | `BoostBar` | S |
 | 2.6 | Jump to date + time scrubber | `JumpToDateSheet`, `TimeScrubber` | M |
+| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | M |
+| 2.5 | "Add a boost" on the boost bar | `BoostBar` | **done** (`boost` slice: ＋ opener per row into the existing reaction picker) |
+| 2.6 | Jump to date sheet (time scrubber stays todo) | `JumpToDateSheet` (+ `TimeScrubber` ahead) | **done** (`boost` slice: sheet + topbar entry over `requestTravelTo`; no scrubber yet) |
 | 2.7 | Catch-up: "Since you left" digest, mark caught up | `CatchUpSummary`, `SinceDigestCard` | M |
 | 2.8 | BlockKit structured-action modal + send review | `message/BlockKitModal` | M |
 | 2.9 | Local edit-history view, context trail | `MessageView` | M |
@@ -127,6 +130,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 2.1–2.3 rich message text (links, mentions, channel jump, mIRC, code, quote, spoiler, emoji) landed.
 - 2026-10-10 — Phase 3.3 + 4.2 (keywords/ignored/DND) notification settings landed (`v3/notify`).
 - 2026-10-10 — Phase 1.1–1.3 primary navigation (rail + bottom bar), You hub for guests and accounts, Appearance link landed (v3/nav).
+- 2026-10-10 — Phase 2.5–2.6 boost slice landed (Add-a-boost opener + jump-to-date sheet over `requestTravelTo`; time scrubber stays todo).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 

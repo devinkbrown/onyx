@@ -43,6 +43,7 @@ topbar model =
         , pinsToggle model
         , mediaToggle model
         , notifySheetButton model
+        , jumpToggle model
         , div
             [ classList
                 [ ( "onyx-conn", True )
@@ -135,6 +136,21 @@ mediaToggle model =
         , onClick MediaIndexOpen
         ]
         [ text "Media" ]
+
+
+{-| Jump-to-date toggle (the discoverable time-travel entry in the
+oracle: channel-gated, opening the date sheet for the active
+conversation). -}
+jumpToggle : Model -> Html Msg
+jumpToggle model =
+    button
+        [ class "onyx-jump-toggle"
+        , attribute "aria-label" "Jump to date"
+        , attribute "data-testid" "topbar-jump-to-date"
+        , disabled (model.activeChannel == Nothing)
+        , onClick JumpToDateOpen
+        ]
+        [ text "Jump" ]
 
 
 {-| Own identity chip: the current nick, an `alias` badge while the
