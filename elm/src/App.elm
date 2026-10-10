@@ -2773,6 +2773,7 @@ type Msg
     | EditCancel
     | ZoneReceived Time.Zone
     | ChannelSelect String
+    | ChannelLinkClicked String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
     | PinnedMessagesOpen
@@ -37363,6 +37364,28 @@ updateCore msg model =
 
                                             else
                                                 sendComposerText sending target
+
+        ChannelLinkClicked raw ->
+            -- A `#channel` link in a message body (mirrors the oracle
+            -- `navigate({ kind: 'channel' })`): a known room opens; an
+            -- unknown, valid one joins and opens on the self-JOIN echo
+            -- through the pending-join triple. Offline or invalid names
+            -- do nothing.
+            case parseDeepLinkJoin raw of
+                Nothing ->
+                    ( model, [] )
+
+                Just channel ->
+                    if Dict.member (String.toLower channel) model.channels then
+                        updateCore (ChannelSelect channel) model
+
+                    else if model.connection /= Live then
+                        ( model, [] )
+
+                    else
+                        ( { model | pendingDeepLinkJoin = Just channel }
+                        , [ SendLine (Wire.formatIrcLine "JOIN" [ channel ]) ]
+                        )
 
         ChannelSelect name ->
             -- A context switch dismisses the message menu and its

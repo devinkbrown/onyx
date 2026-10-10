@@ -19,6 +19,7 @@ import Prefs
 import Time
 import Translate
 import Upload
+import View.MessageText exposing (messageText)
 
 
 thread : Model -> Html Msg
@@ -1914,7 +1915,7 @@ messageBody model m =
         Nothing ->
             []
     )
-        ++ [ text presented.caption ]
+        ++ [ messageText model.ourNick presented.caption ]
         ++ List.map (attachmentCard model m) presented.attachments
         ++ mediaUnfurls model m presented
         ++ [ previewCard model m (App.displayBody m) ]

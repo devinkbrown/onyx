@@ -1767,3 +1767,33 @@ html, body {
 .conn-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--onyx-line); }
 .conn-alt-title { width: 100%; margin: 0; font-size: 12px; font-weight: 600; color: var(--onyx-faint); }
 .onyx-leave { padding: 4px 10px; font-size: 12px; }
+
+/* Rich message text (mirrors shell/message MessageText rules). */
+
+.shell-msg-text { white-space: normal; overflow-wrap: anywhere; }
+.shell-msg-link { color: var(--onyx-accent); text-decoration: underline; text-underline-offset: 2px; }
+.shell-msg-mention { color: var(--lapis-bright); font-weight: 600; }
+.shell-msg-mention--self { color: var(--onyx-accent-ink); background: var(--onyx-accent); border-radius: 3px; padding: 0 3px; }
+.shell-msg-channel-link {
+  font: inherit; color: var(--onyx-accent); background: none; border: 0; padding: 0; cursor: pointer;
+  text-decoration: underline dotted; text-underline-offset: 2px;
+}
+.shell-msg-text code {
+  font-family: var(--font-mono); font-size: 0.92em;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 4px; padding: 0 4px;
+}
+.shell-msg-codeblock {
+  position: relative; margin: 6px 0; padding: 10px 12px; overflow-x: auto; max-width: 100%;
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 6px;
+}
+.shell-msg-codeblock code { background: none; border: 0; padding: 0; white-space: pre; }
+.shell-msg-codeblock-lang { position: absolute; top: 4px; right: 8px; font-size: 11px; color: var(--onyx-faint); }
+.shell-msg-blockquote { margin: 4px 0; padding: 2px 0 2px 10px; border-left: 3px solid var(--onyx-line); color: var(--onyx-dim); }
+.shell-msg-spoiler { display: inline; }
+.shell-msg-spoiler > summary {
+  display: inline; list-style: none; cursor: pointer;
+  background: var(--onyx-panel-2); color: var(--onyx-faint); border-radius: 3px; padding: 0 4px; font-size: 0.85em;
+}
+.shell-msg-spoiler > summary::-webkit-details-marker { display: none; }
+.shell-msg-spoiler[open] > summary { display: none; }
+.shell-msg-emoji { font-size: 1.1em; }
