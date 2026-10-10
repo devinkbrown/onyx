@@ -2410,6 +2410,7 @@
         var caps = voiceCapabilities();
         if (!has("shareSupported")) snapshot.shareSupported = caps.shareSupported;
         if (!has("pipSupported")) snapshot.pipSupported = caps.pipSupported;
+        if (!has("cameraSupported")) snapshot.cameraSupported = caps.cameraSupported;
       }
       try {
         if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(snapshot);

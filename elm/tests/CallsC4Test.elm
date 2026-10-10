@@ -93,7 +93,17 @@ inCall : Model
 inCall =
     base
         |> withRoster [ "odalys", "mara", "jun" ]
-        |> step (snapshot [ ( "shareSupported", Encode.bool True ), ( "pipSupported", Encode.bool True ) ])
+        |> step (snapshot [ ( "shareSupported", Encode.bool True ), ( "pipSupported", Encode.bool True ), ( "cameraSupported", Encode.bool True ) ])
+
+
+{-| Idle, but the engine has said video is on. -}
+videoOn : Model -> Model
+videoOn model =
+    let
+        local =
+            model.callLocal
+    in
+    { model | callLocal = { local | cameraSupported = True } }
 
 
 step : Msg -> Model -> Model
@@ -203,7 +213,26 @@ commands =
                     ()
         , test "join with video starts with the camera intent" <|
             \_ ->
-                Expect.equal True (step (CallJoin { channel = "#harbor", video = True }) base).callLocal.camera
+                Expect.equal True (step (CallJoin { channel = "#harbor", video = True }) (videoOn base)).callLocal.camera
+        -- Video is switched off on the live network: the camera is never
+        -- assumed. A fresh client offers no camera, a stray video join
+        -- starts voice-only, and joining never re-enables the flag.
+        , test "camera fails closed until the engine reports video" <|
+            \_ ->
+                let
+                    joined =
+                        step (CallJoin { channel = "#harbor", video = True }) base
+
+                    live =
+                        base |> withRoster [ "odalys", "mara", "jun" ] |> step (snapshot [])
+                in
+                Expect.all
+                    [ \_ -> Expect.equal False base.callLocal.cameraSupported
+                    , \_ -> Expect.equal False joined.callLocal.camera
+                    , \_ -> Expect.equal False joined.callLocal.cameraSupported
+                    , \_ -> query live |> Query.findAll [ testid "camera-button" ] |> Query.count (Expect.equal 0)
+                    ]
+                    ()
         -- v3/calls-engine: iPhone/iPad WebKit report shareSupported = False;
         -- the phone path to Share (More) must then not offer it at all.
         , test "share unavailable: More menu does not offer Share" <|

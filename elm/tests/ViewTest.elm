@@ -3855,11 +3855,18 @@ suite =
             , test "idle hub with an open room offers voice and video join" <|
                 \_ ->
                     let
+                        local =
+                            blank.callLocal
+
                         q =
-                            query { blank | callsOpen = True, activeChannel = Just "#room" }
+                            query { blank | callsOpen = True, activeChannel = Just "#room", callLocal = { local | cameraSupported = True } }
                     in
                     Expect.all
                         [ \_ ->
+                            query { blank | callsOpen = True, activeChannel = Just "#room" }
+                                |> Query.findAll [ Selector.tag "button", Selector.containing [ Selector.text "Join with video in #room" ] ]
+                                |> Query.count (Expect.equal 0)
+                        , \_ ->
                             q
                                 |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Join call in #room" ] ]
                                 |> Event.simulate Event.click

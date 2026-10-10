@@ -115,7 +115,7 @@ blankLocal =
     , deafened = False
     , shareSupported = False
     , pipSupported = False
-    , cameraSupported = True
+    , cameraSupported = False
     , shareStatus = ""
     , tier = Nothing
     }
@@ -222,8 +222,10 @@ decodeLocal lifecycle raw prev =
         pipSupported =
             flag "pipSupported" prev.pipSupported
 
-        -- Absent keeps the previous value (default True: older bridges);
-        -- the engine reports False while video is switched off.
+        -- Absent keeps the previous value. Fails closed (default False):
+        -- the camera is offered only once the engine says video is on
+        -- (ports.js `voiceCapabilities`); it reports False while video
+        -- is switched off on the live network.
         cameraSupported =
             flag "cameraSupported" prev.cameraSupported
     in

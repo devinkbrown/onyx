@@ -41199,7 +41199,7 @@ updateCore msg model =
                     | callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8: the stored pref
                     , callJoinTarget = Just channel
                     -- v3/calls-c4: camera intent from the join verb.
-                    , callLocal = { blankCallLocal | camera = video, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported }
+                    , callLocal = { blankCallLocal | camera = video && model.callLocal.cameraSupported, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported, cameraSupported = model.callLocal.cameraSupported }
                     , callMoreOpen = False
                     , callPrivacyOpen = False
                   }
