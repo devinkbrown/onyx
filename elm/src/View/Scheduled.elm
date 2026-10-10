@@ -48,18 +48,10 @@ scheduledSheet model =
             , modal = True
             , attrs = []
             }
-                [ div [ class "onyx-scheduled-head" ]
-                    [ span [ class "onyx-scheduled-title" ] [ text "Scheduled messages" ]
-                    , button
-                        [ type_ "button"
-                        , class "onyx-scheduled-close"
-                        , attribute "aria-label" "Close scheduled messages"
-                        , onClick (SetShowScheduledMessages False)
-                        ]
-                        [ text "×" ]
-                    ]
-                , p [ class "onyx-scheduled-desc" ]
-                    [ text "Messages waiting to send. They are kept on this device and send when their time arrives and you are connected." ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "scheduled", title = "Scheduled messages", closeLabel = "Close scheduled messages", onClose = SetShowScheduledMessages False }
+                        |> (\h -> { h | closeClass = "onyx-scheduled-close", subtitle = Just "Kept on this device. Each one sends when its time arrives and you are connected." })
+                    )
                 , if List.isEmpty rows then
                     p [ class "onyx-scheduled-empty" ]
                         [ strong [] [ text "No scheduled messages." ]

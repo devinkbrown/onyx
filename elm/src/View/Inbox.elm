@@ -1,4 +1,4 @@
-module View.Inbox exposing (inbox)
+module View.Inbox exposing (inbox, inboxSheet)
 
 {-| Notification inbox — the mentions/messages bell with an unread
 badge and a filterable newest-first popover (mirroring
@@ -9,6 +9,11 @@ mark-all-read).
 
 Focus-trap/Escape handling stays with the ports layer's DOM concerns;
 follow-topic pins stay ahead (the room opens without the topic jump).
+
+v3/ui-sheets — the bell stays in the top bar; the panel itself is a
+`View.Sheet` popover mounted with the other overlays (`inboxSheet`):
+top-right under the bar on desktop, a bottom sheet on phones, with the
+shared light-dismiss veil, focus scope and Escape.
 -}
 
 import App exposing (InboxFilter(..), InboxNotification, Model, Msg(..), NotificationType(..), isAttentionNotification, notificationContext, notificationKindGlyph, notificationKindLabel, unreadAttentionCount)
@@ -16,6 +21,7 @@ import Html exposing (Html, button, div, li, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, disabled)
 import Html.Events exposing (onClick)
 import Set
+import View.Sheet as Sheet
 
 
 inbox : Model -> Html Msg
@@ -25,9 +31,17 @@ inbox model =
             unreadAttentionCount model
     in
     div [ class "shell-ribbon-inbox" ]
-        ([ button
+        [ button
             [ class "shell-ribbon-bell"
             , attribute "data-testid" "inbox-bell"
+            , attribute "aria-haspopup" "dialog"
+            , attribute "aria-expanded"
+                (if model.showNotificationCenter then
+                    "true"
+
+                 else
+                    "false"
+                )
             , attribute "aria-label"
                 (if unread > 0 then
                     "Notifications, " ++ String.fromInt unread ++ " unread"
@@ -37,7 +51,7 @@ inbox model =
                 )
             , onClick NotificationCenterOpened
             ]
-            ([ span [ attribute "aria-hidden" "true" ] [ text "🔔" ] ]
+            ([ span [ class "shell-ribbon-bell-icon", attribute "aria-hidden" "true" ] [] ]
                 ++ (if unread > 0 then
                         [ span [ class "shell-ribbon-badge", attribute "data-testid" "inbox-badge" ]
                             [ text (String.fromInt unread) ]
@@ -47,14 +61,17 @@ inbox model =
                         []
                    )
             )
-         ]
-            ++ (if model.showNotificationCenter then
-                    [ inboxPanel model ]
+        ]
 
-                else
-                    []
-               )
-        )
+
+{-| The open inbox, mounted in the shell overlays. -}
+inboxSheet : Model -> Html Msg
+inboxSheet model =
+    if model.showNotificationCenter then
+        inboxPanel model
+
+    else
+        text ""
 
 
 inboxPanel : Model -> Html Msg
@@ -69,12 +86,34 @@ inboxPanel model =
         count filter =
             List.length (List.filter (filterMatches filter) model.notifications)
     in
-    div [ class "notif-center", attribute "role" "dialog", attribute "aria-label" "Notification inbox", attribute "data-testid" "inbox-panel" ]
-        [ div [ class "notif-center__head" ]
-            [ span [ class "notif-center__title" ] [ text "Inbox" ]
-            , button [ class "notif-center__action", onClick NotificationsMarkedRead, disabled (List.isEmpty model.notifications) ] [ text "Mark all read" ]
-            , button [ class "notif-center__close", onClick NotificationCenterClosed, attribute "aria-label" "Close inbox" ] [ text "×" ]
-            ]
+    Sheet.view
+        { scope = "inbox"
+        , label = Sheet.Labelled "Notification inbox"
+        , onClose = NotificationCenterClosed
+        , placement = Sheet.Popover
+        , layerClass = "notif-center-layer"
+        , panelClass = "notif-center"
+        , backdropClass = ""
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "data-testid" "inbox-panel" ]
+        }
+        [ Sheet.headerWith
+            (Sheet.head { scope = "inbox", title = "Inbox", closeLabel = "Close inbox", onClose = NotificationCenterClosed }
+                |> (\h ->
+                        { h
+                            | actions =
+                                [ button
+                                    [ class "notif-center__action"
+                                    , attribute "type" "button"
+                                    , onClick NotificationsMarkedRead
+                                    , disabled (List.isEmpty model.notifications)
+                                    ]
+                                    [ text "Mark all read" ]
+                                ]
+                        }
+                   )
+            )
         , div [ class "notif-center__filters", attribute "role" "group", attribute "aria-label" "Inbox filters" ]
             [ filterButton model InboxAll "All" (count InboxAll)
             , filterButton model InboxAttention "Needs you" (count InboxAttention)
@@ -197,7 +236,7 @@ inboxRow model note =
             , attribute "data-notification-id" note.id
             , onClick (NotificationDismissed note.id)
             ]
-            [ text "×" ]
+            [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
         ]
 
 

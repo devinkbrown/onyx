@@ -128,7 +128,7 @@ sheet model =
     in
     Sheet.view
         { scope = "guest-claim"
-        , label = Sheet.Labelled "Keep this name"
+        , label = Sheet.LabelledBy (Sheet.titleId "guest-claim")
         , onClose = GuestClaimClose
         , placement = Sheet.Center
         , layerClass = "guest-claim-veil"
@@ -138,8 +138,10 @@ sheet model =
         , modal = True
         , attrs = [ attribute "data-testid" "guest-claim-sheet" ]
         }
-            [ p [ class "guest-claim-sheet__lede" ]
-                [ text "Create an account for the name you are using. You stay connected while it is set up." ]
+            [ Sheet.headerWith
+                (Sheet.head { scope = "guest-claim", title = "Keep this name", closeLabel = "Close keep this name", onClose = GuestClaimClose }
+                    |> (\h -> { h | subtitle = Just "Create an account for the name you are using. You stay connected while it is set up." })
+                )
             , if verifying then
                 verifyForm model busy
 
@@ -153,8 +155,8 @@ errorRow model =
     case claimErrorText model of
         Just err ->
             p [ class "guest-claim-sheet__error", attribute "role" "alert" ]
-                [ span [ attribute "aria-hidden" "true" ] [ text "⚠" ]
-                , text (" " ++ err)
+                [ span [ class "ui-icon ui-icon--alert", attribute "aria-hidden" "true" ] []
+                , text err
                 ]
 
         Nothing ->

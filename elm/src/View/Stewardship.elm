@@ -83,17 +83,10 @@ panelShell model view title body =
         , modal = True
         , attrs = [ attribute "data-testid" "steward-panel" ]
         }
-            ([ div [ class "onyx-steward-head" ]
-                [ span [ class "onyx-steward-title" ] [ text title ]
-                , span [ class "onyx-steward-room" ] [ text view.channel ]
-                , button
-                    [ class "onyx-steward-close"
-                    , attribute "aria-label" "Close Room care"
-                    , attribute "data-testid" "steward-close"
-                    , onClick StewardClose
-                    ]
-                    [ text "×" ]
-                ]
+            ([ Sheet.headerWith
+                (Sheet.head { scope = "steward", title = title, closeLabel = "Close Room care", onClose = StewardClose }
+                    |> (\h -> { h | kicker = Just view.channel, closeTestId = Just "steward-close" })
+                )
              ]
                 ++ body
             )

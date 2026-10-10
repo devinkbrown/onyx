@@ -58,20 +58,10 @@ sheet model =
         , modal = True
         , attrs = [ attribute "aria-describedby" "new-message-description" ]
         }
-            ([ div [ class "onyx-newmsg-header" ]
-                [ div [ class "onyx-newmsg-mark", attribute "aria-hidden" "true" ] [ text "✦" ]
-                , div []
-                    [ p [ class "onyx-newmsg-eyebrow" ] [ text "Private message" ]
-                    , h2 [ id "new-message-title" ] [ text "New conversation" ]
-                    ]
-                , button
-                    [ type_ "button"
-                    , class "onyx-newmsg-close"
-                    , attribute "aria-label" "Close new conversation"
-                    , onClick NewMessageClose
-                    ]
-                    [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
-                ]
+            ([ Sheet.headerWith
+                (Sheet.head { scope = "new-message", title = "New conversation", closeLabel = "Close new conversation", onClose = NewMessageClose }
+                    |> (\h -> { h | titleId = Just "new-message-title", kicker = Just "Private message" })
+                )
              , p [ id "new-message-description", class "onyx-newmsg-help" ]
                 [ text "Start a private conversation with someone on this server." ]
              ]

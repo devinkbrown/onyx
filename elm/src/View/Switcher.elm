@@ -119,7 +119,7 @@ paletteDialog model =
             , attribute "tabindex" "-1"
             ]
             [ div [ class "onyx-spotlight-search" ]
-                [ span [ class "onyx-spotlight-sigil", attribute "aria-hidden" "true" ] [ text "⌕" ]
+                [ span [ class "onyx-spotlight-sigil", attribute "aria-hidden" "true" ] []
                 , input
                     ([ id "onyx-spotlight-input"
                      , class "onyx-spotlight-input"
@@ -153,9 +153,11 @@ paletteDialog model =
                     , attribute "aria-label" "Close spotlight"
                     , onClick PaletteClose
                     ]
-                    [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
+                    [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
                 ]
-            , p [ class "onyx-spotlight-status", id "onyx-spotlight-status" ] [ text activeHint ]
+            , -- The input's description for screen readers; the
+              -- highlight already shows it, so it is visually hidden.
+              p [ class "onyx-spotlight-status sr-only", id "onyx-spotlight-status" ] [ text activeHint ]
             , div
                 [ id listboxId
                 , class "onyx-spotlight-results"
@@ -210,7 +212,12 @@ optionView active section ( index, matched ) =
         , preventDefaultOn "mousedown" (Decode.succeed ( PaletteHover index, True ))
         , onClick (PaletteRun index)
         ]
-        ([ span [ class "onyx-spotlight-icon", attribute "aria-hidden" "true" ] [ text (Switcher.sectionIcon section) ]
+        ([ span
+            [ class "onyx-spotlight-icon"
+            , attribute "data-icon" (String.toLower (Switcher.sectionLabel section))
+            , attribute "aria-hidden" "true"
+            ]
+            []
          , span [ class "onyx-spotlight-title" ]
             (List.map
                 (\( chunk, hit ) ->
@@ -281,19 +288,17 @@ shortcutsOverlay model =
             , modal = True
             , attrs = [ attribute "aria-describedby" "shortcuts-overlay-description" ]
             }
-                [ div [ class "onyx-shortcuts-header" ]
-                    [ h2 [ id "shortcuts-overlay-title" ] [ text "Keyboard shortcuts" ]
-                    , button
-                        [ type_ "button"
-                        , class "onyx-shortcuts-close"
-                        , attribute "aria-label" "Close keyboard shortcuts"
-                        , attribute "data-onyx-autofocus" "shortcuts"
-                        , onClick ShortcutsClose
-                        ]
-                        [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
-                    ]
-                , p [ id "shortcuts-overlay-description", class "onyx-shortcuts-description" ]
-                    [ text "A quick reference for moving through Onyx without leaving the keyboard." ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "shortcuts", title = "Keyboard shortcuts", closeLabel = "Close keyboard shortcuts", onClose = ShortcutsClose }
+                        |> (\h ->
+                                { h
+                                    | titleId = Just "shortcuts-overlay-title"
+                                    , subtitle = Just "A quick reference for moving through Onyx without leaving the keyboard."
+                                    , subtitleId = Just "shortcuts-overlay-description"
+                                    , closeAttrs = [ attribute "data-onyx-autofocus" "shortcuts" ]
+                                }
+                           )
+                    )
                 , div [ class "shortcuts-overlay", attribute "data-testid" "shortcuts-overlay" ]
                     (List.map groupSection Switcher.shortcutGroups)
                 ]

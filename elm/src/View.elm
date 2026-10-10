@@ -66,6 +66,7 @@ import View.Thread exposing (thread)
 import View.Account2
 import View.Toast exposing (toaster)
 import View.Nav
+import View.Inbox
 import View.Switcher
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
@@ -316,6 +317,7 @@ overlays model =
         , View.StageMode.leaveConfirm model
         , reclaimDialog model
         , View.Nav.youHub model
+        , View.Inbox.inboxSheet model -- v3/ui-sheets
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model

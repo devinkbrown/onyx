@@ -3657,8 +3657,9 @@ suite =
                     in
                     Expect.all
                         [ \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "create-room-formation") ] q
-                                |> Query.has [ Selector.text "Start a room" ]
+                            -- v3/ui-sheets: the sheet head titles the formation (no second title in the form).
+                            Query.find [ Selector.attribute (Attr.attribute "data-shortcut-scope" "start-room") ] q
+                                |> Query.has [ Selector.text "Start a room", Selector.attribute (Attr.attribute "data-testid" "create-room-formation") ]
                         , \_ ->
                             Query.findAll [ Selector.class "chb-skin" ] q
                                 |> Query.count (Expect.equal 3)

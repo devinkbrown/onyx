@@ -114,16 +114,10 @@ notifySheet model =
             , modal = True
             , attrs = [ attribute "data-testid" "notify-sheet" ]
             }
-                [ div [ class "notify-head" ]
-                    [ h2 [ class "notify-title", id (Sheet.titleId "notify") ] [ text "Notifications" ]
-                    , button
-                        [ attribute "type" "button"
-                        , class "notify-close"
-                        , attribute "aria-label" "Close notifications"
-                        , onClick NotifySheetClose
-                        ]
-                        [ text "✕" ]
-                    ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "notify", title = "Notifications", closeLabel = "Close notifications", onClose = NotifySheetClose }
+                        |> (\h -> { h | subtitle = Just "Alerts, sounds, quiet hours and the words that reach you." })
+                    )
                 , desktopSection model
                 , dndSection model
                 , keywordsSection model

@@ -155,13 +155,8 @@ sheetFrame frame body =
         , modal = True
         , attrs = [ attribute "data-testid" frame.testId ]
         }
-            (button
-                [ type_ "button"
-                , class "onyx-moddesk-close"
-                , attribute "aria-label" frame.closeLabel
-                , onClick frame.close
-                ]
-                [ span [ attribute "aria-hidden" "true" ] [ text "×" ] ]
+            (div [ class "onyx-moddesk-bar" ]
+                [ Sheet.closeButton { label = frame.closeLabel, onClose = frame.close, testId = Nothing, extraClass = "onyx-moddesk-close" } ]
                 :: body
             )
 
