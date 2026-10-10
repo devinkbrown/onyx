@@ -14,7 +14,7 @@ with the "Same page as Download" kicker.
 
 import App exposing (Model, Msg(..), downloadAvailabilityFor, downloadCatalogState, downloadCopyState, downloadShaFor, downloadShaLoading, isInstallPath)
 import Download
-import Html exposing (Html, a, article, aside, button, code, div, h1, h2, h3, h4, li, p, pre, section, span, strong, text, ul)
+import Html exposing (Html, a, article, aside, button, code, details, div, h1, h2, h3, h4, li, p, pre, section, span, strong, summary, text, ul)
 import Html.Attributes exposing (attribute, class, download, href, id)
 import Html.Events exposing (onClick)
 import View.PublicFrame exposing (frame)
@@ -64,7 +64,7 @@ view model =
                         , text " control. You get the same rooms, people, and calls — no store badge required."
                         ]
                     , p [] [ text "Safari on iPhone uses Add to Home Screen. Chrome, Edge, and other supporting browsers offer an install prompt once the app is open." ]
-                    , a [ class "r-btn primary", href "/app/" ] [ text "Join in the browser" ]
+                    , a [ class "r-btn ghost", href "/app/" ] [ text "Join in the browser" ]
                     ]
                 , aside [ class "dl-honesty", attribute "aria-labelledby" "honesty-heading" ]
                     [ h2 [ id "honesty-heading", class "dl-section-title" ] [ text "What this is — and is not" ]
@@ -236,7 +236,7 @@ laneCard model card =
             [ div [ class "dl-actions" ]
                 (if availability == Download.DlAvailable then
                     [ a
-                        [ class "r-btn primary"
+                        [ class "r-btn ghost"
                         , attribute "data-testid" ("dl-download-" ++ lane)
                         , href card.archiveUrl
                         , download card.archiveName
@@ -271,77 +271,90 @@ laneCard model card =
                         ]
                     ]
                 )
-            , div [ class "dl-checksum", attribute "data-testid" ("dl-checksum-" ++ lane) ]
-                [ span [ class "dl-checksum-label" ] [ text "SHA-256" ]
-                , if availability /= Download.DlAvailable then
-                    p [ class "dl-checksum-missing" ]
-                        [ text
-                            (if availability == Download.DlLoading then
-                                "Checksum will be checked after artifact availability is resolved."
-
-                             else if availability == Download.DlUnavailable then
-                                "No checksum is published because this artifact is unavailable."
-
-                             else
-                                "Checksum is unavailable because artifact availability could not be confirmed."
-                            )
-                        ]
-
-                  else
-                    case hash of
-                        Just h ->
-                            div [ class "dl-checksum-row" ]
-                                [ code [ class "dl-hash", attribute "data-testid" ("dl-hash-" ++ lane) ] [ text h ]
-                                , copyButton model ("hash-" ++ lane) "Copy"
-                                ]
-
-                        Nothing ->
-                            p [ class "dl-checksum-missing" ]
-                                [ text
-                                    (if shaLoading then
-                                        "Loading the published SHA-256 sidecar."
-
-                                     else
-                                        "The archive is published, but its SHA-256 sidecar is not currently available."
-                                    )
-                                ]
-                ]
-            , div [ class "dl-install" ]
-                [ h4 []
+            , details [ class "dl-more" ]
+                [ summary [ class "dl-more__summary" ]
                     [ text
                         (if card.hasInstallScript then
-                            "Install on " ++ card.osLabel
+                            "Checksum and install steps"
 
                          else
-                            "Use on " ++ card.osLabel
+                            "Checksum and steps"
                         )
                     ]
-                , pre [ class "dl-pre", attribute "data-testid" ("dl-install-" ++ lane) ] [ text steps ]
-                , copyButton model
-                    ("install-" ++ lane)
-                    (if card.hasInstallScript then
-                        "Copy install steps"
+                , div [ class "dl-more__body" ]
+                    [ div [ class "dl-checksum", attribute "data-testid" ("dl-checksum-" ++ lane) ]
+                        [ span [ class "dl-checksum-label" ] [ text "SHA-256" ]
+                        , if availability /= Download.DlAvailable then
+                            p [ class "dl-checksum-missing" ]
+                                [ text
+                                    (if availability == Download.DlLoading then
+                                        "Checksum will be checked after artifact availability is resolved."
 
-                     else
-                        "Copy steps"
-                    )
-                , if card.hasInstallScript then
-                    p [ class "dl-note" ]
-                        [ text "Root and network are required only when "
-                        , code [] [ text "install.sh" ]
-                        , text (" auto-installs system packages via " ++ Maybe.withDefault "" card.packageManager ++ ". Use ")
-                        , code [] [ text "--prefix" ]
-                        , text " and "
-                        , code [] [ text "--no-deps" ]
-                        , text " for a non-root tree. The script never curl-pipes remote code."
-                        ]
+                                     else if availability == Download.DlUnavailable then
+                                        "No checksum is published because this artifact is unavailable."
 
-                  else
-                    p [ class "dl-note" ]
-                        [ text "This package is "
-                        , strong [] [ text "unsigned" ]
-                        , text ". Extract and run from the package tree. Onyx does not claim codesign, notarization, virus-free status, or GUI launch verification for this lane."
+                                     else
+                                        "Checksum is unavailable because artifact availability could not be confirmed."
+                                    )
+                                ]
+
+                          else
+                            case hash of
+                                Just h ->
+                                    div [ class "dl-checksum-row" ]
+                                        [ code [ class "dl-hash", attribute "data-testid" ("dl-hash-" ++ lane) ] [ text h ]
+                                        , copyButton model ("hash-" ++ lane) "Copy"
+                                        ]
+
+                                Nothing ->
+                                    p [ class "dl-checksum-missing" ]
+                                        [ text
+                                            (if shaLoading then
+                                                "Loading the published SHA-256 sidecar."
+
+                                             else
+                                                "The archive is published, but its SHA-256 sidecar is not currently available."
+                                            )
+                                        ]
                         ]
+                    , div [ class "dl-install" ]
+                        [ h4 []
+                            [ text
+                                (if card.hasInstallScript then
+                                    "Install on " ++ card.osLabel
+
+                                 else
+                                    "Use on " ++ card.osLabel
+                                )
+                            ]
+                        , pre [ class "dl-pre", attribute "data-testid" ("dl-install-" ++ lane) ] [ text steps ]
+                        , copyButton model
+                            ("install-" ++ lane)
+                            (if card.hasInstallScript then
+                                "Copy install steps"
+
+                             else
+                                "Copy steps"
+                            )
+                        , if card.hasInstallScript then
+                            p [ class "dl-note" ]
+                                [ text "Root and network are required only when "
+                                , code [] [ text "install.sh" ]
+                                , text (" auto-installs system packages via " ++ Maybe.withDefault "" card.packageManager ++ ". Use ")
+                                , code [] [ text "--prefix" ]
+                                , text " and "
+                                , code [] [ text "--no-deps" ]
+                                , text " for a non-root tree. The script never curl-pipes remote code."
+                                ]
+
+                          else
+                            p [ class "dl-note" ]
+                                [ text "This package is "
+                                , strong [] [ text "unsigned" ]
+                                , text ". Extract and run from the package tree. Onyx does not claim codesign, notarization, virus-free status, or GUI launch verification for this lane."
+                                ]
+                        ]
+                    ]
                 ]
             ]
         ]

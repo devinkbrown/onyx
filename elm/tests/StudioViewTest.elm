@@ -69,7 +69,7 @@ suite =
             \_ ->
                 Expect.all
                     [ \q -> q |> Query.has [ Selector.attribute (Attr.attribute "data-testid" "theme-studio") ]
-                    , \q -> q |> Query.has [ Selector.text "// Theme Studio" ]
+                    , \q -> q |> Query.has [ Selector.text "Theme Studio" ]
                     , \q -> q |> Query.hasNot [ Selector.text "modified" ]
                     , \q -> q |> Query.hasNot [ Selector.class "ts-badge--modified" ]
                     ]
@@ -364,7 +364,7 @@ suite =
         , test "export busy and copied states relabel the button" <|
             \_ ->
                 Expect.all
-                    [ \q -> q |> Query.has [ Selector.text "[copying…]" ]
+                    [ \q -> q |> Query.has [ Selector.text "Copying…" ]
                     ]
                     (query { blank | studioExportBusy = True })
         , test "save opens the inline name row with keyboard commit" <|
@@ -454,7 +454,7 @@ suite =
                             |> Event.expect StudioEyeDropperSample
                     , \q ->
                         q
-                            |> Query.has [ Selector.text "[⌖ sample screen]" ]
+                            |> Query.has [ Selector.text "Sample screen" ]
                     ]
                     (query { blank | studioEyeDropperSupported = True })
         , test "eye-dropper failure status renders as an alert" <|

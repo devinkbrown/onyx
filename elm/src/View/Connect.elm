@@ -4,16 +4,21 @@ module View.Connect exposing (connectGate)
 guest path (display name + optional room), with Sign in and Create
 account as secondary modes under "Other ways to join".
 
-Copy, labels, aria names, and `data-testid` hooks follow the oracle.
-The status line is a polite live region that distinguishes failure
-types without naming a server. Fields lock while a dial is in flight;
-Cancel abandons it.
+Copy, labels, aria names, and `data-testid` hooks follow the oracle
+(the mode buttons carry its `conn-mode-*` ids). The status line is a
+polite live region that distinguishes failure types without naming a
+server; its idle copy repeats the lede, so it is visually hidden until
+there is news (connecting, an error). Fields lock while a dial is in
+flight; Cancel abandons it. A pending deep-link room (`?join=`, an
+invite) is named in the guest title and the room hint, since leaving
+the room field empty joins it.
 -}
 
 import App exposing (ConnectMode(..), ConnectPhase(..), Model, Msg(..))
-import Html exposing (Html, button, div, form, h1, h2, input, label, main_, nav, p, span, text)
-import Html.Attributes exposing (attribute, autocomplete, class, classList, disabled, for, id, placeholder, type_, value)
+import Html exposing (Html, a, button, div, form, h1, h2, input, label, main_, nav, p, span, text)
+import Html.Attributes exposing (attribute, autocomplete, class, classList, disabled, for, href, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import View.PublicFrame exposing (brandMark)
 
 
 connectGate : Model -> Html Msg
@@ -30,14 +35,31 @@ connectGate model =
 
         busy =
             phase == ConnectConnecting
+
+        -- A deep link (`?join=`) or invite is already carrying the
+        -- room: the guest door names it.
+        invitedRoom =
+            if String.isEmpty (String.trim form_.room) then
+                model.pendingDeepLinkJoin
+
+            else
+                Nothing
+
+        title =
+            case ( form_.mode, invitedRoom ) of
+                ( ConnectGuest, Just room ) ->
+                    "Join " ++ room
+
+                _ ->
+                    copy.title
     in
     main_ [ class "conn", attribute "data-testid" "connect" ]
         [ div [ class "conn-card" ]
-            [ div [ class "conn-brand" ]
-                [ span [ class "onyx-gem", attribute "aria-hidden" "true" ] []
+            [ a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
+                [ brandMark "conn-brand-mark"
                 , span [ class "conn-brand-name" ] [ text "Onyx" ]
                 ]
-            , h1 [ class "conn-title" ] [ text copy.title ]
+            , h1 [ class "conn-title" ] [ text title ]
             , p [ class "conn-body" ] [ text copy.body ]
             , form
                 [ class "conn-form"
@@ -45,19 +67,8 @@ connectGate model =
                 , attribute "novalidate" ""
                 , onSubmit ConnectSubmit
                 ]
-                (fields model busy
-                    ++ [ p
-                            [ classList
-                                [ ( "conn-status", True )
-                                , ( "conn-status-error", phase == ConnectError )
-                                , ( "conn-status-busy", busy )
-                                ]
-                            , attribute "role" "status"
-                            , attribute "aria-live" "polite"
-                            , attribute "data-testid" "conn-status"
-                            ]
-                            [ text (App.connectStatusMessage model) ]
-                       , div [ class "conn-actions" ]
+                (fields model invitedRoom busy
+                    ++ [ div [ class "conn-actions" ]
                             (button
                                 [ type_ "submit"
                                 , class "conn-submit"
@@ -80,9 +91,27 @@ connectGate model =
                                         []
                                    )
                             )
+                       , p
+                            [ classList
+                                [ ( "conn-status", True )
+                                , ( "conn-status-idle", phase == ConnectIdle )
+                                , ( "conn-status-error", phase == ConnectError )
+                                , ( "conn-status-busy", busy )
+                                ]
+                            , attribute "role" "status"
+                            , attribute "aria-live" "polite"
+                            , attribute "data-testid" "conn-status"
+                            ]
+                            [ text (App.connectStatusMessage model) ]
                        ]
                 )
             , modeNav form_.mode busy
+            ]
+        , nav [ class "conn-foot", attribute "aria-label" "About Onyx" ]
+            [ a [ href "/about/" ] [ text "About" ]
+            , a [ href "/privacy/" ] [ text "Privacy" ]
+            , a [ href "/guidelines/" ] [ text "House rules" ]
+            , a [ href "/status/" ] [ text "Status" ]
             ]
         ]
 
@@ -100,11 +129,14 @@ submitAria mode =
             "Create your Onyx account"
 
 
-fields : Model -> Bool -> List (Html Msg)
-fields model busy =
+fields : Model -> Maybe String -> Bool -> List (Html Msg)
+fields model invitedRoom busy =
     let
         f =
             model.connectForm
+
+        roomPlaceholder =
+            Maybe.withDefault "#lounge" invitedRoom
 
         nickField =
             field
@@ -127,11 +159,19 @@ fields model busy =
                 { id_ = "conn-room"
                 , label_ = "Room"
                 , kind = "text"
-                , placeholder_ = "#lounge"
+                , placeholder_ = roomPlaceholder
                 , auto = "off"
                 , value_ = f.room
                 , error = f.roomError
-                , hint = Just "Optional — leave empty to land on Home and browse rooms."
+                , hint =
+                    Just
+                        (case invitedRoom of
+                            Just room ->
+                                "Optional — leave empty to join " ++ room ++ "."
+
+                            Nothing ->
+                                "Optional — leave empty to land on Home and browse rooms."
+                        )
                 , busy = busy
                 , onInput_ = ConnectRoomInput
                 }
@@ -185,7 +225,7 @@ fields model busy =
                 { id_ = "conn-room"
                 , label_ = "Room"
                 , kind = "text"
-                , placeholder_ = "#lounge"
+                , placeholder_ = roomPlaceholder
                 , auto = "off"
                 , value_ = f.room
                 , error = f.roomError
@@ -199,6 +239,28 @@ fields model busy =
             let
                 strength =
                     App.passwordStrength f.password
+
+                -- The submit stays disabled until the form is valid, so
+                -- say why as soon as it is knowable: a short password,
+                -- or a confirmation that already differs.
+                passwordHint =
+                    if String.isEmpty f.password then
+                        Nothing
+
+                    else
+                        App.validateConnectPassword f.password
+
+                confirmError =
+                    case f.confirmError of
+                        Just err ->
+                            Just err
+
+                        Nothing ->
+                            if not (String.isEmpty f.confirm) && String.length f.confirm >= String.length f.password then
+                                App.validateConnectConfirm f.password f.confirm
+
+                            else
+                                Nothing
             in
             [ nickField
             , field
@@ -221,7 +283,7 @@ fields model busy =
                 , auto = "new-password"
                 , value_ = f.password
                 , error = f.passwordError
-                , hint = Nothing
+                , hint = passwordHint
                 , busy = busy
                 , onInput_ = ConnectPasswordInput
                 }
@@ -252,7 +314,7 @@ fields model busy =
                 , placeholder_ = "re-enter your password"
                 , auto = "new-password"
                 , value_ = f.confirm
-                , error = f.confirmError
+                , error = confirmError
                 , hint = Nothing
                 , busy = busy
                 , onInput_ = ConnectConfirmInput
@@ -327,7 +389,7 @@ field cfg =
 modeNav : ConnectMode -> Bool -> Html Msg
 modeNav current busy =
     let
-        entry mode label_ =
+        entry mode key label_ =
             if mode == current then
                 text ""
 
@@ -337,12 +399,15 @@ modeNav current busy =
                     , class "conn-alt-btn"
                     , disabled busy
                     , onClick (ConnectModeSet mode)
+                    , attribute "data-testid" ("conn-mode-" ++ key)
                     ]
                     [ text label_ ]
     in
     nav [ class "conn-alt", attribute "aria-label" "Other ways to join", attribute "data-testid" "conn-modes" ]
         [ h2 [ class "conn-alt-title" ] [ text "Other ways to join" ]
-        , entry ConnectGuest "Join as a guest"
-        , entry ConnectSignIn "Sign in"
-        , entry ConnectRegister "Create account"
+        , div [ class "conn-alt-row" ]
+            [ entry ConnectGuest "guest" "Join as a guest"
+            , entry ConnectSignIn "signin" "Sign in"
+            , entry ConnectRegister "register" "Create account"
+            ]
         ]

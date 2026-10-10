@@ -1,5 +1,6 @@
 module View.PublicFrame exposing
     ( NavItem
+    , brandMark
     , footerLinks
     , frame
     , normalisePath
@@ -9,8 +10,10 @@ module View.PublicFrame exposing
 {-| Shared public-route chrome, mirroring `src/ui/public/PublicFrame`
 (header, primary navigation, skip link, footer) with nav items from
 the canonical manifest (`publicRouteManifest`: About + Download carry
-`primary` placement, ordered About then Download). The brand lockup,
-mark, and footer identity copy the oracle class and asset contract;
+`primary` placement, ordered About then Download). The footer
+identity copies the oracle class contract; the brand mark is drawn
+in CSS rather than fetched as raster lockup/wordmark images, and the
+phone menu adds the secondary destinations under the primary pair.
 `SceneAtmosphere` stays a CSS concern (the `public-atmosphere`
 landmark is rendered for it to hydrate).
 
@@ -21,8 +24,8 @@ navigation, and closes on Escape (wired in `Main.subscriptions`).
 -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, a, button, div, footer, header, img, main_, nav, p, span, text)
-import Html.Attributes exposing (alt, attribute, class, classList, height, href, id, src, tabindex, width)
+import Html exposing (Html, a, button, div, footer, header, main_, nav, p, span, text)
+import Html.Attributes exposing (attribute, class, classList, href, id, tabindex)
 import Html.Events exposing (onClick)
 
 
@@ -43,14 +46,33 @@ primaryNav =
     ]
 
 
-{-| Footer exploration links, mirroring `PublicFooter`. -}
+{-| Secondary destinations, shown under the primary items in the
+phone menu only (desktop keeps the header to the manifest's two
+primary links; the footer carries the rest). -}
+moreNav : List NavItem
+moreNav =
+    [ { label = "Guides", href = "/guides/" }
+    , { label = "Status", href = "/status/" }
+    , { label = "Roadmap", href = "/roadmap/" }
+    , { label = "Privacy", href = "/privacy/" }
+    , { label = "House rules", href = "/guidelines/" }
+    , { label = "Contact", href = "/contact/" }
+    ]
+
+
+{-| Footer exploration links, mirroring `PublicFooter` (plus the
+other public destinations, so every page is two taps from any). -}
 footerLinks : List NavItem
 footerLinks =
-    [ { label = "House rules", href = "/guidelines/" }
-    , { label = "Privacy", href = "/privacy/" }
-    , { label = "Contact", href = "/contact/" }
-    , { label = "Status", href = "/status/" }
+    [ { label = "About", href = "/about/" }
+    , { label = "Download", href = "/download/" }
     , { label = "Guides", href = "/guides/" }
+    , { label = "Status", href = "/status/" }
+    , { label = "Roadmap", href = "/roadmap/" }
+    , { label = "House rules", href = "/guidelines/" }
+    , { label = "Privacy", href = "/privacy/" }
+    , { label = "Accessibility", href = "/accessibility/" }
+    , { label = "Contact", href = "/contact/" }
     ]
 
 
@@ -103,6 +125,13 @@ navLink currentPath item =
         [ text item.label ]
 
 
+{-| The Onyx mark, drawn in CSS (`.public-frame__mark`) so it is
+crisp at every size and never depends on a raster fetch. -}
+brandMark : String -> Html msg
+brandMark extra =
+    span [ class ("public-frame__mark " ++ extra), attribute "aria-hidden" "true" ] []
+
+
 {-| Shared document framing for public routes: atmosphere landmark,
 skip link, header, optional context line, labelled main, footer. -}
 frame : Model -> String -> String -> Maybe (Html Msg) -> List (Html Msg) -> Html Msg
@@ -129,9 +158,7 @@ frame model currentPath mainLabel context children =
                            )
                     )
                     [ span [ class "public-frame__brand-visual", attribute "aria-hidden" "true" ]
-                        [ img [ class "public-frame__lockup", src "/brand/lockup.png", width 200, height 78, alt "", attribute "decoding" "async" ] []
-                        , img [ class "public-frame__mark", src "/brand/mark.png", width 40, height 40, alt "", attribute "decoding" "async" ] []
-                        , img [ class "public-frame__wordmark", src "/brand/wordmark.png", width 86, height 37, alt "", attribute "decoding" "async" ] []
+                        [ brandMark ""
                         , span [ class "public-frame__name" ] [ text "Onyx" ]
                         ]
                     ]
@@ -143,7 +170,10 @@ frame model currentPath mainLabel context children =
                             , classList [ ( "is-open", model.navMenuOpen ) ]
                             , attribute "aria-label" "Primary navigation"
                             ]
-                            (List.map (navLink currentPath) primaryNav)
+                            [ div [ class "public-frame__nav-primary" ] (List.map (navLink currentPath) primaryNav)
+                            , p [ class "public-frame__nav-more-title" ] [ text "More from Onyx" ]
+                            , div [ class "public-frame__nav-more" ] (List.map (navLink currentPath) moreNav)
+                            ]
                         ]
                     , div [ class "public-frame__nav-actions" ]
                         [ a [ class "public-frame__open", href "/app/" ] [ text "Open Onyx" ]
@@ -185,12 +215,13 @@ frame model currentPath mainLabel context children =
             [ div [ class "public-frame__footer-inner" ]
                 [ div [ class "public-frame__footer-identity" ]
                     [ a [ class "public-frame__footer-brand", href "/" ]
-                        [ img [ class "public-frame__mark", src "/brand/mark.png", width 28, height 28, alt "" ] []
+                        [ brandMark "public-frame__mark--sm"
                         , span [] [ text "Onyx" ]
                         ]
                     , p [] [ text "Rooms, messages, and calls for friends, clubs, and creators." ]
+                    , a [ class "public-frame__footer-open", href "/app/" ] [ text "Open Onyx" ]
                     ]
-                , nav [ attribute "aria-label" "Footer navigation" ]
+                , nav [ class "public-frame__footer-nav", attribute "aria-label" "Footer navigation" ]
                     [ p [ class "public-frame__footer-title" ] [ text "Explore Onyx" ]
                     , div [ class "public-frame__footer-links" ]
                         (List.map (\link -> a [ href link.href ] [ text link.label ]) footerLinks)
@@ -198,4 +229,3 @@ frame model currentPath mainLabel context children =
                 ]
             ]
         ]
-
