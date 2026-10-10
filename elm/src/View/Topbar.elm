@@ -11,6 +11,7 @@ import Html exposing (Html, b, button, div, form, h1, header, input, label, p, s
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Nav
+import View.ModDesk
 
 
 topbar : Model -> Html Msg
@@ -46,6 +47,7 @@ topbar model =
         , mediaToggle model
         , notifySheetButton model
         , jumpToggle model
+        , View.ModDesk.deskToggles model
         , div
             [ classList
                 [ ( "onyx-conn", True )

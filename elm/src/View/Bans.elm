@@ -5,9 +5,10 @@ review-first unbans (mirroring `BanListPanel.tsx`: op-gated fetch,
 verbatim status strings, mask rows with setters, and a confirm step
 that re-checks authority before the lift sends `MODE -b`).
 
-The panel renders only where we moderate; elsewhere it is empty (the
-oracle mounts its equivalent inside the moderation cockpit rather than
-inline, so non-moderators never see the surface at all).
+v3/moddesk: the panel is the body of the room-desk sheet
+(`View.ModDesk.moderationSheet`), opened from the op-gated Moderation
+button rather than rendered inline in the main column; non-moderators
+get the read-only fallback.
 -}
 
 import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
@@ -41,30 +42,36 @@ banPanel model channel =
             view =
                 banListViewFor model channel
         in
-        section [ class "moderation-desk__bans", attribute "data-testid" "ban-list-panel" ]
-            ([ div [ class "moderation-cockpit__head" ]
-                [ div []
-                    [ h4 [] [ text "Active blocks" ]
-                    , span [ class "moderation-desk__room" ] [ text channel ]
-                    ]
-                , button
-                    [ attribute "data-testid" "ban-list-refresh"
-                    , disabled (not live)
-                    , onClick (BanListRequested channel)
-                    ]
-                    [ text "Refresh list" ]
-                ]
-             ]
-                ++ deskRail model channel live
-                ++ statusLine view
-                ++ entryList model channel view
-                ++ addForm model channel live
+        -- v3/moddesk — oracle cockpit order: authority rail, room
+        -- desk (safeguards, invite, member action, mask block),
+        -- timed block, the authoritative block list, server
+        -- activity, then the open-wire disclosure.
+        div [ class "moderation-cockpit__body" ]
+            (deskRail model channel live
                 ++ deskForms model channel live
+                ++ addForm model channel live
+                ++ [ section [ class "moderation-desk__bans", attribute "data-testid" "ban-list-panel" ]
+                        ([ div [ class "moderation-cockpit__head" ]
+                            [ div []
+                                [ h4 [] [ text "Active blocks" ]
+                                , span [ class "moderation-desk__room" ] [ text channel ]
+                                ]
+                            , button
+                                [ attribute "data-testid" "ban-list-refresh"
+                                , disabled (not live)
+                                , onClick (BanListRequested channel)
+                                ]
+                                [ text "Refresh list" ]
+                            ]
+                         ]
+                            ++ statusLine view
+                            ++ entryList model channel view
+                            ++ reviewDialog model channel
+                        )
+                   ]
                 ++ deskActivity model channel
                 ++ [ protocolDisclosure model channel ]
-                ++ reviewDialog model channel
             )
-
 
 addForm : Model -> String -> Bool -> List (Html Msg)
 addForm model channel live =

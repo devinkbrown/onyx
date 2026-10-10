@@ -112,6 +112,9 @@ banOpModel =
                 , entries = [ { mask = "*!*@bad.example", setBy = Just "alice", setAt = Nothing } ]
                 }
         , banListMeta = Dict.singleton "#c" (banMeta BanReady)
+
+        -- v3/moddesk: the room desk lives in a sheet now
+        , moderationOpen = True
     }
 
 

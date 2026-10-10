@@ -2745,4 +2745,92 @@ html, body {
   .onyx-spotlight, .onyx-shortcuts { padding: 8px; align-items: start; }
   .onyx-spotlight-panel, .onyx-shortcuts-sheet { max-height: calc(100dvh - 16px); }
   .onyx-spotlight-hint { display: none; }
+
+/* v3/moddesk — room desk + operator desk sheets */
+.onyx-moddesk-toggles { display: contents; }
+.onyx-moddesk-toggle {
+  background: transparent; border: 1px solid var(--onyx-line); border-radius: 6px;
+  color: var(--onyx-text); cursor: pointer; font: inherit; font-size: 13px;
+  min-height: 24px; padding: 4px 10px;
+}
+.onyx-moddesk-toggle[aria-pressed="true"] { border-color: var(--onyx-accent); }
+.onyx-moddesk { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: flex-end; }
+.onyx-moddesk-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 55%); }
+.onyx-moddesk-sheet {
+  position: relative; box-sizing: border-box; width: min(480px, 100%); height: 100%;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: var(--onyx-panel); border-left: 1px solid var(--onyx-line);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 35%);
+  color: var(--onyx-text); display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  animation: onyx-moddesk-in var(--dur-base, 220ms) ease-out;
+}
+@keyframes onyx-moddesk-in { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .onyx-moddesk-sheet { animation: none; } }
+.onyx-moddesk-close {
+  position: absolute; top: 12px; right: 12px; background: transparent;
+  border: 1px solid var(--onyx-line); border-radius: 6px; color: var(--onyx-dim);
+  cursor: pointer; font-size: 16px; line-height: 1; min-width: 32px; min-height: 32px;
+}
+.onyx-moddesk-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px; padding-right: 40px; }
+.onyx-moddesk-head h2 { font-size: 16px; margin: 0; }
+.onyx-moddesk-eyebrow { color: var(--onyx-faint); font-size: 11px; letter-spacing: 0.08em; margin: 0 0 2px; text-transform: uppercase; }
+.onyx-moddesk-room { font-family: var(--font-mono, monospace); font-size: 13px; color: var(--onyx-dim); margin: 0; overflow-wrap: anywhere; }
+.onyx-moddesk-role, .onyx-moddesk-hint { color: var(--onyx-dim); font-size: 13px; margin: 0; }
+.onyx-moddesk-offline { color: var(--onyx-warn); font-size: 13px; margin: 0; }
+.onyx-moddesk-errors { color: var(--onyx-bad); font-size: 13px; margin: 0; padding-left: 18px; }
+.onyx-moddesk-rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
+.onyx-moddesk-rail dt { color: var(--onyx-faint); font-size: 11px; }
+.onyx-moddesk-rail dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.onyx-moddesk-form { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--onyx-line); padding-top: 12px; }
+.onyx-moddesk-form label { font-size: 13px; font-weight: 650; }
+.onyx-moddesk-row, .onyx-moddesk-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.onyx-moddesk-sheet input, .onyx-moddesk-sheet select {
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 6px;
+  color: var(--onyx-text); font: inherit; font-size: 13px; padding: 6px 10px; min-width: 0; flex: 1 1 160px;
+}
+.onyx-moddesk-sheet button:not(.onyx-moddesk-close) {
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 6px;
+  color: var(--onyx-text); cursor: pointer; font: inherit; font-size: 13px; min-height: 28px; padding: 4px 12px;
+}
+.onyx-moddesk-sheet button:disabled { opacity: 0.45; cursor: default; }
+.onyx-moddesk-sheet .onyx-moddesk-danger { border-color: var(--onyx-bad); color: var(--onyx-bad); background: transparent; }
+.onyx-moddesk-review {
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-bad); border-radius: 6px;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+}
+.onyx-moddesk-review p { margin: 0; font-size: 13px; }
+.onyx-moddesk-wire { font-family: var(--font-mono, monospace); font-size: 12px; overflow-wrap: anywhere; }
+.onyx-moddesk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.onyx-moddesk-events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.onyx-moddesk-event { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; border-bottom: 1px solid var(--onyx-line); padding: 4px 0; }
+.onyx-moddesk-event-cat { font-weight: 650; }
+.onyx-moddesk-event-sev { color: var(--onyx-dim); }
+.onyx-moddesk-event-text { flex: 1 1 100%; overflow-wrap: anywhere; }
+.oper-event-console { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--onyx-line); padding-top: 12px; }
+.oper-event-console h3 { font-size: 15px; margin: 0; }
+.oper-desk { display: flex; flex-direction: column; gap: 12px; }
+.onyx-moddesk-sheet .moderation-cockpit__body { display: flex; flex-direction: column; gap: 12px; }
+.onyx-moddesk-sheet .moderation-cockpit__body > section,
+.onyx-moddesk-sheet .moderation-cockpit__modes { border-top: 1px solid var(--onyx-line); padding-top: 12px; }
+.onyx-moddesk-sheet .moderation-cockpit__modes { display: flex; flex-wrap: wrap; gap: 8px; }
+.onyx-moddesk-sheet .moderation-cockpit__mode[aria-pressed="true"] { border-color: var(--onyx-accent); }
+.onyx-moddesk-sheet .moderation-cockpit__mode small { color: var(--onyx-dim); margin-left: 6px; }
+.onyx-moddesk-sheet .moderation-cockpit__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.onyx-moddesk-sheet .moderation-cockpit__head h4, .onyx-moddesk-sheet .moderation-desk__log h4 { font-size: 14px; margin: 0; }
+.onyx-moddesk-sheet .moderation-cockpit__hint, .onyx-moddesk-sheet .moderation-desk__receipt { color: var(--onyx-dim); font-size: 13px; margin: 0; }
+.onyx-moddesk-sheet .moderation-desk__boundary { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.onyx-moddesk-sheet .moderation-desk__boundary span:first-child { font-weight: 650; }
+.onyx-moddesk-sheet .moderation-desk__rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; font-size: 13px; }
+.onyx-moddesk-sheet .moderation-desk__rail > div { display: flex; flex-direction: column; }
+.onyx-moddesk-sheet .moderation-desk__rail > div span:first-child { color: var(--onyx-faint); font-size: 11px; }
+.onyx-moddesk-sheet .moderation-desk__ban-list, .onyx-moddesk-sheet .moderation-desk__log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.onyx-moddesk-sheet .moderation-desk__ban-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.onyx-moddesk-sheet .moderation-desk__ban-mask { overflow-wrap: anywhere; }
+.onyx-moddesk-sheet .moderation-review { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border: 1px solid var(--onyx-bad); border-radius: 6px; padding: 8px; }
+.onyx-moddesk-sheet .moderation-review p { flex: 1 1 100%; margin: 0; font-size: 13px; }
+.onyx-moddesk-sheet .onyx-moderation-review { margin: 0; max-width: none; }
+.onyx-moddesk-sheet .moderation-cockpit__protocol { font-size: 13px; color: var(--onyx-dim); }
+.onyx-moddesk-sheet .moderation-cockpit__protocol code { overflow-wrap: anywhere; }
+@media (max-width: 719.98px) {
+  .onyx-moddesk-sheet { width: 100%; border-left: 0; padding: 16px; }
 }

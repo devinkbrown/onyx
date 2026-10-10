@@ -101,8 +101,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 | # | Surface | Oracle | Size |
 |---|---|---|---|
-| 5.1 | Moderation cockpit: room desk, invite form, current-room header (move bans out of the main column) | `ModerationCockpit` | S |
-| 5.2 | Oper desk (broadcast / kill / rehash) + event console with filters | `OperDesk`, `OperEventConsole` | M |
+| 5.1 | Moderation cockpit: room desk, invite form, current-room header (move bans out of the main column) | `ModerationCockpit` | S · **done** (v3/moddesk) |
+| 5.2 | Oper desk (broadcast / kill / rehash) + event console with filters | `OperDesk`, `OperEventConsole` | M · **done** (v3/moddesk) |
 
 ## Phase 6 — Voice and video
 

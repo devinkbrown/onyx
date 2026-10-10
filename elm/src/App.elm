@@ -57,6 +57,9 @@ import MessageWindow
 import Multiline
 import Nav
 import Notify
+-- v3/moddesk
+import EventReplay
+import OperDesk
 import NotifyCenter
 import Outbox
 import Passkey
@@ -364,6 +367,11 @@ type alias Model =
     , seenMsgids : Dict String (List String)
     , isOper : Bool
     , isNetworkAdmin : Bool
+    -- v3/moddesk
+    , moderationOpen : Bool
+    , operDeskOpen : Bool
+    , operDesk : OperDesk.Desk
+    , operEventReplay : EventReplay.EventReplayFeed
     , isAway : Bool
     , latencyMs : Maybe Int
     , latencyHistory : List Int
@@ -2718,6 +2726,17 @@ type Msg
     | ModerationDeskInvite String
     | ModerationDeskSubmitInvite String
     | ModerationDeskToggleMode String String
+    -- v3/moddesk
+    | ModerationSheetOpen
+    | ModerationSheetClose
+    | OperDeskOpen
+    | OperDeskClose
+    | OperDeskField OperDesk.Field String
+    | OperDeskSubmit OperDeskIntent
+    | OperDeskConfirm
+    | OperDeskCancel
+    | OperEventReplayLimit Int
+    | OperEventReplayRequested
     | OverrideToggleSoftIgnore String
     | OverrideSetNickColor { nick : String, color : String }
     | OverrideClearNickColor String
@@ -3159,6 +3178,11 @@ init nick url =
     , seenMsgids = Dict.empty
     , isOper = False
     , isNetworkAdmin = False
+    -- v3/moddesk
+    , moderationOpen = False
+    , operDeskOpen = False
+    , operDesk = OperDesk.blankDesk
+    , operEventReplay = EventReplay.emptyEventReplayFeed
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -3652,6 +3676,11 @@ blank =
     , seenMsgids = Dict.empty
     , isOper = False
     , isNetworkAdmin = False
+    -- v3/moddesk
+    , moderationOpen = False
+    , operDeskOpen = False
+    , operDesk = OperDesk.blankDesk
+    , operEventReplay = EventReplay.emptyEventReplayFeed
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -4427,7 +4456,7 @@ foldLine model message =
                                     foldDirectoryNotice withAttr body
 
                                 Nothing ->
-                                    case foldAccountSessionNotice withAttr message of
+                                    case foldOperReplayThenSession withAttr message of
                                         Just captured ->
                                             captured
 
@@ -17020,6 +17049,173 @@ foldAccountSessionNotice model message =
 
         [] ->
             Nothing
+
+
+-- v3/moddesk
+
+
+{-| Structured `EVENT REPLAY JSON` notices fold into the operator feed
+ahead of the session-roster parse (mirroring the store order: replay,
+then `SESSION LIST`). Same server-sourced gate as the roster — empty
+sender, non-channel target, no CTCP — and only `{`-led bodies; a body
+the parser rejects leaves the feed equal and falls through.
+-}
+foldOperReplayThenSession : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldOperReplayThenSession model message =
+    case foldOperReplayNotice model message of
+        Just folded ->
+            Just folded
+
+        Nothing ->
+            foldAccountSessionNotice model message
+
+
+foldOperReplayNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldOperReplayNotice model message =
+    case message.params of
+        target :: _ ->
+            let
+                body =
+                    trailingParam message.params
+            in
+            if message.nick /= Nothing || isChannelName model target || not (String.startsWith "{" body) then
+                Nothing
+
+            else
+                let
+                    next =
+                        EventReplay.applyEventReplayNotice model.operEventReplay body model.nowMs
+                in
+                if next == model.operEventReplay then
+                    Nothing
+
+                else
+                    Just ( { model | operEventReplay = next }, [] )
+
+        [] ->
+            Nothing
+
+
+{-| Desk submit (mirroring `OperDesk.submit`): offline nothing runs; a
+failed plan shows its errors and drops any staged review; a destructive
+plan (broadcast, KILL, REHASH) stages for review; a read sends now.
+-}
+submitOperDesk : OperDeskIntent -> Model -> ( Model, List Outbound )
+submitOperDesk intent model =
+    let
+        desk =
+            model.operDesk
+    in
+    if model.connection /= Live then
+        ( model, [] )
+
+    else
+        case planOperAction intent of
+            Err errors ->
+                ( { model | operDesk = { desk | pending = Nothing, errors = errors } }, [] )
+
+            Ok command ->
+                if command.destructive then
+                    ( { model | operDesk = { desk | errors = [], pending = Just command } }, [] )
+
+                else
+                    dispatchOperDesk command { model | operDesk = { desk | errors = [] } }
+
+
+{-| Confirm the staged review (mirroring `confirmPending`): a sent
+disconnect clears its nick and reason, a sent broadcast its draft. -}
+confirmOperDesk : Model -> ( Model, List Outbound )
+confirmOperDesk model =
+    case model.operDesk.pending of
+        Nothing ->
+            ( model, [] )
+
+        Just command ->
+            if model.connection /= Live then
+                ( model, [] )
+
+            else
+                let
+                    ( sent, out ) =
+                        dispatchOperDesk command model
+
+                    desk =
+                        sent.operDesk
+
+                    cleared =
+                        if List.isEmpty out then
+                            desk
+
+                        else if command.command == "KILL" then
+                            { desk | killNick = "", killReason = "" }
+
+                        else if List.head command.params == Just "BROADCAST" then
+                            { desk | broadcast = "" }
+
+                        else
+                            desk
+                in
+                ( { sent | operDesk = cleared }, out )
+
+
+{-| The shared operator choke point (mirroring `operAction`): without
+oper status the session refuses with a toast instead of leaking intent;
+otherwise the planned line sends and the desk stamps `lastSent`. -}
+dispatchOperDesk : OperDeskCommand -> Model -> ( Model, List Outbound )
+dispatchOperDesk command model =
+    let
+        desk =
+            model.operDesk
+    in
+    if not model.isOper then
+        ( addToast
+            { variant = ToastError
+            , title = "Operator access required"
+            , description = Just "This network grants operator status from the signed-in account."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            { model | operDesk = { desk | pending = Nothing } }
+        , []
+        )
+
+    else
+        ( { model
+            | operDesk =
+                { desk
+                    | pending = Nothing
+                    , lastSent = Just (OperDesk.formatWirePreview command ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs))
+                }
+          }
+        , [ SendLine (Wire.formatIrcLine command.command command.params) ]
+        )
+
+
+{-| Bounded structured replay (mirroring `requestOperEventReplay`: oper
+and live only; the feed opens pending at once so the console shows
+"waiting" before the header notice lands). -}
+requestOperEventReplay : Model -> ( Model, List Outbound )
+requestOperEventReplay model =
+    if model.connection /= Live || not model.isOper then
+        ( model, [] )
+
+    else
+        let
+            desk =
+                model.operDesk
+
+            empty =
+                EventReplay.emptyEventReplayFeed
+        in
+        ( { model
+            | operEventReplay = { empty | pending = True, receivedAt = Just model.nowMs }
+            , operDesk =
+                { desk | lastReplay = Just (OperDesk.replayWire desk.replayLimit ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs)) }
+          }
+        , [ SendLine (Wire.formatIrcLine "EVENT" (EventReplay.eventReplayJsonParams desk.replayLimit)) ]
+        )
 
 
 foldAccountSessionBody : Model -> String -> Maybe ( Model, List Outbound )
@@ -40268,6 +40464,69 @@ updateCore msg model =
 
                     _ ->
                         ( model, [] )
+
+        -- v3/moddesk
+        ModerationSheetOpen ->
+            -- The room desk opens only over a room we moderate (the
+            -- topbar button is op-gated; this re-checks so a stale
+            -- click after a de-op cannot open the sheet).
+            case model.activeChannel of
+                Just channel ->
+                    if isChannelOp model channel then
+                        ( { model | moderationOpen = True }, [] )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        ModerationSheetClose ->
+            ( { model | moderationOpen = False }, [] )
+
+        OperDeskOpen ->
+            if model.isOper then
+                ( { model | operDeskOpen = True }, [] )
+
+            else
+                ( model, [] )
+
+        OperDeskClose ->
+            let
+                desk =
+                    model.operDesk
+            in
+            ( { model | operDeskOpen = False, operDesk = { desk | pending = Nothing } }, [] )
+
+        OperDeskField field value ->
+            ( { model | operDesk = OperDesk.setField field value model.operDesk }, [] )
+
+        OperDeskSubmit intent ->
+            submitOperDesk intent model
+
+        OperDeskConfirm ->
+            confirmOperDesk model
+
+        OperDeskCancel ->
+            let
+                desk =
+                    model.operDesk
+            in
+            ( { model | operDesk = { desk | pending = Nothing } }, [] )
+
+        OperEventReplayLimit limit ->
+            if List.member limit OperDesk.replayLimits then
+                let
+                    desk =
+                        model.operDesk
+                in
+                ( { model | operDesk = { desk | replayLimit = limit } }, [] )
+
+            else
+                ( model, [] )
+
+        OperEventReplayRequested ->
+            requestOperEventReplay model
 
         OverrideToggleSoftIgnore nick ->
             -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
