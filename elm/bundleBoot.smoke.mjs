@@ -22,7 +22,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,7 +52,33 @@ function assetRoot() {
     rmSync(out, { recursive: true, force: true });
     throw new Error(`could not compile the bundle (put elm 0.19.1 on PATH, set ELM=..., or smoke a build with ONYX_ELM_DIST=...): ${err.message}`, { cause: err });
   }
-  return { dir: here, appJs, cleanup() { rmSync(out, { recursive: true, force: true }); } };
+  /* v3/calls-engine: index.html also loads the voice engine bundle
+     (voice.js), built by media/build-voice.mjs with the repo's esbuild. */
+  try {
+    execFileSync(process.execPath, [join(here, "media/build-voice.mjs"), findEsbuild(), out], {
+      cwd: here,
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+  } catch (err) {
+    rmSync(out, { recursive: true, force: true });
+    throw new Error(`could not bundle the voice engine (needs the repo's esbuild; set ESBUILD=...): ${err.message}`, { cause: err });
+  }
+  return { dir: here, appJs, voiceJs: join(out, "voice.js"), cleanup() { rmSync(out, { recursive: true, force: true }); } };
+}
+
+function findEsbuild() {
+  if (process.env.ESBUILD) return process.env.ESBUILD;
+  let common = "";
+  try {
+    common = execFileSync("git", ["-C", here, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).trim();
+  } catch (err) { common = ""; }
+  for (const root of [join(here, ".."), common ? join(common, "..") : ""]) {
+    const dir = root && join(root, "node_modules/.pnpm");
+    if (!dir || !existsSync(dir)) continue;
+    const hit = readdirSync(dir).find((n) => n.startsWith("esbuild@"));
+    if (hit) return join(dir, hit, "node_modules/esbuild/bin/esbuild");
+  }
+  throw new Error("esbuild not found");
 }
 
 /* Every subresource request is answered locally; nothing reaches the
@@ -65,7 +91,9 @@ function localResources(root, fetched) {
         if (u.origin !== ORIGIN) return new Response("", { status: 404 });
         const rel = decodeURIComponent(u.pathname.replace(/^\/+/, ""));
         fetched.push(rel);
-        const file = rel === "app.js" && root.appJs ? root.appJs : join(root.dir, rel);
+        const file = rel === "app.js" && root.appJs ? root.appJs
+          : rel === "voice.js" && root.voiceJs ? root.voiceJs
+          : join(root.dir, rel);
         try {
           const type = rel.endsWith(".js") ? "application/javascript" : rel.endsWith(".css") ? "text/css" : "application/octet-stream";
           return new Response(readFileSync(file), { headers: { "Content-Type": type } });
@@ -182,6 +210,9 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
   try {
     assert.ok(loader.fetched.some((f) => /^app(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads the app bundle");
     assert.ok(loader.fetched.some((f) => /^ports(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads ports.js");
+    /* v3/calls-engine: the voice engine mounts before ports.js wires it. */
+    assert.ok(loader.fetched.some((f) => /^voice(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads the voice engine");
+    assert.equal(typeof window.OnyxVoiceEngine?.joinVoice, "function", "window.OnyxVoiceEngine is mounted");
     assert.deepEqual(errors, [], "boot runs without runtime errors");
 
     /* 1. Connect gate renders, no socket yet. */
