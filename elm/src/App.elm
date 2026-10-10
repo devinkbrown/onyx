@@ -36059,7 +36059,7 @@ settleAttachmentUpload model done =
 update : Msg -> Model -> ( Model, List Outbound )
 update msg model =
     let
-        ( next, out ) =
+        first =
             -- v3/polish: scrubber pulse / copy results route first
             case polishIntercept msg model of
                 Just handled ->
@@ -36067,7 +36067,34 @@ update msg model =
 
                 Nothing ->
                     updateCore msg model
+    in
+    List.foldl (\step acc -> step msg model acc) first settleSteps
 
+
+{-| Post-update settle steps, run in order after every `updateCore`.
+Each step sees the message, the model from BEFORE the update, and the
+accumulated (model, outbound). A new slice adds ONE line here (and its
+step function below) instead of threading names through a shared `let`:
+parallel slices then merge as adjacent one-line additions.
+-}
+settleSteps : List (Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound ))
+settleSteps =
+    [ settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
+    , settleStepNav -- v3/nav
+    , settleStepDmSafety -- v3/dmsafety
+    , settleStepCalls -- v3/calls-c1
+    , settleStepCallMedia -- v3/calls-c4
+    , settleStepRoomMenu -- v3/frame
+    , settleStepRoomSettings -- v3/roomsettings
+    , settleStepCallDock -- v3/calls-c6
+    , settleStepStage -- v3/calls-c11
+    , settleStepPolish -- v3/polish
+    ]
+
+
+settleStepConnect : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepConnect msg _ ( next, outs ) =
+    let
         -- A close ends any dial in flight (a socket that never opened
         -- included), so the form reports the failure instead of spinning.
         closed =
@@ -36081,46 +36108,65 @@ update msg model =
 
         ( settled, connectOut ) =
             settleConnectGate closed
-
-        -- v3/nav
-        navSettled =
-            Nav.reconcile (isChannelName settled) model.activeChannel settled
-
-        -- v3/dmsafety
-        ( safetySettled, safetyOut ) =
-            reconcileDmSafety model.activeChannel navSettled
-
-        -- v3/calls-c1
-        callsSettled =
-            CallUi.settle (callDisplayName safetySettled) safetySettled
-
-        -- v3/calls-c4
-        mediaSettled =
-            settleCallMedia callsSettled
-
-        -- v3/frame
-        frameSettled =
-            settleRoomMenu msg model mediaSettled
-
-        -- v3/roomsettings
-        roomSettingsSettled =
-            settleRoomSettings msg frameSettled
-
-        -- v3/calls-c6
-        ( dockSettled, dockOut ) =
-            CallDock.settle { live = roomSettingsSettled.connection == Live, now = roomSettingsSettled.nowMs } model roomSettingsSettled
-
-        -- v3/calls-c11
-        stageSettled =
-            settleStage dockSettled
     in
-    ( stageSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut )
+    ( settled, outs ++ connectOut )
 
-        -- v3/polish
-        ( polishSettled, polishOut ) =
-            polishSettle msg model dockSettled
+
+settleStepNav : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepNav _ prior ( m, outs ) =
+    ( Nav.reconcile (isChannelName m) prior.activeChannel m, outs )
+
+
+settleStepDmSafety : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepDmSafety _ prior ( m, outs ) =
+    let
+        ( settled, safetyOut ) =
+            reconcileDmSafety prior.activeChannel m
     in
-    ( polishSettled, out ++ connectOut ++ safetyOut ++ List.map VoiceRing dockOut ++ polishOut )
+    ( settled, outs ++ safetyOut )
+
+
+settleStepCalls : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepCalls _ _ ( m, outs ) =
+    ( CallUi.settle (callDisplayName m) m, outs )
+
+
+settleStepCallMedia : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepCallMedia _ _ ( m, outs ) =
+    ( settleCallMedia m, outs )
+
+
+settleStepRoomMenu : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRoomMenu msg prior ( m, outs ) =
+    ( settleRoomMenu msg prior m, outs )
+
+
+settleStepRoomSettings : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRoomSettings msg _ ( m, outs ) =
+    ( settleRoomSettings msg m, outs )
+
+
+settleStepCallDock : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepCallDock _ prior ( m, outs ) =
+    let
+        ( settled, dockOut ) =
+            CallDock.settle { live = m.connection == Live, now = m.nowMs } prior m
+    in
+    ( settled, outs ++ List.map VoiceRing dockOut )
+
+
+settleStepStage : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepStage _ _ ( m, outs ) =
+    ( settleStage m, outs )
+
+
+settleStepPolish : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepPolish msg prior ( m, outs ) =
+    let
+        ( settled, polishOut ) =
+            polishSettle msg prior m
+    in
+    ( settled, outs ++ polishOut )
 
 
 -- v3/calls-c6
