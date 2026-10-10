@@ -26,6 +26,8 @@ import View.Appearance
 import View.Calls exposing (callsHub)
 -- v3/calls-c1
 import View.CallStage
+-- v3/calls-c8
+import View.VoiceSettings
 import View.CallDock -- v3/calls-c6
 import View.Download
 import View.Guides
@@ -303,6 +305,7 @@ overlays model =
         , inviteShareSheet model -- v3/dmsafety
         -- v3/calls-c1
         , View.CallStage.privacySheet model
+        , View.VoiceSettings.sheet model -- v3/calls-c8
         , View.CallStage.announcer model
         , reclaimDialog model
         , View.Nav.youHub model

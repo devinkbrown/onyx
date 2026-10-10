@@ -11,8 +11,9 @@ module View.CallStage exposing
 and C3 security chip + call privacy sheet (`CALLS_DESIGN.md` §2.4,
 §2.5, §2.12, §3.3).
 
-Bar v1 carries Mute, More (one stub item: "Open voice settings",
-disabled until C9) and Leave in the centre; where / timer / people on
+Bar v1 carries Mute, More and Leave in the centre (v3/calls-c8:
+More → "Open voice settings" opens the C9 sheet; Hand / React /
+Captions join the centre group); where / timer / people on
 the left; the security chip on the right. v3/calls-c4 adds Camera and
 Share to the centre (Share moves into More <768px), Deafen / layout /
 stage size to More, the connection pip to the right zone, the
@@ -42,6 +43,9 @@ import CallMedia
 import View.CallVideo
 import View.Sheet as Sheet
 import View.CallDock -- v3/calls-c6
+-- v3/calls-c8
+import View.CallOverlays
+import View.VoiceSettings
 
 
 {-| The call surface at the top of the message column: the stage +
@@ -238,6 +242,10 @@ voiceStage model =
                         )
                     ]
                     (List.map personCell everyone)
+        -- v3/calls-c8: reaction chips + live captions, docked above
+        -- the bar (never over a control)
+        , View.CallOverlays.reactionChips model
+        , View.CallOverlays.captionsOverlay model
         , View.CallVideo.qualityPrompt model
         , controlBar model
         ]
@@ -356,6 +364,7 @@ controlBar model =
                   else
                     timer
                 , span [ class "onyx-call-people-count" ] [ text ("· " ++ CallUi.peopleLabel count) ]
+                , View.VoiceSettings.pttHint model -- v3/calls-c8
                 ]
             , div [ class "onyx-call-bar-center", attribute "role" "group", attribute "aria-label" "Call controls" ]
                 [ button
@@ -393,6 +402,10 @@ controlBar model =
                 -- v3/calls-c4: camera + share (share moves into More <768px)
                 , cameraButton model
                 , shareButton model "onyx-cbtn onyx-cbtn-share" "screenshare-button"
+                -- v3/calls-c8: hand / react / captions (React moves into More <768px)
+                , View.CallOverlays.handButton model reconnecting
+                , View.CallOverlays.reactButton model reconnecting
+                , View.CallOverlays.captionsButton model reconnecting
                 , div [ class "onyx-call-more-wrap" ]
                     [ button
                         [ type_ "button"
@@ -421,6 +434,7 @@ controlBar model =
                     [ callIcon "leave", span [ class "onyx-cbtn-cap" ] [ text "Leave" ] ]
                 ]
             , div [ class "onyx-call-bar-right" ] [ securityChip model, View.CallVideo.qualityPip model ]
+            , View.CallOverlays.reactMenu model -- v3/calls-c8
             -- v3/calls-c4
             , span
                 [ class "sr-only"
@@ -538,6 +552,7 @@ moreTools model =
             )
         , div [ class "onyx-call-more-share" ]
             [ shareButton model "onyx-call-more-item" "call-more-share" ]
+        , View.CallOverlays.moreReactItem model -- v3/calls-c8
         , moreItem
             [ attribute "aria-pressed" (boolAttr (model.callLayout == CallMedia.LayoutSpotlight))
             , attribute "data-testid" "layout-button"
@@ -552,14 +567,8 @@ moreTools model =
             ]
             "expand"
             (CallMedia.stageSizeLabel model.callStageSize)
-        , button
-            [ type_ "button"
-            , class "onyx-call-more-item"
-            , attribute "aria-label" "Open voice settings"
-            , attribute "aria-disabled" "true"
-            , attribute "data-testid" "call-more-settings"
-            ]
-            [ callIcon "settings", text "Open voice settings" ]
+        -- v3/calls-c8: the live settings entry (was a disabled stub)
+        , View.CallOverlays.settingsItem
         ]
 
 

@@ -128,6 +128,8 @@ import Task
 import Time
 import Url
 import View
+-- v3/calls-c8
+import VoiceSettings
 
 
 port wsConnect : { url : String } -> Cmd msg
@@ -241,6 +243,15 @@ port voicePipLoaded : (Decode.Value -> msg) -> Sub msg
 
 -- v3/calls-c4: the ONE call-media command port and the per-peer feed.
 port voiceCommand : { verb : String, on : Bool, channel : String, tile : String } -> Cmd msg
+
+
+{-| v3/calls-c8 — voice settings persistence (`onyx:voice-settings`)
+and the ports-side feed: stored prefs at boot, the `enumerateDevices`
+bridge result, and the speaker chooser outcome. -}
+port voicePrefsSave : { json : String } -> Cmd msg
+
+
+port voiceSettingsFeed : (Decode.Value -> msg) -> Sub msg
 
 
 port voicePeerState : (Decode.Value -> msg) -> Sub msg
@@ -1249,6 +1260,10 @@ perform key outbound =
         App.VoiceCommand req ->
             voiceCommand req
 
+        -- v3/calls-c8
+        App.VoicePrefsSave req ->
+            voicePrefsSave req
+
         App.FollowedSave req ->
             followedSave req
 
@@ -1617,6 +1632,11 @@ subscriptions model =
         -- (only while a call is up) for the 400/800ms speaker hold and
         -- the 2.5s quality hysteresis.
         , voicePeerState App.CallPeerState
+        -- v3/calls-c8: voice settings feed, and the push-to-talk hold
+        -- riding the shared `shortcut` port (a second subscriber; the
+        -- switcher maps the ptt names to UnknownShortcut and ignores them).
+        , voiceSettingsFeed (App.VoiceSettingsMsg << VoiceSettings.Feed)
+        , shortcut App.VoicePttShortcut
         , if model.app.calls.lifecycle /= Media.Idle then
             Time.every 200 (App.CallClock << toFloat << Time.posixToMillis)
 

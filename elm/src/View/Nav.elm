@@ -26,6 +26,8 @@ import Html.Events exposing (onClick)
 import Nav
 import View.Account2
 import View.Sheet as Sheet
+-- v3/calls-c8
+import View.VoiceSettings
 
 
 {-| The model for one variant, fed from shell state. -}
@@ -261,6 +263,8 @@ youHub model =
                             , action = Nav.YouPreferences
                             }
 
+                        -- v3/calls-c8
+                        , View.VoiceSettings.youEntry
                         -- v3/account2
                         , (View.Account2.youEntries model).people
                         , (View.Account2.youEntries model).themeShare
