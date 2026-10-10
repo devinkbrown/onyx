@@ -144,6 +144,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Calls C6 (DM ring overlays), C7 (picture-in-picture) and C10 (reconnecting + classified errors) landed (`v3/calls-c6`).
 - 2026-10-10 — 1.0 shell frame + tokens landed (`v3/frame`): token ladder, one frame grid, `View.Sheet` primitive, one overlay focus mechanism, one Escape order, global topbar + room header with More menu (24 `FrameTest` vectors + `overlayFocus.smoke.mjs` 8/8).
 - 2026-10-10 — 0.6 / 7.4 / 7.5 partial (`v3/ship`): elm-program-test vendored (`tools/vendor-elm-packages.sh`), 6 `ShipFlowTest` ship-bar flows, `bundleBoot.smoke.mjs` real-bundle jsdom smoke, `tools/build.sh` hashed static build; fixed reversed same-port command order in `Main.update` and double-CRLF framing in `ports.js`.
+- 2026-10-10 — Calls C4–C5 (camera/share/deafen commands + connection quality; video grid, tiles, spotlight/screenshare, dominant speaker, paging of 16) landed (`v3/calls-c4`).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 
@@ -183,6 +184,10 @@ C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands
 C5 Video grid, tiles, layouts, dominant speaker (L) · C6 DM ring overlays (S) **done** ·
 C7 PiP (M) **done** · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
 C10 Reconnecting + classified errors (S) **done** · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
+C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) **done** ·
+C5 Video grid, tiles, layouts, dominant speaker (L) **done** · C6 DM ring overlays (S) ·
+C7 PiP (M) · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
+C10 Reconnecting + classified errors (S) · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
 
 C1–C3 landed on `v3/calls-c1` (`CallUi`, `View.CallPresence`, `View.CallStage`; 45 `CallsC1Test`
 vectors). Join-muted-on, the reserved Privacy-code slot and snapshot-carried peer fingerprints
@@ -191,6 +196,10 @@ ship as provisional answers to §7.2/§7.5/§7.6.
 C6, C7 and C10 landed on `v3/calls-c6` (`CallDock`, `View.CallDock`, `css/calls-c6.css`; 28
 `CallsC6Test` tests + `voiceRing.smoke.mjs` 9/9). Provisional §7 answers: a timed-out
 outgoing ring reuses `CallEnded` (§7.7), an accepted DM call joins muted (§7.2).
+C4–C5 landed on `v3/calls-c4` (`CallMedia`, `View.CallVideo`, `css/calls-c4.css`; one
+`voiceCommand` port + one `voicePeerState` port; 34 `CallsC4Test` vectors +
+`voiceTiles.smoke.mjs` 12/12). Deafen stays local-only (§7.4) and remote `kind = screen` peers
+force the screenshare layout (§7.3) as provisional answers.
 
 Open product questions are in spec §7 (mic chord vs room-mute chord, join-muted default,
 screen-share peers in ROSTER, wire for DEAFEN/RECORD, privacy code, fingerprint forwarding,

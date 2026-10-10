@@ -25,6 +25,8 @@ has no Elm More menu yet, so the idle join simply hides.
 import App exposing (Model, Msg(..))
 import CallDock -- v3/calls-c6
 import CallUi
+-- v3/calls-c4
+import CallMedia
 import Dict
 import Html exposing (Html, button, div, h2, li, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, title, type_)
@@ -128,14 +130,16 @@ headerVoice model =
                     current =
                         CallUi.currentCallIn model.calls room
 
+                    -- v3/calls-c4: full local health (deafened / sharing / video).
                     status =
-                        CallUi.roomStatus
+                        CallMedia.roomStatus
                             { participants = names
                             , speaking = model.media.speaking
                             , raised = model.media.hands
                             , muted = model.media.muted
                             , currentCall = current
                             , localMuted = model.callSelfMuted
+                            , local = model.callLocal
                             }
 
                     chip =

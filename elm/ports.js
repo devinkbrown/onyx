@@ -2207,6 +2207,14 @@
     if (name === "EncoderError") return "encoder";
     return "other";
   }
+  /* v3/calls-c4: engine-confirmed local media + quality on the same
+     snapshot (spec §5): camera / screen / deafened flags, the browser
+     capabilities (shareSupported / pipSupported), the network tier
+     (0..3) and a screen-share refusal. Forwarded only when present;
+     Elm folds them fail-closed (CallMedia.decodeLocal). */
+  var VOICE_MEDIA_FIELDS = [
+    "camera", "screen", "deafened", "shareSupported", "pipSupported", "qualityTier", "screenError"
+  ];
 
   function voiceFeedBlank() {
     return { channel: null, startedAt: null, sawEstablished: false };
@@ -2260,6 +2268,10 @@
     VOICE_RING_FIELDS.forEach(function (key) {
       if (Object.prototype.hasOwnProperty.call(ev, key)) snapshot[key] = ev[key];
     });
+    /* v3/calls-c4 */
+    VOICE_MEDIA_FIELDS.forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(ev, key)) snapshot[key] = ev[key];
+    });
     return {
       snapshot: snapshot,
       feed: {
@@ -2274,16 +2286,250 @@
      push snapshots into Elm. Without an engine the hub honestly rests
      idle — never a fabricated call. Integration point:
      window.OnyxVoiceEngine.subscribe(pushEvent). */
+  /* v3/calls-c4: browser capabilities the bar must not over-promise
+     (Share is disabled "Screen sharing unavailable" without
+     getDisplayMedia; the tile PiP button needs document PiP). */
+  function voiceCapabilities() {
+    var share = false;
+    var pip = false;
+    try {
+      share = typeof navigator !== "undefined" && !!navigator.mediaDevices
+        && typeof navigator.mediaDevices.getDisplayMedia === "function";
+    } catch (err) { share = false; }
+    try {
+      pip = typeof document !== "undefined" && !!document && document.pictureInPictureEnabled === true;
+    } catch (err) { pip = false; }
+    return { shareSupported: share, pipSupported: pip };
+  }
+
+  var VOICE_PEER_KINDS = { voice: true, video: true, screen: true };
+  var VOICE_MAX_PEERS = 256;
+
+  /* One engine peer (CadencePeerState minus the canvas) as plain flags;
+     Elm re-validates (CallMedia.decodePeers). */
+  function voicePeerEntry(peer) {
+    if (!peer || typeof peer.nick !== "string" || !peer.nick || peer.nick.length > 256) return null;
+    var entry = {
+      nick: peer.nick,
+      kind: VOICE_PEER_KINDS[peer.kind] ? peer.kind : "voice",
+      hasVideo: peer.hasVideo === true,
+      speaking: peer.speaking === true,
+      muted: peer.muted === true,
+      videoPaused: peer.videoPaused === true
+    };
+    if (typeof peer.quality === "number" && peer.quality >= 0 && peer.quality <= 3) entry.quality = peer.quality;
+    return entry;
+  }
+
+  /* Event routing for the one engine subscription:
+       {state, ...}                 call lifecycle (+ trust/media fields)
+       {peer} / {peerLeft} / {peers} per-peer media flags → voicePeerState
+       {localStream} / {stream:{tile, media}}  MediaStreams for the tile
+                                    binder (never forwarded to Elm). */
   function mountVoiceFeedPush(app) {
     var feed = voiceFeedBlank();
-    return function push(event) {
-      var step = voiceFeedNext(feed, event, Date.now());
+    var last = null;
+    var peers = {};
+    var streams = {};
+    var listeners = [];
+    function sendPeers() {
+      var list = Object.keys(peers).slice(0, VOICE_MAX_PEERS).map(function (k) { return peers[k]; });
+      try {
+        if (app.ports.voicePeerState) app.ports.voicePeerState.send({ peers: list });
+      } catch (err) { /* port gone */ }
+    }
+    function streamsChanged() {
+      listeners.forEach(function (fn) {
+        try { fn(); } catch (err) { /* binder is best-effort */ }
+      });
+    }
+    function push(event) {
+      var ev = event || {};
+      var has = function (key) { return Object.prototype.hasOwnProperty.call(ev, key); };
+      if (has("peer") || has("peerLeft") || has("peers")) {
+        if (Array.isArray(ev.peers)) {
+          peers = {};
+          ev.peers.forEach(function (p) {
+            var entry = voicePeerEntry(p);
+            if (entry) peers[entry.nick.toLowerCase()] = entry;
+          });
+        }
+        if (ev.peer) {
+          var entry = voicePeerEntry(ev.peer);
+          if (entry) peers[entry.nick.toLowerCase()] = entry;
+        }
+        if (typeof ev.peerLeft === "string") delete peers[ev.peerLeft.toLowerCase()];
+        sendPeers();
+        streamsChanged();
+        return;
+      }
+      if (has("localStream") || has("stream")) {
+        if (has("localStream")) {
+          if (ev.localStream) {
+            streams.self = ev.localStream;
+            streams["self-screen"] = ev.localStream;
+          } else {
+            delete streams.self;
+            delete streams["self-screen"];
+          }
+        }
+        if (ev.stream && typeof ev.stream.tile === "string") {
+          if (ev.stream.media) streams[ev.stream.tile] = ev.stream.media;
+          else delete streams[ev.stream.tile];
+        }
+        streamsChanged();
+        return;
+      }
+      var step = voiceFeedNext(feed, ev, Date.now());
       if (!step) return;
       feed = step.feed;
+      var snapshot = step.snapshot;
+      if (snapshot.state === "idle") {
+        last = null;
+        if (Object.keys(peers).length) {
+          peers = {};
+          sendPeers();
+        }
+        streams = {};
+        streamsChanged();
+      } else {
+        last = { state: snapshot.state, nick: snapshot.nick, channel: snapshot.channel };
+        var caps = voiceCapabilities();
+        if (!has("shareSupported")) snapshot.shareSupported = caps.shareSupported;
+        if (!has("pipSupported")) snapshot.pipSupported = caps.pipSupported;
+      }
       try {
-        if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(step.snapshot);
+        if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(snapshot);
       } catch (err) { /* port gone */ }
+    }
+    /* Re-send the live call with confirmed local-media fields (command
+       outcomes). Dropped while idle — nothing to confirm. */
+    push.local = function (fields) {
+      if (!last) return;
+      var ev = {};
+      Object.keys(last).forEach(function (k) { ev[k] = last[k]; });
+      Object.keys(fields || {}).forEach(function (k) { ev[k] = fields[k]; });
+      push(ev);
     };
+    push.streamFor = function (tile) {
+      return Object.prototype.hasOwnProperty.call(streams, tile) ? streams[tile] : null;
+    };
+    push.onStreams = function (fn) {
+      if (typeof fn === "function") listeners.push(fn);
+    };
+    return push;
+  }
+
+  var voiceCanvasStreams = (typeof WeakMap === "function") ? new WeakMap() : null;
+
+  function voiceCanvasStream(canvas) {
+    if (!canvas || typeof canvas.captureStream !== "function") return null;
+    if (voiceCanvasStreams && voiceCanvasStreams.has(canvas)) return voiceCanvasStreams.get(canvas);
+    var stream = null;
+    try { stream = canvas.captureStream(); } catch (err) { stream = null; }
+    if (stream && voiceCanvasStreams) voiceCanvasStreams.set(canvas, stream);
+    return stream;
+  }
+
+  function voiceFindPeer(peers, lower) {
+    var found = null;
+    if (!peers) return null;
+    var visit = function (state, nick) {
+      if (found) return;
+      var name = (state && typeof state.nick === "string") ? state.nick : nick;
+      if (typeof name === "string" && name.toLowerCase() === lower) found = state;
+    };
+    if (typeof peers.forEach === "function") peers.forEach(visit);
+    else Object.keys(peers).forEach(function (k) { visit(peers[k], k); });
+    return found;
+  }
+
+  /* Resolve the MediaStream for one tile id (`self`, `self-screen`,
+     `peer:{nick}`, `screen:{nick}`): streams the integration pushed,
+     then engine.streamForTile, then the CadenceMediaEngine surface
+     (getScreenStream for shares, the peer's decode canvas via
+     captureStream for cameras). Null when nothing is live — the tile
+     then shows its avatar, never a frozen frame. */
+  function voiceTileStream(tile, feed, engine) {
+    if (typeof tile !== "string" || !tile) return null;
+    var stream = (feed && typeof feed.streamFor === "function") ? feed.streamFor(tile) : null;
+    if (stream) return stream;
+    if (!engine) return null;
+    try {
+      if (typeof engine.streamForTile === "function") {
+        stream = engine.streamForTile(tile);
+        if (stream) return stream;
+      }
+      var match = /^(peer|screen):(.+)$/.exec(tile);
+      if (!match) return null;
+      var peer = (typeof engine.getPeers === "function") ? voiceFindPeer(engine.getPeers(), match[2]) : null;
+      var nick = (peer && typeof peer.nick === "string") ? peer.nick : match[2];
+      if (match[1] === "screen") {
+        if (typeof engine.getScreenStream === "function") {
+          stream = engine.getScreenStream(nick);
+          if (stream) return stream;
+        }
+      }
+      if (peer && peer.canvas) return voiceCanvasStream(peer.canvas);
+    } catch (err) { /* resolution is best-effort */ }
+    return null;
+  }
+
+  /* Bind `<video data-voice-tile>` placeholders that Elm renders to
+     their streams (Elm never touches MediaStreams). Rebinds on DOM
+     mutations (new / re-keyed tiles) and on stream changes, coalesced
+     into one microtask. Videos are always muted: remote audio plays
+     through the engine, never twice. */
+  function createVoiceTileBinder(resolve, doc) {
+    var scheduled = false;
+    function bindNow() {
+      var nodes;
+      try { nodes = doc.querySelectorAll("video[data-voice-tile]"); } catch (err) { return; }
+      for (var i = 0; i < nodes.length; i += 1) {
+        var el = nodes[i];
+        var stream = null;
+        try { stream = resolve(el.getAttribute("data-voice-tile")) || null; } catch (err) { stream = null; }
+        try { el.muted = true; } catch (err) { /* read-only in some hosts */ }
+        if ((el.srcObject || null) !== stream) {
+          try { el.srcObject = stream; } catch (err) { /* binding is best-effort */ }
+        }
+        /* Unbound placeholders stay hidden (CSS) so the avatar shows —
+           never an empty black frame. Not observed: no rebind loop. */
+        try { el.setAttribute("data-bound", stream ? "true" : "false"); } catch (err) { /* best-effort */ }
+      }
+    }
+    function refresh() {
+      if (scheduled) return;
+      scheduled = true;
+      Promise.resolve().then(function () {
+        scheduled = false;
+        bindNow();
+      });
+    }
+    var observer = null;
+    var view = doc.defaultView || (typeof window !== "undefined" ? window : null);
+    var Observer = view && view.MutationObserver;
+    if (Observer && doc.body) {
+      observer = new Observer(refresh);
+      observer.observe(doc.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-voice-tile"]
+      });
+    }
+    return {
+      refresh: refresh,
+      bindNow: bindNow,
+      disconnect: function () { if (observer) observer.disconnect(); }
+    };
+  }
+
+  function runVoiceEngine(call, ok, fail) {
+    var out;
+    try { out = call(); } catch (err) { fail(); return; }
+    if (out && typeof out.then === "function") out.then(ok, function () { fail(); });
+    else ok(out);
   }
 
   function mountVoiceFeed(app) {
@@ -3669,6 +3915,74 @@ function fetchPublicFeed(url) {
     }
     if (typeof document !== "undefined" && document) {
       try { installVoicePipAssist(document); } catch (err) { /* assist is best-effort */ }
+    }
+    /* v3/calls-c4: tile video binding + the ONE call-media command port.
+       Every outcome is reported back as an engine-confirmed snapshot
+       field (camera / screen / deafened), so the bar never claims a
+       state the engine did not reach. */
+    if (typeof document !== "undefined" && document && document.body) {
+      var voiceTiles = createVoiceTileBinder(function (tile) {
+        return voiceTileStream(tile, voicePush, voiceEngine());
+      }, document);
+      voicePush.onStreams(voiceTiles.refresh);
+      voiceTiles.refresh();
+    }
+    if (app.ports.voiceCommand) {
+      app.ports.voiceCommand.subscribe(function (req) {
+        var verb = (req && typeof req.verb === "string") ? req.verb : "";
+        var on = !!(req && req.on);
+        var channel = (req && typeof req.channel === "string" && req.channel) ? req.channel : undefined;
+        var engine = voiceEngine();
+        var report = voicePush.local;
+        if (verb === "camera") {
+          if (on) {
+            if (!engine || typeof engine.startCamera !== "function") { report({ camera: false }); return; }
+            runVoiceEngine(function () { return engine.startCamera(channel); },
+              function (res) { report({ camera: res !== false }); },
+              function () { report({ camera: false }); });
+          } else {
+            if (!engine || typeof engine.stopCamera !== "function") { report({ camera: !!engine }); return; }
+            runVoiceEngine(function () { return engine.stopCamera(); },
+              function () { report({ camera: false }); },
+              function () { report({ camera: true }); });
+          }
+        } else if (verb === "share") {
+          if (on) {
+            if (!voiceCapabilities().shareSupported) { report({ screen: false, screenError: true, shareSupported: false }); return; }
+            if (!engine || typeof engine.startScreenShare !== "function") { report({ screen: false, screenError: true }); return; }
+            runVoiceEngine(function () { return engine.startScreenShare(channel); },
+              function (res) { report(res === false ? { screen: false, screenError: true } : { screen: true }); },
+              function () { report({ screen: false, screenError: true }); });
+          } else {
+            /* Without a stop verb the share cannot honestly end: report it
+               still live rather than pretend. */
+            if (!engine || typeof engine.stopScreenShare !== "function") { report({ screen: !!engine }); return; }
+            runVoiceEngine(function () { return engine.stopScreenShare(channel); },
+              function () { report({ screen: false }); },
+              function () { report({ screen: true }); });
+          }
+        } else if (verb === "deafen") {
+          if (!engine || typeof engine.setDeafened !== "function") { report({ deafened: false }); return; }
+          runVoiceEngine(function () { return engine.setDeafened(on); },
+            function () { report({ deafened: on }); },
+            function () { report({ deafened: !on }); });
+        } else if (verb === "pip") {
+          var tile = (req && typeof req.tile === "string") ? req.tile : "";
+          if (!tile || typeof document === "undefined") return;
+          var target = null;
+          var nodes = document.querySelectorAll("video[data-voice-tile]");
+          for (var i = 0; i < nodes.length; i += 1) {
+            if (nodes[i].getAttribute("data-voice-tile") === tile) { target = nodes[i]; break; }
+          }
+          if (!target) return;
+          try {
+            var done = (document.pictureInPictureElement === target)
+              ? document.exitPictureInPicture()
+              : (typeof target.requestPictureInPicture === "function" ? target.requestPictureInPicture() : null);
+            if (done && typeof done.then === "function") done.then(null, function () { /* declined: stays in page */ });
+          } catch (err) { /* PiP is an optional enhancement */ }
+        }
+      });
     }
     if (app.ports.appearanceStorePrefs) {
       app.ports.appearanceStorePrefs.subscribe(function (req) {
@@ -9127,6 +9441,12 @@ function fetchPublicFeed(url) {
     voiceFeed: {
       blank: voiceFeedBlank,
       next: voiceFeedNext
+    },
+    voiceTiles: {
+      createBinder: createVoiceTileBinder,
+      resolve: voiceTileStream,
+      peerEntry: voicePeerEntry,
+      capabilities: voiceCapabilities
     },
     wire: wire,
     createTranscriptScroller: createTranscriptScroller,
