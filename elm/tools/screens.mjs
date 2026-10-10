@@ -192,10 +192,35 @@ if (extra) {
   const h = { base, pin, joinRoom, tryClick, settle };
   for (const [k, fn] of Object.entries(mod.default || {})) SCENARIOS[k] = (p) => fn(p, h);
 }
-const VIEWPORTS = {
-  phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
+// Aspect-ratio matrix. Select with --vp a,b,c or --vp all (default:
+// phone,desktop). Touch entries emulate mobile (isMobile + hasTouch).
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const touch = (w, h, dpr, ua) => ({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true, userAgent: ua });
+const MATRIX = {
+  se: touch(320, 568, 2, IPHONE_UA),            // iPhone SE 1st gen / smallest supported
+  phone: touch(390, 844, 3, IPHONE_UA),         // iPhone 15
+  promax: touch(430, 932, 3, IPHONE_UA),        // iPhone 15 Pro Max
+  'phone-land': touch(844, 390, 3, IPHONE_UA),  // iPhone 15 landscape
+  fold: touch(344, 882, 3),                     // foldable, folded (very tall/narrow)
+  'fold-open': touch(673, 841, 2.6),            // foldable, unfolded (near-square)
+  tablet: touch(820, 1180, 2, IPAD_UA),         // iPad Air portrait
+  'tablet-land': touch(1180, 820, 2, IPAD_UA),  // iPad Air landscape
+  'ipad-pro-land': touch(1366, 1024, 2, IPAD_UA),
+  laptop: { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 },
+  'laptop-short': { viewport: { width: 1366, height: 600 }, deviceScaleFactor: 1 },
   desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 },
+  fhd: { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 },
+  ultrawide: { viewport: { width: 2560, height: 1080 }, deviceScaleFactor: 1 },
+  'ultrawide-qhd': { viewport: { width: 3440, height: 1440 }, deviceScaleFactor: 1 },
 };
+const vpArg = opt('--vp', 'phone,desktop');
+const vpNames = vpArg === 'all' ? Object.keys(MATRIX) : vpArg.split(',');
+const VIEWPORTS = {};
+for (const n of vpNames) {
+  if (!MATRIX[n]) { console.error(`unknown viewport ${n}; known: ${Object.keys(MATRIX).join(', ')}`); process.exit(2); }
+  VIEWPORTS[n] = MATRIX[n];
+}
 
 const browser = await chromium.launch({ executablePath: chromePath, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const shots = [];
