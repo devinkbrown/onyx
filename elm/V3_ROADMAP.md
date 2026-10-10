@@ -54,7 +54,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 2.1 | Rich message text: clickable links (safe schemes only), channel links, mentions | `message/MessageText` | M |
 | 2.2 | mIRC formatting (bold/italic/underline/colour/reset) | `MessageText` | M |
 | 2.3 | Markdown subset: inline code, code blocks, blockquote, spoiler | `MessageText` | M |
-| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | M |
+| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | **done** (v3/composer; More tools tray still todo) |
 | 2.5 | "Add a boost" on the boost bar | `BoostBar` | S |
 | 2.6 | Jump to date + time scrubber | `JumpToDateSheet`, `TimeScrubber` | M |
 | 2.7 | Catch-up: "Since you left" digest, mark caught up | `CatchUpSummary`, `SinceDigestCard` | M |
