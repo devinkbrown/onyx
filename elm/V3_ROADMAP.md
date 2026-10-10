@@ -75,8 +75,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 
 | # | Surface | Oracle | Size |
 |---|---|---|---|
-| 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | M |
-| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | L |
+| 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | **done** (v3/frame + v3/roomsettings: privacy glyph, expandable topic, facepile, notify strip + invite / DM safety trigger in the header, Room settings in More; heatline, export, mark read and room care in More still todo) |
+| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | **done** (v3/roomsettings; invite builder, export, hide/leave and topic-draft durability not in the sheet; webhooks linked to Room care) |
 | 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | **done** (`v3/notify`: room All/@/Mute strip in the thread header + Notifications sheet with desktop/sound/DND; quiet-hours schedule + calm presets narrowed out — no `App` state) |
 | 3.4 | Invite friends share sheet | `RoomInviteShare` | S |
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M · **done** (v3/roster: Filter members field + Escape clear, header count, avatar + presence dot, role/away in words, per-row Message + double-click DM; no windowing, loading skeleton, or modal/mobile copy) |
@@ -86,7 +86,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M |
 | 3.6 | Profile card: Message / Report / moderation controls | `PeopleProfileCard` | S |
 | 3.7 | DM E2EE safety number + key-change banner | `DmSafetySheet`, `DmKeyChangeBanner` | M · **done** (v3/dmsafety: DM header posture chip + Verify panel + inline key-change row with accept/keep-locked; ports `dmSafetyRequest`/`dmKeyAcceptRequest`) |
-| 3.8 | Room insights strip, context rail, scheduled-event line, bridge badge, group-control mark | `RoomInsightsStrip`, `ContextRail`, `ScheduledEventLine`, `BridgeStatusBadge` | S each |
+| 3.8 | Room insights strip, context rail, scheduled-event line, bridge badge, group-control mark | `RoomInsightsStrip`, `ContextRail`, `ScheduledEventLine`, `BridgeStatusBadge` | **done** except context rail (v3/roomsettings: insights in Room settings, event line / bridge badge / group-control mark in the header) |
 | 3.9 | Harbor confirm sheet for room verbs | `HarborConfirmSheet` | S |
 
 ## Phase 4 — Settings and account completeness
