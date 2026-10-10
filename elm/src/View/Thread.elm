@@ -139,7 +139,7 @@ channelTranscript model channel =
                         [ span [ class "onyx-intro-glyph", attribute "aria-hidden" "true" ]
                             [ text (String.left 1 channel.name) ]
                         , h2 [ class "onyx-intro-title" ] [ text channel.name ]
-                        , text "This is the very beginning of the conversation."
+                        , p [ class "onyx-intro-copy" ] [ text "This is the very beginning of the conversation." ]
                         ]
 
                   else
@@ -236,7 +236,7 @@ rowEntries model target rv m =
 
 dayDivider : String -> Html Msg
 dayDivider label =
-    div
+    li
         [ class "onyx-day-divider"
         , attribute "role" "separator"
         , attribute "aria-label" label
@@ -246,7 +246,7 @@ dayDivider label =
 
 unreadDivider : Html Msg
 unreadDivider =
-    div
+    li
         [ class "onyx-unread-divider"
         , attribute "role" "separator"
         , attribute "aria-label" "New messages"
@@ -286,7 +286,7 @@ rowNode model target rv m =
 
 systemRow : Bool -> App.ChatMessage -> Html Msg
 systemRow hideEvents m =
-    div
+    li
         [ class "onyx-system"
         , attribute "data-event" m.msgType
         , Html.Attributes.hidden (PrefsPanel.hidesEvent hideEvents m.msgType) -- v3/prefs

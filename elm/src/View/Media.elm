@@ -161,7 +161,13 @@ filterPanel model filter label =
                 Links ->
                     "links"
     in
-    div [ class "room-media-index-panel", attribute "data-media-filter" filterId ]
+    div
+        [ class "room-media-index-panel"
+        , attribute "data-media-filter" filterId
+        , attribute "role" "tabpanel"
+        , attribute "aria-label" label
+        , Html.Attributes.hidden (model.mediaIndexFilter /= filter)
+        ]
         [ ul [ class "room-media-index-list", attribute "aria-label" (label ++ " in this conversation") ]
             (List.map (mediaItem model) items)
         , if model.mediaIndexVaultState /= App.MediaVaultLoading && List.isEmpty items then
