@@ -132,7 +132,26 @@ composer model =
         , sendLater model
         , case model.composerError of
             Just err ->
-                p [ class "onyx-composer-error", attribute "role" "alert" ] [ text err ]
+                p [ class "onyx-composer-error", attribute "role" "alert" ]
+                    (text err
+                        :: (case model.dmKeyHold of
+                                -- v3/dm-key-hold: explicit plaintext consent
+                                Just peer ->
+                                    [ text " "
+                                    , button
+                                        [ type_ "button"
+                                        , class "onyx-composer-plain"
+                                        , attribute "data-testid" "dm-send-unencrypted"
+                                        , attribute "aria-label" ("Send to " ++ peer ++ " without encryption")
+                                        , onClick (DmSendUnencrypted peer)
+                                        ]
+                                        [ text "Send unencrypted" ]
+                                    ]
+
+                                Nothing ->
+                                    []
+                           )
+                    )
 
             Nothing ->
                 text ""

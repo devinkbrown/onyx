@@ -395,6 +395,8 @@ suite =
                     |> ProgramTest.fillIn "new-message-recipient" "Who do you want to message?" "alice"
                     |> pressEnterInForm [ Selector.containing [ Selector.id "new-message-recipient" ] ]
                     |> composerIs "alice"
+                    -- The peer key lookup answers "no key" before the send.
+                    |> serverSays [ ":onyx.test 766 kai alice ocean.dm-key :key not set" ]
                     |> sendInComposer "hi alice"
                     |> ProgramTest.expectOutgoingPortValues "wsSend"
                         Decode.string
