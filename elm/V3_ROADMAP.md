@@ -127,8 +127,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 7.1 | Focus traps + Escape + focus restore on every overlay (shared helper in ports) | M · **done** via 1.0 (v3/frame) except the image lightbox, which keeps its background-isolating helper |
 | 7.2 | Responsive pass: 375px layouts for every sheet, safe-area insets | M · partly via 1.0 (every `View.Sheet` becomes a bottom sheet <768px; no fixed widths over 375px; bottom nav honours the safe-area inset) — browser verification pending |
 | 7.3 | PWA: install sheet, update-available banner | S |
-| 7.4 | Browser e2e for the Elm build (Playwright against a static server) incl. connect → join → send | M |
-| 7.5 | Build + deploy path for the Elm bundle (`elm make --optimize`, hashed asset, CSP) | M |
+| 7.4 | Browser e2e for the Elm build (Playwright against a static server) incl. connect → join → send | M · **partial** (v3/ship): the ship-bar path runs without a browser — `ShipFlowTest` (elm-program-test 4.0.1, 6 keyboard-only flows over `App.init`/`update`/`View.view` with simulated ports) + `bundleBoot.smoke.mjs` (jsdom boots `index.html` + a fresh `--optimize` bundle + real `ports.js`; gate → Enter → stub WebSocket dial → registration → Home → browse/join → Enter-send → inbound DM). **Pending:** Playwright itself (bundled Chromium is glibc, host is musl) |
+| 7.5 | Build + deploy path for the Elm bundle (`elm make --optimize`, hashed asset, CSP) | M · **partial** (v3/ship): `elm/tools/build.sh` → `elm/dist-elm/` (gitignored): `--optimize` build, index.html + app.css + css/*.css + ports.js, 12-hex sha256 names for every local script/stylesheet with the tags rewritten; smoke the output with `ONYX_ELM_DIST=elm/dist-elm node --test elm/bundleBoot.smoke.mjs`. **Pending:** deploy path (deliberately none — production stays `deploy.sh`-only), minification (no uglify/esbuild resolvable from the repo root), CSP (index.html still has an inline boot script needing a hash or extraction) |
 | 7.6 | Visual regression screenshots per surface | M |
 
 ## Progress log
@@ -142,6 +142,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
 - 2026-10-10 — Calls C1–C3 (presence + join banner, voice-only stage + bar v1 + announcer, security chip + privacy sheet) landed (`v3/calls-c1`).
 - 2026-10-10 — 1.0 shell frame + tokens landed (`v3/frame`): token ladder, one frame grid, `View.Sheet` primitive, one overlay focus mechanism, one Escape order, global topbar + room header with More menu (24 `FrameTest` vectors + `overlayFocus.smoke.mjs` 8/8).
+- 2026-10-10 — 0.6 / 7.4 / 7.5 partial (`v3/ship`): elm-program-test vendored (`tools/vendor-elm-packages.sh`), 6 `ShipFlowTest` ship-bar flows, `bundleBoot.smoke.mjs` real-bundle jsdom smoke, `tools/build.sh` hashed static build; fixed reversed same-port command order in `Main.update` and double-CRLF framing in `ports.js`.
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 
@@ -154,7 +155,7 @@ keyboard-only and at 375px, with elm-program-test flows + Playwright + screensho
 
 | New # | Item | Replaces / moves | Size |
 |---|---|---|---|
-| 0.6 | Playwright against the static Elm build (375 / 768 / 1280) | pulled from 7.4 | M |
+| 0.6 | Playwright against the static Elm build (375 / 768 / 1280) | pulled from 7.4 | M · **partial** (v3/ship): browserless substitutes for the logic half — elm-program-test ship-bar flows (connect → Home → open room → send → DM → settings → appearance, keyboard-only: native enabled tabbable buttons, form submit, roving radio/tab arrows, `shortcut`-port chords) and the jsdom real-bundle smoke, which caught two wire bugs now fixed (per-port reversed `Cmd.batch` order put `USER`/`NICK` before `CAP LS`; every frame carried a second CRLF). **Pending:** 375/768/1280 geometry, focus movement in a real engine, screenshots, axe — all need a runnable browser |
 | 1.0 | Shell frame + tokens: Solid token ladder in `app.css`, responsive grid (nav rail / collection sidebar / main / context rail), sheet/dialog primitive with one focus-trap port, `role="log"` transcript container, 375px gate, visual-regression baselines | absorbs 7.1, 7.2, 7.6 | L · **done** (v3/frame: token ladder + 15/13/11 type + reduced motion; one `.onyx-frame` grid with <768px single column + bottom nav; `View.Sheet` on 23 sheets; ONE overlay focus mechanism in `ports.js` (`installOverlayFocus`, absorbs the call-dialog helper); ONE Escape order `App.escapeMsg`; global topbar vs. `View.RoomHeader` + More menu; repaired three merge-damaged CSS blocks. **Deferred:** visual-regression baselines and real-browser 375/768/1280 geometry (no runnable browser on this host — the bundled Chromium is glibc, the host is musl), `Feature/X` registry blocks, moving the facepile/notify strip from the transcript into the room header, right-rail (non-modal) thread/pins/members panels) |
 | 1.1→1.7 | Ctrl/Cmd+K becomes an action palette right after primary nav | 1.7 moved up | S · **done** (v3/switcher) |
 | 1.4a | Land on Home after connect; Home absorbs the catch-up digest | absorbs 2.7 | M |

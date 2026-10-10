@@ -1507,7 +1507,12 @@ update msg model =
             App.update msg model.app
     in
     ( { model | app = app }
-    , Cmd.batch (List.map (perform model.navKey) outbound)
+      -- v3/ship: elm/core 1.0.5 gathers a batch's commands per port by
+      -- consing (`_Platform_insert`), so commands for ONE port reach
+      -- ports.js in reverse batch order. Reversing here keeps the wire in
+      -- `App.update` order (CAP LS before NICK/USER, so SASL can run
+      -- pre-registration); bundleBoot.smoke.mjs pins this on the real bundle.
+    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound))
     )
 
 
