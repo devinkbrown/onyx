@@ -94,7 +94,7 @@ inCall : Model
 inCall =
     base
         |> withRoster [ "odalys", "mara", "jun" ]
-        |> step (snapshot [])
+        |> step (snapshot [ ( "cameraSupported", Encode.bool True ) ])
 
 
 step : Msg -> Model -> Model

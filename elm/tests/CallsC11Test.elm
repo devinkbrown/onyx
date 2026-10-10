@@ -142,6 +142,7 @@ inCallAt roster model =
                     [ ( "state", Encode.string "in_call" )
                     , ( "channel", Encode.string "#stage" )
                     , ( "startedAt", Encode.int 1000 )
+                    , ( "cameraSupported", Encode.bool True )
                     ]
                 )
             )
