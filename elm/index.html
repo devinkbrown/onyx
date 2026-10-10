@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="app.css">
 <link rel="stylesheet" href="css/calls-c8.css">
 <link rel="stylesheet" href="css/calls-c11.css">
+
+<link rel="stylesheet" href="css/polish.css">
 <link rel="stylesheet" href="css/account2.css">
 
 <link rel="stylesheet" href="css/roomsettings.css">
@@ -183,7 +185,8 @@
       dndUntil: dndUntil,
       sessionToken: resumeTokens.sessionToken,
       meshToken: resumeTokens.meshToken,
-      meshExpiresAtMs: resumeTokens.meshExpiresAtMs
+      meshExpiresAtMs: resumeTokens.meshExpiresAtMs,
+      polish: OnyxPorts.polishFlags ? OnyxPorts.polishFlags() : null
     }
   });
   OnyxPorts.wire(app);

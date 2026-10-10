@@ -6,9 +6,9 @@ reconnect (the oracle's outbox); only the sealed paths refuse while
 disconnected. Outbox chrome below the input comes from the shared
 `Outbox` truth tables, so copy cannot drift.
 
-Send-later lives beside Send: a `Send later` button (disabled with
-the oracle's reason copy while the draft cannot be queued) opens a
-small picker with the four presets, a custom date/time field parsed
+Send-later lives in the More tools tray (v3/polish, `View.Polish`):
+its `Send later` entry (disabled with the oracle's reason copy while
+the draft cannot be queued) opens a small picker with the four presets, a custom date/time field parsed
 against the local clock by the ports bridge, and a queue button that
 hands off to the scheduled sheet. The picker is a `div` dialog, never
 a nested form, so Enter in the composer still sends.
@@ -24,7 +24,9 @@ import Html.Attributes as Attr
 import Html.Events exposing (custom, on, onClick, onInput, onMouseEnter, onSubmit, preventDefaultOn)
 import Json.Decode as Decode
 import Outbox
+import Polish
 import Schedule
+import View.Polish
 
 
 composer : Model -> Html Msg
@@ -129,7 +131,14 @@ composer model =
                     "Send"
                 )
             ]
-        , sendLater model
+        -- v3/polish: Send later moved into the More tools tray; the
+        -- schedule popover still anchors here.
+        , View.Polish.moreTools model
+        , if model.scheduleOpen then
+            div [ class "onyx-schedule" ] [ schedulePopover model ]
+
+          else
+            text ""
         , case model.composerError of
             Just err ->
                 p [ class "onyx-composer-error", attribute "role" "alert" ]
@@ -433,54 +442,6 @@ stagedRow item =
         )
 
 
-{-| Send-later entry + picker (mirroring the composer's schedule
-surface: the button is disabled with the refusal reason while the
-draft cannot be queued, and the picker offers the four presets plus
-a custom date/time). -}
-sendLater : Model -> Html Msg
-sendLater model =
-    let
-        gate =
-            { target = model.activeChannel
-            , body = model.composer
-            , editing = editingFor model /= Nothing
-            , attachmentsStaged = not (List.isEmpty model.attachments)
-            }
-
-        able =
-            Schedule.canScheduleComposer gate
-
-        hint =
-            Maybe.withDefault "Schedule this message" (Schedule.scheduleComposerRefusal gate)
-    in
-    div [ class "onyx-schedule" ]
-        ([ button
-            ([ type_ "button"
-             , class "onyx-schedule-open"
-             , disabled (not able)
-             , title hint
-             , attribute "aria-label" "Schedule message to send later"
-             , attribute "aria-haspopup" "dialog"
-             , onClick ScheduleOpen
-             ]
-                ++ (if model.scheduleOpen then
-                        [ attribute "aria-expanded" "true", attribute "aria-controls" "onyx-schedule-picker" ]
-
-                    else
-                        [ attribute "aria-expanded" "false" ]
-                   )
-            )
-            [ text "Send later" ]
-         ]
-            ++ (if model.scheduleOpen then
-                    [ schedulePopover model ]
-
-                else
-                    []
-               )
-        )
-
-
 schedulePopover : Model -> Html Msg
 schedulePopover model =
     let
@@ -615,6 +576,10 @@ keyDecoder model =
                                     Nothing ->
                                         if key.key == "Escape" && model.composerAssist.emojiOpen then
                                             Decode.succeed ( ComposerEmojiClose, True )
+
+                                        else if key.key == "Escape" && model.polish.toolsOpen then
+                                            -- v3/polish: the tools tray closes before edit/reply
+                                            Decode.succeed ( PolishMsg Polish.ToolsClose, True )
 
                                         else
                                             escapeDecoder model |> Decode.map (\msg -> ( msg, False ))

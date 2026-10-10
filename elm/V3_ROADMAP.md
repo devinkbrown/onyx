@@ -51,7 +51,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
 | 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; no recents / time grammar) |
 | 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port, rows narrowed to handled chords) |
-| 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home: coach only; notify prompt todo) |
+| 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home coach; v3/polish: dismissal persisted in `onyx:first-hour-seen`, quiet notify sheet after the first send) |
 | 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 
 ## Phase 2 — Messages that render like a modern chat
@@ -61,12 +61,12 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 2.1 | Rich message text: clickable links (safe schemes only), channel links, mentions | `message/MessageText` | M |
 | 2.2 | mIRC formatting (bold/italic/underline/colour/reset) | `MessageText` | M |
 | 2.3 | Markdown subset: inline code, code blocks, blockquote, spoiler | `MessageText` | M |
-| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | **done** (v3/composer; More tools tray still todo) |
+| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | **done** (v3/composer; v3/polish: More tools tray — Attach, Send later, Jump to date, Emoji, Room ledger, slash tip; emoji closes after send) |
 | 2.5 | "Add a boost" on the boost bar | `BoostBar` | S |
-| 2.6 | Jump to date + time scrubber | `JumpToDateSheet`, `TimeScrubber` | M |
-| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | M |
+| 2.6 | Jump to date + time scrubber | `JumpToDateSheet`, `TimeScrubber` | **done** (see below; v3/polish scrubber) |
+| 2.4 | Composer: emoji picker, nick completion, slash-command suggestions, More tools | `Composer` | **done** (see above; v3/polish tray) |
 | 2.5 | "Add a boost" on the boost bar | `BoostBar` | **done** (`boost` slice: ＋ opener per row into the existing reaction picker) |
-| 2.6 | Jump to date sheet (time scrubber stays todo) | `JumpToDateSheet` (+ `TimeScrubber` ahead) | **done** (`boost` slice: sheet + topbar entry over `requestTravelTo`; no scrubber yet) |
+| 2.6 | Jump to date sheet + time scrubber | `JumpToDateSheet`, `TimeScrubber` | **done** (`boost` slice: sheet + topbar entry over `requestTravelTo`; v3/polish: 24h UTC scrubber from the room More menu over the same fold) |
 | 2.7 | Catch-up: "Since you left" digest, mark caught up | `CatchUpSummary`, `SinceDigestCard` | M |
 | 2.8 | BlockKit structured-action modal + send review | `message/BlockKitModal` | M |
 | 2.9 | Local edit-history view, context trail | `MessageView` | M |
@@ -126,7 +126,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|
 | 7.1 | Focus traps + Escape + focus restore on every overlay (shared helper in ports) | M · **done** via 1.0 (v3/frame) except the image lightbox, which keeps its background-isolating helper |
 | 7.2 | Responsive pass: 375px layouts for every sheet, safe-area insets | M · partly via 1.0 (every `View.Sheet` becomes a bottom sheet <768px; no fixed widths over 375px; bottom nav honours the safe-area inset) — browser verification pending |
-| 7.3 | PWA: install sheet, update-available banner | S |
+| 7.3 | PWA: install sheet, update-available banner | S · **done** (v3/polish): Add to Home Screen sheet over a captured `beforeinstallprompt` (iOS: Share copy), update strip over an existing Onyx service worker — the Elm build registers none, so detection is an honest no-op without one |
 | 7.4 | Browser e2e for the Elm build (Playwright against a static server) incl. connect → join → send | M · **partial** (v3/ship): the ship-bar path runs without a browser — `ShipFlowTest` (elm-program-test 4.0.1, 6 keyboard-only flows over `App.init`/`update`/`View.view` with simulated ports) + `bundleBoot.smoke.mjs` (jsdom boots `index.html` + a fresh `--optimize` bundle + real `ports.js`; gate → Enter → stub WebSocket dial → registration → Home → browse/join → Enter-send → inbound DM). **Pending:** Playwright itself (bundled Chromium is glibc, host is musl) |
 | 7.5 | Build + deploy path for the Elm bundle (`elm make --optimize`, hashed asset, CSP) | M · **partial** (v3/ship): `elm/tools/build.sh` → `elm/dist-elm/` (gitignored): `--optimize` build, index.html + app.css + css/*.css + ports.js, 12-hex sha256 names for every local script/stylesheet with the tags rewritten; smoke the output with `ONYX_ELM_DIST=elm/dist-elm node --test elm/bundleBoot.smoke.mjs`. **Pending:** deploy path (deliberately none — production stays `deploy.sh`-only), minification (no uglify/esbuild resolvable from the repo root), CSP (index.html still has an inline boot script needing a hash or extraction) |
 | 7.6 | Visual regression screenshots per surface | M |
@@ -142,6 +142,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
 - 2026-10-10 — Calls C1–C3 (presence + join banner, voice-only stage + bar v1 + announcer, security chip + privacy sheet) landed (`v3/calls-c1`).
 - 2026-10-10 — Calls C6 (DM ring overlays), C7 (picture-in-picture) and C10 (reconnecting + classified errors) landed (`v3/calls-c6`).
+- 2026-10-10 — v3/polish: composer More tools tray, time scrubber, first-run notify prompt, persisted first-hour coach, Add to Home Screen + update-available (7.3), Back online only after a recovery (42 `PolishTest` vectors + `polish.smoke.mjs` 6/6).
 - 2026-10-10 — 1.0 shell frame + tokens landed (`v3/frame`): token ladder, one frame grid, `View.Sheet` primitive, one overlay focus mechanism, one Escape order, global topbar + room header with More menu (24 `FrameTest` vectors + `overlayFocus.smoke.mjs` 8/8).
 - 2026-10-10 — 0.6 / 7.4 / 7.5 partial (`v3/ship`): elm-program-test vendored (`tools/vendor-elm-packages.sh`), 6 `ShipFlowTest` ship-bar flows, `bundleBoot.smoke.mjs` real-bundle jsdom smoke, `tools/build.sh` hashed static build; fixed reversed same-port command order in `Main.update` and double-CRLF framing in `ports.js`.
 - 2026-10-10 — Calls C4–C5 (camera/share/deafen commands + connection quality; video grid, tiles, spotlight/screenshare, dominant speaker, paging of 16) landed (`v3/calls-c4`).
