@@ -11,7 +11,7 @@ Focus-trap/Escape handling stays with the ports layer's DOM concerns;
 follow-topic pins stay ahead (the room opens without the topic jump).
 -}
 
-import App exposing (InboxFilter(..), InboxNotification, Model, Msg(..), isAttentionNotification, notificationContext, notificationKindGlyph, notificationKindLabel, unreadAttentionCount)
+import App exposing (InboxFilter(..), InboxNotification, Model, Msg(..), NotificationType(..), isAttentionNotification, notificationContext, notificationKindGlyph, notificationKindLabel, unreadAttentionCount)
 import Html exposing (Html, button, div, li, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, disabled)
 import Html.Events exposing (onClick)
@@ -71,9 +71,9 @@ inboxPanel model =
     in
     div [ class "notif-center", attribute "role" "dialog", attribute "aria-label" "Notification inbox", attribute "data-testid" "inbox-panel" ]
         [ div [ class "notif-center__head" ]
-            [ span [] [ text "Inbox" ]
-            , button [ onClick NotificationsMarkedRead, disabled (List.isEmpty model.notifications) ] [ text "Mark all read" ]
-            , button [ onClick NotificationCenterClosed, attribute "aria-label" "Close inbox" ] [ text "×" ]
+            [ span [ class "notif-center__title" ] [ text "Inbox" ]
+            , button [ class "notif-center__action", onClick NotificationsMarkedRead, disabled (List.isEmpty model.notifications) ] [ text "Mark all read" ]
+            , button [ class "notif-center__close", onClick NotificationCenterClosed, attribute "aria-label" "Close inbox" ] [ text "×" ]
             ]
         , div [ class "notif-center__filters", attribute "role" "group", attribute "aria-label" "Inbox filters" ]
             [ filterButton model InboxAll "All" (count InboxAll)
@@ -106,7 +106,8 @@ inboxPanel model =
 filterButton : Model -> InboxFilter -> String -> Int -> Html Msg
 filterButton model filter label count =
     button
-        [ attribute "aria-pressed"
+        [ class "notif-center__filter"
+        , attribute "aria-pressed"
             (if model.inboxFilter == filter then
                 "true"
 
@@ -137,10 +138,27 @@ inboxRow model note =
         context =
             notificationContext note
 
+        kindLabel =
+            notificationKindLabel note.kind
+
         read =
             Set.member note.id model.readNotificationIds
+
+        when =
+            relativeAge note.atMs model.nowMs
     in
-    li [ class "notif-center__row", attribute "data-testid" "inbox-row" ]
+    li
+        [ class "notif-center__row"
+        , attribute "data-testid" "inbox-row"
+        , attribute "data-type" (kindToken note.kind)
+        , attribute "data-unread"
+            (if read then
+                "false"
+
+             else
+                "true"
+            )
+        ]
         [ button
             [ class "notif-center__open"
             , attribute "aria-label" ("Open notification from " ++ context ++ ": " ++ clipped note.text)
@@ -148,14 +166,29 @@ inboxRow model note =
             ]
             [ span [ class "notif-center__glyph", attribute "aria-hidden" "true" ] [ text (notificationKindGlyph note.kind) ]
             , span [ class "notif-center__body" ]
-                [ span [ class "notif-center__kind" ] [ text (notificationKindLabel note.kind) ]
-                , span [ class "notif-center__context" ] [ text context ]
-                , span [ class "notif-center__text" ] [ text (clipped note.text) ]
-                , if read then
-                    span [ class "notif-center__read" ] [ text "Read" ]
+                [ span [ class "notif-center__meta" ]
+                    ([ span [ class "notif-center__kind" ] [ text kindLabel ] ]
+                        ++ (if context /= kindLabel then
+                                [ span [ class "notif-center__context" ] [ text context ] ]
 
-                  else
-                    span [] []
+                            else
+                                []
+                           )
+                        ++ (case when of
+                                Just label ->
+                                    [ span [ class "notif-center__when" ] [ text label ] ]
+
+                                Nothing ->
+                                    []
+                           )
+                        ++ (if read then
+                                [ span [ class "notif-center__read" ] [ text "Read" ] ]
+
+                            else
+                                []
+                           )
+                    )
+                , span [ class "notif-center__text" ] [ text (clipped note.text) ]
                 ]
             ]
         , button
@@ -166,6 +199,50 @@ inboxRow model note =
             ]
             [ text "×" ]
         ]
+
+
+kindToken : NotificationType -> String
+kindToken kind =
+    case kind of
+        NotifMention ->
+            "mention"
+
+        NotifDm ->
+            "dm"
+
+        NotifFollow ->
+            "follow"
+
+        NotifSystem ->
+            "system"
+
+        NotifError ->
+            "error"
+
+
+{-| Compact relative age ("now", "5m", "3h", "2d"); Nothing when either
+clock is unset so a zero stamp never renders as "20000d". -}
+relativeAge : Float -> Float -> Maybe String
+relativeAge atMs nowMs =
+    if atMs <= 0 || nowMs <= 0 then
+        Nothing
+
+    else
+        let
+            minutes =
+                floor (max 0 (nowMs - atMs) / 60000)
+        in
+        if minutes < 1 then
+            Just "now"
+
+        else if minutes < 60 then
+            Just (String.fromInt minutes ++ "m")
+
+        else if minutes < 48 * 60 then
+            Just (String.fromInt (minutes // 60) ++ "h")
+
+        else
+            Just (String.fromInt (minutes // 1440) ++ "d")
 
 
 {-| Clip row text for labels (mirroring the oracle `clipped`:

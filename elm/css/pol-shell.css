@@ -1,0 +1,503 @@
+/* v3/pol-shell — production polish for the shell views (inbox, account,
+   moderation desk, browser/formation, calls hub, rail, room header,
+   prefs, profile, topbar identity, stewardship, switcher, notify).
+   Ported from the Solid reference (src/shell/**, src/app/*.css) onto the
+   Elm tokens in app.css :root. One sea-glass accent: current location,
+   primary action, focus ring, mention glyph. 6px radii, no glow. */
+
+/* ---------- Shared quiet skins (zero specificity) ----------------------
+   Sheets and the room browser carry a few class-less buttons/fields;
+   give them the house control skin so nothing falls back to UA chrome.
+   :where() keeps every classed rule in charge. */
+
+:where(.onyx-sheet, .chb) :where(button:not([class])),
+:where(.chb) :where(button) {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+:where(.onyx-sheet, .chb) :where(button:not([class])):hover,
+:where(.chb) :where(button):hover { border-color: var(--onyx-dim); }
+:where(.onyx-sheet, .chb) :where(button:not([class])):disabled,
+:where(.chb) :where(button):disabled { opacity: 0.5; cursor: default; }
+
+:where(.onyx-sheet, .chb) :where(input:not([type="checkbox"]):not([type="radio"]):not([class]), select:not([class]), textarea:not([class])),
+:where(.chb) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-width: 0;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-text);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+/* ---------- Inbox (NotificationCenter) ---------------------------------
+   Rows: glyph tile | kicker line (kind · context · when · read) over the
+   message | dismiss. Unread rows carry a hairline left rule. */
+
+.notif-center__head { padding-bottom: var(--space-2); border-bottom: 1px solid var(--onyx-line); }
+.notif-center__title { flex: 1; font-size: var(--text-md); font-weight: 650; }
+.notif-center .notif-center__close {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--onyx-dim);
+}
+.notif-center .notif-center__action:disabled { opacity: 0.5; cursor: default; }
+
+.notif-center__filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 2px;
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.notif-center .notif-center__filter {
+  min-height: 28px;
+  border-color: transparent;
+  color: var(--onyx-dim);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.notif-center .notif-center__filter:hover { color: var(--onyx-text); }
+.notif-center .notif-center__filter[aria-pressed="true"] { color: var(--onyx-text); }
+
+.notif-center__empty {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-5) var(--space-3);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  text-align: center;
+  border: 1px dashed var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+.notif-center__list { display: flex; flex-direction: column; gap: 2px; }
+
+.notif-center__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-1);
+  min-width: 0;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius);
+}
+.notif-center__row[data-unread="true"] { border-left-color: var(--onyx-dim); background: color-mix(in oklab, var(--onyx-panel-2) 55%, transparent); }
+
+.notif-center .notif-center__open {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-2);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+}
+.notif-center .notif-center__open:hover { background: var(--onyx-panel-2); }
+
+.notif-center__glyph {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font: 600 var(--text-2xs) / 1 var(--font-mono);
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.notif-center__row[data-type="mention"] .notif-center__glyph { color: var(--onyx-accent); }
+.notif-center__row[data-type="dm"] .notif-center__glyph { color: var(--gold-bright); }
+.notif-center__row[data-type="error"] .notif-center__glyph { color: var(--onyx-bad); border-color: color-mix(in oklab, var(--onyx-bad) 45%, var(--onyx-line)); }
+
+.notif-center__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-center__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--onyx-faint);
+}
+.notif-center__kind {
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-dim);
+}
+.notif-center__row[data-type="error"] .notif-center__kind { color: var(--onyx-bad); }
+.notif-center__context { min-width: 0; color: var(--onyx-dim); overflow-wrap: anywhere; }
+.notif-center__when { margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.notif-center__read { color: var(--onyx-faint); }
+.notif-center__text {
+  color: var(--onyx-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+.notif-center__row[data-unread="false"] .notif-center__text { color: var(--onyx-dim); }
+
+.notif-center .notif-center__dismiss {
+  min-width: 32px;
+  min-height: 32px;
+  margin-top: var(--space-1);
+  padding: 0;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--onyx-faint);
+  border-color: transparent;
+}
+.notif-center .notif-center__dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+@media (max-width: 360px) {
+  .notif-center__filters { grid-template-columns: 1fr; }
+}
+@media (forced-colors: active) {
+  .notif-center__row[data-unread="true"] { border-left-color: Highlight; }
+}
+
+/* ---------- Account ----------------------------------------------------- */
+
+.onyx-account-section__subtitle { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 650; }
+.onyx-account-scope {
+  display: inline-block;
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-dim);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-pill);
+}
+.onyx-account-status { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--onyx-text); }
+.onyx-account-push { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.onyx-account-passkey-list { margin-top: var(--space-2); }
+.onyx-account-passkey-list .onyx-account-actions { align-items: center; }
+
+/* Retention chips: radio-group pills. */
+.onyx-account-chips__label { margin: var(--space-3) 0 2px; font-size: var(--text-sm); font-weight: 650; }
+.onyx-account-chips__desc { margin: 0 0 var(--space-2); font-size: var(--text-2xs); color: var(--onyx-dim); }
+.onyx-account-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0 0 var(--space-2); }
+.onyx-account-chip {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.onyx-account-chip:hover { color: var(--onyx-text); border-color: var(--onyx-dim); }
+.onyx-account-chip.on { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); font-weight: 650; }
+
+/* Capability matrix. */
+.onyx-account-caps { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; }
+.onyx-account-cap {
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--onyx-line);
+  overflow-wrap: anywhere;
+}
+.onyx-account-cap:last-child { border-bottom: 0; }
+.onyx-account-cap .onyx-account-hint { display: inline; margin: 0; }
+.onyx-account-cap-status { font-weight: 650; color: var(--onyx-dim); }
+.onyx-account-cap[data-cap-status="Active"] .onyx-account-cap-status { color: var(--onyx-text); }
+
+.onyx-account-push-toggle,
+.onyx-account-persona-off,
+.onyx-account-persona-wear,
+.onyx-account-persona-claim-go {
+  min-height: 28px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-text);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-account-push-toggle:hover,
+.onyx-account-persona-off:hover,
+.onyx-account-persona-wear:hover,
+.onyx-account-persona-claim-go:hover { background: var(--onyx-panel-2); }
+.onyx-account-push-toggle:disabled,
+.onyx-account-persona-claim-go:disabled { opacity: 0.5; cursor: default; }
+.onyx-account-persona-wear { flex: none; }
+
+/* ---------- Moderation desk (Bans) ------------------------------------ */
+
+.moderation-cockpit__empty-wrap { display: flex; flex-direction: column; gap: var(--space-3); }
+.moderation-cockpit__empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  border: 1px dashed var(--onyx-line);
+  border-radius: var(--radius);
+}
+.moderation-desk__bans,
+.moderation-desk__ban-add,
+.moderation-cockpit__form,
+.moderation-ban-form,
+.moderation-member-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.moderation-desk__bans .moderation-cockpit__head > div { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.moderation-desk__room { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.moderation-desk__optional { margin-left: var(--space-1); font-size: var(--text-2xs); font-weight: 400; color: var(--onyx-faint); }
+.moderation-desk__offline {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--onyx-warn);
+  border: 1px solid color-mix(in oklab, var(--onyx-warn) 40%, var(--onyx-line));
+  border-radius: var(--radius);
+}
+.moderation-ban-form > button,
+.moderation-cockpit__form > button { align-self: flex-start; }
+.onyx-moddesk-form--danger { border-top-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
+.onyx-moddesk-form--danger label:first-of-type { color: var(--onyx-bad); }
+
+/* ---------- Room browser + formation ---------------------------------- */
+
+.chb-row { list-style: none; }
+.chb-row--joined .chb-card { background: var(--onyx-panel-2); }
+.chb-row--live .chb-card { border-color: var(--onyx-dim); }
+.chb-room-copy { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.chb-pill--in { color: var(--onyx-dim); border-color: var(--onyx-line); }
+.chb-refresh { flex: none; }
+.chb .chb-add { align-self: flex-end; flex: none; }
+.chb .chb-copy { align-self: flex-start; }
+.chb .chb-ghost { background: transparent; }
+.chb .chb-submit {
+  font-weight: 650;
+  color: var(--onyx-accent-ink);
+  background: var(--onyx-accent);
+  border-color: var(--onyx-accent);
+}
+.chb .chb-submit:hover { border-color: var(--onyx-text); }
+.chb .chb-close { background: transparent; border: 0; color: var(--onyx-dim); min-width: 32px; }
+.chb .chb-sort-btn[aria-pressed="true"] { color: var(--onyx-text); border-color: var(--onyx-dim); }
+
+/* ---------- Calls hub + call chrome hooks ----------------------------- */
+
+.onyx-calls-header { display: flex; flex-direction: column; }
+.onyx-calls-join,
+.onyx-calls-controls { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.onyx-calls-join-voice,
+.onyx-calls-join-video,
+.onyx-calls-mute,
+.onyx-calls-leave {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-calls-join-voice:hover,
+.onyx-calls-join-video:hover,
+.onyx-calls-mute:hover { border-color: var(--onyx-dim); }
+.onyx-calls-leave { color: var(--onyx-bad); background: transparent; border-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
+.onyx-calls-leave:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+
+.onyx-call-ring-avatar { flex: none; }
+.onyx-call-pip-leave { margin-left: auto; }
+.onyx-voice-chip-count { font-weight: 600; white-space: nowrap; }
+.onyx-call-more-cap { white-space: nowrap; }
+.onyx-cq-word { font-weight: 700; letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.onyx-vs-clear { color: var(--onyx-dim); }
+
+/* ---------- Connect / DM safety / guest chip -------------------------- */
+
+.conn-strength-label { flex: none; min-width: 6ch; text-align: right; }
+.onyx-dmsafe-number-block {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.onyx-keychange-peer { font-weight: 750; overflow-wrap: anywhere; }
+.onyx-keychange-group { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.guest-claim-chip__nick { font-weight: 700; overflow-wrap: anywhere; }
+
+/* ---------- Jump-to-date body / session reclaim ---------------------- */
+
+.jump-to-date {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.a2-reclaim--success { border-left: 3px solid var(--onyx-dim); }
+
+/* ---------- Home / Nav / You ------------------------------------------ */
+
+.onyx-home-empty.is-first-room { border-style: dashed; }
+.onyx-home-outbox-offline { border-color: var(--onyx-dim); }
+.onyx-nav-btn--selected:not(.onyx-nav-btn--active) { background: var(--onyx-panel-2); color: var(--onyx-text); }
+.onyx-you-settings { display: flex; flex-direction: column; min-width: 0; }
+
+/* ---------- Composer tools / scrubber / room header menu -------------- */
+
+.shell-composer-tool { flex: none; }
+.shell-composer-action-label { font-size: var(--text-sm); font-weight: 600; }
+.shell-composer-tools-ledger { text-decoration: none; color: inherit; }
+
+/* Room "More" menu entries: inherit the menu-row skin from
+   .onyx-room-more-menu > button; the -open states read as pressed. */
+.onyx-search-toggle { flex: none; }
+.onyx-room-settings-toggle,
+.onyx-pins-toggle,
+.onyx-media-toggle,
+.onyx-jump-toggle,
+.onyx-scrubber-toggle { text-align: left; white-space: nowrap; }
+.onyx-pins-toggle-open,
+.onyx-media-toggle-open { background: var(--onyx-panel-2); font-weight: 650; }
+
+/* ---------- Prefs -------------------------------------------------------- */
+
+.pref-category-nav__landmark { display: block; min-width: 0; }
+.pref-reset-all { align-self: flex-start; }
+.pref-appearance-entry .pref-action-card { width: 100%; }
+.pref-vault-portable,
+.pref-vault-retention,
+.pref-clear-history { min-width: 0; }
+
+/* ---------- Profile + member card ------------------------------------ */
+
+.onyx-profile-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: center;
+}
+.onyx-profile-summary > .onyx-avatar { grid-row: span 3; }
+.onyx-profile-summary > p { grid-column: 2; overflow-wrap: anywhere; }
+.onyx-profile-summary .onyx-profile-badge { justify-self: start; }
+
+/* The member card pop (not the sheet layer, which Sheet positions):
+   a centred modal card over a dim veil. */
+.onyx-profile-pop:not(.onyx-sheet-layer) {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.onyx-profile-backdrop:not(.onyx-sheet-backdrop) {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, #000 55%, transparent);
+}
+.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card {
+  position: relative;
+  width: min(360px, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  margin: 0;
+  overflow-y: auto;
+  background: var(--onyx-panel);
+  box-shadow: var(--elev-3);
+}
+.onyx-member-copy { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Rail -------------------------------------------------------- */
+
+.onyx-rail-zero { list-style: none; padding: var(--space-1) var(--space-2); }
+.onyx-rail-filter-on .onyx-rail-filter-input { border-color: var(--onyx-dim); }
+.onyx-rail-dm .onyx-rail-avatar { border-radius: 50%; position: relative; }
+.onyx-rail-preview { max-width: 100%; }
+
+/* ---------- Room settings hooks --------------------------------------- */
+
+.rset-flag { list-style: none; }
+.rset-roles { display: flex; flex-direction: column; gap: var(--space-2); }
+.rset-group-mark-word { font-size: var(--text-2xs); font-weight: 600; }
+.rset-event-clear { flex: none; margin-left: auto; }
+
+/* ---------- Stewardship / switcher / shortcuts ------------------------ */
+
+.onyx-steward-notices { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
+.onyx-steward-notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.onyx-palette-launcher-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.shortcuts-overlay__group { min-width: 0; }
+
+/* ---------- Topbar identity chip --------------------------------------- */
+
+.onyx-ident {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 220px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-pill);
+}
+.onyx-ident:hover { background: var(--onyx-panel-2); }
+.onyx-ident-nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.onyx-ident-badge {
+  flex: none;
+  padding: 0 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  border-radius: var(--r-pill);
+}
+.onyx-ident-alias { border-style: dashed; }
+.onyx-ident-guest .onyx-ident-nick { color: var(--onyx-dim); font-weight: 500; }
+
+@media (max-width: 767.98px) {
+  .onyx-ident { max-width: 140px; }
+  .onyx-calls-join > button,
+  .onyx-calls-controls > button { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notif-center *,
+  .onyx-account-chip,
+  .onyx-ident { transition: none; animation: none; }
+}
