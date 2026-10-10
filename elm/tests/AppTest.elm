@@ -10495,7 +10495,7 @@ suite =
                         update (DmSealed { target = "dave", envelope = envelopeBody, schedId = Nothing }) m3
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
+                    [ \_ -> Expect.equal [] (withoutSafetyLoads outbound)
                     , \_ -> Expect.equal True (Set.member "dave" m4.peerKeyChanges)
                     , \_ -> Expect.equal Dict.empty m4.pendingSeals
                     ]
@@ -10513,7 +10513,7 @@ suite =
                         update (DmSealFailed { target = "dave", keyChanged = True, schedId = Nothing }) m2
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
+                    [ \_ -> Expect.equal [] (withoutSafetyLoads outbound)
                     , \_ -> Expect.equal True (Set.member "dave" m3.peerKeyChanges)
                     , \_ -> Expect.equal [] m3.toasts
                     , \_ -> Expect.equal Dict.empty m3.pendingSeals
@@ -24332,3 +24332,17 @@ searchRow id label query mode createdAt =
         , ( "createdAt", Encode.float createdAt )
         ]
 
+
+{-| v3/dmsafety — the inline key-change row loads its safety evidence
+through a port; strip those requests when asserting "nothing sent". -}
+withoutSafetyLoads : List Outbound -> List Outbound
+withoutSafetyLoads =
+    List.filter
+        (\o ->
+            case o of
+                DmSafetyRequested _ ->
+                    False
+
+                _ ->
+                    True
+        )

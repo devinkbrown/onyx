@@ -112,7 +112,7 @@ home model =
               else
                 text ""
             , if Home.showInviteFriends { connected = connected, roomCount = List.length joined, dmCount = List.length dms } then
-                inviteSection
+                inviteSection model
 
               else
                 text ""
@@ -306,15 +306,16 @@ quietSection input =
         ]
 
 
-inviteSection : Html Msg
-inviteSection =
+inviteSection : Model -> Html Msg
+inviteSection model =
     section [ class "onyx-home-invite", attribute "aria-label" "Invite friends" ]
         [ p [ class "onyx-home-empty-copy" ] [ text "Onyx is better with your people. Copy an invite link and send it to a friend." ]
         , button
             [ type_ "button"
             , class "onyx-home-action"
             , attribute "data-testid" "home-invite-friends"
-            , onClick HomeInviteCopy
+            -- v3/dmsafety: opens the share sheet (was a direct copy).
+            , onClick (InviteShareOpen (App.homeInviteChannel model))
             ]
             [ text "Invite friends" ]
         ]

@@ -23,6 +23,7 @@ import Translate
 -- v3/transcript
 import TranscriptRows
 import Upload
+import View.DmSafety
 import View.Home
 import View.MessageText exposing (messageText)
 import View.Notify exposing (roomNotifyStrip)
@@ -61,7 +62,8 @@ channelTranscript model channel =
         div [ class "onyx-thread-frame" ]
             [ -- v3/home
               div [ class "onyx-empty" ]
-                [ facepileRow channel
+                [ View.DmSafety.convoHeader model channel -- v3/dmsafety
+                , facepileRow channel
                 , h2 [] [ text channel.name ]
                 , View.Home.emptyRoomIntro model channel
                 , roomNotifyStrip model channel.name
@@ -96,7 +98,8 @@ channelTranscript model channel =
         in
         div [ class "onyx-thread-frame" ]
             [ div []
-                [ facepileRow channel
+                [ View.DmSafety.convoHeader model channel -- v3/dmsafety
+                , facepileRow channel
                 , roomNotifyStrip model channel.name
                 , topicFilterBar model channel
                 , topicTools model channel
