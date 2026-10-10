@@ -319,7 +319,9 @@ applyVerb state channel verb actor tail =
         else
             state
 
-    else if (verb == "MUTE" || verb == "UNMUTE") && not (String.isEmpty actor) then
+    else if (verb == "MUTE" || verb == "UNMUTE") && not (String.isEmpty actor) && micKind arg then
+        -- v3/calls-engine: `MUTE <#c> <nick> video` is camera-off, not a
+        -- muted microphone (the engine handles it as VIDEO_LEAVE).
         if verb == "MUTE" then
             if present && (Set.size state.muted < maxParticipants || Set.member lowered state.muted) then
                 { state | muted = Set.insert lowered state.muted }
@@ -366,6 +368,17 @@ applyVerb state channel verb actor tail =
 
     else
         state
+
+
+{-| The MUTE/UNMUTE kind that means the microphone: `voice`, `audio`, or
+none (the legacy form). -}
+micKind : String -> Bool
+micKind kind =
+    let
+        k =
+            String.toLower kind
+    in
+    k == "" || k == "voice" || k == "audio"
 
 
 isE2eeVerb : String -> Bool

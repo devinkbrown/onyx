@@ -3,6 +3,7 @@ import type { IRCClient } from '../irc/client';
 import {
   OpcodecWasm, CadenceVoxEncoder, CadenceVisEncoder,
   rgbaToYuv420,
+  isCadenceVisKeyframe,
   CADENCEVOX_FRAME_48K,
   type CadenceVoxQuality,
 } from './OpcodecWasm';
@@ -283,6 +284,31 @@ function videoProfileFor(kind: MediaKind, quality: StreamQuality = '4k60', broad
   return CAMERA_PROFILE;
 }
 
+/** Constructor options. `camera` overrides the camera capture/encode profile
+ *  (cadencevis sizes must be multiples of 16; quality 0-100). */
+export interface CadenceEngineOptions {
+  kind: MediaKind;
+  camera?: { width?: number; height?: number; fps?: number; quality?: number };
+}
+
+function cameraProfileFrom(camera: CadenceEngineOptions['camera']): VideoCaptureProfile {
+  if (!camera) return CAMERA_PROFILE;
+  const dim = (value: number | undefined, fallback: number, max: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+    const clamped = Math.max(16, Math.min(max, Math.trunc(value)));
+    return clamped - (clamped % 16);
+  };
+  return {
+    ...CAMERA_PROFILE,
+    width: dim(camera.width, CAMERA_PROFILE.width, MAX_PEER_VIDEO_WIDTH),
+    height: dim(camera.height, CAMERA_PROFILE.height, MAX_PEER_VIDEO_HEIGHT),
+    fps: typeof camera.fps === 'number' && Number.isFinite(camera.fps)
+      ? Math.max(1, Math.min(60, Math.trunc(camera.fps))) : CAMERA_PROFILE.fps,
+    quality: typeof camera.quality === 'number' && Number.isFinite(camera.quality)
+      ? Math.max(0, Math.min(100, Math.trunc(camera.quality))) : CAMERA_PROFILE.quality,
+  };
+}
+
 function parseVideoJoinPayload(payload: string): VideoCaptureProfile {
   const [wRaw, hRaw, qRaw, fpsRaw, screenRaw] = payload.trim().split(/\s+/);
   const screenShare = screenRaw === 'screen' || screenRaw === 'true' || screenRaw === '1';
@@ -460,10 +486,21 @@ export class CadenceMediaEngine {
   private lastLossRate  = 0;
   private lastDecodeAt  = 0;
 
-  constructor(callbacks: CadenceMediaCallbacks, options: { kind: MediaKind } = { kind: 'video' }) {
+  /** Camera capture/encode profile (constructor `camera` override). */
+  private readonly cameraProfile: VideoCaptureProfile;
+
+  /** The profile for a capture kind: cameras use this engine's profile
+   *  unless broadcasting; screens keep the module defaults. */
+  private profileFor(kind: MediaKind, quality: StreamQuality = '4k60', broadcast = false): VideoCaptureProfile {
+    if (kind === 'video' && !broadcast) return this.cameraProfile;
+    return videoProfileFor(kind, quality, broadcast);
+  }
+
+  constructor(callbacks: CadenceMediaCallbacks, options: CadenceEngineOptions = { kind: 'video' }) {
     this.cb          = callbacks;
     this.defaultKind = options.kind;
     this.incomingKind = options.kind;
+    this.cameraProfile = cameraProfileFrom(options.camera);
 
     this.registry.onPeerStateChanged = s => this.cb.onPeerState?.(s);
     this.registry.onPeerLeft         = n => this.cb.onPeerLeft(n);
@@ -502,7 +539,7 @@ export class CadenceMediaEngine {
         if (this.client && this.activeRoom === room) {
           this.mediaframeCmd(room, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
           if (this.localKind === 'video' || this.localKind === 'screen') {
-            const profile = this.localVideoProfile ?? videoProfileFor(this.localKind);
+            const profile = this.localVideoProfile ?? this.profileFor(this.localKind);
             this.mediaframeCmd(
               room,
               'VIDEO_JOIN',
@@ -654,7 +691,7 @@ export class CadenceMediaEngine {
     if (!this.mediaAllowed(kind)) throw new Error(`${kind} media is disabled`);
     const devs = navigator.mediaDevices;
     if (!devs) throw new Error('Media devices unavailable');
-    const profile = selectedProfile ?? videoProfileFor(kind, quality, broadcast);
+    const profile = selectedProfile ?? this.profileFor(kind, quality, broadcast);
     const settings = this.cb.getMediaSettings?.();
 
     if (kind === 'screen') {
@@ -850,7 +887,7 @@ export class CadenceMediaEngine {
 
   private async startVideoCapture(
     stream: MediaStream,
-    profile: VideoCaptureProfile = CAMERA_PROFILE,
+    profile: VideoCaptureProfile = this.cameraProfile,
   ) {
     this.stopVideoCapture();
     this.localVideoProfile = profile;
@@ -1100,7 +1137,7 @@ export class CadenceMediaEngine {
     );
     const encoded = this.vidEnc.encode(y, u, v, keyframeOnly);
     if (!encoded.length) return;
-    const ftype = encoded[0] === 0xFF ? 'KEYFRAME' : 'FRAME';
+    const ftype = isCadenceVisKeyframe(encoded) ? 'KEYFRAME' : 'FRAME';
     if (keyframeOnly && ftype !== 'KEYFRAME') return;
     this.sendFrame(this.activeRoom, ftype, encoded);
   }
@@ -1450,7 +1487,7 @@ export class CadenceMediaEngine {
       const stream = preacquired
         ? this.adoptLocalStream(preacquired, 'video')
         : await this.capture('video');
-      const profile = videoProfileFor('video');
+      const profile = this.profileFor('video');
       await this.ensureWasm();
       this.setActiveRoom(channel);
       await this.ensureLocalMediaGroupKey();
@@ -1678,7 +1715,7 @@ export class CadenceMediaEngine {
       this.mediaframeCmd(this.callWith, 'ACCEPT');
       this.mediaframeCmd(this.callWith, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
       if (kind === 'video') {
-        const profile = videoProfileFor('video');
+        const profile = this.profileFor('video');
         this.mediaframeCmd(this.callWith, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
       }
       this.sendMooringHandshake(this.callWith).catch(() => {});
@@ -2282,7 +2319,7 @@ export class CadenceMediaEngine {
         this.setCallState('in_call', fromNick, null);
         this.mediaframeCmd(fromNick, 'VOICE_JOIN', `${SAMPLE_RATE} ${AUDIO_CHANNELS}`);
         if (this.localKind === 'video') {
-          const profile = this.localVideoProfile ?? videoProfileFor('video');
+          const profile = this.localVideoProfile ?? this.profileFor('video');
           this.mediaframeCmd(fromNick, 'VIDEO_JOIN', `${profile.width} ${profile.height} ${profile.quality} ${profile.fps}`);
         }
         this.sendMooringHandshake(fromNick).catch(() => {});

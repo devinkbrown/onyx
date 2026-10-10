@@ -609,6 +609,31 @@ recoveryTests =
                     , \_ -> Expect.equal Nothing (step (CallJoin { channel = "#harbor", video = False }) (failWith "permission") |> step (snapshot [ ( "state", Encode.string "in_call" ), ( "channel", Encode.string "#harbor" ) ])).callJoinError
                     ]
                     ()
+        -- v3/calls-engine: adapter-classified refusals (voice-core.ts).
+        , test "account / encryption refusals classify; DM-unsupported toasts" <|
+            \_ ->
+                let
+                    failWith kind =
+                        base
+                            |> step (CallJoin { channel = "#harbor", video = False })
+                            |> step (snapshot [ ( "state", Encode.string "idle" ), ( "outcome", Encode.string "failed" ), ( "errorKind", Encode.string kind ) ])
+
+                    sub kind =
+                        query (failWith kind) |> Query.find [ testid "call-join-failed-sub" ]
+
+                    toasted kind =
+                        step (snapshot [ ( "state", Encode.string "idle" ), ( "outcome", Encode.string "failed" ), ( "errorKind", Encode.string kind ) ]) base
+                            |> .toasts
+                            |> List.map .title
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Just AccountRequired) (failWith "account").callJoinError
+                    , \_ -> sub "account" |> Query.has [ Selector.text "Calls are end-to-end encrypted and need an Onyx account. Sign in, then try again." ]
+                    , \_ -> Expect.equal (Just EncryptionUnavailable) (failWith "encryption").callJoinError
+                    , \_ -> sub "encryption" |> Query.has [ Selector.text "This browser couldn't set up call encryption. Make sure site storage isn't blocked, then try again." ]
+                    , \_ -> Expect.equal [ "Direct calls aren't available yet" ] (toasted "unsupported")
+                    ]
+                    ()
         , test "codec and encoder failures toast with oracle copy" <|
             \_ ->
                 let

@@ -547,6 +547,8 @@ pipLiveAria speaking =
 type JoinError
     = PermissionDenied
     | NoDevice
+    | AccountRequired
+    | EncryptionUnavailable
     | JoinOther
 
 
@@ -588,6 +590,13 @@ joinErrorFromKind kind =
         "no_device" ->
             Just NoDevice
 
+        -- v3/calls-engine: media E2EE needs an account + enrolled device key.
+        "account" ->
+            Just AccountRequired
+
+        "encryption" ->
+            Just EncryptionUnavailable
+
         "other" ->
             Just JoinOther
 
@@ -605,6 +614,12 @@ failedSub error room =
         Just NoDevice ->
             "No microphone was found. Connect one or check Voice settings."
 
+        Just AccountRequired ->
+            "Calls are end-to-end encrypted and need an Onyx account. Sign in, then try again."
+
+        Just EncryptionUnavailable ->
+            "This browser couldn't set up call encryption. Make sure site storage isn't blocked, then try again."
+
         _ ->
             "Your place in " ++ room ++ " is kept."
 
@@ -613,6 +628,14 @@ failedSub error room =
 codecToast : String -> Maybe { title : String, description : String }
 codecToast kind =
     case kind of
+        -- v3/calls-engine: the server has no direct-call target (MEDIA takes
+        -- channels only), so a DM ring fails closed with this explanation.
+        "unsupported" ->
+            Just
+                { title = "Direct calls aren't available yet"
+                , description = "This server carries calls in rooms only. Start one from a room instead."
+                }
+
         "codec" ->
             Just
                 { title = "Media codec unavailable"

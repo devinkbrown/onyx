@@ -116,6 +116,19 @@ suite =
                         |> .muted
                         |> Set.isEmpty
                         |> Expect.equal True
+            , -- v3/calls-engine: camera-off is `MUTE <#c> <nick> video`
+              test "MUTE video (camera off) is not a muted microphone; MUTE voice is" <|
+                \_ ->
+                    let
+                        joined =
+                            foldMediaLine blankMediaState known "#&" (params [ "MEDIA", "#c", "JOIN", "dave", "video" ])
+                    in
+                    Expect.all
+                        [ \_ -> foldMediaLine joined known "#&" (params [ "MEDIA", "#c", "MUTE", "dave", "video" ]) |> .muted |> Set.isEmpty |> Expect.equal True
+                        , \_ -> foldMediaLine joined known "#&" (params [ "MEDIA", "#c", "MUTE", "dave", "voice" ]) |> .muted |> Set.member "dave" |> Expect.equal True
+                        , \_ -> foldMediaLine joined known "#&" (params [ "MEDIA", "#c", "MUTE", "dave", "audio" ]) |> .muted |> Set.member "dave" |> Expect.equal True
+                        ]
+                        ()
             , test "HAND up/down round-trips" <|
                 \_ ->
                     blankMediaState
