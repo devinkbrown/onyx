@@ -8137,7 +8137,10 @@ function fetchPublicFeed(url) {
       req = req || {};
       if (typeof req.serverUrl !== "string" || !req.serverUrl) return Promise.resolve(null);
       if (!attributionAccountBytes(req.account, TextEnc)) return Promise.resolve(null);
-      if (!ATTRIBUTION_NODE_HEX_RE.test(req.nodeHex || "")) return Promise.resolve(null);
+      /* v3/rx-calls: "" = node-less enrollment (IDENTITY ADD only; the
+         enroll transcript never covers the node). Anything else must
+         be a 16-hex node. */
+      if (req.nodeHex !== "" && !ATTRIBUTION_NODE_HEX_RE.test(req.nodeHex || "")) return Promise.resolve(null);
       if (!validGen(req.gen)) return Promise.resolve(null);
       var serverUrl = req.serverUrl;
       var account = req.account;

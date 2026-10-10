@@ -1,5 +1,6 @@
 module View.CallPresence exposing
     ( callIcon
+    , guestCard
     , headerVoice
     , joinBanner
     , railAriaSuffix
@@ -307,6 +308,24 @@ joinBanner model room =
                     [ callIcon "x" ]
                 ]
 
+        -- v3/rx-calls: guests are offered an account, not a join that fails
+        Just (CallUi.BannerGuest count) ->
+            let
+                members =
+                    Dict.get (String.toLower room) model.channels
+                        |> Maybe.map .members
+                        |> Maybe.withDefault Dict.empty
+
+                names =
+                    CallUi.voiceRoster members (CallUi.rosterFor model.media room)
+            in
+            guestCard model
+                { title = CallUi.guestTitle count
+                , faces = List.take 3 names
+                , testid = "call-join-banner"
+                , dismiss = Just (CallBannerDismiss room)
+                }
+
         Just CallUi.BannerFailed ->
             div
                 [ class "onyx-join-banner onyx-join-banner-failed"
@@ -332,6 +351,76 @@ joinBanner model room =
 
         Nothing ->
             text ""
+
+
+{-| v3/rx-calls — "Sign in to join calls": calls are end-to-end
+encrypted, so they need an Onyx account. Keeping the guest name
+registers it in place (no reconnect); "Sign in" leaves for the
+sign-in form. Used by the room banner and the Calls hub.
+-}
+guestCard :
+    Model
+    -> { title : String, faces : List String, testid : String, dismiss : Maybe Msg }
+    -> Html Msg
+guestCard model cfg =
+    let
+        nick =
+            String.trim model.ourNick
+    in
+    div
+        [ class "onyx-join-banner onyx-call-guest"
+        , attribute "data-testid" cfg.testid
+        , attribute "data-variant" "guest"
+        , attribute "role" "status"
+        ]
+        [ if List.isEmpty cfg.faces then
+            span [ class "onyx-call-guest-icon", attribute "aria-hidden" "true" ] [ callIcon "lock" ]
+
+          else
+            faces cfg.faces
+        , div [ class "onyx-join-banner-copy" ]
+            [ strong [] [ text cfg.title ]
+            , span [] [ text "Calls are end-to-end encrypted, so they need an Onyx account. Keeping your name takes a moment and you stay connected." ]
+            ]
+        , div [ class "onyx-join-banner-actions" ]
+            [ button
+                [ type_ "button"
+                , class "onyx-call-btn onyx-call-btn-ghost"
+                , attribute "data-testid" "call-guest-signin"
+                , attribute "aria-label" "Sign in with an existing account (you will reconnect)"
+                , onClick CallGuestSignIn
+                ]
+                [ text "Sign in" ]
+            , button
+                [ type_ "button"
+                , class "onyx-call-btn onyx-call-btn-primary"
+                , attribute "data-testid" "call-guest-claim"
+                , onClick GuestClaimOpen
+                ]
+                [ callIcon "key"
+                , text
+                    (if String.isEmpty nick then
+                        "Create an account"
+
+                     else
+                        "Keep the name " ++ nick
+                    )
+                ]
+            ]
+        , case cfg.dismiss of
+            Just msg ->
+                button
+                    [ type_ "button"
+                    , class "onyx-join-banner-hide"
+                    , attribute "data-testid" "call-join-banner-hide"
+                    , attribute "aria-label" "Hide voice banner"
+                    , onClick msg
+                    ]
+                    [ callIcon "x" ]
+
+            Nothing ->
+                text ""
+        ]
 
 
 {-| Hub "Rooms with voice" (§2.17): navigation-only rows reusing the

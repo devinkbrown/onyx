@@ -410,35 +410,295 @@ operator/admin view.)
 
 ---
 
-## 12. Voice / Video / Screen (MEDIA) — rich channel calls
+## 12. Voice / Video / Screen (MEDIA) — channel calls on the IRC WebSocket
 
-`MEDIA <subcommand> <#channel> [args]` (feature-gated; control plane only — **media
-bytes never flow over the IRC socket**). You must be a channel member. Media
-control replies and call-state notifications arrive as
-`:<server> EVENT <target> MEDIA <verb> <#channel> ...`; failures are
-`FAIL MEDIA <CODE>`.
+Browser calls ride the **same `wss` connection as IRC**. `MEDIA …` text lines are
+the control plane, and **binary WebSocket frames carrying Cadence frames** (codecs
+`cadencevox` / `cadencevis`) are the media plane (`src/daemon/server.zig:2785`).
+Media payloads are client-held E2EE ciphertext. The server checks framing and
+authority, never decrypts, and never re-wraps browser media onto its UDP legs
+(`src/daemon/server.zig:53953`). The native Cadence UDP leg and the WebRTC RTP/STUN
+leg are for non-browser clients. A WebSocket caller is never offered `NATIVE`, and
+gets `TRANSPORT` only for an explicit `transport=webrtc` with a routable candidate
+(`src/daemon/server.zig:65968`, `:65973`, `:66024`). Onyx uses neither UDP leg.
 
-Subcommands: `JOIN <kind>` · `LEAVE` · `OFFER <codecs> [transport=webrtc]` ·
-`ANSWER <codecs>` · `ROSTER` · `PROFILE` · `STATS` · `MUTE`/`UNMUTE <kind>` ·
-`SPEAKING` · `HAND` · `REACT` · `LAYER` (simulcast) · `BREAKOUT` · `POS` (spatial) ·
-`CAPTION` · `TRANSCRIPT`.
+Evidence paths below are in the Onyx Server repo.
 
-- **kind** = `voice` | `video` | `screen` (default `voice`).
-- **codecs** (CSV) = `cadencevox` (audio) | `cadencevis` (video) | `raw`. `OFFER` may request
-  `transport=webrtc` for the browser/WebRTC leg; otherwise the native CADENCEVOX/CADENCEVIS
-  UDP leg is used.
-- Two media planes, bridged by header-rewrap only (no transcode): a **WebRTC-compatible
-  RTP/STUN UDP plane** (`MEDIA OFFER transport=webrtc` → ICE creds, SRTP group key)
-  and a **native CADENCEVOX/CADENCEVIS UDP leg** (`kagura_frame` datagrams). SFU forwarding,
-  simulcast, ABR; room cap 64 participants.
-- **Browser codec:** Onyx Server ships WASM codec exports (`kagura_wasm.zig`: CADENCEVOX
-  audio + CADENCEVIS video encode/decode for `wasm32-freestanding`) — Onyx can use these
-  for the native leg, or use standard WebRTC for the RTP leg.
-- **`ACTIVITY <target> <state> [text]`** — presence/activity broadcast (rich presence).
+### 12.1 Client checklist (joining a call)
 
-`MEDIA ROSTER`/`SPEAKING`/`MUTE` give you the call roster + live speaking/mute state
-to render a rich voice UI. `OFFER-ACK`/`ANSWER-ACK`/`TRANSPORT`/`NATIVE`
-`EVENT ... MEDIA ...` lines carry the negotiated transport + endpoint info.
+1. **Socket:** use `wss://<node>:8080` and offer `onyx.irc-media.v1` first
+   (`new WebSocket(url, ['onyx.irc-media.v1', 'text.ircv3.net'])`). The server
+   selects the first protocol it supports, in your offer order
+   (`src/proto/websocket.zig:638`). `text.ircv3.net` is text-only: a binary frame
+   on it closes the socket with 1002 (`src/daemon/server.zig:17349`, `:66678`). TLS
+   must terminate at Onyx Server. Plain `ws://` exists only as the testing listener
+   `[listen] ws_plain` (`src/daemon/server.zig:2543`), and `MEDIA JOIN` on it fails
+   with `SECURE_SIGNALING_REQUIRED` (§12.3).
+2. **Account:** log in with SASL (§5). The media E2EE verbs require an account,
+   and the server relays a binary frame only after an accepted E2EE handshake.
+   A guest can appear in the call roster, but it cannot send media.
+3. **Events:** send `IRCX`, then `EVENT ADD MEDIA [<#chan-glob>]`. `EVENT` is
+   IRCX-gated, so it returns 421 until you send `IRCX`
+   (`src/proto/ircx_gate.zig:45`). Non-opers may subscribe to MEDIA
+   (`src/daemon/server.zig:37043`), and delivery requires channel membership
+   (`src/daemon/server.zig:37693`).
+4. **Device key:** send `IDENTITY ADD <label> <pubhex> <sighex>` and wait for
+   `NOTICE <you> :IDENTITY ADDED label=<label>` (§12.6). Do this before the
+   handshake on every session (re-adding a label overwrites it). Do **not** gate
+   it on ISUPPORT `ACCOUNTRESIDENCE` (§12.8).
+5. **Channel:** `JOIN #room`. MEDIA targets are **channels only**: a nick or DM
+   target gets `403` (§12.3), so there are no DM or 1:1 calls yet.
+6. **Join the call:** `MEDIA JOIN #room voice` returns a caller-only
+   `EVENT <you> MEDIA MACKEY #room <base64>`, and the room sees
+   `MEDIA JOIN #room <you> voice`. `MEDIA OFFER #room cadencevox,cadencevis` is
+   optional for browsers.
+7. **Handshake:** send `MEDIA E2EE-HANDSHAKE #room :<base64>` **after** the JOIN,
+   because the server requires you to be in the call. Any JOIN that adds a new kind
+   clears the connection's attachment (`src/daemon/server.zig:66254`), so send the
+   handshake again after `MEDIA JOIN #room video|screen`.
+8. **Group key:** exchange `MEDIA E2EE-GROUPKEY …` with each peer's attachment
+   (§12.6).
+9. **Media:** send binary Cadence frames on the same socket, each tagged with the
+   MACKEY HMAC (§12.7).
+10. **Leave:** `MEDIA LEAVE #room`. Disconnecting, PART, KICK, NICK and account
+    changes also retire the call (`src/daemon/server.zig:17064`, `:23029`,
+    `:23978`, `:43105`, `:44267`).
+
+### 12.2 Server prerequisites (operator config)
+
+| Key | Default | Effect for browser calls |
+|---|---|---|
+| `[media] ws_media_relay` | `false` | **Must be `true`.** When it is false, a WS `MEDIA JOIN` gets no MACKEY and binary frames are ignored without a reply (`src/daemon/server.zig:2219`, `:53962`). |
+| `[media] ws_media_require_mac` | `false` | When true, untagged frames are dropped. When false, untagged frames relay, but a tag that is present must verify (`src/daemon/server.zig:2225`; `src/substrate/cadence_frame.zig:361`). |
+| `[media] enabled` | `false` | Controls the UDP legs only. WS call membership works without it (`src/daemon/server.zig:6124`). |
+| feature `media` | on | When this feature is disabled, `MEDIA` returns `421 … :Command disabled by configuration` (`src/daemon/modules/feature_misc.zig:110`; `src/daemon/server.zig:18075`). |
+| `[media] max_participants` | `64` | Room cap, at most 256 (`src/daemon/media_room.zig:18`). |
+
+### 12.3 Requirements, and what you get when one is missing
+
+| Missing | Reply | Evidence |
+|---|---|---|
+| Channel target (nick/DM, or a channel that does not exist) | `403 <target> :No such channel`. This is a **numeric, not a FAIL**. | `src/daemon/media_cmd.zig:36` |
+| Channel membership | `442 <#chan> :You're not on that channel` (opers are exempt for `QUALITY` only) | `src/daemon/media_cmd.zig:44`, `:52` |
+| Registration | `451` (MEDIA requires a registered client) | `src/daemon/registry.zig:377` |
+| Protected `wss` socket | `FAIL MEDIA SECURE_SIGNALING_REQUIRED` on WS `JOIN`, and on `OFFER`/`ANSWER` when they would issue endpoint credentials. The check requires a live TLS session on the connection itself. | `src/daemon/server.zig:6205`, `:54447`, `:65350` |
+| Media-capable subprotocol | WS close `1002` on the first binary frame | `src/daemon/server.zig:17349` |
+| Logged-in account | `FAIL MEDIA AUTH_REQUIRED` on `E2EE-HANDSHAKE`/`E2EE-GROUPKEY`, and `FAIL IDENTITY NOT_LOGGED_IN` on `IDENTITY ADD`. `MEDIA JOIN` itself does not check for an account. | `src/daemon/media_cmd.zig:341`; `src/daemon/server.zig:46255` |
+| Enrolled device key | `FAIL MEDIA UNENROLLED_E2EE_IDENTITY` | `src/daemon/media_cmd.zig:362` |
+| Being in the call | `FAIL MEDIA NOT_IN_CALL` | `src/daemon/media_cmd.zig:345` (and per verb) |
+| Accepted handshake (binary frames) | Frame dropped and `404 <#chan> :Media frame rejected` (§12.7) | `src/daemon/server.zig:54026`, `:54053` |
+| Transmit permission | `FAIL MEDIA TX_DENIED`. The server-managed umode `+M` (media-tx-deny) blocks JOIN/OFFER/UNMUTE/SPEAKING and frames. | `src/daemon/media_cmd.zig:63`, `:487`; `src/proto/usermode.zig:160` |
+
+### 12.4 Subcommands
+
+The form is `MEDIA <sub> <#chan> [args]`; fewer than 2 params returns `461`
+(`src/daemon/media_cmd.zig:30`). In this table:
+
+- **room → `VERB <nick> [detail]`** means the line
+  `:<srv> EVENT <you> MEDIA VERB <#chan> <nick> [detail]`.
+- **caller → `VERB [detail]`** means the line
+  `:<srv> EVENT <you> MEDIA VERB <#chan> [detail]`, which carries **no nick token** (§12.5).
+
+| Subcommand + args | Result |
+|---|---|
+| `JOIN [voice\|audio\|video\|screen]` (default `voice`) | With WS and relay on: caller → `MACKEY <base64 32-byte key>` (`src/daemon/server.zig:66458`). Room → `JOIN <nick> <kind>` on the nick's first attachment of that kind (`src/daemon/server.zig:6221`). Re-joining a kind you already hold is a silent no-op. |
+| `LEAVE` | Room → `LEAVE <nick>` when the nick's last attachment leaves. If another same-nick device stays in the call, the room gets `E2EE-DETACH <nick> <att>` instead (`src/daemon/server.zig:53828`, `:53833`). If you are not in the call: `NOTICE <you> :MEDIA: you are not in this call` (`src/daemon/media_cmd.zig:474`). |
+| `MUTE <kind>` / `UNMUTE <kind>` | Room → `MUTE\|UNMUTE <nick> <kind>`. Otherwise `NOT_IN_CALL` (`src/daemon/media_cmd.zig:492`). While a kind is muted, the server rejects its frames (§12.7). |
+| `SPEAKING <kind> <on\|1\|off>` | Room → `SPEAKING\|SILENT <nick> <kind>`. Otherwise `NOT_PUBLISHING` (`src/daemon/media_cmd.zig:506`). |
+| `ROSTER` | Caller → `ROSTER <nick> <kinds> <breakout> <x> <y> <hand\|-> [codecs=… fec=…] consent=0\|1` for each participant, then `ROSTER-END count=N`. `kinds` is a comma list; a `-` prefix means muted and `*` means speaking (`src/daemon/server.zig:54748`). |
+| `HAND [up\|down]` (bare = up) · `QUEUE` | Room → `HAND <nick> up\|down`. `QUEUE`: caller → `QUEUE <i> <nick>` … `QUEUE-END count=N` (`src/daemon/media_cmd.zig:437`; `src/daemon/server.zig:54735`). |
+| `REACT <token>` (≤32 bytes) | Room → `REACT <nick> <token>`. Ephemeral (`src/daemon/media_cmd.zig:452`). |
+| `OFFER <codec,…> [transport=webrtc] [fingerprint=sha-256:<hex>]` | Codecs are `cadencevox`, `cadencevis`, `raw`. Caller → `OFFER-ACK codecs=<agreed> fec=<scheme>`, plus `KIND-DENIED kind=<k> reason=no_common_codec`. Room → `CAPS <nick> codecs=… fec=…` and `PROFILE <nick> …` (`src/daemon/server.zig:54433`, `:66086`, `:54201`). |
+| `ANSWER <codec,…>` | Caller → `ANSWER-ACK …`. Before any OFFER: `NO_OFFER` (`src/daemon/server.zig:54437`). |
+| `PROFILE` | Caller → `PROFILE codecs=… fec=…`, or `NO_OFFER` (`src/daemon/media_cmd.zig:86`). |
+| `STATS` | Caller → `STATS <nick> leg=webrtc\|native …` … `STATS-END count=N`. Counts **UDP legs only**; WS media is not counted (`src/daemon/server.zig:54684`). |
+| `QUALITY` | Caller → `QUALITY <nick> loss= rtt= spatial= bitrate=` … `QUALITY-END count=N` (`src/daemon/server.zig:54713`). |
+| `ABR <cur_kbps> <avail_kbps> <loss_pct> <rtt_ms> [nack/s]` | Caller → `ABR action= bitrate= fec= keyframe= spatial<= temporal<=` (`src/daemon/media_cmd.zig:185`). |
+| `LAYER <max_spatial> <max_temporal 0-7>` | Caller → `LAYER spatial<=S temporal<=T`. Applies to SFU (UDP) forwarding (`src/daemon/media_cmd.zig:156`). |
+| `BREAKOUT <room>` · `POS <x> <y>` | Room → `BREAKOUT <nick> <room>` · `POS <nick> <x> <y>` (`src/daemon/media_cmd.zig:263`). |
+| `CAPTION :<text>` · `TRANSCRIPT` | Room → `CAPTION <nick> <text>` (also retained). `TRANSCRIPT`: caller → `TRANSCRIPT <speaker> :<text>` … `TRANSCRIPT-END count=N` (`src/daemon/media_cmd.zig:307`). |
+| `CONSENT <on\|off>` · `RECORD [stop]` | Room → `CONSENT <nick> on\|off`, `RECORD <nick> started\|stopped`. RECORD needs every participant's consent (`CONSENT_REQUIRED`) (`src/daemon/media_cmd.zig:97`). |
+| `E2EE-HANDSHAKE` · `E2EE-GROUPKEY` | See §12.6. |
+| `E2EE-DETACH` | Server-originated only. A client that sends it gets `INVALID_SUBCOMMAND` (`src/daemon/media_cmd.zig:468`). |
+| `TURN …` | Always `FAIL MEDIA TURN_CUT`: no TURN relay is offered (`src/daemon/media_cmd.zig:26`). |
+
+Users with umode `+P` (media-presence-private) suppress their own presence
+broadcasts: JOIN, LEAVE, MUTE, SPEAKING, HAND, REACT, POS, BREAKOUT, CONSENT and
+RECORD (`src/daemon/server.zig:53938`; `src/proto/usermode.zig:161`). `CAPTION`,
+`CAPS`, `PROFILE` and the `E2EE-*` events are always published.
+
+### 12.5 Reply shapes
+
+- **Room events (Event Spine):**
+  `[@tags ]:<srv> EVENT <you> MEDIA <VERB> <#chan> <nick> [detail]`, where `<srv>`
+  is the originating node. These reach MEDIA subscribers on every mesh node
+  (`src/daemon/server.zig:37529`; `src/daemon/event_spine.zig:482`). The sender is
+  not excluded, so your own actions come back to you; ignore your own nick
+  (`src/daemon/server.zig:55988`).
+- **Caller-only replies** (no subscription needed; they may carry secrets):
+  `[@tags ]:<srv> EVENT <you> MEDIA <VERB> <#chan> [detail]`
+  (`src/daemon/server.zig:37651`). **There is no nick token**, so do not parse
+  these with the room-event shape. These are `MACKEY`, `ROSTER`/`-END`,
+  `STATS`/`-END`, `QUALITY`/`-END`, `QUEUE`/`-END`, `TRANSCRIPT`/`-END`,
+  `OFFER-ACK`, `ANSWER-ACK`, `KIND-DENIED`, `PROFILE`, `LAYER`, `ABR`, `RECORD`,
+  and (UDP legs only) `TRANSPORT`, `NATIVE` and `NATIVE-MACKEY`.
+- **Failures:** `FAIL MEDIA <CODE> :<reason>` when you have negotiated
+  `standard-replies`. Otherwise the server sends `NOTICE <you> :FAIL MEDIA <CODE>: <reason>`
+  (`src/daemon/server.zig:55449`). MEDIA emits **no `NOTE` or `WARN` lines**.
+
+| FAIL MEDIA code | Meaning |
+|---|---|
+| `AUTH_REQUIRED` | E2EE verb without a logged-in account |
+| `UNENROLLED_E2EE_IDENTITY` | The handshake's Ed25519 key is not an `IDENTITY ADD`ed key on your account |
+| `BAD_E2EE_HANDSHAKE` | Wrong arity; non-canonical base64, length or version; or the signature does not verify for this channel |
+| `BAD_E2EE_GROUPKEY` / `BAD_E2EE_SENDER` / `BAD_E2EE_TARGET` | Bad GROUPKEY arity or encoding / sender attachment is not this connection's accepted handshake / target is not a member in the call |
+| `SECURE_SIGNALING_REQUIRED` | The connection is not a live TLS (`wss`) session |
+| `NOT_IN_CALL` / `NOT_PUBLISHING` | No `MEDIA JOIN` yet / that kind is not published |
+| `TX_DENIED` | Umode `+M` |
+| `INVALID_KIND` / `INVALID_SUBCOMMAND` | Kind is not voice/audio/video/screen / unknown verb |
+| `JOIN_FAILED` / `TRANSPORT_UNAVAILABLE` | Media routing is unavailable on this node (`src/daemon/server.zig:6200`, `:54444`) |
+| `NO_CODECS` / `NO_COMMON_CODEC` / `NO_OFFER` | Empty codec list / no overlap / ANSWER or PROFILE before any OFFER |
+| `BAD_FINGERPRINT` / `DTLS_UNAVAILABLE` | WebRTC leg only |
+| `BAD_LAYER` `BAD_ABR` `BAD_CONSENT` `CONSENT_REQUIRED` `INVALID_POSITION` `POS_FAILED` `BREAKOUT_FAILED` `HAND_FAILED` `INVALID_REACTION` | Bad arguments or state for that verb |
+| `TURN_CUT` | No TURN relay |
+
+### 12.6 Media E2EE: `IDENTITY ADD`, `E2EE-HANDSHAKE`, `E2EE-GROUPKEY`
+
+**Enrollment.** The form is `IDENTITY ADD <label> <pub-hex 64> <sig-hex 128>`
+(`src/daemon/server.zig:46253`).
+
+- The label is `[A-Za-z0-9._-]{1,32}`.
+- The signature is Ed25519 over
+  `"ONYX-ACCOUNT-IDENTITY-v1" 0x00 <account> 0x00 <label> 0x00 <32-byte pubkey>`
+  (`src/proto/account_identity.zig:25`, `:73`, `:95`). `<account>` is the name
+  from `900`.
+- The key is stored as the user PROP `identity.key.<label>` and replicated across
+  the mesh (`src/daemon/server.zig:46270`).
+- Success is `:<srv> NOTICE <you> :IDENTITY ADDED label=<label>` (`src/daemon/server.zig:46191`, `:46273`).
+- Failure is `FAIL IDENTITY NOT_LOGGED_IN|NEED_MORE_PARAMS|BAD_ASSERTION|BAD_LABEL|STORE_FAILED`
+  (`src/daemon/server.zig:46255`–`:46267`).
+
+**`MEDIA E2EE-HANDSHAKE <#chan> :<b64>`** takes exactly 3 params. `<b64>` is
+standard padded base64 of a 275-byte signed-v2 envelope
+(`src/daemon/media_cmd.zig:350`; `src/daemon/server.zig:37545`, `:37571`):
+
+| Bytes | Field |
+|---|---|
+| `[0]` | version `0x02` |
+| `[1..17)` | attachment id (16 bytes) |
+| `[17..82)` | P-256 static public key (`0x04…`) |
+| `[82..147)` | P-256 ephemeral public key (`0x04…`) |
+| `[147..179)` | call nonce (opaque to the server) |
+| `[179..211)` | Ed25519 device signing public key (**must be enrolled**) |
+| `[211..275)` | Ed25519 signature over `"onyx-media-handshake-v2" 0x00 ‖ lower(#chan) ‖ 0x00 ‖ bytes[0..211)` |
+
+The server checks the canonical encoding and the point prefixes. It then checks
+that the signing key matches an `identity.key.*` prop on your account
+(`src/daemon/server.zig:37626`); if not, you get `UNENROLLED_E2EE_IDENTITY`.
+Last, it strict-verifies the signature (`src/daemon/server.zig:37602`); if that
+fails, you get `BAD_E2EE_HANDSHAKE`.
+
+On success the room gets `E2EE-HANDSHAKE <nick> :<b64>`, and the attachment is
+bound to **this connection**. A connection holds one attachment: a new handshake
+first publishes `E2EE-DETACH` for the old one (`src/daemon/media_cmd.zig:370`–`:385`).
+
+**`MEDIA E2EE-GROUPKEY <#chan> <sender-att> <target-nick> <target-att> <epoch> :<b64-wrapped>`**
+takes exactly 7 params (`src/daemon/media_cmd.zig:388`).
+
+- An attachment token is 22-char **unpadded base64url** of the 16-byte id
+  (`src/daemon/server.zig:37614`).
+- `<sender-att>` must equal this connection's accepted handshake attachment.
+- `<target-nick>` must be a channel member who is in the call.
+- `<epoch>` is a canonical u64 decimal.
+- The wrapped key is canonical padded base64 of at most 512 bytes.
+- The relay goes to **every MEDIA subscriber in the channel** as
+  `E2EE-GROUPKEY <sender> <sender-att> <target> <target-att> <epoch> :<wrapped>`.
+  Receivers filter on target.
+
+**Naming.** Outbound subtypes are `E2EE-HANDSHAKE` / `E2EE-GROUPKEY` only. The
+server's MEDIA handler has no `TSUMUGI_*` branch. Such a line falls through to
+kind parsing and is refused with `INVALID_KIND` or `INVALID_SUBCOMMAND`
+(`src/daemon/media_cmd.zig:479`, `:521`), and the server never emits one.
+`TSUMUGI_*` survive only as historical client-side interop literals (inbound-only).
+Never send them, and never introduce new Japanese names.
+
+### 12.7 Binary media frames (same socket)
+
+**Admission.** The server checks these in order (`src/daemon/server.zig:53961`–`:54002`):
+
+1. `ws_media_relay` is on and you are registered.
+2. You do not have `+M`.
+3. The socket is bound to a call by a WS `MEDIA JOIN`.
+4. The Cadence frame shape and the MAC (if present, or if required) are valid.
+5. **Authorization** (`src/daemon/server.zig:54018`–`:54056`):
+   - You are a channel member.
+   - The payload **starts with this connection's 16-byte handshake attachment id**
+     and is at least 16 + 64 bytes long.
+   - The codec is `cadencevox` (0x01) or `cadencevis` (0x02). `raw` is rejected.
+   - `stream_id` equals FNV-1a32 of `lower(#chan) 0x00 lower(nick) 0x00 "audio"|"video"`
+     (`src/daemon/server.zig:54062`).
+   - You joined the matching kind (voice for `cadencevox`, video or screen for
+     `cadencevis`) and have not `MEDIA MUTE`d it, because a muted kind cannot
+     publish (`src/substrate/undertow/media.zig:128`).
+
+A rejected frame is dropped, and the server sends `404 <#chan|*> :<reason>` at
+most once per second. The IRC session stays up (`src/daemon/server.zig:54008`).
+
+**Cadence frame layout** (`src/substrate/cadence_frame.zig:12`–`:23`), all little-endian:
+
+| Field | Size |
+|---|---|
+| payload length | u32 |
+| band (≥ 64) | u8 |
+| stream_id | u32 |
+| sequence | u32 |
+| timestamp | u64 |
+| flags (bit 0 = keyframe) | u8 |
+| codec tag | u8 |
+| payload | variable |
+| optional MAC tag | 16 bytes |
+
+The tag is `HMAC-SHA256(MACKEY, frame bytes)[0..16]`, where MACKEY is the base64
+32-byte key from `MEDIA MACKEY` (`src/substrate/cadence_frame.zig:70`, `:286`).
+
+**Binding.** Each socket has one call binding: the channel and nick at JOIN time
+(`src/daemon/server.zig:3368`). A JOIN in another channel rebinds the socket and
+clears its attachment.
+
+**Size and SendQ.**
+
+- One binary message, after reassembly of continuation frames, may be at most
+  **4 MiB**. A larger message closes the socket with `1009`
+  (`src/daemon/helix/ws_snapshot.zig:55`; `src/daemon/server.zig:2794`, `:66667`).
+- Relayed frames enter each recipient's normal SendQ. The default class SendQ is
+  1 MiB (`src/daemon/conn_class.zig:55`; `src/daemon/sendq.zig:68`).
+- A recipient whose SendQ cannot take a frame is **disconnected** with
+  `Delivery gap; reconnect/resume required` (`src/daemon/server.zig:13252`, `:12975`).
+- So keep frames, and especially video keyframes, well under the class SendQ.
+
+**Fan-out.** Frames go to the other call participants in the channel, on WS
+sockets whose subprotocol admits binary (`src/daemon/server.zig:54099`–`:54124`).
+They also go once to mesh peers, which fan out locally and never re-mesh
+(`src/daemon/server.zig:54089`; `src/proto/media_ws_relay.zig:6`). The sender gets
+no echo.
+
+### 12.8 ISUPPORT `ACCOUNTRESIDENCE` — do not rely on it
+
+`buildIsupportTokens` adds `ACCOUNTRESIDENCE=<16-hex node shortId>` only when
+`cfg.node_identity != null` (`src/daemon/server.zig:1913`, `:1966`). The daemon
+builds the 005 list **once**, at `src/main.zig:1820`, and installs it at `:1821`.
+After that it is read-only (`src/proto/protocol_inventory.zig:160`), and every 005
+burst reads that list (`src/daemon/server.zig:42757`).
+
+The node identity is assigned **later**, at `src/main.zig:1901`, and nothing sets
+it earlier. So a live node never advertises `ACCOUNTRESIDENCE`, even when it has
+a mesh identity. `IDENTITY RESIDENCE` still reads the identity at runtime
+(`src/daemon/server.zig:46287`). Treat a missing token as "unknown", not
+"unsupported". Calls never depend on it: enroll with `IDENTITY ADD`
+unconditionally.
+
+`ACTIVITY` is not part of MEDIA. It is `ACTIVITY SUBSCRIBE|UNSUBSCRIBE <#chan>`,
+a channel activity stream for members (`src/daemon/server.zig:58586`).
 
 ---
 

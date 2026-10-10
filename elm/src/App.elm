@@ -3126,6 +3126,8 @@ type Msg
     | CallsChooseRoom
     | CallsReturnToCall String
     | CallJoin { channel : String, video : Bool }
+    -- v3/rx-calls: a guest with an account leaves for the sign-in form
+    | CallGuestSignIn
     | CallLeave
     | CallToggleMute
     | CallHubChanged Media.CallHub
@@ -4633,7 +4635,15 @@ foldLine model message =
                     ( model, [] )
 
         "376" ->
-            ( finishMotd model, [] )
+            -- v3/rx-calls: the welcome burst is over — a signed-in
+            -- account enrolls its device key now even without an
+            -- ACCOUNTRESIDENCE token (call E2EE needs it).
+            fireAttribution Attribution.foldRegistered (finishMotd model)
+
+        -- v3/rx-calls: ERR_NOMOTD ends the welcome burst too (still
+        -- logged like any numeric).
+        "422" ->
+            fireAttribution Attribution.foldRegistered (logNumeric model message)
 
         "353" ->
             ( foldNames model message, [] )
@@ -41157,6 +41167,17 @@ updateCore msg model =
             if model.connection /= Live || String.isEmpty channel then
                 ( model, [] )
 
+            else if CallUi.needsAccount model then
+                -- v3/rx-calls: calls are end-to-end encrypted and need an
+                -- account; nothing goes out — the room shows the
+                -- sign-in banner instead (even if it was hidden).
+                ( { model
+                    | callJoinTarget = Just channel
+                    , callBannerDismissed = Set.remove (String.toLower (String.trim channel)) model.callBannerDismissed
+                  }
+                , []
+                )
+
             else
                 let
                     leaveFirst =
@@ -41258,6 +41279,23 @@ updateCore msg model =
 
             else
                 ( { model | callBannerDismissed = Set.insert (String.toLower (String.trim room)) model.callBannerDismissed }, [] )
+
+        -- v3/rx-calls: "Sign in" from the guest call banner — a
+        -- deliberate disconnect back to the connect form, in sign-in
+        -- mode (the guest session cannot become another account).
+        CallGuestSignIn ->
+            if CallUi.needsAccount model then
+                let
+                    ( left, leftOut ) =
+                        updateCore SessionDisconnect model
+
+                    ( moded, modeOut ) =
+                        updateCore (ConnectModeSet ConnectSignIn) left
+                in
+                ( moded, leftOut ++ modeOut )
+
+            else
+                ( model, [] )
 
         CallMoreToggle ->
             ( { model | callMoreOpen = not model.callMoreOpen && model.calls.lifecycle /= Media.Idle }, [] )
