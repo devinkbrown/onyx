@@ -23,6 +23,7 @@ has no Elm More menu yet, so the idle join simply hides.
 -}
 
 import App exposing (Model, Msg(..))
+import CallDock -- v3/calls-c6
 import CallUi
 import Dict
 import Html exposing (Html, button, div, h2, li, span, strong, text, ul)
@@ -308,7 +309,7 @@ joinBanner model room =
                 [ span [ class "onyx-join-banner-warn" ] [ callIcon "warn" ]
                 , div [ class "onyx-join-banner-copy" ]
                     [ strong [] [ text "Couldn't join. Try again." ]
-                    , span [] [ text ("Your place in " ++ room ++ " is kept.") ]
+                    , span [ attribute "data-testid" "call-join-failed-sub" ] [ text (CallDock.failedSub model.callJoinError room) ] -- v3/calls-c6
                     ]
                 , div [ class "onyx-join-banner-actions" ]
                     [ button

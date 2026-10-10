@@ -35,6 +35,7 @@ import Media exposing (HubPresentation(..))
 import Prefs
 import View.CallPresence exposing (callIcon, joinBanner)
 import View.Sheet as Sheet
+import View.CallDock -- v3/calls-c6
 
 
 {-| The call surface at the top of the message column: the stage +
@@ -144,6 +145,7 @@ voiceStage model =
         , attribute "data-mode" "audio"
         , attribute "data-motion" (motionWord model)
         , attribute "data-testid" "voice-stage"
+        , attribute "data-reconnecting" (boolAttr (View.CallDock.reconnectingNow model)) -- v3/calls-c6
         ]
         [ p
             [ class "onyx-call-stage-status"
@@ -151,9 +153,18 @@ voiceStage model =
             , attribute "aria-live" "polite"
             , attribute "data-testid" "voice-stage-state"
             ]
-            [ span [ class "onyx-call-pip", attribute "data-state" (presentationPip presentation) ] []
-            , text (CallUi.stageStatus model.calls (Maybe.map .label (security model)))
-            ]
+            -- v3/calls-c6: derived reconnecting state (spec §2.14)
+            (if View.CallDock.reconnectingNow model then
+                [ span [ class "onyx-call-pip", attribute "data-state" "provisional" ] []
+                , text "Reconnecting…"
+                ]
+
+             else
+                [ span [ class "onyx-call-pip", attribute "data-state" (presentationPip presentation) ] []
+                , text (CallUi.stageStatus model.calls (Maybe.map .label (security model)))
+                ]
+            )
+        , View.CallDock.lostBanner model -- v3/calls-c6
         , case density of
             CallUi.DensityCollapsed ->
                 div [ class "onyx-call-people onyx-call-people-collapsed" ]
@@ -254,6 +265,10 @@ controlBar model =
         count =
             List.length (people model)
 
+        -- v3/calls-c6: every toggle but Leave waits out a reconnect
+        reconnecting =
+            View.CallDock.reconnectingNow model
+
         timer =
             case ( presentation, model.calls.startedAt ) of
                 ( HubEstablished, Just started ) ->
@@ -287,7 +302,12 @@ controlBar model =
             ]
             [ div [ class "onyx-call-bar-left" ]
                 [ span [ class "onyx-call-where" ] [ text where_ ]
-                , timer
+                , if reconnecting then
+                    -- v3/calls-c6: the clock is unknown while reconnecting
+                    span [ class "onyx-call-timer", attribute "data-testid" "call-timer" ] [ text "—" ]
+
+                  else
+                    timer
                 , span [ class "onyx-call-people-count" ] [ text ("· " ++ CallUi.peopleLabel count) ]
                 ]
             , div [ class "onyx-call-bar-center", attribute "role" "group", attribute "aria-label" "Call controls" ]
@@ -295,6 +315,7 @@ controlBar model =
                     [ type_ "button"
                     , class "onyx-cbtn"
                     , attribute "data-testid" "call-mute"
+                    , disabled reconnecting -- v3/calls-c6
                     , attribute "aria-pressed" (boolAttr muted)
                     , attribute "aria-label"
                         (if muted then
@@ -327,6 +348,7 @@ controlBar model =
                         [ type_ "button"
                         , class "onyx-cbtn"
                         , attribute "data-testid" "call-more"
+                        , disabled reconnecting -- v3/calls-c6
                         , attribute "aria-label" "More call tools"
                         , attribute "aria-haspopup" "dialog"
                         , attribute "aria-expanded" (boolAttr model.callMoreOpen)

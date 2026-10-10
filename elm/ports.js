@@ -2191,6 +2191,23 @@
     "localFingerprint", "fingerprintPending", "peerFingerprints", "sfu"
   ];
 
+  /* v3/calls-c6: ring / error evidence that rides the same snapshot.
+     `acceptFailed` (the engine's accept promise rejected) and
+     `errorKind` (classified getUserMedia / codec failure) are
+     validated fail-closed in Elm (CallDock). */
+  var VOICE_RING_FIELDS = ["acceptFailed", "errorKind"];
+
+  /* Map a getUserMedia / engine error to the spec §2.15 classes. */
+  function voiceErrorKind(err) {
+    var name = "";
+    try { name = (err && typeof err.name === "string") ? err.name : ""; } catch (e) { name = ""; }
+    if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") return "permission";
+    if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") return "no_device";
+    if (name === "CodecError" || name === "MediaCodecError") return "codec";
+    if (name === "EncoderError") return "encoder";
+    return "other";
+  }
+
   function voiceFeedBlank() {
     return { channel: null, startedAt: null, sawEstablished: false };
   }
@@ -2210,8 +2227,11 @@
       if (ev.joinFailed) outcome = "failed";
       else if (ev.rejoinPending) outcome = "dropped";
       else if (feed.sawEstablished) outcome = "ended";
+      var idleSnapshot = { state: "idle", nick: "", channel: null, startedAt: null, outcome: outcome };
+      /* v3/calls-c6 */
+      if (typeof ev.errorKind === "string") idleSnapshot.errorKind = ev.errorKind;
       return {
-        snapshot: { state: "idle", nick: "", channel: null, startedAt: null, outcome: outcome },
+        snapshot: idleSnapshot,
         feed: voiceFeedBlank()
       };
     }
@@ -2234,6 +2254,10 @@
        fail-closed (CallUi.decodeSecurityFeed) and never trusts more
        than the engine reported. */
     VOICE_TRUST_FIELDS.forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(ev, key)) snapshot[key] = ev[key];
+    });
+    /* v3/calls-c6 */
+    VOICE_RING_FIELDS.forEach(function (key) {
       if (Object.prototype.hasOwnProperty.call(ev, key)) snapshot[key] = ev[key];
     });
     return {
@@ -3258,6 +3282,60 @@ function fetchPublicFeed(url) {
     try { doc.__onyxOverlayFocus = handle; } catch (err) { /* best-effort */ }
     return handle;
   }
+  /* v3/calls-c6 — mini voice view assist (spec §2.8). Elm owns the
+     PiP's position and buttons; three DOM-only duties live here:
+       - pointer capture on the drag handle, so a fast drag keeps
+         feeding `pointermove` to the handle;
+       - Escape inside the PiP blurs it;
+       - focus-obscure yield (WCAG 2.4.11): while a focused element
+         outside the PiP intersects its rect, the PiP gets
+         `data-yield="true"` (CSS fades it and drops pointer events). */
+  var VOICE_PIP_SELECTOR = "[data-voice-pip=\"region\"]";
+  function voicePipRectsMeet(a, b) {
+    return !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  }
+  function voicePipYield(doc) {
+    var pip = null;
+    try { pip = doc.querySelector(VOICE_PIP_SELECTOR); } catch (err) { pip = null; }
+    if (!pip) return;
+    var active = null;
+    try { active = doc.activeElement; } catch (err) { active = null; }
+    var covered = false;
+    try {
+      if (active && active !== doc.body && !pip.contains(active) && active.getBoundingClientRect) {
+        covered = voicePipRectsMeet(pip.getBoundingClientRect(), active.getBoundingClientRect());
+      }
+    } catch (err) { covered = false; }
+    try {
+      if (covered) pip.setAttribute("data-yield", "true");
+      else pip.removeAttribute("data-yield");
+    } catch (err) { /* best-effort */ }
+  }
+  function installVoicePipAssist(doc) {
+    if (!doc || !doc.addEventListener) return null;
+    try { if (doc.__onyxVoicePipAssist) return doc.__onyxVoicePipAssist; } catch (err) { return null; }
+    function onPointerDown(e) {
+      var handle = null;
+      try { handle = e.target && e.target.closest ? e.target.closest("[data-voice-pip-handle]") : null; } catch (err) { handle = null; }
+      if (!handle || e.button !== 0) return;
+      try { if (e.target.closest("button")) return; } catch (err) { /* keep going */ }
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* best-effort */ }
+    }
+    function onKeyDown(e) {
+      if (!e || e.key !== "Escape") return;
+      var pip = null;
+      try { pip = e.target && e.target.closest ? e.target.closest(VOICE_PIP_SELECTOR) : null; } catch (err) { pip = null; }
+      if (!pip) return;
+      try { if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur(); } catch (err) { /* best-effort */ }
+    }
+    function onFocus() { voicePipYield(doc); }
+    doc.addEventListener("pointerdown", onPointerDown, true);
+    doc.addEventListener("keydown", onKeyDown, true);
+    doc.addEventListener("focusin", onFocus, true);
+    var handle = { yield: function () { voicePipYield(doc); } };
+    try { doc.__onyxVoicePipAssist = handle; } catch (err) { /* best-effort */ }
+    return handle;
+  }
   /* Back-compat name for the palette slice's helper. */
   var installShortcutFocus = installOverlayFocus;
   function wireShortcuts(app) {
@@ -3476,8 +3554,9 @@ function fetchPublicFeed(url) {
       var hook = (typeof window !== "undefined") ? window.OnyxVoiceEngine : undefined;
       return (hook && typeof hook === "object") ? hook : null;
     }
-    function voiceFailed(channel) {
-      voicePush({ state: "idle", nick: "", channel: channel || null, joinFailed: true });
+    function voiceFailed(channel, err) {
+      /* v3/calls-c6: classified failure (permission / no device / …) */
+      voicePush({ state: "idle", nick: "", channel: channel || null, joinFailed: true, errorKind: voiceErrorKind(err) });
     }
     if (app.ports.voiceJoin) {
       app.ports.voiceJoin.subscribe(function (req) {
@@ -3492,10 +3571,10 @@ function fetchPublicFeed(url) {
         try {
           var done = engine.joinVoice(channel, { video: video });
           if (done && typeof done.then === "function") {
-            done.then(null, function () { voiceFailed(channel); });
+            done.then(null, function (reason) { voiceFailed(channel, reason); });
           }
         } catch (err) {
-          voiceFailed(channel);
+          voiceFailed(channel, err);
         }
       });
     }
@@ -3514,6 +3593,82 @@ function fetchPublicFeed(url) {
         if (!engine || typeof engine.setMuted !== "function") return;
         try { engine.setMuted(!!(req && req.muted)); } catch (err) { /* mute is best-effort */ }
       });
+    }
+    /* v3/calls-c6: DM ring commands (mirroring the oracle store's
+       startDmCall / acceptDmCall / rejectDmCall / endDmCall over the
+       engine's startCall / acceptIncomingCall / rejectCall / hangup).
+       Elm validated the verb's preconditions; the bridge only resolves
+       the engine. A start without an engine (or a rejected start)
+       feeds the failed outcome — never a phantom ring; a rejected
+       accept feeds `acceptFailed` on the same ring so the dialog can
+       offer a retry. Reject / hangup are best-effort. */
+    if (app.ports.voiceRing) {
+      app.ports.voiceRing.subscribe(function (req) {
+        var verb = req && typeof req.verb === "string" ? req.verb : "";
+        var peer = req && typeof req.peer === "string" ? req.peer : "";
+        var engine = voiceEngine();
+        if (verb === "start") {
+          if (!peer) return;
+          if (!engine || typeof engine.startCall !== "function") {
+            voicePush({ state: "idle", nick: "", channel: null, joinFailed: true, errorKind: "other" });
+            return;
+          }
+          try {
+            var started = engine.startCall(peer, "voice");
+            if (started && typeof started.then === "function") {
+              started.then(null, function (reason) {
+                voicePush({ state: "idle", nick: "", channel: null, joinFailed: true, errorKind: voiceErrorKind(reason) });
+              });
+            }
+          } catch (err) {
+            voicePush({ state: "idle", nick: "", channel: null, joinFailed: true, errorKind: voiceErrorKind(err) });
+          }
+          return;
+        }
+        if (verb === "accept") {
+          var acceptFailed = function () {
+            voicePush({ state: "ringing_in", nick: peer, channel: null, acceptFailed: true });
+          };
+          if (!engine || typeof engine.acceptIncomingCall !== "function") { acceptFailed(); return; }
+          try {
+            var accepted = engine.acceptIncomingCall();
+            if (accepted && typeof accepted.then === "function") accepted.then(null, acceptFailed);
+          } catch (err) { acceptFailed(); }
+          return;
+        }
+        if (verb === "reject") {
+          if (!engine || typeof engine.rejectCall !== "function" || !peer) return;
+          try { engine.rejectCall(peer); } catch (err) { /* best-effort */ }
+          return;
+        }
+        if (verb === "hangup") {
+          if (!engine || typeof engine.hangup !== "function" || !peer) return;
+          try { engine.hangup(peer); } catch (err) { /* best-effort */ }
+        }
+      });
+    }
+    /* v3/calls-c6: mini voice view position (`onyx:voice-pip-position`,
+       spec §2.8). Elm validates fail-closed (CallDock.decodePipPosition);
+       the bridge stores the corner + inward offsets verbatim and replays
+       them once subscriptions are live. */
+    var VOICE_PIP_KEY = "onyx:voice-pip-position";
+    if (app.ports.voicePipSave) {
+      app.ports.voicePipSave.subscribe(function (req) {
+        if (!req || typeof req.corner !== "string") return;
+        writeSlot(VOICE_PIP_KEY, JSON.stringify({ corner: req.corner, x: req.x | 0, y: req.y | 0 }));
+      });
+    }
+    if (app.ports.voicePipLoaded) {
+      setTimeout(function () {
+        var raw = readSlot(VOICE_PIP_KEY);
+        if (typeof raw !== "string" || raw.length > 256) return;
+        var parsed = null;
+        try { parsed = JSON.parse(raw); } catch (err) { return; }
+        try { app.ports.voicePipLoaded.send(parsed); } catch (err) { /* port gone */ }
+      }, 0);
+    }
+    if (typeof document !== "undefined" && document) {
+      try { installVoicePipAssist(document); } catch (err) { /* assist is best-effort */ }
     }
     if (app.ports.appearanceStorePrefs) {
       app.ports.appearanceStorePrefs.subscribe(function (req) {
@@ -9000,6 +9155,9 @@ function fetchPublicFeed(url) {
     classifyShortcut: classifyShortcut,
     installShortcutFocus: installShortcutFocus,
     installOverlayFocus: installOverlayFocus,
+    /* v3/calls-c6 */
+    voiceErrorKind: voiceErrorKind,
+    installVoicePipAssist: installVoicePipAssist,
     installOverlayFocusOnce: installOverlayFocusOnce,
     wireShortcuts: wireShortcuts,
     memKV: memKV

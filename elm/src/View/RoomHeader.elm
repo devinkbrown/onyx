@@ -43,6 +43,7 @@ import Html.Events exposing (onClick)
 import RoomSettings
 import View.CallPresence
 import View.DmSafety
+import View.CallDock -- v3/calls-c6
 import View.ModDesk
 import View.Notify
 import View.RoomSettings
@@ -155,7 +156,8 @@ moreMenu model =
                         ]
                         (View.RoomSettings.settingsToggle model
                             -- v3/roomsettings
-                            ++ [ pinsToggle model
+                            ++ [ View.CallDock.dmCallItem model -- v3/calls-c6
+                               , pinsToggle model
                                , mediaToggle model
                                , jumpToggle model
                                ]
