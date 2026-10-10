@@ -42,6 +42,7 @@ import View.Stewardship exposing (stewardPanel)
 import View.Inbox exposing (inbox)
 import View.Trust exposing (trustPageForRoute)
 import View.Rail exposing (rail)
+import View.NewMessage exposing (newMessageSheet)
 import View.Roadmap
 import View.Roster exposing (roster)
 import View.Scheduled exposing (scheduledSheet)
@@ -255,5 +256,6 @@ shell model =
                , profileCard model
                , moderationReview model
                , personSafetySheet model
+               , newMessageSheet model
                ]
         )

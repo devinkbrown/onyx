@@ -46,6 +46,9 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | **done** (v3/home; recaps/vault/resume narrowed) |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | M |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | S |
+| 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
+| 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
+| 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
 | 1.7 | Quick switch (Ctrl+K) | `RoomSwitcherSheet` | S |
 | 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | S |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home: coach only; notify prompt todo) |
@@ -131,6 +134,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — Phase 3.3 + 4.2 (keywords/ignored/DND) notification settings landed (`v3/notify`).
 - 2026-10-10 — Phase 1.1–1.3 primary navigation (rail + bottom bar), You hub for guests and accounts, Appearance link landed (v3/nav).
 - 2026-10-10 — Phase 2.5–2.6 boost slice landed (Add-a-boost opener + jump-to-date sheet over `requestTravelTo`; time scrubber stays todo).
+- 2026-10-10 — Phase 1.5/1.6 sectioned sidebar (Favorites/Rooms/Messages, filter, badges, star toggle, colour labels, DM previews) + New conversation sheet landed (`Sidebar`, `View.Rail`, `View.NewMessage`; 31 `SidebarTest` vectors).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 

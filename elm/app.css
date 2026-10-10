@@ -413,6 +413,198 @@ html, body {
   margin-left: 8px;
 }
 
+/* v3/sidebar — sectioned sidebar (Favorites / Rooms / Messages) */
+
+.onyx-rail-filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.onyx-rail-filter-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 8px;
+}
+.onyx-rail-filter-input:focus { outline: 1px solid var(--onyx-accent); outline-offset: 0; }
+.onyx-rail .onyx-rail-filter-unread,
+.onyx-rail .onyx-rail-filter-clear,
+.onyx-rail .onyx-rail-new,
+.onyx-rail .onyx-rail-star {
+  display: inline-flex;
+  width: auto;
+  flex: none;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.onyx-rail .onyx-rail-filter-unread-on {
+  border-color: var(--onyx-accent);
+  color: var(--onyx-accent);
+}
+.onyx-rail-filter-empty { color: var(--onyx-dim); font-size: 13px; margin: 0 0 12px; }
+
+.onyx-rail-section { margin-bottom: 14px; }
+.onyx-rail-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.onyx-rail-section-heading .onyx-rail-label { margin: 0; }
+.onyx-rail-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--onyx-faint);
+  margin: 0 0 8px;
+}
+.onyx-rail-empty { color: var(--onyx-dim); font-size: 13px; margin: 0; }
+
+.onyx-rail-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.onyx-rail .onyx-rail-item {
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.onyx-rail-row .onyx-rail-item { flex: 1; }
+.onyx-rail-copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.onyx-rail-sub {
+  color: var(--onyx-faint);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onyx-rail-meta { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.onyx-rail-meta .onyx-rail-offline { margin-left: 0; }
+.onyx-rail-time { color: var(--onyx-faint); font-size: 11px; }
+.onyx-rail-has-unread .onyx-rail-name { font-weight: 650; }
+.onyx-rail-unread {
+  background: var(--onyx-panel-2);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  padding: 1px 5px;
+  text-align: center;
+}
+.onyx-rail-mention { background: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.onyx-rail-color {
+  border-radius: 3px;
+  flex: none;
+  height: 10px;
+  width: 4px;
+}
+.onyx-rail-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+.onyx-rail-keywarn { color: var(--onyx-warn); font-size: 12px; }
+.onyx-rail .onyx-rail-star {
+  border-color: transparent;
+  color: var(--onyx-faint);
+  padding: 3px 6px;
+}
+.onyx-rail .onyx-rail-star-on { color: var(--onyx-accent); }
+
+/* v3/sidebar — New conversation sheet */
+
+.onyx-newmsg {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.onyx-newmsg-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 55%); }
+.onyx-newmsg-sheet {
+  position: relative;
+  width: min(420px, 100%);
+  box-sizing: border-box;
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+.onyx-newmsg-header { display: flex; align-items: flex-start; gap: 10px; }
+.onyx-newmsg-header > div:nth-child(2) { flex: 1; min-width: 0; }
+.onyx-newmsg-header h2 { font-size: 16px; margin: 0; }
+.onyx-newmsg-mark { color: var(--onyx-accent); font-size: 18px; line-height: 1; }
+.onyx-newmsg-eyebrow {
+  color: var(--onyx-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+.onyx-newmsg-close {
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+.onyx-newmsg-help, .onyx-newmsg-hint, .onyx-newmsg-empty { color: var(--onyx-dim); font-size: 13px; margin: 0; }
+.onyx-newmsg-hint span { color: var(--onyx-text); font-family: var(--font-mono); }
+.onyx-newmsg-state { color: var(--onyx-warn); font-size: 13px; margin: 0; }
+.onyx-newmsg form { display: flex; flex-direction: column; gap: 8px; }
+.onyx-newmsg label { font-size: 13px; font-weight: 650; }
+.onyx-newmsg input {
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: 6px;
+  color: var(--onyx-text);
+  font: inherit;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.onyx-newmsg input[aria-invalid="true"] { border-color: var(--onyx-bad); }
+.onyx-newmsg-error { color: var(--onyx-bad); font-size: 13px; margin: 0; }
+.onyx-newmsg-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.onyx-newmsg-secondary, .onyx-newmsg-primary {
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+.onyx-newmsg-secondary { background: transparent; border: 1px solid var(--onyx-line); color: var(--onyx-text); }
+.onyx-newmsg-primary { background: var(--onyx-accent); border: 1px solid var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 650; }
+.onyx-newmsg-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* Thread */
 
 .onyx-thread-pane {

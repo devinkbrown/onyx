@@ -792,6 +792,12 @@ type alias Model =
     -- v3/home
     , homeCoachDismissed : Bool
     , homeCaughtUpAnnounce : String
+
+    -- v3/sidebar
+    , sidebarFilter : String
+    , sidebarUnreadOnly : Bool
+    , newMessageOpen : Bool
+    , newMessageRecipient : String
     }
 
 
@@ -2941,6 +2947,15 @@ type Msg
     | CallHubChanged Media.CallHub
     | CallHubSnapshot Decode.Value
     | SelectBoardTab String
+    -- v3/sidebar
+    | SidebarFilterInput String
+    | SidebarUnreadOnlyToggle
+    | SidebarFilterClear
+    | SidebarStarToggle String
+    | NewMessageOpen
+    | NewMessageClose
+    | NewMessageInput String
+    | NewMessageSubmit
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3478,6 +3493,11 @@ init nick url =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    -- v3/sidebar
+    , sidebarFilter = ""
+    , sidebarUnreadOnly = False
+    , newMessageOpen = False
+    , newMessageRecipient = ""
     }
 
 
@@ -3961,6 +3981,11 @@ blank =
     , accountSessions = []
     , accountSessionsPending = False
     , accountSessionsError = Nothing
+    -- v3/sidebar
+    , sidebarFilter = ""
+    , sidebarUnreadOnly = False
+    , newMessageOpen = False
+    , newMessageRecipient = ""
     }
 
 
@@ -39677,6 +39702,68 @@ updateCore msg model =
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )
+
+        -- v3/sidebar
+        SidebarFilterInput value ->
+            ( { model | sidebarFilter = value }, [] )
+
+        SidebarUnreadOnlyToggle ->
+            ( { model | sidebarUnreadOnly = not model.sidebarUnreadOnly }, [] )
+
+        SidebarFilterClear ->
+            ( { model | sidebarFilter = "", sidebarUnreadOnly = False }, [] )
+
+        SidebarStarToggle name ->
+            -- The row star (mirroring `handleToggleStar`): ownerless
+            -- sessions never write; already starred under either key
+            -- unstars, otherwise stars through the shared folds.
+            if deviceMemoryOwner model == Nothing then
+                ( model, [] )
+
+            else if Set.member (String.toLower name) model.starredChannels || Set.member name model.starredChannels then
+                unstarChannel model name
+
+            else
+                starChannel model name
+
+        NewMessageOpen ->
+            ( { model | newMessageOpen = True, newMessageRecipient = "" }, [] )
+
+        NewMessageClose ->
+            ( { model | newMessageOpen = False, newMessageRecipient = "" }, [] )
+
+        NewMessageInput value ->
+            ( { model | newMessageRecipient = value }, [] )
+
+        NewMessageSubmit ->
+            -- Start a DM (mirroring `NewMessageSheet.submit` +
+            -- `startNewConversation`): live only, a valid nickname only;
+            -- the sheet closes and the profile-card DM path opens the
+            -- conversation (blocked peers coach instead). A fresh peer
+            -- gets an empty DM shell so the conversation lists at once,
+            -- gated by the 256-conversation cap.
+            case ( model.connection, Invite.parseNickname (Just model.newMessageRecipient) ) of
+                ( Live, Just nick ) ->
+                    let
+                        closed =
+                            { model | newMessageOpen = False, newMessageRecipient = "" }
+
+                        shelled =
+                            if isBlockedDmTarget closed nick || isChannelName closed nick then
+                                closed
+
+                            else
+                                case ensureDmShellCapacity closed nick of
+                                    ( room, True ) ->
+                                        { room | channels = Dict.insert (String.toLower nick) (ensureChannel room nick) room.channels }
+
+                                    ( _, False ) ->
+                                        closed
+                    in
+                    updateCore (MemberMessage nick) shelled
+
+                _ ->
+                    ( model, [] )
 
         WhoisRequest nick ->
             requestWhois model nick
