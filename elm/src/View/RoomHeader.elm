@@ -53,6 +53,7 @@ import View.ModDesk
 import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
+import View.Roster
 
 
 roomHeader : Model -> Html Msg
@@ -117,6 +118,7 @@ roomHeader model =
                         _ ->
                             text ""
                     , View.CallPresence.headerVoice model -- v3/calls-c1
+                    , View.Roster.membersToggle model -- v3/ui-roster: narrow layouts open the member sheet
                     , searchToggle model
                     , moreMenu model name isRoom channel
                     ]

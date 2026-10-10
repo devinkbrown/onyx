@@ -91,6 +91,62 @@ activeRoute tab =
             }
 
 
+{-| Decorative room sketch beside the hero: an illustration of a
+room (header, a few grouped messages, the composer), not live data —
+the whole figure is `aria-hidden` and captioned as an illustration so
+nothing here implies anyone is online. -}
+sketch : Html Msg
+sketch =
+    let
+        row tint initial name time lines =
+            div [ class "onyx-land-sketch-msg" ]
+                [ span [ class ("onyx-land-sketch-avatar onyx-land-sketch-avatar--" ++ tint) ] [ text initial ]
+                , div [ class "onyx-land-sketch-msg-body" ]
+                    (p [ class "onyx-land-sketch-meta" ]
+                        [ span [ class "onyx-land-sketch-name" ] [ text name ]
+                        , span [ class "onyx-land-sketch-time" ] [ text time ]
+                        ]
+                        :: List.map (\line -> p [ class "onyx-land-sketch-line" ] [ text line ]) lines
+                    )
+                ]
+    in
+    div [ class "onyx-land-sketch", attribute "aria-hidden" "true" ]
+        [ div [ class "onyx-land-sketch-window" ]
+            [ div [ class "onyx-land-sketch-head" ]
+                [ span [ class "onyx-land-sketch-room" ] [ text "# game-night" ]
+                , span [ class "onyx-land-sketch-topic" ] [ text "Fridays, 9pm. Bring snacks." ]
+                ]
+            , div [ class "onyx-land-sketch-log" ]
+                [ row "lapis" "M" "Mara" "8:52" [ "Who's around tonight?" ]
+                , row "gold" "J" "Jun" "8:54" [ "Here. Starting a call at 9", "Same room as last week" ]
+                , row "shu" "I" "Iris" "8:55" [ "In. I'll bring the playlist" ]
+                , p [ class "onyx-land-sketch-event" ] [ text "Jun started a voice call" ]
+                ]
+            , div [ class "onyx-land-sketch-composer" ]
+                [ span [ class "onyx-land-sketch-input" ] [ text "Message #game-night" ]
+                , span [ class "onyx-land-sketch-send" ] []
+                ]
+            ]
+        , p [ class "onyx-land-sketch-caption" ] [ text "Illustration, not a live room." ]
+        ]
+
+
+claimIcon : Int -> String
+claimIcon index =
+    case index of
+        0 ->
+            "ads"
+
+        1 ->
+            "trackers"
+
+        2 ->
+            "dms"
+
+        _ ->
+            "device"
+
+
 {-| The landing surface. The active board tab arrives as plain state;
 unknown ids fall back to the public room, never a blank panel.
 `View` renders it inside the public frame, whose `main` landmark
@@ -105,7 +161,8 @@ landing tab =
     div [ class "onyx-landing" ]
         [ section [ class "onyx-land-hero", attribute "aria-labelledby" "hero-heading" ]
             [ div [ class "onyx-land-copy" ]
-                [ h1 [ id "hero-heading", class "onyx-land-h1" ]
+                [ p [ class "onyx-land-kicker" ] [ text "Rooms, messages, and calls" ]
+                , h1 [ id "hero-heading", class "onyx-land-h1" ]
                     [ span [] [ text "Good company." ]
                     , span [] [ text "Great nights." ]
                     ]
@@ -114,17 +171,26 @@ landing tab =
                 , div [ class "onyx-land-cta" ]
                     [ a [ class "onyx-land-open", href "/app/" ] [ text "Open Onyx" ]
                     , a [ class "onyx-land-link", href "/invite?join=%23root" ] [ text "See the public room" ]
-                    , a [ class "onyx-land-link", href "/download" ] [ text "Keep it on this device" ]
                     ]
                 , p [ class "onyx-land-note" ]
-                    [ text "Browser first. Keep it on this device from a supporting browser." ]
+                    [ text "Browser first — no download needed. "
+                    , a [ href "/download" ] [ text "Keep it on this device" ]
+                    , text " from a supporting browser."
+                    ]
                 ]
+            , sketch
             ]
         , section [ class "onyx-land-trust", attribute "aria-labelledby" "trust-heading" ]
             [ h2 [ id "trust-heading", class "onyx-land-h2" ] [ text "What you can count on" ]
             , dl [ class "onyx-land-claims" ]
-                (List.concatMap
-                    (\( term, detail ) -> [ dt [] [ text term ], dd [] [ text detail ] ])
+                (List.indexedMap
+                    (\index ( term, detail ) ->
+                        div [ class "onyx-land-claim" ]
+                            [ span [ class ("onyx-land-claim-icon onyx-land-claim-icon--" ++ claimIcon index), attribute "aria-hidden" "true" ] []
+                            , dt [] [ text term ]
+                            , dd [] [ text detail ]
+                            ]
+                    )
                     trustClaims
                 )
             , p [ class "onyx-land-detail" ]
@@ -143,6 +209,7 @@ landing tab =
                     (\route ->
                         Html.button
                             [ attribute "role" "tab"
+                            , attribute "type" "button"
                             , attribute "aria-selected" (if route.id == active.id then "true" else "false")
                             , onClick (SelectBoardTab route.id)
                             ]

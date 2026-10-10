@@ -225,7 +225,7 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Offline — sends queue on this device") ] q
+                        Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Offline — sends queue on this device") ] q
                             |> Query.has
                                 [ Selector.attribute (Attr.placeholder "Offline — sends queue on this device")
                                 , Selector.disabled False
@@ -246,7 +246,7 @@ suite =
                     q =
                         query blank
                 in
-                Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Select a channel") ] q
+                Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Select a channel") ] q
                     |> Query.has
                         [ Selector.attribute (Attr.placeholder "Select a channel")
                         , Selector.disabled True
@@ -1023,7 +1023,7 @@ suite =
                             |> Event.expect EditCancel
                     , \_ ->
                         query armed
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Query.has [ Selector.attribute (Attr.placeholder "Edit message") ]
                     , \_ ->
                         query armed
@@ -1076,19 +1076,99 @@ suite =
                 Expect.all
                     [ \_ ->
                         query edited
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
                     , \_ ->
                         query replied
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Message #c") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect ReplyCancel
                     , \_ ->
                         query both
-                            |> Query.find [ Selector.tag "input", Selector.attribute (Attr.placeholder "Edit message") ]
+                            |> Query.find [ Selector.tag "textarea", Selector.attribute (Attr.placeholder "Edit message") ]
                             |> Event.simulate (key "Escape" False)
                             |> Event.expect EditCancel
+                    ]
+                    ()
+        , test "rows carry a quick-action toolbar with icon buttons" <|
+            \_ ->
+                let
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    bar =
+                        query base
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Actions for message from alice") ]
+
+                    action key =
+                        bar |> Query.find [ Selector.attribute (Attr.attribute "data-row-action" key) ]
+
+                    pointer kind tag =
+                        Event.custom "contextmenu"
+                            (Encode.object
+                                [ ( "pointerType", Encode.string kind )
+                                , ( "target", Encode.object [ ( "tagName", Encode.string tag ) ] )
+                                ]
+                            )
+
+                    row =
+                        query base
+                            |> Query.find [ Selector.class "onyx-message", Selector.containing [ Selector.text "hello there" ] ]
+                in
+                Expect.all
+                    [ \_ -> bar |> Query.has [ Selector.attribute (Attr.attribute "role" "toolbar") ]
+                    , \_ -> action "react" |> Event.simulate Event.click |> Event.expect (ReactionPickerOpen { target = "#c", msgid = "m1" })
+                    , \_ -> action "reply" |> Event.simulate Event.click |> Event.expect (ReplyArm { target = "#c", msgid = "m1" })
+                    , \_ -> action "reply" |> Query.has [ Selector.attribute (Attr.tabindex -1), Selector.attribute (Attr.attribute "aria-label" "Reply") ]
+                    , \_ -> action "more" |> Query.has [ Selector.class "onyx-msg-menu-trigger" ]
+                    , \_ -> row |> Query.has [ Selector.attribute (Attr.tabindex -1) ]
+                    , \_ -> row |> Event.simulate (pointer "touch" "SPAN") |> Event.expect (MessageMenuOpen { target = "#c", msgid = "m1" })
+                    , \_ -> row |> Event.simulate (pointer "mouse" "SPAN") |> Event.toResult |> Expect.err
+                    , \_ -> row |> Event.simulate (pointer "touch" "A") |> Event.toResult |> Expect.err
+                    , \_ ->
+                        -- no tofu: a row without boosts renders no boost bar
+                        row |> Query.hasNot [ Selector.class "boost-bar" ]
+                    ]
+                    ()
+        , test "the thread action opens the replies panel for the row" <|
+            \_ ->
+                let
+                    base =
+                        blank
+                            |> (\m -> feed m ":me!u@h JOIN #c")
+                            |> (\m -> feed m ":alice!u@h JOIN #c")
+                            |> (\m -> feed m "@msgid=m1 :alice!u@h PRIVMSG #c :hello there")
+                            |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
+
+                    rowId =
+                        base.channels
+                            |> Dict.get "#c"
+                            |> Maybe.andThen (.messages >> List.head)
+                            |> Maybe.map .id
+                            |> Maybe.withDefault -1
+                in
+                query base
+                    |> Query.find [ Selector.attribute (Attr.attribute "data-row-action" "thread") ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (ThreadOpen { channel = "#c", parentId = rowId })
+        , test "the composer's conversation picker never repeats the room topic" <|
+            \_ ->
+                let
+                    topical =
+                        feed { channelModel | topicHistory = Dict.fromList [ ( "#c", [ "Welcome to #c — be kind, stay curious.", "Sprint" ] ) ] }
+                            ":s 332 me #c :Welcome to #c — be kind, stay curious."
+
+                    picker =
+                        query topical |> Query.find [ Selector.class "onyx-topic-options" ]
+                in
+                Expect.all
+                    [ \_ -> picker |> Query.has [ Selector.text "Sprint" ]
+                    , \_ -> picker |> Query.hasNot [ Selector.text "Welcome to #c — be kind, stay curious." ]
                     ]
                     ()
         , test "thread rows offer a capability-gated message menu" <|
@@ -1126,7 +1206,7 @@ suite =
                                 [ Selector.class "onyx-msg-menu-trigger"
                                 , Selector.attribute (Attr.attribute "aria-label" "Message actions for message from alice")
                                 ]
-                            |> Query.has [ Selector.text "⋯" ]
+                            |> Query.has [ Selector.containing [ Selector.attribute (Attr.attribute "data-icon" "more") ] ]
                     , \_ ->
                         query opened
                             |> Query.find [ Selector.class "onyx-msg-menu" ]
@@ -1369,10 +1449,12 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        query rosterBase
-                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View network profile for alice") ]
+                        -- v3/ui-roster: rows carry no buttons of their own; the
+                        -- network profile is one step in, on the member card.
+                        query (Tuple.first (update (UserProfileOpened { nick = "alice", channel = "#c" }) rosterBase))
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View profile of alice") ]
                             |> Event.simulate Event.click
-                            |> Event.expect (WhoisRequest "alice")
+                            |> Event.expect (MemberCardWhois "alice")
                     , \_ ->
                         query loading
                             |> Query.find [ Selector.class "onyx-profile-sheet" ]
@@ -1992,11 +2074,18 @@ suite =
                 let
                     q =
                         query channelModel
+
+                    group key =
+                        Query.find [ Selector.class "onyx-roster" ] q
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-group" key) ]
+                            |> Query.find [ Selector.class "onyx-mlist-group-head" ]
                 in
+                -- v3/ui-roster: section titles in words with a separate
+                -- count; plain members who are here read "Online".
                 Expect.all
-                    [ \_ -> Query.has [ Selector.text "Ops (1)" ] q
-                    , \_ -> Query.has [ Selector.text "Voice (1)" ] q
-                    , \_ -> Query.has [ Selector.text "Members (1)" ] q
+                    [ \_ -> group "op" |> Query.has [ Selector.text "Ops", Selector.text "1" ]
+                    , \_ -> group "voice" |> Query.has [ Selector.text "Voice", Selector.text "1" ]
+                    , \_ -> group "member" |> Query.has [ Selector.text "Online", Selector.text "1" ]
                     ]
                     ()
         , test "roster marks away members and resolves learned ranks" <|
@@ -2011,9 +2100,15 @@ suite =
                 Expect.all
                     [ \_ -> Query.has [ Selector.class "onyx-away" ] q
                     , \_ ->
-                        Query.findAll [ Selector.class "onyx-member-prefix" ] q
+                        -- v3/ui-roster: roles read as words (never prefix
+                        -- symbols); the first row is the op.
+                        Query.findAll [ Selector.class "onyx-member-role" ] q
                             |> Query.first
-                            |> Query.has [ Selector.text "@" ]
+                            |> Query.has [ Selector.text "Op" ]
+                    , \_ ->
+                        -- away members gather in the trailing Away section
+                        Query.find [ Selector.attribute (Attr.attribute "data-group" "away") ] q
+                            |> Query.has [ Selector.text "bob", Selector.text "Voice · Away" ]
                     ]
                     ()
         , test "topbar identity chip names the nick without a badge" <|
@@ -2852,18 +2947,18 @@ suite =
                             Query.findAll [ Selector.class "onyx-facepile-face" ] q
                                 |> Query.count (Expect.equal 3)
                         , \_ ->
-                            Query.find
-                                [ Selector.tag "button"
-                                , Selector.containing [ Selector.text "AL" ]
-                                ]
-                                q
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.containing [ Selector.text "AL" ]
+                                    ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Open profile for alice, here") ]
                         , \_ ->
-                            Query.find
-                                [ Selector.tag "button"
-                                , Selector.containing [ Selector.text "AL" ]
-                                ]
-                                q
+                            Query.find [ Selector.class "onyx-facepile" ] q
+                                |> Query.find
+                                    [ Selector.tag "button"
+                                    , Selector.containing [ Selector.text "AL" ]
+                                    ]
                                 |> Event.simulate Event.click
                                 |> Event.expect (UserProfileOpened { nick = "alice", channel = "#c" })
                         ]
@@ -3658,8 +3753,9 @@ suite =
                     in
                     Expect.all
                         [ \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "create-room-formation") ] q
-                                |> Query.has [ Selector.text "Start a room" ]
+                            -- v3/ui-sheets: the sheet head titles the formation (no second title in the form).
+                            Query.find [ Selector.attribute (Attr.attribute "data-shortcut-scope" "start-room") ] q
+                                |> Query.has [ Selector.text "Start a room", Selector.attribute (Attr.attribute "data-testid" "create-room-formation") ]
                         , \_ ->
                             Query.findAll [ Selector.class "chb-skin" ] q
                                 |> Query.count (Expect.equal 3)

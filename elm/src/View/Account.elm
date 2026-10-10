@@ -44,24 +44,22 @@ accountPanel model =
             , modal = True
             , attrs = [ attribute "data-testid" "account-panel" ]
             }
-                [ div [ class "onyx-account-head" ]
-                    [ h2 [ class "onyx-account-title", Html.Attributes.id (Sheet.titleId "account") ] [ text "Account settings" ]
-                    , button
-                        [ type_ "button"
-                        , class "onyx-account-close"
-                        , attribute "aria-label" "Close account settings"
-                        , attribute "data-testid" "account-close"
-                        , onClick (SetAccountOpen False)
-                        ]
-                        [ span [ attribute "aria-hidden" "true" ] [ text "✕" ] ]
-                    ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "account", title = "Account settings", closeLabel = "Close account settings", onClose = SetAccountOpen False }
+                        |> (\h ->
+                                { h
+                                    | closeTestId = Just "account-close"
+                                    , subtitle = Maybe.map (\name -> "Signed in as " ++ name) model.accountName
+                                }
+                           )
+                    )
                 , case model.accountName of
                     Nothing ->
                         p [ class "onyx-account-guest" ]
                             [ text "Sign in to manage your account." ]
 
                     Just _ ->
-                        div []
+                        div [ class "onyx-account-body" ]
                             [ sectionNav
                             , overviewSection model
                             , securitySection model

@@ -1,0 +1,416 @@
+/* v3/ui-roster — the channel member list (View.Roster).
+
+   A calm list in the Discord / Slack mould: one clean line per person
+   (avatar with a presence dot, the full name), role sections in words
+   with counts, Away dimmed at the end, the filter folded into an icon
+   until it is needed, no per-row buttons on touch and a single quiet
+   Message icon on hover / focus with a fine pointer.
+
+   Wide layouts (>= 1100px) show the list in flow as the 240px context
+   rail. Below that the frame hides the rail and the room header's
+   people toggle opens the same element as a popover sheet: a right
+   side sheet on tablets, a full-height bottom sheet on phones. The
+   browser owns open / close, light dismiss and Escape (popover=auto).
+   Tokens from app.css :root; icons are the .pt-ico masks from
+   css/pol-thread.css. */
+
+/* ── 1. In-flow rail (reset the UA popover box) ─────────────────────── */
+
+.onyx-roster[popover] {
+  position: static;
+  inset: auto;
+  width: auto;
+  height: auto;
+  margin: 0;
+  color: inherit;
+  border: 0;
+  border-left: 1px solid var(--onyx-line);
+  background: var(--onyx-panel);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-2) var(--space-4);
+}
+
+@media (min-width: 1100px) {
+  .onyx-roster[popover] { display: flex; }
+}
+
+/* ── 2. Header: title, count, folded filter ─────────────────────────── */
+
+.onyx-roster .onyx-roster-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: flex-start;
+  min-height: 32px;
+  padding: 0 var(--space-1) 0 var(--space-2);
+}
+
+.onyx-roster .onyx-mlist-title {
+  margin: 0;
+  color: var(--onyx-dim);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+
+.onyx-roster .onyx-roster-count {
+  color: var(--onyx-faint);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.onyx-mlist-find,
+.onyx-mlist-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-dim);
+  cursor: pointer;
+}
+.onyx-mlist-find:hover,
+.onyx-mlist-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-mlist-find .pt-ico { width: 16px; height: 16px; }
+.onyx-mlist-close { display: none; }
+.onyx-mlist-find + .onyx-mlist-close { margin-left: 0; }
+
+/* The filter: always open above 20 members (or while it holds a
+   query); otherwise folded to nothing until its label icon focuses it. */
+.onyx-roster .onyx-roster-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) var(--space-1) var(--space-2);
+  padding: 0 var(--space-2);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.onyx-roster .onyx-roster-filter:focus-within { border-color: var(--onyx-dim); }
+.onyx-roster-filter > .pt-ico { width: 14px; height: 14px; color: var(--onyx-faint); }
+.onyx-roster .onyx-roster-filter-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: var(--text-sm);
+}
+.onyx-roster .onyx-roster-filter-input:focus,
+.onyx-roster .onyx-roster-filter-input:focus-visible { outline: none; }
+.onyx-roster-filter-input::placeholder { color: var(--onyx-faint); }
+.onyx-roster-filter-input::-webkit-search-decoration,
+.onyx-roster-filter-input::-webkit-search-cancel-button { display: none; }
+
+.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within) {
+  height: 0;
+  margin-block: 0;
+  border-width: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.onyx-roster:has(.onyx-roster-filter:focus-within) .onyx-mlist-find { visibility: hidden; }
+
+.onyx-roster .onyx-roster-empty {
+  margin: var(--space-3) var(--space-2);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+/* ── 3. Sections ─────────────────────────────────────────────────────── */
+
+.onyx-mlist-groups { display: grid; gap: var(--space-3); }
+
+.onyx-roster .onyx-roster-group { margin: 0; }
+
+.onyx-mlist-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  list-style: none;
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.onyx-mlist-group-head::-webkit-details-marker { display: none; }
+.onyx-mlist-group-head:hover { color: var(--onyx-text); }
+.onyx-mlist-group-head:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.onyx-roster .onyx-mlist-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  color: inherit;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+.onyx-mlist-group-count { color: var(--onyx-faint); font-weight: 600; letter-spacing: 0; }
+
+.onyx-mlist-group-head > .pt-ico {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--onyx-faint);
+  opacity: 0;
+  transition: transform var(--dur-fast) var(--ease), opacity var(--dur-micro) var(--ease);
+}
+.onyx-mlist-group-head:hover > .pt-ico,
+.onyx-mlist-group-head:focus-visible > .pt-ico,
+.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico { opacity: 1; }
+.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico { transform: rotate(-90deg); }
+
+.onyx-roster .onyx-mlist-rows { display: grid; gap: 1px; margin: 2px 0 0; padding: 0; list-style: none; }
+
+/* ── 4. Rows: one clean line ─────────────────────────────────────────── */
+
+.onyx-roster .onyx-member {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+  min-height: 40px;
+  padding: 0;
+  font-size: var(--text-md);
+}
+
+.onyx-frame .onyx-mlist-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px var(--space-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.onyx-mlist-main:focus-visible,
+.onyx-mlist-main:active { background: var(--onyx-panel-2); }
+@media (hover: hover) {
+  .onyx-member:hover > .onyx-mlist-main { background: var(--onyx-panel-2); }
+}
+.onyx-mlist-main:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.onyx-mlist-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  line-height: var(--leading-snug);
+}
+.onyx-mlist-you { flex: none; color: var(--onyx-faint); font-size: var(--text-2xs); }
+.onyx-member--self .onyx-mlist-name { font-weight: 650; }
+
+/* Presence: a small dot cut into the avatar's corner — solid while
+   here, a hollow ring while away (never the accent). */
+.onyx-roster .onyx-member-presence-dot {
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  background: var(--onyx-text);
+  border: 2px solid var(--onyx-panel);
+  box-sizing: border-box;
+}
+.onyx-roster .onyx-member-presence-dot--away {
+  background: var(--onyx-panel);
+  box-shadow: inset 0 0 0 1.5px var(--onyx-faint);
+}
+.onyx-mlist-main:focus-visible .onyx-member-presence-dot { border-color: var(--onyx-panel-2); }
+@media (hover: hover) {
+  .onyx-member:hover .onyx-member-presence-dot { border-color: var(--onyx-panel-2); }
+}
+
+/* Away: the whole section steps back. */
+.onyx-roster-group--away .onyx-mlist-name { color: var(--onyx-dim); }
+.onyx-roster-group--away .onyx-member-avatar-slot .onyx-avatar { opacity: 0.55; }
+.onyx-roster .onyx-member.onyx-away { opacity: 1; }
+
+/* The role / away words: screen-reader text unless the section does
+   not already say it (an operator listed under Away). */
+.onyx-roster .onyx-member-role {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.onyx-roster .onyx-member-role--shown {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  overflow: visible;
+  clip: auto;
+  flex: none;
+  color: var(--onyx-faint);
+  font-size: var(--text-2xs);
+  pointer-events: none;
+}
+
+/* One quiet Message icon on hover / focus (fine pointers only). */
+.onyx-roster .onyx-member-message {
+  position: absolute;
+  top: 50%;
+  right: var(--space-1);
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  cursor: pointer;
+}
+.onyx-roster .onyx-member-message .pt-ico { width: 16px; height: 16px; }
+.onyx-roster .onyx-member-message:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+@media (hover: hover) and (pointer: fine) {
+  .onyx-roster .onyx-member-message { display: grid; opacity: 0; pointer-events: none; }
+  .onyx-roster .onyx-member:hover > .onyx-member-message,
+  .onyx-roster .onyx-member:focus-within > .onyx-member-message { opacity: 1; pointer-events: auto; }
+  .onyx-roster .onyx-member:hover > .onyx-member-role--shown { visibility: hidden; }
+}
+
+/* Room care: a quiet footer action, out of the list's way. */
+.onyx-mlist-foot { margin-top: auto; padding: var(--space-4) var(--space-2) 0; }
+.onyx-mlist-foot:empty,
+.onyx-mlist-foot > div:empty { display: none; }
+.onyx-roster .onyx-roster-care {
+  margin: 0;
+  padding: var(--space-1) 0;
+  background: transparent;
+  border: 0;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.onyx-roster .onyx-roster-care:hover { color: var(--onyx-text); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── 5. The header toggle + sheet (below the rail breakpoint) ─────────── */
+
+.onyx-members-toggle { display: none; }
+
+@media (max-width: 1099.98px) {
+  .onyx-room-header .onyx-members-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-variant-numeric: tabular-nums;
+  }
+  .onyx-members-toggle .pt-ico { width: 18px; height: 18px; }
+  .onyx-members-toggle-count { font-size: var(--text-sm); font-weight: 600; }
+
+  .onyx-frame > .onyx-roster:popover-open,
+  .onyx-roster:popover-open {
+    position: fixed;
+    inset: 0 0 0 auto;
+    display: flex;
+    width: min(360px, 100vw);
+    height: var(--vvh, 100dvh);
+    max-height: var(--vvh, 100dvh);
+    margin: 0;
+    padding: max(var(--space-3), var(--safe-top)) var(--space-2) calc(var(--space-4) + var(--safe-bottom));
+    border: 0;
+    border-left: 1px solid var(--onyx-line);
+    box-shadow: var(--elev-3);
+    animation: onyx-sheet-in var(--dur-base) var(--ease);
+  }
+  .onyx-roster::backdrop { background: color-mix(in srgb, #000 55%, transparent); }
+  .onyx-roster:popover-open .onyx-mlist-close { display: grid; }
+}
+
+@media (max-width: 767.98px) {
+  .onyx-frame > .onyx-roster:popover-open,
+  .onyx-roster:popover-open {
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: 100%;
+    height: calc(var(--vvh, 100dvh) - max(var(--space-6), calc(var(--safe-top) + var(--space-2))));
+    max-height: calc(var(--vvh, 100dvh) - max(var(--space-6), calc(var(--safe-top) + var(--space-2))));
+    padding: var(--space-2) var(--space-2) calc(var(--space-4) + var(--safe-bottom));
+    border-left: 0;
+    border-top: 1px solid var(--onyx-line);
+    border-radius: 12px 12px 0 0;
+  }
+  /* A grabber line says "sheet" without a word. */
+  .onyx-roster:popover-open::before {
+    content: "";
+    flex: none;
+    align-self: center;
+    width: 36px;
+    height: 4px;
+    margin: 0 0 var(--space-2);
+    border-radius: var(--r-pill);
+    background: var(--onyx-line);
+  }
+
+  .onyx-roster:popover-open .onyx-roster-head { min-height: var(--target-min); }
+  .onyx-roster:popover-open .onyx-mlist-title {
+    color: var(--onyx-text);
+    font-size: var(--text-lg);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .onyx-roster:popover-open .onyx-roster-count { font-size: var(--text-sm); }
+  .onyx-roster:popover-open .onyx-mlist-find,
+  .onyx-roster:popover-open .onyx-mlist-close { width: var(--target-min); height: var(--target-min); }
+  .onyx-roster:popover-open .onyx-mlist-find .pt-ico,
+  .onyx-roster:popover-open .onyx-mlist-close .pt-ico { width: 20px; height: 20px; }
+  .onyx-roster:popover-open .onyx-roster-filter-input { min-height: 40px; font-size: 16px; }
+  .onyx-roster:popover-open .onyx-mlist-group-head { min-height: 36px; }
+  .onyx-roster:popover-open .onyx-mlist-group-head > .pt-ico { opacity: 1; }
+  .onyx-roster:popover-open .onyx-member,
+  .onyx-roster:popover-open .onyx-mlist-main { min-height: 52px; }
+  .onyx-roster:popover-open .onyx-mlist-main { gap: var(--space-3); font-size: 16px; }
+  .onyx-roster:popover-open .onyx-avatar--sm { width: 2.25rem; height: 2.25rem; font-size: 0.78rem; }
+}
+
+/* ── 6. Motion, forced colours ───────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-roster:popover-open { animation: none; }
+  .onyx-mlist-group-head > .pt-ico { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .onyx-roster .onyx-member-presence-dot { forced-color-adjust: none; background: CanvasText; border-color: Canvas; }
+  .onyx-roster .onyx-member-presence-dot--away { background: Canvas; box-shadow: inset 0 0 0 1.5px CanvasText; }
+  .onyx-mlist-group-head > .pt-ico { opacity: 1; }
+}

@@ -8,7 +8,7 @@ through the Elm document head.
 -}
 
 import App exposing (Msg)
-import Html exposing (Html, a, div, h1, p, section, text)
+import Html exposing (Html, a, div, h1, nav, p, section, text)
 import Html.Attributes exposing (attribute, class, href)
 
 
@@ -30,6 +30,11 @@ notFound isAppMiss =
                      else
                         "Back to home"
                     )
+                ]
+            , nav [ class "not-found-page__more", attribute "aria-label" "Other places to go" ]
+                [ a [ href "/guides/" ] [ text "Guides" ]
+                , a [ href "/status/" ] [ text "Status" ]
+                , a [ href "/about/" ] [ text "About" ]
                 ]
             ]
         ]

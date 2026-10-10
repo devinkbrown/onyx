@@ -43,29 +43,16 @@ formation model =
         , modal = True
         , attrs = []
         }
-            [ div [ class "chb-head" ]
-                [ h2 [ class "chb-title" ] [ text "Start a room" ]
-                , p [ class "chb-desc" ] [ text "Name it, share the invite with a few people, and walk in together." ]
-                , button
-                    [ type_ "button"
-                    , class "chb-close"
-                    , attribute "aria-label" "Close room creation"
-                    , onClick CreateRoomClose
-                    ]
-                    [ text "×" ]
-                ]
+            [ Sheet.headerWith
+                (Sheet.head { scope = "start-room", title = "Start a room", closeLabel = "Close room creation", onClose = CreateRoomClose }
+                    |> (\h -> { h | subtitle = Just "Name it, share the invite with a few people, and walk in together." })
+                )
             , form
                 [ class "chb-create"
                 , attribute "data-testid" "create-room-formation"
                 , onSubmit CreateSubmit
                 ]
-                [ div [ class "chb-create-header" ]
-                    [ span [ class "chb-eyebrow" ] [ text "Create" ]
-                    , h2 [] [ text "Start a room" ]
-                    , p [ class "chb-create-lead" ]
-                        [ text "A room is a shared conversation. Name it, choose an optional look, and share the invite before you enter." ]
-                    ]
-                , p [ class "chb-create-note" ] [ text formationCopy ]
+                [ p [ class "chb-create-note" ] [ text formationCopy ]
                 , if offline then
                     p [ class "chb-state chb-state--offline", attribute "role" "status" ]
                         [ text "You’re offline. Reconnect to create or join this room. Your form will stay here." ]

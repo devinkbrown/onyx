@@ -191,7 +191,7 @@ studio model =
     div [ class "ts-studio", attribute "data-testid" "theme-studio" ]
         [ header [ class "ts-header" ]
             [ div [ class "ts-header__title-row" ]
-                ([ span [ class "ts-eyebrow" ] [ text "// Theme Studio" ] ]
+                ([ span [ class "ts-eyebrow" ] [ text "Theme Studio" ] ]
                     ++ (if hasOverrides model then
                             [ span [ class "ts-badge ts-badge--modified" ] [ text "modified" ] ]
 
@@ -208,7 +208,7 @@ studio model =
         , div [ class "ts-body" ]
             [ editor model
             , aside [ class "ts-preview-pane", attribute "aria-label" "Live preview" ]
-                [ span [ class "ts-eyebrow" ] [ text "// Preview" ]
+                [ span [ class "ts-eyebrow" ] [ text "Preview" ]
                 , preview
                 , audit model
                 ]
@@ -406,7 +406,7 @@ generateCol model =
     in
     div [ class "ts-factory__col", attribute "role" "group", attribute "aria-label" "Generate a palette from a seed" ]
         [ div [ class "ts-factory__col-head" ]
-            [ span [ class "ts-eyebrow" ] [ text "// Generate" ]
+            [ span [ class "ts-eyebrow" ] [ text "Generate" ]
             , div [ class "ts-scheme-toggle", attribute "role" "group", attribute "aria-label" "Colour scheme" ]
                 [ schemeBtn "dark" "dark" "ts-scheme-dark"
                 , schemeBtn "light" "light" "ts-scheme-light"
@@ -425,12 +425,12 @@ generateCol model =
             , seedNum "contrast" "ts-gen-contrast" seed.contrast "4.5" "12" "0.1" (contrastBadge seed.contrast) "ts-gen-contrast"
             ]
         , div [ class "ts-factory__actions" ]
-            [ btn "primary" "sm" [ attribute "data-testid" "ts-generate", onClick StudioGenerate ] [ text "[generate]" ]
-            , btn "ghost" "sm" [ attribute "data-testid" "ts-randomize", onClick StudioRandomize ] [ text "[🎲 randomize]" ]
-            , tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-seed-from-current", onClick StudioSeedFromCurrent, title "Recover a seed from the palette that is live right now." ] [ text "[seed from current]" ])
+            [ btn "ghost" "sm" [ attribute "data-testid" "ts-generate", onClick StudioGenerate ] [ text "Generate" ]
+            , btn "ghost" "sm" [ attribute "data-testid" "ts-randomize", onClick StudioRandomize ] [ text "Randomize" ]
+            , tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-seed-from-current", onClick StudioSeedFromCurrent, title "Recover a seed from the palette that is live right now." ] [ text "Seed from current" ])
             , div [ class "ts-seed-transfer", attribute "role" "group", attribute "aria-label" "Portable seed transfer" ]
                 [ tip "top" (seedExportBtn model)
-                , tip "top" (btn "ghost" "sm" [ class "ts-seed-btn", attribute "data-testid" "ts-import-seed", onClick StudioImportSeedRequest, title "Paste a portable seed JSON — validated fail-closed, then generated." ] [ text "[import seed]" ])
+                , tip "top" (btn "ghost" "sm" [ class "ts-seed-btn", attribute "data-testid" "ts-import-seed", onClick StudioImportSeedRequest, title "Paste a portable seed JSON — validated fail-closed, then generated." ] [ text "Import seed" ])
                 ]
             ]
         , case model.studioSeedCopyFailure of
@@ -440,7 +440,7 @@ generateCol model =
             Nothing ->
                 text ""
         , p [ class "ts-factory__hint" ]
-            [ text "One seed → a whole coherent palette, AA-clean by construction. After the first generate, the knobs re-generate live." ]
+            [ text "One seed makes a whole coherent palette, AA-clean by construction. After the first generate, the knobs re-generate live." ]
         ]
 
 
@@ -526,10 +526,10 @@ eyeDropper model =
                 ]
                 [ text
                     (if model.studioEyeDropperBusy then
-                        "[sampling screen…]"
+                        "Sampling screen…"
 
                      else
-                        "[⌖ sample screen]"
+                        "Sample screen"
                     )
                 ]
             ]
@@ -579,13 +579,13 @@ seedExportBtn model =
         )
         [ text
             (if model.studioSeedBusy then
-                "[copying seed…]"
+                "Copying seed…"
 
              else if model.studioSeedCopied then
-                "[✓ seed copied]"
+                "Seed copied"
 
              else
-                "[export seed]"
+                "Export seed"
             )
         ]
 
@@ -617,7 +617,7 @@ adjustCol model =
     in
     div [ class "ts-factory__col", attribute "role" "group", attribute "aria-label" "Adjust the current palette" ]
         [ div [ class "ts-factory__col-head" ]
-            ([ span [ class "ts-eyebrow" ] [ text "// Adjust" ] ]
+            ([ span [ class "ts-eyebrow" ] [ text "Adjust" ] ]
                 ++ (if dirty then
                         [ span [ class "ts-badge ts-badge--modified" ] [ text "live" ] ]
 
@@ -632,8 +632,8 @@ adjustCol model =
             , knob "contrast" "ts-adj-contrast" adjust.contrast "-1" "1" "0.02" (Studio.fmtSigned adjust.contrast) "ts-adjust-contrast"
             ]
         , div [ class "ts-factory__actions" ]
-            [ tip "top" (btn "primary" "sm" [ attribute "data-testid" "ts-bake", disabled (not dirty), onClick StudioAdjustBake, title "Commit the adjusted palette and zero the knobs." ] [ text "[bake]" ])
-            , tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-adjust-revert", disabled (not dirty), onClick StudioAdjustRevert, title "Abandon the adjustment and restore the palette you started from." ] [ text "[revert]" ])
+            [ tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-bake", disabled (not dirty), onClick StudioAdjustBake, title "Commit the adjusted palette and zero the knobs." ] [ text "Bake" ])
+            , tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-adjust-revert", disabled (not dirty), onClick StudioAdjustRevert, title "Abandon the adjustment and restore the palette you started from." ] [ text "Revert" ])
             ]
         , p [ class "ts-factory__hint" ]
             [ text "Relative nudges from the palette as it was when you started dragging — zero restores it exactly. Bake (or Save) keeps the result." ]
@@ -1043,7 +1043,7 @@ preview =
                             , span [ class "ts-pv-msg__link" ] [ text "eshmaki.me/stats" ]
                             ]
                         ]
-                    , pvMsg "21:07" "var(--ok, #46c08a)" "onyx" "→ network: 2 homes linked, quorum ok" True
+                    , pvMsg "21:07" "var(--ok, #46c08a)" "onyx" "network: 2 homes linked, quorum ok" True
                     , pvMsg "21:09" "var(--shu)" "rei" "a coral light drifting through dark water" False
                     ]
                 , div [ class "ts-pv-actions" ]
@@ -1102,7 +1102,7 @@ audit model =
     in
     div [ class "ts-audit", attribute "aria-label" "Contrast audit", attribute "data-testid" "ts-contrast-audit" ]
         [ div [ class "ts-audit__head" ]
-            [ span [ class "ts-eyebrow" ] [ text "// Contrast (WCAG AA)" ]
+            [ span [ class "ts-eyebrow" ] [ text "Contrast (WCAG AA)" ]
             , if failing > 0 then
                 span [ class "ts-audit__status ts-audit__status--warn", attribute "data-testid" "ts-audit-status" ]
                     [ text (String.fromInt failing ++ " below AA") ]
@@ -1173,7 +1173,7 @@ studioFooter model =
                     , onClick StudioReset
                     , title "Reset all custom overrides to the base theme defaults."
                     ]
-                    [ text "[reset]" ]
+                    [ text "Reset" ]
                 )
              ]
                 ++ saveBlock model
@@ -1199,7 +1199,7 @@ studioFooter model =
                         Nothing ->
                             []
                    )
-                ++ [ tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-import-btn", onClick StudioImportRequest, title "Import a previously exported theme JSON blob." ] [ text "[import]" ])
+                ++ [ tip "top" (btn "ghost" "sm" [ attribute "data-testid" "ts-import-btn", onClick StudioImportRequest, title "Import a previously exported theme JSON blob." ] [ text "Import" ])
                    , tip "top" (exportBtn model)
                    ]
             )
@@ -1227,7 +1227,7 @@ saveBlock model =
         ]
 
     else
-        [ tip "top" (btn "primary" "sm" [ attribute "data-testid" "ts-save-btn", onClick StudioBeginSave, title "Save the current base + edits as a named theme you can select anywhere." ] [ text "[save theme]" ]) ]
+        [ tip "top" (btn "primary" "sm" [ attribute "data-testid" "ts-save-btn", onClick StudioBeginSave, title "Save the current base + edits as a named theme you can select anywhere." ] [ text "Save theme" ]) ]
 
 
 {-| Share-link button with its busy/copied states. -}
@@ -1249,13 +1249,13 @@ shareBtn model =
         ]
         [ text
             (if model.studioShareBusy then
-                "[copying link…]"
+                "Copying link…"
 
              else if model.studioShareCopied then
-                "[copied!]"
+                "Copied"
 
              else
-                "[share link]"
+                "Share link"
             )
         ]
 
@@ -1279,12 +1279,12 @@ exportBtn model =
         ]
         [ text
             (if model.studioExportBusy then
-                "[copying…]"
+                "Copying…"
 
              else if model.studioExportCopied then
-                "[copied!]"
+                "Copied"
 
              else
-                "[export]"
+                "Export"
             )
         ]

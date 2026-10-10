@@ -45,20 +45,17 @@ prefsSheet model =
             , modal = True
             , attrs = [ attribute "aria-describedby" "pref-sheet-desc", attribute "data-testid" "preferences-panel" ]
             }
-                [ div [ class "onyx-prefs-head" ]
-                    [ div []
-                        [ h2 [ class "onyx-prefs-title", id "pref-sheet-title" ] [ text "Device preferences" ]
-                        , p [ class "onyx-prefs-desc", id "pref-sheet-desc" ] [ text "Local choices for this browser — applied live." ]
-                        ]
-                    , button
-                        [ type_ "button"
-                        , class "onyx-prefs-close"
-                        , attribute "aria-label" "Close preferences"
-                        , attribute "data-testid" "preferences-close"
-                        , onClick PrefsClose
-                        ]
-                        [ span [ attribute "aria-hidden" "true" ] [ text "✕" ] ]
-                    ]
+                [ Sheet.headerWith
+                    (Sheet.head { scope = "prefs", title = "Device preferences", closeLabel = "Close preferences", onClose = PrefsClose }
+                        |> (\h ->
+                                { h
+                                    | titleId = Just "pref-sheet-title"
+                                    , subtitle = Just "Local choices for this browser — applied live."
+                                    , subtitleId = Just "pref-sheet-desc"
+                                    , closeTestId = Just "preferences-close"
+                                }
+                           )
+                    )
                 , div [ class "onyx-prefs-body" ]
                     [ categoryNav model
                     , div [ class "pref-category-content", attribute "data-layout" "category-detail" ]
@@ -292,7 +289,7 @@ appearanceLauncher =
             , attribute "data-testid" "pref-open-appearance"
             , onClick (YouHubGo Nav.YouAppearance)
             ]
-            [ span [ class "pref-action-card__icon", attribute "aria-hidden" "true" ] [ text "◐" ]
+            [ span [ class "pref-action-card__icon", attribute "aria-hidden" "true" ] []
             , span [ class "pref-action-card__body" ]
                 [ strong [ class "pref-action-card__title" ] [ text "Appearance" ]
                 , span [ class "pref-desc" ] [ text "Choose a look, text size, and motion." ]

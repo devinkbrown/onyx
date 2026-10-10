@@ -90,19 +90,31 @@ destination card =
                     ]
 
                 else
-                    [ div [ class "invite-preview", attribute "role" "note", attribute "aria-label" "Invite preview" ]
-                        ([ p [ class "invite-preview-title" ] [ text (Invite.inviteTitle card) ]
-                         , p [ class "invite-preview-desc" ] [ text (Invite.inviteDescription card) ]
-                         ]
-                            ++ (case card.topic of
-                                    Just topic ->
-                                        [ p [ class "invite-preview-topic" ] [ text topic ] ]
+                    -- The share preview only earns a card when it adds
+                    -- something the heading does not say: who invited
+                    -- you, or what the room is talking about.
+                    let
+                        details =
+                            (case card.inviter of
+                                Just _ ->
+                                    [ p [ class "invite-preview-desc" ] [ text (Invite.inviteDescription { card | topic = Nothing }) ] ]
 
-                                    Nothing ->
-                                        []
-                               )
-                        )
-                    ]
+                                Nothing ->
+                                    []
+                            )
+                                ++ (case card.topic of
+                                        Just topic ->
+                                            [ p [ class "invite-preview-topic" ] [ text topic ] ]
+
+                                        Nothing ->
+                                            []
+                                   )
+                    in
+                    if List.isEmpty details then
+                        []
+
+                    else
+                        [ div [ class "invite-preview", attribute "role" "note", attribute "aria-label" "Invite preview" ] details ]
                )
             ++ [ p [ class "invite-access-note", attribute "role" "note" ]
                     [ text "This link points to a destination. The room still applies its own access rules when you join." ]

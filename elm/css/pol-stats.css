@@ -39,6 +39,12 @@
   margin-inline: auto;
   padding-inline: clamp(16px, 4vw, 48px);
 }
+/* Inside the public frame the main column already carries the gutter
+   and measure; a second inset would misalign the page with the header. */
+.public-frame__main :is(.stats-page, .status-route, .roadmap-page) .r-wrap {
+  max-width: none;
+  padding-inline: 0;
+}
 :is(.stats-page, .status-route, .roadmap-page) .r-section {
   padding-block: clamp(var(--space-7), 5vw, 4.5rem);
 }
@@ -59,22 +65,14 @@
 
 /* Kickers / eyebrows: small, weighted, dim — never the accent. */
 :is(.stats-page, .status-route, .roadmap-page) :is(.r-kicker, .r-eyebrow, .status-kicker, .roadmap-kicker) {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: block;
   margin: 0;
   color: var(--pg-dim);
-  font-size: var(--text-sm);
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 650;
   line-height: var(--leading-snug);
   letter-spacing: var(--tracking-kicker);
-}
-:is(.stats-page, .status-route, .roadmap-page) :is(.r-kicker, .r-eyebrow, .status-kicker, .roadmap-kicker)::before {
-  content: '';
-  flex: none;
-  width: 1rem;
-  height: 2px;
-  background: currentColor;
+  text-transform: uppercase;
 }
 :is(.stats-page, .status-route, .roadmap-page) .r-title {
   max-width: 24ch;
@@ -123,31 +121,6 @@
 :is(.stats-page, .status-route, .roadmap-page) .r-btn.primary:focus-visible {
   outline: 2px solid var(--onyx-text);
   outline-offset: 2px;
-}
-
-/* Public-frame context line ("Rooms · Stats"). The frame chrome is
-   owned elsewhere; these three hooks only set the line's rhythm. */
-.public-frame__current-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2);
-  min-width: 0;
-  margin: 0;
-  color: var(--onyx-dim);
-  font-size: var(--text-sm);
-  line-height: var(--leading-snug);
-}
-.public-frame__current-kicker {
-  color: var(--onyx-faint);
-  font-weight: 700;
-  letter-spacing: var(--tracking-kicker);
-}
-.public-frame__current-label {
-  min-width: 0;
-  color: var(--onyx-text);
-  font-weight: 650;
-  overflow-wrap: anywhere;
 }
 
 /* ================================================================
@@ -356,10 +329,11 @@
   min-width: 0;
   padding: var(--space-6) var(--space-4);
   border-top: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
+  border-radius: 0;
   outline: none;
   scroll-margin-top: var(--space-8);
 }
+.roadmap-card:first-child { border-top: 0; }
 .roadmap-card:last-child { border-bottom: 1px solid var(--onyx-line); }
 .roadmap-card:is(:target, [data-current='true']) {
   background: var(--onyx-panel);
@@ -508,7 +482,8 @@
   padding-block: var(--space-3);
   border-block: 1px solid var(--pg-line);
   color: var(--pg-dim);
-  font: var(--text-2xs) / var(--leading-body) var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
 }
 .stats-page .stats-ledger p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .stats-page .stats-ledger strong { color: var(--pg-text); }
@@ -786,7 +761,8 @@
   padding-block: var(--space-3);
   border-block: 1px solid var(--pg-line);
   color: var(--pg-faint);
-  font: var(--text-2xs) / var(--leading-body) var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
 }
 .stats-page .stats-inspector-ledger p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .stats-page .stats-inspector-ledger strong { color: var(--pg-text); }
@@ -873,7 +849,7 @@
   padding-block: var(--space-3);
   border-block: 1px solid var(--pg-line);
 }
-.stats-page .public-room-comparison__ledger p { min-width: 0; margin: 0; color: var(--pg-dim); font: var(--text-2xs) / var(--leading-body) var(--font-mono); overflow-wrap: anywhere; }
+.stats-page .public-room-comparison__ledger p { min-width: 0; margin: 0; color: var(--pg-dim); font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; }
 .stats-page .public-room-comparison__selection { min-height: 1.5em; margin: var(--space-4) 0 0; color: var(--pg-faint); font-size: var(--text-sm); }
 .stats-page .public-room-comparison__chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
 .stats-page .public-room-comparison__chips > div { display: flex; min-width: 0; }
@@ -1027,7 +1003,8 @@
   .status-quiet { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .status-quiet-link { grid-row: auto; grid-column: 1; }
 
-  .roadmap-card { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-2); padding-inline: var(--space-3); }
+  .roadmap-card { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-2); padding-inline: 0; }
+  .roadmap-card:is(:target, [data-current='true']) { padding-inline: var(--space-3); }
   .roadmap-card-head,
   .roadmap-card h2,
   .roadmap-summary { grid-column: 1; grid-row: auto; }
@@ -1060,9 +1037,6 @@
 }
 
 @media (max-width: 400px) {
-  .roadmap-legend { grid-template-columns: minmax(0, 1fr); }
-  .roadmap-legend a { border-inline-start: 0; border-top: 1px solid var(--onyx-line); }
-  .roadmap-legend a:first-child { border-top: 0; }
   .stats-page .data-summary.stats-summary,
   .stats-page .stats-inspector-metrics { grid-template-columns: minmax(0, 1fr); }
   .stats-page .stats-summary > .data-metric,
@@ -1070,6 +1044,16 @@
   .stats-page .stats-inspector-metrics > div { padding-inline: var(--space-3); }
   .stats-page .stats-summary > .data-metric:first-child,
   .stats-page .stats-inspector-metrics > div:first-child { border-top: 0; }
+}
+
+/* ---------- Touch (iOS) ---------- */
+
+:is(.stats-page, .status-route, .roadmap-page) :where(a, button, input, label) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.stats-page :is(.stats-refresh, .data-action, .public-room-comparison__share, .public-room-comparison__clear, .public-room-comparison__chip,
+  .stats-view-nav a, .stats-window-options button, .stats-control-group button):active:not(:disabled) { background: var(--onyx-panel-2); }
+@media (max-width: 768px), (pointer: coarse) {
+  /* 16px: iOS Safari never zooms on focus. */
+  .stats-page .stats-room-search input { font-size: max(1rem, 16px); scroll-margin-bottom: calc(120px + var(--kb-inset, 0px)); }
 }
 
 /* ---------- Motion + forced colours ---------- */

@@ -3315,6 +3315,16 @@ init nick url =
     let
         deepLink =
             parseDeepLinkQuery url.query
+
+        -- v3/ui-public: a cold load parses the same query/fragment
+        -- state `UrlChanged` does, so a shared invite (`?join=`,
+        -- `?as=`) or roadmap link renders correctly on first paint,
+        -- and an invite's chosen name pre-fills the connect gate.
+        bootParams =
+            Invite.parseQueryParams (Maybe.withDefault "" url.query)
+
+        bootGuestName =
+            Maybe.withDefault "" (Invite.parseGuestName (Dict.get "as" bootParams))
     in
     { -- v3/home
       homeCoachDismissed = False
@@ -3397,7 +3407,7 @@ init nick url =
     , recoveryCodes = blankRecoveryCodes
     , pendingRecoveryLogin = Nothing
     , connectGate = False
-    , connectForm = blankConnectForm
+    , connectForm = { blankConnectForm | nick = bootGuestName }
     , wsPin = Nothing
     -- v3/dm-key-hold
     , dmKeyPending = Dict.empty
@@ -3619,12 +3629,17 @@ init nick url =
     , navDrawerOpen = False
     , youHubOpen = False
     , navMenuOpen = False
-    , navPath = ""
-    , roadmapPriority = Nothing
+    , navPath = url.path
+    , roadmapPriority = priorityFromFragment url.fragment
     , origin = ""
     , mediaUrl = Nothing
-    , inviteParams = Dict.empty
-    , inviteName = ""
+    , inviteParams = bootParams
+    , inviteName =
+        if Route.fromUrl url == Route.Invite then
+            bootGuestName
+
+        else
+            ""
     , inviteNameError = Nothing
     , inviteCopy = CopyIdle
     , onyxosStage = "oracle"

@@ -7,6 +7,7 @@ module Roster exposing
     , groupMembers
     , isSelf
     , matchesFilter
+    , presenceGroups
     , rowSummary
     , totalCount
     )
@@ -65,6 +66,48 @@ groupMembers prefixOrder modeToPrefix members =
                     inGroup ->
                         Just { key = key, label = Modes.groupLabelFor key, members = inGroup }
             )
+
+
+{-| v3/ui-roster — presence-first sections for the member list: each
+role group keeps only the people who are here (plain members read
+"Online"), and everyone away — whatever their role — gathers in one
+trailing "Away" group (alphabetical, like every group). Empty groups
+drop out, so the order stays Owners … Voice, Online, Away.
+-}
+presenceGroups : List (Group { a | away : Bool }) -> List (Group { a | away : Bool })
+presenceGroups groups =
+    let
+        here =
+            List.filterMap
+                (\g ->
+                    case List.filter (\e -> not e.member.away) g.members of
+                        [] ->
+                            Nothing
+
+                        members ->
+                            Just
+                                { g
+                                    | members = members
+                                    , label =
+                                        if g.key == "member" then
+                                            "Online"
+
+                                        else
+                                            g.label
+                                }
+                )
+                groups
+
+        away =
+            groups
+                |> List.concatMap (\g -> List.filter (\e -> e.member.away) g.members)
+                |> List.sortWith (\a b -> Modes.compareNicks a.member.nick b.member.nick)
+    in
+    if List.isEmpty away then
+        here
+
+    else
+        here ++ [ { key = "away", label = "Away", members = away } ]
 
 
 {-| Trimmed, case-insensitive nick substring match. -}
