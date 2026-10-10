@@ -17,7 +17,7 @@ roster), with the composer pinned under the thread.
 import App exposing (Model, Msg, inviteCard)
 import Invite exposing (inviteTitle)
 import Browser
-import Html exposing (Html, div, main_)
+import Html exposing (Html, div, main_, text)
 import Html.Attributes exposing (attribute, class)
 import Route
 import Guides exposing (surfaceForRoute, surfaceTitle)
@@ -36,7 +36,7 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
-import View.Bans exposing (banPanel)
+import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
 import View.Inbox exposing (inbox)
@@ -229,12 +229,6 @@ shell model =
                         [ rail model
                         , thread model
                         , roster model
-                        , case model.activeChannel of
-                            Just name ->
-                                banPanel model name
-
-                            Nothing ->
-                                div [] []
                         ]
                , if model.callsOpen then
                     div [] []
@@ -254,7 +248,14 @@ shell model =
                , jumpToDateSheet model
                , profileSheet model
                , profileCard model
-               , moderationReview model
+               , -- v3/moddesk: the review renders inside the room desk while it is open
+                 if model.moderationOpen then
+                    text ""
+
+                 else
+                    moderationReview model
+               , moderationSheet model
+               , operSheet model
                , personSafetySheet model
                , newMessageSheet model
                ]
