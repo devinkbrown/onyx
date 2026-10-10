@@ -388,6 +388,12 @@ port highlightWordsSave : { words : List String } -> Cmd msg
 port dndSave : { enabled : Bool, until : Maybe Int } -> Cmd msg
 
 
+port notifyPushSave : { enabled : Bool } -> Cmd msg
+
+
+port notifySoundSave : { enabled : Bool } -> Cmd msg
+
+
 port channelNotifySave : { entries : List { channel : String, level : String } } -> Cmd msg
 
 
@@ -1169,6 +1175,12 @@ perform key outbound =
         App.DndSave req ->
             dndSave req
 
+        App.NotifyPushSave req ->
+            notifyPushSave req
+
+        App.NotifySoundSave req ->
+            notifySoundSave req
+
         App.ChannelNotifySave req ->
             channelNotifySave req
 
@@ -1456,6 +1468,9 @@ subscriptions model =
 
                             else if model.app.scheduleOpen then
                                 Decode.succeed App.ScheduleClose
+
+                            else if model.app.notifySheetOpen then
+                                Decode.succeed App.NotifySheetClose
 
                             else if model.app.accountOpen then
                                 Decode.succeed (App.SetAccountOpen False)

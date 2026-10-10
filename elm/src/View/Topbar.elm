@@ -5,6 +5,7 @@ module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, to
 
 import App exposing (Model, Msg(..), isGuestNick)
 import Dict
+import View.Notify exposing (notifySheetButton)
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -40,6 +41,7 @@ topbar model =
             [ text "Search" ]
         , pinsToggle model
         , mediaToggle model
+        , notifySheetButton model
         , div
             [ classList
                 [ ( "onyx-conn", True )

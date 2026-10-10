@@ -20,6 +20,7 @@ import Time
 import Translate
 import Upload
 import View.MessageText exposing (messageText)
+import View.Notify exposing (roomNotifyStrip)
 
 
 thread : Model -> Html Msg
@@ -43,6 +44,7 @@ thread model =
                                 [ facepileRow channel
                                 , h2 [] [ text channel.name ]
                                 , text "No messages yet. Say hello."
+                                , roomNotifyStrip model channel.name
                                 ]
 
                         else
@@ -72,6 +74,7 @@ thread model =
                             in
                             div []
                                 [ facepileRow channel
+                                , roomNotifyStrip model channel.name
                                 , topicFilterBar model channel
                                 , topicTools model channel
                                 , forumCards model channel

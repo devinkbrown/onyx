@@ -3083,6 +3083,26 @@ function fetchPublicFeed(url) {
         } catch (err) { /* storage unavailable / quota — non-fatal */ }
       });
     }
+    /* Desktop + sound alert prefs: plain boolean slots mirroring the
+       oracle `setPushNotificationsEnabled` / `setSoundEnabled` writers
+       (`onyx:push-notifications`, `onyx:sound`); index.html boots flags
+       from these same keys. */
+    if (app.ports.notifyPushSave) {
+      app.ports.notifyPushSave.subscribe(function (req) {
+        if (!req || typeof req.enabled !== "boolean") return;
+        try {
+          writeSlot("onyx:push-notifications", String(!!req.enabled));
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.notifySoundSave) {
+      app.ports.notifySoundSave.subscribe(function (req) {
+        if (!req || typeof req.enabled !== "boolean") return;
+        try {
+          writeSlot("onyx:sound", String(!!req.enabled));
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
     /* Per-room notify levels: Elm normalizes fail-closed (lowercase
        `#`/`&` keys, `mentions`/`none` only, 256 cap); the bridge writes
        the `{ [channel]: level }` object under the plain
