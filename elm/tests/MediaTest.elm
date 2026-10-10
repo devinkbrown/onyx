@@ -513,8 +513,12 @@ suite =
                             update (CallJoin { channel = "", video = False }) blank
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ VoiceJoin { channel = "#reef", video = True } ] outs
-                        , \_ -> Expect.equal False joined.callSelfMuted
+                        -- v3/calls-c1: join muted is the shipped default
+                        -- (provisional, spec §7.2), so the join is followed
+                        -- by the engine mute and the local flag starts on.
+                        [ \_ -> Expect.equal [ VoiceJoin { channel = "#reef", video = True }, VoiceMute { muted = True } ] outs
+                        , \_ -> Expect.equal True joined.callSelfMuted
+                        , \_ -> Expect.equal (Just "#reef") joined.callJoinTarget
                         , \_ -> Expect.equal [] offlineOuts
                         , \_ -> Expect.equal [] emptyOuts
                         ]
@@ -528,7 +532,7 @@ suite =
                         ( joined, outs ) =
                             update (CallJoin { channel = "#b", video = False }) busy
                     in
-                    Expect.equal [ VoiceLeave { channel = "#a" }, VoiceJoin { channel = "#b", video = False } ] outs
+                    Expect.equal [ VoiceLeave { channel = "#a" }, VoiceJoin { channel = "#b", video = False }, VoiceMute { muted = True } ] outs
             , test "CallLeave no-ops when idle and leaves when live" <|
                 \_ ->
                     let

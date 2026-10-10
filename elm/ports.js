@@ -2128,6 +2128,11 @@
      clock; live calls pass Date.now(). */
   var VOICE_CALL_STATES = { idle: true, ringing_in: true, ringing_out: true, in_call: true };
 
+  var VOICE_TRUST_FIELDS = [
+    "securityLevel", "e2eeActive", "e2eeDegraded", "stageMode", "transportInsecure",
+    "localFingerprint", "fingerprintPending", "peerFingerprints", "sfu"
+  ];
+
   function voiceFeedBlank() {
     return { channel: null, startedAt: null, sawEstablished: false };
   }
@@ -2159,14 +2164,22 @@
     } else {
       startedAt = null;
     }
+    var snapshot = {
+      state: ev.state,
+      nick: (typeof ev.nick === "string") ? ev.nick : "",
+      channel: channel,
+      startedAt: startedAt,
+      outcome: null
+    };
+    /* v3/calls-c1: engine trust fields ride the same snapshot (spec
+       §5). Forwarded only when present; Elm validates each one
+       fail-closed (CallUi.decodeSecurityFeed) and never trusts more
+       than the engine reported. */
+    VOICE_TRUST_FIELDS.forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(ev, key)) snapshot[key] = ev[key];
+    });
     return {
-      snapshot: {
-        state: ev.state,
-        nick: (typeof ev.nick === "string") ? ev.nick : "",
-        channel: channel,
-        startedAt: startedAt,
-        outcome: null
-      },
+      snapshot: snapshot,
       feed: {
         channel: channel,
         startedAt: startedAt,
@@ -4570,6 +4583,88 @@ function fetchPublicFeed(url) {
           release();
         }
       }
+      try {
+        var observer = new Mutation(function () { settle(); });
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      } catch (err) { /* observation unavailable */ }
+    })();
+    /* v3/calls-c1 — call dialog focus (More call tools popover, call
+       privacy sheet): any `[data-call-dialog]` gets initial focus on
+       its `[data-initial-focus]` child (else itself), Tab wraps inside
+       it, and unmounting returns focus to the opener (APG dialog
+       pattern, spec §3.2). Escape is Elm-owned (a pure close Msg). */
+    (function installCallDialogFocus() {
+      if (typeof document === "undefined" || !document) return;
+      try {
+        if (document.__onyxCallDialogFocus) return;
+        document.__onyxCallDialogFocus = true;
+      } catch (err) { return; }
+      var Mutation =
+        (typeof MutationObserver !== "undefined" && MutationObserver)
+        || (typeof window !== "undefined" && window && window.MutationObserver)
+        || null;
+      var current = null;
+      var returnFocus = null;
+      function dialog() {
+        try { return document.querySelector("[data-call-dialog]"); } catch (err) { return null; }
+      }
+      function focusables(root) {
+        var nodes = [];
+        try {
+          nodes = root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        } catch (err) { return []; }
+        return Array.prototype.filter.call(nodes, function (el) {
+          try { return !el.disabled && el.tabIndex >= 0; } catch (err) { return false; }
+        });
+      }
+      function focusEl(el) {
+        try { el.focus({ preventScroll: true }); } catch (err) {
+          try { el.focus(); } catch (ignored) { /* best-effort */ }
+        }
+      }
+      function trapTab(e) {
+        var root = dialog();
+        if (!root || e.key !== "Tab" || e.defaultPrevented) return;
+        var items = focusables(root);
+        if (items.length === 0) {
+          try { e.preventDefault(); } catch (err) { /* best-effort */ }
+          return;
+        }
+        var first = items[0];
+        var last = items[items.length - 1];
+        var active = null;
+        try { active = document.activeElement; } catch (err) { active = null; }
+        var inside = false;
+        try { inside = !!active && root.contains(active); } catch (err) { inside = false; }
+        try {
+          if (e.shiftKey && (active === first || active === root || !inside)) {
+            e.preventDefault();
+            focusEl(last);
+          } else if (!e.shiftKey && (active === last || !inside)) {
+            e.preventDefault();
+            focusEl(first);
+          }
+        } catch (err) { /* best-effort */ }
+      }
+      function settle() {
+        var root = dialog();
+        if (root && root !== current) {
+          if (!current) {
+            try { returnFocus = document.activeElement || null; } catch (err) { returnFocus = null; }
+          }
+          current = root;
+          var target = null;
+          try { target = root.querySelector("[data-initial-focus]"); } catch (err) { target = null; }
+          focusEl(target || root);
+        } else if (!root && current) {
+          current = null;
+          var back = returnFocus;
+          returnFocus = null;
+          try { if (back && back.isConnected) focusEl(back); } catch (err) { /* best-effort */ }
+        }
+      }
+      try { document.addEventListener("keydown", trapTab); } catch (err) { /* no DOM events */ }
+      if (!Mutation) return;
       try {
         var observer = new Mutation(function () { settle(); });
         observer.observe(document.body || document.documentElement, { childList: true, subtree: true });

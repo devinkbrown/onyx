@@ -22,12 +22,21 @@ import Upload
 import View.Home
 import View.MessageText exposing (messageText)
 import View.Notify exposing (roomNotifyStrip)
+-- v3/calls-c1
+import View.CallStage
 
 
 thread : Model -> Html Msg
 thread model =
     section [ class "onyx-thread-pane" ]
-        [ case model.activeChannel of
+        [ -- v3/calls-c1
+          case model.activeChannel of
+            Just target ->
+                View.CallStage.roomCallSurface model target
+
+            Nothing ->
+                text ""
+        , case model.activeChannel of
             Nothing ->
                 -- v3/home
                 View.Home.home model

@@ -10,6 +10,8 @@ import Html exposing (Html, b, button, div, form, h1, header, input, label, p, s
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Nav
+-- v3/calls-c1
+import View.CallPresence
 
 
 topbar : Model -> Html Msg
@@ -20,6 +22,8 @@ topbar model =
             , h1 [] [ text "Onyx" ]
             ]
         , div [ class "onyx-topic" ] [ text (activeTopic model) ]
+        -- v3/calls-c1
+        , View.CallPresence.headerVoice model
         , button
             [ class "onyx-calls-toggle"
             , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]

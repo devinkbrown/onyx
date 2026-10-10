@@ -20,6 +20,8 @@ import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
 import Sidebar
+-- v3/calls-c1
+import View.CallPresence
 
 
 rail : Model -> Html Msg
@@ -241,7 +243,7 @@ roomRow model canStar channel =
                     [ ( "onyx-rail-active", active )
                     , ( "onyx-rail-has-unread", channel.unread > 0 && not active )
                     ]
-                , attribute "aria-label" (Sidebar.roomAriaLabel channel starred)
+                , attribute "aria-label" (Sidebar.roomAriaLabel channel starred ++ View.CallPresence.railAriaSuffix model channel.name)
                 , attribute "aria-current"
                     (if active then
                         "location"
@@ -277,6 +279,8 @@ roomRow model canStar channel =
 
                       else
                         span [ class "onyx-rail-time", attribute "aria-hidden" "true" ] [ text stamp ]
+                    -- v3/calls-c1
+                    , View.CallPresence.railCount model channel.name
                     , badge channel
                     ]
                 ]

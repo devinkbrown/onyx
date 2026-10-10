@@ -49,6 +49,8 @@ import Isupport exposing (ISupport)
 import Labels
 import Status
 import Media
+-- v3/calls-c1
+import CallUi
 import IdentityOverrides
 import Moderation
 import Modes
@@ -549,6 +551,13 @@ type alias Model =
     , calls : Media.CallHub
     , callSelfMuted : Bool
     , callsOpen : Bool
+    -- v3/calls-c1
+    , callBannerDismissed : Set String
+    , callJoinTarget : Maybe String
+    , callMoreOpen : Bool
+    , callPrivacyOpen : Bool
+    , callSecurityFeed : CallUi.SecurityFeed
+    , callAnnouncer : CallUi.Announcer
     -- v3/nav
     , navSection : Nav.Id
     , navDrawerOpen : Bool
@@ -2946,6 +2955,12 @@ type Msg
     | CallToggleMute
     | CallHubChanged Media.CallHub
     | CallHubSnapshot Decode.Value
+    -- v3/calls-c1
+    | CallBannerDismiss String
+    | CallMoreToggle
+    | CallMoreClose
+    | CallPrivacyOpen
+    | CallPrivacyClose
     | SelectBoardTab String
     -- v3/sidebar
     | SidebarFilterInput String
@@ -3263,6 +3278,13 @@ init nick url =
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callsOpen = False
+    -- v3/calls-c1
+    , callBannerDismissed = Set.empty
+    , callJoinTarget = Nothing
+    , callMoreOpen = False
+    , callPrivacyOpen = False
+    , callSecurityFeed = CallUi.blankSecurityFeed
+    , callAnnouncer = CallUi.blankAnnouncer
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -3751,6 +3773,13 @@ blank =
     , calls = Media.blankCallHub
     , callSelfMuted = False
     , callsOpen = False
+    -- v3/calls-c1
+    , callBannerDismissed = Set.empty
+    , callJoinTarget = Nothing
+    , callMoreOpen = False
+    , callPrivacyOpen = False
+    , callSecurityFeed = CallUi.blankSecurityFeed
+    , callAnnouncer = CallUi.blankAnnouncer
     -- v3/nav
     , navSection = Nav.Home
     , navDrawerOpen = False
@@ -35263,8 +35292,40 @@ update msg model =
         -- v3/nav
         navSettled =
             Nav.reconcile (isChannelName settled) model.activeChannel settled
+
+        -- v3/calls-c1
+        callsSettled =
+            CallUi.settle (callDisplayName navSettled) navSettled
     in
-    ( navSettled, out ++ connectOut )
+    ( callsSettled, out ++ connectOut )
+
+
+-- v3/calls-c1
+{-| Display casing for a lowercased call roster key: the call room's
+member nick, the DM peer as reported, else the key itself.
+-}
+callDisplayName : Model -> String -> String
+callDisplayName model key =
+    let
+        lower =
+            String.toLower key
+
+        fromMembers =
+            model.calls.channel
+                |> Maybe.andThen (\c -> Dict.get (String.toLower c) model.channels)
+                |> Maybe.andThen (\ch -> Dict.get lower ch.members)
+                |> Maybe.map .nick
+    in
+    case fromMembers of
+        Just nick ->
+            nick
+
+        Nothing ->
+            if String.toLower model.calls.withPeer == lower && not (String.isEmpty lower) then
+                model.calls.withPeer
+
+            else
+                key
 
 
 updateCore : Msg -> Model -> ( Model, List Outbound )
@@ -39652,8 +39713,23 @@ updateCore msg model =
                             Nothing ->
                                 []
                 in
-                ( { model | callSelfMuted = False }
-                , leaveFirst ++ [ VoiceJoin { channel = channel, video = video } ]
+                -- v3/calls-c1: join muted by default (spec §2.3,
+                -- provisional) and remember the room for the failed
+                -- banner.
+                ( { model
+                    | callSelfMuted = CallUi.joinMutedDefault
+                    , callJoinTarget = Just channel
+                    , callMoreOpen = False
+                    , callPrivacyOpen = False
+                  }
+                , leaveFirst
+                    ++ [ VoiceJoin { channel = channel, video = video } ]
+                    ++ (if CallUi.joinMutedDefault then
+                            [ VoiceMute { muted = True } ]
+
+                        else
+                            []
+                       )
                 )
 
         CallLeave ->
@@ -39695,10 +39771,41 @@ updateCore msg model =
                         merged =
                             Media.applyEngineSnapshot model.calls snap
                     in
-                    ( { model | calls = merged, callSelfMuted = model.callSelfMuted && merged.lifecycle /= Media.Idle }, [] )
+                    ( { model
+                        | calls = merged
+                        , callSelfMuted = model.callSelfMuted && merged.lifecycle /= Media.Idle
+                        -- v3/calls-c1
+                        , callSecurityFeed = CallUi.decodeSecurityFeed merged.lifecycle raw model.callSecurityFeed
+                      }
+                    , []
+                    )
 
                 Nothing ->
                     ( model, [] )
+
+        -- v3/calls-c1
+        CallBannerDismiss room ->
+            -- Hide the invite banner for this room for the session; the
+            -- header chip stays the permanent entry.
+            if String.isEmpty (String.trim room) then
+                ( model, [] )
+
+            else
+                ( { model | callBannerDismissed = Set.insert (String.toLower (String.trim room)) model.callBannerDismissed }, [] )
+
+        CallMoreToggle ->
+            ( { model | callMoreOpen = not model.callMoreOpen && model.calls.lifecycle /= Media.Idle }, [] )
+
+        CallMoreClose ->
+            ( { model | callMoreOpen = False }, [] )
+
+        CallPrivacyOpen ->
+            -- The sheet only exists for a live call surface (the chip
+            -- is never rendered idle).
+            ( { model | callPrivacyOpen = model.calls.lifecycle /= Media.Idle, callMoreOpen = False }, [] )
+
+        CallPrivacyClose ->
+            ( { model | callPrivacyOpen = False }, [] )
 
         SelectBoardTab tab ->
             ( { model | landingBoardTab = tab }, [] )

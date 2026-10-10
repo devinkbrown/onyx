@@ -24,6 +24,8 @@ import Guides exposing (surfaceForRoute, surfaceTitle)
 import View.About
 import View.Appearance
 import View.Calls exposing (callsHub)
+-- v3/calls-c1
+import View.CallStage
 import View.Download
 import View.Guides
 import View.Stats
@@ -222,7 +224,7 @@ shell model =
                )
             ++ [ if model.callsOpen then
                     main_ [ class "onyx-main onyx-main-calls" ]
-                        [ callsHub model.calls model.activeChannel model.callSelfMuted ]
+                        [ callsHub model ]
 
                  else
                     main_ [ class "onyx-main" ]
@@ -257,5 +259,8 @@ shell model =
                , moderationReview model
                , personSafetySheet model
                , newMessageSheet model
+               -- v3/calls-c1
+               , View.CallStage.privacySheet model
+               , View.CallStage.announcer model
                ]
         )
