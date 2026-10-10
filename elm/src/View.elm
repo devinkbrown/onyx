@@ -26,6 +26,8 @@ import View.Appearance
 import View.Calls exposing (callsHub)
 -- v3/calls-c1
 import View.CallStage
+-- v3/calls-c11
+import View.StageMode
 import View.CallDock -- v3/calls-c6
 import View.Download
 import View.Guides
@@ -304,6 +306,9 @@ overlays model =
         -- v3/calls-c1
         , View.CallStage.privacySheet model
         , View.CallStage.announcer model
+        -- v3/calls-c11
+        , View.StageMode.handsSheet model
+        , View.StageMode.leaveConfirm model
         , reclaimDialog model
         , View.Nav.youHub model
         -- v3/switcher

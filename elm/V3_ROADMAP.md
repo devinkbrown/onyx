@@ -145,6 +145,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 - 2026-10-10 — 1.0 shell frame + tokens landed (`v3/frame`): token ladder, one frame grid, `View.Sheet` primitive, one overlay focus mechanism, one Escape order, global topbar + room header with More menu (24 `FrameTest` vectors + `overlayFocus.smoke.mjs` 8/8).
 - 2026-10-10 — 0.6 / 7.4 / 7.5 partial (`v3/ship`): elm-program-test vendored (`tools/vendor-elm-packages.sh`), 6 `ShipFlowTest` ship-bar flows, `bundleBoot.smoke.mjs` real-bundle jsdom smoke, `tools/build.sh` hashed static build; fixed reversed same-port command order in `Main.update` and double-CRLF framing in `ports.js`.
 - 2026-10-10 — Calls C4–C5 (camera/share/deafen commands + connection quality; video grid, tiles, spotlight/screenshare, dominant speaker, paging of 16) landed (`v3/calls-c4`).
+- 2026-10-10 — Calls C11 (stage mode: speakers vs audience, raised-hands queue, invites, end/leave stage) and C12 (call chords through the `shortcut` port, `aria-keyshortcuts`, `?` overlay group, a11y pass) landed (`v3/calls-c11`).
 
 ## Revised sequencing (Fable design research, 2026-10-10)
 
@@ -183,11 +184,11 @@ C1 Presence + join banner (M) **done** · C2 Voice-only stage + control bar v1 +
 C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) ·
 C5 Video grid, tiles, layouts, dominant speaker (L) · C6 DM ring overlays (S) **done** ·
 C7 PiP (M) **done** · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
-C10 Reconnecting + classified errors (S) **done** · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
+C10 Reconnecting + classified errors (S) **done** · C11 Stage mode (L) **done** · C12 Shortcuts + a11y pass (S) **done**.
 C3 Security chip + privacy sheet (S) **done** · C4 Camera/share/deafen commands + quality (M) **done** ·
 C5 Video grid, tiles, layouts, dominant speaker (L) **done** · C6 DM ring overlays (S) ·
 C7 PiP (M) · C8 Captions + reactions (M) · C9 Voice settings + PTT (M) ·
-C10 Reconnecting + classified errors (S) · C11 Stage mode (L) · C12 Shortcuts + a11y pass (S).
+C10 Reconnecting + classified errors (S) · C11 Stage mode (L) **done** · C12 Shortcuts + a11y pass (S) **done**.
 
 C1–C3 landed on `v3/calls-c1` (`CallUi`, `View.CallPresence`, `View.CallStage`; 45 `CallsC1Test`
 vectors). Join-muted-on, the reserved Privacy-code slot and snapshot-carried peer fingerprints
@@ -200,6 +201,11 @@ C4–C5 landed on `v3/calls-c4` (`CallMedia`, `View.CallVideo`, `css/calls-c4.cs
 `voiceCommand` port + one `voicePeerState` port; 34 `CallsC4Test` vectors +
 `voiceTiles.smoke.mjs` 12/12). Deafen stays local-only (§7.4) and remote `kind = screen` peers
 force the screenshare layout (§7.3) as provisional answers.
+
+C11–C12 landed on `v3/calls-c11` (`Stage`, `View.StageMode`, `css/calls-c11.css`; 36
+`CallsC11Test` vectors + `callKeys.smoke.mjs` 4/4). Call chords ride the existing `shortcut`
+port; §7.1 is answered provisionally with the spec default (microphone takes Ctrl+Shift+M; the
+oracle's room-notification mute chord is not bound in the Elm client).
 
 Open product questions are in spec §7 (mic chord vs room-mute chord, join-muted default,
 screen-share peers in ROSTER, wire for DEAFEN/RECORD, privacy code, fingerprint forwarding,
