@@ -612,6 +612,27 @@ port sessionTokenStore : { kind : String, token : String, expiresAt : Maybe Int,
 
 port sessionTokensClear : { server : String, nick : String } -> Cmd msg
 
+
+{-| v3/rx-public — remembered identities: one request port (`op` = list |
+select | use | forget | remember; ids and slot names only), a sanitized
+metadata listing back, and the `use` answer (`held` = a stored password
+is now armed in the ports-side SASL holder; the password never crosses).
+-}
+port credentialsRequest : { op : String, id : String, server : String, nick : String, display : String, remember : Bool } -> Cmd msg
+
+
+port credentialsListed : (Decode.Value -> msg) -> Sub msg
+
+
+port credentialsReady : ({ id : String, nick : String, held : Bool } -> msg) -> Sub msg
+
+
+{-| v3/rx-public — public page navigation: `fragment = ""` scrolls to
+the top; otherwise the `#fragment` target scrolls into view and takes
+focus (the skip link, section navs, roadmap cards).
+-}
+port pageNavigated : { fragment : String } -> Cmd msg
+
 port reclaimTimerStart : { stage : String } -> Cmd msg
 
 port reclaimTimersClear : () -> Cmd msg
@@ -1062,10 +1083,12 @@ init rawFlags url key =
                     }
         , savedSearchesList ()
         , guidesProgressRequest ()
+        , credentialsRequest { op = "list", id = "", server = "", nick = "", display = "", remember = False } -- v3/rx-public
         , appearanceRequest ()
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
         , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
+        , Task.perform (always (App.RouteEntered url)) (Task.succeed ()) -- v3/rx-public
         ]
     )
         |> (\( model, cmds ) ->
@@ -1439,6 +1462,12 @@ perform key outbound =
         App.SessionTokensCleared req ->
             sessionTokensClear req
 
+        App.CredentialsRequest req ->
+            credentialsRequest req
+
+        App.PageNavigated req ->
+            pageNavigated req
+
         App.ReclaimTimerStarted req ->
             reclaimTimerStart req
 
@@ -1677,6 +1706,9 @@ subscriptions model =
         , mediaBinaryReceived App.MediaBinaryReceived
         , httpResult App.HttpResult
         , reclaimTimerFired App.ReclaimTimerFired
+        -- v3/rx-public
+        , credentialsListed App.RememberedListed
+        , credentialsReady App.RememberedReady
         , saslPayload App.SaslPayload
         , saslFailed App.SaslFailed
         , saslTimeout (\_ -> App.SaslTimeout)

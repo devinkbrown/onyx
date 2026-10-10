@@ -1782,3 +1782,51 @@
   .ts-studio .onyx-field__input { font-size: max(1rem, 16px); scroll-margin-bottom: calc(120px + var(--kb-inset, 0px)); }
   .ap-bar a { min-height: var(--target-min); }
 }
+
+/* ── 18. v3/rx-public: every aspect ratio ─────────────────────────────
+   - Wide (>=1180px): the everyday settings flow in two columns (title,
+     lede, note and the Advanced disclosure span both), so a desktop
+     page is not one long ribbon of short chip rows.
+   - The Theme Studio preview rides along (sticky, scrolls inside when
+     taller than the screen) so edits stay visible while the token list
+     scrolls.
+   - fhd and up: the measure follows the rem scale (html:has(.ap) in
+     pol-public.css) instead of a fixed 1040px.
+   - Short + wide (landscape phones, 200% zoom): compact bar and wrap. */
+.ap-wrap { max-width: 65rem; }
+
+@media (min-width: 1180px) {
+  .ap-wrap {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(40px, 4vw, 72px);
+    align-items: start;
+    max-width: 76rem;
+  }
+  .ap-wrap > :is(.ap-h1, .ap-lede, .ap-local-note, .ap-studio) { grid-column: 1 / -1; }
+  .ap-wrap > .ap-group { align-self: start; }
+}
+
+@media (min-width: 769px) and (min-height: 521px) {
+  .ts-preview-pane {
+    position: sticky;
+    top: calc(max(56px, 3.5rem) + var(--space-3));
+    align-self: start;
+    max-height: calc(100vh - max(56px, 3.5rem) - var(--space-6));
+    max-height: calc(100dvh - max(56px, 3.5rem) - var(--space-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (min-width: 1700px) {
+  .ap-bar { min-height: 3.5rem; }
+  .ts-body { grid-template-columns: minmax(0, 1fr) minmax(0, min(30rem, 44%)); }
+}
+
+@media (max-height: 520px) and (min-width: 521px) {
+  .ap-bar { min-height: 48px; padding-left: max(var(--space-4), env(safe-area-inset-left)); padding-right: max(var(--space-4), env(safe-area-inset-right)); }
+  .ap-wrap { padding: var(--space-5) max(var(--space-5), env(safe-area-inset-right)) var(--space-8) max(var(--space-5), env(safe-area-inset-left)); }
+  .ap-group { margin-top: var(--space-6); }
+  .ts-preview-pane { position: static; max-height: none; overflow: visible; }
+}

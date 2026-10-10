@@ -5,6 +5,7 @@ module View.PublicFrame exposing
     , frame
     , normalisePath
     , primaryNav
+    , relatedNav
     )
 
 {-| Shared public-route chrome, mirroring `src/ui/public/PublicFrame`
@@ -24,7 +25,7 @@ navigation, and closes on Escape (wired in `Main.subscriptions`).
 -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, a, button, div, footer, header, main_, nav, p, span, text)
+import Html exposing (Html, a, button, div, footer, header, li, main_, nav, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, href, id, tabindex)
 import Html.Events exposing (onClick)
 
@@ -74,6 +75,41 @@ footerLinks =
     , { label = "Accessibility", href = "/accessibility/" }
     , { label = "Contact", href = "/contact/" }
     ]
+
+
+{-| v3/rx-public — "Also on Onyx": sibling reading pages (trust and
+public-contract pages plus Status), the current one marked. CSS sets it
+beside the article on wide screens and after it on phones. -}
+relatedNav : String -> Html msg
+relatedNav currentPath =
+    let
+        item link =
+            li []
+                [ a
+                    (href link.href
+                        :: (if normalisePath link.href == normalisePath currentPath then
+                                [ attribute "aria-current" "page" ]
+
+                            else
+                                []
+                           )
+                    )
+                    [ text link.label ]
+                ]
+    in
+    nav [ class "public-related", attribute "aria-label" "Related pages" ]
+        [ p [ class "public-related__title" ] [ text "Also on Onyx" ]
+        , ul [ class "public-related__list" ]
+            (List.map item
+                [ { label = "Privacy", href = "/privacy/" }
+                , { label = "House rules", href = "/guidelines/" }
+                , { label = "Contact", href = "/contact/" }
+                , { label = "Accessibility", href = "/accessibility/" }
+                , { label = "Glossary", href = "/glossary/" }
+                , { label = "Status", href = "/status/" }
+                ]
+            )
+        ]
 
 
 {-| Manifest slashless match key: drop any query/fragment, strip one
@@ -211,6 +247,10 @@ frame model currentPath mainLabel context children =
             Nothing ->
                 text ""
         , main_ [ id "public-main", class "public-frame__main", tabindex -1, attribute "aria-label" mainLabel ] children
+
+        -- v3/rx-public: SPA page changes are announced (the frame node
+        -- persists across public pages, so the new label is spoken).
+        , p [ class "sr-only", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true", attribute "data-testid" "route-announcer" ] [ text mainLabel ]
         , footer [ class "public-frame__footer" ]
             [ div [ class "public-frame__footer-inner" ]
                 [ div [ class "public-frame__footer-identity" ]

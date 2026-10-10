@@ -437,7 +437,7 @@ inspectorSection model =
                 text ""
 
               else
-                a [ class "r-btn primary stats-inspector-open", href (Stats.roomDeepLink room 0) ]
+                a [ class "r-btn ghost stats-inspector-open", href (Stats.roomDeepLink room 0) ]
                     [ text "Open room ", span [ class "pub-arrow", attribute "aria-hidden" "true" ] [] ]
             ]
         , case statsMatchingDetail model of
