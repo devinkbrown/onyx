@@ -84,6 +84,12 @@ opChannel modes =
     }
 
 
+{-| v3/frame: Moderation lives in the room header's More menu. -}
+menuOpen : Model -> Model
+menuOpen model =
+    { model | roomMenuOpen = True }
+
+
 roomModel : Set.Set Char -> Model
 roomModel modes =
     { blank | connection = Live, ourNick = "me", activeChannel = Just "#c", channels = Dict.singleton "#c" (opChannel modes) }
@@ -389,8 +395,8 @@ suite =
             [ test "the Moderation button shows only for room moderators" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> query (roomModel (Set.singleton 'o')) |> Query.find [ testId "moderation-open" ] |> Event.simulate Event.click |> Event.expect ModerationSheetOpen
-                        , \_ -> query (roomModel (Set.singleton 'v')) |> Query.findAll [ testId "moderation-open" ] |> Query.count (Expect.equal 0)
+                        [ \_ -> query (menuOpen (roomModel (Set.singleton 'o'))) |> Query.find [ testId "moderation-open" ] |> Event.simulate Event.click |> Event.expect ModerationSheetOpen
+                        , \_ -> query (menuOpen (roomModel (Set.singleton 'v'))) |> Query.findAll [ testId "moderation-open" ] |> Query.count (Expect.equal 0)
                         ]
                         ()
             , test "the ban desk no longer renders inline in the main column" <|

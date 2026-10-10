@@ -18,6 +18,7 @@ import Html.Events exposing (onClick, onInput, onSubmit)
 import Notify exposing (Permission(..))
 import NotifyCenter exposing (NotifyMode(..))
 import Set
+import View.Sheet as Sheet
 
 
 {-| Topbar entry point for the Notifications sheet. -}
@@ -101,16 +102,20 @@ notifySheet model =
         text ""
 
     else
-        div [ class "onyx-notify-veil" ]
-            [ div
-                [ class "notify-panel"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "Notifications"
-                , attribute "data-testid" "notify-sheet"
-                ]
+        Sheet.view
+            { scope = "notify"
+            , label = Sheet.Labelled "Notifications"
+            , onClose = NotifySheetClose
+            , placement = Sheet.Center
+            , layerClass = ""
+            , panelClass = "notify-panel"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "data-testid" "notify-sheet" ]
+            }
                 [ div [ class "notify-head" ]
-                    [ h2 [ class "notify-title" ] [ text "Notifications" ]
+                    [ h2 [ class "notify-title", id (Sheet.titleId "notify") ] [ text "Notifications" ]
                     , button
                         [ attribute "type" "button"
                         , class "notify-close"
@@ -124,7 +129,6 @@ notifySheet model =
                 , keywordsSection model
                 , ignoredSection model
                 ]
-            ]
 
 
 {-| Desktop + sound rows, mirroring the `NotificationControls` desktop

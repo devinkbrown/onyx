@@ -383,16 +383,17 @@ suite =
                         |> Event.expect JumpToDateClose
             ]
         , describe "topbar jump entry"
-            [ test "opens the sheet from the thread topbar" <|
+            [ test "opens the sheet from the room header's More menu" <|
                 \_ ->
-                    query threadModel
+                    -- v3/frame: the entry moved into the room header overflow.
+                    query { threadModel | roomMenuOpen = True }
                         |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "topbar-jump-to-date") ]
                         |> Event.simulate Event.click
                         |> Event.expect JumpToDateOpen
-            , test "disables the entry with no conversation" <|
+            , test "offers no entry with no conversation" <|
                 \_ ->
-                    query blank
-                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "topbar-jump-to-date") ]
-                        |> Query.has [ Selector.disabled True ]
+                    -- v3/frame: no room, no room header — the entry is absent.
+                    query { blank | roomMenuOpen = True }
+                        |> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "topbar-jump-to-date") ]
             ]
         ]

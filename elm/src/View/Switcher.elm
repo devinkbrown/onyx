@@ -24,6 +24,7 @@ import Html.Attributes exposing (attribute, class, id, placeholder, type_, value
 import Html.Events exposing (onClick, onInput, preventDefaultOn, on)
 import Json.Decode as Decode
 import Switcher
+import View.Sheet as Sheet
 
 
 listboxId : String
@@ -268,22 +269,18 @@ test ids); Escape arrives through the global `shortcut` port. -}
 shortcutsOverlay : Model -> Html Msg
 shortcutsOverlay model =
     if model.shortcutsOpen then
-        div [ class "onyx-shortcuts" ]
-            [ div
-                [ class "onyx-shortcuts-backdrop"
-                , attribute "aria-hidden" "true"
-                , onClick ShortcutsClose
-                ]
-                []
-            , section
-                [ class "onyx-shortcuts-sheet"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-labelledby" "shortcuts-overlay-title"
-                , attribute "aria-describedby" "shortcuts-overlay-description"
-                , attribute "data-shortcut-scope" "shortcuts"
-                , attribute "tabindex" "-1"
-                ]
+        Sheet.view
+            { scope = "shortcuts"
+            , label = Sheet.LabelledBy "shortcuts-overlay-title"
+            , onClose = ShortcutsClose
+            , placement = Sheet.Center
+            , layerClass = "onyx-shortcuts"
+            , panelClass = "onyx-shortcuts-sheet"
+            , backdropClass = "onyx-shortcuts-backdrop"
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "aria-describedby" "shortcuts-overlay-description" ]
+            }
                 [ div [ class "onyx-shortcuts-header" ]
                     [ h2 [ id "shortcuts-overlay-title" ] [ text "Keyboard shortcuts" ]
                     , button
@@ -300,7 +297,6 @@ shortcutsOverlay model =
                 , div [ class "shortcuts-overlay", attribute "data-testid" "shortcuts-overlay" ]
                     (List.map groupSection Switcher.shortcutGroups)
                 ]
-            ]
 
     else
         text ""

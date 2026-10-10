@@ -24,6 +24,7 @@ Stats slice; nav arrows are text glyphs (the oracle inlines SVG).
 import App exposing (Model, Msg(..))
 import Html exposing (Html, button, div, form, input, li, p, section, small, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, id, maxlength, placeholder, title, type_, value)
+import Json.Decode
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Provenance exposing (Scope(..))
@@ -119,7 +120,7 @@ panel model =
         query =
             String.trim model.searchQuery
     in
-    div [ class "onyx-message-search", attribute "role" "search", attribute "aria-label" "Message search", on "keydown" panelKey ]
+    div [ class "onyx-message-search", attribute "role" "search", attribute "aria-label" "Message search", Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) panelKey) ]
         [ div [ class "onyx-message-search__surface" ]
             [ div [ class "onyx-message-search__query-field" ]
                 [ input
@@ -134,7 +135,7 @@ panel model =
                     , attribute "aria-describedby" statusId
                     , placeholder ("Find messages in " ++ target)
                     , onInput (\next -> SearchQuery { query = next })
-                    , on "keydown" searchKey
+                    , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) searchKey)
                     ]
                     []
                 , span [ class "onyx-message-search__count", attribute "aria-hidden" "true" ]

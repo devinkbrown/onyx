@@ -3051,8 +3051,10 @@ function fetchPublicFeed(url) {
      Ctrl/Cmd+K and Escape work everywhere (inputs included); `?` and
      `/` only outside editable fields, without Ctrl/Meta/Alt. IME
      composition and keys an earlier handler already claimed are never
-     taken. A foreign modal dialog (one not marked
-     `data-shortcut-scope`) owns the keyboard, Escape aside. Returns
+     taken. Any open modal sheet other than the palette's own layers
+     (`data-shortcut-scope="palette"` / `"shortcuts"`) owns the
+     keyboard, Escape aside (v3/frame: every View.Sheet is scoped, so
+     the probe exempts only the palette scopes). Returns
      `{ name, prevent }` or null. */
   function shortcutEditableTarget(target) {
     if (!target || typeof target !== "object") return false;
@@ -3070,7 +3072,9 @@ function fetchPublicFeed(url) {
   function shortcutForeignModal(doc) {
     if (!doc || !doc.querySelector) return false;
     try {
-      return !!doc.querySelector('[role="dialog"][aria-modal="true"]:not([data-shortcut-scope])');
+      return !!doc.querySelector(
+        '[role="dialog"][aria-modal="true"]:not([data-shortcut-scope="palette"]):not([data-shortcut-scope="shortcuts"])'
+      );
     } catch (err) { return false; }
   }
   function classifyShortcut(e, doc) {
@@ -3092,56 +3096,133 @@ function fetchPublicFeed(url) {
     if (shortcutForeignModal(doc)) return null;
     return key === "?" ? { name: "shortcuts", prevent: true } : { name: "palette", prevent: true };
   }
-  /* Focus for the palette / shortcuts overlay (APG dialog): when an
-     element marked `data-onyx-autofocus` mounts, remember the opener
-     and focus it; Tab wraps inside its `data-shortcut-scope` dialog;
-     when the last one unmounts, focus returns to the opener. A swap
-     palette -> shortcuts keeps the original opener. */
-  function installShortcutFocus(doc, Mutation) {
-    if (!doc || !doc.querySelector) return null;
-    var current = null;
-    var opener = null;
+  /* v3/frame — the ONE overlay focus mechanism (APG dialog pattern).
+     Every overlay the Elm view mounts carries a scope marker:
+     `data-shortcut-scope` (View.Sheet, the palette, the shortcuts
+     overlay) or `data-call-dialog` (call privacy sheet, More call
+     tools). The helper keeps a stack of mounted overlays in document
+     order (the last one is topmost) and, for each overlay that mounts:
+       - remembers the opener (the element focused before it mounted;
+         a same-mutation swap such as palette -> shortcuts inherits the
+         replaced overlay's opener);
+       - moves focus inside — its `[data-onyx-autofocus]` or
+         `[data-initial-focus]` child, else the panel itself;
+     Tab / Shift+Tab wrap inside the topmost overlay; when an overlay
+     unmounts, focus returns to its opener (or into the overlay that is
+     now on top). The image lightbox keeps its own background-isolating
+     helper, so this one stands aside while it is mounted. Escape is
+     Elm-owned: `App.escapeMsg` over the ordered overlay list. */
+  var OVERLAY_SCOPE_SELECTOR = "[data-shortcut-scope], [data-call-dialog]";
+  var OVERLAY_AUTOFOCUS_SELECTOR = "[data-onyx-autofocus], [data-initial-focus]";
+  var OVERLAY_FOCUSABLE =
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  var LIGHTBOX_SELECTOR = ".shell-msg-lightbox-dialog";
+  function overlayFocusables(root) {
+    var nodes = [];
+    try { nodes = root.querySelectorAll(OVERLAY_FOCUSABLE); } catch (err) { return []; }
+    return Array.prototype.filter.call(nodes, function (el) {
+      try {
+        if (el.disabled) return false;
+        if (el.getAttribute && el.getAttribute("aria-hidden") === "true") return false;
+        return typeof el.tabIndex !== "number" || el.tabIndex >= 0;
+      } catch (err) { return false; }
+    });
+  }
+  function overlayFocus(el) {
+    if (!el || !el.focus) return;
+    try { el.focus({ preventScroll: true }); } catch (err) {
+      try { el.focus(); } catch (ignored) { /* best-effort */ }
+    }
+  }
+  function installOverlayFocus(doc, Mutation) {
+    if (!doc || !doc.querySelectorAll) return null;
+    var stack = []; /* [{ root, opener }] bottom -> top */
+    function mounted() {
+      try {
+        return Array.prototype.slice.call(doc.querySelectorAll(OVERLAY_SCOPE_SELECTOR));
+      } catch (err) { return []; }
+    }
+    function lightboxOpen() {
+      try { return !!(doc.querySelector && doc.querySelector(LIGHTBOX_SELECTOR)); } catch (err) { return false; }
+    }
+    function contains(root, el) {
+      try { return !!el && !!root.contains && root.contains(el); } catch (err) { return false; }
+    }
+    function focusInto(root) {
+      var target = null;
+      try { target = root.querySelector(OVERLAY_AUTOFOCUS_SELECTOR); } catch (err) { target = null; }
+      if (!target) {
+        var hasIndex = false;
+        try { hasIndex = root.hasAttribute && root.hasAttribute("tabindex"); } catch (err) { hasIndex = false; }
+        target = hasIndex ? root : (overlayFocusables(root)[0] || root);
+      }
+      overlayFocus(target);
+    }
     function settle() {
-      var el = null;
-      try { el = doc.querySelector("[data-onyx-autofocus]"); } catch (err) { el = null; }
-      if (el && el !== current) {
-        if (!current) {
-          try { opener = doc.activeElement || null; } catch (err) { opener = null; }
+      var live = mounted();
+      var restore = null;
+      var popped = false;
+      /* Drop unmounted overlays; the lowest dropped opener wins. */
+      for (var i = stack.length - 1; i >= 0; i--) {
+        if (live.indexOf(stack[i].root) < 0) {
+          restore = stack[i].opener;
+          stack.splice(i, 1);
+          popped = true;
         }
-        current = el;
-        try { el.focus({ preventScroll: true }); } catch (err) {
-          try { el.focus(); } catch (ignored) { /* best-effort */ }
+      }
+      var top = live.length ? live[live.length - 1] : null;
+      var known = false;
+      for (var j = 0; j < stack.length; j++) {
+        if (stack[j].root === top) { known = true; break; }
+      }
+      var active = null;
+      try { active = doc.activeElement || null; } catch (err) { active = null; }
+      if (top && !known) {
+        /* Overlays that mounted together below the top just join the
+           stack; only the topmost takes focus. */
+        for (var k = 0; k < live.length - 1; k++) {
+          var seen = false;
+          for (var m = 0; m < stack.length; m++) {
+            if (stack[m].root === live[k]) { seen = true; break; }
+          }
+          if (!seen) stack.push({ root: live[k], opener: active });
         }
-      } else if (!el && current) {
-        current = null;
-        var back = opener;
-        opener = null;
-        try {
-          if (back && back.isConnected !== false && back.focus) back.focus({ preventScroll: true });
-        } catch (err) { /* best-effort */ }
+        stack.push({ root: top, opener: popped ? restore : active });
+        if (!lightboxOpen() && !contains(top, active)) focusInto(top);
+        return;
+      }
+      if (!popped || lightboxOpen()) return;
+      if (top) {
+        if (contains(top, active)) return;
+        if (restore && restore.isConnected !== false && contains(top, restore)) overlayFocus(restore);
+        else focusInto(top);
+      } else if (restore && restore.isConnected !== false) {
+        overlayFocus(restore);
       }
     }
     function trapTab(e) {
       if (!e || e.key !== "Tab" || e.defaultPrevented) return;
-      var root = null;
-      try { root = doc.querySelector("[data-shortcut-scope]"); } catch (err) { root = null; }
-      if (!root || !root.querySelectorAll) return;
-      var items = Array.prototype.filter.call(
-        root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
-        function (node) { return !node.disabled && node.getAttribute("aria-hidden") !== "true"; }
-      );
-      if (items.length === 0) return;
+      if (lightboxOpen()) return;
+      var live = mounted();
+      var root = live.length ? live[live.length - 1] : null;
+      if (!root) return;
+      var items = overlayFocusables(root);
+      if (items.length === 0) {
+        try { e.preventDefault(); } catch (err) { /* best-effort */ }
+        return;
+      }
       var first = items[0];
       var last = items[items.length - 1];
-      var active = doc.activeElement;
-      var inside = root.contains ? root.contains(active) : true;
+      var active = null;
+      try { active = doc.activeElement; } catch (err) { active = null; }
+      var inside = contains(root, active);
       try {
-        if (e.shiftKey && (active === first || !inside)) {
+        if (e.shiftKey && (active === first || active === root || !inside)) {
           e.preventDefault();
-          last.focus();
+          overlayFocus(last);
         } else if (!e.shiftKey && (active === last || !inside)) {
           e.preventDefault();
-          first.focus();
+          overlayFocus(first);
         }
       } catch (err) { /* best-effort */ }
     }
@@ -3152,8 +3233,28 @@ function fetchPublicFeed(url) {
         observer.observe(doc.body || doc.documentElement, { childList: true, subtree: true });
       } catch (err) { /* observation unavailable */ }
     }
-    return { settle: settle, trapTab: trapTab };
+    return {
+      settle: settle,
+      trapTab: trapTab,
+      depth: function () { return stack.length; }
+    };
   }
+  /* Idempotent document-level install (wired once from `wire`). */
+  function installOverlayFocusOnce(doc) {
+    if (!doc) return null;
+    try {
+      if (doc.__onyxOverlayFocus) return doc.__onyxOverlayFocus;
+    } catch (err) { return null; }
+    var Mutation =
+      (typeof MutationObserver !== "undefined" && MutationObserver)
+      || (typeof window !== "undefined" && window && window.MutationObserver)
+      || null;
+    var handle = installOverlayFocus(doc, Mutation);
+    try { doc.__onyxOverlayFocus = handle; } catch (err) { /* best-effort */ }
+    return handle;
+  }
+  /* Back-compat name for the palette slice's helper. */
+  var installShortcutFocus = installOverlayFocus;
   function wireShortcuts(app) {
     if (!app || !app.ports || !app.ports.shortcut) return;
     if (typeof window === "undefined" || !window || !window.addEventListener) return;
@@ -3166,15 +3267,6 @@ function fetchPublicFeed(url) {
       }
       try { app.ports.shortcut.send(hit.name); } catch (err) { /* port gone */ }
     });
-    try {
-      if (doc && !doc.__onyxShortcutFocus) {
-        doc.__onyxShortcutFocus = true;
-        var Mutation =
-          (typeof MutationObserver !== "undefined" && MutationObserver)
-          || (window.MutationObserver || null);
-        installShortcutFocus(doc, Mutation);
-      }
-    } catch (err) { /* focus management is best-effort */ }
   }
 
   function wire(app) {
@@ -4971,88 +5063,12 @@ function fetchPublicFeed(url) {
         observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
       } catch (err) { /* observation unavailable */ }
     })();
-    /* v3/calls-c1 — call dialog focus (More call tools popover, call
-       privacy sheet): any `[data-call-dialog]` gets initial focus on
-       its `[data-initial-focus]` child (else itself), Tab wraps inside
-       it, and unmounting returns focus to the opener (APG dialog
-       pattern, spec §3.2). Escape is Elm-owned (a pure close Msg). */
-    (function installCallDialogFocus() {
-      if (typeof document === "undefined" || !document) return;
-      try {
-        if (document.__onyxCallDialogFocus) return;
-        document.__onyxCallDialogFocus = true;
-      } catch (err) { return; }
-      var Mutation =
-        (typeof MutationObserver !== "undefined" && MutationObserver)
-        || (typeof window !== "undefined" && window && window.MutationObserver)
-        || null;
-      var current = null;
-      var returnFocus = null;
-      function dialog() {
-        try { return document.querySelector("[data-call-dialog]"); } catch (err) { return null; }
-      }
-      function focusables(root) {
-        var nodes = [];
-        try {
-          nodes = root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        } catch (err) { return []; }
-        return Array.prototype.filter.call(nodes, function (el) {
-          try { return !el.disabled && el.tabIndex >= 0; } catch (err) { return false; }
-        });
-      }
-      function focusEl(el) {
-        try { el.focus({ preventScroll: true }); } catch (err) {
-          try { el.focus(); } catch (ignored) { /* best-effort */ }
-        }
-      }
-      function trapTab(e) {
-        var root = dialog();
-        if (!root || e.key !== "Tab" || e.defaultPrevented) return;
-        var items = focusables(root);
-        if (items.length === 0) {
-          try { e.preventDefault(); } catch (err) { /* best-effort */ }
-          return;
-        }
-        var first = items[0];
-        var last = items[items.length - 1];
-        var active = null;
-        try { active = document.activeElement; } catch (err) { active = null; }
-        var inside = false;
-        try { inside = !!active && root.contains(active); } catch (err) { inside = false; }
-        try {
-          if (e.shiftKey && (active === first || active === root || !inside)) {
-            e.preventDefault();
-            focusEl(last);
-          } else if (!e.shiftKey && (active === last || !inside)) {
-            e.preventDefault();
-            focusEl(first);
-          }
-        } catch (err) { /* best-effort */ }
-      }
-      function settle() {
-        var root = dialog();
-        if (root && root !== current) {
-          if (!current) {
-            try { returnFocus = document.activeElement || null; } catch (err) { returnFocus = null; }
-          }
-          current = root;
-          var target = null;
-          try { target = root.querySelector("[data-initial-focus]"); } catch (err) { target = null; }
-          focusEl(target || root);
-        } else if (!root && current) {
-          current = null;
-          var back = returnFocus;
-          returnFocus = null;
-          try { if (back && back.isConnected) focusEl(back); } catch (err) { /* best-effort */ }
-        }
-      }
-      try { document.addEventListener("keydown", trapTab); } catch (err) { /* no DOM events */ }
-      if (!Mutation) return;
-      try {
-        var observer = new Mutation(function () { settle(); });
-        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
-      } catch (err) { /* observation unavailable */ }
-    })();
+    /* v3/frame — the ONE overlay focus mechanism covers every sheet,
+       the palette / shortcuts overlay and the call dialogs
+       (`[data-call-dialog]`, formerly `installCallDialogFocus`). */
+    if (typeof document !== "undefined" && document) {
+      try { installOverlayFocusOnce(document); } catch (err) { /* focus management is best-effort */ }
+    }
     /* Device vault retention policy (mirroring `readRetentionPolicy` /
        `writeRetentionPolicy` + `applyRetentionPolicy`: the stored JSON
        is the source of truth — `trimTarget` re-reads it on every
@@ -8978,6 +8994,8 @@ function fetchPublicFeed(url) {
     wireGroupWelcome: wireGroupWelcome,
     classifyShortcut: classifyShortcut,
     installShortcutFocus: installShortcutFocus,
+    installOverlayFocus: installOverlayFocus,
+    installOverlayFocusOnce: installOverlayFocusOnce,
     wireShortcuts: wireShortcuts,
     memKV: memKV
   };

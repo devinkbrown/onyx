@@ -15,6 +15,7 @@ import Html.Attributes exposing (attribute, class, disabled, for, id, maxlength,
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Invite
 import Json.Decode as Decode
+import View.Sheet as Sheet
 
 
 newMessageSheet : Model -> Html Msg
@@ -45,23 +46,18 @@ sheet model =
             else
                 Invite.nicknameError recipient False
     in
-    div [ class "onyx-newmsg" ]
-        [ div
-            [ class "onyx-newmsg-backdrop"
-            , attribute "role" "presentation"
-            , attribute "data-testid" "new-message-backdrop"
-            , onClick NewMessageClose
-            ]
-            []
-        , section
-            [ class "onyx-newmsg-sheet"
-            , attribute "role" "dialog"
-            , attribute "aria-modal" "true"
-            , attribute "aria-labelledby" "new-message-title"
-            , attribute "aria-describedby" "new-message-description"
-            , attribute "tabindex" "-1"
-            , on "keydown" escapeDecoder
-            ]
+    Sheet.view
+        { scope = "new-message"
+        , label = Sheet.LabelledBy "new-message-title"
+        , onClose = NewMessageClose
+        , placement = Sheet.Center
+        , layerClass = "onyx-newmsg"
+        , panelClass = "onyx-newmsg-sheet"
+        , backdropClass = "onyx-newmsg-backdrop"
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "aria-describedby" "new-message-description" ]
+        }
             ([ div [ class "onyx-newmsg-header" ]
                 [ div [ class "onyx-newmsg-mark", attribute "aria-hidden" "true" ] [ text "✦" ]
                 , div []
@@ -107,6 +103,7 @@ sheet model =
                             ]
                         , input
                             [ id "new-message-recipient"
+                            , Sheet.autofocus "new-message"
                             , value recipient
                             , onInput NewMessageInput
                             , attribute "autocomplete" "off"
@@ -164,20 +161,4 @@ sheet model =
                         ]
                    ]
             )
-        ]
 
-
-{-| Escape dismisses the sheet (IME composition yields). -}
-escapeDecoder : Decode.Decoder Msg
-escapeDecoder =
-    Decode.map2 Tuple.pair
-        (Decode.field "key" Decode.string)
-        (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
-        |> Decode.andThen
-            (\( key, composing ) ->
-                if key == "Escape" && not composing then
-                    Decode.succeed NewMessageClose
-
-                else
-                    Decode.fail "ignored"
-            )

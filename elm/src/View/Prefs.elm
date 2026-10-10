@@ -24,6 +24,7 @@ import Nav
 import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
+import View.Sheet as Sheet
 
 
 prefsSheet : Model -> Html Msg
@@ -32,15 +33,18 @@ prefsSheet model =
         text ""
 
     else
-        div [ class "onyx-prefs-veil" ]
-            [ div
-                [ class "onyx-prefs"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-labelledby" "pref-sheet-title"
-                , attribute "aria-describedby" "pref-sheet-desc"
-                , attribute "data-testid" "preferences-panel"
-                ]
+        Sheet.view
+            { scope = "prefs"
+            , label = Sheet.LabelledBy "pref-sheet-title"
+            , onClose = PrefsClose
+            , placement = Sheet.Center
+            , layerClass = ""
+            , panelClass = "onyx-prefs"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "aria-describedby" "pref-sheet-desc", attribute "data-testid" "preferences-panel" ]
+            }
                 [ div [ class "onyx-prefs-head" ]
                     [ div []
                         [ h2 [ class "onyx-prefs-title", id "pref-sheet-title" ] [ text "Device preferences" ]
@@ -61,7 +65,6 @@ prefsSheet model =
                         (List.map (categoryPanel model) PrefsPanel.categories)
                     ]
                 ]
-            ]
 
 
 categoryNav : Model -> Html Msg

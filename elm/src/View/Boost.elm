@@ -18,6 +18,7 @@ import Html.Attributes exposing (attribute, class, disabled, for, href, id, type
 import Html.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Set
+import View.Sheet as Sheet
 
 
 {-| The sheet renders only while `showJumpToDate` is set. -}
@@ -27,19 +28,18 @@ jumpToDateSheet model =
         text ""
 
     else
-        div [ class "onyx-jump-veil" ]
-            [ div
-                [ class "onyx-jump-backdrop"
-                , onClick JumpToDateClose
-                ]
-                []
-            , div
-                [ class "jump-to-date-sheet"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "Jump to date"
-                , on "keydown" escapeDecoder
-                ]
+        Sheet.view
+            { scope = "jump-to-date"
+            , label = Sheet.Labelled "Jump to date"
+            , onClose = JumpToDateClose
+            , placement = Sheet.Center
+            , layerClass = ""
+            , panelClass = "jump-to-date-sheet"
+            , backdropClass = "onyx-jump-backdrop"
+            , layerAttrs = []
+            , modal = True
+            , attrs = []
+            }
                 [ div [ class "jump-to-date-head" ]
                     [ h2 [ class "jump-to-date-title" ] [ text "Jump to date" ]
                     , button
@@ -53,7 +53,6 @@ jumpToDateSheet model =
                 , div [ class "jump-to-date", attribute "data-testid" "jump-to-date-sheet" ]
                     [ sheetBody model ]
                 ]
-            ]
 
 
 sheetBody : Model -> Html Msg
@@ -255,25 +254,3 @@ actionsRow model channel =
                )
         )
 
-
-{-| Escape light-dismisses the sheet (same IME-yielding shape as the
-reaction-picker decoder). -}
-escapeDecoder : Decode.Decoder Msg
-escapeDecoder =
-    Decode.field "isComposing" Decode.bool
-        |> Decode.andThen
-            (\composing ->
-                if composing then
-                    Decode.fail "ime"
-
-                else
-                    Decode.field "key" Decode.string
-                        |> Decode.andThen
-                            (\key ->
-                                if key == "Escape" then
-                                    Decode.succeed JumpToDateClose
-
-                                else
-                                    Decode.fail "not-escape"
-                            )
-            )

@@ -5,7 +5,7 @@ module View.Nav exposing (mobileNav, navItems, primaryNav, youHub)
 `primaryNav` / `mobileNav` mirror `src/shell/PrimaryNavigation.tsx`:
 one `Nav.items` model rendered as a slim desktop rail (`Primary`
 landmark, `Quick switch to …` tooltips) and a bottom tab bar under
-720px (`Mobile navigation`, `Open …` names). Both always render; CSS
+768px (`Mobile navigation`, `Open …` names). Both always render; CSS
 picks one per width. Collections carry `aria-pressed`/`aria-expanded`,
 the current location `aria-current="page"`, You `aria-haspopup="dialog"`.
 
@@ -24,6 +24,7 @@ import Html exposing (Html, button, div, h2, h3, nav, p, section, small, span, s
 import Html.Attributes exposing (attribute, class, classList, type_)
 import Html.Events exposing (onClick)
 import Nav
+import View.Sheet as Sheet
 
 
 {-| The model for one variant, fed from shell state. -}
@@ -177,15 +178,18 @@ youHub model =
                     Nothing ->
                         "You are browsing as a guest."
         in
-        div [ class "onyx-you-veil" ]
-            [ div
-                [ class "onyx-you"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "You"
-                , attribute "data-testid" "you-hub"
-                , attribute "data-guest" (boolString guest)
-                ]
+        Sheet.view
+            { scope = "you"
+            , label = Sheet.Labelled "You"
+            , onClose = YouHubClose
+            , placement = Sheet.Center
+            , layerClass = "onyx-you-veil"
+            , panelClass = "onyx-you"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "data-testid" "you-hub", attribute "data-guest" (boolString guest) ]
+            }
                 [ div [ class "onyx-you-head" ]
                     [ div [ class "onyx-you-identity" ]
                         [ h2 [ class "onyx-you-title" ] [ text "You" ]
@@ -289,7 +293,6 @@ youHub model =
                         ]
                     ]
                 ]
-            ]
 
 
 boolString : Bool -> String

@@ -8,9 +8,9 @@ abyssal surface, warm off-white text, ONE sea-glass accent reserved for
 live/active states, system font stack, 6px radii, hierarchy through
 weight and size only. No gradients, no glow, no glass, no emoji icons.
 
-Layout: top bar (brand + connection pill + channel topic) over a
-three-column working area (channel rail, message thread, grouped
-roster), with the composer pinned under the thread.
+Layout (v3/frame): one CSS grid — nav rail | collection sidebar |
+conversation column (room header, transcript, composer) | context
+rail — under a global top bar; one column + bottom nav under 768px.
 
 -}
 
@@ -41,7 +41,6 @@ import View.PublicInfo exposing (pageForRoute, pageTitle, route)
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
-import View.Inbox exposing (inbox)
 import View.Trust exposing (trustPageForRoute)
 import View.Rail exposing (rail)
 import View.NewMessage exposing (newMessageSheet)
@@ -50,7 +49,7 @@ import View.Roster exposing (roster)
 import View.Scheduled exposing (scheduledSheet)
 import View.Search exposing (panel)
 import View.Browser exposing (browser)
-import View.GuestClaim exposing (guestClaim)
+import View.GuestClaim exposing (guestClaimChip, guestClaimSheet)
 import View.Account exposing (accountPanel)
 import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
@@ -64,6 +63,7 @@ import View.Nav
 import View.Switcher
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
+import View.RoomHeader exposing (roomHeader)
 
 
 view : Model -> Browser.Document Msg
@@ -190,10 +190,19 @@ documentTitle model =
                                     "Onyx"
 
 
-{-| v3/nav — the app frame: desktop primary rail, the shell, the
-mobile bottom bar (CSS picks one per width) and the You hub sheet.
-`data-nav-drawer` lets narrow layouts swap the thread for the rail
-while the Rooms / Messages drawer is open.
+{-| v3/frame — the ONE app frame grid (see `.onyx-frame` in app.css):
+
+    nav rail | topbar (global)                                  |
+             | notices (reconnect banner, search, guest chip)   |
+             | collection sidebar | conversation | context rail |
+    mobile bottom nav (under 768px only)
+
+The conversation column stacks the room header, the transcript pane
+and the composer. Under 768px the grid collapses to one column: the
+sidebar replaces the conversation while the Rooms / Messages drawer is
+open (`data-nav-drawer`), the context rail hides, and the bottom nav
+takes the last row. Every overlay (sheets, palette, toasts, the You
+hub) mounts in `.onyx-overlays`, outside the grid flow.
 -}
 appFrame : Model -> Html Msg
 appFrame model =
@@ -207,69 +216,83 @@ appFrame model =
              else
                 "false"
             )
+        , attribute "data-calls"
+            (if model.callsOpen then
+                "true"
+
+             else
+                "false"
+            )
         ]
-        [ View.Nav.primaryNav model
-        , shell model
-        , View.Nav.mobileNav model
+        ([ View.Nav.primaryNav model
+         , topbar model
+         , div [ class "onyx-notices" ]
+            ([ reconnectBanner model, guestClaimChip model ]
+                ++ (if model.searchOpen then
+                        [ panel model ]
+
+                    else
+                        []
+                   )
+            )
+         ]
+            ++ (if model.callsOpen then
+                    [ main_ [ class "onyx-main onyx-main-calls" ]
+                        [ callsHub model ]
+                    ]
+
+                else
+                    [ rail model
+                    , main_ [ class "onyx-main" ]
+                        [ roomHeader model
+                        , thread model
+                        , composer model
+                        ]
+                    , roster model
+                    ]
+               )
+            ++ [ View.Nav.mobileNav model
+               , overlays model
+               ]
+        )
+
+
+{-| Everything that floats over the frame. Order is stacking order
+(later paints above earlier); `App.overlayStack` mirrors it for Escape.
+-}
+overlays : Model -> Html Msg
+overlays model =
+    div [ class "onyx-overlays" ]
+        [ toaster model
+        , stewardPanel model
+        , guestClaimSheet model
+        , browser model
+        , scheduledSheet model
+        , accountPanel model
+        , notifySheet model
+        , prefsSheet model
+        , pinsDrawer model
+        , mediaPanel model
+        , jumpToDateSheet model
+        , profileSheet model
+        , profileCard model
+        , -- v3/moddesk: the review renders inside the room desk while it is open
+          if model.moderationOpen then
+            text ""
+
+          else
+            moderationReview model
+        , moderationSheet model
+        , operSheet model
+        , personSafetySheet model
+        , newMessageSheet model
+        , inviteShareSheet model -- v3/dmsafety
+        -- v3/calls-c1
+        , View.CallStage.privacySheet model
+        , View.CallStage.announcer model
+        , reclaimDialog model
         , View.Nav.youHub model
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
         ]
-
-
-shell : Model -> Html Msg
-shell model =
-    div [ class "onyx-shell" ]
-        ([ topbar model, reconnectBanner model, reclaimDialog model ]
-            ++ (if model.searchOpen then
-                    [ panel model ]
-
-                else
-                    []
-               )
-            ++ [ if model.callsOpen then
-                    main_ [ class "onyx-main onyx-main-calls" ]
-                        [ callsHub model ]
-
-                 else
-                    main_ [ class "onyx-main" ]
-                        [ rail model
-                        , thread model
-                        , roster model
-                        ]
-               , if model.callsOpen then
-                    div [] []
-
-                 else
-                    composer model
-               , inbox model
-               , toaster model
-               , stewardPanel model
-               , guestClaim model
-               , browser model
-               , scheduledSheet model
-               , accountPanel model
-               , notifySheet model
-               , prefsSheet model
-               , pinsDrawer model
-               , mediaPanel model
-               , jumpToDateSheet model
-               , profileSheet model
-               , profileCard model
-               , -- v3/moddesk: the review renders inside the room desk while it is open
-                 if model.moderationOpen then
-                    text ""
-
-                 else
-                    moderationReview model
-               , moderationSheet model
-               , operSheet model
-               , personSafetySheet model
-               , newMessageSheet model
-               , inviteShareSheet model -- v3/dmsafety
-               -- v3/calls-c1
-               , View.CallStage.privacySheet model
-               , View.CallStage.announcer model
-               ]
-        )

@@ -15,6 +15,7 @@ import Html exposing (Html, a, button, div, h2, input, li, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput)
 import View.Formation exposing (formation)
+import View.Sheet as Sheet
 
 
 browser : Model -> Html Msg
@@ -46,12 +47,18 @@ browser model =
                     , query = model.browserQuery
                     }
         in
-        div [ class "chb-veil" ]
-            [ div
-                [ class "chb"
-                , attribute "role" "dialog"
-                , attribute "aria-label" "Browse rooms"
-                ]
+        Sheet.view
+            { scope = "browse-rooms"
+            , label = Sheet.Labelled "Browse rooms"
+            , onClose = BrowserClose
+            , placement = Sheet.Center
+            , layerClass = "chb-veil"
+            , panelClass = "chb"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = []
+            }
                 [ div [ class "chb-head" ]
                     [ h2 [ class "chb-title" ] [ text "Browse rooms" ]
                     , p [ class "chb-desc" ] [ text "Public rooms with people in them." ]
@@ -111,7 +118,6 @@ browser model =
                 , browserBody model offline rows
                 , admission model
                 ]
-            ]
 
 
 pressed : Bool -> String

@@ -22,6 +22,7 @@ import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
+import View.Sheet as Sheet
 
 
 accountPanel : Model -> Html Msg
@@ -30,16 +31,20 @@ accountPanel model =
         text ""
 
     else
-        div [ class "onyx-account-veil" ]
-            [ div
-                [ class "onyx-account"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "Account settings"
-                , attribute "data-testid" "account-panel"
-                ]
+        Sheet.view
+            { scope = "account"
+            , label = Sheet.LabelledBy (Sheet.titleId "account")
+            , onClose = SetAccountOpen False
+            , placement = Sheet.Center
+            , layerClass = ""
+            , panelClass = "onyx-account"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "data-testid" "account-panel" ]
+            }
                 [ div [ class "onyx-account-head" ]
-                    [ h2 [ class "onyx-account-title" ] [ text "Account settings" ]
+                    [ h2 [ class "onyx-account-title", Html.Attributes.id (Sheet.titleId "account") ] [ text "Account settings" ]
                     , button
                         [ type_ "button"
                         , class "onyx-account-close"
@@ -74,7 +79,6 @@ accountPanel model =
                             , dataSection model
                             ]
                 ]
-            ]
 
 
 sectionNav : Html Msg

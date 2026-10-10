@@ -1,4 +1,4 @@
-module View.GuestClaim exposing (guestClaim)
+module View.GuestClaim exposing (guestClaim, guestClaimChip, guestClaimSheet)
 
 {-| Guest claim affordance — the in-session "keep this nick" chip and
 claim sheet mirroring `GuestClaimPrompt.tsx` (compact dismissible chip
@@ -20,22 +20,33 @@ import App exposing (GuestClaimPhase(..), Model, Msg(..), guestClaimMinPassword,
 import Html exposing (Html, b, button, div, form, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import View.Sheet as Sheet
 
 
 guestClaim : Model -> Html Msg
 guestClaim model =
-    div []
-        [ if guestClaimVisible model then
-            chip model
+    div [] [ guestClaimChip model, guestClaimSheet model ]
 
-          else
-            text ""
-        , if model.guestClaimOpen && model.accountName == Nothing && not (String.isEmpty (String.trim model.ourNick)) then
-            sheet model
 
-          else
-            text ""
-        ]
+{-| v3/frame — the in-flow "Keep the name" chip (the frame's notices
+row). -}
+guestClaimChip : Model -> Html Msg
+guestClaimChip model =
+    if guestClaimVisible model then
+        chip model
+
+    else
+        text ""
+
+
+{-| v3/frame — the claim sheet (the frame's overlay layer). -}
+guestClaimSheet : Model -> Html Msg
+guestClaimSheet model =
+    if model.guestClaimOpen && model.accountName == Nothing && not (String.isEmpty (String.trim model.ourNick)) then
+        sheet model
+
+    else
+        text ""
 
 
 chip : Model -> Html Msg
@@ -115,13 +126,18 @@ sheet model =
         verifying =
             model.guestClaimPhase == ClaimVerifying || model.verifyRequired
     in
-    div [ class "guest-claim-veil" ]
-        [ div
-            [ class "guest-claim-sheet"
-            , attribute "role" "dialog"
-            , attribute "aria-label" "Keep this name"
-            , attribute "data-testid" "guest-claim-sheet"
-            ]
+    Sheet.view
+        { scope = "guest-claim"
+        , label = Sheet.Labelled "Keep this name"
+        , onClose = GuestClaimClose
+        , placement = Sheet.Center
+        , layerClass = "guest-claim-veil"
+        , panelClass = "guest-claim-sheet"
+        , backdropClass = ""
+        , layerAttrs = []
+        , modal = True
+        , attrs = [ attribute "data-testid" "guest-claim-sheet" ]
+        }
             [ p [ class "guest-claim-sheet__lede" ]
                 [ text "Create an account for the name you are using. You stay connected while it is set up." ]
             , if verifying then
@@ -130,7 +146,6 @@ sheet model =
               else
                 registerForm model busy
             ]
-        ]
 
 
 errorRow : Model -> Html Msg

@@ -24,6 +24,7 @@ import Provenance
 import RoomMedia exposing (RoomMediaFilter(..))
 import Set
 import Upload
+import View.Sheet as Sheet
 
 
 {-| The panel: nothing while closed, otherwise the dialog with
@@ -34,14 +35,18 @@ mediaPanel model =
         text ""
 
     else
-        div [ class "onyx-media-veil" ]
-            [ div
-                [ class "room-media-index"
-                , attribute "role" "dialog"
-                , attribute "aria-modal" "true"
-                , attribute "aria-label" "Pictures, files, and links"
-                , attribute "data-testid" "room-media-index"
-                ]
+        Sheet.view
+            { scope = "media"
+            , label = Sheet.Labelled "Pictures, files, and links"
+            , onClose = MediaIndexClose
+            , placement = Sheet.Side
+            , layerClass = ""
+            , panelClass = "room-media-index"
+            , backdropClass = ""
+            , layerAttrs = []
+            , modal = True
+            , attrs = [ attribute "data-testid" "room-media-index" ]
+            }
                 [ div [ class "room-media-index-head" ]
                     [ span [ class "room-media-index-title" ] [ text "Pictures, files, and links" ]
                     , button
@@ -68,7 +73,6 @@ mediaPanel model =
                 , filterPanel model Files "Files"
                 , filterPanel model Links "Links"
                 ]
-            ]
 
 
 {-| Device-scope badge (mirroring `ProvenanceBadge` for the
