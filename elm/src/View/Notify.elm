@@ -140,23 +140,23 @@ desktopSection model =
         desktopActive =
             model.pushEnabled && model.notifyPermission == Granted
 
-        ( desktopLabel, desktopDisabled ) =
+        ( desktopDisabled, desktopLabel ) =
             case model.notifyPermission of
                 Unsupported ->
-                    ( "Desktop notifications are not supported", True )
+                    ( True, "Desktop notifications are not supported" )
 
                 Denied ->
-                    ( "Desktop notifications are blocked by the browser", True )
+                    ( True, "Desktop notifications are blocked by the browser" )
 
                 Granted ->
                     if desktopActive then
-                        ( "Disable desktop notifications", False )
+                        ( False, "Disable desktop notifications" )
 
                     else
-                        ( "Enable desktop notifications", False )
+                        ( False, "Enable desktop notifications" )
 
                 Default ->
-                    ( "Enable desktop notifications", False )
+                    ( False, "Enable desktop notifications" )
 
         desktopMsg =
             case model.notifyPermission of
