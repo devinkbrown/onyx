@@ -16,6 +16,7 @@ import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Html.Keyed
 import Html.Lazy
 import Json.Decode as Decode
+import PrefsPanel
 import Set exposing (Set)
 import Prefs
 import Time
@@ -248,7 +249,7 @@ attachment cards) or whose menu / picker is open render eagerly.
 rowNode : Model -> String -> TranscriptRows.RowView -> App.ChatMessage -> Html Msg
 rowNode model target rv m =
     if rv.system then
-        Html.Lazy.lazy systemRow m
+        Html.Lazy.lazy2 systemRow model.prefs.hideEvents m
 
     else
         let
@@ -266,11 +267,12 @@ rowNode model target rv m =
             Html.Lazy.lazy7 quietRow target model.zone model.prefs model.ourNick title (TranscriptRows.flagsToBits rv.flags) m
 
 
-systemRow : App.ChatMessage -> Html Msg
-systemRow m =
+systemRow : Bool -> App.ChatMessage -> Html Msg
+systemRow hideEvents m =
     div
         [ class "onyx-system"
         , attribute "data-event" m.msgType
+        , Html.Attributes.hidden (PrefsPanel.hidesEvent hideEvents m.msgType) -- v3/prefs
         , attribute "role" "article"
         , attribute "tabindex" "-1"
         , attribute "aria-label" m.body

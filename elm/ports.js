@@ -833,6 +833,64 @@
     return plan;
   }
 
+  /* v3/prefs — pure plan for a Preferences outbox review: which stored
+     rows a discard request deletes (only ids that exist) and which rows
+     stay listed. Listed rows are the still-unsent ones: wire-admitted rows
+     (on the wire, awaiting prune) and unaddressable rows never list. */
+  function outboxReviewPlan(rows, discard) {
+    var wanted = {};
+    (discard || []).forEach(function (id) {
+      if (typeof id === "string" && id) wanted[id] = true;
+    });
+    var plan = { remove: [], keep: [] };
+    (rows || []).forEach(function (raw) {
+      var row = outboxPlainEntry(raw);
+      if (!row.id) return;
+      if (wanted[row.id]) {
+        plan.remove.push(row.id);
+        return;
+      }
+      if (row.wireAdmitted || outboxWireAdmitted[row.id]) return;
+      if (!isOutboxTarget(row.target) || !row.text) return;
+      plan.keep.push(outboxElmRow(row));
+    });
+    plan.keep.sort(function (a, b) { return a.queuedAt - b.queuedAt; });
+    return plan;
+  }
+
+  /* v3/prefs — read the outbox, deleting the requested ids in the same
+     readwrite transaction; reports only after commit so `removed` is a
+     verified delete, never an optimistic one. */
+  function outboxReview(db, req, onReport) {
+    var tag = req && typeof req.tag === "string" ? req.tag : "refresh";
+    function report(removed, rows, ok) {
+      try { onReport({ removed: removed, rows: rows, ok: ok, tag: tag }); } catch (err) {}
+    }
+    if (db === null) { report([], [], false); return; }
+    var tx;
+    try { tx = db.transaction(OUTBOX, "readwrite"); } catch (err) { report([], [], false); return; }
+    var plan = { remove: [], keep: [] };
+    try {
+      var store = tx.objectStore(OUTBOX);
+      var all = store.getAll();
+      all.onsuccess = function () {
+        plan = outboxReviewPlan(all.result || [], req && req.discard);
+        plan.remove.forEach(function (id) {
+          try { store.delete(id); } catch (err) {}
+        });
+      };
+    } catch (err) { report([], [], false); return; }
+    tx.oncomplete = function () {
+      plan.remove.forEach(function (id) {
+        delete outboxUncertainHeld[id];
+        delete outboxWireAdmitted[id];
+      });
+      report(plan.remove, plan.keep, true);
+    };
+    tx.onerror = function () { report([], [], false); };
+    tx.onabort = function () { report([], [], false); };
+  }
+
   function outboxQueue(db, req, onQueued, onFailed) {
     var target = req && req.target;
     var text = req && req.text;
@@ -5705,6 +5763,15 @@ function fetchPublicFeed(url) {
       });
     }
 
+    /* v3/prefs — Preferences queued-send review/discard. */
+    if (app.ports.outboxReview) {
+      app.ports.outboxReview.subscribe(function (req) {
+        outboxReview(vault, req, function (report) {
+          if (app.ports.outboxReviewed) app.ports.outboxReviewed.send(report);
+        });
+      });
+    }
+
     if (app.ports.outboxFlush) {
       app.ports.outboxFlush.subscribe(function (req) {
         var labeled = !!(req && req.labeled);
@@ -8731,6 +8798,8 @@ function fetchPublicFeed(url) {
       plainEntry: outboxPlainEntry,
       flushPlan: outboxFlushPlan,
       flush: outboxFlush,
+      reviewPlan: outboxReviewPlan,
+      review: outboxReview,
       maxEntries: OUTBOX_MAX_ENTRIES,
       maxAgeMs: OUTBOX_MAX_AGE_MS
     },

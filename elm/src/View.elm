@@ -53,6 +53,7 @@ import View.Account exposing (accountPanel)
 import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
+import View.Prefs exposing (prefsSheet)
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
@@ -248,6 +249,7 @@ shell model =
                , scheduledSheet model
                , accountPanel model
                , notifySheet model
+               , prefsSheet model
                , pinsDrawer model
                , mediaPanel model
                , jumpToDateSheet model

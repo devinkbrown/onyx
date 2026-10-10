@@ -64,6 +64,10 @@ Port contract (implemented by `ports.js`):
     loss; with `labeled` every sent row carries a ports-minted
     `@label=` and `sentLabels` maps row ids to labels for the
     labeled-response correlation).
+  - `outboxReview { discard, tag }` /
+    `outboxReviewed { removed, rows, ok, tag }` (v3/prefs: Preferences
+    queued-send listing + verified delete in one readwrite transaction;
+    reported only after commit).
   - `passkeyCreate { challenge, rpId, account }` /
     `passkeyCreated { credId, clientDataJSON, authData }`.
   - `passkeyGet { challenge, rpId, allowCreds }` /
@@ -112,6 +116,7 @@ provisioning), media transport, uploads.
 import App
 import Attribution
 import Browser
+import Browser.Dom
 import Browser.Events
 import Browser.Navigation as Nav
 import Json.Decode as Decode
@@ -255,6 +260,15 @@ port outboxFlushed : ({ sent : List String, uncertain : List String, dropped : L
 port outboxRetryStart : Int -> Cmd msg
 
 port outboxRetryFired : (() -> msg) -> Sub msg
+
+
+{-| v3/prefs — read the durable outbox (optionally deleting `discard`
+ids first); `tag` is echoed back so the fold knows which request settled.
+-}
+port outboxReview : { discard : List String, tag : String } -> Cmd msg
+
+
+port outboxReviewed : ({ removed : List String, rows : List { id : String, target : String, text : String, queuedAt : Float }, ok : Bool, tag : String } -> msg) -> Sub msg
 
 
 port tempBanTimerStart : { key : String, delayMs : Int } -> Cmd msg
@@ -1111,6 +1125,13 @@ perform key outbound =
         App.OutboxRetryTimer req ->
             outboxRetryStart req.delayMs
 
+        -- v3/prefs
+        App.OutboxReview req ->
+            outboxReview req
+
+        App.PrefsFocus { id } ->
+            Task.attempt (\_ -> App.PrefsFocusDone) (Browser.Dom.focus id)
+
         App.TempBanTimerStart req ->
             tempBanTimerStart req
 
@@ -1515,6 +1536,10 @@ subscriptions model =
                             else if model.app.notifySheetOpen then
                                 Decode.succeed App.NotifySheetClose
 
+                            else if model.app.prefsOpen then
+                                -- v3/prefs
+                                Decode.succeed App.PrefsClose
+
                             else if model.app.accountOpen then
                                 Decode.succeed (App.SetAccountOpen False)
 
@@ -1557,6 +1582,7 @@ subscriptions model =
         , outboxQueueFailed App.OutboxQueueFailed
         , outboxFlushed App.OutboxFlushed
         , outboxRetryFired (\_ -> App.OutboxRetryFired)
+        , outboxReviewed App.PrefsOutboxReviewed
         , scheduledPersisted App.ScheduledPersisted
         , scheduledFenceResult App.ScheduledFenceResult
         , scheduledAddResult App.ScheduledAddResult
