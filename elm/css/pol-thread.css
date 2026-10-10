@@ -244,7 +244,8 @@
 
 /* Touch: no hover, so nothing shows until the row is tapped; then the
    bar carries comfortable targets. Long-press opens the menu directly
-   (Thread.longPressMenu), so the callout and selection stay out of it. */
+   where the browser reports it (Thread.longPressMenu); links and images
+   keep their native callout. */
 @media (hover: none) {
   .onyx-row-actions { top: -22px; right: var(--space-1); gap: 0; }
   .onyx-row-action,
@@ -253,7 +254,6 @@
   .onyx-message .onyx-msg-menu-trigger .pt-ico { width: 20px; height: 20px; }
   .onyx-message:hover:not(:focus-within):not(.onyx-message--active) { background: transparent; }
   .onyx-message:hover:not(:focus-within):not(.onyx-message--active) > .onyx-row-actions { opacity: 0; pointer-events: none; }
-  .onyx-message { -webkit-touch-callout: none; }
 }
 
 /* Reaction picker light-dismiss layer (mirrors .onyx-msg-menu-backdrop). */
@@ -1604,6 +1604,9 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 }
 .room-media-index-close:hover,
 .pins-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.room-media-index-close .pt-ico,
+.pins-close .pt-ico,
+.pins-item-unpin .pt-ico { width: 16px; height: 16px; }
 
 .room-media-index-desc { margin: calc(-1 * var(--space-2)) 0 0; color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-body); }
 
@@ -1762,6 +1765,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .room-media-index-meta {
   display: flex;
   flex-wrap: wrap;
+  column-gap: 0.35em;
   min-width: 0;
   color: var(--onyx-dim);
   font-size: var(--text-xs);

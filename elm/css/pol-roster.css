@@ -111,7 +111,8 @@
 .onyx-roster .onyx-roster-filter-input:focus,
 .onyx-roster .onyx-roster-filter-input:focus-visible { outline: none; }
 .onyx-roster-filter-input::placeholder { color: var(--onyx-faint); }
-.onyx-roster-filter-input::-webkit-search-decoration { display: none; }
+.onyx-roster-filter-input::-webkit-search-decoration,
+.onyx-roster-filter-input::-webkit-search-cancel-button { display: none; }
 
 .onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within) {
   height: 0;

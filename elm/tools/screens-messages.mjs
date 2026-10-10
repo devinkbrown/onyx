@@ -345,6 +345,36 @@ export default {
     await h.settle(page, 900);
   },
 
+  'msg-media': async (page, h) => {
+    await room(page, h);
+    await h.tryClick(page, '[data-testid="room-more"]');
+    await h.tryClick(page, '[data-testid="ribbon-room-media"]');
+    await h.settle(page, 400);
+  },
+
+  'msg-pins': async (page, h) => {
+    await room(page, h);
+    await h.tryClick(page, '[data-testid="room-more"]');
+    await h.tryClick(page, '[data-testid="ribbon-pins"]');
+    await h.settle(page, 400);
+  },
+
+  'msg-unread2': async (page, h) => {
+    const inject = await room(page, h);
+    // Leave the room for Home, let three rows land, then come back.
+    await h.tryClick(page, '[data-testid="nav-home"]:visible');
+    await h.settle(page, 500);
+    inject([
+      `@time=${new Date().toISOString()};msgid=v1 :iris!i@onyx.test PRIVMSG #lounge :ok the staging build is green again`,
+      `@time=${new Date().toISOString()};msgid=v2 :iris!i@onyx.test PRIVMSG #lounge :@kn your fix landed, thank you`,
+      `@time=${new Date().toISOString()};msgid=v3 :theo!t@onyx.test PRIVMSG #lounge :nice, shipping it tonight`,
+    ]);
+    await h.settle(page, 400);
+    if (isPhone(page)) await h.tryClick(page, '[data-testid="nav-rooms"]:visible');
+    await h.tryClick(page, '.onyx-rail-item:has-text("#lounge")');
+    await h.settle(page, 900);
+  },
+
   'msg-empty': async (page, h) => {
     await wire(page, h, { drop: (r) => r === '#quiet' });
     await h.joinRoom(page, 'kn', '#quiet');
