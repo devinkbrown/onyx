@@ -16,6 +16,12 @@
  * NAMES burst widened for the big room. Nothing edits screens.mjs or
  * touches the network.
  *
+ * Note: the 4,000-member scenarios push ~8,000 server lines through
+ * Playwright's WebSocket route one await at a time (~30 s), so the app's
+ * own keepalive can report "NOTE page socket closed 4001 Ping timeout"
+ * (the PONG queues behind the roster). That is the harness pacing, not
+ * app CPU: the join's long tasks total ~1.5-3 s.
+ *
  * `gp-members-4000` prints MEASURE lines (long tasks while the roster
  * paints and while typing in the composer) so a change can be compared
  * against the baseline build.
