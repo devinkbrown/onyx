@@ -50,12 +50,10 @@
    ellipsis when the sidebar is narrow instead of being cut mid-word. */
 .onyx-rail .onyx-rail-filter-input { text-overflow: ellipsis; }
 
-/* Room header, any width: the topic gives way first and the name only
-   after it (ellipsis), so neither can run into the buttons; the
-   facepile steps aside while the column is narrow. `em` follows the
-   reader's own default font size, so a large-text setting drops the
-   facepile sooner. */
-.onyx-frame .onyx-room-header-name { flex: 0 0.2 auto; min-width: 0; white-space: nowrap; }
+/* Room header, any width: the facepile steps aside while the column is
+   narrow (the topic already gives way first). `em` follows the reader's
+   own default font size, so a large-text setting drops the facepile
+   sooner. */
 @media (max-width: 74em) {
   .onyx-frame .onyx-room-header-actions .onyx-facepile { display: none; }
 }
@@ -242,7 +240,7 @@
 .onyx-railmenu-confirm-title { margin: 0; font-size: var(--text-md); font-weight: 650; overflow-wrap: anywhere; }
 .onyx-railmenu-confirm-copy { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
 .onyx-railmenu-confirm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
-.onyx-frame .onyx-railmenu-confirm-actions button {
+.onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button {
   min-height: 40px;
   padding: 0 var(--space-3);
   font: inherit;
@@ -274,7 +272,7 @@
   .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
   .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
   .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
-  .onyx-frame .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
+  .onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
   .onyx-railmenu-head .onyx-railmenu-tile,
   .onyx-railmenu-head .onyx-railmenu-face { width: 44px; height: 44px; }
   .onyx-railmenu-title { font-size: var(--text-lg); }
@@ -283,7 +281,7 @@
 /* Two-pane widths below the dialog breakpoint (foldables open, small
    tablets): a bottom sheet the width of the list pane, not of the screen. */
 @media (min-width: 600px) and (max-width: 767.98px) {
-  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] { place-items: end center; }
+  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] { place-items: end center; justify-content: center; }
   .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] > .onyx-sheet.onyx-railmenu { width: min(420px, 100%); border-width: 1px 1px 0; }
 }
 
@@ -466,8 +464,8 @@
   .onyx-frame .onyx-room-header-icon,
   .onyx-frame .onyx-room-header .onyx-members-toggle { min-width: 44px; min-height: 44px; }
   .onyx-frame .onyx-room-header .onyx-call-join { min-height: 44px; }
-  .onyx-frame .onyx-room-topic-toggle { min-height: 32px; }
-  .onyx-frame .onyx-room-more-menu > button { min-height: 44px; font-size: var(--text-md); }
+  .onyx-frame .onyx-room-header .onyx-room-topic-toggle { min-height: 32px; }
+  .onyx-frame .onyx-room-more-menu.onyx-room-more-menu > button { min-height: 44px; font-size: var(--text-md); }
   .onyx-frame .onyx-room-more-alerts .room-notify-seg { min-height: 40px; }
 
   .onyx-frame .onyx-roster .onyx-member,
@@ -480,7 +478,7 @@
 
   .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
   .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; }
-  .onyx-frame .onyx-railmenu-confirm-actions button { min-height: 44px; }
+  .onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button { min-height: 44px; }
 }
 
 /* 6. Short windows (≤520px tall) ----------------------------------------- */
