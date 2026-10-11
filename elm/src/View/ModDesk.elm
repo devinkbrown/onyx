@@ -259,13 +259,15 @@ operDesk model =
 
 tabStrip : Model -> Html Msg
 tabStrip model =
-    div
-        [ class "oc-tabs"
-        , attribute "role" "tablist"
-        , attribute "aria-label" "Operator desk sections"
-        , attribute "data-testid" "oc-tabs"
+    div [ class "oc-tabs", attribute "data-testid" "oc-tabs" ]
+        [ div
+            [ class "oc-tablist"
+            , attribute "role" "tablist"
+            , attribute "aria-label" "Operator desk sections"
+            ]
+            (List.map (tabButton model.operConsole.tab) OperReply.sections)
         ]
-        (List.map (tabButton model.operConsole.tab) OperReply.sections)
+
 
 
 tabButton : Section -> Section -> Html Msg
