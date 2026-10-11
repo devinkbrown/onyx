@@ -528,6 +528,62 @@ suite =
                         , \_ -> Expect.equal [ TranscriptScroll { action = "message", key = "m:p1" } ] out
                         ]
                         ()
+            , test "a ?at= window that closes lands on the row nearest its moment" <|
+                \_ ->
+                    let
+                        withRows =
+                            feedAll { live | activeChannel = Just "#c", caps = [ "message-tags", "chathistory" ] }
+                                [ "@time=2026-10-10T10:00:00.000Z;msgid=t-1 :alice!u@h PRIVMSG #c :early"
+                                , "@time=2026-10-10T12:00:00.000Z;msgid=t-2 :alice!u@h PRIVMSG #c :late"
+                                ]
+
+                        -- the 11:50 moment is nearest the 12:00 row
+                        travelling =
+                            { withRows | pendingTravel = Just { target = "#c", at = 1791633000000 }, historyLoading = Set.fromList [ "#c" ] }
+
+                        ( closed, outs ) =
+                            update (WsLineReceived "@batch=ta :srv BATCH +ta chathistory #c") travelling
+                                |> (\( m, o ) -> let ( m2, o2 ) = update (WsLineReceived "@batch=ta;time=2026-10-10T11:49:00.000Z;msgid=t-3 :alice!u@h PRIVMSG #c :window") m in ( m2, o ++ o2 ))
+                                |> (\( m, o ) -> let ( m2, o2 ) = update (WsLineReceived ":srv BATCH -ta") m in ( m2, o ++ o2 ))
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing closed.pendingTravel
+                        , \_ -> Expect.equal True (List.any (\o -> case o of
+                                                                    TranscriptScroll { action } ->
+                                                                        action == "message"
+
+                                                                    _ ->
+                                                                        False
+                                                            ) outs)
+                        ]
+                        ()
+            , test "a dropped connection that clears a pending travel lands nowhere" <|
+                \_ ->
+                    let
+                        travelling =
+                            { withRows | pendingTravel = Just { target = "#c", at = 1791633000000 } }
+
+                        withRows =
+                            feedAll { live | activeChannel = Just "#c" }
+                                [ "@time=2026-10-10T10:00:00.000Z;msgid=t-1 :alice!u@h PRIVMSG #c :early"
+                                , "@time=2026-10-10T12:00:00.000Z;msgid=t-2 :alice!u@h PRIVMSG #c :late"
+                                ]
+
+                        ( dropped, outs ) =
+                            update (WsClosed { clean = False, reason = "x" }) travelling
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing dropped.pendingTravel
+                        , \_ -> Expect.equal Nothing dropped.gapConvo.landing
+                        , \_ -> Expect.equal False (List.any (\o -> case o of
+                                                                    TranscriptScroll _ ->
+                                                                        True
+
+                                                                    _ ->
+                                                                        False
+                                                            ) outs)
+                        ]
+                        ()
             , test "a landing far back pages the window to it" <|
                 \_ ->
                     let

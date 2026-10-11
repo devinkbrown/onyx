@@ -55830,14 +55830,14 @@ were hidden in this feed, and ask the scroll bridge to bring the row to
 the middle of the pane with a short pulse (and focus, unless a search
 field is driving the jump). A landing whose row is not here yet waits
 for history; one for a conversation you left is dropped. -}
-gapSettleLanding : Model -> Model -> ( Model, List Outbound )
-gapSettleLanding prior next =
+gapSettleLanding : Msg -> Model -> Model -> ( Model, List Outbound )
+gapSettleLanding msg prior next =
     let
         -- 2. a server time-travel window closed: land nearest its moment
         travelled =
             case ( prior.pendingTravel, next.pendingTravel, next.activeChannel ) of
                 ( Just pending, Nothing, Just active ) ->
-                    if String.toLower pending.target == String.toLower active && next.gapConvo.landing == Nothing then
+                    if String.toLower pending.target == String.toLower active && next.gapConvo.landing == Nothing && not (gapIsConnectionDrop msg) then
                         case Dict.get (String.toLower active) next.channels |> Maybe.andThen (\ch -> gapNearestRow (round pending.at) ch.messages) of
                             Just row ->
                                 let
@@ -56084,7 +56084,7 @@ settleStepGapConvo msg prior ( next0, outs ) =
             gapSettleDrafts prior owned
 
         ( landed, landingOuts ) =
-            gapSettleLanding prior drafted
+            gapSettleLanding msg prior drafted
 
         ( searched, searchOuts ) =
             gapSettleSearchHit prior landed
@@ -56265,3 +56265,15 @@ gapLandOn id model =
 
         Nothing ->
             model
+
+
+{-| A dropped link also clears a pending travel; that is not a window
+closing, so nothing lands. -}
+gapIsConnectionDrop : Msg -> Bool
+gapIsConnectionDrop msg =
+    case msg of
+        WsClosed _ ->
+            True
+
+        _ ->
+            False
