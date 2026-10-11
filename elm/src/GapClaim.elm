@@ -122,7 +122,6 @@ blank =
 the App settled, and whether local history is on. -}
 type alias Ctx =
     { scope : Maybe String
-    , guest : String
     , localHistory : Bool
     }
 
@@ -319,7 +318,7 @@ scope after registration). Everything per-scope resets; the device-wide
 scopeChanged : { scope : Maybe String, guest : String } -> State -> ( State, List Effect )
 scopeChanged input state =
     if input.scope == state.scope then
-        ( { state | guest = input.guest }, [] )
+        ( state, [] )
 
     else
         case input.scope of
@@ -370,11 +369,8 @@ attachBlocker localHistory =
 
 
 update : Ctx -> Msg -> State -> ( State, List Effect )
-update ctx msg state0 =
+update ctx msg state =
     let
-        state =
-            { state0 | guest = ctx.guest }
-
         live =
             case ( ctx.scope, state.scope ) of
                 ( Just a, Just b ) ->
@@ -756,6 +752,7 @@ explainLines input =
             ]
                 ++ (if input.shared then
                         [ "Other accounts and guests that use this device won\u{2019}t see it."
+                        , sharedCaution
                         ]
 
                     else
@@ -767,11 +764,17 @@ explainLines input =
             , "Sign in first if you\u{2019}d rather keep it with your account. Nothing leaves this device."
             ]
                 ++ (if input.shared then
-                        [ "Accounts that use this device won\u{2019}t see it." ]
+                        [ "Accounts that use this device won\u{2019}t see it.", sharedCaution ]
 
                     else
                         []
                    )
+
+
+{-| On a shared device the older history may not all be the viewer's. -}
+sharedCaution : String
+sharedCaution =
+    "It may include conversations of other people who used Onyx on this device. If it isn\u{2019}t yours, delete it instead."
 
 
 {-| The result line after an attach or delete. -}

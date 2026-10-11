@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/* global IDBObjectStore, DOMException */
 /**
  * screens-gap-claim.mjs — extra screens.mjs scenarios for v3/gap-claim:
  * the Home card and the Preferences → History & data card that offer to
@@ -208,7 +209,8 @@ export default {
     await h.settle(page, 300);
     const counts = await vaultCounts(page);
     if (counts.unstamped !== 0) throw new Error(`rows left unstamped: ${counts.unstamped}`);
-    if (!counts.byOwner['["onyx","account","kn"]']) throw new Error('rows were not attached to the account scope');
+    // the pinned test endpoint is its own network, so match the account part of the scope key
+    if (!Object.keys(counts.byOwner).some((k) => k.endsWith(',"account","kn"]'))) throw new Error('rows were not attached to the account scope');
     await reveal(page, h, HOME_CARD);
     await expectNoSecret(page);
   },
@@ -219,7 +221,7 @@ export default {
     await page.waitForSelector(`${HOME_CARD} [data-testid="claim-result"]`, { timeout: 12000 });
     await h.settle(page, 300);
     const counts = await vaultCounts(page);
-    if (!counts.byOwner['["onyx","guest"]']) throw new Error('rows were not attached to the guest scope');
+    if (!Object.keys(counts.byOwner).some((k) => k.endsWith(',"guest"]'))) throw new Error('rows were not attached to the guest scope');
     await reveal(page, h, HOME_CARD);
   },
   'gc-home-deleted': async (page, h) => {

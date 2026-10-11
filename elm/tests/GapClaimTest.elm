@@ -30,7 +30,7 @@ guestKey =
 
 ctx : Ctx
 ctx =
-    { scope = Just kai, guest = guestKey, localHistory = True }
+    { scope = Just kai, localHistory = True }
 
 
 summary : Summary
@@ -508,6 +508,8 @@ suite =
                         , \_ -> Expect.equal True (String.contains "can\u{2019}t be matched to one" alone)
                         , \_ -> Expect.equal False (String.contains "Other accounts" alone)
                         , \_ -> Expect.equal True (String.contains "Other accounts and guests that use this device won\u{2019}t see it" shared)
+                        , \_ -> Expect.equal True (String.contains "If it isn\u{2019}t yours, delete it instead." shared)
+                        , \_ -> Expect.equal False (String.contains "If it isn\u{2019}t yours" alone)
                         ]
                         ()
             , test "a guest: says guest history is shared by guests on this network, and to sign in first" <|

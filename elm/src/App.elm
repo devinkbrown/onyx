@@ -54414,7 +54414,6 @@ gapGroupVerb verb nick model =
 gapClaimCtx : Model -> GapClaim.Ctx
 gapClaimCtx model =
     { scope = model.gapAccount.scope
-    , guest = gapClaimGuestScope model
     , localHistory = model.prefs.localHistory
     }
 

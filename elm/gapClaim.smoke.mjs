@@ -35,6 +35,8 @@ globalThis.IDBKeyRange = { only: (v) => ({ only: v }), bound: (lower, upper) => 
 require("./ports.js");
 const { gapClaim, gapAccount, vaultStore, outboxStore } = globalThis.OnyxPorts;
 
+const defer = globalThis.setImmediate;
+
 const KAI = '["onyx","account","kai"]';
 const LEE = '["onyx","account","lee"]';
 const GUEST = '["onyx","guest"]';
@@ -73,12 +75,12 @@ function fakeIdb(opts) {
       };
       const settle = () => {
         if (tx.done || tx.pending !== 0) return;
-        setImmediate(() => { if (!tx.done && tx.pending === 0) finish(); });
+        defer(() => { if (!tx.done && tx.pending === 0) finish(); });
       };
       const request = (compute) => {
         const req = {};
         tx.pending += 1;
-        setImmediate(() => {
+        defer(() => {
           try { req.result = compute(); } catch (err) { req.error = err; }
           if (req.error) { if (req.onerror) req.onerror({ target: req }); } else if (req.onsuccess) req.onsuccess({ target: req });
           tx.pending -= 1;
@@ -94,7 +96,7 @@ function fakeIdb(opts) {
           let i = 0;
           const step = () => {
             tx.pending += 1;
-            setImmediate(() => {
+            defer(() => {
               if (i < entries.length) {
                 const [key, value] = entries[i];
                 req.result = {

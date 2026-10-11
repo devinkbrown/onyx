@@ -62,7 +62,7 @@
 
 /* Counts, then the date range: one line when there is room, two when not. */
 .gc-facts-range::before { content: " \00B7  "; white-space: pre; }
-@container gc (max-width: 460px) {
+@container gc (max-width: 520px) {
   .gc-facts-counts,
   .gc-facts-range { display: block; }
   .gc-facts-range::before { content: none; }
@@ -155,7 +155,7 @@
 
 /* ---------- narrow card (phones, folds, the preferences sheet) ---------- */
 
-@container gc (max-width: 460px) {
+@container gc (max-width: 400px) {
   .gc-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .gc-actions > .gc-btn { width: 100%; min-width: 0; }
   /* The primary action always has the full row to itself. */
