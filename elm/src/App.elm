@@ -1049,7 +1049,9 @@ type Outbound
     | E2eeDeviceIdentityRequest
     -- v3/dmsafety
     | DmSafetyRequested { peer : String, keys : List String, owner : Maybe DeviceMemoryOwner }
-    | DmKeyAcceptRequested { peer : String, keys : List String, owner : Maybe DeviceMemoryOwner }
+    | DmKeyAcceptRequested { peer : String, keys : List String, pendingKeys : List String, pending : String, owner : Maybe DeviceMemoryOwner }
+    -- v3/gap-pwa-safety
+    | DmKeyCheckRequested { peer : String, keys : List String, owner : Maybe DeviceMemoryOwner }
     | RoomSealRequested { room : String, plaintext : String }
     | RoomOpenRequested { room : String, messageId : Int, envelope : String }
     | GroupControlInstall { channel : String, kind : String, fromAccount : String, fromDevice : String, toAccount : Maybe String, toDevice : Maybe String, payload : String, epoch : Int, signerB64 : String, localAccount : String, endpoint : Maybe String }
@@ -3194,10 +3196,13 @@ type Msg
     | DmSafetyToggle String
     | DmSafetyClose
     | DmSafetyRetry String
-    | DmSafetyResult { peer : String, keys : List String, current : Maybe String, pending : Maybe String }
-    | DmKeyAccept String
-    | DmKeyAccepted { peer : String, keys : List String, ok : Bool }
+    | DmSafetyResult { peer : String, keys : List String, current : Maybe String, pending : Maybe String, pendingKeys : List String }
+    | DmKeyAccept { peer : String, pending : String }
+    | DmKeyAccepted { peer : String, keys : List String, pendingKeys : List String, ok : Bool, trusted : Bool }
     | DmKeyKeepLocked String
+    -- v3/gap-pwa-safety
+    | DmKeyChecked { peer : String, keys : List String, status : String }
+    | PageRestored { online : Bool }
     | InviteShareOpen String
     | InviteShareClose
     | InviteShareCopy
@@ -9438,7 +9443,18 @@ foldMetadataCommand model message =
                 ( model, [] )
 
             else
-                ( applyUserMetadata model target key (Maybe.withDefault "" (List.head rest)), [] )
+                let
+                    stored =
+                        applyUserMetadata model target key (Maybe.withDefault "" (List.head rest))
+                in
+                -- v3/gap-pwa-safety: a pushed device key moves the DM
+                -- directory exactly like a 761 reply (the oracle's shared
+                -- `_applyMetadata`), so a rotation is seen without a GET.
+                if List.member (String.toLower key) [ "ocean.dm-key", "ocean.dm-keys" ] then
+                    foldMetadata stored { message | params = model.ourNick :: message.params } False
+
+                else
+                    ( stored, [] )
 
         _ ->
             ( model, [] )
@@ -10598,6 +10614,12 @@ sendComposerText model target =
         ( stopped
         , [ OutboxQueue { target = Maybe.withDefault target (composerSendTarget model target), text = model.composer } ] ++ stopOut
         )
+
+    else if not (isChannelName model target) && dmKeyChangedFor model target then
+        -- v3/gap-pwa-safety: a pending key change holds the send. The
+        -- draft stays; nothing seals toward an unreviewed key and nothing
+        -- goes out in plaintext.
+        ( { model | composerError = Just (DmSafety.keyChangeHoldCopy target) }, [] )
 
     else if not (isChannelName model target) && dmDesignated model target then
         sendDesignatedDm { model | composerError = Nothing } target
@@ -12716,12 +12738,7 @@ admitScheduledSeal model sid target envelope =
                         && List.all (\k -> Set.member k sealedSet) liveKeys
             in
             if not liveMatches then
-                ( { unsealed
-                    | peerKeyChanges = Set.insert (String.toLower seal.target) unsealed.peerKeyChanges
-                    , serviceLog =
-                        List.take maxServiceLog
-                            (("Peer key changed for " ++ seal.target ++ " — DM stays locked until re-verified.") :: unsealed.serviceLog)
-                  }
+                ( flagPeerKeyChange seal.target unsealed
                     |> (\flagged -> addToast (scheduledUncertainToast 1) flagged.nowMs flagged)
                 , []
                 )
@@ -12826,12 +12843,7 @@ rejectScheduledSeal model sid keyChanged =
 
                 flagged =
                     if keyChanged then
-                        { unsealed
-                            | peerKeyChanges = Set.insert (String.toLower seal.target) unsealed.peerKeyChanges
-                            , serviceLog =
-                                List.take maxServiceLog
-                                    (("Peer key changed for " ++ seal.target ++ " — DM stays locked until re-verified.") :: unsealed.serviceLog)
-                        }
+                        flagPeerKeyChange seal.target unsealed
 
                     else
                         unsealed
@@ -21667,8 +21679,13 @@ webPushOwner model =
 {-| Reconcile the push bit with the browser whenever the account
 owner may have changed (mirroring the oracle recovery effect: the
 bit refreshes, and recovery with intent follows from the reply).
-Signed out clears the bit with no outbound. Opt-in only: a login
-never queries push state for users who never enabled it. -}
+Signed out clears the bit with no outbound.
+
+v3/gap-pwa-safety: every signed-in owner is checked — the bit boots
+False on each page load, so gating on it meant a reload never showed
+push as on and never recovered an expired endpoint. Opt-in still
+holds: the check is a local, prompt-free read, and recovery only runs
+when ports find this owner's intent marker. -}
 requestWebPushCheck : Model -> ( Model, List Outbound )
 requestWebPushCheck model =
     let
@@ -21677,9 +21694,6 @@ requestWebPushCheck model =
     in
     if String.isEmpty owner.account then
         ( { model | webPushOn = False }, [] )
-
-    else if not model.webPushOn then
-        ( model, [] )
 
     else
         ( model, [ WebPushCheckActive owner ] )
@@ -21726,8 +21740,14 @@ foldWebPushProbed model probed =
         withProbe =
             { model | webPushSupported = Just probed.supported }
     in
-    if not model.webPushBusy || model.webPushOn then
+    if not model.webPushBusy then
         ( withProbe, [] )
+
+    else if model.webPushOn then
+        -- v3/gap-pwa-safety: an active check landed while the enable
+        -- probed (checks now run on every login/grant): push is already
+        -- on for this owner, so the toggle settles instead of sticking.
+        ( { withProbe | webPushBusy = False, webPushError = Nothing }, [] )
 
     else
         case
@@ -30819,7 +30839,7 @@ reconcileDmSafety previousActive model =
                         ( { switched
                             | dmSafety =
                                 DmSafety.markLoading stamp switched.dmSafety
-                                    |> DmSafety.foldResult { peer = stamp.peer, keys = stamp.keys, current = Nothing, pending = Nothing }
+                                    |> DmSafety.foldResult { peer = stamp.peer, keys = stamp.keys, current = Nothing, pending = Nothing, pendingKeys = [] }
                           }
                         , []
                         )
@@ -30834,18 +30854,34 @@ reconcileDmSafety previousActive model =
 
 
 {-| `acceptPeerKeyChange`: only with both exact numbers for the live
-key set, never twice in flight; re-pins the exact live set.
+key set, never twice in flight.
+
+v3/gap-pwa-safety: acceptance trusts only what the user reviewed. The
+click carries the pending number it showed, and the request names the
+evidence's pending keys (the presented keys not yet pinned) bound to
+that number; a click racing a re-render (the evidence reloaded under
+the pointer) is refused. Ports pin the still-presented trusted keys plus
+the reviewed ones — never a device added after the review.
 -}
-dmKeyAccept : Model -> String -> ( Model, List Outbound )
-dmKeyAccept model peer =
+dmKeyAccept : Model -> { peer : String, pending : String } -> ( Model, List Outbound )
+dmKeyAccept model review =
     let
         keys =
-            sealKeysFor model peer
+            sealKeysFor model review.peer
 
         key =
-            String.toLower peer
+            String.toLower review.peer
+
+        shown =
+            String.trim review.pending
+
+        reviewed =
+            DmSafety.pendingKeysFor key model.dmSafety
     in
-    if not (dmKeyChangedFor model peer) || List.isEmpty keys || not (DmSafety.evidenceReady key keys model.dmSafety) || Set.member key model.dmSafety.accepting then
+    if not (dmKeyChangedFor model key) || List.isEmpty keys || not (DmSafety.evidenceReady key keys model.dmSafety) || Set.member key model.dmSafety.accepting then
+        ( model, [] )
+
+    else if String.isEmpty shown || DmSafety.pendingNumber key model.dmSafety /= Just shown || List.isEmpty reviewed then
         ( model, [] )
 
     else
@@ -30855,7 +30891,7 @@ dmKeyAccept model peer =
 
             Just owner ->
                 ( { model | dmSafety = DmSafety.markAccepting key model.dmSafety }
-                , [ DmKeyAcceptRequested { peer = key, keys = keys, owner = Just owner } ]
+                , [ DmKeyAcceptRequested { peer = key, keys = keys, pendingKeys = reviewed, pending = shown, owner = Just owner } ]
                 )
 
 
@@ -30863,7 +30899,7 @@ dmKeyAccept model peer =
 envelopes; a failure keeps the warning with a retry; a result for a
 key set the directory has since moved past is ignored (fail closed).
 -}
-dmKeyAccepted : Model -> { peer : String, keys : List String, ok : Bool } -> ( Model, List Outbound )
+dmKeyAccepted : Model -> { peer : String, keys : List String, pendingKeys : List String, ok : Bool, trusted : Bool } -> ( Model, List Outbound )
 dmKeyAccepted model result =
     let
         key =
@@ -30878,7 +30914,7 @@ dmKeyAccepted model result =
         folded =
             { model | dmSafety = DmSafety.foldAcceptResult { peer = key, keys = result.keys, ok = result.ok, liveKeys = live } model.dmSafety }
     in
-    if result.ok && wasAccepting && result.keys == live && dmKeyChangedFor model key then
+    if result.ok && result.trusted && wasAccepting && result.keys == live && dmKeyChangedFor model key then
         let
             cleared =
                 { folded | peerKeyChanges = Set.remove key folded.peerKeyChanges }
@@ -30886,6 +30922,10 @@ dmKeyAccepted model result =
         ( cleared, pendingOpensFor cleared key )
 
     else
+        -- v3/gap-pwa-safety: a persisted acceptance that still leaves an
+        -- unreviewed key in the presented set (`trusted` False) keeps the
+        -- review up; its evidence was dropped by the fold, so it reloads
+        -- showing only the keys still pending.
         ( folded, [] )
 
 
@@ -36156,6 +36196,7 @@ settleSteps =
     [ settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
     , settleStepNav -- v3/nav
     , settleStepDmSafety -- v3/dmsafety
+    , settleStepDmKeyWatch -- v3/gap-pwa-safety
     , settleStepCalls -- v3/calls-c1
     , settleStepCallMedia -- v3/calls-c4
     , settleStepRoomMenu -- v3/frame
@@ -36208,6 +36249,148 @@ settleStepDmSafety _ prior ( m, outs ) =
             reconcileDmSafety prior.activeChannel m
     in
     ( settled, outs ++ safetyOut )
+
+
+-- v3/gap-pwa-safety
+
+
+{-| Key changes used to surface only on seal/open. Whenever the DM
+device directory moves (761 reply, 766 unset, METADATA push) every peer
+whose live key set changed gets a pure pin verdict from ports; a
+`changed` answer raises the review (`DmKeyChecked`). Our own entry and
+emptied sets are skipped; no owner, no trust namespace, no check. The
+unchanged directory is the same value, so the common path is one
+reference comparison.
+-}
+settleStepDmKeyWatch : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepDmKeyWatch _ prior ( m, outs ) =
+    ( m, outs ++ dmDirectoryChecks prior m )
+
+
+dmDirectoryChecks : Model -> Model -> List Outbound
+dmDirectoryChecks prior next =
+    if prior.dmDirectory == next.dmDirectory then
+        []
+
+    else
+        case deviceMemoryOwner next of
+            Nothing ->
+                []
+
+            Just owner ->
+                let
+                    peers =
+                        Set.fromList
+                            (Dict.keys prior.dmDirectory.primary
+                                ++ Dict.keys prior.dmDirectory.devices
+                                ++ Dict.keys next.dmDirectory.primary
+                                ++ Dict.keys next.dmDirectory.devices
+                            )
+
+                    own =
+                        String.toLower next.ourNick
+                in
+                Set.toList peers
+                    |> List.filterMap
+                        (\peer ->
+                            let
+                                after =
+                                    sealKeysFor next peer
+                            in
+                            if peer == own || List.isEmpty after || List.sort after == List.sort (sealKeysFor prior peer) then
+                                Nothing
+
+                            else
+                                Just (DmKeyCheckRequested { peer = peer, keys = after, owner = Just owner })
+                        )
+
+
+{-| The peer's name as the conversation shows it (directory keys are
+lowercased). -}
+dmPeerDisplayName : Model -> String -> String
+dmPeerDisplayName model peer =
+    case Dict.get (String.toLower peer) model.channels of
+        Just channel ->
+            channel.name
+
+        Nothing ->
+            peer
+
+
+{-| Raise the key-change review for a peer (the oracle
+`_flagPeerKeyChange`): the TOFU flag and the service-log line, plus —
+once per detected change, so repeated sends and receives never spam —
+an error toast and an Inbox row naming the peer.
+-}
+flagPeerKeyChange : String -> Model -> Model
+flagPeerKeyChange peer model =
+    let
+        key =
+            String.toLower peer
+
+        already =
+            Set.member key model.peerKeyChanges
+
+        flagged =
+            { model
+                | peerKeyChanges = Set.insert key model.peerKeyChanges
+                , serviceLog =
+                    List.take maxServiceLog
+                        (("Peer key changed for " ++ peer ++ " — DM stays locked until re-verified.") :: model.serviceLog)
+            }
+    in
+    if already then
+        flagged
+
+    else
+        addNotification
+            (addToast
+                { variant = ToastError
+                , title = DmSafety.keyChangeToastTitle
+                , description = Just (DmSafety.keyChangeNotice peer)
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                flagged.nowMs
+                flagged
+            )
+            { kind = NotifError
+            , text = DmSafety.keyChangeNotice peer
+            , from = Nothing
+            , channel = Nothing
+            , topic = Nothing
+            }
+
+
+{-| Put a held DM's text back where the user left it: the live composer
+when that conversation is open and empty, else its stored draft when
+none is kept. The hold copy explains why it did not send.
+-}
+restoreHeldDraft : String -> String -> Model -> Model
+restoreHeldDraft target text model =
+    let
+        key =
+            String.toLower target
+
+        active =
+            Maybe.map String.toLower model.activeChannel == Just key
+    in
+    if String.isEmpty (String.trim text) then
+        model
+
+    else if active then
+        if String.isEmpty (String.trim model.composer) then
+            { model | composer = text, composerError = Just (DmSafety.keyChangeHoldCopy target) }
+
+        else
+            { model | composerError = Just (DmSafety.keyChangeHoldCopy target) }
+
+    else if String.isEmpty (String.trim (Maybe.withDefault "" (Dict.get key model.composerDrafts))) then
+        { model | composerDrafts = Dict.insert key text model.composerDrafts }
+
+    else
+        model
 
 
 settleStepCalls : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -41743,6 +41926,27 @@ updateCore msg model =
         DmKeyAccepted result ->
             dmKeyAccepted model result
 
+        DmKeyChecked result ->
+            -- v3/gap-pwa-safety: a peer's directory entry moved off its
+            -- pin (761 reply or METADATA push). Only the live key set's
+            -- verdict counts; the review rises with its toast + Inbox row.
+            if result.status == "changed" && result.keys == sealKeysFor model result.peer && not (dmKeyChangedFor model result.peer) then
+                ( flagPeerKeyChange (dmPeerDisplayName model result.peer) model, [] )
+
+            else
+                ( model, [] )
+
+        PageRestored { online } ->
+            -- v3/gap-pwa-safety (oracle `installConnectPageLifecycle`): a
+            -- page back from the bfcache or a freeze redials an offline
+            -- session at once; a live socket is probed ports-side, so a
+            -- dead one closes into the normal reconnect path.
+            if model.autoReconnect && online && model.connection == Offline then
+                reconnectNow model
+
+            else
+                ( model, [] )
+
         DmKeyKeepLocked peer ->
             -- `dismissPeerKeyChange`: drop the warning WITHOUT trusting
             -- the key (the pin is untouched, so the next seal/open
@@ -42921,13 +43125,11 @@ updateCore msg model =
                             -- local plaintext kept on the row so the
                             -- ciphertext-only echo resolves against it.
                             if not liveMatches then
-                                ( { model
-                                    | pendingSeals = Dict.remove key model.pendingSeals
-                                    , peerKeyChanges = Set.insert key model.peerKeyChanges
-                                    , serviceLog =
-                                        List.take maxServiceLog
-                                            (("Peer key changed for " ++ target ++ " — DM stays locked until re-verified.") :: model.serviceLog)
-                                  }
+                                -- v3/gap-pwa-safety: the text goes back to
+                                -- the draft (held, never resent on its own).
+                                ( { model | pendingSeals = Dict.remove key model.pendingSeals }
+                                    |> flagPeerKeyChange target
+                                    |> restoreHeldDraft target text
                                 , []
                                 )
 
@@ -43033,13 +43235,17 @@ updateCore msg model =
 
                 Nothing ->
                         if keyChanged then
-                            ( { model
-                                | pendingSeals = Dict.remove (String.toLower target) model.pendingSeals
-                                , peerKeyChanges = Set.insert (String.toLower target) model.peerKeyChanges
-                                , serviceLog =
-                                    List.take maxServiceLog
-                                        (("Peer key changed for " ++ target ++ " — DM stays locked until re-verified.") :: model.serviceLog)
-                              }
+                            -- v3/gap-pwa-safety: the dropped seal's text
+                            -- returns to the draft and the send is held.
+                            let
+                                held =
+                                    Dict.get (String.toLower target) model.pendingSeals
+                                        |> Maybe.map .text
+                                        |> Maybe.withDefault ""
+                            in
+                            ( { model | pendingSeals = Dict.remove (String.toLower target) model.pendingSeals }
+                                |> flagPeerKeyChange target
+                                |> restoreHeldDraft target held
                             , []
                             )
 
@@ -43080,14 +43286,7 @@ updateCore msg model =
 
         DmOpenFailed { peer, keyChanged } ->
             if keyChanged then
-                ( { model
-                    | peerKeyChanges = Set.insert (String.toLower peer) model.peerKeyChanges
-                    , serviceLog =
-                        List.take maxServiceLog
-                            (("Peer key changed for " ++ peer ++ " — DM stays locked until re-verified.") :: model.serviceLog)
-                  }
-                , []
-                )
+                ( flagPeerKeyChange peer model, [] )
 
             else
                 ( model, [] )
@@ -46125,23 +46324,61 @@ polishNotifyAnswered model =
             toast =
                 Polish.notifyArmedToast model.notifyPermission
         in
-        ( addToast
-            { variant =
-                if toast.success then
-                    ToastSuccess
+        if firstRunArmsPush model then
+            -- v3/gap-pwa-safety (oracle `armClosedTabNotifications`):
+            -- the grant also arms closed-tab push through the one
+            -- WebPushToggle machine; its result toast ("Push on" or the
+            -- typed reason) reports the outcome instead of this one.
+            let
+                ( armed, pushOut ) =
+                    toggleWebPush dismissed
+            in
+            ( armed, out ++ pushOut )
 
-                else
-                    ToastWarning
-            , title = toast.title
-            , description = Just toast.description
-            , duration = Nothing
-            , groupKey = Just "first-run-notify"
-            , undo = Nothing
-            }
-            dismissed.nowMs
-            dismissed
-        , out
-        )
+        else
+            ( addToast
+                { variant =
+                    if toast.success then
+                        ToastSuccess
+
+                    else
+                        ToastWarning
+                , title = toast.title
+                , description = Just toast.description
+                , duration = Nothing
+                , groupKey = Just "first-run-notify"
+                , undo = Nothing
+                }
+                dismissed.nowMs
+                dismissed
+            , out
+            )
+
+
+{-| v3/gap-pwa-safety — the first-run Turn on chains closed-tab push
+only when nothing the model already knows would refuse it (granted,
+signed in, live, VAPID advertised, push off and idle). Anything else
+keeps the plain "Notifications allowed" outcome. -}
+firstRunArmsPush : Model -> Bool
+firstRunArmsPush model =
+    model.notifyPermission
+        == Notify.Granted
+        && not model.webPushOn
+        && not model.webPushBusy
+        && (case
+                Push.enableReadiness
+                    { supported = Maybe.withDefault True model.webPushSupported
+                    , account = model.accountName
+                    , connected = model.connection == Live
+                    , vapid = model.isupport.vapid
+                    }
+            of
+                Ok _ ->
+                    True
+
+                Err _ ->
+                    False
+           )
 
 
 polishSettleScrubber : Model -> ( Model, List Outbound )
