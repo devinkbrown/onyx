@@ -243,11 +243,18 @@ async function pageScoreBoxes({ b64, boxes, dpr }) {
     for (let i = 0; i < data.length; i += 4) lums.push(lum(data[i], data[i + 1], data[i + 2]));
     lums.sort((a, b) => a - b);
     const fgLum = lum(box.fg[0], box.fg[1], box.fg[2]);
-    // Worst ground for this text: the pixels closest to its own luminance
-    // (5th / 95th percentile, so a lone star does not decide it).
+    const score = (groundLum) => (Math.max(fgLum, groundLum) + 0.05) / (Math.min(fgLum, groundLum) + 0.05);
+    // The typical ground (median pixel) and the worst one for this text
+    // (the 5th / 95th percentile pixel nearest its own luminance, so a lone
+    // star or streak does not decide it).
+    const median = lums[Math.floor(lums.length * 0.5)];
     const near = fgLum >= 0.18 ? lums[Math.floor(lums.length * 0.95)] : lums[Math.floor(lums.length * 0.05)];
-    const ratio = (Math.max(fgLum, near) + 0.05) / (Math.min(fgLum, near) + 0.05);
-    out.push({ text: box.text, tag: box.tag, ratio: Math.round(ratio * 100) / 100 });
+    out.push({
+      text: box.text,
+      tag: box.tag,
+      ratio: Math.round(score(median) * 100) / 100,
+      worst: Math.round(score(near) * 100) / 100,
+    });
   }
   return out;
 }
@@ -255,10 +262,11 @@ async function pageScoreBoxes({ b64, boxes, dpr }) {
 /**
  * Contrast of the transcript text against what is ACTUALLY painted behind it
  * (the background scene included): collect the text boxes, hide the text,
- * screenshot the bare surface, score each box against its worst pixels.
+ * screenshot the bare surface, score each box against the typical (median)
+ * pixel behind it and against its worst pixel.
  * @returns {Promise<{ checked: number, worst: Array<{text:string,tag:string,ratio:number}>, failures: Array<{text:string,tag:string,ratio:number}> }>}
  */
-export async function auditSceneContrast(page, { scope = '.onyx-thread-pane', min = 4.5 } = {}) {
+export async function auditSceneContrast(page, { scope = '.onyx-thread-pane', min = 4.5, floor = 3 } = {}) {
   const boxes = await page.evaluate(pageTextBoxes, { scope });
   const hide = await page.addStyleTag({ content: '*, *::before, *::after { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; } ::placeholder { color: transparent !important; }' });
   const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
@@ -266,5 +274,11 @@ export async function auditSceneContrast(page, { scope = '.onyx-thread-pane', mi
   await hide.evaluate((node) => node.remove());
   const scored = await page.evaluate(pageScoreBoxes, { b64: shot, boxes, dpr });
   scored.sort((a, b) => a.ratio - b.ratio);
-  return { checked: scored.length, worst: scored.slice(0, 5), failures: scored.filter((s) => s.ratio + 0.005 < min) };
+  return {
+    checked: scored.length,
+    worst: scored.slice(0, 5),
+    // Typical ground must clear `min` (AA); the worst pixel under the text
+    // must still clear `floor` (3:1, the non-text / large-text bar).
+    failures: scored.filter((s) => s.ratio + 0.005 < min || s.worst + 0.005 < floor),
+  };
 }

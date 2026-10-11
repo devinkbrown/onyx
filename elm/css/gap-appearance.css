@@ -82,6 +82,12 @@
 
 :root[data-high-contrast='true'] { --focus-width: 3px; }
 
+/* The spoiler label is the only cue that content is hidden: `dim`, not the
+   metadata grey (the scene audit measures `faint` at ~3:1 on a painted
+   scene, below what an affordance deserves). */
+.shell-msg-spoiler > summary.shell-msg-spoiler-label { color: var(--onyx-dim); }
+.shell-msg-spoiler > summary.shell-msg-spoiler-label:hover { color: var(--onyx-text); }
+
 /* Placeholders follow the theme too (the browser's own grey is a fixed
    #757575: too faint on a light shell, off-palette everywhere, and it
    ignored high contrast). `faint` clears 3:1 on every surface (4.5:1 under
@@ -204,6 +210,13 @@ html { font-size: 100%; }
    Avatar.nickTint); on a light shell the same hue darkens to read AA. */
 
 :root[data-shell-scheme='light'] :is(.onyx-sender, .onyx-thread-msg-from) { filter: brightness(0.4) saturate(1.15); }
+
+/* The mention row tints the ground with --gold. On a dark ground 9% is a
+   whisper; on a light one it darkens the paper enough that accent links
+   inside it slip under AA (4.45:1), so the tint is lighter there. */
+:root[data-shell-scheme='light'] .onyx-mention { background: color-mix(in oklab, var(--gold) 6%, transparent); }
+:root[data-shell-scheme='light'] .onyx-mention:hover,
+:root[data-shell-scheme='light'] .onyx-mention:focus-within { background: color-mix(in oklab, var(--gold) 9%, transparent); }
 :root[data-shell-scheme='light'] { color-scheme: light; }
 
 /* ── 9. The background scene ──────────────────────────────────────────
@@ -232,9 +245,11 @@ html { font-size: 100%; }
 :root[data-scene='appearance'] #onyx-scene { --onyx-scene-alpha: 0.7; }
 
 :root[data-shell-scheme='light'] #onyx-scene {
-  --onyx-scene-alpha: 0.24;
+  --onyx-scene-alpha: 0.12;
   filter: invert(1) hue-rotate(180deg);
 }
+
+:root[data-shell-scheme='light'][data-scene='appearance'] #onyx-scene { --onyx-scene-alpha: 0.4; }
 
 :root[data-high-contrast='true'] #onyx-scene { --onyx-scene-alpha: 0.2; }
 @media (prefers-contrast: more) {

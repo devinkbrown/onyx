@@ -166,12 +166,14 @@ type alias Targets =
     }
 
 
-{-| Base set: WCAG AA for text (4.5), 3:1 for metadata (`faint`, the
-house budget — on every surface it can sit on, panel-2 included), no
-floor on the decorative seam. -}
+{-| Base set: WCAG AA for text (4.5) with headroom for the accent and
+secondary text (4.8: a mention row, a hover or a background scene tints
+the ground a little and must not tip them under AA), 3:1 for metadata
+(`faint`, the house budget — on every surface it can sit on, panel-2
+included), no floor on the decorative seam. -}
 baseTargets : Targets
 baseTargets =
-    { text = 4.5, dim = 4.5, faint = 3, accent = 4.5, accentInk = 4.5, status = 4.5, line = 1 }
+    { text = 4.5, dim = 4.8, faint = 3, accent = 4.8, accentInk = 4.5, status = 4.5, line = 1 }
 
 
 {-| High-contrast set: one WCAG rung up (AAA 7 for text, secondary text

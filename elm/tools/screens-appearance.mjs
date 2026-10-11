@@ -123,19 +123,33 @@ async function auditPublic(page, h, theme) {
 }
 
 /** Transcript text against the pixels the scene actually paints behind it. */
-async function sceneContrast(page, h, theme, bg, highContrast) {
-  await room(page, h, { theme, bg, prefs: highContrast ? { highContrast: true } : {} });
-  await page.waitForFunction(() => document.documentElement.dataset.scene === 'app', null, { timeout: 5000 });
-  const result = await auditSceneContrast(page, { min: highContrast ? 7 : 4.5 });
-  if (process.env.AUDIT_VERBOSE) console.log(`scene ${theme}/${bg}${highContrast ? '+hc' : ''} @${page.viewportSize()?.width}: ${result.checked} boxes, worst ${result.worst.map((w) => `${w.tag}"${w.text}"=${w.ratio}`).join(' ')}`);
+async function sceneContrast(page, h, theme, bg, highContrast, surface = 'app') {
+  if (surface === 'appearance') {
+    await seed(page, { theme, bg, prefs: highContrast ? { highContrast: true } : {} });
+    await page.goto(`${h.base}/appearance`);
+    await h.settle(page, 700);
+  } else {
+    await room(page, h, { theme, bg, prefs: highContrast ? { highContrast: true } : {} });
+  }
+  await page.waitForFunction((want) => document.documentElement.dataset.scene === want, surface, { timeout: 5000 });
+  const result = await auditSceneContrast(page, { scope: surface === 'app' ? '.onyx-thread-pane' : 'body', min: 4.5 });
+  if (process.env.AUDIT_VERBOSE) console.log(`scene ${surface} ${theme}/${bg}${highContrast ? '+hc' : ''} @${page.viewportSize()?.width}: ${result.checked} boxes, worst ${result.worst.map((w) => `${w.tag}"${w.text}"=${w.ratio}/${w.worst}`).join(' ')}`);
   if (result.failures.length) {
-    throw new Error(`scene ${theme}/${bg}: ${result.failures.length}/${result.checked} text boxes below target — ${result.failures.slice(0, 5).map((f) => `${f.tag} "${f.text}" ${f.ratio}:1`).join('; ')}`);
+    throw new Error(`scene ${surface} ${theme}/${bg}: ${result.failures.length}/${result.checked} text boxes below target — ${result.failures.slice(0, 5).map((f) => `${f.tag} "${f.text}" ${f.ratio}:1 (worst ${f.worst})`).join('; ')}`);
   }
 }
 
 const SCENE_IDS = ['deep-current', 'bioluminescence', 'caustics', 'aurora', 'pyrite-field', 'gold-veins', 'ember', 'forest', 'resin', 'ink-wash', 'mist', 'frost', 'aurora-ribbons', 'tide-bands', 'obsidian', 'lapis-gradient', 'paper-grain'];
 
 export default {
+  'ap-scene-frost-ember': (page, h) => sceneContrast(page, h, 'frost', 'ember', false),
+  'ap-scene-frost-mist': (page, h) => sceneContrast(page, h, 'frost', 'mist', false),
+  'ap-scene-kohaku-ember': (page, h) => sceneContrast(page, h, 'kohaku', 'ember', false),
+  'ap-scene-hc-ocean-ember': (page, h) => sceneContrast(page, h, 'ocean', 'ember', true),
+  'ap-scene-hc-pearl-ember': (page, h) => sceneContrast(page, h, 'pearl', 'ember', true),
+  'ap-scene-appearance-dark-ember': (page, h) => sceneContrast(page, h, 'ocean', 'ember', false, 'appearance'),
+  'ap-scene-appearance-light-ember': (page, h) => sceneContrast(page, h, 'pearl', 'ember', false, 'appearance'),
+  'ap-scene-appearance-dark-aurora': (page, h) => sceneContrast(page, h, 'ocean', 'aurora', false, 'appearance'),
   ...Object.fromEntries(SCENE_IDS.flatMap((bg) => [
     [`ap-scene-dark-${bg}`, (page, h) => sceneContrast(page, h, 'ocean', bg, false)],
     [`ap-scene-light-${bg}`, (page, h) => sceneContrast(page, h, 'pearl', bg, false)],

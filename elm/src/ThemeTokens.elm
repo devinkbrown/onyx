@@ -10,7 +10,9 @@ v3/gap-appearance — Elm-owned divergence (the Solid oracle is
 deprecated): the light looks now paint the whole shell, so Pearl's
 `--shu` / `--warn` / `--ok` and Frost's `--paper-dim` / `--paper-mute` /
 `--warn` / `--shu` / `--ok` were darkened, and Tide's, Kohaku's and
-Frost's `--paper-mute` nudged to clear 3:1 on every surface, to the
+Frost's `--paper-mute` nudged to clear 3:1 on every surface, Pearl's
+`--lapis` and Frost's `--paper-dim` nudged to clear 4.8:1 (headroom for
+tinted rows and hovers), to the
 values `ShellPalette` derives, so every built-in palette clears AA on
 its own surfaces (`ShellPaletteTest` gates all 18). Keep these on
 regeneration.
@@ -254,7 +256,7 @@ tokensFor id =
                 , ( "--stone-2", "#dbd6cc" )
                 , ( "--stone-3", "#d0cbc1" )
                 , ( "--stone-line", "#c9c2b5" )
-                , ( "--lapis", "#0065b0" )
+                , ( "--lapis", "#005fa7" )
                 , ( "--lapis-bright", "#086fbe" )
                 , ( "--lapis-deep", "#003e70" )
                 , ( "--gold", "#896100" )
@@ -626,7 +628,7 @@ tokensFor id =
                 , ( "--shu", "#be222b" )
                 , ( "--shu-bright", "#e64344" )
                 , ( "--paper", "#202b2e" )
-                , ( "--paper-dim", "#515d60" )
+                , ( "--paper-dim", "#4c575a" )
                 , ( "--paper-mute", "#65787d" )
                 , ( "--ok", "#007347" )
                 , ( "--warn", "#7b5f07" )
