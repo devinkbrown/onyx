@@ -46870,11 +46870,15 @@ authGatePortIn value model =
         "identifyRefused" ->
             ( authGateLoginFailed
                 { code =
-                    if field "reason" == "unsafe" then
-                        "UNSAFE_PASSWORD"
+                    case field "reason" of
+                        "unsafe" ->
+                            "UNSAFE_PASSWORD"
 
-                    else
-                        "NO_PASSWORD"
+                        "toolong" ->
+                            "TOO_LONG"
+
+                        _ ->
+                            "NO_PASSWORD"
                 , text = ""
                 }
                 model

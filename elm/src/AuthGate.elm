@@ -1129,6 +1129,9 @@ identifyFailCopy failure =
         "UNSAFE_PASSWORD" ->
             "This password contains a space, which two-step sign-in can't send. Use a recovery code, or reset your password."
 
+        "TOO_LONG" ->
+            "This password is too long for two-step sign-in to send. Use a recovery code, or reset your password."
+
         _ ->
             orCode failure "Sign-in failed"
 
