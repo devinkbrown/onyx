@@ -107,6 +107,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 5.1 | Moderation cockpit: room desk, invite form, current-room header (move bans out of the main column) | `ModerationCockpit` | S · **done** (v3/moddesk) |
 | 5.2 | Oper desk (broadcast / kill / rehash) + event console with filters | `OperDesk`, `OperEventConsole` | M · **done** (v3/moddesk) |
+| 5.3 | Operator console: live Event Spine feed (filter/pause/clear, rate-limited), network bans (WARD/K/D/X-lines + tests), silencing (SHUN/GAG/QUARANTINE), abuse insight (ABUSE/CLONES/SESSIONS), appeals (user + oper side), content controls (FILTER/SPAMTRAP/HOLD/POLICY/CHALLENGE), accounts admin, node controls + read-only mesh reports + audit trail | server `oper_cmd.zig` / `server.zig` (no oracle) | L · **done** (v3/gap-oper); remaining: force actions, integrations, GRANT/REVOKE, AUDIT PROOF, VHOST approvals |
 
 ## Phase 6 — Voice and video
 

@@ -83,6 +83,9 @@ import Organizer
 -- v3/moddesk
 import EventReplay
 import OperDesk
+import OperConsole -- v3/gap-oper
+import OperFeed -- v3/gap-oper
+import OperReply -- v3/gap-oper
 import NotifyCenter
 import Outbox
 import Passkey
@@ -426,6 +429,8 @@ type alias Model =
     , operDeskOpen : Bool
     , operDesk : OperDesk.Desk
     , operEventReplay : EventReplay.EventReplayFeed
+    -- v3/gap-oper
+    , operConsole : OperConsole.State
     , isAway : Bool
     , latencyMs : Maybe Int
     , latencyHistory : List Int
@@ -2957,6 +2962,8 @@ type Msg
     | OperDeskCancel
     | OperEventReplayLimit Int
     | OperEventReplayRequested
+    -- v3/gap-oper
+    | OperConsoleMsg OperConsole.Msg
     | OverrideToggleSoftIgnore String
     | OverrideSetNickColor { nick : String, color : String }
     | OverrideClearNickColor String
@@ -3595,6 +3602,7 @@ init nick url =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -4205,6 +4213,7 @@ blank =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -8729,6 +8738,10 @@ foldEvent model message =
                 , raw = message.raw
                 }
 
+        -- v3/gap-oper: operator planes feed the desk's live feed.
+        Spine.EventAsFeed draft ->
+            ( { model | operConsole = OperConsole.observeEvent (operConsoleCtx model) draft model.operConsole }, [] )
+
 
 {-| True when a DM peer is designated for E2EE and must never fall
 through to a plaintext send — the `isDmE2eeDesignated` predicate over
@@ -12403,10 +12416,18 @@ parseSlashLocal text =
         case String.split " " (String.dropLeft 1 text) of
             cmd :: rest ->
                 case String.toLower cmd of
+                    -- v3/gap-oper
+                    "appeal" ->
+                        Just ( "appeal", Nothing )
+
+                    "desk" ->
+                        Just ( "desk", slashNickArg rest )
+
                     "ignore" ->
                         Just ( "ignore", slashNickArg rest )
 
                     "unignore" ->
+
                         Just ( "unignore", slashNickArg rest )
 
                     "read" ->
@@ -15498,6 +15519,8 @@ slashCommands =
     , { name = "history", usage = "/history", description = "Open message search / history tools.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "search", usage = "/search <query>", description = "Open message search with a query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "help", usage = "/help [command]", description = "List every slash command, or describe one.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "appeal", usage = "/appeal [what happened]", description = "Ask the operators for a second look at a ban or mute.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "desk", usage = "/desk [live|bans|silence|abuse|appeals|content|network]", description = "Open the operator desk on a tab (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "broadcast", usage = "/broadcast <text>", description = "Announce to operators subscribed to ANNOUNCE (opers).", kind = SlashIrc, aliases = [ "wallops" ], insertText = Nothing, oper = True }
     , { name = "kill", usage = "/kill <nick> <reason>", description = "Disconnect someone from the network; the reason is recorded (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "rehash", usage = "/rehash", description = "Ask this node to reload its configuration (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
@@ -17643,6 +17666,13 @@ runSlashLocal model target verb nickArg =
 
         ( "event", _ ) ->
             runSlashEvent model target
+
+        -- v3/gap-oper
+        ( "appeal", _ ) ->
+            runSlashAppeal model
+
+        ( "desk", arg ) ->
+            runSlashDesk model (Maybe.withDefault "" arg)
 
         ( "broadcast", _ ) ->
             runSlashOper model "broadcast"
@@ -20353,9 +20383,11 @@ dispatchOperDesk command model =
                     | pending = Nothing
                     , lastSent = Just (OperDesk.formatWirePreview command ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs))
                 }
+            , operConsole = OperConsole.armFor (operConsoleCtx model) command.command model.operConsole -- v3/gap-oper
           }
         , [ SendLine (Wire.formatIrcLine command.command command.params) ]
         )
+
 
 
 {-| Bounded structured replay (mirroring `requestOperEventReplay`: oper
@@ -20383,8 +20415,253 @@ requestOperEventReplay model =
         )
 
 
+-- v3/gap-oper
+
+
+{-| `/appeal [text]`: open the appeal sheet, prefilled with whatever
+followed the verb. -}
+runSlashAppeal : Model -> ( Model, List Outbound )
+runSlashAppeal model =
+    let
+        text =
+            String.trim (String.dropLeft 7 (String.trim model.composer))
+
+        ( next, _ ) =
+            OperConsole.update (operConsoleCtx model) OperConsole.OpenUserAppeal model.operConsole
+
+        console =
+            if text == "" then
+                next
+
+            else
+                { next | forms = OperConsole.setField OperConsole.AppealText text next.forms }
+    in
+    ( { model | operConsole = console, composer = "" }, [] )
+
+
+{-| `/desk [tab]`: open the operator desk (opers only). -}
+runSlashDesk : Model -> String -> ( Model, List Outbound )
+runSlashDesk model target =
+    if not model.isOper then
+        ( addToast
+            { variant = ToastError
+            , title = "Operator access required"
+            , description = Just "This network grants operator status from the signed-in account."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            { model | composer = "" }
+        , []
+        )
+
+    else
+        let
+            wanted =
+                OperReply.sections
+                    |> List.filter (\s -> String.toLower (OperReply.sectionLabel s) == String.toLower (String.trim target))
+                    |> List.head
+
+            console =
+                model.operConsole
+
+            opened =
+                { model
+                    | operDeskOpen = True
+                    , composer = ""
+                    , operConsole =
+                        case wanted of
+                            Just section ->
+                                { console | tab = section }
+
+                            Nothing ->
+                                console
+                }
+
+            ( learned, lines ) =
+                OperConsole.update (operConsoleCtx opened) OperConsole.Opened opened.operConsole
+        in
+        ( { opened | operConsole = learned }, List.map SendLine lines )
+
+
+
+{-| What the operator console needs from the model. -}
+operConsoleCtx : Model -> OperConsole.Ctx
+operConsoleCtx model =
+    { live = model.connection == Live
+    , isOper = model.isOper
+    , nowMs = model.nowMs
+    }
+
+
+operConsoleStep : OperConsole.Msg -> Model -> ( Model, List Outbound )
+operConsoleStep consoleMsg model =
+    let
+        ( next, lines ) =
+            OperConsole.update (operConsoleCtx model) consoleMsg model.operConsole
+
+        focus =
+            case consoleMsg of
+                OperConsole.TabKey _ ->
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.SelectTab _ ->
+                    -- Focus brings a tab that was half off the strip into view.
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.Confirm ->
+                    -- The review closes: focus goes back to the tab, not the void.
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                OperConsole.Cancel ->
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                _ ->
+                    -- A change just staged for review: its confirm button takes focus.
+                    if model.operConsole.pending == Nothing && next.pending /= Nothing then
+                        [ PrefsFocus { id = "oc-review-confirm" } ]
+
+                    else
+                        []
+
+    in
+    ( { model | operConsole = next }, List.map SendLine lines ++ focus )
+
+
+{-| The console reads the daemon's replies after every update: opening
+the desk learns which categories this session follows, every inbound
+reply line is offered to the console (it claims only the operator
+patterns and, for a person mid-appeal, their own answer), and a closed
+socket forgets session-scoped state. -}
+settleStepOper : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOper msg prior ( m, outs ) =
+    case msg of
+        OperDeskOpen ->
+            if m.operDeskOpen && not prior.operDeskOpen then
+                let
+                    ( next, lines ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Opened m.operConsole
+                in
+                ( { m | operConsole = next }, outs ++ List.map SendLine lines )
+
+            else
+                ( m, outs )
+
+        WsLineReceived line ->
+            ( observeOperLines [ line ] m, outs )
+
+        WsBatchReceived batch ->
+            ( observeOperLines batch.lines m, outs )
+
+        WsClosed _ ->
+            let
+                ( next, _ ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Disconnected m.operConsole
+            in
+            ( { m | operConsole = next }, outs )
+
+        WsOpened _ ->
+            -- A queued appeal is the one command the daemon takes before
+            -- registration: it goes out ahead of the handshake lines.
+            let
+                ( next, lines ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Connected m.operConsole
+            in
+            ( { m | operConsole = next }, List.map SendLine lines ++ outs )
+
+        Tick _ ->
+
+            if OperConsole.anyLoading m.operConsole then
+                let
+                    ( next, _ ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Settle m.operConsole
+                in
+                ( { m | operConsole = next }, outs )
+
+            else
+                ( m, outs )
+
+        _ ->
+            ( m, outs )
+
+
+observeOperLines
+ : List String -> Model -> Model
+observeOperLines lines m =
+    let
+        asking =
+            m.operConsole.userAppeal == OperConsole.AppealSending
+    in
+    if not (m.isOper || asking) then
+        m
+
+    else
+        let
+            ctx =
+                operConsoleCtx m
+
+            fold line console =
+                if operLineCandidate line then
+                    OperConsole.observeLine ctx (Wire.parseIrcMessage line) console
+
+                else
+                    console
+        in
+        { m | operConsole = List.foldl fold m.operConsole lines }
+
+
+{-| A cheap command-token check so history bursts are not parsed twice:
+only NOTICE, FAIL, MODE and three-digit numerics can be operator
+replies. -}
+operLineCandidate : String -> Bool
+operLineCandidate line =
+    let
+        afterTags =
+            if String.startsWith "@" line then
+                String.dropLeft 1 (dropWord line)
+
+            else
+                line
+
+        afterPrefix =
+            if String.startsWith ":" afterTags then
+                dropWord afterTags
+
+            else
+                afterTags
+
+        command =
+            String.toUpper (String.left 7 (String.trim (String.left 8 afterPrefix)))
+                |> String.words
+                |> List.head
+                |> Maybe.withDefault ""
+    in
+    List.member command [ "NOTICE", "FAIL", "MODE" ]
+        || (String.length command == 3 && String.all Char.isDigit command)
+
+
+dropWord : String -> String
+dropWord text =
+    case String.indexes " " text of
+        i :: _ ->
+            String.dropLeft (i + 1) text
+
+        [] ->
+            ""
+
+
 foldAccountSessionBody : Model -> String -> Maybe ( Model, List Outbound )
 foldAccountSessionBody model body =
+
     case Session.parseSessionListLine body of
         Just row ->
             Just
@@ -39398,6 +39675,7 @@ settleSteps =
     , settleStepWatch -- v3/gap-watch
     , settleStepRemembered -- v3/rx-public
     , settleStepUserModes -- v3/gap-usermodes
+    , settleStepOper -- v3/gap-oper
     ]
 
 
@@ -46044,7 +46322,12 @@ updateCore msg model =
         OperEventReplayRequested ->
             requestOperEventReplay model
 
+        -- v3/gap-oper
+        OperConsoleMsg consoleMsg ->
+            operConsoleStep consoleMsg model
+
         OverrideToggleSoftIgnore nick ->
+
             -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
             -- owner-gated, nick-normalized, field toggled, journal
             -- saved; without an owner nothing moves).
@@ -48822,13 +49105,14 @@ slashHelpGroups oper =
     in
     [ ( "Messages", named [ "me", "msg", "notice", "ctcp", "ping" ] )
     , ( "Rooms", named [ "join", "part", "topic", "invite", "share", "kick", "ban", "unban", "op", "deop", "voice", "devoice", "mode", "modex", "stage", "event", "webhook" ] )
-    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd" ] )
+    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd", "appeal" ] )
     , ( "This device", named [ "read", "star", "unstar", "mute", "unmute", "notify", "autojoin", "unautojoin", "color", "clear", "search", "history", "export", "import", "help" ] )
     , ( "Text", named [ "shrug", "tableflip", "unflip", "lenny", "disapprove" ] )
     , ( "Advanced", named [ "quote" ] )
     ]
         ++ (if oper then
-                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe" ] ) ]
+                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe", "desk" ] ) ]
+
 
             else
                 []
@@ -48892,6 +49176,7 @@ overlayStack model =
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
+        , ( "appeal-sheet", model.operConsole.userAppealOpen, OperConsoleMsg OperConsole.CloseUserAppeal ) -- v3/gap-oper
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
         -- v3/gap-organize: folder picker, row menu, saved messages
         , ( "organize", Organizer.sheetOpen model.organize, OrganizeMsg Organizer.SheetClose )

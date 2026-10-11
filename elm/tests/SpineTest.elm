@@ -157,13 +157,28 @@ suite =
                     Expect.equal
                         (EventAsPasskey { params = [ "WEBAUTHN", "REGISTER", "challenge" ] })
                         (foldEventLine (Wire.parseIrcMessage ":s EVENT me WEBAUTHN REGISTER challenge"))
-            , test "category bodies and other planes are ignored" <|
+            , test "v3/gap-oper: operator planes feed the desk, other planes and commands are ignored" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> Expect.equal EventIgnored (foldEventLine (Wire.parseIrcMessage ":s EVENT me CONNECT alice!u@h"))
+                        [ \_ ->
+                            case foldEventLine (Wire.parseIrcMessage "@onyx_server.io/category=CONNECT;onyx_server.io/severity=info :s.example EVENT me USER CONNECT alice!u@h") of
+                                EventAsFeed draft ->
+                                    Expect.equal ( "CONNECT", "info", "USER CONNECT alice!u@h" ) ( draft.category, draft.severity, draft.text )
+
+                                other ->
+                                    Expect.fail ("expected a feed row, got " ++ Debug.toString other)
+                        , \_ ->
+                            case foldEventLine (Wire.parseIrcMessage ":s.example EVENT me OBSERVE connect bob!b@h acct=bob") of
+                                EventAsFeed draft ->
+                                    Expect.equal "OBSERVE" draft.category
+
+                                other ->
+                                    Expect.fail ("expected a feed row, got " ++ Debug.toString other)
+                        , \_ -> Expect.equal EventIgnored (foldEventLine (Wire.parseIrcMessage ":s EVENT me MEMBER JOIN #c alice"))
                         , \_ -> Expect.equal EventIgnored (foldEventLine (Wire.parseIrcMessage ":s PRIVMSG #c :hi"))
                         ]
                         ()
+
             , test "WALLOPS renders into the server log" <|
                 \_ ->
                     Expect.all
