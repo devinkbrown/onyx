@@ -1957,12 +1957,9 @@ roomAct ctx channel msg state =
                                             [ WriteProp
                                                 { channel = channel
                                                 , key = "SLOWMODE"
-                                                , value =
-                                                    if secs == 0 then
-                                                        ""
-
-                                                    else
-                                                        String.fromInt secs
+                                                -- "0" turns it off: the server's validator
+                                                -- refuses an empty value (`channelBuiltinSet`).
+                                                , value = String.fromInt secs
                                                 }
                                             ]
 
@@ -1974,12 +1971,14 @@ roomAct ctx channel msg state =
                                             [ WriteProp
                                                 { channel = channel
                                                 , key = "SLOWVOICE"
+                                                -- "0" makes voice and hosts wait; "1" (not an
+                                                -- empty value) restores their exemption.
                                                 , value =
                                                     if d.slowVoice then
                                                         "0"
 
                                                     else
-                                                        ""
+                                                        "1"
                                                 }
                                             ]
                                 in

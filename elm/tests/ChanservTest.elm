@@ -598,7 +598,7 @@ updateWire =
         , test "the welcome draft is cut at the server's 255 limit" <|
             \_ ->
                 Expect.equal 255 (String.length (Chanserv.blank |> Chanserv.update ctx (WelcomeInput (String.repeat 400 "a")) |> Tuple.first |> .drafts |> .welcome))
-        , test "slow mode writes SLOWMODE seconds and SLOWVOICE 0; off clears both" <|
+        , test "slow mode writes SLOWMODE seconds (0 is off) and SLOWVOICE 0 or 1, never an empty value" <|
             \_ ->
                 let
                     draft secs voice =
@@ -618,8 +618,12 @@ updateWire =
                             (fx (draft "60" True) Dict.empty)
                     , \_ ->
                         Expect.equal
-                            [ WriteProp { channel = "#c", key = "SLOWMODE", value = "" } ]
+                            [ WriteProp { channel = "#c", key = "SLOWMODE", value = "0" } ]
                             (fx (draft "0" False) (Dict.fromList [ ( "SLOWMODE", "30" ) ]))
+                    , \_ ->
+                        Expect.equal
+                            [ WriteProp { channel = "#c", key = "SLOWVOICE", value = "1" } ]
+                            (fx (draft "30" False) (Dict.fromList [ ( "SLOWMODE", "30" ), ( "SLOWVOICE", "0" ) ]))
                     , \_ -> Expect.equal [] (fx (draft "30" False) (Dict.fromList [ ( "SLOWMODE", "30" ) ]))
                     , \_ -> Expect.equal [] (fx (draft "86401" False) Dict.empty)
                     , \_ -> Expect.equal [] (fx (draft "-1" False) Dict.empty)
