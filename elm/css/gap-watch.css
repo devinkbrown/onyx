@@ -596,8 +596,11 @@
     gap: var(--space-2);
   }
 
-  .onyx-watch-title { flex: 0 1 auto; }
-  .onyx-watch-line { flex: 1 1 auto; min-width: 0; }
+  /* The title gives way first (it ellipsizes); the state and clock are
+     what people glance at, so they are never clipped to a fragment. */
+  .onyx-watch-heading { overflow: hidden; }
+  .onyx-watch-title { flex: 1 1 0; min-width: 6ch; }
+  .onyx-watch-line { flex: none; overflow: visible; }
   /* One line has no room for the link's host without clipping it to a
      fragment; the host stays on the Open button's name and in details. */
   .onyx-watch-line > .onyx-watch-site { display: none; }
