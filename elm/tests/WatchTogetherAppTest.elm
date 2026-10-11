@@ -129,11 +129,38 @@ reviewing =
         |> step (wt WT.EditorReview)
 
 
+{-| A value of exactly 512 bytes: the server's cap, so one more name
+cannot be published. -}
+tightValue : String
+tightValue =
+    let
+        nicks =
+            List.map (\i -> String.fromInt i ++ String.repeat 58 "n") (List.range 1 6)
+
+        build k =
+            WT.serialize
+                { title = String.repeat k "x"
+                , url = Nothing
+                , host = Just "alice"
+                , state = WT.Paused
+                , position = Just 0
+                , duration = Nothing
+                , at = Nothing
+                , participants = "alice" :: nicks
+                , handoffTo = Nothing
+                }
+    in
+    build (clamp 1 160 (512 - String.length (build 1) + 1))
+
+
 suite : Test
 suite =
     describe "v3/gap-watch App integration"
         [ describe "the preference"
-            [ test "it ships off, and the toggle writes it through the shared preference path" <|
+            [ test "the tight value really is 512 bytes" <|
+                \_ ->
+                    Expect.equal 512 (String.length tightValue)
+            , test "it ships off, and the toggle writes it through the shared preference path" <|
                 \_ ->
                     Expect.equal ( False, True, False )
                         ( blank.prefs.watchTogether
@@ -362,6 +389,90 @@ suite =
                             { reviewing | connection = Offline }
                     in
                     Expect.equal [] (propLines (Tuple.second (stepOut (wt WT.EditorConfirm) offline)))
+            ]
+        , describe "handoff, participation and ending on the card"
+            [ test "the person offered hosting sees who offered and an Accept button" <|
+                \_ ->
+                    feed room ":alice!u@h PROP #c ocean.watch :title=Night&host=alice&state=handoff&position=90&participants=alice%2Cme&handoff=me"
+                        |> step (wt WT.ToggleExpanded)
+                        |> query
+                        |> Expect.all
+                            [ Query.has [ Selector.text "alice offered you hosting." ]
+                            , Query.has [ Selector.attribute (Attr.attribute "data-testid" "watch-accept") ]
+                            , Query.has [ Selector.text "Handing over to me" ]
+                            ]
+            , test "the host with an offer out sees who is pending and can cancel, not play" <|
+                \_ ->
+                    feed room ":me!u@h PROP #c ocean.watch :title=Night&host=me&state=handoff&position=90&participants=me%2Calice&handoff=alice"
+                        |> step (wt WT.ToggleExpanded)
+                        |> query
+                        |> Expect.all
+                            [ Query.has [ Selector.text "Waiting for alice to accept hosting. Playback is paused." ]
+                            , Query.has [ Selector.attribute (Attr.attribute "data-testid" "watch-cancel-handoff") ]
+                            , \q -> Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "watch-play") ] q |> Query.count (Expect.equal 0)
+                            ]
+            , test "a participant who is not the host can leave" <|
+                \_ ->
+                    feed room ":alice!u@h PROP #c ocean.watch :title=Night&host=alice&state=paused&participants=alice%2Cme"
+                        |> step (wt WT.ToggleExpanded)
+                        |> query
+                        |> Query.has [ Selector.attribute (Attr.attribute "data-testid" "watch-leave-button") ]
+            , test "the host is told to hand hosting over instead of leaving" <|
+                \_ ->
+                    feed room ":me!u@h PROP #c ocean.watch :title=Night&host=me&state=paused&participants=me"
+                        |> step (wt WT.ToggleExpanded)
+                        |> query
+                        |> Expect.all
+                            [ Query.has [ Selector.text "Hand hosting to someone else before you leave." ]
+                            , \q -> Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "watch-leave-button") ] q |> Query.count (Expect.equal 0)
+                            ]
+            , test "when the 512 byte value has no room for another name Join is shown as full" <|
+                \_ ->
+                    feed room (":alice!u@h PROP #c ocean.watch :" ++ tightValue)
+                        |> step (wt WT.ToggleExpanded)
+                        |> query
+                        |> Expect.all
+                            [ Query.has [ Selector.text "Activity full" ]
+                            , Query.has [ Selector.text "This activity has no room for another name." ]
+                            ]
+            , test "End activity asks first; the question names the activity and how many it ends for" <|
+                \_ ->
+                    let
+                        mine =
+                            feed room ":me!u@h PROP #c ocean.watch :title=Night&host=me&state=paused&participants=me%2Calice"
+
+                        raw =
+                            Dict.get "#c" mine.props.channelProps |> Maybe.andThen (Dict.get "ocean.watch") |> Maybe.withDefault ""
+                    in
+                    mine
+                        |> step (wt WT.ToggleExpanded)
+                        |> step (wt (WT.AskEnd { channel = "#c", raw = raw, self = "me" }))
+                        |> query
+                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "watch-end-confirmation") ]
+                        |> Expect.all
+                            [ Query.has [ Selector.text "End \u{201C}Night\u{201D}?" ]
+                            , Query.has [ Selector.text "2 participants" ]
+                            , Query.has [ Selector.text "End for everyone" ]
+                            , Query.has [ Selector.text "Keep it running" ]
+                            ]
+            , test "Play on the card sends the published value, once" <|
+                \_ ->
+                    let
+                        mine =
+                            feed room ":me!u@h PROP #c ocean.watch :title=Night&host=me&state=paused&participants=me"
+                    in
+                    query mine
+                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "watch-play") ]
+                        |> Event.simulate Event.click
+                        |> Event.expect
+                            (wt
+                                (WT.Play
+                                    { channel = "#c"
+                                    , raw = "title=Night&host=me&state=paused&participants=me"
+                                    , self = "me"
+                                    }
+                                )
+                            )
             ]
         , describe "running it"
             [ test "the host plays: PROP carries state=playing with an at anchor" <|
