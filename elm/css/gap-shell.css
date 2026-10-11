@@ -55,7 +55,11 @@
   outline: none;
 }
 .gs-join-input::placeholder { color: var(--onyx-faint); }
-.gs-join-go {
+.onyx-rail .gs-join-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
   flex: none;
   min-height: 26px;
   padding: 0 var(--space-2);
@@ -68,13 +72,16 @@
   border-radius: calc(var(--radius) - 2px);
   cursor: pointer;
 }
-.gs-join-go:disabled { color: var(--onyx-faint); background: transparent; border-color: transparent; cursor: default; }
-.gs-join-go:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-rail .gs-join-go:hover:not(:disabled) { background: var(--onyx-line); }
+.onyx-rail .gs-join-go:disabled,
+.onyx-rail .gs-join-go:disabled:hover { color: var(--onyx-faint); background: transparent; border-color: transparent; cursor: default; }
+.onyx-rail .gs-join-go:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-join-error { margin: 0; font-size: var(--text-xs); color: var(--onyx-warn); overflow-wrap: anywhere; }
 
-.gs-rail-activity {
+.onyx-rail .gs-rail-activity {
   position: relative;
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
@@ -89,8 +96,8 @@
   border-radius: var(--radius);
   cursor: pointer;
 }
-.gs-rail-activity:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.gs-rail-activity:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-rail .gs-rail-activity:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-rail .gs-rail-activity:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-icon-activity { --shi: var(--gs-i-activity); width: 18px; height: 18px; }
 .gs-door-copy { display: flex; align-items: baseline; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
 .gs-door-name { font-size: var(--text-sm); font-weight: 600; color: var(--onyx-text); white-space: nowrap; }
@@ -315,7 +322,21 @@
 .gs-motd-pack-list { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); }
 .gs-motd-pack-list li { overflow-wrap: anywhere; }
 
-/* ---------- 6. Connect gate -------------------------------------------- */
+/* ---------- 6. Connect gate + recovery banner -------------------------- */
+
+/* The recovery strip now carries real reasons (offline, a kill, a ban):
+   let it wrap to two lines instead of cutting the reason at "Spammin…". */
+.onyx-reconnect-msg {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.onyx-reconnect { align-items: center; }
 
 .gs-conn-signin { align-self: flex-start; margin-top: var(--space-1); }
 
@@ -324,8 +345,9 @@
 @media (hover: none) and (pointer: coarse) {
   .gs-join-field { min-height: 44px; }
   .gs-join-input { height: 42px; font-size: 16px; }
-  .gs-join-go { min-height: 36px; padding: 0 var(--space-3); }
-  .gs-rail-activity { min-height: 44px; }
+  .onyx-rail .gs-join-field { padding-right: 2px; }
+  .onyx-rail .gs-join-go { min-height: 40px; min-width: 56px; padding: 0 var(--space-3); }
+  .onyx-rail .gs-rail-activity { min-height: 44px; }
   .gs-seg-btn { min-height: 40px; }
   .gs-motd-dismiss { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
   .gs-motd-more { min-height: 44px; }
@@ -337,7 +359,7 @@
 @media (max-width: 767.98px) {
   .gs-rail-extras { padding: var(--space-3) var(--space-4) 0; gap: var(--space-3); }
   .gs-join-input { font-size: 16px; }
-  .gs-rail-activity { min-height: 48px; padding: 0 var(--space-3); background: var(--onyx-panel); border: 1px solid var(--onyx-line); }
+  .onyx-rail .gs-rail-activity { min-height: 48px; padding: 0 var(--space-3); background: var(--onyx-panel); border: 1px solid var(--onyx-line); }
   .gs-door-name { font-size: var(--text-md); }
   .gs-door-sub { font-size: var(--text-sm); }
   .gs-act-text { font-size: var(--text-md); }
@@ -360,7 +382,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gs-rail-activity,
+  .onyx-rail .gs-rail-activity,
   .gs-seg-btn,
   .gs-btn { transition: none; }
 }

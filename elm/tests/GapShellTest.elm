@@ -550,6 +550,14 @@ replies =
                     , \_ -> Expect.equal [] (errorTexts (feedM ":s 315 kai #c :End of /WHO list." settledLive))
                     ]
                     ()
+        , test "FAIL SESSION is an inbox error, except the calm resume refusals" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal [ "no such session list" ] (errorTexts (feedM ":s FAIL SESSION LIST :no such session list" settledLive))
+                    , \_ -> Expect.equal [] (errorTexts (feedM ":s FAIL SESSION INVALID_TOKEN :stale bearer" settledLive))
+                    , \_ -> Expect.equal [] (errorTexts (feedM ":s FAIL SESSION NO_SESSION :nothing to resume" settledLive))
+                    ]
+                    ()
         , test "a +a room denial answers the join prompt" <|
             \_ ->
                 let
@@ -915,6 +923,19 @@ pure =
                     , \_ -> Expect.equal [ "e", "d" ] (GapShell.newLogEntries 3 [ "c", "b", "a" ] [ "e", "d", "c" ])
                     , \_ -> Expect.equal [] (GapShell.newLogEntries 3 [ "c", "b", "a" ] [ "c", "b", "a" ])
                     , \_ -> Expect.equal [ "x" ] (GapShell.newLogEntries 3 [ "x", "x", "y" ] [ "x", "x", "x" ])
+                    ]
+                    ()
+        , test "activity lines drop the MOTD margin and the end-of-list closers" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "Welcome to Onyx.") (GapShell.displayLine "- Welcome to Onyx.")
+                    , \_ -> Expect.equal Nothing (GapShell.displayLine "-")
+                    , \_ -> Expect.equal Nothing (GapShell.displayLine "   ")
+                    , \_ -> Expect.equal Nothing (GapShell.displayLine "#lounge End of /WHO list.")
+                    , \_ -> Expect.equal (Just "mesh: 2 nodes linked") (GapShell.displayLine "mesh: 2 nodes linked")
+                    , \_ ->
+                        Expect.equal [ "Hi" ]
+                            (List.map .text (GapShell.recordEntries 5 [ "-", "- Hi" ] []))
                     ]
                     ()
         , test "close reasons: fatal vs transient" <|

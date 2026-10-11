@@ -10802,7 +10802,7 @@ gapShellBanner model =
     else if gs.browserOffline then
         Just
             { title = "You’re offline"
-            , detail = "You’re offline. Messages you send wait on this device and go out when you’re back."
+            , detail = "You’re offline. Messages you send wait on this device until you’re back."
             , online = False
             }
 
@@ -10811,7 +10811,7 @@ gapShellBanner model =
             ( Just reason, Offline ) ->
                 Just
                     { title = "Disconnected by the server"
-                    , detail = reason ++ " Onyx won’t reconnect on its own."
+                    , detail = reason
                     , online = False
                     }
 
@@ -18691,7 +18691,18 @@ foldSessionReply model message reply =
             ( revoked, outbound )
 
         else
-            ( logged, [] )
+            -- v3/gap-shell: any other FAIL SESSION (LIST/DROP refused…)
+            -- is an inbox error, as in the oracle; the two resume
+            -- refusals above stay calm (the app just signs in afresh).
+            ( addNotification logged
+                { kind = NotifError
+                , text = boundSystemEventText errText
+                , from = Nothing
+                , channel = Nothing
+                , topic = Nothing
+                }
+            , []
+            )
 
 
 {-| Current-server NOTICE credential envelopes

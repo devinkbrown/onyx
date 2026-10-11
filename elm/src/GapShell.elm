@@ -11,6 +11,7 @@ module GapShell exposing
     , classifySasl
     , closeReason
     , decodeShellEvent
+    , displayLine
     , failureCopy
     , init
     , isFatalClose
@@ -191,7 +192,36 @@ newLogEntries cap prior after =
 recordEntries : Float -> List String -> List Entry -> List Entry
 recordEntries now fresh existing =
     List.take maxActivityEntries
-        (List.map (\line -> { atMs = now, text = line, kind = classifyEntry line }) fresh ++ existing)
+        (List.filterMap
+            (\line ->
+                Maybe.map (\text -> { atMs = now, text = text, kind = classifyEntry text }) (displayLine line)
+            )
+            fresh
+            ++ existing
+        )
+
+
+{-| What a log line shows as in Activity: MOTD lines lose their `- `
+margin (a bare `-` is a blank line, dropped), and the "End of /WHO
+list." style closers carry nothing a person needs. -}
+displayLine : String -> Maybe String
+displayLine line =
+    let
+        trimmed =
+            String.trim line
+
+        text =
+            if String.startsWith "- " trimmed then
+                String.trim (String.dropLeft 2 trimmed)
+
+            else
+                trimmed
+    in
+    if String.isEmpty text || text == "-" || String.contains "End of /" text then
+        Nothing
+
+    else
+        Just text
 
 
 {-| Kind of a log line, read from the prefixes the folds write. -}
