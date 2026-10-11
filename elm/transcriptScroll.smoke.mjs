@@ -193,3 +193,16 @@ test("wire: no ports no-ops; ports subscribe and observe the body", () => {
   policyFn({ action: "bottom", key: "#a" });
   frames.forEach((f) => f());
 });
+
+test("leaving the transcript for Home (no log) resets the shared pane to the top", () => {
+  const dom = makeDom({ heights: Array(20).fill(30) });
+  const { s } = scroller(dom);
+  s.sync();
+  assert.equal(dom.pane.scrollTop, 400);
+  dom.doc.current = null; // Home: no role=log on screen
+  s.sync();
+  assert.equal(dom.pane.scrollTop, 0);
+  assert.equal(s.state().attached, false);
+  s.sync(); // a second render with no log keeps it put
+  assert.equal(dom.pane.scrollTop, 0);
+});

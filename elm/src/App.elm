@@ -341,10 +341,11 @@ type alias Channel =
 {-| v3/rx-shell — an open sidebar row menu: the conversation it acts
 on and where it was asked for (pointer position and viewport size from
 the click / context-menu event; all zero for a keyboard press, which
-centres the menu).
+centres the menu). `leaving` is the second step of Leave room: the menu
+asks before it parts.
 -}
 type alias RailMenu =
-    { name : String, x : Float, y : Float, vw : Float, vh : Float }
+    { name : String, x : Float, y : Float, vw : Float, vh : Float, leaving : Bool }
 
 
 type alias Model =
@@ -3229,6 +3230,8 @@ type Msg
     | RailMenuOpen RailMenu
     | RailMenuClose
     | RailMarkRead String
+    | RailLeaveAsk
+    | RailLeaveCancel
     | RailLeave String
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
@@ -42062,6 +42065,21 @@ updateCore msg model =
                     recordLocalReadMarker model name
             in
             ( { marked | railMenu = Nothing }, outs )
+
+        RailLeaveAsk ->
+            case model.railMenu of
+                Just menu ->
+                    if isChannelName model menu.name then
+                        ( { model | railMenu = Just { menu | leaving = True } }, [] )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        RailLeaveCancel ->
+            ( { model | railMenu = Maybe.map (\menu -> { menu | leaving = False }) model.railMenu }, [] )
 
         RailLeave name ->
             if isChannelName model name && Dict.member (String.toLower name) model.channels then

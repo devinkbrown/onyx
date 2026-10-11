@@ -46,6 +46,10 @@
 .onyx-facepile-face + .onyx-facepile-face { margin-left: -0.3rem; }
 .onyx-facepile-face .onyx-avatar { font-size: 0.66rem; box-shadow: 0 0 0 2px var(--onyx-bg); }
 
+/* The filter's placeholder ("Find a room or person") ends in an
+   ellipsis when the sidebar is narrow instead of being cut mid-word. */
+.onyx-rail .onyx-rail-filter-input { text-overflow: ellipsis; }
+
 /* 1. Sidebar rows -------------------------------------------------------- */
 
 /* Rows are positioned so the hover actions can sit over their end. */
@@ -223,6 +227,25 @@
 }
 .onyx-railmenu-notify .room-notify-seg[aria-checked="true"] { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); font-weight: 650; }
 
+/* Leave room asks before it parts: Stay (the default focus) / Leave. */
+.onyx-railmenu-confirm { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-2) var(--space-1); }
+.onyx-railmenu-confirm-title { margin: 0; font-size: var(--text-md); font-weight: 650; overflow-wrap: anywhere; }
+.onyx-railmenu-confirm-copy { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
+.onyx-railmenu-confirm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+.onyx-railmenu-confirm-actions button {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-railmenu-confirm-cancel { color: var(--onyx-text); background: transparent; border: 1px solid var(--onyx-line); }
+.onyx-railmenu-confirm-cancel:hover { background: var(--onyx-panel-2); }
+.onyx-railmenu-confirm-leave { color: var(--onyx-bad); background: transparent; border: 1px solid var(--onyx-bad); }
+.onyx-railmenu-confirm-leave:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+
 /* Anchored at the pointer: no veil, no entrance travel, a close the
    pointer does not need (Escape and a click outside close it). */
 .onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet-backdrop { background: transparent; animation: none; }
@@ -241,9 +264,17 @@
   .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
   .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
   .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
+  .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
   .onyx-railmenu-head .onyx-railmenu-tile,
   .onyx-railmenu-head .onyx-railmenu-face { width: 44px; height: 44px; }
   .onyx-railmenu-title { font-size: var(--text-lg); }
+}
+
+/* Two-pane widths below the dialog breakpoint (foldables open, small
+   tablets): a bottom sheet the width of the list pane, not of the screen. */
+@media (min-width: 600px) and (max-width: 767.98px) {
+  .onyx-sheet-layer.onyx-railmenu-layer { place-items: end center; }
+  .onyx-sheet-layer.onyx-railmenu-layer > .onyx-sheet.onyx-railmenu { width: min(420px, 100%); border-width: 1px 1px 0; }
 }
 
 /* 2. Empty collections ---------------------------------------------------- */
@@ -439,6 +470,7 @@
 
   .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
   .onyx-railmenu-notify .room-notify-seg { min-height: 40px; }
+  .onyx-railmenu-confirm-actions button { min-height: 44px; }
 }
 
 /* 6. Short windows (≤520px tall) ----------------------------------------- */

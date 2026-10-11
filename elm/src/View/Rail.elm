@@ -699,7 +699,7 @@ rowContextMenu name =
 view can flip it near the bottom edge). -}
 point : String -> Decode.Decoder App.RailMenu
 point name =
-    Decode.map4 (\x y vw vh -> { name = name, x = x, y = y, vw = vw, vh = vh })
+    Decode.map4 (\x y vw vh -> { name = name, x = x, y = y, vw = vw, vh = vh, leaving = False })
         (Decode.oneOf [ Decode.field "clientX" Decode.float, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.field "clientY" Decode.float, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.at [ "view", "innerWidth" ] Decode.float, Decode.succeed 0 ])
@@ -821,6 +821,44 @@ railMenu model =
                         [ span [ class "onyx-shi", attribute "data-icon" icon, attribute "aria-hidden" "true" ] []
                         , span [ class "onyx-railmenu-label" ] [ text label ]
                         ]
+
+                railMenuHead =
+                    div [ class "onyx-railmenu-head" ]
+                        [ if isRoom then
+                            span [ class "onyx-rail-tile onyx-railmenu-tile", attribute "aria-hidden" "true" ] [ text (tileLetter channel.name) ]
+
+                          else
+                            span [ class "onyx-face onyx-railmenu-face", attribute "aria-hidden" "true" ] [ text (Avatar.initials channel.name) ]
+                        , div [ class "onyx-railmenu-titles" ]
+                            [ h2 [ class "onyx-railmenu-title", id (Sheet.titleId "rail-menu") ] [ text channel.name ]
+                            , p [ class "onyx-railmenu-sub" ] [ text status ]
+                            ]
+                        , Sheet.closeButton { label = "Close options", onClose = RailMenuClose, testId = Nothing, extraClass = "onyx-railmenu-close" }
+                        ]
+
+                leaveConfirm room =
+                    [ div [ class "onyx-railmenu-confirm", attribute "role" "group", attribute "aria-label" ("Leave " ++ room ++ "?") ]
+                        [ p [ class "onyx-railmenu-confirm-title" ] [ text ("Leave " ++ room ++ "?") ]
+                        , p [ class "onyx-railmenu-confirm-copy" ] [ text "You will stop receiving its messages. You can rejoin later if the room is open to you." ]
+                        , div [ class "onyx-railmenu-confirm-actions" ]
+                            [ button
+                                [ type_ "button"
+                                , class "onyx-railmenu-confirm-cancel"
+                                , attribute "data-testid" "rail-menu-leave-cancel"
+                                , Sheet.autofocus "rail-menu"
+                                , onClick RailLeaveCancel
+                                ]
+                                [ text "Stay" ]
+                            , button
+                                [ type_ "button"
+                                , class "onyx-railmenu-confirm-leave"
+                                , attribute "data-testid" "rail-menu-leave-confirm"
+                                , onClick (RailLeave room)
+                                ]
+                                [ text "Leave room" ]
+                            ]
+                        ]
+                    ]
             in
             Sheet.view
                 { scope = "rail-menu"
@@ -834,20 +872,12 @@ railMenu model =
                 , modal = True
                 , attrs = attribute "data-testid" "rail-menu" :: anchor
                 }
-                ([ div [ class "onyx-railmenu-head" ]
-                    [ if isRoom then
-                        span [ class "onyx-rail-tile onyx-railmenu-tile", attribute "aria-hidden" "true" ] [ text (tileLetter channel.name) ]
+                (railMenuHead
+                    :: (if menu.leaving && isRoom then
+                            leaveConfirm channel.name
 
-                      else
-                        span [ class "onyx-face onyx-railmenu-face", attribute "aria-hidden" "true" ] [ text (Avatar.initials channel.name) ]
-                    , div [ class "onyx-railmenu-titles" ]
-                        [ h2 [ class "onyx-railmenu-title", id (Sheet.titleId "rail-menu") ] [ text channel.name ]
-                        , p [ class "onyx-railmenu-sub" ] [ text status ]
-                        ]
-                    , Sheet.closeButton { label = "Close options", onClose = RailMenuClose, testId = Nothing, extraClass = "onyx-railmenu-close" }
-                    ]
-                 ]
-                    ++ (if isRoom then
+                        else
+                            ((if isRoom then
                             [ item "favorite"
                                 (if starred then
                                     "Remove from Favorites"
@@ -898,7 +928,7 @@ railMenu model =
                        ]
                     ++ (if isRoom then
                             [ div [ class "onyx-railmenu-notify" ] [ View.Notify.roomNotifyStrip model channel.name ]
-                            , item "leave" "Leave room" "leave" (RailLeave channel.name) [ class "onyx-railmenu-item--danger" ]
+                            , item "leave" "Leave room" "leave" RailLeaveAsk [ class "onyx-railmenu-item--danger" ]
                             ]
 
                         else
@@ -923,5 +953,6 @@ railMenu model =
                                 )
                                 [ attribute "aria-pressed" (boolAttr muted) ]
                             ]
+                       ))
                        )
                 )
