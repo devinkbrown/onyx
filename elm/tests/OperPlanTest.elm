@@ -156,7 +156,10 @@ suite =
                 \_ -> Expect.equal True (isErr (OperPlan.plan (Quarantine { nick = "bob", channel = "quarantine", reason = "spam wave" })))
             ]
         , describe "abuse insight"
-            [ test "ABUSE and CLONES" <|
+            [ test "USERIP is a read" <|
+                \_ -> Expect.equal (Ok ( "USERIP bob", False )) (OperPlan.plan (UserIp "bob") |> Result.map (\c -> ( OperPlan.preview c, c.mutates )))
+            , test "ABUSE and CLONES" <|
+
                 \_ -> Expect.equal [ Ok "ABUSE bob", Ok "CLONES" ] [ line (AbuseCheck "bob"), line ClonesScan ]
             , test "SESSIONS packs its filter into ONE trailing parameter" <|
                 \_ ->

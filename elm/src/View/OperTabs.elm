@@ -755,7 +755,16 @@ abuseTab model =
                                 )
                             , button [ type_ "submit", class "oc-btn oc-btn-primary oc-btn-align", disabled (not ready || String.trim forms.abuseNick == ""), attribute "data-testid" "oc-abuse-submit" ]
                                 [ text "Check" ]
+                            , K.button_
+                                { kind = "quiet"
+                                , label = "Real address"
+                                , testId = "oc-abuse-userip"
+                                , onClick = run (UserIp forms.abuseNick)
+                                , disabled = not ready || String.trim forms.abuseNick == ""
+                                , ariaLabel = Just "Show the real, uncloaked address of this person"
+                                }
                             ]
+
                         ]
                     , case console.abuse of
                         Just abuse ->

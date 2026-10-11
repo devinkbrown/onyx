@@ -238,6 +238,14 @@ classify message =
                     _ ->
                         Nothing
 
+            "340" ->
+                case message.params of
+                    [ _, entries ] ->
+                        Just (Said { section = Abuse, text = userIpText entries })
+
+                    _ ->
+                        Nothing
+
             "382" ->
                 case List.drop 1 message.params of
                     _ :: text :: _ ->
@@ -296,7 +304,25 @@ classify message =
                 Nothing
 
 
+{-| `bob=+u@203.0.113.9 ann*=-a@198.51.100.2` → `bob is at u@203.0.113.9;
+ann is at a@198.51.100.2` (an `*` marks an operator, `+`/`-` away state). -}
+userIpText : String -> String
+userIpText entries =
+    String.words entries
+        |> List.map
+            (\token ->
+                case String.split "=" token of
+                    [ who, where_ ] ->
+                        String.replace "*" "" who ++ " is at " ++ String.dropLeft 1 where_
+
+                    _ ->
+                        token
+            )
+        |> String.join "; "
+
+
 lastParam : List String -> String
+
 lastParam params =
     Maybe.withDefault "" (List.head (List.reverse params))
 

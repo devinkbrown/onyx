@@ -254,7 +254,15 @@ suite =
                     Expect.equal (Just (Failed { command = "ACCOUNT", code = "ACCOUNT_UNKNOWN", text = "No such account" }))
                         (read ":onyx.test FAIL ACCOUNT ACCOUNT_UNKNOWN :No such account")
             ]
+        , describe "USERIP"
+            [ test "340 reads who is at which address, without the operator or away marks" <|
+                \_ ->
+                    expectReply
+                        (Said { section = Abuse, text = "bob is at u@203.0.113.9; ann is at a@198.51.100.2" })
+                        ":onyx.test 340 root :bob=+u@203.0.113.9 ann*=-a@198.51.100.2"
+            ]
         , describe "two-person rule"
+
 
             [ test "a mesh ward waits for a second operator" <|
                 \_ -> expectReply SecondOperator (notice "waiting for a second operator")

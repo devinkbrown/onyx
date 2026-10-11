@@ -270,6 +270,7 @@ type Intent
     | GagUser { nick : String, on : Bool }
     | Quarantine { nick : String, channel : String, reason : String }
     | AbuseCheck String
+    | UserIp String
     | ClonesScan
     | SessionsList SessionsForm
     | AppealsList
@@ -462,7 +463,13 @@ plan intent =
                 |> Result.map (\n -> mk Abuse "ABUSE" [ n ] Nothing ("Show why " ++ n ++ " might be throttled, shunned or flagged.") False False)
                 |> Result.mapError List.singleton
 
+        UserIp nick ->
+            nickOf nick
+                |> Result.map (\n -> mk Abuse "USERIP" [ n ] Nothing ("Show the real, uncloaked address of " ++ n ++ ".") False False)
+                |> Result.mapError List.singleton
+
         ClonesScan ->
+
             Ok (mk Abuse "CLONES" [] Nothing "Scan connected people for clone groups." False False)
 
         SessionsList form ->
