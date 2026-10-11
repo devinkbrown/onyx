@@ -5,6 +5,7 @@ module UserModes exposing
     , Held
     , Memo
     , Msg(..)
+    , Offline
     , PrivacyGroup(..)
     , PrivacyMode
     , Request
@@ -12,6 +13,15 @@ module UserModes exposing
     , State
     , Status
     , Whowas
+    , agoText
+    , deferSubmit
+    , heldPending
+    , ignoreAdded
+    , ignoreRemoved
+    , lastSeenLine
+    , offlineFor
+    , serverOnlyBlocks
+    , silencedOnServer
     , acceptAddLine
     , acceptListLine
     , acceptRemoveLine
@@ -311,6 +321,7 @@ type alias State =
     -- server-held schedules
     , deferServer : Bool
     , deferInflight : List Held
+    , deferSentAt : Float
     , deferHeld : List Held
 
     -- account autojoin
@@ -378,6 +389,7 @@ blank =
     , memoStatus = Nothing
     , deferServer = False
     , deferInflight = []
+    , deferSentAt = 0
     , deferHeld = []
     , autojoins = []
     , autojoinBuffer = []
@@ -406,6 +418,13 @@ type alias Ctx =
     , silenceLimit : Int
     , ignored : Set String
     , isChannel : String -> Bool
+
+    -- lower-case nicks whose profile (WHOIS sheet) is open: a 401 for one
+    -- of them means "offline", which is when WHOWAS/SEEN are worth asking.
+    , profileNicks : Set String
+
+    -- lower-case nicks of the open DM conversations, newest first.
+    , dmPeers : List String
     }
 
 
@@ -428,6 +447,20 @@ type Effect
 maxHeld : Int
 maxHeld =
     20
+
+
+maxApproveBatch : Int
+maxApproveBatch =
+    24
+
+
+pluralize : Int -> String -> String -> String
+pluralize n one many =
+    if n == 1 then
+        one
+
+    else
+        many
 
 
 maxRealnameLength : Int
@@ -946,6 +979,7 @@ type Msg
     | AcceptAdd
     | AcceptRemove String
     | AcceptRefresh
+    | AcceptExistingDms
     | RequestAccept String
     | RequestDismiss String
     | RequestsSeen
@@ -986,7 +1020,29 @@ update : Ctx -> Msg -> State -> ( State, List Effect )
 update ctx msg state =
     case msg of
         Loaded raw ->
-            ( decodeStored raw state, [] )
+            let
+                loaded =
+                    decodeStored raw state
+
+                pruned =
+                    { loaded | deferHeld = List.filter (heldStillPending ctx.nowMs) loaded.deferHeld }
+            in
+            if ctx.live then
+                let
+                    ( modesFixed, modeEffects ) =
+                        reassertModes ctx pruned
+
+                    nameEffects =
+                        if String.isEmpty modesFixed.realname || modesFixed.realnameLive /= Nothing then
+                            []
+
+                        else
+                            sends [ setnameLine modesFixed.realname ]
+                in
+                ( modesFixed, modeEffects ++ nameEffects )
+
+            else
+                ( pruned, [] )
 
         ToggleMode letter ->
             toggleMode ctx letter state
@@ -1024,6 +1080,31 @@ update ctx msg state =
 
             else
                 ( state, [] )
+
+        AcceptExistingDms ->
+            if not ctx.live then
+                ( { state | acceptStatus = offlineStatus }, [] )
+
+            else
+                let
+                    have =
+                        Set.fromList (List.map String.toLower state.accepts)
+
+                    fresh =
+                        ctx.dmPeers
+                            |> List.filter (\n -> not (Set.member (String.toLower n) have) && n /= "" && not (ctx.isChannel n))
+                            |> List.take maxApproveBatch
+                in
+                if List.isEmpty fresh then
+                    ( { state | acceptStatus = Just { text = "Everyone you message is already approved.", error = False } }, [] )
+
+                else
+                    ( { state
+                        | accepts = state.accepts ++ fresh
+                        , acceptStatus = Just { text = "Approved " ++ String.fromInt (List.length fresh) ++ " " ++ pluralize (List.length fresh) "person" "people" ++ " you already message.", error = False }
+                      }
+                    , List.filterMap (acceptAddLine >> Maybe.map Send) fresh ++ [ Send acceptListLine ]
+                    )
 
         RequestAccept nick ->
             if not ctx.live then
@@ -1293,7 +1374,13 @@ update ctx msg state =
                             { state | realname = clean, realnameDraft = Nothing }
                     in
                     if ctx.live then
-                        ( { saved | realnameStatus = Just savingStatus }
+                        -- The echo needs the `setname` cap; the status
+                        -- must not wait on it, so the change shows as
+                        -- saved now and a 461 flips it to an error.
+                        ( { saved
+                            | realnameLive = Just clean
+                            , realnameStatus = Just { text = "Saved. People see “" ++ clean ++ "” on your profile.", error = False }
+                          }
                         , Persist :: sends [ setnameLine clean ]
                         )
 
@@ -1309,12 +1396,15 @@ update ctx msg state =
                     ctx.nick ++ " (webchat)"
             in
             if ctx.live then
-                ( { saved | realnameStatus = Just savingStatus }
+                ( { saved
+                    | realnameLive = Just fallback
+                    , realnameStatus = Just { text = "Back to the default name.", error = False }
+                  }
                 , Persist :: sends [ setnameLine fallback ]
                 )
 
             else
-                ( { saved | realnameStatus = Just { text = "Back to the default.", error = False } }, [ Persist ] )
+                ( { saved | realnameStatus = Just { text = "Back to the default name.", error = False } }, [ Persist ] )
 
         ProfileLookup lookup ->
             profileLookup ctx lookup.nick lookup.account state
@@ -1323,9 +1413,34 @@ update ctx msg state =
             ( state, [ OpenPrivacy ] )
 
 
-savingStatus : Status
-savingStatus =
-    { text = "Saving…", error = False }
+{-| Turn back on, once per connection, the modes this browser had on
+(`wanted`) that the server's own report (`modes`) does not list.
+-}
+reassertModes : Ctx -> State -> ( State, List Effect )
+reassertModes ctx state =
+    if not state.modesKnown then
+        ( state, [] )
+
+    else
+        let
+            missing =
+                state.wanted
+                    |> Set.toList
+                    |> List.filter (\l -> not (Set.member l state.modes) && modeAvailable state l)
+        in
+        case modeLine ctx.nick missing [] of
+            Just line ->
+                ( { state | pending = Dict.fromList (List.map (\l -> ( l, True )) missing) }
+                , Send line :: sends [ modeQueryLine ctx.nick ]
+                )
+
+            Nothing ->
+                ( state, [] )
+
+
+heldStillPending : Float -> Held -> Bool
+heldStillPending nowMs held =
+    toFloat held.sendAt > nowMs - 60000
 
 
 offlineStatus : Maybe Status
@@ -1424,8 +1539,8 @@ profileLookup ctx nick account state =
                 String.toLower nick
 
             ( afterWhowas, whowasOut ) =
-                case ( state.whowasPending, whowasLine nick ) of
-                    ( Nothing, Just line ) ->
+                case ( state.whowasPending, Dict.member key state.whowas, whowasLine nick ) of
+                    ( Nothing, False, Just line ) ->
                         ( { state | whowasPending = Just key, whowasBuffer = Nothing }, [ Send line ] )
 
                     _ ->
@@ -1459,6 +1574,256 @@ askSeen account state =
 
             Nothing ->
                 ( state, [] )
+
+
+
+-- ── server-held schedule submit ───────────────────────────────────────
+
+
+deferReplyWaitMs : Float
+deferReplyWaitMs =
+    15000
+
+
+{-| Hand a send-later draft to the server (`DEFER AT`). Its reply is a bare
+NOTICE with no id, so one request is in flight at a time and answers settle
+in order; a request nobody answered stops blocking after a few seconds.
+-}
+deferSubmit : Ctx -> { channel : String, text : String, sendAt : Int } -> State -> Result String ( State, List Effect )
+deferSubmit ctx input state =
+    let
+        body =
+            String.trim input.text
+
+        busy =
+            not (List.isEmpty state.deferInflight) && ctx.nowMs - state.deferSentAt < deferReplyWaitMs
+
+        holding =
+            List.any
+                (\h -> String.toLower h.channel == String.toLower input.channel && heldStillPending ctx.nowMs h)
+                state.deferHeld
+    in
+    case ctx.account of
+        Nothing ->
+            Err "Sign in to have the server send messages for you."
+
+        Just account ->
+            if busy then
+                Err "The server is still confirming the last one. Try again in a moment."
+
+            else if toFloat input.sendAt <= ctx.nowMs then
+                Err "Pick a time in the future."
+
+            else if holding then
+                Err ("The server already holds a message for " ++ input.channel ++ " (it keeps one per room). Choose “On this device” instead.")
+
+            else
+                case deferAtLine input.sendAt input.channel body of
+                    Nothing ->
+                        Err "The server can't hold that message. Keep it on this device instead."
+
+                    Just line ->
+                        Ok
+                            ( { state
+                                | deferInflight = [ { channel = input.channel, text = body, sendAt = input.sendAt, account = account } ]
+                                , deferSentAt = ctx.nowMs
+                              }
+                            , [ Send line ]
+                            )
+
+
+{-| Held sends the server still owes (past ones have been sent). -}
+heldPending : Float -> State -> List Held
+heldPending nowMs state =
+    List.filter (heldStillPending nowMs) state.deferHeld
+
+
+
+-- ── local ignore ↔ server SILENCE ────────────────────────────────────
+
+
+{-| `/ignore`, the block menu, undo: mirror a new local block to the
+server when the person opted in (signed in, so it follows the account).
+-}
+ignoreAdded : Ctx -> String -> State -> ( State, List Effect )
+ignoreAdded ctx nick state =
+    if not state.serverIgnore || not ctx.live || ctx.account == Nothing then
+        ( state, [] )
+
+    else
+        case maskForNick nick of
+            Nothing ->
+                ( state, [] )
+
+            Just mask ->
+                if List.any (\m -> String.toLower m == String.toLower mask) state.silenced then
+                    ( state, [] )
+
+                else if silenceFull ctx state then
+                    ( { state
+                        | silenceStatus =
+                            Just
+                                { text = "The server's block list is full (" ++ String.fromInt ctx.silenceLimit ++ "). " ++ nick ++ " is blocked on this device only."
+                                , error = True
+                                }
+                      }
+                    , []
+                    )
+
+                else
+                    ( state, sends [ silenceAddLine mask ] )
+
+
+{-| An unblock also lifts the server block it was mirrored to. -}
+ignoreRemoved : Ctx -> String -> State -> ( State, List Effect )
+ignoreRemoved ctx nick state =
+    case maskForNick nick of
+        Nothing ->
+            ( state, [] )
+
+        Just mask ->
+            let
+                listed =
+                    List.any (\m -> String.toLower m == String.toLower mask) state.silenced
+            in
+            if ctx.live && (listed || (state.serverIgnore && not state.silenceKnown)) then
+                ( state, sends [ silenceRemoveLine mask ] )
+
+            else
+                ( state, [] )
+
+
+{-| Server blocks that are not "this person, any host" for a nick the
+device list already names — the rest of the list a person manages here.
+-}
+serverOnlyBlocks : Set String -> State -> List String
+serverOnlyBlocks ignored state =
+    List.filter
+        (\mask ->
+            case silencedNick mask of
+                Just nick ->
+                    not (Set.member (String.toLower nick) ignored)
+
+                Nothing ->
+                    True
+        )
+        state.silenced
+
+
+{-| Is this nick also blocked on the server? -}
+silencedOnServer : State -> String -> Bool
+silencedOnServer state nick =
+    case maskForNick nick of
+        Just mask ->
+            List.any (\m -> String.toLower m == String.toLower mask) state.silenced
+
+        Nothing ->
+            False
+
+
+
+-- ── offline profile ───────────────────────────────────────────────────
+
+
+type alias Offline =
+    { name : Maybe String
+    , account : Maybe String
+    , leftMs : Maybe Float
+    , lastSeenMs : Maybe Float
+    , loading : Bool
+    , found : Bool
+    }
+
+
+{-| What WHOWAS/SEEN have said about an offline nick, or `Nothing`
+before anyone asked. -}
+offlineFor : String -> State -> Maybe Offline
+offlineFor nick state =
+    let
+        key =
+            String.toLower nick
+    in
+    case Dict.get key state.whowas of
+        Nothing ->
+            if state.whowasPending == Just key then
+                Just { name = Nothing, account = Nothing, leftMs = Nothing, lastSeenMs = Nothing, loading = True, found = False }
+
+            else
+                Nothing
+
+        Just w ->
+            let
+                accountKey =
+                    Maybe.map String.toLower w.account
+
+                seenRecord =
+                    accountKey |> Maybe.andThen (\a -> Dict.get a state.seen)
+
+                seenLoading =
+                    case accountKey of
+                        Just a ->
+                            List.member a state.seenPending
+
+                        Nothing ->
+                            False
+            in
+            Just
+                { name = w.realname
+                , account = w.account
+                , leftMs = Maybe.map (\secs -> toFloat secs * 1000) w.signoffSecs
+                , lastSeenMs = seenRecord |> Maybe.andThen .lastSeenMs |> Maybe.map toFloat
+                , loading = seenLoading
+                , found = w.found || (seenRecord |> Maybe.map .found |> Maybe.withDefault False)
+                }
+
+
+{-| "Last seen 3 hours ago" for an offline profile, if anyone knows. -}
+lastSeenLine : Float -> Offline -> Maybe String
+lastSeenLine nowMs offline =
+    case ( offline.lastSeenMs, offline.leftMs ) of
+        ( Just seen, _ ) ->
+            Just ("Last seen " ++ agoText nowMs seen)
+
+        ( Nothing, Just left ) ->
+            Just ("Last seen " ++ agoText nowMs left)
+
+        ( Nothing, Nothing ) ->
+            Nothing
+
+
+{-| Relative age: "just now", "5 minutes ago", "3 hours ago", "2 days ago". -}
+agoText : Float -> Float -> String
+agoText nowMs thenMs =
+    let
+        secs =
+            floor (max 0 (nowMs - thenMs) / 1000)
+
+        unit n word =
+            String.fromInt n ++ " " ++ word ++ (if n == 1 then "" else "s") ++ " ago"
+    in
+    if thenMs <= 0 then
+        "a while ago"
+
+    else if secs < 45 then
+        "just now"
+
+    else if secs < 3600 then
+        unit (max 1 (secs // 60)) "minute"
+
+    else if secs < 86400 then
+        unit (secs // 3600) "hour"
+
+    else if secs < 86400 * 14 then
+        unit (secs // 86400) "day"
+
+    else if secs < 86400 * 60 then
+        unit (secs // (86400 * 7)) "week"
+
+    else if secs < 86400 * 730 then
+        unit (secs // (86400 * 30)) "month"
+
+    else
+        unit (secs // (86400 * 365)) "year"
 
 
 
@@ -1522,18 +1887,10 @@ foldWire ctx message state =
             in
             if state.reassert then
                 let
-                    missing =
-                        state.wanted
-                            |> Set.toList
-                            |> List.filter (\l -> not (Set.member l letters) && modeAvailable state l)
+                    ( reasserted, effects ) =
+                        reassertModes ctx { settled | reassert = False }
                 in
-                case modeLine ctx.nick missing [] of
-                    Just line ->
-                        done { settled | reassert = False, pending = Dict.fromList (List.map (\l -> ( l, True )) missing) }
-                            (Send line :: sends [ modeQueryLine ctx.nick ])
-
-                    Nothing ->
-                        done { settled | reassert = False } []
+                done reasserted effects
 
             else
                 done settled []
@@ -1698,6 +2055,19 @@ foldWire ctx message state =
                 Nothing ->
                     Nothing
 
+        "401" ->
+            -- `401 <me> <nick> :No such nick` for a profile that is open:
+            -- the person is offline, so ask for their last identity.
+            if Set.member (String.toLower (str 1)) ctx.profileNicks then
+                let
+                    ( asked, effects ) =
+                        profileLookup ctx (str 1) Nothing state
+                in
+                observe asked effects
+
+            else
+                Nothing
+
         "406" ->
             -- `406 <me> <nick> :There was no such nickname`
             if Just (String.toLower (str 1)) == state.whowasPending then
@@ -1741,17 +2111,7 @@ foldWire ctx message state =
             case ( message.nick, params ) of
                 ( Just nick, name :: _ ) ->
                     if isMe nick then
-                        observe
-                            { state
-                                | realnameLive = Just name
-                                , realnameStatus =
-                                    if state.realnameStatus == Just savingStatus then
-                                        Just { text = "Saved. People see “" ++ name ++ "” on your profile.", error = False }
-
-                                    else
-                                        state.realnameStatus
-                            }
-                            []
+                        observe { state | realnameLive = Just name } []
 
                     else
                         Nothing
