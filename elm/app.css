@@ -3851,8 +3851,10 @@ html { scroll-padding-block: var(--space-6); }
 .onyx-composer .shell-composer-tool--emoji[aria-expanded="true"] { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
 .onyx-newmsg-mark { color: var(--onyx-dim); }
 
-/* Under 768px: one column, the bottom nav, sheets become bottom sheets. */
-@media (max-width: 767.98px) {
+/* Under 600px (v3/rx-shell; was 768px): one column and the bottom nav.
+   From 600px the frame keeps the nav rail and a list beside the
+   conversation (css/rx-shell.css). */
+@media (max-width: 599.98px) {
   .onyx-frame {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -3892,7 +3894,10 @@ html { scroll-padding-block: var(--space-6); }
   /* The bottom nav and composer are outside the scroller; any page-
      level scroll still keeps focused rows above them (2.4.11). */
   html { scroll-padding-bottom: calc(var(--mobile-nav-h) + var(--composer-h)); }
+}
 
+/* Under 768px sheets become bottom sheets. */
+@media (max-width: 767.98px) {
   .onyx-sheet-layer,
   .onyx-sheet-layer[data-placement="side"] {
     place-items: end stretch;

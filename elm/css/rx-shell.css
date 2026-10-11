@@ -1,0 +1,607 @@
+/* v3/rx-shell — the app frame on every aspect ratio.
+
+   Loaded after the pol-* files and before ui-sheets.css. Owns the frame
+   geometry across the viewport matrix plus the shell pieces this pass
+   added (row menu, empty collections, the topbar compose glyph):
+
+     0. tokens + extra shell glyphs
+     1. sidebar rows: the overflow control, touch rows, row menu
+     2. empty Rooms / Messages collections
+     3. topbar compose; nav totals that read on every nav form
+     4. compact two-pane (600–767px: foldables open, small tablets,
+        200% zoom) — nav rail · list · conversation, not a stretched phone
+     5. touch at tablet / desktop widths (hover: none): 44px targets,
+        16px fields
+     6. short windows (≤520px tall: landscape phones, short laptops at
+        zoom) — the global bar folds into the sidebar head so the room
+        header and the bar share one 44px row
+     7. narrow phones (≤360px: SE, folded foldables)
+     8. wide screens — the reading measure (~72ch), wider rails, and a
+        max app width with a calm surround from 1960px
+     9. motion / forced colours
+
+   Phones (<600px) keep css/pol-shell.css §3. Tokens from app.css :root. */
+
+/* 0. Tokens + glyphs ----------------------------------------------------- */
+
+:root {
+  /* The conversation column: ~72ch of body text plus the avatar gutter. */
+  --convo-measure: calc(72ch + 5rem);
+  --app-max: 100vw;
+  --rx-surround: color-mix(in oklab, var(--onyx-bg) 72%, #000);
+}
+
+.onyx-shi[data-icon="check"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); }
+.onyx-shi[data-icon="leave"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4.5H6.5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1H14M10.5 12H20M16.5 8.5 20 12l-3.5 3.5'/%3E%3C/svg%3E"); }
+.onyx-shi[data-icon="bell-off"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 5.2A6 6 0 0 1 18 11v4M6 11v5.5L4.5 18H17M10 20.5a2 2 0 0 0 4 0M4 4l16 16'/%3E%3C/svg%3E"); }
+
+/* 1. Sidebar rows -------------------------------------------------------- */
+
+/* Rows are positioned so the hover actions can sit over their end. */
+.onyx-rail .onyx-rail-row,
+.onyx-rail .onyx-rail-entry { position: relative; display: flex; align-items: center; min-width: 0; }
+.onyx-rail .onyx-rail-entry > .onyx-rail-item { flex: 1 1 auto; min-width: 0; }
+
+/* The overflow control: `…` beside the star. */
+.onyx-rail .onyx-rail-more {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--onyx-faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+}
+.onyx-rail .onyx-rail-more .onyx-shi { width: 16px; height: 16px; }
+.onyx-rail .onyx-rail-more:hover,
+.onyx-rail .onyx-rail-more[aria-expanded="true"] { color: var(--onyx-text); background: var(--onyx-panel); }
+
+/* Fine pointers: star and `…` float over the row end (over the badge)
+   on hover or keyboard focus, so names keep the whole row otherwise. */
+@media (hover: hover) {
+  .onyx-rail .onyx-rail-row > .onyx-rail-star,
+  .onyx-rail .onyx-rail-row > .onyx-rail-more,
+  .onyx-rail .onyx-rail-entry > .onyx-rail-more {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity var(--dur-micro) var(--ease);
+  }
+  .onyx-rail .onyx-rail-row > .onyx-rail-more,
+  .onyx-rail .onyx-rail-entry > .onyx-rail-more { right: 4px; }
+  .onyx-rail .onyx-rail-row > .onyx-rail-star { right: 34px; }
+  .onyx-rail .onyx-rail-row:is(:hover, :focus-within, .onyx-rail-row--menu) > :is(.onyx-rail-star, .onyx-rail-more),
+  .onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) > .onyx-rail-more { opacity: 1; }
+  /* The badge yields to the actions while they show. */
+  .onyx-rail .onyx-rail-row:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-meta,
+  .onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-meta { visibility: hidden; }
+  .onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-time { visibility: hidden; }
+  .onyx-rail .onyx-rail-row:is(:hover, :focus-within) > .onyx-rail-item,
+  .onyx-rail .onyx-rail-entry:is(:hover, :focus-within) > .onyx-rail-item { color: var(--onyx-text); background: var(--onyx-panel-2); }
+  .onyx-rail .onyx-rail-row--starred .onyx-rail-item { padding-right: var(--space-2); }
+}
+
+/* Touch: the star moves into the row menu; `…` is always there. */
+@media (hover: none) {
+  .onyx-rail .onyx-rail-row > .onyx-rail-star { display: none; }
+  .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; color: var(--onyx-dim); }
+  .onyx-rail .onyx-rail-more .onyx-shi { width: 20px; height: 20px; }
+  /* A long press opens the row menu (Android) — never the iOS callout. */
+  .onyx-rail :is(.onyx-rail-row, .onyx-rail-entry) { -webkit-touch-callout: none; }
+}
+
+/* Touch rows beside a conversation: the current row's step runs under
+   its overflow control too, so the row reads as one piece. */
+@media (min-width: 600px) and (hover: none) {
+  .onyx-rail :is(.onyx-rail-row, .onyx-rail-entry):has(> .onyx-rail-active) { background: var(--onyx-panel-2); border-radius: var(--radius); }
+}
+
+/* Phone list rows: `…` sits at the row end inside the hairline. */
+@media (max-width: 599.98px) {
+  .onyx-rail .onyx-rail-row > .onyx-rail-more,
+  .onyx-rail .onyx-rail-entry > .onyx-rail-more { position: absolute; right: var(--space-1); top: 50%; transform: translateY(-50%); }
+  .onyx-rail .onyx-rail-row > .onyx-rail-item,
+  .onyx-rail .onyx-rail-entry > .onyx-rail-item { padding-right: 50px; }
+}
+
+/* The row menu: a context menu at the pointer on wide screens (the
+   view sets left / top|bottom / max-height), a centred dialog for a
+   keyboard open, a bottom sheet on phones (ui-sheets.css). */
+.onyx-sheet-layer > .onyx-sheet.onyx-railmenu {
+  width: min(320px, 100%);
+  padding: var(--space-2);
+}
+.onyx-railmenu-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-1) var(--space-1) var(--space-3) var(--space-2);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.onyx-railmenu-head .onyx-railmenu-tile,
+.onyx-railmenu-head .onyx-railmenu-face {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+}
+.onyx-railmenu-head .onyx-railmenu-tile { border-radius: calc(var(--radius) * 1.5); }
+.onyx-railmenu-head .onyx-railmenu-face { font-size: 12px; }
+.onyx-railmenu-titles { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.onyx-railmenu-title {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+.onyx-railmenu-sub { margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
+.onyx-railmenu .onyx-railmenu-close { margin: 0; }
+
+.onyx-railmenu .onyx-railmenu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  color: var(--onyx-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 18px; height: 18px; color: var(--onyx-dim); }
+.onyx-railmenu .onyx-railmenu-item:hover:not(:disabled) { background: var(--onyx-panel-2); }
+.onyx-railmenu .onyx-railmenu-item:disabled { color: var(--onyx-faint); cursor: default; }
+.onyx-railmenu .onyx-railmenu-item:disabled .onyx-shi { color: var(--onyx-faint); }
+.onyx-railmenu .onyx-railmenu-item--danger { color: var(--onyx-bad); }
+.onyx-railmenu .onyx-railmenu-item--danger .onyx-shi { color: var(--onyx-bad); }
+.onyx-railmenu .onyx-railmenu-item--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+.onyx-railmenu-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onyx-railmenu-hint { margin: 0 0 var(--space-1); padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 18px); font-size: var(--text-sm); color: var(--onyx-faint); }
+
+/* Notifications: the room's All / @ / Mute choice as a segmented row. */
+.onyx-railmenu-notify {
+  margin: var(--space-1) 0;
+  padding: var(--space-2) var(--space-3);
+  border-block: 1px solid var(--onyx-line);
+}
+.onyx-railmenu-notify .room-notify {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  padding: 0;
+  border: 0;
+}
+.onyx-railmenu-notify .room-notify-name {
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onyx-railmenu-notify .room-notify-seg {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-railmenu-notify .room-notify-seg[aria-checked="true"] { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); font-weight: 650; }
+
+/* Anchored at the pointer: no veil, no entrance travel, a close the
+   pointer does not need (Escape and a click outside close it). */
+.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet-backdrop { background: transparent; animation: none; }
+.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu {
+  position: fixed;
+  width: 272px;
+  margin: 0;
+  overflow-y: auto;
+  animation: onyx-sheet-in var(--dur-fast) var(--ease);
+}
+.onyx-railmenu-layer[data-anchored="true"] .onyx-railmenu-close { display: none; }
+.onyx-railmenu-layer[data-anchored="true"] .onyx-railmenu-head { padding-top: var(--space-1); }
+
+/* Phones: the bottom sheet's rows are thumb-sized. */
+@media (max-width: 767.98px) {
+  .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
+  .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
+  .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
+  .onyx-railmenu-head .onyx-railmenu-tile,
+  .onyx-railmenu-head .onyx-railmenu-face { width: 44px; height: 44px; }
+  .onyx-railmenu-title { font-size: var(--text-lg); }
+}
+
+/* 2. Empty collections ---------------------------------------------------- */
+
+.onyx-rail .onyx-rail-emptystate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 var(--space-2);
+  padding: var(--space-3) var(--space-2);
+}
+.onyx-rail-emptystate-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-2);
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  border-radius: calc(var(--radius) * 1.5);
+}
+.onyx-rail-emptystate-mark .onyx-shi { width: 22px; height: 22px; }
+.onyx-rail .onyx-rail-emptystate-title { margin: 0; font-size: var(--text-md); font-weight: 650; color: var(--onyx-text); }
+.onyx-rail .onyx-rail-emptystate .onyx-rail-empty { margin: 0; padding: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
+.onyx-rail-emptystate-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.onyx-rail .onyx-rail-emptystate-go,
+.onyx-rail .onyx-rail-emptystate-alt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+.onyx-rail .onyx-rail-emptystate-go { color: var(--onyx-accent-ink); background: var(--onyx-accent); border: 1px solid var(--onyx-accent); }
+.onyx-rail .onyx-rail-emptystate-go:hover { background: var(--onyx-accent); filter: brightness(1.06); }
+.onyx-rail .onyx-rail-emptystate-alt { color: var(--onyx-text); background: transparent; border: 1px solid var(--onyx-line); }
+.onyx-rail .onyx-rail-emptystate-alt:hover { background: var(--onyx-panel-2); }
+/* The empty state already offers both ways in: the foot steps aside. */
+.onyx-rail[data-collection="rooms"]:has(.onyx-rail-zero) .onyx-rail-foot { display: none; }
+
+@media (max-width: 599.98px) {
+  .onyx-rail .onyx-rail-emptystate {
+    align-items: center;
+    margin: var(--space-6) auto 0;
+    max-width: 22rem;
+    padding: var(--space-4);
+    text-align: center;
+  }
+  .onyx-rail-emptystate-mark { width: 56px; height: 56px; margin-bottom: var(--space-3); border-radius: calc(var(--radius) * 2); }
+  .onyx-rail-emptystate-mark .onyx-shi { width: 28px; height: 28px; }
+  .onyx-rail .onyx-rail-emptystate-title { font-size: var(--text-lg); }
+  .onyx-rail .onyx-rail-emptystate .onyx-rail-empty { font-size: var(--text-md); }
+  .onyx-rail-emptystate-actions { justify-content: center; margin-top: var(--space-4); }
+  .onyx-rail .onyx-rail-emptystate-go,
+  .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; padding: 0 var(--space-4); font-size: var(--text-md); }
+  .onyx-rail .onyx-rail-zero { list-style: none; }
+}
+
+/* 3. Topbar compose + nav totals ----------------------------------------- */
+
+.onyx-topbar .onyx-topbar-compose {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-topbar .onyx-topbar-compose:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-topbar .onyx-topbar-compose .onyx-shi { width: 19px; height: 19px; }
+
+/* Toasts: the dismiss is a mask glyph. */
+.onyx-toast__dismiss .onyx-shi { width: 16px; height: 16px; }
+
+/* Totals stay legible on the rail: an 11px figure on a 18px pill that
+   clears the glyph, the mention pill in the accent. */
+.onyx-primary-nav .onyx-nav-badge {
+  top: -7px;
+  left: calc(100% - 9px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+/* The rail's hover / focus label carries the total in words. */
+.onyx-primary-nav .onyx-nav-label-count { color: var(--onyx-dim); font-weight: 500; }
+
+@media (max-width: 599.98px) {
+  /* Phones keep New on the Messages page; the bar stays three glyphs. */
+  .onyx-topbar .onyx-topbar-compose { display: none; }
+  .onyx-mobile-nav .onyx-nav-badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; line-height: 18px; }
+}
+
+/* Two-pane and wider on a notched device (landscape phones, iPads):
+   the columns that run to the bottom edge clear the home indicator. */
+@media (min-width: 600px) {
+  .onyx-frame > .onyx-rail { padding-bottom: max(var(--space-4), var(--safe-bottom)); }
+  .onyx-frame > .onyx-primary-nav { padding-bottom: max(var(--space-2), var(--safe-bottom)); }
+  .onyx-frame > .onyx-roster[popover]:not(:popover-open) { padding-bottom: max(var(--space-4), var(--safe-bottom)); }
+}
+
+/* 4. Compact two-pane (600–767px) ---------------------------------------- */
+
+@media (min-width: 600px) and (max-width: 767.98px) {
+  :root {
+    --sidebar-w: clamp(216px, 36vw, 264px);
+    /* No bottom nav here: offsets that clear it collapse. */
+    --mobile-nav-h: 0px;
+  }
+
+  .onyx-frame > .onyx-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    padding: 0 var(--space-2) 0 var(--space-3);
+  }
+  .onyx-topbar .onyx-palette-kbd,
+  .onyx-topbar .onyx-ident-nick { display: none; }
+  .onyx-topbar .onyx-ident { padding: 0 var(--space-1); }
+
+  /* The conversation column is phone-width: icon-only call, search in
+     More, the topic on its own line. */
+  .onyx-frame .onyx-room-header { column-gap: var(--space-1); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); }
+  .onyx-room-header-titles { flex-direction: column; align-items: stretch; gap: 0; }
+  .onyx-frame .onyx-room-header-name { max-width: 100%; font-size: var(--text-md); line-height: 1.25; }
+  .onyx-frame .onyx-room-header-topic { font-size: var(--text-xs); line-height: 1.3; }
+  .onyx-frame .onyx-room-topic-toggle { display: none; }
+  .onyx-frame .onyx-room-header .onyx-room-privacy { display: none; }
+  .onyx-frame .onyx-room-header .onyx-search-toggle { display: none; }
+  .onyx-room-more-menu > .onyx-room-more-search { display: flex; }
+  .onyx-frame .onyx-room-header .onyx-call-join-label { display: none; }
+  .onyx-frame .onyx-room-header .onyx-call-join { justify-content: center; min-width: 40px; padding: 0; border-color: transparent; }
+  .onyx-frame .onyx-room-header .onyx-voice-chip-status { display: none; }
+
+  .onyx-rail .onyx-rail-title { padding-top: var(--space-2); font-size: var(--text-md); }
+  .onyx-rail-foot { flex-direction: column; }
+}
+
+/* Narrow sidebars (compact two-pane, short windows): the filter row's
+   New is a glyph, so the field keeps room for its words. */
+@media (min-width: 600px) and (max-width: 767.98px), (min-width: 600px) and (max-height: 520px) {
+  .onyx-rail .onyx-rail-filter .onyx-rail-new { justify-content: center; min-width: 32px; padding: 0; }
+  .onyx-rail .onyx-rail-filter .onyx-rail-new .onyx-shi { width: 18px; height: 18px; }
+  .onyx-rail-filter .onyx-rail-new-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .onyx-rail .onyx-rail-filter-unread { padding: 0 var(--space-2); }
+}
+
+/* 5. Touch at tablet / desktop widths ------------------------------------ */
+
+@media (min-width: 600px) and (hover: none) {
+  .onyx-rail .onyx-rail-item { min-height: 44px; font-size: var(--text-md); }
+  .onyx-rail .onyx-rail-dm { min-height: 52px; }
+  .onyx-frame .onyx-rail-filter-input { min-height: 40px; font-size: 16px; }
+  .onyx-rail .onyx-rail-filter-unread,
+  .onyx-rail .onyx-rail-filter-clear,
+  .onyx-rail .onyx-rail-filter .onyx-rail-new { min-height: 40px; }
+  .onyx-rail .onyx-rail-new { min-height: 36px; }
+  .onyx-rail .onyx-rail-browse { min-height: 44px; font-size: var(--text-md); }
+  .onyx-rail .onyx-rail-emptystate-go,
+  .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; }
+  .onyx-rail .onyx-rail-active::before { top: 12px; bottom: 12px; }
+
+  .onyx-primary-nav .onyx-nav-btn { width: 44px; min-height: 48px; }
+  .onyx-topbar .onyx-palette-launcher { min-height: 40px; }
+  .onyx-topbar .shell-ribbon-bell,
+  .onyx-topbar .onyx-topbar-compose { width: 44px; min-height: 44px; }
+  .onyx-topbar .onyx-ident { min-height: 44px; }
+  .onyx-room-header-icon,
+  .onyx-frame .onyx-room-header .onyx-members-toggle { min-width: 44px; min-height: 44px; }
+  .onyx-frame .onyx-room-header .onyx-call-join { min-height: 44px; }
+  .onyx-frame .onyx-room-topic-toggle { min-height: 32px; }
+  .onyx-frame .onyx-room-more-menu > button { min-height: 44px; font-size: var(--text-md); }
+  .onyx-room-more-alerts .room-notify-seg { min-height: 40px; }
+
+  .onyx-roster .onyx-member,
+  .onyx-frame .onyx-roster .onyx-mlist-main { min-height: 44px; }
+  .onyx-roster .onyx-roster-filter-input { min-height: 40px; font-size: 16px; }
+  .onyx-mlist-find,
+  .onyx-mlist-close { width: 44px; height: 44px; }
+  .onyx-mlist-group-head { min-height: 36px; }
+  .onyx-mlist-group-head > .pt-ico { opacity: 1; }
+}
+
+/* 6. Short windows (≤520px tall) ----------------------------------------- */
+
+/* Landscape phones (844×390), 200% zoom on a laptop, short windows:
+   the global bar folds into the sidebar head, so it shares one 44px
+   row with the room header and the transcript keeps the height. */
+@media (min-width: 600px) and (max-height: 520px) {
+  :root { --sidebar-w: clamp(216px, 28vw, 272px); }
+
+  .onyx-frame {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "nav notices notices notices"
+      "nav topbar  main    context"
+      "nav sidebar main    context";
+  }
+  .onyx-frame[data-calls="true"] > .onyx-topbar { grid-column: 2 / -1; }
+  .onyx-frame[data-calls="true"] > .onyx-main { grid-row: 3; }
+
+  .onyx-frame > .onyx-topbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 44px;
+    padding: 0 var(--space-1) 0 var(--space-2);
+    border-right: 1px solid var(--onyx-line);
+  }
+  .onyx-frame[data-calls="true"] > .onyx-topbar { border-right: 0; }
+  .onyx-topbar .onyx-brand,
+  .onyx-topbar .onyx-topbar-title,
+  .onyx-topbar .onyx-palette-kbd,
+  .onyx-topbar .onyx-ident-nick,
+  .onyx-topbar .onyx-ident-badge { display: none; }
+  .onyx-frame .onyx-topbar-search { flex: 1 1 auto; min-width: 0; }
+  .onyx-topbar .onyx-palette-launcher { width: 100%; min-height: 32px; }
+  .onyx-frame .onyx-topbar-global { flex: none; gap: 0; }
+  .onyx-topbar .shell-ribbon-bell,
+  .onyx-topbar .onyx-topbar-compose { width: 36px; min-height: 36px; }
+  .onyx-topbar .onyx-ident { min-height: 36px; padding: 0 2px; }
+  .onyx-topbar .onyx-moddesk-toggle { min-height: 32px; padding: 0 var(--space-2); font-size: var(--text-xs); }
+
+  /* Nav rail: tighter, still 40px targets. */
+  .onyx-frame > .onyx-primary-nav { gap: 0; padding: var(--space-1) 0 max(var(--space-1), var(--safe-bottom)); }
+  .onyx-primary-nav .onyx-nav-btn { min-height: 40px; }
+
+  /* Room header: one 44px row. */
+  .onyx-frame .onyx-room-header { min-height: 44px; padding-block: 0; }
+  .onyx-room-header-titles { flex-direction: row; align-items: baseline; }
+  .onyx-frame .onyx-room-header-name { font-size: var(--text-md); }
+  .onyx-frame .onyx-room-header .onyx-facepile { display: none; }
+  .onyx-frame .onyx-room-header-sub { display: none; }
+
+  /* The list loses its title (the rail marks the collection). */
+  .onyx-rail .onyx-rail-title { display: none; }
+  .onyx-frame .onyx-rail-filter { margin-top: var(--space-2); }
+  .onyx-rail-foot { flex-direction: row; flex-wrap: wrap; }
+  .onyx-rail .onyx-rail-foot .onyx-rail-browse { flex: 1 1 auto; }
+
+  .onyx-main > .onyx-thread-pane { padding-block: var(--space-2); }
+  .onyx-frame > .onyx-main > .onyx-composer { padding-top: var(--space-1); padding-bottom: max(var(--space-2), var(--safe-bottom)); }
+
+  /* Keyboard up: the header keeps its name, nothing else. */
+  :root[data-kb="open"] .onyx-frame .onyx-room-header { min-height: 40px; }
+  :root[data-kb="open"] .onyx-frame .onyx-room-header-topic-row { display: none; }
+
+  /* Home: less air above the fold. */
+  .onyx-home .onyx-home-inner { padding-top: var(--space-4); gap: var(--space-4); }
+}
+
+/* Short and wide enough for dialogs: the inbox drops from the bell,
+   which now sits in the sidebar head (left), not the far right. */
+@media (min-width: 768px) and (max-height: 520px) {
+  .onyx-overlays .onyx-sheet-layer[data-placement="popover"] {
+    place-items: start start;
+    padding: 46px var(--space-4) var(--space-2) calc(var(--nav-rail-w) + var(--safe-left) + var(--space-2));
+  }
+}
+
+/* Short and touch: the two 44px rows still give the thumb 44px. */
+@media (min-width: 600px) and (max-height: 520px) and (hover: none) {
+  .onyx-topbar .shell-ribbon-bell,
+  .onyx-topbar .onyx-topbar-compose { width: 40px; min-height: 44px; }
+  .onyx-topbar .onyx-palette-launcher { min-height: 36px; }
+  .onyx-primary-nav .onyx-nav-btn { min-height: 44px; }
+}
+
+/* Short phones (landscape SE): a compact bottom nav and bars. */
+@media (max-width: 599.98px) and (max-height: 520px) {
+  :root { --mobile-nav-h: 48px; }
+  .onyx-mobile-nav .onyx-nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .onyx-frame > .onyx-topbar { min-height: 44px; }
+  .onyx-frame .onyx-room-header { min-height: 44px; }
+  .onyx-frame .onyx-room-header-topic-row { display: none; }
+}
+
+/* 7. Narrow phones (≤360px) ----------------------------------------------- */
+
+@media (max-width: 360px) {
+  .onyx-frame > .onyx-topbar { padding-left: var(--space-3); }
+  .onyx-topbar .onyx-brand h1,
+  .onyx-topbar-title { font-size: var(--text-lg); }
+  .onyx-rail-foot { flex-direction: column; gap: var(--space-2); }
+  .onyx-rail .onyx-rail-browse { flex: none; width: 100%; }
+  .onyx-rail .onyx-rail-tile,
+  .onyx-rail .onyx-rail-avatar { width: 44px; height: 44px; }
+  .onyx-rail .onyx-rail-item { gap: var(--space-2); padding-inline: var(--space-3); }
+  .onyx-rail .onyx-rail-item::after { left: 68px; }
+  .onyx-rail .onyx-rail-color { left: 50px; }
+  .onyx-frame .onyx-rail-filter { padding-inline: var(--space-3); }
+  .onyx-mobile-nav .onyx-nav-glyph { width: 44px; }
+  /* Keep the name: the words get the room the key glyph took. */
+  .guest-claim-chip__icon { display: none; }
+  .guest-claim-chip .guest-claim-chip__keep { padding: 0 var(--space-2); }
+}
+
+/* 8. Wide screens --------------------------------------------------------- */
+
+/* The reading measure: the transcript and the composer keep ~72ch of
+   body text and centre in the conversation column, so lines (and the
+   hover toolbar) never run a screen away from the avatar. The pane
+   pads itself down to the measure: rows stay left-aligned inside the
+   column and the whole pane still scrolls. */
+@media (min-width: 600px) {
+  .onyx-frame > .onyx-main > .onyx-thread-pane {
+    padding-inline: max(var(--space-4), calc((100% - var(--convo-measure)) / 2));
+  }
+  .onyx-frame > .onyx-main > .onyx-composer {
+    align-self: center;
+    width: 100%;
+    max-width: calc(var(--convo-measure) + 2 * var(--space-4));
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --sidebar-w: 300px;
+    --context-w: 264px;
+  }
+  .onyx-frame > .onyx-topbar { grid-template-columns: minmax(0, 1fr) minmax(240px, 600px) minmax(0, 1fr); }
+}
+
+/* Past 1960px the app stops growing: a calm surround, the frame centred
+   with a hairline at each side. */
+@media (min-width: 1960px) {
+  :root { --app-max: 1920px; }
+  html:has(> body .onyx-frame) > body { background: var(--rx-surround); }
+  .onyx-frame {
+    max-width: var(--app-max);
+    margin-inline: auto;
+    border-inline: 1px solid var(--onyx-line);
+    background: var(--onyx-bg);
+  }
+  /* Floating things follow the frame, not the screen edge. */
+  .onyx-overlays .onyx-toaster { right: calc((100vw - var(--app-max)) / 2 + var(--space-5)); }
+  .onyx-overlays .onyx-sheet-layer[data-placement="side"] { padding-right: calc((100vw - var(--app-max)) / 2); }
+  .onyx-overlays .onyx-sheet-layer[data-placement="popover"] { padding-right: calc((100vw - var(--app-max)) / 2 + var(--space-4)); }
+}
+
+/* Big, dense screens (34" ultrawide QHD and up): type and spacing step
+   up one notch so the UI keeps its physical size. */
+@media (min-width: 2400px) and (min-height: 1300px) {
+  html:has(> body .onyx-frame) { font-size: 106.25%; }
+  :root { --sidebar-w: 320px; --context-w: 280px; --nav-rail-w: 60px; }
+}
+
+/* 9. Motion, forced colours ----------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-rail .onyx-rail-row > :is(.onyx-rail-star, .onyx-rail-more),
+  .onyx-rail .onyx-rail-entry > .onyx-rail-more { transition: none; }
+  .onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .onyx-rail .onyx-rail-more,
+  .onyx-topbar .onyx-topbar-compose { border: 1px solid ButtonText; }
+  .onyx-railmenu .onyx-railmenu-item:disabled { color: GrayText; }
+  .onyx-frame { border-inline-color: CanvasText; }
+}
