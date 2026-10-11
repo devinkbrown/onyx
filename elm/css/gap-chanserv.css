@@ -1,0 +1,271 @@
+/* v3/gap-chanserv — registered-room services and the channel-operator
+   tools: nested disclosures in Room settings, the mask-list tabs, the
+   join-refusal card with "Ask to join", the hosts' Invite action in the
+   inbox, the composer's slow-mode line.
+
+   Tokens only. The accent stays on the one primary action per surface
+   and on focus; danger is the existing --onyx-bad. Linked before
+   ui-sheets.css so the shared sheet rules (44px touch targets under
+   768px, 16px fields) still win where they overlap. */
+
+/* Room settings: nested disclosures -------------------------------------- */
+
+.cs-disclosure {
+  display: block;
+  min-width: 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+.cs-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-md);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.cs-disclosure > summary::-webkit-details-marker { display: none; }
+
+.cs-disclosure > summary::after {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  background: var(--onyx-dim);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.cs-disclosure[open] > summary::after { transform: rotate(180deg); }
+.cs-disclosure > summary:hover { background: var(--onyx-panel-2); }
+
+/* Block flow, not flex: Chromium wraps the closed content in a slot that
+   a flex gap would still pad. */
+.cs-disclosure[open] { padding-bottom: var(--space-3); }
+.cs-disclosure > :not(summary) { margin: var(--space-2) var(--space-3) 0; }
+.cs-disclosure > .rset-flags { margin-inline: var(--space-2); }
+
+.cs-subhead {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-dim);
+}
+
+.cs-rule-group + .cs-rule-group { margin-top: var(--space-2); }
+
+.cs-status { min-height: 1em; }
+.cs-status[role="status"] { color: var(--onyx-dim); }
+
+.cs-slow-form { gap: var(--space-2); }
+
+/* Mask / access rows keep their action beside the text, even on phones. */
+.rset-access-row.cs-row { flex-direction: row; align-items: center; }
+.rset-access-row.cs-row > .rset-btn { align-self: center; flex: none; }
+
+/* A pair of short inputs with words between: "5 joins per 10 seconds". */
+.cs-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-pair > .rset-input,
+.cs-pair > .rset-select { flex: 1 1 6rem; width: auto; min-width: 0; }
+.cs-pair-word { flex: none; font-size: var(--text-sm); color: var(--onyx-dim); }
+
+/* Locked rules (MLOCK): one row per rule, name left, choice right. */
+.cs-mlock { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+.cs-mlock-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8.5rem, 11rem);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cs-mlock-name { font-size: var(--text-md); overflow-wrap: anywhere; }
+
+/* Drop registration: the one irreversible step asks twice. */
+.cs-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-bad);
+  border-radius: var(--radius);
+}
+
+.cs-btn-danger {
+  color: var(--onyx-bad);
+  border-color: var(--onyx-bad);
+}
+
+.cs-btn-danger:hover { background: color-mix(in oklab, var(--onyx-bad) 14%, transparent); }
+
+/* Mask-list tabs: a segmented control that wraps rather than scrolls. */
+.cs-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 2px;
+  background: var(--onyx-panel-2);
+  border-radius: var(--radius);
+}
+
+.cs-tab {
+  flex: 1 1 auto;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cs-tab:hover { color: var(--onyx-text); }
+
+.cs-tab[aria-selected="true"] {
+  color: var(--onyx-text);
+  font-weight: 600;
+  background: var(--onyx-bg);
+  border-color: var(--onyx-line);
+}
+
+.cs-tabpanel { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+
+/* Join-refusal card: sits with the other notices under the top bar. */
+.cs-join {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  max-width: min(100%, 44rem);
+  margin: var(--space-2) var(--space-3);
+  padding: var(--space-3) calc(var(--space-3) + 28px) var(--space-3) var(--space-3);
+  color: var(--onyx-text);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+.cs-join-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-join-title { margin: 0; font-size: var(--text-md); font-weight: 650; overflow-wrap: anywhere; }
+.cs-join-body { margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); overflow-wrap: anywhere; }
+
+.cs-join-close {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.cs-join-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.cs-join-close .onyx-sheet-x { width: 14px; height: 14px; }
+
+.cs-join-actions { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+
+.cs-join-ask,
+.cs-join-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.cs-join-ask > .rset-input,
+.cs-join-key > .rset-input { flex: 1 1 11rem; width: auto; min-width: 0; }
+.cs-join-ask > .rset-btn,
+.cs-join-key > .rset-btn { align-self: auto; flex: none; min-width: 6.5rem; }
+
+/* Inside the room browser the same actions sit under its refusal line. */
+.chb-admission .cs-join-actions { margin-top: var(--space-2); }
+
+/* Inbox: the Invite action under a "X asks to join #c" row. */
+.cs-knock-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-2) calc(32px + var(--space-3) + var(--space-2));
+}
+
+.cs-knock-note { font-style: italic; min-width: 0; overflow-wrap: anywhere; }
+
+/* Composer: one quiet line while slow mode applies to you. */
+.cs-slow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 2px var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-slow-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--onyx-faint);
+}
+
+.cs-slow-wait { color: var(--onyx-text); }
+.cs-slow-wait .cs-slow-dot { background: var(--onyx-warn); }
+
+/* Touch: 44px targets wherever the finger lands, at any width. */
+@media (hover: none), (max-width: 767.98px) {
+  .cs-disclosure > summary { min-height: 44px; }
+  .cs-section :is(.rset-btn, .rset-input, .rset-select, .rset-textarea, .rset-toggle),
+  .cs-disclosure :is(.rset-btn, .rset-input, .rset-select, .rset-textarea, .rset-toggle),
+  .cs-join :is(.rset-btn, .rset-input),
+  .cs-knock-actions .rset-btn { min-height: 44px; }
+  .cs-tab { min-height: 44px; }
+  .cs-join-close { width: 44px; height: 44px; top: 0; right: 0; }
+  .cs-join { padding-right: calc(var(--space-3) + 40px); }
+  .cs-knock-actions { padding-left: var(--space-3); }
+}
+
+/* Narrow: the locked-rules rows stack, long values never push wide. */
+@media (max-width: 420px) {
+  .cs-mlock-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); padding-bottom: var(--space-1); }
+  .cs-join { margin-inline: var(--space-2); }
+}
+
+/* Landscape phones are short: the refusal card stays compact. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .cs-join { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin-block: var(--space-1); padding-block: var(--space-2); }
+  .cs-join-copy { flex: 1 1 14rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-disclosure > summary::after { transition: none; }
+}

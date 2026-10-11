@@ -45347,8 +45347,12 @@ the server sent us, `477`/`480`/`489`/`520` become the join prompt plus
 an inbox row like `471`/`473`/`474`.
 -}
 chanservJoinRefusal : Model -> Wire.IrcMessage -> ( Model, List Outbound )
-chanservJoinRefusal model message =
+chanservJoinRefusal base message =
     let
+        -- The raw numeric stays in the service log (power users, tests).
+        model =
+            logNumeric base message
+
         channel =
             Maybe.withDefault "" (secondParam message.params)
 
@@ -45383,7 +45387,7 @@ chanservJoinRefusal model message =
                 )
 
             else
-                ( logNumeric model message, [] )
+                ( model, [] )
 
         code ->
             if isChannelName model channel && (code /= "477" || String.startsWith "Cannot join" serverText) then
@@ -45406,12 +45410,25 @@ chanservJoinRefusal model message =
                 )
 
             else if code == "477" && not (String.isEmpty serverText) then
-                -- e.g. a DM to someone who only takes messages from
+                -- A direct message to someone who only takes messages from
                 -- signed-in accounts (`+R`).
-                ( addNotification model { kind = NotifError, text = serverText, from = Nothing, channel = Nothing, topic = Nothing }, [] )
+                ( addNotification model
+                    { kind = NotifError
+                    , text =
+                        if String.contains "(+R" serverText then
+                            channel ++ " only takes messages from signed-in accounts. Sign in to message them."
+
+                        else
+                            serverText
+                    , from = Nothing
+                    , channel = Nothing
+                    , topic = Nothing
+                    }
+                , []
+                )
 
             else
-                ( logNumeric model message, [] )
+                ( model, [] )
 
 
 {-| Room care "Delete room" (D7): ask the core, which drops a registered

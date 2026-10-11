@@ -1269,7 +1269,10 @@ clearOut input =
 
         kicks =
             if input.founderRank then
-                [ Send (Wire.formatIrcLine "CLEAR" [ input.channel, "USERS", reason ]) ]
+                -- No reason argument: Onyx Server re-assembles the line from
+                -- its params and drops the colon, so any reason text would
+                -- be read as an unknown option. The default reason is fine.
+                [ Send (Wire.formatIrcLine "CLEAR" [ input.channel, "USERS" ]) ]
 
             else
                 List.map (\nick -> Send (Wire.formatIrcLine "KICK" [ input.channel, nick, reason ])) input.others

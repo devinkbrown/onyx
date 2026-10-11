@@ -53,7 +53,7 @@ cs =
 
 sectionWith : String -> String -> List (Html Msg) -> Html Msg
 sectionWith key heading body =
-    section [ class "rset-section", attribute "aria-labelledby" ("chset-" ++ key ++ "-heading"), attribute "data-testid" ("chset-" ++ key) ]
+    section [ class "rset-section cs-section", attribute "aria-labelledby" ("chset-" ++ key ++ "-heading"), attribute "data-testid" ("chset-" ++ key) ]
         (h3 [ id ("chset-" ++ key ++ "-heading"), class "rset-heading" ] [ text heading ] :: body)
 
 
@@ -506,7 +506,7 @@ moreRules model ctx room =
                     [ ul [ class "rset-access-list", attribute "aria-label" "Timed rules" ]
                         (List.map
                             (\r ->
-                                li [ class "rset-access-row" ]
+                                li [ class "rset-access-row cs-row" ]
                                     [ div [ class "rset-access-meta" ]
                                         [ span [ class "rset-access-level" ] [ text (timedName r.letter) ]
                                         , span [ class "rset-hint" ] [ text ("Until " ++ clock model r.until) ]
@@ -913,7 +913,7 @@ listBlock cfg =
         [ ul [ class "rset-access-list", attribute "aria-label" cfg.label, attribute "aria-busy" (boolAttr cfg.loading) ]
             (List.map
                 (\( meta, action ) ->
-                    li [ class "rset-access-row" ]
+                    li [ class "rset-access-row cs-row" ]
                         [ div [ class "rset-access-meta" ] meta
                         , action
                         ]
