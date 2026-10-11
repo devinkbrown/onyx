@@ -44,7 +44,7 @@ function block(css, selector) {
 const props = (body) => [...body.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]).sort();
 
 test("every palette slot is bridged onto --onyx-* with a house fallback", () => {
-  assert.equal(slots.length, 12);
+  assert.equal(slots.length, 13);
   const root = block(gap, ":root {");
   for (const slot of slots) {
     assert.match(root, new RegExp(`--onyx-${slot}:\\s*var\\(--onyx-theme-${slot},\\s*#[0-9a-f]{6}\\)`), `bridge for ${slot}`);

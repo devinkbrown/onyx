@@ -24,7 +24,9 @@ enforces contrast on the way:
   - text ← `--paper`, dim ← `--paper-dim`, faint ← `--paper-mute`;
   - accent ← `--lapis`, accent-ink ← `--on-accent` / ground / text /
     black / white (the first that reads AA on the accent);
-  - warn ← `--warn`, bad ← `--danger` (→ `--shu`), success ← `--ok`.
+  - warn ← `--warn`, bad ← `--danger` (→ `--shu`), success ← `--ok`;
+    bad-ink (text on a danger fill) is the first of ground / text /
+    white / black that reads AA on the bad colour.
 
 Every foreground is then nudged in OKLCH lightness (hue and chroma
 kept, gamut-fit) until it clears its target against the worst ground
@@ -63,6 +65,7 @@ type alias Shell =
     , accentInk : String
     , warn : String
     , bad : String
+    , badInk : String
     , success : String
     }
 
@@ -74,7 +77,7 @@ type alias Slot =
 {-| Slot names in commit order (CSS suffixes). -}
 slotNames : List Slot
 slotNames =
-    [ "bg", "panel", "panel-2", "line", "text", "dim", "faint", "accent", "accent-ink", "warn", "bad", "success" ]
+    [ "bg", "panel", "panel-2", "line", "text", "dim", "faint", "accent", "accent-ink", "warn", "bad", "bad-ink", "success" ]
 
 
 {-| The palette token each slot is derived from: an anchor holds only
@@ -117,6 +120,9 @@ slotSources slot =
         "bad" ->
             [ "--danger", "--shu" ]
 
+        "bad-ink" ->
+            [ "--danger", "--shu" ]
+
         "success" ->
             [ "--ok" ]
 
@@ -144,6 +150,7 @@ anchorsFor themeId =
                 , ( "accent-ink", "#06281a" )
                 , ( "warn", "#d9a13b" )
                 , ( "bad", "#e5484d" )
+                , ( "bad-ink", "#0b0e12" )
                 , ( "success", "#46c08a" )
                 ]
 
@@ -290,6 +297,9 @@ derive input =
         bad =
             pick "bad" [ "--danger", "--shu" ] |> Maybe.withDefault house.bad |> ensure targets.status uiGrounds
 
+        badInk =
+            bestOn bad targets.accentInk [ bg, text, white, black ]
+
         success =
             pick "success" [ "--ok" ] |> Maybe.withDefault accent |> ensure targets.status uiGrounds
 
@@ -307,6 +317,7 @@ derive input =
     , accentInk = Theme.rgbToHex accentInk
     , warn = Theme.rgbToHex warn
     , bad = Theme.rgbToHex bad
+    , badInk = Theme.rgbToHex badInk
     , success = Theme.rgbToHex success
     }
 
@@ -325,6 +336,7 @@ toPairs shell =
     , ( "accent-ink", shell.accentInk )
     , ( "warn", shell.warn )
     , ( "bad", shell.bad )
+    , ( "bad-ink", shell.badInk )
     , ( "success", shell.success )
     ]
 
@@ -393,6 +405,7 @@ contrastFailures highContrast shell =
         ++ check "accent-ink" shell.accentInk targets.accentInk [ ( "accent", shell.accent ) ]
         ++ check "warn" shell.warn targets.status uiGrounds
         ++ check "bad" shell.bad targets.status uiGrounds
+        ++ check "bad-ink" shell.badInk targets.accentInk [ ( "bad", shell.bad ) ]
         ++ check "success" shell.success targets.status uiGrounds
         ++ check "line" shell.line targets.line uiGrounds
 

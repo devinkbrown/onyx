@@ -3475,7 +3475,7 @@ html, body {
 }
 .onyx-cbtn:hover { background: var(--onyx-panel-2); }
 .onyx-cbtn[aria-pressed="true"] { background: var(--onyx-text); color: var(--onyx-bg); border-color: var(--onyx-text); }
-.onyx-cbtn-leave { margin-left: 6px; background: var(--onyx-bad); border-color: var(--onyx-bad); color: #fff; }
+.onyx-cbtn-leave { margin-left: 6px; background: var(--onyx-bad); border-color: var(--onyx-bad); color: var(--onyx-bad-ink); } /* v3/gap-appearance: AA ink on the danger fill */
 .onyx-cbtn-leave:hover { background: var(--onyx-bad); }
 .onyx-cbtn-cap { line-height: 1; }
 .onyx-call-more-wrap { position: relative; }

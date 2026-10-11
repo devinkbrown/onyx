@@ -42,6 +42,7 @@ house =
     , accentInk = "#06281a"
     , warn = "#d9a13b"
     , bad = "#e5484d"
+    , badInk = "#0b0e12"
     , success = "#46c08a"
     }
 
@@ -217,14 +218,14 @@ suite =
                     , \s -> Expect.equal [] (ShellPalette.contrastFailures False s)
                     ]
                     shell
-        , test "the commit is 24 prefixed #rrggbb pairs (base + high contrast)" <|
+        , test "the commit is 26 prefixed #rrggbb pairs (base + high contrast)" <|
             \_ ->
                 let
                     pairs =
                         ShellPalette.commitTokens { themeId = "pearl", base = ThemeTokens.tokensFor "pearl", tokens = ThemeTokens.tokensFor "pearl" }
                 in
                 Expect.all
-                    [ \p -> Expect.equal 24 (List.length p)
+                    [ \p -> Expect.equal 26 (List.length p)
                     , \p -> Expect.equal True (List.all (\( _, v ) -> hexOnly v) p)
                     , \p ->
                         Expect.equal

@@ -31,6 +31,7 @@
   --onyx-accent-ink: var(--onyx-theme-accent-ink, #06281a);
   --onyx-warn: var(--onyx-theme-warn, #d9a13b);
   --onyx-bad: var(--onyx-theme-bad, #e5484d);
+  --onyx-bad-ink: var(--onyx-theme-bad-ink, #0b0e12);
   /* Success is its own token: the accent no longer doubles as "ok". */
   --onyx-success: var(--onyx-theme-success, #46c08a);
   /* The focus colour is the accent (budget: location, action, focus, mention). */
@@ -48,6 +49,7 @@
   --onyx-accent-ink: var(--onyx-theme-hc-accent-ink, #06281a);
   --onyx-warn: var(--onyx-theme-hc-warn, #d9a13b);
   --onyx-bad: var(--onyx-theme-hc-bad, #e5484d);
+  --onyx-bad-ink: var(--onyx-theme-hc-bad-ink, #0b0e12);
   --onyx-success: var(--onyx-theme-hc-success, #46c08a);
   --focus-width: 3px;
 }
@@ -62,6 +64,7 @@
     --onyx-accent-ink: var(--onyx-theme-hc-accent-ink, #06281a);
     --onyx-warn: var(--onyx-theme-hc-warn, #d9a13b);
     --onyx-bad: var(--onyx-theme-hc-bad, #e5484d);
+    --onyx-bad-ink: var(--onyx-theme-hc-bad-ink, #0b0e12);
     --onyx-success: var(--onyx-theme-hc-success, #46c08a);
     --focus-width: 3px;
   }
