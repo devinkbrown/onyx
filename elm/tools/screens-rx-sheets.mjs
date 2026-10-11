@@ -199,7 +199,7 @@ async function measure(page) {
       const cs = getComputedStyle(el);
       return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05;
     };
-    const closeRe = /^(close|cancel|not now|dismiss|done|no thanks|back)\b/i;
+    const closeRe = /^(close|cancel|not now|dismiss|done|no thanks|back|stay)\b/i;
     const closes = [...panel.querySelectorAll('button')].filter((b) => {
       const label = (b.getAttribute('aria-label') || b.textContent || '').trim();
       return closeRe.test(label) && visible(b);
@@ -575,6 +575,44 @@ const sheets = {
     };
     await open();
     await audit(page, h, 'invite', open);
+  },
+  // v3/gap-shell: the Activity sheet (server notices and problems).
+  'rx-activity': async (page, h) => {
+    const inject = await boot(page, h);
+    await inject(
+      `:${NET} NOTICE kn :Your session will be kept for 24h if you drop`,
+      `:${NET} FAIL SEEN NO_SUCH_NICK zed :No such nick`,
+    );
+    await backToList(page, h);
+    const open = () => openFrom(page, h, ['[data-testid="sidebar-activity"]', '[data-testid="gs-rail-activity"]']);
+    if (!(await open())) await report(page, 'activity', ['no visible Activity opener']);
+    await audit(page, h, 'activity', open);
+  },
+  // v3/gap-shell: leaving a room asks first.
+  'rx-leave-room': async (page, h) => {
+    await boot(page, h);
+    const open = async () => {
+      await clickVisible(page, ['[data-testid="room-more"]'], h);
+      await markOpener(page, '[data-testid="room-more"]');
+      await clickVisible(page, ['[data-testid="ribbon-leave-room"]'], h);
+    };
+    await open();
+    await audit(page, h, 'leave-room', open);
+  },
+  // v3/gap-commands: /help opens the slash-command reference.
+  'rx-commands-help': async (page, h) => {
+    await boot(page, h);
+    const open = async () => {
+      await markOpener(page, '#shell-composer-input');
+      await page.fill('#shell-composer-input', '/help');
+      for (let i = 0; i < 3 && !(await page.$('[data-testid="commands-help"]')); i += 1) {
+        await page.focus('#shell-composer-input');
+        await page.keyboard.press('Enter');
+        await h.settle(page, 500);
+      }
+    };
+    await open();
+    await audit(page, h, 'commands-help', open, { openerMayGo: true });
   },
   'rx-jump-date': async (page, h) => {
     await boot(page, h);

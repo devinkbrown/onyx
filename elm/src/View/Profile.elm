@@ -19,6 +19,7 @@ import PersonSafety
 import Prefs
 import Services
 import Set
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -553,6 +554,12 @@ cardFor model nick channel =
                 [ span [ class "onyx-member-dot", attribute "aria-hidden" "true" ] []
                 , span [] [ text role.label ]
                 ]
+            , -- v3/gap-organize: your private note on them
+              if isSelf then
+                text ""
+
+              else
+                View.Organize.memberNote model nick
             , if isSelf then
                 text ""
 

@@ -1,0 +1,753 @@
+/* v3/gap-watch — Watch Together (View.WatchTogether): the room activity
+   card, its details disclosure, the start editor sheet and the room
+   More-menu entry. Linked before ui-sheets.css so the shared sheet
+   family keeps the last word on layer, head and phone bottom sheets.
+
+   Calm by design: the card is one compact sticky bar above the
+   transcript (panel surface, 1px seam, 6px radius); its details overlay
+   the transcript instead of pushing it, so the reading position never
+   jumps. The accent marks only the host's primary action (play/pause,
+   Join / Accept / Start) and the focus ring. Icons are CSS masks over
+   data-URI SVGs — never font glyphs. Tokens from app.css :root only. */
+
+:root {
+  --gw-i-play: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M8 5.2v13.6a.8.8 0 001.2.7l10.6-6.8a.8.8 0 000-1.4L9.2 4.5A.8.8 0 008 5.2z' fill='black'/></svg>");
+  --gw-i-pause: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='6.5' y='5' width='4' height='14' rx='1' fill='black'/><rect x='13.5' y='5' width='4' height='14' rx='1' fill='black'/></svg>");
+  --gw-i-open: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'><path d='M14 4.5h5.5V10'/><path d='M19.5 4.5L11 13'/><path d='M17.5 14v4.5a1 1 0 01-1 1h-11a1 1 0 01-1-1v-11a1 1 0 011-1H10'/></svg>");
+  --gw-bar-h: 56px;
+  --gw-control: 36px;
+}
+
+.pt-ico[data-icon="watch-play"] { --pt-glyph: var(--gw-i-play); }
+.pt-ico[data-icon="watch-pause"] { --pt-glyph: var(--gw-i-pause); }
+.pt-ico[data-icon="watch-open"] { --pt-glyph: var(--gw-i-open); }
+
+/* Touch: every control is a 44px target, even at desktop widths. */
+@media (hover: none), (pointer: coarse) {
+  :root { --gw-control: var(--target-min); }
+}
+
+/* ---------- the card ---------- */
+
+.onyx-watch {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  color: var(--onyx-text);
+  container: watch / inline-size;
+}
+
+/* Stick flush under the room header: Chrome and Safari stop a sticky
+   box at the scroller's padding edge, so pull it up by the pane padding
+   (app.css: --space-3, --space-2 under 768px). */
+.onyx-main > .onyx-thread-pane > .onyx-watch { top: calc(-1 * var(--space-3)); }
+
+@media (max-width: 767.98px) {
+  .onyx-main > .onyx-thread-pane > .onyx-watch { top: calc(-1 * var(--space-2)); }
+}
+
+.onyx-watch[data-expanded="true"] {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.onyx-watch-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--gw-bar-h);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.onyx-watch-icon-btn,
+.onyx-watch-glyph {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--gw-control);
+  height: var(--gw-control);
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-dim);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.onyx-watch-icon-btn:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+.onyx-watch-glyph {
+  cursor: default;
+  background: var(--onyx-panel-2);
+  border-color: var(--onyx-line);
+}
+
+.onyx-watch[data-state="playing"] .onyx-watch-glyph { color: var(--onyx-text); }
+
+.onyx-watch-glyph .pt-ico,
+.onyx-watch-play .pt-ico { width: 16px; height: 16px; }
+
+/* The host's play/pause is the card's primary action. */
+.onyx-watch-icon-btn.onyx-watch-play {
+  color: var(--onyx-accent-ink);
+  background: var(--onyx-accent);
+  border-color: var(--onyx-accent);
+}
+
+.onyx-watch-icon-btn.onyx-watch-play:hover { color: var(--onyx-accent-ink); background: var(--onyx-accent); }
+
+.onyx-watch-more .pt-ico { transition: transform var(--dur-fast) var(--ease); }
+.onyx-watch-more[aria-expanded="true"] .pt-ico { transform: rotate(180deg); }
+.onyx-watch-more[aria-expanded="true"] { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+.onyx-watch-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.onyx-watch-kicker {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-faint);
+}
+
+.onyx-watch-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  font-weight: 650;
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.onyx-watch-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+  white-space: nowrap;
+}
+
+.onyx-watch-line > span { flex: none; }
+.onyx-watch-line > span + span::before {
+  content: "·";
+  margin-right: var(--space-2);
+  color: var(--onyx-faint);
+}
+
+.onyx-watch[data-state="playing"] .onyx-watch-state { color: var(--onyx-text); }
+
+.onyx-watch-clock {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.onyx-watch-line > .onyx-watch-site {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Thin, quiet progress under the bar (decorative; the clock speaks). */
+.onyx-watch-track {
+  position: relative;
+  height: 2px;
+  margin: 0 var(--space-3) var(--space-2);
+  overflow: hidden;
+  border-radius: 1px;
+  background: var(--onyx-line);
+}
+
+.onyx-watch-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--onyx-dim);
+}
+
+.onyx-watch[data-state="playing"] .onyx-watch-fill { background: var(--onyx-text); }
+
+/* Outcome / role announcements (always mounted; empty takes no room). */
+.onyx-watch-status {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+}
+
+.onyx-watch-status:empty { padding: 0; }
+.onyx-watch-status:focus { outline: none; }
+.onyx-watch-status-problem { color: var(--onyx-warn); }
+
+/* ---------- details: overlays the transcript under the bar ---------- */
+
+.onyx-watch-details {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: -1px;
+  right: -1px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  max-height: min(62vh, 560px);
+  max-height: min(62dvh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--onyx-line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--onyx-panel);
+  box-shadow: var(--elev-2);
+  scrollbar-width: thin;
+  scrollbar-color: var(--onyx-line) transparent;
+  animation: gw-drop var(--dur-fast) var(--ease);
+}
+
+@keyframes gw-drop {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.onyx-watch-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.onyx-watch-seek {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onyx-watch-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--gw-control);
+  margin: 0;
+  accent-color: var(--onyx-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.onyx-watch-seek-gap { flex: 1 1 auto; }
+
+.onyx-watch-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+.onyx-watch-hosted {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+}
+
+.onyx-watch-host { color: var(--onyx-text); font-weight: 650; }
+.onyx-watch-roster-toggle { flex: none; margin-left: calc(-1 * var(--space-1)); }
+.onyx-watch-away { color: var(--onyx-warn); }
+
+.onyx-watch-roster {
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--onyx-line);
+}
+
+.onyx-watch-roster-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 2px var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onyx-watch-person {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 28px;
+  font-size: var(--text-sm);
+}
+
+.onyx-watch-person-nick {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.onyx-watch-person-role {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--onyx-faint);
+}
+
+.onyx-watch-empty,
+.onyx-watch-note,
+.onyx-watch-honest {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+}
+
+.onyx-watch-honest {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--onyx-line);
+}
+
+.onyx-watch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onyx-watch-actions > .onyx-watch-note { flex: 1 1 100%; }
+
+.onyx-watch-handoff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onyx-watch-handoff-label { font-size: var(--text-sm); color: var(--onyx-dim); }
+
+.onyx-watch-select {
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--gw-control);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+/* Buttons: the calls family's quiet secondary, accent for the primary. */
+.onyx-watch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-height: var(--gw-control);
+  max-width: 100%;
+  padding: 0 14px;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.onyx-watch-btn:hover { border-color: var(--onyx-dim); }
+
+.onyx-watch-btn-primary {
+  border-color: var(--onyx-accent);
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+}
+
+.onyx-watch-btn-primary:hover { border-color: var(--onyx-accent); }
+
+.onyx-watch-btn-danger {
+  border-color: var(--onyx-bad);
+  background: transparent;
+  color: var(--onyx-bad);
+}
+
+.onyx-watch-nudge {
+  flex: none;
+  padding: 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.onyx-watch-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--gw-control);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.onyx-watch-text-btn:hover { color: var(--onyx-text); text-decoration: underline; text-underline-offset: 3px; }
+.onyx-watch-text-btn .pt-ico { width: 16px; height: 16px; }
+
+.onyx-watch [aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.onyx-watch-end-row { display: flex; }
+
+/* Ending is destructive: a quiet outlined button (it reads as a control,
+   not a caption) that only turns red on intent; the confirmation that
+   follows carries the weight. */
+.onyx-watch-end {
+  padding: 0 14px;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+}
+
+.onyx-watch-end:hover { border-color: var(--onyx-bad); color: var(--onyx-bad); text-decoration: none; }
+
+.onyx-watch-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-bad);
+  border-radius: var(--radius);
+}
+
+.onyx-watch-confirm-q {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+}
+
+.onyx-watch-confirm-q strong { color: var(--onyx-text); }
+
+.onyx-watch-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.onyx-watch-link {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.onyx-watch-link-url {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.onyx-watch-link-label {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-faint);
+}
+
+.onyx-watch-url {
+  display: block;
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* The full-width "Open <host>" link in the details. */
+.onyx-watch-open-wide {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: var(--gw-control);
+  padding: 0 14px;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.onyx-watch-open-wide > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.onyx-watch-open-wide:hover { border-color: var(--onyx-dim); }
+
+.onyx-watch-hide { align-self: flex-start; }
+.onyx-watch-col > .onyx-watch-hide { margin-left: calc(-1 * var(--space-1)); }
+
+.onyx-watch :is(button, a, input, select):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* ---------- widths (container queries on the card) ---------- */
+
+/* Narrow (phones, folds): the bar keeps play/pause, the title + clock
+   and the details toggle. The link's host and Open move into the
+   details so the host is always read before the link is opened; Close
+   lives there too. */
+@container watch (max-width: 479.98px) {
+  .onyx-watch-open,
+  .onyx-watch-close,
+  .onyx-watch-line > .onyx-watch-site { display: none; }
+
+  .onyx-watch-bar { padding-left: var(--space-2); }
+
+  .onyx-watch-details { padding: var(--space-3) var(--space-3) var(--space-4); }
+
+  .onyx-watch-confirm-actions > .onyx-watch-btn,
+  .onyx-watch-actions > .onyx-watch-btn { flex: 1 1 auto; }
+}
+
+@container watch (min-width: 480px) {
+  .onyx-watch-hide { display: none; }
+}
+
+/* Wide: details split into the controls and the link / honesty note. */
+@container watch (min-width: 760px) {
+  .onyx-watch-details {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-6);
+    padding: var(--space-4);
+  }
+
+  .onyx-watch-col-main { flex: 3 1 0; }
+  .onyx-watch-col-side { flex: 2 1 0; max-width: 28rem; }
+}
+
+/* Short viewports (phone landscape, laptop-short): a single-line bar so
+   the transcript and composer keep their height; details scroll. */
+@media (max-height: 520px) {
+  :root { --gw-bar-h: 44px; }
+
+  .onyx-watch { margin-bottom: var(--space-2); }
+
+  .onyx-watch-bar { padding-top: 2px; padding-bottom: 2px; }
+
+  .onyx-watch-kicker { display: none; }
+
+  .onyx-watch-heading {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  /* The title gives way first (it ellipsizes); the state and clock are
+     what people glance at, so they are never clipped to a fragment. */
+  .onyx-watch-heading { overflow: hidden; }
+  .onyx-watch-title { flex: 1 1 0; min-width: 6ch; }
+  .onyx-watch-line { flex: none; overflow: visible; }
+  /* One line has no room for the link's host without clipping it to a
+     fragment; the host stays on the Open button's name and in details. */
+  .onyx-watch-line > .onyx-watch-site { display: none; }
+  .onyx-watch-track { margin-bottom: var(--space-1); }
+
+  .onyx-watch-details { max-height: min(58dvh, 300px); }
+}
+
+/* Landscape phones: keep clear of the notch / home-indicator insets. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .onyx-watch-details { padding-left: max(var(--space-3), env(safe-area-inset-left, 0px)); padding-right: max(var(--space-3), env(safe-area-inset-right, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-watch-details { animation: none; }
+  .onyx-watch-more .pt-ico { transition: none; }
+}
+
+/* ---------- start editor sheet ---------- */
+
+.onyx-sheet-layer > .onyx-watch-sheet { width: min(var(--sheet-w-sm, 440px), 100%); }
+
+.onyx-watch-form,
+.onyx-watch-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.onyx-watch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.onyx-watch-label {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--onyx-text);
+}
+
+.onyx-watch-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+}
+
+/* 16px input text: no iOS focus zoom. */
+.onyx-watch-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.onyx-watch-input::placeholder { color: var(--onyx-faint); }
+.onyx-watch-input[aria-invalid="true"] { border-color: var(--onyx-bad); }
+.onyx-watch-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-accent); }
+
+.onyx-watch-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-bad);
+}
+
+.onyx-watch-form-error {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-bad);
+  border-radius: var(--radius);
+}
+
+.onyx-watch-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.onyx-watch-sheet-actions > .onyx-watch-btn { min-height: 40px; }
+.onyx-watch-sheet :is(button, a, input):focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.onyx-watch-review-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.onyx-watch-review-list dt {
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+}
+
+.onyx-watch-review-list dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.onyx-watch-review-title { font-weight: 650; }
+.onyx-watch-review-host { font-weight: 650; }
+
+@media (max-width: 767.98px) {
+  .onyx-watch-sheet-actions > .onyx-watch-btn { flex: 1 1 10rem; min-height: var(--target-min); }
+}
+
+/* Short viewports (phone landscape): title across, link and length side
+   by side, hints folded away (they stay the fields' accessible
+   descriptions), so Review is reachable without scrolling. */
+@media (max-height: 520px) {
+  .onyx-watch-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .onyx-watch-form > :not(.onyx-watch-field),
+  .onyx-watch-form > .onyx-watch-field:first-child { grid-column: 1 / -1; }
+
+  .onyx-watch-form .onyx-watch-hint { display: none; }
+  .onyx-watch-review { gap: var(--space-3); }
+}
+
+@media (max-width: 359.98px) {
+  .onyx-watch-review-list { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .onyx-watch-review-list dd + dt { margin-top: var(--space-2); }
+}
+
+/* ---------- room More menu entry ---------- */
+
+.onyx-room-more-menu > .onyx-room-more-watch { justify-content: space-between; gap: var(--space-3); }
+
+.onyx-room-more-watch-state {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--onyx-dim);
+}

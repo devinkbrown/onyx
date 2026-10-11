@@ -44,6 +44,7 @@ import Set
 import Stats
 import Stewardship
 import Time
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -108,6 +109,7 @@ roomSettingsSheet model =
                 , contextLine ctx
                 , topicSection model ctx room
                 , notifySection model room
+                , View.Organize.roomSettingsSection model room.name -- v3/gap-organize
                 , details [ class "rset-advanced" ]
                     [ summary [] [ text "Advanced" ]
                     , p [ class "rset-hint" ] [ text "Room rules, roles, insights, and integrations. Everyday alerts stay above." ]
@@ -153,7 +155,7 @@ contextLine ctx =
 notPorted : Html Msg
 notPorted =
     p [ class "rset-hint rset-footnote", attribute "data-testid" "chset-not-ported" ]
-        [ text "Invite links live on the room header (Invite friends). Transcript export, hide and leave are not in this sheet yet." ]
+        [ text "Invite links live on the room header (Invite friends). Transcript export and leave are not in this sheet yet." ]
 
 
 sectionWith : String -> String -> List (Html Msg) -> Html Msg
