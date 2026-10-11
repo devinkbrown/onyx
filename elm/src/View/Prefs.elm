@@ -25,6 +25,7 @@ import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
 import View.Sheet as Sheet
+import View.UserModes
 
 
 prefsSheet : Model -> Html Msg
@@ -201,6 +202,10 @@ panelBody model category =
                 , p [ class "pref-desc" ] [ text "Preview, HTTPS-only, and end-to-end encryption switches live in Appearance under Privacy." ]
                 ]
             ]
+
+        Privacy ->
+            -- v3/gap-usermodes
+            View.UserModes.privacyPanel model
 
         History ->
             [ sectionHead "History & data" "How this browser remembers, finds, retains, and erases local conversation data."

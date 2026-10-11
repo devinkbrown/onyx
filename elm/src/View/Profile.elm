@@ -20,6 +20,7 @@ import Prefs
 import Services
 import Set
 import View.Sheet as Sheet
+import View.UserModes
 
 
 {-| The open WHOIS sheet, or nothing when no sheet is showing. -}
@@ -60,6 +61,8 @@ sheetFor model nick =
                 )
             , profileSummary shown info
             , profileStatus info
+            , -- v3/gap-usermodes: an offline person's last-seen (WHOWAS/SEEN)
+              View.UserModes.offlineBlock model shown
             , profileDetails shown info
             ]
 
@@ -547,7 +550,8 @@ cardFor model nick channel =
                 , span [] [ text role.label ]
                 ]
             , if isSelf then
-                text ""
+                -- v3/gap-usermodes: your own network name (SETNAME)
+                View.UserModes.selfNameRow model
 
               else
                 div
@@ -606,6 +610,12 @@ cardFor model nick channel =
                         ]
                         [ text "Close" ]
                     ]
+            , -- v3/gap-usermodes: not in this room -> when were they last here
+              if not isSelf && member == Nothing && App.isChannelName model channel then
+                View.UserModes.lastSeenButton model nick account
+
+              else
+                text ""
             , details [ class "onyx-member-advanced" ]
                 (summary [ class "onyx-member-advanced-toggle" ] [ text "Room and network details" ]
                     :: advancedRows nick channel role account info

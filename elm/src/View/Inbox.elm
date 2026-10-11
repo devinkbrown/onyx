@@ -22,13 +22,15 @@ import Html.Attributes exposing (attribute, class, disabled)
 import Html.Events exposing (onClick)
 import Set
 import View.Sheet as Sheet
+import View.UserModes
 
 
 inbox : Model -> Html Msg
 inbox model =
     let
+        -- v3/gap-usermodes: message requests ride the bell's count
         unread =
-            unreadAttentionCount model
+            unreadAttentionCount model + View.UserModes.badgeCount model
     in
     div [ class "shell-ribbon-inbox" ]
         [ button
@@ -114,6 +116,8 @@ inboxPanel model =
                         }
                    )
             )
+        , -- v3/gap-usermodes
+          View.UserModes.requestsBlock model
         , div [ class "notif-center__filters", attribute "role" "group", attribute "aria-label" "Inbox filters" ]
             [ filterButton model InboxAll "All" (count InboxAll)
             , filterButton model InboxAttention "Needs you" (count InboxAttention)
@@ -139,6 +143,8 @@ inboxPanel model =
 
           else
             ul [ class "notif-center__list" ] (List.map (inboxRow model) visible)
+        , -- v3/gap-usermodes
+          View.UserModes.offlineLink model
         ]
 
 

@@ -18,6 +18,7 @@ import Html.Attributes exposing (attribute, class, href, type_)
 import Html.Events exposing (onClick)
 import Schedule
 import View.Sheet as Sheet
+import View.UserModes
 
 
 scheduledSheet : Model -> Html Msg
@@ -52,15 +53,20 @@ scheduledSheet model =
                     (Sheet.head { scope = "scheduled", title = "Scheduled messages", closeLabel = "Close scheduled messages", onClose = SetShowScheduledMessages False }
                         |> (\h -> { h | closeClass = "onyx-scheduled-close", subtitle = Just "Kept on this device. Each one sends when its time arrives and you are connected." })
                     )
-                , if List.isEmpty rows then
+                , if List.isEmpty rows && List.isEmpty (View.UserModes.heldRows model) then
                     p [ class "onyx-scheduled-empty" ]
                         [ strong [] [ text "No scheduled messages." ]
                         , span [] [ text "Use Send later in the composer to keep a message on this device until later." ]
                         ]
 
+                  else if List.isEmpty rows then
+                    text ""
+
                   else
                     ul [ class "onyx-scheduled-list", attribute "aria-label" "Pending scheduled messages" ]
                         (List.map (scheduledRow model now connected) rows)
+                , -- v3/gap-usermodes: sends the server holds (it can't cancel them)
+                  div [ class "um-held-wrap" ] (View.UserModes.heldRows model)
                 ]
 
 

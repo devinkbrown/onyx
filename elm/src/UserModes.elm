@@ -27,8 +27,10 @@ module UserModes exposing
     , acceptRemoveLine
     , autojoinLine
     , blank
+    , clearOwned
     , deferAtLine
     , deferCheck
+    , deferCheckCopy
     , deferMaxBytes
     , decodeStored
     , encodeStored
@@ -329,6 +331,7 @@ type alias State =
     , autojoinBuffer : List String
     , autojoinListing : Bool
     , autojoinKnown : Bool
+    , autojoinDraft : String
     , autojoinStatus : Maybe Status
 
     -- profile depth
@@ -395,6 +398,7 @@ blank =
     , autojoinBuffer = []
     , autojoinListing = False
     , autojoinKnown = False
+    , autojoinDraft = ""
     , autojoinStatus = Nothing
     , realname = ""
     , realnameLive = Nothing
@@ -898,6 +902,38 @@ deferCheck input =
         DeferOk
 
 
+{-| Why the server can't hold this draft, in a few plain words. -}
+deferCheckCopy : DeferCheck -> String
+deferCheckCopy check =
+    case check of
+        DeferOk ->
+            ""
+
+        DeferNeedsAccount ->
+            "Sign in to use this."
+
+        DeferOffline ->
+            "Connect to use this."
+
+        DeferRoomOnly ->
+            "Rooms only."
+
+        DeferNotMember ->
+            "Join the room first."
+
+        DeferEncrypted ->
+            "Not for encrypted rooms."
+
+        DeferEmpty ->
+            "Write a message first."
+
+        DeferMultiline ->
+            "One line only."
+
+        DeferTooLong ->
+            "Up to 400 bytes."
+
+
 heldFor : Maybe String -> State -> List Held
 heldFor account state =
     case account of
@@ -957,6 +993,34 @@ onConnected ctx state =
     ( fresh, query ++ name )
 
 
+{-| Forget what the previous owner chose on this browser (an account
+switch): the server-side lists are theirs too and are asked for again.
+-}
+clearOwned : State -> State
+clearOwned state =
+    { state
+        | wanted = Set.empty
+        , serverIgnore = False
+        , realname = ""
+        , deferServer = False
+        , deferHeld = []
+        , deferInflight = []
+        , accepts = []
+        , acceptKnown = False
+        , silenced = []
+        , silenceKnown = False
+        , autojoins = []
+        , autojoinKnown = False
+        , memoWaiting = []
+        , memoKnown = False
+        , memoForward = Nothing
+        , memoForwardKnown = False
+        , memoIgnores = []
+        , requests = []
+        , requestsUnseen = 0
+    }
+
+
 onDisconnected : State -> State
 onDisconnected state =
     { state
@@ -1009,6 +1073,8 @@ type Msg
     | MemoOpenDm String
     | DeferChoose Bool
     | AutojoinRefresh
+    | AutojoinDraft String
+    | AutojoinAddDraft
     | AutojoinAdd String
     | AutojoinRemove String
     | RealnameEdit
@@ -1042,8 +1108,15 @@ update ctx msg state =
 
                         else
                             sends [ setnameLine modesFixed.realname ]
+
+                    blockEffects =
+                        if modesFixed.serverIgnore && ctx.account /= Nothing && not modesFixed.silenceKnown then
+                            [ Send silenceListLine ]
+
+                        else
+                            []
                 in
-                ( modesFixed, modeEffects ++ nameEffects )
+                ( modesFixed, modeEffects ++ nameEffects ++ blockEffects )
 
             else
                 ( pruned, [] )
@@ -1331,6 +1404,17 @@ update ctx msg state =
             else
                 ( state, [] )
 
+        AutojoinDraft value ->
+            ( { state | autojoinDraft = String.left 64 value, autojoinStatus = Nothing }, [] )
+
+        AutojoinAddDraft ->
+            case normalizeRoom state.autojoinDraft of
+                Nothing ->
+                    ( { state | autojoinStatus = Just { text = "Enter a room name like #lounge.", error = True } }, [] )
+
+                Just channel ->
+                    update ctx (AutojoinAdd channel) { state | autojoinDraft = "" }
+
         AutojoinAdd channel ->
             if ctx.live && ctx.account /= Nothing then
                 ( { state | autojoinListing = True, autojoinBuffer = [], autojoinStatus = Nothing }
@@ -1445,6 +1529,27 @@ reassertModes ctx state =
 heldStillPending : Float -> Held -> Bool
 heldStillPending nowMs held =
     toFloat held.sendAt > nowMs - 60000
+
+
+{-| "lounge" and "#lounge" both mean the room #lounge. -}
+normalizeRoom : String -> Maybe String
+normalizeRoom raw =
+    let
+        value =
+            String.trim raw
+
+        prefixed =
+            if String.startsWith "#" value || String.startsWith "&" value then
+                value
+
+            else
+                "#" ++ value
+    in
+    if String.isEmpty value || String.length prefixed < 2 then
+        Nothing
+
+    else
+        wireToken prefixed
 
 
 offlineStatus : Maybe Status
