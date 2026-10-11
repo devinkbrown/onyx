@@ -79,14 +79,18 @@ test("Text size, Density and Conversation width each have rules", () => {
   assert.ok(compactRows, "compact row heights are fine-pointer only");
 });
 
-test("Conversation width: the measure reaches the log and composer (display: contents frame)", () => {
-  // The old `.onyx-thread-pane > *` cap cannot touch rows inside the
-  // display:contents frame, so the gutters carry it instead.
-  assert.match(read("app.css"), /\.onyx-thread-frame \{ display: contents; \}/);
-  const wide = block(gap, "@media (min-width: 1200px)");
-  assert.match(wide, /:root:not\(\[data-width='full'\]\) \.onyx-main > \.onyx-thread-pane/);
-  assert.match(wide, /:root:not\(\[data-width='full'\]\) \.onyx-main > \.onyx-composer/);
-  assert.match(wide, /padding-inline:\s*max\(var\(--space-4\),\s*calc\(\(100% - var\(--shell-measure\)\) \/ 2\)\)/);
+test("Conversation width: Full lifts the rx-convo and rx-shell measures", () => {
+  // Measured is theirs (--pt-measure / --convo-measure); Full must lift both
+  // and hand the calc()-padded edges back their ordinary gutter.
+  assert.match(read("css/pol-thread.css"), /--pt-measure:\s*46rem/);
+  assert.match(read("css/rx-shell.css"), /--convo-measure:\s*calc\(72ch \+ 5rem\)/);
+  const full = block(gap, ":root[data-width='full'] {");
+  assert.match(full, /--pt-measure:\s*none/);
+  assert.match(full, /--convo-measure:\s*none/);
+  assert.match(gap, /:root\[data-width='full'\] \.onyx-frame > \.onyx-main > \.onyx-thread-pane \{ padding-inline: var\(--space-4\); \}/);
+  assert.match(gap, /:root\[data-width='full'\] \.onyx-main > \.onyx-composer \{ padding-inline: var\(--space-4\); \}/);
+  // The pre-rx dead cap stays harmless: Full also lifts it.
+  assert.match(gap, /:root\[data-width='full'\] \.onyx-frame \{ --shell-measure: none; \}/);
 });
 
 test("the duration ladder derives from the theme's --dur without a cycle", () => {

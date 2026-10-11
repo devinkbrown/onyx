@@ -206,9 +206,37 @@ async function assertEscapePreview(page, h) {
   if (process.env.AUDIT_VERBOSE) console.log(`escape-preview @${page.viewportSize()?.width}: ${before.id} -> ${staged.id} -> ${after.id}`);
 }
 
+/**
+ * Conversation width in a real browser: Measured keeps the reading column
+ * (the log and the composer share it and stay centred); Full lets both run
+ * the width of the conversation column. Only meaningful where the column is
+ * wider than the measure, so narrower viewports just check nothing overflows.
+ */
+async function assertWidth(page, h, width) {
+  await room(page, h, { prefs: { width } });
+  const m = await page.evaluate(() => {
+    const rect = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left, w: r.width }; };
+    return { pane: rect('.onyx-main > .onyx-thread-pane'), log: rect('.onyx-thread-frame [role="log"]'), composer: rect('.onyx-main > .onyx-composer .onyx-composer-bar, .onyx-main > .onyx-composer'), attr: document.documentElement.dataset.width };
+  });
+  const vw = page.viewportSize()?.width ?? 0;
+  const problems = [];
+  if (m.attr !== width) problems.push(`data-width ${m.attr}`);
+  if (m.pane && m.log && vw >= 1600) {
+    const free = m.pane.w;
+    if (width === 'measured' && m.log.w > 0.7 * free) problems.push(`measured log ${Math.round(m.log.w)}px fills ${Math.round(free)}px`);
+    if (width === 'full' && m.log.w < 0.85 * free) problems.push(`full log ${Math.round(m.log.w)}px should fill ${Math.round(free)}px`);
+    const centred = Math.abs((m.log.x + m.log.w / 2) - (m.pane.x + m.pane.w / 2));
+    if (width === 'measured' && centred > 24) problems.push(`measured log off-centre by ${Math.round(centred)}px`);
+  }
+  if (process.env.AUDIT_VERBOSE) console.log(`width ${width} @${vw}: pane ${Math.round(m.pane?.w ?? 0)} log ${Math.round(m.log?.w ?? 0)} composer ${Math.round(m.composer?.w ?? 0)}`);
+  if (problems.length) throw new Error(`width ${width}: ${problems.join('; ')}`);
+}
+
 const SCENE_IDS = ['deep-current', 'bioluminescence', 'caustics', 'aurora', 'pyrite-field', 'gold-veins', 'ember', 'forest', 'resin', 'ink-wash', 'mist', 'frost', 'aurora-ribbons', 'tide-bands', 'obsidian', 'lapis-gradient', 'paper-grain'];
 
 export default {
+  'ap-assert-width-measured': (page, h) => assertWidth(page, h, 'measured'),
+  'ap-assert-width-full': (page, h) => assertWidth(page, h, 'full'),
   'ap-assert-escape-preview': (page, h) => assertEscapePreview(page, h),
   ...Object.fromEntries(['sm', 'md', 'lg'].flatMap((scale) => ['compact', 'cozy', 'roomy'].map((density) => [`ap-assert-${scale}-${density}`, (page, h) => assertScaleDensity(page, h, scale, density)]))),
   'ap-scene-frost-ember': (page, h) => sceneContrast(page, h, 'frost', 'ember', false),
