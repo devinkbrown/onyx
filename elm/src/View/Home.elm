@@ -12,9 +12,9 @@ folds add `HomeMarkAllCaughtUp`, `HomeCoachDismiss`, `HomeInviteCopy`.
 
 Narrowings: no device-memory (vault) catch-up, continue-reading
 resume points, recap cards, formation strip, recently-visited rooms,
-or room-invite tier (Elm has no INVITE inbox projection yet); the
-queued-send rows show destination + status but not the per-row
-Open / Remove controls (the durable queue stays ports-side).
+or room-invite tier (invites reach the Inbox; Home does not show
+them); queued-send rows carry per-row Open / Remove controls through
+`View.Organize.homeOutboxActions` (v3/gap-organize).
 -}
 
 import App exposing (Channel, Model, Msg(..))

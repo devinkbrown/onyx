@@ -39,12 +39,12 @@ Two documented narrowings follow from the Elm vault's flat row model
     `exportedAt` becomes `""` instead of "now" (no clock in a pure
     fold — the caller stamps when it needs one).
 
-There is no file-pick UI in the Elm client yet, so nothing calls this
-parser — the executable spec in `tests/VaultImportTest.elm` pins the
-contract for the coming merge path, which will write the projected
-rows through the existing `vaultPut` port (whose trim already applies
-the destination retention policy, matching the oracle's
-import-obeys-policy order).
+The import flow (v3/gap-import) parses a picked file with this module
+and stages the rows for review (`HistoryImport.fromVaultSnapshot`); the
+executable spec in `tests/VaultImportTest.elm` pins the contract. The
+confirmed merge writes the projected rows through the vault persist port
+(`historyImportPersist`, whose trim already applies the destination
+retention policy, matching the oracle's import-obeys-policy order).
 -}
 
 import Dict

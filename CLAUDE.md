@@ -16,6 +16,12 @@ names — do not reintroduce Japanese names in new code or UI.
 English subsystem names: Cadence (CadenceVox/CadenceVis), MooringSession/MooringGroup,
 Event Spine.
 
+**The Elm client in `elm/` is the product** (`./deploy.sh` with `ONYX_CLIENT=elm`
+builds it and overlays it onto the SPA documents). The SolidJS client described
+below (`src/`) is deprecated and kept as the behavioural oracle: fix bugs in
+`elm/`, do not patch `src/`. Elm docs: `elm/README.md`, `elm/design/INDEX.md`
+(roadmap, protocol coverage, client parity map, server feature map).
+
 **License: AGPL-3.0-or-later** (see `LICENSE`). The client source is public under
 that license. The hosted Onyx network and the separately maintained Onyx Server
 daemon are operational products with their own deployment and release boundaries.
@@ -29,10 +35,13 @@ daemon are operational products with their own deployment and release boundaries
 
 ## Layout
 - Entry: `src/index.tsx` — routes `/` (Landing), `/about`, `/app` (AppShell),
-  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/guides`,
-  `/community`, `/privacy`, `/guidelines`, and `/contact`. Keep this table in
+  `/appearance`, `/stats`, `/status`, `/roadmap`, `/invite`, `/onyxos`,
+  `/download` (+ `/install`), `/guides`, `/community`, `/privacy`,
+  `/guidelines`, `/contact`, and the public-info pages `/accessibility`,
+  `/glossary`, `/integrations`, `/agents`. Keep this table in
   sync with `ROUTE_ENTRYPOINTS` in
-  `tools/materialize-route-entrypoints.mjs`, which owns their static metadata.
+  `tools/materialize-route-entrypoints.mjs`, which owns their static metadata
+  (the Elm router, `elm/src/Route.elm`, mirrors the same table).
   First import is `src/lib/migrateStorage.ts` (legacy `ocean-*` →
   `onyx:*` localStorage migration, runs as an import side effect) — keep it first.
 - IRC layer: `src/lib/irc/` — `client.ts` (WS client, SASL PLAIN/SCRAM,
@@ -83,6 +92,7 @@ pnpm dev        # dev server
 pnpm build      # → dist/ (safe: NEVER touches production)
 ./deploy.sh     # first-party dist/ build + route entrypoints + sw stamp,
                 # host-specific site overlay, then rsync --delete dist/ → out/
+                # (ONYX_CLIENT=elm also builds elm/ and overlays it: tools/elm-overlay.mjs)
 ```
 nginx serves `out/` at eshmaki.me. ONLY deploy.sh writes out/ — plain builds
 go to dist/, so tests/e2e can never wipe or half-replace production.

@@ -22,9 +22,9 @@ Every control writes through `RoomSettingsMsg` (pure core in
 above, network opers) get the editors.
 
 Not ported here (narrowings, listed in the sheet's own footer): the
-invite builder (the header's Invite friends button covers it), local
-transcript export, hide / leave, and per-device topic draft
-durability.
+invite builder (the header's Invite friends button covers it), leave
+(it is in the room header's More menu) and per-device topic draft
+durability. Transcript export and hide are sheet sections.
 
 -}
 

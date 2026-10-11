@@ -2,9 +2,9 @@ module View.ModDesk exposing (deskToggles, moderationSheet, moderationToggle, op
 
 {-| v3/moddesk — the moderation cockpit and the operator desk as sheets.
 
-  - `deskToggles`: the room-level Moderation button (room moderators
-    only, via `App.isChannelOp`) and the Operator button (server
-    operators only, via `model.isOper`).
+  - `deskToggles`: the room-level desk button (moderators get
+    "Moderation", members "Room safety"; v3/gap-people) and the
+    Operator button (server operators only, via `model.isOper`).
   - `moderationSheet`: the room desk (mirroring
     `shell/ModerationCockpit.tsx`) — current-room header, then the
     `View.Bans` body (authority rail, safeguards, invite, member action,
@@ -15,7 +15,7 @@ module View.ModDesk exposing (deskToggles, moderationSheet, moderationToggle, op
     subscriptions / privileges / reload config / observe / disconnect,
     destructive plans behind an inline review) plus
     `shell/OperEventConsole.tsx` (bounded `EVENT REPLAY JSON`, local
-    category / severity / text filters).
+    category / severity / text filters), plus `View.OperTabs` (v3/gap-oper).
 
 Roles read as words ("Room moderator", "IRC operator", "Network
 administrator"), never as mode letters.

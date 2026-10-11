@@ -5022,9 +5022,9 @@ foldLine model message =
             ( logNumeric model message, [] )
 
         "710" ->
-            -- KNOCK sent (contract §11): neither client tracks
-            -- knock state — the notice text is the whole signal —
-            -- so this stays on the generic numeric log.
+            -- KNOCK (contract §11): `Chanserv.fold` tracks knock state
+            -- from this line (`settleStepChanserv`); the core fold
+            -- leaves it on the generic numeric log.
             ( logNumeric model message, [] )
 
         "711" ->
@@ -5339,9 +5339,9 @@ foldLine model message =
             ( foldLatencyPong model (secondOrFirst message.params), [ PingObserved ] )
 
         "221" ->
-            -- Own umodes (contract §11): the oracle keeps no 221
-            -- fold — the modes surface reads 005/324 instead — so
-            -- this stays on the generic numeric log.
+            -- Own umodes (contract §11): `UserModes.foldWire` reads 221
+            -- first (observed, not consumed: `foldLineUserModes`), so
+            -- this fold only keeps it on the generic numeric log.
             ( logNumeric model message, [] )
 
         "251" ->
@@ -5998,9 +5998,9 @@ foldLine model message =
             foldWhois model message
 
         "271" ->
-            -- SILENCE list rows (contract §11): neither client keeps
-            -- a silence list — `/ignore` is local-only — so these
-            -- stay on the generic numeric log like the oracle.
+            -- SILENCE list rows (contract §11): `UserModes.foldWire`
+            -- keeps the silence list (observed, not consumed), so
+            -- this fold only leaves them on the generic numeric log.
             ( logNumeric model message, [] )
 
         "272" ->
@@ -6008,8 +6008,8 @@ foldLine model message =
             ( logNumeric model message, [] )
 
         "281" ->
-            -- ACCEPT list rows: same generic-log rule (no oracle
-            -- path; acceptance is server-side).
+            -- ACCEPT list rows: same rule (`UserModes.foldWire`
+            -- keeps the accept list).
             ( logNumeric model message, [] )
 
         "282" ->
@@ -7818,9 +7818,9 @@ parseCtcpQuery body =
 {-| Fold one inbound non-self CTCP query PRIVMSG (mirroring the
 oracle query arm: VERSION answers the configured reply, TIME answers
 via the ports clock when enabled, PING echoes its args when enabled,
-CLIENTINFO lists the four answered queries — everything else,
-including ACTION, is swallowed with no row and no notice, exactly
-like the oracle `break`). The NOTICE target is the validated sender;
+CLIENTINFO lists the four answered queries — everything else is
+swallowed with no row and no notice, exactly like the oracle `break`;
+ACTION is a message, never here). The NOTICE target is the validated sender;
 an unvalidatable sender drops the reply but still swallows the row.
 -}
 foldCtcpQuery : Model -> String -> String -> List Outbound
@@ -7895,8 +7895,8 @@ foldScreenshareCtcp model sender body =
 {-| Whether a PRIVMSG body is a CTCP query for the swallow rule:
 non-notice, non-self, both `\x01` delimiters present. EDIT/DELETE
 mutation wrappers are claimed earlier by `parseCtcpMutation`, so by
-the time this runs only queries and unknown CTCP (ACTION included)
-remain. -}
+the time this runs only queries and unknown CTCP remain (ACTION is a
+message since v3/gap-commands, so it is excluded). -}
 isCtcpQueryBody : Bool -> String -> String -> String -> Bool
 isCtcpQueryBody isNotice sender ourNick body =
     not isNotice
@@ -7909,8 +7909,8 @@ isCtcpQueryBody isNotice sender ourNick body =
 
 
 {-| Whether a wire line is a swallowed CTCP wrapper: a non-self
-PRIVMSG fully wrapped in `\x01` (queries, mutations, ACTION, polls —
-the oracle `break`s them all before the store and the vault). Used
+PRIVMSG fully wrapped in `\x01` (queries, mutations, polls — not ACTION,
+a message — the oracle `break`s them before the store and the vault). Used
 at the vault gate so a swallowed wrapper never persists a row
 either. -}
 isSwallowedCtcpWire : String -> Wire.IrcMessage -> Bool
@@ -10527,10 +10527,10 @@ nextNickAlias aliases tryIdx currentNick rejected =
     go 0 aliases
 
 
-{-| Pre-registration nick errors, mirroring `client.ts` plus the
-store 433 arm: a 432 naming a registered nick closes with guidance
-(an explicit sign-in must never degrade into guest registration);
-other 432/437 only log pre-registration. A 433 rotates the
+{-| Nick errors, mirroring `client.ts` plus the store 433 arm: while
+registering, `foldRegistrationNickError` claims them (a registered nick
+closes with sign-in guidance — an explicit sign-in must never degrade
+into guest registration; the rest retry or fail). A 433 rotates the
 owner-scoped nick-alias list (skipping the current, rejected, and
 already-tried aliases, flagging the alias bit) and errors to the
 inbox only once the list is exhausted — pre- and post-registration
@@ -11783,8 +11783,8 @@ settleJoinFocus msg prior m outs =
 
 
 {-| Record a channel join rejection for the join surface (mirroring
-`setChannelJoinPrompt`: the channel plus the human reason). Elm has no
-channel browser yet, so the prompt waits for it; a later self-JOIN to
+`setChannelJoinPrompt`: the channel plus the human reason). The channel
+browser shows it (`View.Chanserv`); a later self-JOIN to
 the same room clears it (`clearJoinPromptFor`), standing in for the
 browser's joined-effect close. -}
 setChannelJoinPrompt : Model -> String -> String -> Model
@@ -15628,9 +15628,9 @@ type alias SlashCommand =
     }
 
 
-{-| The composer slash-command registry (mirroring `SLASH_COMMANDS`,
-same order and copy; the suggestion query layer stays ahead — only the
-`/help` lookup ships here). -}
+{-| The composer slash-command registry (derived from `SLASH_COMMANDS`
+plus Elm-only verbs and its own copy). `ComposerAssist` suggests from
+it; bare `/help` opens the sheet built from `slashHelpGroups`. -}
 slashCommands : List SlashCommand
 slashCommands =
     [ { name = "me", usage = "/me <action>", description = "Send an action message.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
@@ -18563,7 +18563,7 @@ startPendingCreateRoom model request =
 
 {-| Settle a pending creation on the confirmed self-JOIN: send `TOPIC`
 when one was built, land inside (closing the browser), and prefill the
-first line — or just focus the composer when there is none. An expired
+first line when there is one. An expired
 pending clears silently. A foreign room never settles ours.
 -}
 settlePendingCreateRoom : Model -> String -> ( Model, List Outbound )
@@ -24776,11 +24776,11 @@ requestStewardDeleteRoom model channel =
                 stewardRefused model "Type the room name to delete it."
 
 
-{-| Owner-only webhook verbs (mirroring `webhookCreate`/`webhookList`/
+{-| Webhook verbs (mirroring `webhookCreate`/`webhookList`/
 `webhookDelete` over `sendRaw`: the store actions send unconditionally
-and the settings UI gates on op + connected — here the Room-care
-sheet is owner-only already, and the shared connected-owner gate
-covers offline). -}
+and the settings UI gates on op + connected — here `webhookGate`
+applies the same gate: any room host (as the server checks), any room
+size, and only while connected). -}
 requestWebhookCreate : Model -> String -> ( Model, List Outbound )
 requestWebhookCreate model channel =
     -- v3/gap-people: any room host (op and above, as the server checks),
@@ -32118,7 +32118,7 @@ that belongs to the caller's account (password-verified server-side;
 both surfacing through the normal message path). Mirrors the oracle
 `ghost`: silent unless live (the `!client` guard). The connect-screen
 reclaim dialog that supplies the password (`Connect.tsx handleReclaim`)
-has no Elm surface yet, so this constructor waits for it.
+has no Elm counterpart: the in-session dialog uses `reclaimNickWithPassword`.
 -}
 ghostNick : Model -> String -> String -> List Outbound
 ghostNick model nick password =
@@ -33463,8 +33463,8 @@ threadRowIndex newestFirst rowId =
 {-| The single must-show row for a conversation window (mirroring
 the anchor memo: active search hit, then the unread divider while
 the feed is in live-tail mode or freshly opened — never a stale
-divider over a historical page the user chose. Time-travel
-landings stay ahead: vault row ids do not map onto chat rows). -}
+divider over a historical page the user chose. Time-travel landings
+use `gapConvo.landing` (vault row ids do not map onto chat rows). -}
 threadAnchorIndex : Model -> Channel -> Maybe Int
 threadAnchorIndex model channel =
     let
@@ -38502,7 +38502,7 @@ foldChat model message isNotice =
                                 Nothing ->
                                     if isCtcpQueryBody isNotice sender model.ourNick resolvedBody then
                                         -- Inbound non-self CTCP query (or unknown
-                                        -- CTCP, ACTION included): answer the four
+                                        -- CTCP, ACTION excluded): answer the four
                                         -- known queries, swallow the row either
                                         -- way — mirroring the oracle `break`.
                                         ( model, foldCtcpQuery model sender resolvedBody )
@@ -39579,8 +39579,8 @@ pickAttachments model =
 
 
 {-| Stage picked files under the cap plan (mirrors `addFiles` +
-`planAttachmentAccept`; per-file photo sniffing stays a later
-slice — originals stage as-is). -}
+`planAttachmentAccept`; photo sniffing and metadata cleaning run
+ports-side, so originals stage as-is). -}
 stagePicked : Model -> String -> List { name : String, size : Float, mime : String } -> Model
 stagePicked model key files =
     let
@@ -41109,8 +41109,8 @@ updateCore msg model =
         VaultOpenHit { target, at } ->
             -- Navigate to the hit's conversation and hydrate around its
             -- stamp (mirrors `openVaultResult`: navigate + travelTo +
-            -- close; the travel merge sets `historyLanding`). The panel
-            -- closes, invalidating any scheduled scan.
+            -- close; the travel merge lands via `gapConvo.landing`). The
+            -- panel closes, invalidating any scheduled scan.
             let
                 ( navigated, navOut ) =
                     update (ChannelSelect target) (invalidateVaultSearch { model | searchOpen = False })
@@ -42658,7 +42658,7 @@ updateCore msg model =
             -- A quote for another conversation selects it first (which
             -- swaps the per-target drafts) and the merged prefix lands
             -- in the draft the send will use, stored and visible alike.
-            -- Caret/focus motion stays a narrowing (no caret state).
+            -- The composer takes focus in `gapSettleComposerFocus`.
             let
                 insert =
                     ComposerInject.formatQuoteInsert from body
@@ -45167,8 +45167,8 @@ updateCore msg model =
 
         InviteJoinSubmit ->
             -- Invalid names surface the error instead of navigating
-            -- (the oracle also moves focus to the field — a DOM
-            -- behaviour with no pure equivalent).
+            -- (the oracle also moves focus to the field — see below,
+            -- `PrefsFocus` does that here).
             case Invite.guestNameError model.inviteName of
                 Nothing ->
                     ( model, [ LoadUrl (inviteJoinHref model) ] )
@@ -45449,8 +45449,8 @@ updateCore msg model =
             ( { model | callSelfMuted = next }, [ VoiceMute { muted = next } ] )
 
         CallHubChanged hub ->
-            -- Engine-bridge seam (lands with the engine): lifecycle,
-            -- channel, peer, start time, and outcome in one snapshot.
+            -- Whole-hub snapshot seam (the engine's feed is `CallHubSnapshot`):
+            -- lifecycle, channel, peer, start time, and outcome in one snapshot.
             -- An idle hub releases the local capture flag with it.
             ( { model | calls = hub, callSelfMuted = model.callSelfMuted && hub.lifecycle /= Media.Idle }, [] )
 
@@ -50314,8 +50314,8 @@ statusSave draft model =
 
 {-| The residence document for this owner (mirroring
 `PortableIdentitySection.exportDoc`: refused without a device-memory
-owner). Favorites come from the starred rooms; this client keeps no
-folders or quiet hours.
+owner). Favorites come from the starred rooms; the folders and quiet
+hours kept by `Organizer` are not exported.
 -}
 portableExport : Model -> Maybe String
 portableExport model =

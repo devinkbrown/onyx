@@ -44,8 +44,8 @@ overlay, as pure data (mirroring `chat/spotlight/Spotlight.tsx`,
 
 The palette is a combobox: the input keeps DOM focus and the listbox
 highlight is virtual (`aria-activedescendant`). Navigation order is
-the display order (Rooms, then DMs, then Actions; best match first
-inside each), so the arrow keys never jump around the list.
+the display order (Recent, Rooms, DMs, People, then Actions; best
+match first inside each), so the arrow keys never jump around the list.
 
 Global keys arrive through ONE incoming `shortcut` port: `ports.js`
 owns the scope rules (never inside editable fields except Ctrl/Cmd+K
@@ -1045,8 +1045,8 @@ rank query items =
         |> List.sortBy (\m -> negate m.score)
 
 
-{-| Ranked rows in display (= navigation) order: Rooms, DMs, Actions,
-best match first inside each section. -}
+{-| Ranked rows in display (= navigation) order: Recent, Rooms, DMs,
+People, Actions, best match first inside each section. -}
 matches : String -> List Entry -> List Matched
 matches query items =
     rank query items

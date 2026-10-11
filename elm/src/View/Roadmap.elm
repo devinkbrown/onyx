@@ -10,9 +10,9 @@ The oracle's hash bridge (read `location.hash` on mount and on
 `roadmapPriority` syncs from the URL fragment on every navigation and
 `SelectRoadmapPriority` handles legend clicks. Modified clicks keep
 their native browser behaviour (the click decoder below only fires
-for unmodified left clicks). Moving keyboard focus onto the card
-(`focusRoadmapPriority`) is a DOM behaviour with no pure equivalent
-and stays a documented narrowing.
+for unmodified left clicks). Keyboard focus reaches the card through
+the fragment navigation (`pageNavigated` → `focusFragment`, ports.js,
+v3/rx-public).
 -}
 
 import App exposing (Model, Msg(..))

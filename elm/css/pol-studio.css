@@ -26,8 +26,8 @@
   background: var(--onyx-bg);
 }
 
-/* Ports-side scene canvas mount: fixed behind the chrome, never a
-   hit target, and a flat ground while no scene is mounted. */
+/* Appearance-page scene host (the canvas itself is #onyx-scene under <html>,
+   see gap-appearance.css): fixed behind the chrome, never a hit target. */
 .ap-background-host {
   position: fixed;
   inset: 0;

@@ -8,8 +8,8 @@ line, time, device-key warning and the calm offline-memo stamp) with a
 "New conversation" button, then "Browse rooms" / "Start a room".
 
 Section/sort/filter derivation lives in `Sidebar`; this module only
-renders it. Roving arrow-key focus, folders and the Activity entry stay
-with later slices (see COVERAGE).
+renders it. Roving arrow-key focus lives in ports.js; folders and the
+Activity row come from `View.Organize` and `View.GapShell.railExtras`.
 
 v3/ui-mobile-shell — Rooms and Messages are separate collections
 (`data-collection`): the selected nav collection shows only its own

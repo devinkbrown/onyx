@@ -7,9 +7,9 @@ frame with the "Native work" context line.
 
 The tab fold lives in `App` (`onyxosStage`, `SelectOnyxosStage`,
 `OnyxosStageKey` with wraparound + Home/End, mirroring
-`onTabKeyDown`). Moving DOM focus onto the newly selected tab is a
-DOM behaviour with no pure equivalent and stays a documented
-narrowing; roving `tabindex` and `aria-selected` still fold purely.
+`onTabKeyDown`). DOM focus follows the newly selected tab through
+`PrefsFocus` (v3/rx-public); roving `tabindex` and `aria-selected`
+fold purely.
 -}
 
 import App exposing (Model, Msg(..))

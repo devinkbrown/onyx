@@ -9,12 +9,12 @@ Fold ownership: the query card, join/sign-in hrefs, and name
 validation live in `App` (`inviteCard`, `inviteJoinHref`,
 `inviteSignInHref`); the copy round-trip is the `ClipboardCopy`
 outbound with a single-flight guard. Document metadata beyond the
-title (description/meta dance) stays ports-side.
+title is static head metadata stamped by `tools/materialize-route-entrypoints.mjs`.
 
 Narrowings: the decorative vein SVG is a CSS-owned `div` (no elm/svg
-dependency — the artwork is `aria-hidden` either way); moving focus
-to the name field on a failed submit is a DOM behaviour; the PWA
-update-coordinator hold while typing stays ports-side.
+dependency — the artwork is `aria-hidden` either way); the PWA
+update-coordinator hold while typing stays ports-side. A failed submit
+returns focus to the name field (`PrefsFocus`).
 -}
 
 import App exposing (InviteCopy(..), Model, Msg(..), inviteCard, inviteJoinHref, inviteSignInHref)

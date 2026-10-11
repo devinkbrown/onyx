@@ -7,9 +7,9 @@ receipt + the shared-receipt finish gate.
 
 Divergences are ports/DOM-shaped and documented: the native share-sheet
 button has no port (copy covers the receipt); Enter-to-add on the
-invitee field stays a DOM concern; the friend quick-add row has no Elm
-friends store yet; the next-hang label renders once `createHangLabel`
-is fed (locale formatting stays in JS).
+invitee field stays a DOM concern; the friend quick-add row is not
+rendered (`model.friends` exists, this sheet does not read it); the
+next-hang label is fed by the shell boot event (formatted in JS).
 -}
 
 import App exposing (Model, Msg(..), RoomSkin, canFinishCreateRoom, createShareUrl, formationCopy, formationInviteTarget, normalizeCreateRoomName, roomSkins)

@@ -362,11 +362,11 @@ formatIdle seconds =
 
 {-| The member card for the open profile (mirroring
 `PeopleProfileCard`: identity block with display name, pronouns,
-away/about, guest badge, presence line, Mention / Block / Copy
-name actions, and the Advanced disclosure with account, role,
-network role, hostmask, copy, network profile, and ledger rows;
-Message, Report, and moderation stay later slices behind their
-missing backends). -}
+away/about, guest badge, presence line, Message / Mention / Block /
+Report / Copy name actions, and the Advanced disclosure with account,
+role, network role, hostmask, copy, network profile, and ledger rows;
+room moderators also get the moderation controls
+(`moderationControls`)). -}
 profileCard : Model -> Html Msg
 profileCard model =
     case model.userProfileCard of

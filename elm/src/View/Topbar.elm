@@ -181,8 +181,8 @@ identityChip model =
 {-| Nick reclaim dialog, mirroring the connect form's GHOST reclaim:
 the account password for the taken name, a gated submit, and cancel.
 Rendered in the shell while `reclaimOpen`; the submit reuses the
-in-session GHOST+NICK fold (Elm auto-connects, so there is no
-pre-connect form to return to). Focus trap and Escape stay ahead.
+in-session GHOST+NICK fold (it runs on the live session, not through
+the connect gate). Focus trap and Escape come from `View.Sheet`.
 -}
 reclaimDialog : Model -> Html Msg
 reclaimDialog model =
