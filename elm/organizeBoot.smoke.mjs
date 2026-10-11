@@ -286,7 +286,7 @@ test("hiding a room from its row menu writes the owner-scoped key", async () => 
   try {
     const ls = b.window.localStorage;
     assert.equal(ls.getItem(key("hidden-rooms")), null);
-    q(b.doc, 'button[aria-label="Organize #elm"]').click();
+    q(b.doc, 'button[aria-label="Room options for #elm"]').click();
     await tick(b.dom);
     q(b.doc, '[data-testid="organize-hide"]').click();
     await tick(b.dom);

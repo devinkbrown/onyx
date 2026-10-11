@@ -20,7 +20,7 @@ Open / Remove controls (the durable queue stays ports-side).
 import App exposing (Channel, Model, Msg(..))
 import Dict
 import Home
-import Html exposing (Html, button, dd, div, dl, dt, h1, h2, h3, li, p, section, span, strong, text, ul)
+import Html exposing (Html, button, div, h1, h2, h3, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, id, tabindex, type_)
 import Html.Events exposing (onClick)
 import Outbox
@@ -78,12 +78,10 @@ home model =
             [ div [ class "onyx-home-masthead" ]
                 [ p [ class "onyx-home-welcome" ] [ text (Home.welcomeLine model.ourNick) ]
                 , h1 [ class "onyx-home-title" ] [ text (Home.title inbox) ]
-                , if plan.rooms > 0 then
-                    signalStrip plan
-
-                  else
-                    text ""
-                , if caughtUpEmpty then
+                , -- v3/rx-shell: no separate "Needs your attention" strip —
+                  -- the catch-up card below says it (heading, counts, Mark
+                  -- all caught up), so the numbers show once, above the fold.
+                  if caughtUpEmpty then
                     p [ class "onyx-home-caught-up", attribute "role" "status" ] [ text "Caught up in the rooms you joined." ]
 
                   else
@@ -126,21 +124,6 @@ home model =
               else
                 text ""
             , roomAccess joined dms
-            ]
-        ]
-
-
-signalStrip : Home.CaughtUpPlan -> Html Msg
-signalStrip plan =
-    section [ class "onyx-home-signal", attribute "aria-label" "Catch-up summary" ]
-        [ p [ class "onyx-home-signal-lead" ]
-            [ strong [] [ text "Needs your attention" ]
-            , text " "
-            , span [] [ text (Home.signalMessage plan) ]
-            ]
-        , dl [ class "onyx-home-signal-metrics" ]
-            [ div [] [ dt [] [ text "Unread" ], dd [] [ text (String.fromInt plan.unread) ] ]
-            , div [] [ dt [] [ text "Mentions" ], dd [] [ text (String.fromInt plan.mentions) ] ]
             ]
         ]
 

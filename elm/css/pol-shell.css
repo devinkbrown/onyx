@@ -510,7 +510,9 @@
      0. shell glyphs (.onyx-shi — CSS masks, never font glyphs)
      1. desktop frame, topbar, nav rail, sidebar, room header
      2. narrower windows
-     3. phones (<768px): one slim bar, list pages, pushed conversation
+     3. phones (<600px): one slim bar, list pages, pushed conversation
+   v3/rx-shell — phones end at 600px: from there the frame is a real
+   two-pane (nav rail · list · conversation), see css/rx-shell.css.
    ═══════════════════════════════════════════════════════════════════ */
 
 /* 0. Shell glyphs ------------------------------------------------------ */
@@ -1137,7 +1139,7 @@
 
 /* The context rail is for rooms: Home, DMs and the calls hub give its
    column back to the conversation. */
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   .onyx-frame:not([data-convo="room"]) { grid-template-columns: var(--nav-rail-w) var(--sidebar-w) minmax(0, 1fr) 0; }
   .onyx-frame:not([data-convo="room"]) > .onyx-roster { display: none; }
 }
@@ -1149,7 +1151,7 @@
 }
 
 /* 3. Phones ------------------------------------------------------------- */
-@media (max-width: 767.98px) {
+@media (max-width: 599.98px) {
   /* One slim bar: page title (brand on Home), search, inbox. */
   .onyx-frame > .onyx-topbar {
     display: flex;
@@ -1212,14 +1214,18 @@
     min-height: 56px;
     padding: 0 var(--space-1);
   }
+  /* v3/rx-shell: the waiting count sits beside the chevron (iOS-style),
+     in flow, so it never covers the room name. */
   .onyx-frame .onyx-room-back {
     position: relative;
-    display: inline-grid;
-    place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
     flex: none;
-    width: 40px;
+    min-width: 40px;
     min-height: 44px;
-    padding: 0;
+    padding: 0 var(--space-1) 0 0;
     color: var(--onyx-text);
     background: transparent;
     border: 0;
@@ -1228,21 +1234,18 @@
   }
   .onyx-room-back .onyx-shi { width: 24px; height: 24px; }
   .onyx-room-back-count {
-    position: absolute;
-    top: 4px;
-    right: -2px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
     box-sizing: border-box;
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     font-weight: 700;
-    line-height: 16px;
+    line-height: 20px;
     text-align: center;
+    font-variant-numeric: tabular-nums;
     color: var(--onyx-bg);
     background: var(--onyx-text);
     border-radius: var(--r-pill);
-    box-shadow: 0 0 0 2px var(--onyx-bg);
   }
   .onyx-frame .onyx-room-header-id { gap: var(--space-2); padding-left: 2px; }
   .onyx-frame .onyx-room-header .onyx-room-privacy { display: none; }
@@ -1314,7 +1317,7 @@
   .onyx-rail .onyx-rail-title { display: none; }
   .onyx-frame .onyx-rail-filter { gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4) var(--space-2); }
   .onyx-frame .onyx-rail-filter-input {
-    min-height: 40px;
+    min-height: 44px;
     padding-left: 36px;
     font-size: 16px;
     background: var(--onyx-panel);
@@ -1323,7 +1326,7 @@
   }
   .onyx-rail-filter-icon { left: 12px; width: 18px; height: 18px; }
   .onyx-rail .onyx-rail-filter-unread,
-  .onyx-rail .onyx-rail-filter-clear { min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+  .onyx-rail .onyx-rail-filter-clear { min-height: 44px; padding: 0 var(--space-3); font-size: var(--text-sm); }
   .onyx-rail .onyx-rail-filter-empty { padding: 0 var(--space-4); }
   .onyx-rail .onyx-rail-section { margin: 0 0 var(--space-2); }
   .onyx-rail .onyx-rail-label,
@@ -1332,7 +1335,7 @@
   .onyx-rail .onyx-rail-section-heading .onyx-rail-label { padding: 0; }
   .onyx-rail .onyx-rail-new { min-height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); }
   .onyx-rail .onyx-rail-new .onyx-shi { width: 18px; height: 18px; }
-  .onyx-rail .onyx-rail-filter .onyx-rail-new { justify-content: center; min-width: 40px; min-height: 40px; padding: 0; }
+  .onyx-rail .onyx-rail-filter .onyx-rail-new { justify-content: center; min-width: 44px; min-height: 44px; padding: 0; }
   .onyx-rail .onyx-rail-filter .onyx-rail-new .onyx-shi { width: 20px; height: 20px; }
   .onyx-rail-filter .onyx-rail-new-label { display: none; }
   .onyx-rail .onyx-rail-empty { padding: var(--space-2) var(--space-4); font-size: var(--text-md); }
@@ -1463,6 +1466,6 @@
 /* Keyboard up (pol-ios.css pins the frame to the visible band): the
    composer sits on the keyboard, so the convo page drops its
    home-indicator pad. */
-@media (max-width: 767.98px) {
+@media (max-width: 599.98px) {
   :root[data-kb="open"] .onyx-frame > .onyx-main { padding-bottom: 0; }
 }
