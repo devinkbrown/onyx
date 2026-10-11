@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/* global getComputedStyle, innerHeight, innerWidth, NodeFilter, Image -- the page* functions run in the browser (page.evaluate) */
 /**
  * contrast-audit.mjs — measure the REAL rendered contrast of every visible
  * text node on a Playwright page (v3/gap-appearance).
