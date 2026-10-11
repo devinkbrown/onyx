@@ -10640,7 +10640,15 @@ function fetchPublicFeed(url) {
       }
       if (composerField()) setDrop(true);
       if (dropTimer) clearTimeout(dropTimer);
-      dropTimer = setTimeout(function () { setDrop(false); }, 250);
+      /* A stationary drag still re-fires dragover about every 350ms; a
+         drag that left the window fires nothing, so the target clears
+         after a quiet beat (and at once on a dragleave out of the page). */
+      dropTimer = setTimeout(function () { setDrop(false); }, 900);
+    });
+    doc.addEventListener("dragleave", function (event) {
+      if (!gapDragHasFiles(event) || event.relatedTarget) return;
+      if (dropTimer) clearTimeout(dropTimer);
+      setDrop(false);
     });
     doc.addEventListener("drop", function (event) {
       if (!gapDragHasFiles(event)) return;
@@ -10743,13 +10751,40 @@ function fetchPublicFeed(url) {
   function installGapFocus(doc, Mutation) {
     if (!doc || typeof doc.querySelector !== "function") return null;
     var layers = [
-      { sel: ".onyx-msg-menu", first: '[role="menuitem"]:not([disabled])', open: false, back: null },
-      { sel: ".onyx-react-picker", first: ".onyx-react-search", open: false, back: null },
-      { sel: ".onyx-message-search", first: "#onyx-message-search-input", open: false, back: null }
+      { sel: ".onyx-msg-menu", first: '[role="menuitem"]:not([disabled])', open: false, back: null, backKey: null, trigger: ".onyx-msg-menu-trigger" },
+      { sel: ".onyx-react-picker", first: ".onyx-react-search", open: false, back: null, backKey: null, trigger: '[data-row-action="react"], .onyx-msg-menu-trigger' },
+      { sel: ".onyx-message-search", first: "#onyx-message-search-input", open: false, back: null, backKey: null, trigger: null }
     ];
     function focusEl(el) {
       if (!el) return;
       try { el.focus({ preventScroll: true }); } catch (err) { try { el.focus(); } catch (ignored) { /* best-effort */ } }
+    }
+    /* The opener is re-resolved on close: a message row re-renders as a
+       different node while its menu is open, so the very button that
+       opened the menu may be gone — fall back to the same row's menu
+       trigger (or the row itself), found by its stable row key. */
+    var lastPress = { el: null, at: 0 };
+    function remember(event) {
+      var t = event && event.target;
+      if (!t || typeof t.closest !== "function") return;
+      var control = t.closest("button, [role='button'], a, input, textarea");
+      if (control) { lastPress.el = control; lastPress.at = Date.now(); }
+    }
+    function rowKeyOf(el) {
+      var row = el && typeof el.closest === "function" ? el.closest("[data-row-key]") : null;
+      return row ? row.getAttribute("data-row-key") : null;
+    }
+    function reopener(layer) {
+      var back = layer.back;
+      if (back && back.isConnected) return back;
+      if (!layer.backKey || typeof doc.querySelectorAll !== "function") return null;
+      var rows = doc.querySelectorAll("[data-row-key]");
+      for (var r = 0; r < rows.length; r += 1) {
+        if (rows[r].getAttribute("data-row-key") !== layer.backKey) continue;
+        var trigger = layer.trigger ? rows[r].querySelector(layer.trigger) : null;
+        return trigger || rows[r];
+      }
+      return null;
     }
     function settle() {
       for (var i = 0; i < layers.length; i += 1) {
@@ -10757,15 +10792,22 @@ function fetchPublicFeed(url) {
         var node = doc.querySelector(layer.sel);
         if (node && !layer.open) {
           layer.open = true;
-          layer.back = doc.activeElement || null;
+          var opener = doc.activeElement;
+          /* The opener may already be gone (its row re-rendered when the
+             menu opened) or never focused (Safari buttons): fall back to
+             the last control the user pressed a moment ago. */
+          if ((!opener || opener === doc.body) && lastPress.el && Date.now() - lastPress.at < 2000) opener = lastPress.el;
+          layer.back = opener && opener !== doc.body ? opener : null;
+          layer.backKey = rowKeyOf(layer.back);
           if (!node.contains(doc.activeElement)) focusEl(node.querySelector(layer.first));
         } else if (!node && layer.open) {
           layer.open = false;
-          var back = layer.back;
+          var back = reopener(layer);
           layer.back = null;
+          layer.backKey = null;
           var active = doc.activeElement;
           var lost = !active || active === doc.body || (typeof active.isConnected === "boolean" && !active.isConnected);
-          if (back && lost && back.isConnected) focusEl(back);
+          if (back && lost) focusEl(back);
         }
       }
     }
@@ -10814,6 +10856,8 @@ function fetchPublicFeed(url) {
       }
     }
     doc.addEventListener("keydown", onKey);
+    doc.addEventListener("pointerdown", remember, true);
+    doc.addEventListener("focusin", remember, true);
     if (Mutation) {
       try {
         new Mutation(function () { settle(); }).observe(doc.body || doc.documentElement, { childList: true, subtree: true });
