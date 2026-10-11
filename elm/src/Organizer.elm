@@ -716,7 +716,7 @@ update ctx msg raw =
                         in
                         ( { state | bookmarks = bookmarks }
                         , storeBookmarks owner bookmarks
-                            ++ [ Toast "Message saved" (Just "Find it in Saved messages, from You or the room menu.") ]
+                            ++ [ Toast "Message saved" (Just "Find it under Saved messages.") ]
                         )
 
         BookmarkRemove target id ->

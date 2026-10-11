@@ -77,6 +77,13 @@ async function extra(page, label) {
   const out = process.env.ORG_OUT;
   if (!out) return;
   const { width, height } = page.viewportSize();
+  // Toasts left by the steps before would sit over the surface under test.
+  for (let i = 0; i < 6; i += 1) {
+    const btn = await page.$('.onyx-toast__dismiss');
+    if (!btn) break;
+    await btn.click().catch(() => {});
+    await page.waitForTimeout(120);
+  }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   await page.screenshot({ path: `${out}/${label}--${width}x${height}.png` }).catch(() => {});
   if (overflow > 1) throw new Error(`horizontal overflow ${overflow}px at ${label}`);
@@ -256,6 +263,7 @@ export default {
       await clickVisible(page, ['[data-testid="member-note-save"]'], h);
     }
     await extra(page, 'note');
+    await clickVisible(page, ['[aria-label="Close profile for mara"]'], h);
     await dismissAsks(page, h);
     await clickVisible(page, ['[data-testid="room-more"]'], h);
     await clickVisible(page, ['[data-testid="ribbon-room-settings"]'], h, 600);
