@@ -68,6 +68,20 @@ async function snap(page, label) {
   await page.screenshot({ path: `${process.env.ORG_DEBUG}/${String(dbg).padStart(2, '0')}-${label}.png` }).catch(() => {});
 }
 
+/**
+ * An extra named shot inside one scenario (ORG_OUT=dir): one fixture per
+ * viewport serves several screens. Throws on horizontal overflow so the
+ * run reports it like screens.mjs does for the final shot.
+ */
+async function extra(page, label) {
+  const out = process.env.ORG_OUT;
+  if (!out) return;
+  const { width, height } = page.viewportSize();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  await page.screenshot({ path: `${out}/${label}--${width}x${height}.png` }).catch(() => {});
+  if (overflow > 1) throw new Error(`horizontal overflow ${overflow}px at ${label}`);
+}
+
 async function say(page, h, text) {
   await snap(page, 'say');
   await page.fill('#shell-composer-input', text, { timeout: 5000 });
@@ -170,8 +184,127 @@ async function openRoom(page, h, name) {
   return false;
 }
 
+/** Save the message `fromEnd` rows from the bottom through its menu. */
+async function saveRow(page, h, fromEnd) {
+  const rows = await page.$$('.onyx-message');
+  const row = rows[rows.length - fromEnd];
+  if (!row) return;
+  await row.scrollIntoViewIfNeeded();
+  if (isPhone(page)) {
+    const box = await row.boundingBox();
+    await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
+  } else {
+    await row.hover();
+  }
+  await h.settle(page, 250);
+  const trigger = await row.$('.onyx-msg-menu-trigger');
+  if (trigger) { await trigger.click().catch(() => {}); await h.settle(page, 300); }
+  await clickVisible(page, ['[data-testid="msg-menu-save"]'], h);
+  await page.keyboard.press('Escape');
+}
+
+async function homeTab(page, h) {
+  await clickVisible(page, ['[data-testid="room-back"]'], h);
+  await clickVisible(page, ['.onyx-mobile-nav [data-testid="nav-home"]', '.onyx-primary-nav [data-testid="nav-home"]'], h, 600);
+  await page.mouse.move(5, 5);
+}
+
+async function openYou(page, h) {
+  await toList(page, h, 'rooms');
+  await clickVisible(page, ['[data-testid="you-open"]', '.onyx-mobile-nav [data-testid="nav-you"]'], h);
+}
+
 export default {
   ...shell,
+  // ---- composite scenarios (several shots per fixture; see extra()) ----
+  'orgm-lists': async (page, h) => {
+    await setup(page, h);
+    await toList(page, h, 'rooms');
+    await clickVisible(page, ['[data-testid="sidebar-hidden-toggle"]'], h);
+    await page.mouse.move(700, 450);
+    await extra(page, 'rooms');
+    await rowMore(page, h, '#lounge');
+    await extra(page, 'row-menu');
+    await clickVisible(page, ['[data-testid="organize-move"]'], h);
+    await extra(page, 'move');
+    await dismissAsks(page, h);
+    await toList(page, h, 'messages');
+    await rowMore(page, h, 'jun');
+    await extra(page, 'dm-menu');
+    await clickVisible(page, ['[data-testid="organize-close"]'], h);
+    await clickVisible(page, ['[data-testid="sidebar-closed-toggle"]'], h);
+    await page.mouse.move(700, 450);
+  },
+  'orgm-room': async (page, h) => {
+    await setup(page, h, { organize: false });
+    await openRoom(page, h, '#lounge');
+    await saveRow(page, h, 3);
+    await saveRow(page, h, 5);
+    await h.settle(page, 300);
+    await clickVisible(page, ['[data-testid="room-more"]'], h);
+    await extra(page, 'room-more');
+    await clickVisible(page, ['[data-testid="room-more-saved"]'], h);
+    await extra(page, 'saved');
+    await dismissAsks(page, h);
+    const card = ['[aria-label="View member card for mara"]'];
+    if (!(await clickVisible(page, card, h))) {
+      await clickVisible(page, ['[data-testid="members-toggle"]'], h);
+      await clickVisible(page, card, h);
+    }
+    if (await clickVisible(page, ['[data-testid="member-note-add"]'], h)) {
+      await page.fill('[data-testid="member-note-input"]', 'Runs the design crit on Thursdays. Prefers async reviews.', { timeout: 5000 });
+      await clickVisible(page, ['[data-testid="member-note-save"]'], h);
+    }
+    await extra(page, 'note');
+    await dismissAsks(page, h);
+    await clickVisible(page, ['[data-testid="room-more"]'], h);
+    await clickVisible(page, ['[data-testid="ribbon-room-settings"]'], h, 600);
+    await extra(page, 'rset');
+    await dismissAsks(page, h);
+    await clickVisible(page, ['[data-testid="room-more"]'], h);
+    await clickVisible(page, ['[data-testid="room-more-reader"]'], h, 600);
+    await page.mouse.move(5, 300);
+  },
+  'orgm-dm': async (page, h) => {
+    await setup(page, h, { organize: false });
+    await clickVisible(page, ['[data-testid="room-more"]'], h);
+  },
+  'orgm-home': async (page, h) => {
+    const ws = await setup(page, h);
+    await openRoom(page, h, '#lounge');
+    await saveRow(page, h, 4);
+    await homeTab(page, h);
+    await extra(page, 'home');
+    ws.drop();
+    await h.settle(page, 900);
+    await homeTab(page, h);
+  },
+  'orgm-prefs': async (page, h) => {
+    await setup(page, h);
+    await openYou(page, h);
+    await clickVisible(page, ['[data-testid="shell-notifications"]'], h, 500);
+    await clickVisible(page, ['[data-testid="notify-quiet-toggle"]'], h);
+    await clickVisible(page, ['[data-testid="notify-preset-calm"]'], h);
+    const quiet = await page.$('[data-testid="notify-quiet"]');
+    if (quiet) await quiet.scrollIntoViewIfNeeded();
+    await h.settle(page, 300);
+    await extra(page, 'notify');
+    await page.fill('[data-testid="notify-smart-words"]', 'crypto airdrop, free nitro');
+    await page.fill('[data-testid="notify-smart-people"]', 'deploy-bot');
+    await clickVisible(page, ['[data-testid="notify-smart-save"]'], h);
+    const smart = await page.$('[data-testid="notify-smart-mute"]');
+    if (smart) await smart.scrollIntoViewIfNeeded();
+    await h.settle(page, 300);
+    await extra(page, 'smart');
+    await dismissAsks(page, h);
+    await openYou(page, h);
+    await clickVisible(page, ['[data-testid="you-settings-open-preferences"]'], h, 500);
+    await clickVisible(page, ['#pref-category-tab-conversation'], h, 400);
+    const group = await page.$('[data-testid="pref-organize"]');
+    if (group) await group.scrollIntoViewIfNeeded();
+    await h.settle(page, 300);
+  },
+  // ---- single-screen scenarios (debugging one surface) ----
   'org-rooms': async (page, h) => {
     await setup(page, h);
     await toList(page, h, 'rooms');
