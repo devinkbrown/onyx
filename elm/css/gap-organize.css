@@ -647,13 +647,16 @@
 :root .onyx-frame[data-reader="true"] > .onyx-main { grid-area: main; display: flex; }
 
 .onyx-frame[data-reader="true"] {
-  --gorg-measure: 68ch;
+  --gorg-measure: 42rem;
   --gorg-gutter: max(var(--space-4), calc((100% - var(--gorg-measure)) / 2));
 }
 .onyx-frame[data-reader="true"] .onyx-room-header { padding-inline: var(--gorg-gutter) calc(var(--gorg-gutter) + 112px); }
 .onyx-frame[data-reader="true"] .onyx-room-header-actions > :not(.onyx-room-more) { display: none; }
 .onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane { padding-inline: var(--space-4); }
-.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane > * {
+/* The transcript sits inside a display:contents frame, so the measure
+   goes on its real children (log, typing line, jump controls) too. */
+.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane > *,
+.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane > .onyx-thread-frame > * {
   max-width: var(--gorg-measure);
   margin-inline: auto;
 }
@@ -674,7 +677,7 @@
 
 .gorg-reader-bar {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
   right: calc(env(safe-area-inset-right, 0px) + var(--space-4));
   z-index: 40;
   display: flex;
@@ -706,7 +709,7 @@
   .onyx-rail .gorg-folder-head,
   .onyx-rail .gorg-tucked-toggle { min-height: var(--target-min); }
   .onyx-rail .gorg-tucked-open,
-  .onyx-rail .gorg-tucked-action { min-height: 40px; }
+  .onyx-rail .gorg-tucked-action { min-height: var(--target-min); }
   .gorg-btn,
   .gorg-input,
   .gorg-select { min-height: var(--target-min); }
@@ -715,7 +718,8 @@
   .gorg-switch { width: 48px; height: 28px; }
   .gorg-switch-knob { width: 20px; height: 20px; }
   .gorg-switch[aria-checked="true"] .gorg-switch-knob { transform: translateX(20px); }
-  .gorg-reader-exit { min-height: 36px; }
+  .gorg-reader-bar { top: calc(env(safe-area-inset-top, 0px) + 4px); }
+  .gorg-reader-exit { min-height: var(--target-min); }
   .gorg-outbox-actions .gorg-btn { min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
 }
 
@@ -757,6 +761,12 @@
   .gorg-prefs .gorg-new-folder { flex-wrap: wrap; }
   .gorg-prefs .gorg-new-folder .gorg-btn { flex: 1 1 100%; }
   .gorg-folder-row-actions { flex-wrap: wrap; }
+}
+
+/* Short landscape phones: the header is shorter, so the exit control
+   sits flush with its top edge. */
+@media (hover: none) and (max-height: 500px) {
+  .gorg-reader-bar { top: env(safe-area-inset-top, 0px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
