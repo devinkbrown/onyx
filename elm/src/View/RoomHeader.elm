@@ -55,6 +55,7 @@ import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
 import View.Roster
+import View.WatchTogether -- v3/gap-watch
 
 
 roomHeader : Model -> Html Msg
@@ -277,6 +278,7 @@ moreMenu model name isRoom channel =
                                , mediaToggle model
                                , jumpToggle model
                                , View.Polish.scrubberToggle model -- v3/polish
+                               , View.WatchTogether.menuItem model -- v3/gap-watch
                                ]
                             ++ View.ModDesk.moderationToggle model
                         )

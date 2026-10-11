@@ -32,6 +32,8 @@ import View.MessageText exposing (messageText)
 import View.CallStage
 -- v3/calls-c11
 import View.StageMode
+-- v3/gap-watch
+import View.WatchTogether
 import View.Sheet as Sheet
 
 
@@ -50,6 +52,15 @@ thread model =
           case model.activeChannel of
             Just target ->
                 View.CallStage.roomCallSurface model target
+
+            Nothing ->
+                text ""
+        , -- v3/gap-watch: the room's watch-together card (self-gates on the
+          -- preference and the room's `ocean.watch` value); sticky above
+          -- the transcript
+          case model.activeChannel of
+            Just target ->
+                View.WatchTogether.card model target
 
             Nothing ->
                 text ""

@@ -74,6 +74,7 @@ import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.WatchTogether -- v3/gap-watch
 
 
 view : Model -> Browser.Document Msg
@@ -333,6 +334,8 @@ overlays model =
         -- v3/calls-c11
         , View.StageMode.handsSheet model
         , View.StageMode.leaveConfirm model
+        -- v3/gap-watch
+        , View.WatchTogether.startSheet model
         , reclaimDialog model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
