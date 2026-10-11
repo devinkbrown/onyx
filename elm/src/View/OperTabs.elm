@@ -297,7 +297,8 @@ bansTab model =
                                         }
                                     )
                                , durationFields { prefix = "oc-ban", duration = ban.duration, choice = BanDurationChoice, amount = BanDurationAmount, unit = BanDurationUnit }
-                               , K.field { id = "oc-ban-reason", label = "Reason", hint = "Recorded with the ban and shown to the person." }
+                               , K.field { id = "oc-ban-reason", label = "Reason", hint = "Recorded with the ban. Someone it disconnects can see the reason."
+ }
                                     (K.textInput
                                         { id = "oc-ban-reason"
                                         , value = ban.reason

@@ -254,7 +254,7 @@ suite =
                         staged =
                             send oper (Run (ShunAdd { mask = "*!*@bad.example", duration = OperPlan.blankDuration, reason = "flooding" })) withForm |> stateOf
                     in
-                    Expect.equal [ "SHUN *!*@bad.example :flooding", "SHUN" ] (lines (send oper Confirm staged))
+                    Expect.equal [ "SHUN *!*@bad.example 0 :flooding", "SHUN" ] (lines (send oper Confirm staged))
             , test "a gag reflection is logged in Silence" <|
                 \_ ->
                     let
@@ -618,7 +618,23 @@ suite =
                     in
                     Expect.equal [] (C.observeEvent guest draft C.blank).audit
             ]
+        , describe "older desk forms"
+            [ test "a refusal after an older-desk send lands in Network" <|
+                \_ ->
+                    let
+                        armed =
+                            C.armFor oper "KILL" C.blank
+
+                        state =
+                            feedLine (later 400 oper) ":onyx.test 401 root ghost :No such nick" armed
+                    in
+                    Expect.equal [ ( Network, Bad ) ] (List.map (\l -> ( l.section, l.tone )) state.log)
+            , test "an EVENT command arms the Live tab" <|
+                \_ ->
+                    Expect.equal Feed (C.armFor oper "EVENT" C.blank).claimSection
+            ]
         , describe "reply log"
+
 
             [ test "is bounded" <|
                 \_ ->

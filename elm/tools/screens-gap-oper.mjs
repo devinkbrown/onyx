@@ -122,7 +122,7 @@ const EVENTS = [
 ];
 
 async function operSession(page, h, opts = {}) {
-  const nick = 'root';
+  const nick = opts.nick || 'root';
   const d = daemon(nick);
   let socket = null;
   await page.routeWebSocket(/\/ws(\?.*)?$/, (ws) => {
@@ -134,8 +134,17 @@ async function operSession(page, h, opts = {}) {
       for (const line of String(m).split(/\r?\n/)) if (line.trim()) for (const r of d.handle(line)) ws.send(r);
     });
   });
-  await h.joinRoom(page, nick, '');
+  if (opts.gate) {
+    await page.goto(`${h.base}/app?${h.pin}`);
+    await h.settle(page, 700);
+    return { send: (line) => socket && socket.send(line), events: () => {}, d };
+  }
+  await h.joinRoom(page, nick, opts.room === undefined ? '' : opts.room);
   const send = (line) => socket && socket.send(line);
+  if (opts.oper === false) {
+    await h.settle(page, 300);
+    return { send, events: () => {}, d };
+  }
   send(`:${SRV} 381 ${nick} :You are now an IRC operator`);
   await h.settle(page, 400);
   for (let i = 0; i < 3 && (await page.$('[role="dialog"]')); i += 1) { await page.keyboard.press('Escape'); await h.settle(page, 250); }
@@ -173,6 +182,23 @@ async function fillAll(page, pairs) {
 }
 
 export default {
+  'appeal-gate': async (page, h) => {
+    await operSession(page, h, { gate: true, oper: false });
+    await page.click('[data-testid="appeal-open"]');
+    await h.settle(page, 400);
+    await page.fill('[data-testid="appeal-text-appeal"]', 'I was banned while sharing a connection with my brother. We are two different people.');
+    await page.click('[data-testid="appeal-submit-appeal"]');
+    await h.settle(page, 400);
+  },
+  'appeal-filed': async (page, h) => {
+    await operSession(page, h, { oper: false, nick: 'kai', room: '#lounge' });
+    const box = await page.$('#shell-composer-input');
+    if (box) { await box.fill('/appeal I was muted by mistake, please look again'); await page.keyboard.press('Enter'); }
+    else { await page.evaluate(() => {}); }
+    await h.settle(page, 500);
+    const submit = await page.$('[data-testid="appeal-submit-appeal"]');
+    if (submit) { await submit.click(); await h.settle(page, 500); }
+  },
   'oper-live': async (page, h) => {
     const s = await operSession(page, h);
     await openDesk(page, h);
@@ -197,7 +223,7 @@ export default {
     await h.settle(page, 300);
     const rects = await page.evaluate(() => {
       const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.bottom), Math.round(b.left), Math.round(b.right)]; };
-      return { sheet: r('[data-testid="oper-sheet"]'), tabs: r('[data-testid="oc-tabs"]'), close: r('[data-testid="oper-sheet"] .onyx-sheet-close'), vp: [innerWidth, innerHeight] };
+      return { sheet: r('[data-testid="oper-sheet"]'), tabs: r('[data-testid="oc-tabs"]'), close: r('[data-testid="oper-sheet"] .onyx-sheet-close'), vp: [window.innerWidth, window.innerHeight] };
     });
     console.log('MEASURE', page.viewportSize().width, JSON.stringify(rects));
   },

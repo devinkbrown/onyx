@@ -1201,7 +1201,9 @@ add or touch.
 
 ### P3 — network operator tooling
 
-All of these are RAW today. The sketch is one oper console with typed forms
+**v3/gap-oper update:** items 42–47 are built in the operator console (tabs Live, Bans, Silence, Abuse, Appeals, Content, Network; replies stay in the desk, every change is reviewed first). D5 is closed (`Spine.foldEventLine` → `OperFeed`). Items 48, 49 and 51 are partial (`ACCOUNT` admin, `PRIVS`/`GRANTS`/`AUDIT` views, `MESH`/`NETHEALTH`/`ROUTE`/`STATS` reports, `REHASH`/`UNREJECT`/`DRAIN`/`CONNECT`/`SQUIT`/`GLOBAL`). Still open: 48 (`VHOST` approvals, `SACCESS`, `RESV`, `JUPE`), 49 (`GRANT`/`REVOKE`, `AUDIT PROOF`), 50, 51 (`UPGRADE`, `DIE`/`RESTART`, `CLOSE`), 52. User-side appeal (item 46) is the connect-screen **Appeal a ban** button and `/appeal`.
+
+All of these are RAW today (the list below is the pre-gap-oper state). The sketch is one oper console with typed forms
 plus folds for their NOTICE and numeric output. It can reuse the `src/View/ModDesk.elm`
 `operSheet` and `planOperAction` validation (`src/App.elm:14179`).
 

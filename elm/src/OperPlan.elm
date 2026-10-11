@@ -16,6 +16,7 @@ module OperPlan exposing
     , maxReasonLength
     , plan
     , preview
+    , serverActions
     , serverQueries
 
     , toLine
@@ -290,6 +291,7 @@ type Intent
     | EventStats
     | ServerQuery { verb : String, arg : String }
     | AccountAdmin { action : String, account : String, on : Bool }
+    | ServerAction { action : String, arg : String, arg2 : String }
 
 
 {-| Read-only server queries the Network tab offers, each with the
@@ -313,6 +315,24 @@ serverQueries =
     , { verb = "STATS", arg = "l", label = "Server links", hint = "Established links with queue sizes and uptime." }
     , { verb = "STATS", arg = "z", label = "Runtime counters", hint = "Internal counters for this node." }
     , { verb = "STATS", arg = "m", label = "Command usage", hint = "How often each command has run." }
+    , { verb = "STATS", arg = "c", label = "Auto-linked peers", hint = "Nodes this one dials out to." }
+    , { verb = "STATS", arg = "i", label = "Allow rules", hint = "Which connection classes may connect." }
+    , { verb = "OPERMOTD", arg = "", label = "Operator message of the day", hint = "The note operators see." }
+    , { verb = "MODULES", arg = "", label = "Loaded modules", hint = "Which feature modules this node runs." }
+    ]
+
+
+{-| The node-level controls the Network tab offers (every one is
+reviewed before it is sent): label, the argument names, and the
+plain-language effect. -}
+serverActions : List { action : String, label : String, arg : String, arg2 : String, hint : String }
+serverActions =
+    [ { action = "UNREJECT", label = "Clear an address's penalty", arg = "Address", arg2 = "", hint = "Forgets the connection penalty that is turning this IP away." }
+    , { action = "DRAIN", label = "Stop accepting new connections", arg = "", arg2 = "", hint = "People already connected stay. Use this before maintenance." }
+    , { action = "DRAIN_OFF", label = "Accept new connections again", arg = "", arg2 = "", hint = "Ends a drain." }
+    , { action = "CONNECT", label = "Link to another node", arg = "Host", arg2 = "Port", hint = "Dials a node and joins the mesh." }
+    , { action = "SQUIT", label = "Unlink a node", arg = "Server name", arg2 = "", hint = "Drops the link to that node." }
+    , { action = "GLOBAL", label = "Message everyone on this node", arg = "Message", arg2 = "", hint = "A notice every connected person sees. Not the same as announcing to operators." }
     ]
 
 
@@ -378,7 +398,8 @@ plan intent =
                 (\m secs r ->
                     mk Silence
                         "SHUN"
-                        ([ m ] ++ secondsArg secs)
+                        [ m, String.fromInt secs ]
+
                         (Just r)
                         ("Silently drop everything from " ++ m ++ " " ++ describeDuration secs ++ ". They are not told. Reason: " ++ r)
                         True
@@ -688,6 +709,9 @@ plan intent =
                         _ ->
                             Err [ "That account action is not one the desk offers." ]
 
+        ServerAction { action, arg, arg2 } ->
+            planServerAction action arg arg2
+
         ServerQuery { verb, arg } ->
 
             if List.any (\q -> q.verb == verb && q.arg == arg) serverQueries then
@@ -710,7 +734,51 @@ plan intent =
                 Err [ "That query is not one the desk offers." ]
 
 
+planServerAction : String -> String -> String -> Result (List String) Command
+planServerAction action arg arg2 =
+    case action of
+        "UNREJECT" ->
+            token 64 "address" arg
+                |> Result.map (\ip -> mk Network "UNREJECT" [ ip ] Nothing ("Forget the connection penalty on " ++ ip ++ ".") True False)
+                |> listErr
+
+        "DRAIN" ->
+            Ok (mk Network "DRAIN" [] Nothing "Stop accepting new connections on this node. People already connected stay." True True)
+
+        "DRAIN_OFF" ->
+            Ok (mk Network "DRAIN" [ "OFF" ] Nothing "Accept new connections on this node again." True False)
+
+        "CONNECT" ->
+            case ( token 255 "host" arg, String.toInt (String.trim arg2) ) of
+                ( Ok host, Just portNumber ) ->
+                    if portNumber >= 1 && portNumber <= 65535 then
+                        Ok (mk Network "CONNECT" [ host, String.fromInt portNumber ] Nothing ("Dial " ++ host ++ " port " ++ String.fromInt portNumber ++ " and link it into the mesh.") True True)
+
+                    else
+                        Err [ "A port is a number from 1 to 65535." ]
+
+                ( Err message, _ ) ->
+                    Err [ message ]
+
+                ( _, Nothing ) ->
+                    Err [ "A port is a number from 1 to 65535." ]
+
+        "SQUIT" ->
+            token 255 "server name" arg
+                |> Result.map (\name -> mk Network "SQUIT" [ name ] Nothing ("Drop the link to " ++ name ++ ".") True True)
+                |> listErr
+
+        "GLOBAL" ->
+            freeText 400 "message" arg
+                |> Result.map (\text -> mk Network "GLOBAL" [] (Just text) "Send this notice to everyone connected to this node." True True)
+                |> listErr
+
+        _ ->
+            Err [ "That node action is not one the desk offers." ]
+
+
 mk : Section -> String -> List String -> Maybe String -> String -> Bool -> Bool -> Command
+
 mk section verb args trailing summary mutates destructive =
     { verb = verb
     , args = args
@@ -1128,6 +1196,12 @@ tooBroad pattern =
     literalCount < 3 || starCount > 3
 
 
+{-| A reason for a ban, shun or quarantine. The daemon scans `WARD` /
+`KLINE` / `SHUN` arguments positionally — the first token that is a
+scope, an action or a number is read as one, wherever it sits, with or
+without a leading colon — so a reason that is only a number or only a
+command word would be swallowed as a duration or an action. Those are
+refused here rather than sent wrong. -}
 requiredReason : String -> Result (List String) String
 requiredReason value =
     case freeText maxReasonLength "reason" value of
@@ -1137,6 +1211,9 @@ requiredReason value =
         Ok clean ->
             if String.length clean < 3 then
                 Err [ "Give a reason of a few words; it is recorded with the action." ]
+
+            else if String.toInt clean /= Nothing || List.member (String.toLower clean) [ "node", "mesh", "refuse", "expel", "quarantine", "require_auth" ] then
+                Err [ "Write the reason in words — a bare number or command word would be read as part of the command." ]
 
             else
                 Ok clean

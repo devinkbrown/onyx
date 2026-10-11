@@ -290,7 +290,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: min(58dvh, 560px);
+  max-height: min(58dvh, 640px);
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--onyx-line);

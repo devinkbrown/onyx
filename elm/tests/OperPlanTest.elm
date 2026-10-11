@@ -72,10 +72,12 @@ suite =
                 \_ ->
                     Expect.equal (Ok "KLINE ADD *!*@bad.example 7200 :spam wave")
                         (line (BanAdd (let f = ban Kline "*!*@bad.example" in { f | duration = hours "2" })))
-            , test "a one-word numeric reason cannot be mistaken for a duration" <|
+            , test "a reason that is only a number or a command word is refused (the daemon would read it as a duration or action)" <|
                 \_ ->
-                    Expect.equal (Ok "WARD ADD mask *!*@bad.example node expel :1234")
-                        (line (BanAdd (let f = ban Ward "*!*@bad.example" in { f | reason = "1234" })))
+                    Expect.equal [ True, True, True ]
+                        (List.map (\r -> isErr (OperPlan.plan (BanAdd (let f = ban Ward "*!*@bad.example" in { f | reason = r }))))
+                            [ "1234", "expel", "MESH" ]
+                        )
             , test "the wire line ends in CRLF" <|
                 \_ -> Expect.equal (Ok "KLINE ADD *!*@bad.example :spam wave\u{000D}\n") (wire (BanAdd (ban Kline "*!*@bad.example")))
             , test "a catch-all mask is refused before sending" <|
@@ -134,9 +136,9 @@ suite =
                 \_ ->
                     Expect.equal (Ok "SHUN *!*@bad.example 3600 :flooding")
                         (line (ShunAdd { mask = "*!*@bad.example", duration = { choice = "3600", amount = "", unit = "hours" }, reason = "flooding" }))
-            , test "a permanent SHUN omits the seconds" <|
+            , test "a permanent SHUN says 0 seconds, so the reason can never be read as the duration" <|
                 \_ ->
-                    Expect.equal (Ok "SHUN *!*@bad.example :flooding")
+                    Expect.equal (Ok "SHUN *!*@bad.example 0 :flooding")
                         (line (ShunAdd { mask = "*!*@bad.example", duration = forever, reason = "flooding" }))
             , test "a shun that matches everyone is refused" <|
                 \_ -> Expect.equal True (isErr (OperPlan.plan (ShunAdd { mask = "*!*@*", duration = forever, reason = "oops" })))
@@ -248,7 +250,38 @@ suite =
                         , isErr (OperPlan.plan (AccountAdmin { action = "INFO", account = "bob by", on = True }))
                         ]
             ]
+        , describe "node controls"
+            [ test "each action plans its exact line" <|
+                \_ ->
+                    Expect.equal
+                        [ Ok "UNREJECT 203.0.113.9", Ok "DRAIN", Ok "DRAIN OFF", Ok "CONNECT n3.example.org 6697", Ok "SQUIT n3.example.org", Ok "GLOBAL :Maintenance in ten minutes, please save your work" ]
+                        [ line (ServerAction { action = "UNREJECT", arg = "203.0.113.9", arg2 = "" })
+                        , line (ServerAction { action = "DRAIN", arg = "", arg2 = "" })
+                        , line (ServerAction { action = "DRAIN_OFF", arg = "", arg2 = "" })
+                        , line (ServerAction { action = "CONNECT", arg = "n3.example.org", arg2 = "6697" })
+                        , line (ServerAction { action = "SQUIT", arg = "n3.example.org", arg2 = "" })
+                        , line (ServerAction { action = "GLOBAL", arg = "Maintenance in ten minutes, please save your work", arg2 = "" })
+                        ]
+            , test "all of them are staged for review; the ones that cut service are destructive" <|
+                \_ ->
+                    Expect.equal
+                        [ Ok ( True, False ), Ok ( True, True ), Ok ( True, False ), Ok ( True, True ), Ok ( True, True ), Ok ( True, True ) ]
+                        (List.map
+                            (\a -> OperPlan.plan (ServerAction { action = a, arg = "x.example", arg2 = "6697" }) |> Result.map (\c -> ( c.mutates, c.destructive )))
+                            [ "UNREJECT", "DRAIN", "DRAIN_OFF", "CONNECT", "SQUIT", "GLOBAL" ]
+                        )
+            , test "bad arguments are refused" <|
+                \_ ->
+                    Expect.equal [ True, True, True, True, True ]
+                        [ isErr (OperPlan.plan (ServerAction { action = "UNREJECT", arg = "", arg2 = "" }))
+                        , isErr (OperPlan.plan (ServerAction { action = "CONNECT", arg = "n3.example.org", arg2 = "99999" }))
+                        , isErr (OperPlan.plan (ServerAction { action = "CONNECT", arg = "n3.example.org", arg2 = "" }))
+                        , isErr (OperPlan.plan (ServerAction { action = "GLOBAL", arg = "  ", arg2 = "" }))
+                        , isErr (OperPlan.plan (ServerAction { action = "REBOOT", arg = "x", arg2 = "" }))
+                        ]
+            ]
         , describe "event spine"
+
 
             [ test "follow, unfollow, floor, list and stats" <|
                 \_ ->

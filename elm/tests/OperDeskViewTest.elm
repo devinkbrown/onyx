@@ -9,6 +9,7 @@ import App exposing (ConnectionState(..), Model, Msg(..), Outbound(..), blank, u
 import Expect
 import Html
 import Html.Attributes as Attr
+import Json.Encode as Encode
 import OperConsole as C exposing (Field(..))
 import OperFeed
 import OperPlan exposing (Intent(..))
@@ -94,13 +95,43 @@ suite =
                         , \q -> query (onTab Bans base) |> Query.findAll [ testId "oc-ban-form" ] |> Query.count (Expect.equal 1)
                         ]
                         (query base)
+            , test "arrow keys rove the tab list and the new tab takes focus" <|
+                \_ ->
+                    let
+                        ( moved, out ) =
+                            update (OperConsoleMsg (C.TabKey "ArrowRight")) base
+                    in
+                    Expect.equal ( Bans, [ SendLine "WARD LIST\u{000D}\n", PrefsFocus { id = "oper-tab-bans" } ] ) ( moved.operConsole.tab, out )
+            , test "Home and End wrap to the first and last tab" <|
+                \_ ->
+                    Expect.equal ( Feed, Network )
+                        ( (update (OperConsoleMsg (C.TabKey "Home")) (onTab Appeals base) |> Tuple.first).operConsole.tab
+                        , (update (OperConsoleMsg (C.TabKey "End")) base |> Tuple.first).operConsole.tab
+                        )
+            , test "the tab buttons turn the arrow keys into TabKey (and ignore letters)" <|
+                \_ ->
+                    Expect.all
+                        [ \q ->
+                            q
+                                |> Query.find [ testId "oc-tab-live" ]
+                                |> Event.simulate (Event.custom "keydown" (Encode.object [ ( "key", Encode.string "ArrowRight" ) ]))
+                                |> Event.expect (OperConsoleMsg (C.TabKey "ArrowRight"))
+                        , \q ->
+                            q
+                                |> Query.find [ testId "oc-tab-live" ]
+                                |> Event.simulate (Event.custom "keydown" (Encode.object [ ( "key", Encode.string "a" ) ]))
+                                |> Event.toResult
+                                |> Expect.err
+                        ]
+                        (query base)
             , test "selecting a tab from the update loop asks for its list" <|
+
                 \_ ->
                     let
                         ( moved, out ) =
                             update (OperConsoleMsg (C.SelectTab Bans)) base
                     in
-                    Expect.equal ( Bans, [ SendLine "WARD LIST\u{000D}\n" ] ) ( moved.operConsole.tab, out )
+                    Expect.equal ( Bans, [ SendLine "WARD LIST\u{000D}\n", PrefsFocus { id = "oper-tab-bans" } ] ) ( moved.operConsole.tab, out )
             ]
         , describe "live"
             [ test "the chips show what this session follows" <|

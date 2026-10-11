@@ -11062,10 +11062,18 @@ parseSlashLocal text =
         case String.split " " (String.dropLeft 1 text) of
             cmd :: rest ->
                 case String.toLower cmd of
+                    -- v3/gap-oper
+                    "appeal" ->
+                        Just ( "appeal", Nothing )
+
+                    "desk" ->
+                        Just ( "desk", slashNickArg rest )
+
                     "ignore" ->
                         Just ( "ignore", slashNickArg rest )
 
                     "unignore" ->
+
                         Just ( "unignore", slashNickArg rest )
 
                     "read" ->
@@ -15061,8 +15069,8 @@ runSlashLocal model target verb nickArg =
         ( "appeal", _ ) ->
             runSlashAppeal model
 
-        ( "desk", _ ) ->
-            runSlashDesk model target
+        ( "desk", arg ) ->
+            runSlashDesk model (Maybe.withDefault "" arg)
 
         ( "broadcast", _ ) ->
             runSlashOper model "broadcast"
@@ -17741,9 +17749,11 @@ dispatchOperDesk command model =
                     | pending = Nothing
                     , lastSent = Just (OperDesk.formatWirePreview command ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs))
                 }
+            , operConsole = OperConsole.armFor (operConsoleCtx model) command.command model.operConsole -- v3/gap-oper
           }
         , [ SendLine (Wire.formatIrcLine command.command command.params) ]
         )
+
 
 
 {-| Bounded structured replay (mirroring `requestOperEventReplay`: oper
@@ -17856,6 +17866,14 @@ operConsoleStep consoleMsg model =
         focus =
             case consoleMsg of
                 OperConsole.TabKey _ ->
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.SelectTab _ ->
+                    -- Focus brings a tab that was half off the strip into view.
                     if next.tab /= model.operConsole.tab then
                         [ PrefsFocus { id = OperConsole.tabId next.tab } ]
 

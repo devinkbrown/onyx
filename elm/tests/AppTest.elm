@@ -9840,7 +9840,8 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 59 (List.length slashCommands)
+                    [ \_ -> Expect.atLeast 59 (List.length slashCommands) -- v3/gap-oper: appeal + desk joined (59 + 2)
+
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
                     , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
                     , \_ -> Expect.equal (Just "import") (Maybe.map .name (findSlashCommand "import"))

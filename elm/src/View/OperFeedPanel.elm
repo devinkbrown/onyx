@@ -43,8 +43,20 @@ followPanel model =
         known =
             console.subscribed /= Nothing
     in
-    K.card { id = "follow", title = "Follow the network", hint = "Pick the kinds of event you want to see as they happen. This applies to this session only." }
-        [ div [ class "oc-chips", attribute "role" "group", attribute "aria-label" "Event categories", attribute "data-testid" "oc-follow-chips" ]
+    K.disclosure
+        { id = "follow"
+        , title = "Follow the network"
+        , hint =
+            if known then
+                "Following " ++ String.fromInt (List.length following) ++ " of " ++ String.fromInt (List.length App.operEventCategories) ++ " kinds of event"
+
+            else
+                "Checking what this session follows…"
+        , open = known && List.isEmpty following
+        }
+        [ p [ class "oc-hint" ] [ text "Pick the kinds of event you want to see as they happen. This applies to this session only." ]
+        , div [ class "oc-chips", attribute "role" "group", attribute "aria-label" "Event categories", attribute "data-testid" "oc-follow-chips" ]
+
             (List.map
                 (\category ->
                     button

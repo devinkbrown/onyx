@@ -517,6 +517,7 @@ networkTab model =
                     text ""
             ]
         , accountsCard model
+        , nodeControlsCard model
         , reportsCard model
         , auditCard model
         , OperKit.repliesLog model Network
@@ -667,6 +668,94 @@ accountsCard model =
 
             Nothing ->
                 text ""
+        ]
+
+
+{-| Node-level controls: one picker, one or two arguments, always reviewed. -}
+nodeControlsCard : Model -> Html Msg
+nodeControlsCard model =
+    let
+        forms =
+            model.operConsole.forms
+
+        chosen =
+            OperPlan.serverActions
+                |> List.filter (\a -> a.action == forms.serverAction)
+                |> List.head
+
+        ready =
+            model.connection == Live
+
+        edit_ field v =
+            OperConsoleMsg (OperConsole.Edit field v)
+    in
+    OperKit.disclosure { id = "node-controls", title = "Node controls", hint = "Drain, link, unlink, clear a penalty, message everyone", open = False }
+        [ Html.form
+            [ class "oc-form"
+            , attribute "data-testid" "oc-node-form"
+            , onSubmit (OperConsoleMsg (OperConsole.Run (OperPlan.ServerAction { action = forms.serverAction, arg = forms.serverArg, arg2 = forms.serverArg2 })))
+            ]
+            ([ OperKit.field { id = "oc-node-action", label = "Action", hint = Maybe.withDefault "" (Maybe.map .hint chosen) }
+                (OperKit.selectInput
+                    { id = "oc-node-action"
+                    , value = forms.serverAction
+                    , options = List.map (\a -> ( a.action, a.label )) OperPlan.serverActions
+                    , onChange = edit_ ServerActionPick
+                    , testId = "oc-node-action"
+                    }
+                )
+             ]
+                ++ (case chosen of
+                        Just a ->
+                            (if a.arg == "" then
+                                []
+
+                             else
+                                [ OperKit.field { id = "oc-node-arg", label = a.arg, hint = "" }
+                                    (OperKit.textInput
+                                        { id = "oc-node-arg"
+                                        , value = forms.serverArg
+                                        , placeholder = ""
+                                        , onChange = edit_ ServerArg
+                                        , testId = "oc-node-arg"
+                                        , mono = a.action /= "GLOBAL"
+                                        , max = 400
+                                        }
+                                    )
+                                ]
+                            )
+                                ++ (if a.arg2 == "" then
+                                        []
+
+                                    else
+                                        [ OperKit.field { id = "oc-node-arg2", label = a.arg2, hint = "" }
+                                            (OperKit.textInput
+                                                { id = "oc-node-arg2"
+                                                , value = forms.serverArg2
+                                                , placeholder = ""
+                                                , onChange = edit_ ServerArg2
+                                                , testId = "oc-node-arg2"
+                                                , mono = True
+                                                , max = 5
+                                                }
+                                            )
+                                        ]
+                                   )
+
+                        Nothing ->
+                            []
+                   )
+                ++ [ OperKit.formRow
+                        [ button
+                            [ type_ "submit"
+                            , class "oc-btn oc-btn-danger"
+                            , disabled (not ready)
+                            , attribute "data-testid" "oc-node-submit"
+                            ]
+                            [ text "Review" ]
+                        ]
+                   ]
+            )
         ]
 
 

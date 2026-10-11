@@ -13,7 +13,9 @@ module OperConsole exposing
     , UserAppeal(..)
     , abuseHeadline
     , anyLoading
+    , armFor
     , blank
+
 
     , claimWindowMs
     , maxLog
@@ -179,6 +181,9 @@ type alias Forms =
     , challengeAnswer : String
     , reportPick : String
     , accountName : String
+    , serverAction : String
+    , serverArg : String
+    , serverArg2 : String
     }
 
 
@@ -215,6 +220,9 @@ blankForms =
     , challengeAnswer = ""
     , reportPick = "MESH|"
     , accountName = ""
+    , serverAction = "UNREJECT"
+    , serverArg = ""
+    , serverArg2 = ""
     }
 
 
@@ -320,6 +328,9 @@ type Field
     | ChallengeAnswerText
     | ReportPick
     | AccountName
+    | ServerActionPick
+    | ServerArg
+    | ServerArg2
     | FeedFilterText
 
 
@@ -449,6 +460,15 @@ setField field value forms =
 
         AccountName ->
             { forms | accountName = value }
+
+        ServerActionPick ->
+            { forms | serverAction = value, serverArg = "", serverArg2 = "" }
+
+        ServerArg ->
+            { forms | serverArg = value }
+
+        ServerArg2 ->
+            { forms | serverArg2 = String.left 5 (String.filter Char.isDigit value) }
 
         FeedFilterText ->
             forms
@@ -789,6 +809,23 @@ rovingTab key current =
             current
 
 
+{-| The older desk forms (announce, watch, disconnect, reload, privileges)
+send through `App.dispatchOperDesk`; this opens the same reply window for
+them so a refusal ("No such nick", "Permission denied") shows in the
+tab that sent the command instead of vanishing. -}
+armFor : Ctx -> String -> State -> State
+armFor ctx verb state =
+    { state
+        | claimUntilMs = ctx.nowMs + claimWindowMs
+        , claimSection =
+            if verb == "EVENT" then
+                Feed
+
+            else
+                Network
+    }
+
+
 {-| Replies that never got a terminator (APPEAL LIST, a lost line) end
 when the daemon has been quiet for the rest of the reply window: the
 loading flags drop and any rows that did arrive are kept. -}
@@ -1001,8 +1038,12 @@ consumeForm cmd state =
         ( "CHALLENGE", "QUESTION" :: _ ) ->
             { state | forms = { forms | challengeQuestion = "", challengeAnswer = "" } }
 
-        _ ->
-            state
+        ( v, _ ) ->
+            if List.member v [ "UNREJECT", "CONNECT", "SQUIT", "GLOBAL" ] then
+                { state | forms = { forms | serverArg = "", serverArg2 = "" } }
+
+            else
+                state
 
 
 {-| After a change, ask for the list it changed so the tab shows the
