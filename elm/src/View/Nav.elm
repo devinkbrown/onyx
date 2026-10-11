@@ -28,6 +28,7 @@ import Html.Events exposing (onClick)
 import Nav
 import Sidebar
 import View.Account2
+import View.GapShell -- v3/gap-shell
 import View.Sheet as Sheet
 -- v3/calls-c8
 import View.VoiceSettings
@@ -355,7 +356,8 @@ youHub model =
                         , (View.Account2.youEntries model).themeShare
                         ]
                     , group "help" "Help" Nothing
-                        [ entry
+                        [ View.GapShell.youEntry model -- v3/gap-shell
+                        , entry
                             { testId = "you-open-guides"
                             , label = "Guides"
                             , hint = "How Onyx works, step by step"

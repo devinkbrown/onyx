@@ -23,12 +23,16 @@ module DmSafety exposing
     , groups
     , headerState
     , isOpenFor
+    , keyChangeHoldCopy
+    , keyChangeNotice
     , keyChangeStateCopy
+    , keyChangeToastTitle
     , markAccepting
     , markLoading
     , needsLoad
     , numberAriaLabel
     , numberLabel
+    , pendingKeysFor
     , pendingNumber
     , currentNumber
     , plaintextChip
@@ -65,13 +69,16 @@ type Load
 
 
 {-| Evidence for one peer, stamped with the presented key set and the
-key-change flag it was computed for.
+key-change flag it was computed for. `pendingKeys` (v3/gap-pwa-safety)
+are the presented keys not pinned yet — the exact keys the `pending`
+number binds and the only keys an acceptance may trust.
 -}
 type alias Evidence =
     { keys : List String
     , keyChanged : Bool
     , current : Load
     , pending : Load
+    , pendingKeys : List String
     }
 
 
@@ -134,6 +141,24 @@ dmKeyChangeAlert name =
 dmKeyChangeTitle : String -> String
 dmKeyChangeTitle name =
     name ++ "'s device key changed"
+
+
+{-| v3/gap-pwa-safety — the once-per-change toast + Inbox row (oracle
+`_flagPeerKeyChange`, verbatim). -}
+keyChangeToastTitle : String
+keyChangeToastTitle =
+    "Encryption key changed"
+
+
+keyChangeNotice : String -> String
+keyChangeNotice name =
+    name ++ "'s encryption key changed — verify before continuing."
+
+
+{-| v3/gap-pwa-safety — composer copy while a key change holds sends. -}
+keyChangeHoldCopy : String -> String
+keyChangeHoldCopy name =
+    name ++ "'s device key changed, so this message was not sent. Your text is kept — compare the new safety number, then accept the key or keep messages locked."
 
 
 {-| Elm addition: the oracle header shows no chip for a plaintext DM;
@@ -274,7 +299,7 @@ markLoading input state =
     { state
         | evidence =
             Dict.insert key
-                { keys = input.keys, keyChanged = input.keyChanged, current = Loading, pending = Loading }
+                { keys = input.keys, keyChanged = input.keyChanged, current = Loading, pending = Loading, pendingKeys = [] }
                 state.evidence
 
         -- A new pending key is a distinct acceptance attempt.
@@ -297,7 +322,7 @@ markLoading input state =
 currently awaited) are dropped, so a rotated peer never inherits an
 older number.
 -}
-foldResult : { peer : String, keys : List String, current : Maybe String, pending : Maybe String } -> State -> State
+foldResult : { peer : String, keys : List String, current : Maybe String, pending : Maybe String, pendingKeys : List String } -> State -> State
 foldResult result state =
     let
         key =
@@ -309,7 +334,20 @@ foldResult result state =
                 { state
                     | evidence =
                         Dict.insert key
-                            { ev | current = Loaded (nonBlank result.current), pending = Loaded (nonBlank result.pending) }
+                            { ev
+                                | current = Loaded (nonBlank result.current)
+                                , pending = Loaded (nonBlank result.pending)
+
+                                -- Pending keys only travel with a pending
+                                -- number, and only keys of the stamped set.
+                                , pendingKeys =
+                                    case nonBlank result.pending of
+                                        Just _ ->
+                                            List.filter (\k -> List.member k ev.keys) result.pendingKeys
+
+                                        Nothing ->
+                                            []
+                            }
                             state.evidence
                 }
 
@@ -362,12 +400,24 @@ pendingNumber peer state =
             Nothing
 
 
-{-| Accept is armed only with BOTH exact numbers for the live key set. -}
+{-| The reviewed pending keys (empty until the evidence settles). -}
+pendingKeysFor : String -> State -> List String
+pendingKeysFor peer state =
+    case evidenceFor peer state of
+        Just ev ->
+            ev.pendingKeys
+
+        Nothing ->
+            []
+
+
+{-| Accept is armed only with BOTH exact numbers for the live key set
+(and the pending keys they name). -}
 evidenceReady : String -> List String -> State -> Bool
 evidenceReady peer keys state =
     case evidenceFor peer state of
         Just ev ->
-            ev.keys == keys && currentNumber peer state /= Nothing && pendingNumber peer state /= Nothing
+            ev.keys == keys && currentNumber peer state /= Nothing && pendingNumber peer state /= Nothing && not (List.isEmpty ev.pendingKeys)
 
         Nothing ->
             False

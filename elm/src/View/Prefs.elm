@@ -185,6 +185,14 @@ panelBody model category =
                 , description = "Removes the quiet system lines from the feed."
                 , value = model.prefs.hideEvents
                 }
+            , -- v3/gap-watch
+              toggle
+                { key = "watchTogether"
+                , legend = "Watch together"
+                , title = "Show watch-together activities"
+                , description = "Shows a room's shared watch clock above the conversation. Onyx shares a title, a link and a play/pause clock; it never streams or controls the video."
+                , value = model.prefs.watchTogether
+                }
             , section [ class "pref-group" ]
                 [ h3 [ class "pref-label" ] [ text "Alerts" ]
                 , p [ class "pref-desc" ] [ text "Desktop alerts, sound, do not disturb, keywords, and ignored people." ]

@@ -20,6 +20,8 @@ const ELM_JS_GLOBALS = {
   HTMLElement: 'readonly',
   IDBKeyRange: 'readonly',
   MutationObserver: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
   ResizeObserver: 'readonly',
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
