@@ -1301,6 +1301,17 @@
 
   var saslCreds = { account: "", password: "", hasClientCert: false };
   var scramExchange = null;
+  var stagedPassword = null;
+
+  /* v3/gap-auth: a value that can ride an IRC middle parameter. */
+  function identifyParamSafe(value) {
+    if (!value || value.charAt(0) === ":") return false;
+    for (var i = 0; i < value.length; i++) {
+      var c = value.charCodeAt(i);
+      if (c <= 32 || c === 127) return false;
+    }
+    return true;
+  }
 
   async function scramHmac(keyData, data) {
     var subtle = globalThis.crypto.subtle;
@@ -1316,11 +1327,52 @@
         password: typeof password === "string" ? password : "",
         hasClientCert: Boolean(hasClientCert),
       };
+      stagedPassword = null;
       scramExchange = null;
     },
     clearCredentials: function () {
       saslCreds = { account: "", password: "", hasClientCert: false };
+      stagedPassword = null;
       scramExchange = null;
+    },
+    /* v3/gap-auth: `IDENTIFY <account> <password> <code>` for a two-factor
+       account (the server refuses PLAIN/SCRAM for it with a 904 and
+       accepts the code only on this command). The held password never
+       crosses into Elm: the line is composed here and written straight
+       to the socket. Every parameter rides as a middle parameter, so a
+       password with a space, a control character or a leading colon
+       (or a line past 510 bytes) is refused instead of being re-split
+       by the server. Returns `{ line }` or `{ refused: reason }`. */
+    identifyLine: function (account, code) {
+      var acct = String(account || "");
+      var digits = String(code || "");
+      var password = saslCreds.password;
+      if (!password || !acct) return { refused: "nopassword" };
+      if (saslCreds.account && saslCreds.account.toLowerCase() !== acct.toLowerCase()) return { refused: "nopassword" };
+      if (!identifyParamSafe(acct) || !identifyParamSafe(password) || !identifyParamSafe(digits)) return { refused: "unsafe" };
+      var line = "IDENTIFY " + acct + " " + password + " " + digits + "\r\n";
+      if (new TextEncoder().encode(line).length > 512) return { refused: "toolong" };
+      return { line: line };
+    },
+    /* SETPASS: hold the new password aside until the server confirms,
+       then make it the credential a reconnect signs in with. A failed or
+       interrupted change drops it and the old credential stays. */
+    stageNewPassword: function (account, password) {
+      stagedPassword = { account: String(account || ""), password: typeof password === "string" ? password : "" };
+    },
+    commitNewPassword: function (account) {
+      var staged = stagedPassword;
+      stagedPassword = null;
+      if (!staged || !staged.password) return false;
+      if (String(account || "").toLowerCase() !== staged.account.toLowerCase()) return false;
+      if (saslCreds.password && (!saslCreds.account || saslCreds.account.toLowerCase() === staged.account.toLowerCase())) {
+        saslCreds = { account: saslCreds.account, password: staged.password, hasClientCert: saslCreds.hasClientCert };
+        scramExchange = null;
+      }
+      return true;
+    },
+    dropNewPassword: function () {
+      stagedPassword = null;
     },
     /* RFC 4616 `\0authcid\0passwd`, UTF-8 encoded. Null when no password. */
     plainPayload: function (nick) {
@@ -1436,6 +1488,265 @@
         if (timer !== null) { clearTimeout(timer); timer = null; }
       },
     };
+  }
+
+  /* v3/gap-auth — BLAKE3 (unkeyed hash mode, any output length) for the
+     pre-001 CHALLENGE proof of work. A minimal transcription of the
+     BLAKE3 reference implementation (reference_impl.rs: compress, chunk
+     state, parent nodes, CV stack, root XOF). Pure, synchronous, no
+     dependencies; verified against the official BLAKE3 test vectors in
+     challenge.smoke.mjs. */
+  var B3_IV = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  var B3_PERM = [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8];
+  var B3_CHUNK_START = 1;
+  var B3_CHUNK_END = 2;
+  var B3_PARENT = 4;
+  var B3_ROOT = 8;
+  var B3_BLOCK_LEN = 64;
+  var B3_CHUNK_LEN = 1024;
+
+  function b3Compress(cv, m, counter, blockLen, flags) {
+    var s = [
+      cv[0], cv[1], cv[2], cv[3], cv[4], cv[5], cv[6], cv[7],
+      B3_IV[0], B3_IV[1], B3_IV[2], B3_IV[3],
+      counter >>> 0, Math.floor(counter / 0x100000000) >>> 0, blockLen, flags
+    ];
+    var w = m.slice(0, 16);
+    function g(a, b, c, d, x, y) {
+      s[a] = (s[a] + s[b] + x) | 0;
+      s[d] ^= s[a]; s[d] = (s[d] >>> 16) | (s[d] << 16);
+      s[c] = (s[c] + s[d]) | 0;
+      s[b] ^= s[c]; s[b] = (s[b] >>> 12) | (s[b] << 20);
+      s[a] = (s[a] + s[b] + y) | 0;
+      s[d] ^= s[a]; s[d] = (s[d] >>> 8) | (s[d] << 24);
+      s[c] = (s[c] + s[d]) | 0;
+      s[b] ^= s[c]; s[b] = (s[b] >>> 7) | (s[b] << 25);
+    }
+    for (var r = 0; r < 7; r++) {
+      g(0, 4, 8, 12, w[0], w[1]);
+      g(1, 5, 9, 13, w[2], w[3]);
+      g(2, 6, 10, 14, w[4], w[5]);
+      g(3, 7, 11, 15, w[6], w[7]);
+      g(0, 5, 10, 15, w[8], w[9]);
+      g(1, 6, 11, 12, w[10], w[11]);
+      g(2, 7, 8, 13, w[12], w[13]);
+      g(3, 4, 9, 14, w[14], w[15]);
+      if (r < 6) {
+        var p = new Array(16);
+        for (var i = 0; i < 16; i++) p[i] = w[B3_PERM[i]];
+        w = p;
+      }
+    }
+    for (var j = 0; j < 8; j++) {
+      s[j] = (s[j] ^ s[j + 8]) >>> 0;
+      s[j + 8] = (s[j + 8] ^ cv[j]) >>> 0;
+    }
+    return s;
+  }
+
+  function b3Words(bytes, offset, len) {
+    var out = new Array(16);
+    for (var i = 0; i < 16; i++) {
+      var v = 0;
+      for (var k = 3; k >= 0; k--) {
+        var at = i * 4 + k;
+        v = (v * 256) + (at < len ? bytes[offset + at] : 0);
+      }
+      out[i] = v >>> 0;
+    }
+    return out;
+  }
+
+  /* One chunk's state, mirroring the reference `ChunkState`. */
+  function b3Chunk(key, counter) {
+    return { cv: key.slice(0, 8), counter: counter, block: new Uint8Array(B3_BLOCK_LEN), blockLen: 0, compressed: 0 };
+  }
+
+  function b3ChunkLen(chunk) {
+    return B3_BLOCK_LEN * chunk.compressed + chunk.blockLen;
+  }
+
+  function b3ChunkUpdate(chunk, input, start, end) {
+    var at = start;
+    while (at < end) {
+      if (chunk.blockLen === B3_BLOCK_LEN) {
+        var flags = chunk.compressed === 0 ? B3_CHUNK_START : 0;
+        chunk.cv = b3Compress(chunk.cv, b3Words(chunk.block, 0, B3_BLOCK_LEN), chunk.counter, B3_BLOCK_LEN, flags).slice(0, 8);
+        chunk.compressed += 1;
+        chunk.block = new Uint8Array(B3_BLOCK_LEN);
+        chunk.blockLen = 0;
+      }
+      var take = Math.min(B3_BLOCK_LEN - chunk.blockLen, end - at);
+      for (var i = 0; i < take; i++) chunk.block[chunk.blockLen + i] = input[at + i];
+      chunk.blockLen += take;
+      at += take;
+    }
+  }
+
+  function b3ChunkOutput(chunk) {
+    return {
+      cv: chunk.cv,
+      words: b3Words(chunk.block, 0, chunk.blockLen),
+      counter: chunk.counter,
+      blockLen: chunk.blockLen,
+      flags: (chunk.compressed === 0 ? B3_CHUNK_START : 0) | B3_CHUNK_END
+    };
+  }
+
+  function b3OutputCv(out) {
+    return b3Compress(out.cv, out.words, out.counter, out.blockLen, out.flags).slice(0, 8);
+  }
+
+  function b3ParentOutput(left, right, key) {
+    return { cv: key, words: left.concat(right), counter: 0, blockLen: B3_BLOCK_LEN, flags: B3_PARENT };
+  }
+
+  /* BLAKE3 hash of `input` (Uint8Array or byte array) → `outLen` bytes
+     (default 32), the reference `Hasher::update` + `finalize_xof`. */
+  function blake3(input, outLen) {
+    var bytes = input instanceof Uint8Array ? input : Uint8Array.from(input || []);
+    var want = typeof outLen === "number" && outLen > 0 ? Math.floor(outLen) : 32;
+    var key = B3_IV.slice();
+    var chunk = b3Chunk(key, 0);
+    var stack = [];
+    var at = 0;
+    while (at < bytes.length) {
+      if (b3ChunkLen(chunk) === B3_CHUNK_LEN) {
+        var cv = b3OutputCv(b3ChunkOutput(chunk));
+        var total = chunk.counter + 1;
+        while ((total & 1) === 0) {
+          cv = b3OutputCv(b3ParentOutput(stack.pop(), cv, key));
+          total = total / 2;
+        }
+        stack.push(cv);
+        chunk = b3Chunk(key, chunk.counter + 1);
+      }
+      var take = Math.min(B3_CHUNK_LEN - b3ChunkLen(chunk), bytes.length - at);
+      b3ChunkUpdate(chunk, bytes, at, at + take);
+      at += take;
+    }
+    var output = b3ChunkOutput(chunk);
+    for (var n = stack.length - 1; n >= 0; n--) {
+      output = b3ParentOutput(stack[n], b3OutputCv(output), key);
+    }
+    var result = new Uint8Array(want);
+    var produced = 0;
+    var block = 0;
+    while (produced < want) {
+      var words = b3Compress(output.cv, output.words, block, output.blockLen, output.flags | B3_ROOT);
+      for (var wi = 0; wi < 16 && produced < want; wi++) {
+        for (var bi = 0; bi < 4 && produced < want; bi++) {
+          result[produced] = (words[wi] >>> (8 * bi)) & 0xff;
+          produced += 1;
+        }
+      }
+      block += 1;
+    }
+    return result;
+  }
+
+  /* CHALLENGE pow: the server admits `answer` when
+     BLAKE3(seed ‖ answer)[0] == 0 (onyx-server src/daemon/challenge.zig
+     `powOk`; seed = the raw bytes behind the NOTICE hex, at most 32;
+     answer = 1..64 printable bytes). Decimal nonces from `start` up,
+     `budget` tries; "" when the seed is malformed or the budget runs out. */
+  function challengeSeedBytes(hex) {
+    var text = String(hex || "");
+    if (text.length === 0 || text.length > 64 || text.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(text)) return null;
+    var out = new Uint8Array(text.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(text.substr(i * 2, 2), 16);
+    return out;
+  }
+
+  function solveChallengePow(seedHex, start, budget) {
+    var seed = challengeSeedBytes(seedHex);
+    if (!seed) return "";
+    var from = typeof start === "number" && start >= 0 ? Math.floor(start) : 0;
+    var tries = typeof budget === "number" && budget > 0 ? Math.floor(budget) : 1000000;
+    var msg = new Uint8Array(seed.length + 16);
+    msg.set(seed, 0);
+    for (var n = from; n < from + tries; n++) {
+      var digits = String(n);
+      for (var i = 0; i < digits.length; i++) msg[seed.length + i] = digits.charCodeAt(i);
+      var digest = blake3(msg.subarray(0, seed.length + digits.length), 1);
+      if (digest[0] === 0) return digits;
+    }
+    return "";
+  }
+
+  function challengePowOk(seedHex, answer) {
+    var seed = challengeSeedBytes(seedHex);
+    var text = String(answer || "");
+    if (!seed || text.length === 0 || text.length > 64 || /[\x00-\x1f\x7f]/.test(text)) return false;
+    var tail = new TextEncoder().encode(text);
+    var msg = new Uint8Array(seed.length + tail.length);
+    msg.set(seed, 0);
+    msg.set(tail, seed.length);
+    return blake3(msg, 1)[0] === 0;
+  }
+
+  /* v3/gap-auth: solve the pre-001 CHALLENGE off the main turn. About
+     one nonce in 256 passes, so this normally finishes in the first
+     slice; the slices and the cap only bound a hostile seed. `done`
+     gets the answer, or "" when none was found in budget. */
+  var CHALLENGE_POW_SLICE = 4000;
+  var CHALLENGE_POW_MAX_TRIES = 2000000;
+
+  function solveChallengeAsync(seedHex, done) {
+    var next = 0;
+    var cancelled = false;
+    function slice() {
+      if (cancelled) return;
+      var answer = solveChallengePow(seedHex, next, CHALLENGE_POW_SLICE);
+      if (answer) { done(answer); return; }
+      next += CHALLENGE_POW_SLICE;
+      if (!challengeSeedBytes(seedHex) || next >= CHALLENGE_POW_MAX_TRIES) { done(""); return; }
+      setTimeout(slice, 0);
+    }
+    slice();
+    return { cancel: function () { cancelled = true; } };
+  }
+
+  /* v3/gap-auth: the `authGateOut` / `authGateIn` ports.
+       { kind: "solve", seed }                  -> { kind: "solved", seed, answer }
+       { kind: "identify", account, code }      -> IDENTIFY line on the socket, or
+                                                   { kind: "identifyRefused", reason }
+       { kind: "stage", account, password }     hold a SETPASS password aside
+       { kind: "commit", account }              the server confirmed: it becomes the credential
+       { kind: "drop" }                         the change failed: forget it
+       { kind: "forget" }                       forget every held credential
+     Secrets stay in the SASL credential slot; nothing here logs or echoes
+     a password or code. */
+  function wireAuthGate(app, getSocket) {
+    if (!app.ports || !app.ports.authGateOut) return;
+    var solving = null;
+    app.ports.authGateOut.subscribe(function (req) {
+      var kind = req && req.kind;
+      if (kind === "solve") {
+        var seed = String(req.seed || "");
+        if (solving) solving.cancel();
+        solving = solveChallengeAsync(seed, function (answer) {
+          solving = null;
+          try { app.ports.authGateIn.send({ kind: "solved", seed: seed, answer: answer }); } catch (err) { /* port gone */ }
+        });
+      } else if (kind === "identify") {
+        var composed = sasl.identifyLine(req.account, req.code);
+        if (composed.refused) {
+          try { app.ports.authGateIn.send({ kind: "identifyRefused", reason: composed.refused }); } catch (err) { /* port gone */ }
+        } else {
+          var socket = getSocket();
+          if (socket && socket.isOpen()) socket.send(composed.line);
+        }
+      } else if (kind === "stage") {
+        sasl.stageNewPassword(req.account, req.password);
+      } else if (kind === "commit") {
+        sasl.commitNewPassword(req.account);
+      } else if (kind === "drop") {
+        sasl.dropNewPassword();
+      } else if (kind === "forget") {
+        sasl.clearCredentials();
+      }
+    });
   }
 
   /* Saved searches — local-first named vault queries in their own sibling
@@ -6501,6 +6812,8 @@ function fetchPublicFeed(url) {
         app.ports.saslFailed.send({ reason: "SASL authentication failed: unsupported mechanism" });
       });
     }
+    /* v3/gap-auth: challenge solver + held-password IDENTIFY + SETPASS staging. */
+    wireAuthGate(app, function () { return socket; });
     var saslGuard = createSaslGuard(app);
     if (app.ports.saslTimerStart) {
       app.ports.saslTimerStart.subscribe(function () {
@@ -10100,9 +10413,23 @@ function fetchPublicFeed(url) {
       key: CRED_KEY,
       maxTokenLength: MAX_RESUME_TOKEN_LENGTH
     },
+    /* v3/gap-auth */
+    challenge: {
+      blake3: blake3,
+      seedBytes: challengeSeedBytes,
+      solve: solveChallengePow,
+      solveAsync: solveChallengeAsync,
+      powOk: challengePowOk,
+      maxTries: CHALLENGE_POW_MAX_TRIES
+    },
+    wireAuthGate: wireAuthGate,
     sasl: {
       setCredentials: sasl.setCredentials,
       clearCredentials: sasl.clearCredentials,
+      identifyLine: sasl.identifyLine,
+      stageNewPassword: sasl.stageNewPassword,
+      commitNewPassword: sasl.commitNewPassword,
+      dropNewPassword: sasl.dropNewPassword,
       plainPayload: sasl.plainPayload,
       scramFirst: sasl.scramFirst,
       scramNext: sasl.scramNext,
