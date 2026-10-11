@@ -2332,7 +2332,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-msg-menu-pop .onyx-msg-menu { width: 264px; }
   .onyx-react-pop .onyx-react-picker { width: 352px; }
   .onyx-react-pop .onyx-react-search { min-height: var(--target-min); font-size: 16px; }
-  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 24px; }
+  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 1.5rem; }
   .onyx-frame .onyx-composer .shell-command-item { min-height: var(--target-min); }
 }
 
@@ -2478,7 +2478,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-frame .onyx-composer button.shell-composer-tools-item { min-height: var(--target-min); }
   .onyx-composer .shell-emoji-search { min-height: var(--target-min); font-size: 16px; }
   .onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
-  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 24px; }
+  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 1.5rem; }
 
   /* Search, media index, pins, thread */
   .onyx-message-search__input { min-height: var(--target-min); }
