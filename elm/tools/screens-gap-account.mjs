@@ -81,9 +81,36 @@ async function boot(page, h, opts = {}) {
   return { inject, state, reply };
 }
 
+const isPhone = (page) => (page.viewportSize() || { width: 1440 }).width < 768;
+
+async function clickFirst(page, h, selectors) {
+  for (const sel of selectors) {
+    const el = await page.$(sel);
+    if (el && (await el.isVisible().catch(() => false))) {
+      await el.click().catch(() => {});
+      await h.settle(page, 350);
+      return true;
+    }
+  }
+  return false;
+}
+
+async function dismissAsks(page, h) {
+  for (let i = 0; i < 3 && (await page.$('[role="dialog"]')); i += 1) {
+    await page.keyboard.press('Escape');
+    await h.settle(page, 250);
+  }
+}
+
 async function youEntry(page, h, testId) {
-  await h.tryClick(page, '[data-testid="you-open"]');
-  await h.tryClick(page, `[data-testid="${testId}"]`);
+  await dismissAsks(page, h);
+  if (isPhone(page)) {
+    await clickFirst(page, h, ['[data-testid="room-back"]']);
+    await clickFirst(page, h, ['.onyx-mobile-nav [data-testid="nav-you"]']);
+  } else {
+    await clickFirst(page, h, ['[data-testid="you-open"]']);
+  }
+  await clickFirst(page, h, [`[data-testid="${testId}"]`]);
   await h.settle(page, 300);
 }
 

@@ -46499,31 +46499,44 @@ gapSettleScope msg prior m =
     in
     if changed then
         let
+            -- A guest who signs in / claims the name in this session
+            -- keeps the edits made as that guest, and keeps the lists on
+            -- screen until the account's own lists load (blocks never
+            -- lapse mid-switch).
+            guestUpgrade =
+                case ( ga.scope, candidate ) of
+                    ( Just old, Just cand ) ->
+                        cand.account /= Nothing && old == AccountScope.scopeKey { cand | account = Nothing }
+
+                    _ ->
+                        False
+
             carried =
                 case ( ga.scope, candidate ) of
                     ( Nothing, _ ) ->
                         -- first scope: edits made while unscoped replay onto it
                         AccountScope.recordDiff priorLists nowLists ga.pendingOps
 
-                    ( Just old, Just cand ) ->
-                        -- a guest who signs in / claims the name in this
-                        -- session keeps the edits made as that guest
-                        if cand.account /= Nothing && old == AccountScope.scopeKey { cand | account = Nothing } then
+                    _ ->
+                        if guestUpgrade then
                             ga.sessionOps
 
                         else
                             AccountScope.emptyOps
 
-                    _ ->
-                        AccountScope.emptyOps
-
+            -- Any other identity change starts empty, so one identity's
+            -- lists are never shown to, or written for, the next.
             base =
                 case ga.scope of
                     Nothing ->
                         m
 
                     Just _ ->
-                        gapWithLists gapEmptyLists m
+                        if guestUpgrade then
+                            m
+
+                        else
+                            gapWithLists gapEmptyLists m
 
             reset =
                 { base
@@ -46696,7 +46709,7 @@ gapSettleSearchStatus msg m =
                 status "Couldn't clear saved searches. Try again."
 
         SearchImportedReceived { imported } ->
-            status ("Imported " ++ PrefsPanel.countLabel imported "saved search" ++ ".")
+            status ("Imported " ++ GapAccount.savedSearchLabel imported ++ ".")
 
         SearchExportedReceived { json } ->
             if String.isEmpty json then

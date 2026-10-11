@@ -24,6 +24,7 @@ module GapAccount exposing
     , recognizeLine
     , rememberAlertTag
     , replyLooksRelevant
+    , savedSearchLabel
     , upsertGroupNick
     )
 
@@ -283,6 +284,19 @@ rememberAlertTag tag owner state =
         | alertTags = List.foldl Dict.remove (Dict.insert tag owner state.alertTags) dropped
         , alertTagOrder = kept
     }
+
+
+{-| `1 saved search`, `3 saved searches` (the shared `countLabel` would
+say "searchs"). -}
+savedSearchLabel : Int -> String
+savedSearchLabel n =
+    String.fromInt n
+        ++ (if n == 1 then
+                " saved search"
+
+            else
+                " saved searches"
+           )
 
 
 {-| Title for a coalesced alert. -}

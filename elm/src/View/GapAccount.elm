@@ -470,12 +470,12 @@ historyCards model =
     , section [ class "pref-group pref-clear-history", attribute "aria-labelledby" "pref-saved-searches-title", attribute "data-testid" "pref-saved-searches" ]
         [ div [ class "pref-group-head" ]
             [ h3 [ class "pref-label", id "pref-saved-searches-title" ] [ text "Saved searches" ]
-            , span [ class "pref-count" ] [ text (PrefsPanel.countLabel searches "saved search") ]
+            , span [ class "pref-count" ] [ text (GapAccount.savedSearchLabel searches) ]
             ]
         , p [ class "pref-desc" ] [ text "Searches you saved in this browser. Clearing removes them here only; export them first from Import & export if you want to keep them." ]
         , if ga.searchClearConfirm then
             div [ class "pref-confirm", attribute "role" "group", attribute "aria-label" "Confirm clear saved searches" ]
-                [ p [ class "pref-desc" ] [ text ("Remove " ++ PrefsPanel.countLabel searches "saved search" ++ " from this browser?") ]
+                [ p [ class "pref-desc" ] [ text ("Remove " ++ GapAccount.savedSearchLabel searches ++ " from this browser?") ]
                 , div [ class "pref-actions" ]
                     [ button
                         [ type_ "button"
@@ -598,7 +598,7 @@ transferCards model =
     , section [ class "pref-group", attribute "aria-labelledby" "pref-saved-transfer-title", attribute "data-testid" "pref-saved-searches-transfer" ]
         [ div [ class "pref-group-head" ]
             [ h3 [ class "pref-label", id "pref-saved-transfer-title" ] [ text "Saved searches" ]
-            , span [ class "pref-count" ] [ text (PrefsPanel.countLabel (List.length model.savedSearches) "saved search") ]
+            , span [ class "pref-count" ] [ text (GapAccount.savedSearchLabel (List.length model.savedSearches)) ]
             ]
         , p [ class "pref-desc" ] [ text "Move your saved searches between browsers as a JSON file. Importing merges with the ones already here." ]
         , div [ class "pref-actions" ]

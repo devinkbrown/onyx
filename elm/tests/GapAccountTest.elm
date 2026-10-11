@@ -342,6 +342,10 @@ suite =
                             |> Maybe.map .ignored
                         )
             ]
+        , test "saved-search label pluralizes" <|
+            \_ ->
+                Expect.equal [ "0 saved searches", "1 saved search", "2 saved searches" ]
+                    (List.map savedSearchLabel [ 0, 1, 2 ])
         , describe "alert bookkeeping"
             [ test "an alert tag remembers the scope that raised it" <|
                 \_ ->
