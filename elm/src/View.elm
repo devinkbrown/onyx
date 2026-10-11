@@ -60,10 +60,12 @@ import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
 import View.Prefs exposing (prefsSheet)
+import View.BlockKit -- v3/gap-import
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Account2
+import View.UserModes -- v3/gap-usermodes
 import View.Toast exposing (toaster)
 import View.Nav
 import View.Inbox
@@ -75,6 +77,9 @@ import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
 import View.Polish -- v3/polish
+-- v3/gap-organize
+import View.Attention
+import View.Organize
 import View.WatchTogether -- v3/gap-watch
 import View.GapShell -- v3/gap-shell
 
@@ -239,6 +244,7 @@ appFrame model =
              else
                 "false"
             )
+        , View.Attention.readerAttr model -- v3/gap-organize: reader mode
         , -- v3/ui-mobile-shell: a conversation is showing (phones push it
           -- as its own page: no global bar, no bottom nav, a back control)
           attribute "data-convo"
@@ -263,12 +269,6 @@ appFrame model =
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
-                ++ (if model.searchOpen then
-                        [ panel model ]
-
-                    else
-                        []
-                   )
             )
          ]
             ++ (if model.callsOpen then
@@ -279,11 +279,22 @@ appFrame model =
                 else
                     [ rail model
                     , main_ [ class "onyx-main" ]
-                        [ roomHeader model
-                        , View.Polish.timeScrubber model -- v3/polish
-                        , thread model
-                        , composer model
-                        ]
+                        ([ roomHeader model ]
+                            -- v3/rx-convo: message search belongs to the conversation it
+                            -- searches: it opens under the room header, in the main column
+                            -- (it used to sit in the full-width notices row and pushed the
+                            -- room list and the roster down with it).
+                            ++ (if model.searchOpen then
+                                    [ panel model ]
+
+                                else
+                                    []
+                               )
+                            ++ [ View.Polish.timeScrubber model -- v3/polish
+                               , thread model
+                               , composer model
+                               ]
+                        )
                     , roster model
                     ]
                )
@@ -344,9 +355,14 @@ overlays model =
         , View.GapShell.leaveConfirm model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
+        -- v3/gap-organize: row menu, folder picker, saved messages; reader exit
+        , View.Organize.sheets model
+        , View.Attention.readerPill model
+        , View.UserModes.memoSheet model -- v3/gap-usermodes
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        , View.BlockKit.overlay model -- v3/gap-import
         , View.GapCommands.commandsHelp model -- v3/gap-commands
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model

@@ -7,7 +7,7 @@
  *   node tools/elm-overlay.mjs <dist> <elm-dist>
  *
  * <elm-dist> is the output of elm/tools/build.sh (hashed app.*.js,
- * voice.*.js, voice-worker.*.js, backdrop.*.js, ports.*.js, app.*.css, css/*.css,
+ * voice.*.js, voice-worker.*.js, backdrop.*.js, historyImport.*.js, ports.*.js, app.*.css, css/*.css,
  * index.html, opcodec_wasm.{js,wasm}).
  *
  * 1. Copies the hashed Elm assets to <dist>/assets/elm/ (the deploy's
@@ -45,7 +45,7 @@ const assetOut = join(dist, 'assets', 'elm');
 mkdirSync(join(assetOut, 'css'), { recursive: true });
 const copied = [];
 for (const name of readdirSync(elmDist)) {
-  if (/^(app|ports|voice|voice-worker|backdrop)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
+  if (/^(app|ports|voice|voice-worker|backdrop|historyImport)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
     copyFileSync(join(elmDist, name), join(assetOut, name));
     copied.push(name);
   }
@@ -61,6 +61,7 @@ if (existsSync(cssDir)) {
 }
 if (!copied.some((n) => /^app\..*\.js$/.test(n))) fail('hashed app.*.js not found in elm dist');
 if (!copied.some((n) => /^ports\..*\.js$/.test(n))) fail('hashed ports.*.js not found in elm dist');
+if (!copied.some((n) => /^historyImport\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed historyImport.*.js (history importers) not found in elm dist');
 if (!copied.some((n) => /^voice\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice.*.js (calls engine) not found in elm dist');
 if (!copied.some((n) => /^voice-worker\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice-worker.*.js not found in elm dist');
 // v3/gap-appearance: the background renderer (window.OnyxBackdrop).

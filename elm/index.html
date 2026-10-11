@@ -39,6 +39,12 @@
 
 <link rel="stylesheet" href="css/calls-c4.css">
 
+<link rel="stylesheet" href="css/gap-import.css">
+<!-- v3/gap-organize: folders, saved messages, notes, quiet hours, reader mode -->
+<link rel="stylesheet" href="css/gap-organize.css">
+
+<link rel="stylesheet" href="css/gap-usermodes.css">
+
 <link rel="stylesheet" href="css/gap-commands.css">
 
 <link rel="stylesheet" href="css/gap-watch.css">
@@ -60,6 +66,9 @@
 <!-- v3/gap-appearance: mounts window.OnyxBackdrop (the background scene
      renderer) before ports.js forwards the backgroundScene port to it. -->
 <script src="backdrop.js"></script>
+<!-- v3/gap-import: history importers (worker-backed parsers + the batch
+     ledger); ports.js wires them to the historyImport* ports. -->
+<script src="historyImport.js"></script>
 <script src="ports.js"></script>
 <script>
 (function () {

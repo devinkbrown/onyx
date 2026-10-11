@@ -34,6 +34,8 @@ import Sidebar
 -- v3/calls-c1
 import View.Account2
 import View.CallPresence
+-- v3/gap-organize
+import View.Organize
 import View.GapShell -- v3/gap-shell
 
 
@@ -61,7 +63,8 @@ rail model =
                 , query = model.sidebarFilter
                 , unreadOnly = model.sidebarUnreadOnly
                 }
-                (Dict.values model.channels)
+                -- v3/gap-organize: hidden rooms + closed DMs step out
+                (View.Organize.listed model (Dict.values model.channels))
 
         canStar =
             App.deviceMemoryOwner model /= Nothing
@@ -112,6 +115,8 @@ rail model =
                         ]
                     ]
                )
+            -- v3/gap-organize: room folders sit between Favorites and Rooms
+            ++ View.Organize.folderSections model (roomRow model canStar) derived.rooms
             ++ [ div [ class "onyx-rail-section onyx-rail-section--rooms", attribute "data-testid" "sidebar-channels" ]
                     [ p [ class "onyx-rail-label", id "sidebar-channels-label" ] [ text "Rooms" ]
                     , ul [ attribute "role" "list", attribute "aria-label" "Joined rooms" ]
@@ -121,8 +126,9 @@ rail model =
                             ]
 
                          else
-                            List.map (roomRow model canStar) derived.rooms
+                            List.map (roomRow model canStar) (View.Organize.unfiledRooms model derived.rooms)
                         )
+                    , View.Organize.hiddenFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-section onyx-rail-section--dms", attribute "data-testid" "sidebar-dms" ]
                     [ div [ class "onyx-rail-section-heading" ]
@@ -140,6 +146,7 @@ rail model =
                       else
                         ul [ attribute "role" "list", attribute "aria-labelledby" "sidebar-dms-label" ]
                             (List.map (dmRow model) derived.dms)
+                    , View.Organize.closedFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-foot", attribute "role" "group", attribute "aria-label" "Find or start a room" ]
                     [ button
@@ -457,6 +464,7 @@ roomRow model canStar channel =
                     else
                         []
                    )
+                ++ [ View.Organize.rowMore model channel ] -- v3/gap-organize
             )
         ]
 
@@ -493,6 +501,7 @@ dmRow model channel =
                 (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline }
                     -- v3/account2
                     ++ View.Account2.friendPresenceLabel model channel.name
+                    ++ View.Organize.mutedLabel model channel.name -- v3/gap-organize
                 )
             , attribute "aria-current"
                 (if active then
@@ -562,9 +571,11 @@ dmRow model channel =
 
                           else
                             text ""
+                        , View.Organize.mutedMark model channel.name -- v3/gap-organize
                         , badge channel
                         ]
                     ]
                 ]
             ]
+        , View.Organize.rowMore model channel -- v3/gap-organize
         ]
