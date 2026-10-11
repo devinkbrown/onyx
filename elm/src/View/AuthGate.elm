@@ -20,7 +20,7 @@ check" note while a proof of work is being solved). Secrets typed here
 
 import App exposing (Model, Msg(..))
 import AuthGate exposing (Challenge(..), ChallengeStop(..), Flow(..), PasskeyPhase(..), ResetPhase(..), TwoFactorPhase(..))
-import Html exposing (Html, a, button, div, form, h1, input, label, main_, nav, p, span, strong, text)
+import Html exposing (Html, a, aside, button, div, form, h1, input, label, main_, nav, p, span, strong, text)
 import Html.Attributes exposing (attribute, autocomplete, class, classList, disabled, for, href, id, maxlength, placeholder, tabindex, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import View.PublicFrame exposing (brandMark)
@@ -34,28 +34,22 @@ takesOver model =
 gate : Model -> Html Msg
 gate model =
     let
-        state =
-            model.authGate
-    in
-    let
         current =
-            panel model state
+            panel model model.authGate
     in
     main_ [ class "conn ga", attribute "data-testid" "auth-gate" ]
-        [ div [ class "conn-card" ]
-            [ -- One column normally; two side by side on a short
-              -- landscape window (css/gap-auth.css), so the field and
-              -- its button stay on screen.
-              div [ class "ga-grid" ]
-                [ div [ class "ga-head" ]
-                    (a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
-                        [ brandMark "conn-brand-mark"
-                        , span [ class "conn-brand-name" ] [ text "Onyx" ]
-                        ]
-                        :: current.head
-                    )
-                , div [ class "ga-body" ] current.body
-                ]
+        [ -- The connect gate's own stage (app.css `.conn-stage`): the
+          -- words beside/above the card, so every step inherits its
+          -- desktop split, landscape columns and phone full-bleed layout.
+          div [ class "conn-stage" ]
+            [ aside [ class "conn-context", attribute "aria-label" "About this step" ]
+                (a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
+                    [ brandMark "conn-brand-mark"
+                    , span [ class "conn-brand-name" ] [ text "Onyx" ]
+                    ]
+                    :: current.head
+                )
+            , div [ class "conn-card" ] current.body
             ]
         , nav [ class "conn-foot", attribute "aria-label" "About Onyx" ]
             [ a [ href "/about/" ] [ text "About" ]
