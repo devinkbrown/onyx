@@ -197,6 +197,11 @@
 .onyx-frame .onyx-railmenu .onyx-railmenu-item--danger { color: var(--onyx-bad); }
 .onyx-railmenu .onyx-railmenu-item--danger .onyx-shi { color: var(--onyx-bad); }
 .onyx-railmenu .onyx-railmenu-item--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+/* v3/gap-organize entries (Move to folder, Hide, Close) live in this menu:
+   the same label size as the rest, the hint a quiet second line. */
+.onyx-railmenu .gorg-menu-label { font-size: var(--text-md); font-weight: 400; }
+.onyx-railmenu .gorg-menu-hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-xs); line-height: 1.3; color: var(--onyx-faint); }
+.onyx-frame .onyx-railmenu .onyx-railmenu-item:has(.gorg-menu-hint) { padding-block: var(--space-2); }
 .onyx-railmenu-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onyx-railmenu-hint { margin: 0 0 var(--space-1); padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 18px); font-size: var(--text-sm); color: var(--onyx-faint); }
 
