@@ -47323,7 +47323,18 @@ foldTransferSignal message model =
 
                 Just (RoomTransfer.OfferReceived r) ->
                     ( next
-                        |> pushToast ToastInfo (r.from ++ " offered you " ++ room) "Open the inbox to accept or say not now. Nothing changes until you accept."
+                        |> (\m ->
+                                addToast
+                                    { variant = ToastInfo
+                                    , title = r.from ++ " offered you " ++ room
+                                    , description = Just "Open the inbox to accept or say not now. Nothing changes until you accept."
+                                    , duration = Nothing
+                                    , groupKey = Just roomOfferToastKey
+                                    , undo = Nothing
+                                    }
+                                    m.nowMs
+                                    m
+                           )
                         |> (\m ->
                                 addNotification m
                                     { kind = NotifSystem
@@ -47589,7 +47600,23 @@ settleStepPeople msg prior ( m, outs ) =
         ( transferred, transferOut ) =
             settleTransferActions msg prior steward
     in
-    ( settleOfferNotification msg prior transferred, outs ++ transferOut )
+    ( settleOfferNotification msg prior transferred |> quietOfferToast, outs ++ transferOut )
+
+
+roomOfferToastKey : String
+roomOfferToastKey =
+    "room-offer"
+
+
+{-| The "offered you a room" toast has done its job once Room care is
+open on the offer (it would otherwise sit over the Take view). -}
+quietOfferToast : Model -> Model
+quietOfferToast m =
+    if m.stewardRoom /= Nothing && List.any (\toast -> toast.groupKey == Just roomOfferToastKey) m.toasts then
+        { m | toasts = List.filter (\toast -> toast.groupKey /= Just roomOfferToastKey) m.toasts }
+
+    else
+        m
 
 
 clearsTempBanReview : Msg -> Bool

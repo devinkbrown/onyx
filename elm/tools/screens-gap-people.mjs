@@ -235,7 +235,7 @@ export default {
     await page.addInitScript(() => {
       window.__lt = [];
       try {
-        new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask', buffered: true });
+        new window.PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push(e.duration); }).observe({ type: 'longtask', buffered: true });
       } catch { /* unsupported */ }
     });
     const t0 = Date.now();

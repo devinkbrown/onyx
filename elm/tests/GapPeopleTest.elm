@@ -426,6 +426,10 @@ transferTests =
                     , \_ -> Expect.equal Nothing (stewardOfferFor forged "#c")
                     , \_ -> Expect.notEqual Nothing note
                     , \_ -> Expect.equal (Just "#c") opened.stewardRoom
+                    , \_ -> Expect.equal True (List.any (\t -> t.title == "ann offered you #c") received.toasts)
+                    , \_ ->
+                        -- Room care open on the offer: the toast no longer sits over it.
+                        Expect.equal False (List.any (\t -> t.title == "ann offered you #c") opened.toasts)
                     , \_ -> query opened |> Query.find [ testid "steward-panel" ] |> Query.has [ Selector.text "Take #c?" ]
                     , \_ -> Expect.equal [ line "@+onyx/room=#c;+onyx/room-transfer=accept TAGMSG ann" ] acceptOut
                     , \_ -> Expect.equal (Just True) (Maybe.map .accepted (stewardOfferFor accepted "#c"))

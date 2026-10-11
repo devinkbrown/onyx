@@ -140,6 +140,13 @@
   .moderation-desk__ban-add .chb-check { min-height: var(--target-min); }
 }
 
+/* The sheet's close button sits ~6px wider than the heading's right
+   padding, so the room chip slid under it on phones. Selector weight
+   matches `.onyx-sheet-layer > .onyx-moddesk-sheet` in ui-sheets.css. */
+.onyx-sheet-layer > .onyx-moddesk-sheet .onyx-moddesk-head {
+  padding-inline-end: calc(var(--sheet-pad) + 56px);
+}
+
 /* ── 5. Room settings tools ─────────────────────────────────────────── */
 
 .gp-webhooks,
