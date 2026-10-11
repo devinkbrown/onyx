@@ -1161,6 +1161,10 @@
          but another identity's live rows — and ownerless legacy rows —
          are never sent under this identity. */
       var mine = vaultRowOwned(cursor.value, owner);
+      /* The owner stamp rides the walked row so the durable wire-admitted
+         mark below re-puts it still owned (an ownerless re-put would
+         orphan the row if its prune then failed). */
+      row.ownerStamp = vaultRowOwner(cursor.value);
       if (!row.id || !isOutboxTarget(row.target) || !row.text || row.queuedAt < cutoff) {
         if (row.id && mine) dropped.push(row.id);
         try { cursor.delete(); } catch (err) {
@@ -1209,14 +1213,16 @@
       try {
         storeM = txM.objectStore(OUTBOX);
         rows.forEach(function (row) {
-          storeM.put({
+          var marked = {
             id: row.id,
             target_key: row.target.toLowerCase(),
             target: row.target,
             text: row.text,
             queued_at: row.queuedAt,
             wire_admitted: true
-          });
+          };
+          if (row.ownerStamp) marked.owner = row.ownerStamp;
+          storeM.put(marked);
         });
       } catch (err) {
         try { if (txM.abort) txM.abort(); } catch (abortErr) {}
@@ -10457,6 +10463,7 @@ function fetchPublicFeed(url) {
       exportAll: vaultExportAll,
       aroundWindow: vaultAroundWindow,
       classifyDmRows: classifyVaultDmRows,
+      classifyDm: classifyVaultDm,
       dmPrivacyRowEncrypted: vaultDmPrivacyRowEncrypted,
       dmPrivacyInvalidate: vaultDmPrivacyInvalidate,
       exportSnapshot: vaultExportSnapshot,
@@ -10475,6 +10482,7 @@ function fetchPublicFeed(url) {
       plainEntry: outboxPlainEntry,
       flushPlan: outboxFlushPlan,
       flush: outboxFlush,
+      queue: outboxQueue,
       reviewPlan: outboxReviewPlan,
       review: outboxReview,
       maxEntries: OUTBOX_MAX_ENTRIES,

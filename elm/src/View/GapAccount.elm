@@ -262,15 +262,17 @@ namesSection model =
                     (List.map
                         (\mask ->
                             li [ class "gap-list-row" ]
-                                [ span [ class "gap-list-text" ] [ text mask ]
-                                , button
-                                    [ type_ "button"
-                                    , class "gap-btn gap-btn--quiet"
-                                    , attribute "aria-label" ("Remove " ++ mask)
-                                    , disabled (not live)
-                                    , onClick (gap (RecognizeRemove mask))
+                                [ span [ class "gap-list-text", attribute "title" mask ] [ text mask ]
+                                , span [ class "gap-list-actions" ]
+                                    [ button
+                                        [ type_ "button"
+                                        , class "gap-btn gap-btn--quiet"
+                                        , attribute "aria-label" ("Remove " ++ mask)
+                                        , disabled (not live)
+                                        , onClick (gap (RecognizeRemove mask))
+                                        ]
+                                        [ text "Remove" ]
                                     ]
-                                    [ text "Remove" ]
                                 ]
                         )
                         ga.recognize
@@ -313,8 +315,16 @@ namesSection model =
                 ul [ class "gap-list", attribute "aria-label" "Grouped names", attribute "data-testid" "account-group-list" ]
                     (List.map
                         (\row ->
-                            li [ class "gap-list-row" ]
-                                [ span [ class "gap-list-text" ]
+                            li
+                                [ class
+                                    (if row.primary then
+                                        "gap-list-row"
+
+                                     else
+                                        "gap-list-row gap-list-row--multi"
+                                    )
+                                ]
+                                [ span [ class "gap-list-text", attribute "title" row.nick ]
                                     [ text row.nick
                                     , if row.primary then
                                         span [ class "gap-badge" ] [ text "Primary" ]
@@ -322,26 +332,28 @@ namesSection model =
                                       else
                                         text ""
                                     ]
-                                , if row.primary then
-                                    text ""
+                                , span [ class "gap-list-actions" ]
+                                    [ if row.primary then
+                                        text ""
 
-                                  else
-                                    button
+                                      else
+                                        button
+                                            [ type_ "button"
+                                            , class "gap-btn gap-btn--quiet"
+                                            , attribute "aria-label" ("Make " ++ row.nick ++ " primary")
+                                            , disabled (not live)
+                                            , onClick (gap (GroupPrimary row.nick))
+                                            ]
+                                            [ text "Make primary" ]
+                                    , button
                                         [ type_ "button"
                                         , class "gap-btn gap-btn--quiet"
-                                        , attribute "aria-label" ("Make " ++ row.nick ++ " primary")
+                                        , attribute "aria-label" ("Remove " ++ row.nick ++ " from your group")
                                         , disabled (not live)
-                                        , onClick (gap (GroupPrimary row.nick))
+                                        , onClick (gap (GroupRemove row.nick))
                                         ]
-                                        [ text "Make primary" ]
-                                , button
-                                    [ type_ "button"
-                                    , class "gap-btn gap-btn--quiet"
-                                    , attribute "aria-label" ("Remove " ++ row.nick ++ " from your group")
-                                    , disabled (not live)
-                                    , onClick (gap (GroupRemove row.nick))
+                                        [ text "Remove" ]
                                     ]
-                                    [ text "Remove" ]
                                 ]
                         )
                         ga.groupNicks

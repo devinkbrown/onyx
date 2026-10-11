@@ -74,13 +74,14 @@
 .gap-list-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
   min-height: 40px;
   padding: 2px var(--space-1) 2px var(--space-3);
 }
 .gap-list-row + .gap-list-row { border-top: 1px solid var(--onyx-line); }
 .gap-list-text {
-  flex: 1;
+  flex: 1 1 8ch;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,6 +89,7 @@
   font-size: var(--text-sm, 13px);
   font-family: var(--font-mono, ui-monospace, monospace);
 }
+.gap-list-actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
 .gap-badge {
   display: inline-block;
   margin-left: var(--space-2);
@@ -106,8 +108,14 @@
 @container gap-acct (max-width: 420px) {
   .gap-inline-row { flex-direction: column; }
   .gap-actions > .gap-btn { flex: 1 1 140px; }
-  .gap-list-row { flex-wrap: wrap; padding: var(--space-1) var(--space-2); }
-  .gap-list-text { flex-basis: 100%; }
+  /* A row with two actions puts the name on its own line so neither the
+     name nor a button is squeezed; one-action rows stay on one line. */
+  .gap-list-row--multi .gap-list-text { flex-basis: 100%; padding-top: var(--space-1); }
+  .gap-list-row--multi .gap-list-actions { margin-left: calc(var(--space-2) * -1); }
+}
+@container gap-acct (max-width: 300px) {
+  .gap-list-text { flex-basis: 100%; padding-top: var(--space-1); }
+  .gap-list-actions { margin-left: calc(var(--space-2) * -1); }
 }
 
 /* ---------- Preferences: review panels ---------- */
