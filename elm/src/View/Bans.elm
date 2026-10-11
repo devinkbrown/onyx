@@ -558,9 +558,12 @@ deskMemberForm model channel live =
             , onInput ModerationDeskMember
             , value desk.member
             ]
-            -- `selected` on the options too: a select whose `value` is set
-            -- before its options exist can paint blank.
-            (option [ value "", selected (desk.member == "") ] [ text "Choose a member" ]
+            -- The placeholder's value goes in as an attribute: Elm applies the
+            -- `value` property before the option has its text, so for ""
+            -- the browser kept no value attribute, the option read as its
+            -- text, and the next patch's `select.value = ""` matched nothing
+            -- (a blank select). `selected` marks the live choice as well.
+            (option [ attribute "value" "", selected (desk.member == "") ] [ text "Choose a member" ]
                 :: List.map (\nick -> option [ value nick, selected (desk.member == nick) ] [ text nick ]) candidates
             )
          , select

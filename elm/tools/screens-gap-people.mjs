@@ -120,6 +120,14 @@ async function scrollTo(page, h, sel) {
 
 const clickJs = (page, sel) => page.evaluate((s) => document.querySelector(s)?.click(), sel);
 
+/** A select that paints blank (selectedIndex -1) is a PROBLEM: Elm's
+    `value` property on a placeholder option leaves it that way. */
+async function assertSelected(page, h, sel) {
+  await h.settle(page, 300);
+  const idx = await page.evaluate((s) => document.querySelector(s)?.selectedIndex ?? -2, sel);
+  if (idx < 0) throw new Error(`select ${sel} paints blank (selectedIndex ${idx})`);
+}
+
 const readLongTasks = (page) => page.evaluate(() => {
   const t = window.__lt || [];
   window.__lt = [];
@@ -145,6 +153,7 @@ export default {
   'gp-desk-op': async (page, h) => {
     await boot(page, h, { op: true });
     await roomMore(page, h, 'moderation-open');
+    await assertSelected(page, h, '[data-testid="desk-member-select"]');
   },
   // Read-only desk for a member.
   'gp-desk-member': async (page, h) => {
@@ -175,6 +184,7 @@ export default {
     await boot(page, h, { owner: true });
     await clickJs(page, '[data-testid="steward-open"]');
     await h.settle(page, 300);
+    await assertSelected(page, h, '[data-testid="steward-successor"]');
   },
   'gp-steward-leave': async (page, h) => {
     await boot(page, h, { owner: true });

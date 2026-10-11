@@ -350,7 +350,7 @@ transferSection model view =
                                 , value model.stewardSuccessor
                                 , onInput StewardSuccessorInput
                                 ]
-                                (option [ value "", selected (model.stewardSuccessor == "") ] [ text "Choose a person" ]
+                                (option [ attribute "value" "", selected (model.stewardSuccessor == "") ] [ text "Choose a person" ]
                                     :: List.map
                                         (\member -> option [ value member.nick, selected (model.stewardSuccessor == member.nick) ] [ text member.nick ])
                                         (transferCandidates model view)
