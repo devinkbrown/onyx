@@ -19,6 +19,7 @@ import BlockKit -- v3/gap-import
 import ComposerAssist
 import Dict
 import Emoji
+import GapConvo
 import Html exposing (Html, button, div, form, input, label, p, progress, span, text, textarea)
 import Html.Attributes exposing (attribute, autofocus, class, classList, disabled, placeholder, title, type_, value)
 import Html.Attributes as Attr
@@ -27,6 +28,7 @@ import Json.Decode as Decode
 import Outbox
 import Polish
 import Schedule
+import Upload
 import View.Chanserv -- v3/gap-chanserv
 import View.Icon exposing (icon)
 import View.Polish
@@ -126,6 +128,11 @@ composer model =
                  , value model.composer
                  , onInput ComposerInput
                  , preventDefaultOn "keydown" (keyDecoder model)
+
+                 -- v3/gap-convo: where the caret is (emoji lands there)
+                 , on "keyup" gapCaretDecoder
+                 , on "click" gapCaretDecoder
+                 , on "select" gapCaretDecoder
                  , disabled (not ready)
                  , attribute "id" "shell-composer-input"
                  , attribute "aria-keyshortcuts" "Alt+Enter" -- v3/gap-commands
@@ -176,6 +183,8 @@ composer model =
                     ]
                 ]
             ]
+        , gapDraftLine model -- v3/gap-convo
+        , gapDropTarget model ready -- v3/gap-convo
         , if model.scheduleOpen then
             div [ class "onyx-schedule" ] [ schedulePopover model ]
 
@@ -382,7 +391,7 @@ stagedList model =
 
     else
         div [ class "onyx-attachments", attribute "aria-label" "Files to send", attribute "role" "group" ]
-            (List.map stagedRow model.attachments)
+            (List.map (stagedRow model) model.attachments)
 
 
 {-| Named-conversation picker (mirroring the oracle topic
@@ -448,8 +457,8 @@ conversation model =
                     ]
 
 
-stagedRow : App.StagedAttachment -> Html Msg
-stagedRow item =
+stagedRow : Model -> App.StagedAttachment -> Html Msg
+stagedRow model item =
     let
         statusText =
             case item.status of
@@ -473,6 +482,7 @@ stagedRow item =
     div [ class "onyx-attach-row" ]
         ([ span [ class "onyx-attach-name" ] [ text item.name ]
          , span [ class "onyx-attach-status" ] [ text statusText ]
+         , gapStagedPrivacy model item -- v3/gap-convo
          ]
             ++ (case item.status of
                     App.StagedUploading ->
@@ -493,6 +503,9 @@ stagedRow item =
                     , class "onyx-attach-remove"
                     , attribute "aria-label" ("Remove " ++ item.name)
                     , onClick (AttachRemove item.id)
+
+                    -- v3/gap-convo: never pull a file out from under its upload
+                    , disabled (item.status == App.StagedUploading)
                     ]
                     [ text "Remove" ]
                ]
@@ -843,3 +856,162 @@ emojiButton model ready =
                )
         )
         [ icon "emoji", span [ class "shell-composer-action-label" ] [ text "Emoji" ] ]
+
+
+
+-- v3/gap-convo
+
+
+{-| "Saved here" (or why it is not). Quiet: it appears with the first
+typed character and only changes when the draft's home does. -}
+gapDraftLine : Model -> Html Msg
+gapDraftLine model =
+    case App.gapDraftStatus model of
+        Just status ->
+            p
+                [ class "gap-draft-status"
+                , attribute "role" "status"
+                , attribute "aria-live" "polite"
+                , attribute "data-testid" "draft-status"
+                , attribute "data-kept"
+                    (if status.saved then
+                        "device"
+
+                     else
+                        "tab"
+                    )
+                ]
+                [ text status.text ]
+
+        Nothing ->
+            text ""
+
+
+{-| The drop target while files are dragged over the window: names the
+conversation and promises nothing sends until Send. -}
+gapDropTarget : Model -> Bool -> Html Msg
+gapDropTarget model ready =
+    if model.gapConvo.dropActive && ready then
+        div [ class "gap-drop", attribute "aria-hidden" "true", attribute "data-testid" "drop-target" ]
+            [ div [ class "gap-drop-card" ]
+                [ span [ class "gap-drop-icon" ] [ icon "attach" ]
+                , span [ class "gap-drop-title" ] [ text ("Drop to attach to " ++ Maybe.withDefault "" model.activeChannel) ]
+                , span [ class "gap-drop-copy" ] [ text "Nothing sends until you press Send." ]
+                ]
+            ]
+
+    else
+        text ""
+
+
+{-| Size, privacy and quality for one staged file: photos say whether
+their location and camera details were removed; a photo whose details
+cannot be removed is refused until the user explicitly keeps them; when
+a smaller copy exists the user picks Original or Compact. -}
+gapStagedPrivacy : Model -> App.StagedAttachment -> Html Msg
+gapStagedPrivacy model item =
+    let
+        busy =
+            item.status == App.StagedUploading
+
+        size bytes =
+            span [ class "gap-attach-size" ] [ text (Upload.formatAttachmentBytes bytes) ]
+    in
+    case App.gapPhotoFor model item of
+        Nothing ->
+            size item.size
+
+        Just ( prep, choice ) ->
+            let
+                original =
+                    Maybe.withDefault item.size prep.cleanBytes
+
+                options =
+                    case prep.compactBytes of
+                        Just compact ->
+                            if prep.metadata /= "unsafe" && not choice.keepMetadata then
+                                Upload.photoQualityOptions original (Just compact)
+
+                            else
+                                []
+
+                        Nothing ->
+                            []
+
+                ident =
+                    { key = item.key, index = item.position }
+            in
+            div [ class "gap-attach-photo" ]
+                ((if List.isEmpty options then
+                    [ size original ]
+
+                  else
+                    [ div [ class "gap-attach-quality", attribute "role" "radiogroup", attribute "aria-label" ("Photo quality for " ++ item.name) ]
+                        (List.map
+                            (\option ->
+                                button
+                                    [ type_ "button"
+                                    , class "gap-attach-quality-opt"
+                                    , attribute "role" "radio"
+                                    , attribute "aria-checked"
+                                        (if choice.quality == option.quality then
+                                            "true"
+
+                                         else
+                                            "false"
+                                        )
+                                    , disabled busy
+                                    , onClick (App.GapConvoMsg (GapConvo.PhotoQuality { key = ident.key, index = ident.index, quality = option.quality }))
+                                    ]
+                                    [ text option.label ]
+                            )
+                            options
+                        )
+                    ]
+                 )
+                    ++ (case GapConvo.photoNote prep choice of
+                            Just note ->
+                                [ span
+                                    [ classList [ ( "gap-attach-note", True ), ( "gap-attach-note--warn", note.warn ) ] ]
+                                    [ text note.text ]
+                                ]
+
+                            Nothing ->
+                                []
+                       )
+                    ++ (if prep.metadata == "unsafe" || choice.refused || choice.keepMetadata then
+                            [ button
+                                [ type_ "button"
+                                , class "gap-attach-keep"
+                                , attribute "aria-pressed"
+                                    (if choice.keepMetadata then
+                                        "true"
+
+                                     else
+                                        "false"
+                                    )
+                                , disabled busy
+                                , onClick (App.GapConvoMsg (GapConvo.PhotoKeepMetadata { key = ident.key, index = ident.index, keep = not choice.keepMetadata }))
+                                ]
+                                [ text
+                                    (if choice.keepMetadata then
+                                        "Don't send location data"
+
+                                     else
+                                        "Send with location data"
+                                    )
+                                ]
+                            ]
+
+                        else
+                            []
+                       )
+                )
+
+
+{-| The field's selection after a key-up, click or select. -}
+gapCaretDecoder : Decode.Decoder Msg
+gapCaretDecoder =
+    Decode.map2 (\start end -> App.GapConvoMsg (GapConvo.CaretMoved { start = start, end = end }))
+        (Decode.at [ "target", "selectionStart" ] Decode.int)
+        (Decode.at [ "target", "selectionEnd" ] Decode.int)

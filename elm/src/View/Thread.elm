@@ -9,6 +9,7 @@ import Avatar
 import BlockKit -- v3/gap-import
 import Dict
 import Emoji
+import GapConvo
 import Topic
 import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
@@ -94,7 +95,11 @@ the empty → live transition and the scroll bridge never re-attaches.
 -}
 channelTranscript : Model -> App.Channel -> Html Msg
 channelTranscript model channel =
-    if List.isEmpty channel.messages then
+    if List.isEmpty channel.messages && App.gapHistoryLoadingEmpty model channel then
+        -- v3/gap-convo: history is on its way — placeholders, not "say hi"
+        gapLoadingFrame model channel
+
+    else if List.isEmpty channel.messages then
         div [ class "onyx-thread-frame" ]
             [ -- v3/home; v3/ui-messages: a room / DM intro card
               div [ class "onyx-empty onyx-room-intro" ]
@@ -149,6 +154,7 @@ channelTranscript model channel =
                 , topicFilterBar model channel
                 , topicTools model channel
                 , forumCards model channel
+                , gapCollapsedBanner model channel -- v3/gap-convo
                 , if win.hiddenBefore > 0 then
                     div [ class "onyx-earlier" ]
                         [ button
@@ -597,6 +603,9 @@ rowShell ctx body menuButton panels m =
         -- v3/ui-messages: focusable (never a tab stop) so a tap on touch
         -- reveals the row's actions through :focus-within.
         , tabindex -1
+
+        -- v3/gap-convo: the scroll bridge lands on rows by this key
+        , attribute "data-row-key" (TranscriptRows.rowKey m)
         ]
             ++ longPressMenu ctx.target m flags.menuButton
         )
@@ -1706,7 +1715,8 @@ messageMenuPanel model target m =
                                     Just
                                         (menuItem ("Quote " ++ actionTarget ++ " in composer")
                                             "Quote in composer"
-                                            (App.MessageQuote { target = target, from = m.from, body = m.body })
+                                            -- v3/gap-convo: the readable text, never the sealed envelope
+                                            (App.MessageQuote { target = target, from = m.from, body = Maybe.withDefault "" (App.loadedActionText m) })
                                         )
 
                                   else
@@ -2987,4 +2997,97 @@ fileChip attachment =
 
             Nothing ->
                 text ""
+        ]
+
+
+
+-- v3/gap-convo
+
+
+{-| "Hiding messages from … · Show all": hidden senders can always be
+brought back (the per-row menus go away with their rows). -}
+gapCollapsedBanner : Model -> App.Channel -> Html Msg
+gapCollapsedBanner model channel =
+    case App.gapCollapsedIn model channel of
+        [] ->
+            text ""
+
+        hidden ->
+            let
+                names =
+                    List.map Tuple.first hidden
+
+                count =
+                    List.sum (List.map Tuple.second hidden)
+
+                who =
+                    case names of
+                        [ one ] ->
+                            one
+
+                        [ one, two ] ->
+                            one ++ " and " ++ two
+
+                        one :: rest ->
+                            one ++ " and " ++ String.fromInt (List.length rest) ++ " others"
+
+                        [] ->
+                            ""
+            in
+            div [ class "gap-collapsed", attribute "role" "status", attribute "data-testid" "collapsed-banner" ]
+                [ span [ class "gap-collapsed-text" ]
+                    [ text
+                        ("Hiding "
+                            ++ String.fromInt count
+                            ++ (if count == 1 then
+                                    " message"
+
+                                else
+                                    " messages"
+                               )
+                            ++ " from "
+                            ++ who
+                            ++ " in this feed"
+                        )
+                    ]
+                , button
+                    [ type_ "button"
+                    , class "gap-collapsed-show"
+                    , attribute "aria-label" ("Show messages from " ++ who)
+                    , onClick (App.GapConvoMsg GapConvo.CollapsedShowAll)
+                    ]
+                    [ text "Show all" ]
+                ]
+
+
+{-| An open conversation with no rows yet while CHATHISTORY is in
+flight: message-shaped placeholders (mirroring the oracle skeleton
+rows) instead of the "say the first thing" intro, which would be wrong
+for the second it takes the rows to arrive. The log keeps its DOM
+position so the scroll bridge never re-attaches. -}
+gapLoadingFrame : Model -> App.Channel -> Html Msg
+gapLoadingFrame model channel =
+    div [ class "onyx-thread-frame" ]
+        [ div [ class "gap-loading" ]
+            [ View.DmSafety.convoRows model channel
+            , div [ class "gap-skeleton", attribute "role" "status", attribute "data-testid" "history-loading" ]
+                (span [ class "sr-only" ] [ text "Loading messages" ]
+                    :: List.map gapSkeletonRow [ 2, 1, 3, 2, 1 ]
+                )
+            ]
+        , transcriptLog model channel.name []
+        , text ""
+        , text ""
+        , text ""
+        ]
+
+
+gapSkeletonRow : Int -> Html Msg
+gapSkeletonRow lines =
+    div [ class "gap-skeleton-row", attribute "aria-hidden" "true" ]
+        [ span [ class "gap-skeleton-avatar" ] []
+        , div [ class "gap-skeleton-body" ]
+            (span [ class "gap-skeleton-name" ] []
+                :: List.map (\n -> span [ class "gap-skeleton-line", classList [ ( "gap-skeleton-line--short", n == lines ) ] ] []) (List.range 1 lines)
+            )
         ]

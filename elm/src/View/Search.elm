@@ -22,6 +22,7 @@ Stats slice; nav arrows are text glyphs (the oracle inlines SVG).
 -}
 
 import App exposing (Model, Msg(..))
+import GapConvo
 import Html exposing (Html, button, details, div, form, input, li, p, section, small, span, strong, summary, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, id, maxlength, placeholder, title, type_, value)
 import Json.Decode
@@ -187,6 +188,8 @@ panel model =
             , serverSection model query
             , serverBlockedNotice model query
             , vaultSection model
+            , gapSearchEmpty model query count -- v3/gap-convo
+            , gapHistoryOff model -- v3/gap-convo
             , p [ class "onyx-message-search__status", attribute "role" "status", id statusId ]
                 [ text (Search.statusLabel model.searchQuery target count position) ]
             , p [ class "onyx-message-search__status", attribute "role" "status", attribute "data-testid" "device-search-status" ]
@@ -509,3 +512,51 @@ savedRow saved =
             ]
             [ text "Delete" ]
         ]
+
+
+
+-- v3/gap-convo
+
+
+{-| "No matches yet" once every tier has answered empty (mirroring the
+oracle empty block). -}
+gapSearchEmpty : Model -> String -> Int -> Html Msg
+gapSearchEmpty model query count =
+    if
+        String.length query
+            >= 2
+            && count
+            == 0
+            && model.vaultStatus
+            /= App.VaultSearchPending
+            && App.serverStatusForPanel model
+            /= App.ServerSearchPending
+            && List.isEmpty (App.vaultHits model)
+            && List.isEmpty (App.serverResultsForPanel model)
+    then
+        div [ class "onyx-message-search__empty", attribute "data-testid" "search-empty" ]
+            [ strong [] [ text "No matches yet" ]
+            , span [] [ text "Try a shorter phrase, or search full server history if it's available." ]
+            ]
+
+    else
+        text ""
+
+
+{-| With device history off only this session's loaded messages are
+searched; say so, with the way back to the setting. -}
+gapHistoryOff : Model -> Html Msg
+gapHistoryOff model =
+    if model.prefs.localHistory then
+        text ""
+
+    else
+        div [ class "onyx-message-search__history-off gap-search-history-off", attribute "data-testid" "search-history-off" ]
+            [ span [] [ text "Device history is off, so only messages loaded in this session are searched." ]
+            , button
+                [ type_ "button"
+                , class "onyx-message-search__deep"
+                , onClick (App.GapConvoMsg GapConvo.OpenHistoryPrefs)
+                ]
+                [ text "Open history preferences" ]
+            ]

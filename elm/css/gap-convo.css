@@ -1,0 +1,326 @@
+/* v3/gap-convo — conversation gaps: the quiet "Saved here" draft line, the
+   file drop target, staged-photo privacy + quality, hidden-sender banner,
+   earlier-versions disclosure, search empty state, and the pulse a row gets
+   when a jump lands on it. Linked after pol-thread.css and before
+   ui-sheets.css. Tokens only; flat surfaces; one accent for "this is the
+   thing you jumped to / the choice you made". */
+
+/* ── Draft status ─────────────────────────────────────────────────────
+   One calm line under the bar. It never takes room where room is short
+   (phone landscape) and never competes with the error line. */
+.onyx-composer > .gap-draft-status {
+  margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--onyx-dim);
+  font-size: var(--text-2xs);
+  line-height: 1.3;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.onyx-composer > .gap-draft-status::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--onyx-accent);
+  vertical-align: 1px;
+}
+.onyx-composer > .gap-draft-status[data-kept="tab"]::before { background: var(--onyx-faint); }
+@media (max-height: 480px) and (orientation: landscape) {
+  .onyx-composer > .gap-draft-status { display: none; }
+}
+
+/* ── Drop target ──────────────────────────────────────────────────────
+   Shown only while files are dragged over the window and a conversation
+   is open. A flat scrim and one dashed card name the destination and
+   promise that nothing sends. Never intercepts the drop itself. */
+.gap-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--onyx-bg) 78%, transparent);
+  pointer-events: none;
+}
+.gap-drop-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: min(26rem, 100%);
+  padding: var(--space-7) var(--space-5);
+  border: 2px dashed var(--onyx-accent);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  text-align: center;
+}
+.gap-drop-icon { display: inline-grid; place-items: center; color: var(--onyx-accent); }
+.gap-drop-icon .pt-ico,
+.gap-drop-icon svg { width: 28px; height: 28px; }
+.gap-drop-title {
+  max-width: 100%;
+  color: var(--onyx-text);
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+.gap-drop-copy { color: var(--onyx-dim); font-size: var(--text-sm); }
+@media (max-height: 480px) {
+  .gap-drop-card { padding: var(--space-4) var(--space-5); }
+}
+
+/* ── Staged files ─────────────────────────────────────────────────────
+   Row one: name · size · state · Remove. Row two (photos only): what
+   happened to the location and camera details, the Original / Compact
+   choice, and the consent switch for a photo that cannot be cleaned. */
+.onyx-composer .onyx-attach-row { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.onyx-composer .onyx-attach-row > .onyx-attach-name { grid-column: 1; grid-row: 1; }
+.onyx-composer .onyx-attach-row > .gap-attach-size { grid-column: 2; grid-row: 1; }
+.onyx-composer .onyx-attach-row > .onyx-attach-status { grid-column: 3; grid-row: 1; }
+.onyx-composer .onyx-attach-row > .onyx-attach-remove { grid-column: 4; grid-row: 1; }
+.onyx-composer .onyx-attach-row > .gap-attach-photo { grid-column: 1 / -1; grid-row: 2; }
+.onyx-composer .onyx-attach-row > .shell-attachment-progress { grid-row: 3; }
+.onyx-composer .onyx-attach-remove:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.gap-attach-size {
+  color: var(--onyx-dim);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gap-attach-photo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+  padding: 0 var(--space-2) var(--space-1) 0;
+}
+
+.gap-attach-quality {
+  display: inline-flex;
+  max-width: 100%;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.onyx-composer .gap-attach-quality-opt {
+  /* Shrinks and wraps inside a narrow column rather than clipping. */
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: var(--target-floor);
+  padding: 4px var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  cursor: pointer;
+}
+.onyx-composer .gap-attach-quality-opt + .gap-attach-quality-opt { border-left: 1px solid var(--onyx-line); }
+.onyx-composer .gap-attach-quality-opt:hover:not(:disabled) { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-composer .gap-attach-quality-opt[aria-checked='true'] {
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  box-shadow: inset 0 -2px 0 var(--onyx-accent);
+  font-weight: 650;
+}
+.onyx-composer .gap-attach-quality-opt:disabled { opacity: 0.5; cursor: not-allowed; }
+.onyx-composer .gap-attach-quality-opt:focus-visible,
+.onyx-composer .gap-attach-keep:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.gap-attach-note {
+  min-width: 0;
+  color: var(--onyx-dim);
+  font-size: var(--text-2xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.gap-attach-note--warn { color: var(--onyx-warn); }
+
+.onyx-composer .gap-attach-keep {
+  min-height: var(--target-floor);
+  padding: 2px var(--space-2);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.onyx-composer .gap-attach-keep:hover:not(:disabled) { background: var(--onyx-panel-2); }
+.onyx-composer .gap-attach-keep[aria-pressed='true'] { border-color: var(--onyx-warn); color: var(--onyx-warn); }
+.onyx-composer .gap-attach-keep:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (pointer: coarse) {
+  .onyx-composer .gap-attach-quality-opt,
+  .onyx-composer .gap-attach-keep { min-height: var(--target-min); }
+  .onyx-composer .gap-attach-quality-opt { padding: 0 var(--space-4); }
+  .onyx-composer .gap-attach-keep { padding: 0 var(--space-3); }
+  .onyx-composer .onyx-attach-remove { min-height: var(--target-min); min-width: var(--target-min); }
+}
+
+/* Narrow: size drops under the name so a long file name keeps its line. */
+@media (max-width: 400px) {
+  .onyx-composer .onyx-attach-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .onyx-composer .onyx-attach-row > .gap-attach-size { grid-column: 1; grid-row: 2; }
+  .onyx-composer .onyx-attach-row > .onyx-attach-status { grid-column: 2; }
+  .onyx-composer .onyx-attach-row > .onyx-attach-remove { grid-column: 3; }
+  .onyx-composer .onyx-attach-row > .gap-attach-photo { grid-row: 2; }
+  .onyx-composer .onyx-attach-row > .shell-attachment-progress { grid-row: 3; }
+}
+
+/* ── Hidden senders ───────────────────────────────────────────────────
+   Always one line above the first row while anybody is collapsed, with
+   the way back on the same line. */
+.gap-collapsed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+}
+.gap-collapsed-text { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; line-height: var(--leading-snug); }
+.gap-collapsed-show {
+  flex: none;
+  min-height: var(--target-floor);
+  padding: 2px var(--space-3);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gap-collapsed-show:hover { background: var(--onyx-panel-2); }
+.gap-collapsed-show:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (pointer: coarse) {
+  .gap-collapsed-show { min-height: var(--target-min); padding: 0 var(--space-4); }
+}
+@media (max-width: 400px) {
+  .gap-collapsed { flex-wrap: wrap; }
+  .gap-collapsed-show { margin-left: auto; }
+}
+
+/* ── Search: nothing found ───────────────────────────────────────────── */
+.onyx-message-search__empty {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+.onyx-message-search__empty strong { font-weight: 650; }
+.onyx-message-search__empty span { color: var(--onyx-dim); }
+.gap-search-history-off { display: grid; gap: var(--space-2); justify-items: start; }
+.gap-search-history-off .onyx-message-search__deep { justify-self: start; }
+
+/* ── Landing ──────────────────────────────────────────────────────────
+   A jump (pin, media, vault hit, ?at=, search) centres the row, pulses
+   it once in the accent and leaves a quiet marker until the pulse ends.
+   Reduced motion: the marker alone, no fade. */
+@keyframes gap-landed {
+  0% { background: color-mix(in oklab, var(--onyx-accent) 22%, transparent); }
+  100% { background: transparent; }
+}
+.onyx-message.gap-landed {
+  box-shadow: inset 2px 0 0 var(--onyx-accent);
+  animation: gap-landed 1.6s var(--ease) 1;
+}
+.onyx-message.gap-landed:hover,
+.onyx-message.gap-landed:focus-within { animation: none; background: var(--pt-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .onyx-message.gap-landed { animation: none; background: color-mix(in oklab, var(--onyx-accent) 10%, transparent); }
+}
+:root[data-reduce-motion='true'] .onyx-message.gap-landed { animation: none; background: color-mix(in oklab, var(--onyx-accent) 10%, transparent); }
+
+/* ── History on its way ───────────────────────────────────────────────
+   Message-shaped placeholders while CHATHISTORY is in flight for a
+   conversation with nothing yet. Flat bars, one slow pulse; still under
+   reduced motion. */
+.gap-loading { display: grid; gap: var(--space-4); min-width: 0; }
+.gap-skeleton {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 72ch;
+  padding: var(--space-4) var(--space-2) var(--space-2);
+}
+.gap-skeleton-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.gap-skeleton-avatar { width: 2rem; height: 2rem; border-radius: 50%; background: var(--onyx-panel-2); }
+.gap-skeleton-body { display: grid; gap: var(--space-2); min-width: 0; padding-top: 2px; }
+.gap-skeleton-name,
+.gap-skeleton-line { display: block; height: 0.75rem; border-radius: 3px; background: var(--onyx-panel-2); }
+.gap-skeleton-name { width: 7rem; background: var(--onyx-line); }
+.gap-skeleton-line { width: 100%; }
+.gap-skeleton-line--short { width: 58%; }
+.gap-skeleton-row:nth-child(2n) .gap-skeleton-line { width: 92%; }
+.gap-skeleton-row:nth-child(2n) .gap-skeleton-line--short { width: 40%; }
+@keyframes gap-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.gap-skeleton-avatar,
+.gap-skeleton-name,
+.gap-skeleton-line { animation: gap-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gap-skeleton-avatar,
+  .gap-skeleton-name,
+  .gap-skeleton-line { animation: none; }
+}
+:root[data-reduce-motion='true'] .gap-skeleton-avatar,
+:root[data-reduce-motion='true'] .gap-skeleton-name,
+:root[data-reduce-motion='true'] .gap-skeleton-line { animation: none; }
+@media (max-height: 480px) and (orientation: landscape) {
+  .gap-skeleton { gap: var(--space-3); padding-top: var(--space-2); }
+  .gap-skeleton-row:nth-child(n + 4) { display: none; }
+}
+
+/* ── Search on a short screen ─────────────────────────────────────────
+   The panel sits above the shell; at phone-landscape height it used to
+   leave the transcript ~20px, so a jump landed out of sight. Cap it and
+   let it scroll as one piece so the row you jumped to stays visible. */
+@media (max-height: 520px) {
+  .onyx-message-search {
+    max-height: 40dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block: var(--space-1);
+  }
+  .onyx-message-search__body { max-height: none; overflow: visible; }
+}
+
+/* ── Composer measure on wide screens ─────────────────────────────────
+   rx-shell caps the composer at the reading measure and centres it
+   (`align-self: center; max-width`), while pol-thread ALSO pads it by
+   `(100% - measure) / 2` — where % is the column, not the composer — so
+   past ~1500px the bar was squeezed to a ~200px sliver. The cap alone
+   does the centring; the padding stays a plain gutter. */
+@media (min-width: 600px) {
+  .onyx-frame > .onyx-main > .onyx-composer { padding-inline: var(--space-4); }
+}

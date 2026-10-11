@@ -2952,7 +2952,8 @@ suite =
                 in
                 Expect.all
                     [ \_ -> Expect.equal "> hello\n> world\n\ndraft" m.composer
-                    , \_ -> Expect.equal [] out
+                    , -- v3/gap-convo: the quote hands the keyboard to the composer
+                      \_ -> Expect.equal [ PrefsFocus { id = "shell-composer-input" } ] out
                     , \_ -> Expect.equal [ "Quoted into composer" ] (List.map .title m.toasts)
                     , \_ ->
                         Expect.equal [ "Prefixed a quote from alice." ]
@@ -6497,14 +6498,16 @@ suite =
                         , { id = "#c:5", target = "#c", from = "alice", body = "old", at = 100, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
-                    ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) m1
+                    ( m2, out2 ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 150, rows = window, status = "ok" }) { m1 | activeChannel = Just "#c" }
                 in
                 case Dict.get "#c" m2.channels of
                     Just c ->
                         Expect.all
                             [ \_ -> Expect.equal [ "live", "old" ] (List.map .body c.messages)
-                            , \_ -> Expect.equal (Just "#c:5") m2.historyLanding
+                            , -- v3/gap-convo: the nearest merged row is landed on (scrolled to + focused)
+                              \_ -> Expect.equal True (List.member (TranscriptScroll { action = "message", key = "r:1" }) out2)
+                            , \_ -> Expect.equal (Just "row:1") m2.historyLanding
                             , \_ -> Expect.equal 6 m2.messageSeq
                             , \_ -> Expect.equal True (List.member "#c:5" m2.vaultSeenIds)
                             ]
@@ -6523,14 +6526,15 @@ suite =
                         , { id = "#c:4", target = "#c", from = "alice", body = "m4", at = 400, rowType = "msg", deleted = False, redacted = False , replyTo = Nothing }
                         ]
 
-                    ( m2, _ ) =
-                        update (VaultRowsAroundReceived { target = "#c", at = 350, rows = window, status = "ok" }) joined
+                    ( m2, out2 ) =
+                        update (VaultRowsAroundReceived { target = "#c", at = 350, rows = window, status = "ok" }) { joined | activeChannel = Just "#c" }
                 in
                 case Dict.get "#c" m2.channels of
                     Just c ->
                         Expect.all
                             [ \_ -> Expect.equal [ "m4", "m3" ] (List.map .body c.messages)
-                            , \_ -> Expect.equal (Just "#c:3") m2.historyLanding
+                            , -- v3/gap-convo: ties land older-first (m3, merged row 1)
+                              \_ -> Expect.equal True (List.member (TranscriptScroll { action = "message", key = "r:1" }) out2)
                             ]
                             ()
 
@@ -8795,7 +8799,7 @@ suite =
                         feed base ":me!u@h JOIN #c"
 
                     ( withMsg, _ ) =
-                        feed { joined | historyLoading = Set.empty } "@msgid=pin1 :alice!u@h PRIVMSG #c :hello"
+                        feed { joined | historyLoading = Set.empty, activeChannel = Just "#c" } "@msgid=pin1 :alice!u@h PRIVMSG #c :hello"
 
                     ( focused, focusOut ) =
                         update (PinnedMessageJump { channel = "#c", messageId = "pin1" }) withMsg
@@ -8807,9 +8811,10 @@ suite =
                         update (PinnedMessageJump { channel = "#nope", messageId = "x" }) withMsg
                 in
                 Expect.all
-                    [ \_ -> Expect.equal (Just "pin1") focused.historyLanding
+                    [ -- v3/gap-convo: a loaded pin is landed on at once
+                      \_ -> Expect.equal (Just "pin1") focused.historyLanding
                     , \_ -> Expect.equal False focused.showPinnedMessages
-                    , \_ -> Expect.equal [] focusOut
+                    , \_ -> Expect.equal [ TranscriptScroll { action = "message", key = "m:pin1" } ] focusOut
                     , \_ ->
                         Expect.equal [ SendLine "CHATHISTORY AROUND #c msgid=missing 50\r\n" ]
                             (List.filter isChatHistory requestOut)
@@ -18098,9 +18103,10 @@ suite =
                             update (MediaIndexJump { messageId = "m1", at = 0 }) opened
                     in
                     Expect.all
-                        [ \_ -> Expect.equal (Just "m1") jumped.historyLanding
+                        [ -- v3/gap-convo: the media jump lands on the row
+                          \_ -> Expect.equal (Just "m1") jumped.historyLanding
                         , \_ -> Expect.equal False jumped.mediaIndexOpen
-                        , \_ -> Expect.equal [] outs
+                        , \_ -> Expect.equal [ TranscriptScroll { action = "message", key = "m:m1" } ] outs
                         ]
                         ()
             , test "jump on an unloadable row travels to its stamp" <|
@@ -23845,7 +23851,8 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal True opened.searchOpen
-                        , \_ -> Expect.equal "" opened.composer
+                        , -- v3/gap-convo: Ctrl/Cmd+F never wipes the draft
+                          \_ -> Expect.equal "draft" opened.composer
                         ]
                         ()
             , test "SearchHotkey leaves an open panel and its query alone" <|
