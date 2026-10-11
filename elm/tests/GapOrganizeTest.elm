@@ -639,6 +639,15 @@ notes =
                         , Query.has [ testid "member-note-save" ]
                         , Query.has [ Selector.text "0 / 2048" ]
                         ]
+        , test "choosing someone in the phone member list closes that sheet (it would hide the card)" <|
+            \_ ->
+                view card
+                    |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "View member card for mara") ]
+                    |> Expect.all
+                        [ Query.has [ Selector.attribute (Attr.attribute "popovertarget" "onyx-members") ]
+                        , Query.has [ Selector.attribute (Attr.attribute "popovertargetaction" "hide") ]
+                        , Event.simulate Event.click >> Event.expect (UserProfileOpened { nick = "mara", channel = "#lounge" })
+                        ]
         , test "your own card has no note" <|
             \_ ->
                 view (step (UserProfileOpened { nick = "kn", channel = "#lounge" }) card)

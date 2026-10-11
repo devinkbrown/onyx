@@ -259,7 +259,9 @@ export default {
       await clickVisible(page, ['[data-testid="members-toggle"]'], h);
       await clickVisible(page, card, h);
     }
+    await snap(page, 'room-card');
     if (await clickVisible(page, ['[data-testid="member-note-add"]'], h)) {
+      await snap(page, 'room-note-adding');
       await page.fill('[data-testid="member-note-input"]', 'Runs the design crit on Thursdays. Prefers async reviews.', { timeout: 5000 });
       await clickVisible(page, ['[data-testid="member-note-save"]'], h);
     }
