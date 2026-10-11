@@ -11530,7 +11530,7 @@ function fetchPublicFeed(url) {
     var layers = [
       { sel: ".onyx-msg-menu", first: '[role="menuitem"]:not([disabled])', open: false, back: null, backKey: null, trigger: ".onyx-msg-menu-trigger" },
       { sel: ".onyx-react-picker", first: ".onyx-react-search", open: false, back: null, backKey: null, trigger: '[data-row-action="react"], .onyx-msg-menu-trigger' },
-      { sel: ".onyx-message-search", first: "#onyx-message-search-input", open: false, back: null, backKey: null, trigger: null }
+      { sel: ".onyx-message-search", first: "#onyx-message-search-input", open: false, back: null, backKey: null, trigger: null, fallback: "#shell-composer-input" }
     ];
     function focusEl(el) {
       if (!el) return;
@@ -11554,7 +11554,11 @@ function fetchPublicFeed(url) {
     function reopener(layer) {
       var back = layer.back;
       if (back && back.isConnected) return back;
-      if (!layer.backKey || typeof doc.querySelectorAll !== "function") return null;
+      if (!layer.backKey || typeof doc.querySelectorAll !== "function") {
+        /* No opener to return to (it lived in a sheet that closed with the
+           panel): the composer is the natural next stop, never <body>. */
+        return layer.fallback && typeof doc.querySelector === "function" ? doc.querySelector(layer.fallback) : null;
+      }
       var rows = doc.querySelectorAll("[data-row-key]");
       for (var r = 0; r < rows.length; r += 1) {
         if (rows[r].getAttribute("data-row-key") !== layer.backKey) continue;

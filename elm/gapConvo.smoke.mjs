@@ -524,3 +524,22 @@ test("search panel: opens on its field and gives focus back when it closes with 
   focus.settle();
   assert.equal(doc.activeElement, opener);
 });
+
+test("search panel: when its opener is gone (a phone sheet closed) focus goes to the composer, never <body>", () => {
+  const { doc, focus } = focusSetup();
+  const sheetButton = doc.createElement("button");
+  doc.body.appendChild(sheetButton);
+  sheetButton.focus();
+  const panel = doc.createElement("section");
+  panel.className = "onyx-message-search";
+  const input = doc.createElement("input");
+  input.id = "onyx-message-search-input";
+  panel.appendChild(input);
+  doc.body.appendChild(panel);
+  sheetButton.remove();
+  focus.settle();
+  assert.equal(doc.activeElement, input);
+  panel.remove();
+  focus.settle();
+  assert.equal(doc.activeElement.id, "shell-composer-input");
+});

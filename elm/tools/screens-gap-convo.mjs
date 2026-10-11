@@ -24,6 +24,9 @@
  *   gc-ctrlf          Ctrl+F keeps the draft
  *   gc-loading        history in flight: placeholders, not "say hi"
  *   gc-caret          an emoji lands at the caret, which stays after it
+ *   gc-reply-focus    Reply / Quote hand the keyboard to the composer
+ *   gc-react-keys     the reaction picker opens on its search and roves with arrows
+ *   gc-search-focus   search opens on its field and gives focus back on Escape
  */
 
 const T = (minAgo) => new Date(Date.now() - minAgo * 60000).toISOString();
@@ -128,6 +131,21 @@ async function openSearch(page, h) {
     await page.click('.onyx-room-more-search');
   }
   await h.settle(page, 400);
+}
+
+/* Open the "More" menu on the n-th row (hover on desktop, tap on touch). */
+async function openMenuOnRow(page, n) {
+  const row = (await page.$$('.onyx-message'))[n];
+  await row.scrollIntoViewIfNeeded();
+  if (isPhone(page)) {
+    const box = await row.boundingBox();
+    await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
+  } else {
+    await row.hover();
+  }
+  await page.waitForTimeout(250);
+  await (await row.$('.onyx-msg-menu-trigger')).click();
+  await page.waitForTimeout(400);
 }
 
 /* Hop to a joined room through the Ctrl/Cmd+K switcher. */
@@ -401,6 +419,49 @@ export default {
     const pos = await page.evaluate(() => document.getElementById('shell-composer-input').selectionStart);
     ok(pos === 5 + glyph.length, `the cursor sits right after it (got ${pos})`);
     ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'the field has the keyboard back');
+  },
+
+  'gc-reply-focus': async (page, h) => {
+    await room(page, h);
+    await openMenuOnRow(page, 4);
+    await page.click('.onyx-msg-menu-item:has-text("Reply")');
+    await page.waitForTimeout(500);
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'Reply hands focus to the composer');
+    await openMenuOnRow(page, 5);
+    await page.click('.onyx-msg-menu-item:has-text("Quote")');
+    await page.waitForTimeout(500);
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'Quote hands focus to the composer');
+    ok((await page.inputValue('#shell-composer-input')).startsWith('> '), 'the quote is in the composer');
+  },
+
+  'gc-react-keys': async (page, h) => {
+    await room(page, h);
+    await openMenuOnRow(page, 4);
+    await page.click('.onyx-msg-menu-item:has-text("React")');
+    await page.waitForTimeout(500);
+    const picker = await page.$('.onyx-react-picker');
+    ok(!!picker, 'reaction picker open');
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('onyx-react-search')), 'the picker opens on its search field');
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains('onyx-react-choice')), 'ArrowDown enters the grid');
+    const first = await page.evaluate(() => document.activeElement.textContent);
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+    const second = await page.evaluate(() => document.activeElement.textContent);
+    ok(first !== second, 'ArrowRight moves along the grid');
+    await h.settle(page, 200);
+  },
+
+  'gc-search-focus': async (page, h) => {
+    await room(page, h);
+    await openSearch(page, h);
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'onyx-message-search-input'), 'search opens on its field');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    ok(!(await page.$('.onyx-message-search')), 'Escape closes search');
+    const where = await page.evaluate(() => { const a = document.activeElement; return a ? (a.id || a.className || a.tagName) : ''; });
+    ok(where && where !== 'BODY', `focus is not dropped on the page (got ${where})`);
   },
 
   'gc-menu-keys': async (page, h) => {
