@@ -310,6 +310,19 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
     await tick(dom);
     assert.match(q(doc, '[data-testid="sidebar-dms"]').textContent, /alice/);
 
+    /* 8. v3/gap-account, through the real ports: registering as a guest
+          resolves the guest scope of this (pinned) network and seeds its
+          device lists; an unread DM shows in the tab title. */
+    const guestScope = JSON.stringify([PIN, "guest"]);
+    for (const base of ["onyx:ignored-users", "onyx:muted-dms", "onyx:highlight-words", "onyx:channel-notify"]) {
+      assert.notEqual(
+        window.localStorage.getItem(base + ":scope:" + encodeURIComponent(guestScope)),
+        null,
+        base + " seeded under the guest scope",
+      );
+    }
+    assert.match(doc.title, /^\(1\) /, "an unread DM puts (1) in the tab title: " + doc.title);
+
     for (const frame of sock.sent) assert.match(frame, /^[^\r\n]+\r\n$/, "frame " + JSON.stringify(frame));
     assert.deepEqual(errors, [], "no runtime errors across the flow");
   } finally {

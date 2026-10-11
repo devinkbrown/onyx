@@ -11445,7 +11445,8 @@ function fetchPublicFeed(url) {
       ownerArg: ownerArg,
       rowOwned: vaultRowOwned,
       localHistoryEnabled: localHistoryEnabled,
-      importMaxBytes: VAULT_IMPORT_MAX_BYTES
+      importMaxBytes: VAULT_IMPORT_MAX_BYTES,
+      openVault: openVault
     },
     vaultStore: {
       put: vaultPut,

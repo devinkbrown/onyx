@@ -497,3 +497,58 @@ test("badge clamps junk counts", async () => {
   await tick();
   assert.deepEqual(calls.filter((n) => n > 0), [99999]);
 });
+
+/* ---------- opening the vault beside the old client's database ---------- */
+
+function fakeIndexedDbOpen(behaviour) {
+  const opened = [];
+  const had = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+  globalThis.indexedDB = {
+    open(name, version) {
+      opened.push([name, version]);
+      const req = { result: { name, fake: true }, error: null };
+      setTimeout(() => {
+        const outcome = behaviour(name);
+        if (outcome === "ok") { if (req.onsuccess) req.onsuccess({ target: req }); }
+        else {
+          req.error = { name: outcome };
+          if (req.onerror) req.onerror({ target: req, preventDefault() {} });
+        }
+      }, 0);
+      return req;
+    },
+  };
+  const restore = () => { if (had) Object.defineProperty(globalThis, "indexedDB", had); else delete globalThis.indexedDB; };
+  return { opened, restore };
+}
+
+test("a vault the old client created at a newer schema opens a separate Elm database instead of failing", async () => {
+  const fake = fakeIndexedDbOpen((name) => (name === "onyx-vault" ? "VersionError" : "ok"));
+  try {
+    const db = await new Promise((resolve) => gapAccount.openVault(resolve));
+    assert.equal(db.name, "onyx-elm-vault");
+    assert.deepEqual(fake.opened.map((o) => o[0]), ["onyx-vault", "onyx-elm-vault"]);
+  } finally { fake.restore(); }
+});
+
+test("other open errors, and a failing fallback, report no store (no retry loop)", async () => {
+  const other = fakeIndexedDbOpen(() => "UnknownError");
+  try {
+    assert.equal(await new Promise((resolve) => gapAccount.openVault(resolve)), null);
+    assert.equal(other.opened.length, 1);
+  } finally { other.restore(); }
+  const both = fakeIndexedDbOpen(() => "VersionError");
+  try {
+    assert.equal(await new Promise((resolve) => gapAccount.openVault(resolve)), null);
+    assert.equal(both.opened.length, 2);
+  } finally { both.restore(); }
+});
+
+test("a healthy open uses the primary database", async () => {
+  const fake = fakeIndexedDbOpen(() => "ok");
+  try {
+    const db = await new Promise((resolve) => gapAccount.openVault(resolve));
+    assert.equal(db.name, "onyx-vault");
+    assert.equal(fake.opened.length, 1);
+  } finally { fake.restore(); }
+});
