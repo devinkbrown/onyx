@@ -26,7 +26,7 @@
   --onyx-line: var(--onyx-theme-line, #232b36);
   --onyx-text: var(--onyx-theme-text, #e8e6e1);
   --onyx-dim: var(--onyx-theme-dim, #9aa3ad);
-  --onyx-faint: var(--onyx-theme-faint, #5d6670);
+  --onyx-faint: var(--onyx-theme-faint, #606973);
   --onyx-accent: var(--onyx-theme-accent, #46c08a);
   --onyx-accent-ink: var(--onyx-theme-accent-ink, #06281a);
   --onyx-warn: var(--onyx-theme-warn, #d9a13b);

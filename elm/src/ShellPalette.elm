@@ -139,7 +139,7 @@ anchorsFor themeId =
                 , ( "line", "#232b36" )
                 , ( "text", "#e8e6e1" )
                 , ( "dim", "#9aa3ad" )
-                , ( "faint", "#5d6670" )
+                , ( "faint", "#606973" )
                 , ( "accent", "#46c08a" )
                 , ( "accent-ink", "#06281a" )
                 , ( "warn", "#d9a13b" )
@@ -167,7 +167,8 @@ type alias Targets =
 
 
 {-| Base set: WCAG AA for text (4.5), 3:1 for metadata (`faint`, the
-house budget), no floor on the decorative seam. -}
+house budget — on every surface it can sit on, panel-2 included), no
+floor on the decorative seam. -}
 baseTargets : Targets
 baseTargets =
     { text = 4.5, dim = 4.5, faint = 3, accent = 4.5, accentInk = 4.5, status = 4.5, line = 1 }
@@ -271,7 +272,7 @@ derive input =
         faint =
             pick "faint" [ "--paper-mute" ]
                 |> Maybe.withDefault (mixRgb text bg 0.55)
-                |> ensure targets.faint (faintGrounds input.highContrast textGrounds uiGrounds)
+                |> ensure targets.faint textGrounds
 
         accent =
             pick "accent" [ "--lapis" ] |> Maybe.withDefault house.accent |> ensure targets.accent uiGrounds
@@ -306,15 +307,6 @@ derive input =
     , bad = Theme.rgbToHex bad
     , success = Theme.rgbToHex success
     }
-
-
-faintGrounds : Bool -> List a -> List a -> List a
-faintGrounds highContrast textGrounds uiGrounds =
-    if highContrast then
-        textGrounds
-
-    else
-        uiGrounds
 
 
 {-| A shell as `( slot, value )` pairs, in `slotNames` order. -}
@@ -394,7 +386,7 @@ contrastFailures highContrast shell =
     in
     check "text" shell.text targets.text textGrounds
         ++ check "dim" shell.dim targets.dim textGrounds
-        ++ check "faint" shell.faint targets.faint (faintGrounds highContrast textGrounds uiGrounds)
+        ++ check "faint" shell.faint targets.faint textGrounds
         ++ check "accent" shell.accent targets.accent uiGrounds
         ++ check "accent-ink" shell.accentInk targets.accentInk [ ( "accent", shell.accent ) ]
         ++ check "warn" shell.warn targets.status uiGrounds

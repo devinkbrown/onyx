@@ -14,6 +14,9 @@
  * same keys the app writes), so every shot is a cold load of that state.
  */
 import shell from './screens-shell.mjs';
+import { auditContrast, assertContrast } from './contrast-audit.mjs';
+
+const THEME_IDS = ['ocean', 'tide', 'abyss', 'reef', 'onyx', 'obsidian', 'pearl', 'ink', 'shu', 'hisui', 'pine', 'kohaku', 'terracotta', 'vermillion', 'sapphire', 'teal', 'slate', 'frost'];
 
 /** Seed onyx:* storage before any script runs. */
 async function seed(page, { theme, prefs, bg, motion } = {}) {
@@ -52,7 +55,54 @@ async function prefsSheet(page, h, state, category) {
   await h.settle(page, 300);
 }
 
+
+/** Open the You hub (phone: the bottom nav; else the rail). */
+async function openYou(page, h) {
+  const phone = (page.viewportSize()?.width ?? 1440) < 768;
+  if (phone) await h.tryClick(page, '.onyx-mobile-nav [data-testid="nav-you"]');
+  else await h.tryClick(page, '[data-testid="you-open"]');
+}
+
+/**
+ * Real rendered contrast for one theme across the surfaces the shell
+ * paints: the room, the You hub, Preferences (two panes) and the palette.
+ * `highContrast` raises the bar to AA (4.5); otherwise the house metadata
+ * budget (3:1) — ShellPalette's own targets are AA for text.
+ */
+async function auditTheme(page, h, theme, highContrast) {
+  const min = highContrast ? 4.5 : 3;
+  const state = { theme, prefs: highContrast ? { highContrast: true } : {} };
+  await room(page, h, state);
+  const seen = [];
+  const run = async (label, scope) => {
+    const result = await auditContrast(page, { min, scope });
+    seen.push(`${label}:${result.checked}`);
+    assertContrast(`${theme}${highContrast ? '+hc' : ''} ${label}`, result);
+  };
+  await run('room', '');
+  await openYou(page, h);
+  await run('you', '[role="dialog"]');
+  await h.tryClick(page, '[data-testid="you-settings-open-preferences"]');
+  await h.tryClick(page, '#pref-category-tab-display');
+  await run('prefs-display', '[role="dialog"]');
+  await h.tryClick(page, '#pref-category-tab-conversation');
+  await run('prefs-conversation', '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await h.settle(page, 250);
+  await page.keyboard.press('Control+k');
+  await h.settle(page, 400);
+  await run('palette', '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await h.settle(page, 200);
+  await page.goto(`${h.base}/appearance`);
+  await h.settle(page, 700);
+  await run('appearance', '');
+  if (process.env.AUDIT_VERBOSE) console.log(`audit ${theme}${highContrast ? '+hc' : ''} @${page.viewportSize()?.width}: ${seen.join(' ')}`);
+}
+
 export default {
+  ...Object.fromEntries(THEME_IDS.map((id) => [`ap-audit-${id}`, (page, h) => auditTheme(page, h, id, false)])),
+  ...Object.fromEntries(['ocean', 'pearl', 'frost', 'kohaku'].map((id) => [`ap-audit-hc-${id}`, (page, h) => auditTheme(page, h, id, true)])),
   ...shell,
   'ap-room-ocean': (page, h) => room(page, h, {}),
   'ap-room-pearl': (page, h) => room(page, h, { theme: 'pearl' }),
