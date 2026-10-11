@@ -108,6 +108,9 @@ import TranscriptRows
 import VaultImport
 import Webhook
 import Wire
+-- v3/gap-account
+import AccountScope
+import GapAccount
 
 
 type ConnectionState
@@ -918,6 +921,9 @@ type alias Model =
 
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
+
+    -- v3/gap-account
+    , gapAccount : GapAccount.State
     }
 
 
@@ -1155,6 +1161,8 @@ type Outbound
     | WatchListSave { serverUrl : String, identity : String, entries : Maybe String }
     | CtcpConfigRequest { serverUrl : String, identity : String }
     | CtcpTimeReply { to : String }
+      -- v3/gap-account
+    | GapAccountFx GapAccount.Effect
 
 
 {-| One vault row. `id` is `lower-target ++ ":" ++ seq` where `seq` is
@@ -3256,6 +3264,8 @@ type Msg
     | PortableImportSubmit
     | SessionReclaimDismiss
     | SessionReclaimSignIn
+      -- v3/gap-account
+    | GapAccountMsg GapAccount.Msg
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3905,6 +3915,9 @@ init nick url =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-account
+    , gapAccount = GapAccount.blank
     }
 
 
@@ -4485,6 +4498,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-account
+    , gapAccount = GapAccount.blank
     }
 
 
@@ -31709,25 +31725,46 @@ alertForDelivery model target sender body highlight topic =
                             , desktopThrottleMs = Nothing
                             , soundThrottleMs = Nothing
                             }
+
+                    title =
+                        case alertKind of
+                            Notify.Dm ->
+                                "Direct message from " ++ sender
+
+                            Notify.Follow ->
+                                sender ++ " posted in " ++ target
+
+                            _ ->
+                                sender ++ " mentioned you in " ++ target
+
+                    -- v3/gap-account: a throttled desktop alert coalesces
+                    -- into "N new alerts in X" instead of being dropped.
+                    queued =
+                        if decision.desktopReason == "throttled" then
+                            gapQueueAlert key
+                                { title = title
+                                , label =
+                                    if channelTarget then
+                                        target
+
+                                    else
+                                        sender
+                                , body = notificationBodyFor body
+                                , sender = sender
+                                , isDm = not channelTarget
+                                }
+                                model
+
+                        else
+                            model
                 in
                 if not decision.desktop && not decision.sound then
-                    ( model, [] )
+                    ( queued, [] )
 
                 else
                     let
-                        title =
-                            case alertKind of
-                                Notify.Dm ->
-                                    "Direct message from " ++ sender
-
-                                Notify.Follow ->
-                                    sender ++ " posted in " ++ target
-
-                                _ ->
-                                    sender ++ " mentioned you in " ++ target
-
                         stamped =
-                            { model
+                            { queued
                                 | lastDesktopAt =
                                     if decision.desktop then
                                         Dict.insert key model.nowMs model.lastDesktopAt
@@ -36165,6 +36202,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepGapAccount -- v3/gap-account
     ]
 
 
@@ -37001,56 +37039,12 @@ updateCore msg model =
             ( model, [] )
 
         VaultImportFile { json } ->
-            -- A picked export file lands as text: validate it as a
-            -- vault snapshot and merge the projected rows through the
-            -- normal persist path (whose trim already applies the
-            -- destination retention policy, matching the oracle's
-            -- import-obeys-policy order). Storage itself stays async
-            -- behind `vaultPut`, so the notice reports validated rows
-            -- handed to the store, not confirmed commits.
-            if String.isEmpty (String.trim json) then
-                ( model, [] )
-
-            else
-                case Decode.decodeString Decode.value json of
-                    Err _ ->
-                        ( logService model "Vault import file could not be read as JSON.", [] )
-
-                    Ok value ->
-                        case VaultImport.parseVaultExport value of
-                            Nothing ->
-                                ( logService model "Vault import file held no valid vault snapshot.", [] )
-
-                            Just snap ->
-                                let
-                                    persists =
-                                        List.filterMap
-                                            (\importedTarget ->
-                                                case List.map importVaultRow importedTarget.messages of
-                                                    [] ->
-                                                        Nothing
-
-                                                    rows ->
-                                                        Just (VaultPersist { target = importedTarget.target, rows = rows })
-                                            )
-                                            snap.targets
-
-                                    messageCount =
-                                        List.sum (List.map (List.length << .messages) snap.targets)
-                                in
-                                if List.isEmpty persists then
-                                    ( logService model "Vault import file held no importable messages.", [] )
-
-                                else
-                                    ( logService model
-                                        ("Importing "
-                                            ++ String.fromInt messageCount
-                                            ++ " messages into "
-                                            ++ String.fromInt (List.length persists)
-                                            ++ " conversations."
-                                        )
-                                    , persists
-                                    )
+            -- v3/gap-account: a picked export file is validated and staged
+            -- for review (counts + Import / Cancel in Preferences → Import &
+            -- export); nothing reaches the vault until the user confirms,
+            -- and the merge then rides the normal persist path (whose trim
+            -- applies the destination retention policy).
+            gapStageImport json model
 
         OutboxQueued entry ->
             if List.any (\row -> row.id == entry.id) model.outbox then
@@ -41955,6 +41949,10 @@ updateCore msg model =
         SessionReclaimSignIn ->
             updateCore SessionDisconnect { model | sessionReclaim = Nothing }
 
+        -- v3/gap-account
+        GapAccountMsg sub ->
+            updateGapAccount sub model
+
         RoomMenuToggle ->
             ( { model | roomMenuOpen = not model.roomMenuOpen }, [] )
 
@@ -46247,3 +46245,1386 @@ rawContentVerbs =
 rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
+
+
+
+-- v3/gap-account
+
+
+{-| The four device-memory lists the model holds. -}
+gapListsOf : Model -> AccountScope.ListsSnapshot
+gapListsOf model =
+    { ignored = model.ignoredUsers
+    , muted = model.mutedDMs
+    , highlights = model.highlightWords
+    , notify = model.channelNotify
+    }
+
+
+gapWithLists : AccountScope.ListsSnapshot -> Model -> Model
+gapWithLists lists model =
+    { model
+        | ignoredUsers = lists.ignored
+        , mutedDMs = lists.muted
+        , highlightWords = lists.highlights
+        , channelNotify = lists.notify
+    }
+
+
+gapEmptyLists : AccountScope.ListsSnapshot
+gapEmptyLists =
+    { ignored = Set.empty, muted = Set.empty, highlights = [], notify = Dict.empty }
+
+
+setGap : (GapAccount.State -> GapAccount.State) -> Model -> Model
+setGap f model =
+    { model | gapAccount = f model.gapAccount }
+
+
+{-| Re-normalize lists exactly like the boot flags (oracle bounds). -}
+gapNormalizeLists : AccountScope.ListsSnapshot -> AccountScope.ListsSnapshot
+gapNormalizeLists lists =
+    { ignored = parseNameBlocklist 512 128 (Set.toList lists.ignored)
+    , muted = parseNameBlocklist 512 128 (Set.toList lists.muted)
+    , highlights = parseHighlightWords lists.highlights
+    , notify = parseChannelNotifyEntries (List.map (\( c, l ) -> { channel = c, level = l }) (Dict.toList lists.notify))
+    }
+
+
+{-| Persist the lists that changed under one scope. -}
+gapSaveLists : String -> AccountScope.ListsSnapshot -> AccountScope.ListsSnapshot -> List Outbound
+gapSaveLists key before after =
+    let
+        pick changed v =
+            if changed then
+                Just v
+
+            else
+                Nothing
+
+        payload =
+            { ignored = pick (before.ignored /= after.ignored) (Set.toList after.ignored)
+            , muted = pick (before.muted /= after.muted) (Set.toList after.muted)
+            , highlights = pick (before.highlights /= after.highlights) after.highlights
+            , notify = pick (before.notify /= after.notify) (Dict.toList after.notify)
+            }
+    in
+    if payload.ignored == Nothing && payload.muted == Nothing && payload.highlights == Nothing && payload.notify == Nothing then
+        []
+
+    else
+        [ GapAccountFx (GapAccount.ScopedListsSave { scope = key, lists = GapAccount.encodeLists payload }) ]
+
+
+gapIsVaultPersist : Outbound -> Bool
+gapIsVaultPersist out =
+    case out of
+        VaultPersist _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| A line proving a login on THIS socket: SASL `900`, or the
+in-session IDENTIFY notice. -}
+gapIsLoginLine : String -> Bool
+gapIsLoginLine raw =
+    if String.contains " 900 " raw || String.contains "You are now identified as " raw then
+        let
+            parsed =
+                Wire.parseIrcMessage raw
+        in
+        parsed.nick
+            == Nothing
+            && (parsed.command
+                    == "900"
+                    || (parsed.command == "NOTICE" && List.any (String.startsWith "You are now identified as ") parsed.params)
+               )
+
+    else
+        False
+
+
+{-| The account authenticated on the current socket (a stale
+`accountName` from an earlier socket never counts). -}
+gapSocketAccount : Msg -> Model -> Model -> Maybe String
+gapSocketAccount msg prior m =
+    case msg of
+        WsOpened _ ->
+            Nothing
+
+        _ ->
+            let
+                loggedIn =
+                    case msg of
+                        WsBatchReceived batch ->
+                            List.any gapIsLoginLine batch.lines
+
+                        _ ->
+                            False
+            in
+            if m.accountName == Nothing then
+                Nothing
+
+            else if loggedIn || prior.accountName /= m.accountName then
+                m.accountName
+
+            else
+                m.gapAccount.socketAccount
+
+
+{-| Highest message stamp per conversation: rows at or below it are
+never written back after a local-history erase. -}
+gapWatermark : Model -> Dict String Int
+gapWatermark model =
+    Dict.foldl
+        (\key ch acc ->
+            case List.maximum (List.map .at ch.messages) of
+                Just at ->
+                    Dict.insert key at acc
+
+                Nothing ->
+                    acc
+        )
+        Dict.empty
+        model.channels
+
+
+gapApplyWatermark : Dict String Int -> Outbound -> Maybe Outbound
+gapApplyWatermark marks out =
+    case out of
+        VaultPersist req ->
+            case Dict.get (String.toLower req.target) marks of
+                Nothing ->
+                    Just out
+
+                Just mark ->
+                    case List.filter (\row -> row.at > mark) req.rows of
+                        [] ->
+                            Nothing
+
+                        rows ->
+                            Just (VaultPersist { req | rows = rows })
+
+        _ ->
+            Just out
+
+
+{-| Vault writes go out only with local history on, never in the update
+that switched identities (those rows belong to the previous owner's
+buffers), and never re-persist rows the user erased this session.
+`Main.performIn` additionally refuses any write without a scope. -}
+gapGateVault : Bool -> Model -> List Outbound -> List Outbound
+gapGateVault scopeChanged m outs =
+    if scopeChanged || not m.prefs.localHistory then
+        List.filter (not << gapIsVaultPersist) outs
+
+    else if Dict.isEmpty m.gapAccount.clearWatermark then
+        outs
+
+    else
+        List.filterMap (gapApplyWatermark m.gapAccount.clearWatermark) outs
+
+
+gapAttention : Model -> Int
+gapAttention model =
+    AccountScope.attentionCount
+        (List.map
+            (\ch ->
+                let
+                    room =
+                        isChannelName model ch.name
+                in
+                { isChannel = room
+                , unread = ch.unread
+                , highlights = ch.highlights
+                , muted = not room && Set.member (String.toLower ch.name) model.mutedDMs
+                }
+            )
+            (Dict.values model.channels)
+        )
+
+
+{-| Scope transitions: resolve the scope from the registered socket,
+and on a change clear the previous identity's in-memory lists and vault
+views, then ask the bridge for the new scope's lists. -}
+gapSettleScope : Msg -> Model -> Model -> ( Model, List Outbound, Bool )
+gapSettleScope msg prior m =
+    let
+        ga =
+            m.gapAccount
+
+        -- The scope is re-resolved only when one of its inputs moves
+        -- while registered: the socket just registered (001), the
+        -- endpoint changed, or the socket's authenticated account
+        -- changed (900 / IDENTIFY / logout). Between those events it
+        -- sticks — including offline, so queued sends and local reads
+        -- keep their owner.
+        resolve =
+            m.connection
+                == Live
+                && (prior.connection /= Live || prior.endpoint /= m.endpoint || prior.gapAccount.socketAccount /= ga.socketAccount)
+
+        candidate =
+            if resolve then
+                AccountScope.scopeFor { endpoint = m.endpoint, account = ga.socketAccount }
+
+            else
+                Nothing
+
+        target =
+            if resolve then
+                Maybe.map AccountScope.scopeKey candidate
+
+            else
+                ga.scope
+
+        changed =
+            target /= ga.scope
+
+        isLoad =
+            case msg of
+                GapAccountMsg (GapAccount.ScopedListsLoaded _) ->
+                    True
+
+                _ ->
+                    False
+
+        priorLists =
+            gapListsOf prior
+
+        nowLists =
+            gapListsOf m
+    in
+    if changed then
+        let
+            carried =
+                case ( ga.scope, candidate ) of
+                    ( Nothing, _ ) ->
+                        -- first scope: edits made while unscoped replay onto it
+                        AccountScope.recordDiff priorLists nowLists ga.pendingOps
+
+                    ( Just old, Just cand ) ->
+                        -- a guest who signs in / claims the name in this
+                        -- session keeps the edits made as that guest
+                        if cand.account /= Nothing && old == AccountScope.scopeKey { cand | account = Nothing } then
+                            ga.sessionOps
+
+                        else
+                            AccountScope.emptyOps
+
+                    _ ->
+                        AccountScope.emptyOps
+
+            base =
+                case ga.scope of
+                    Nothing ->
+                        m
+
+                    Just _ ->
+                        gapWithLists gapEmptyLists m
+
+            reset =
+                { base
+                    | vaultRawHits = []
+                    , vaultDmPrivacy = Dict.empty
+                    , vaultSearchSeq = base.vaultSearchSeq + 1
+                    , mediaIndexVault = []
+                    , gapAccount =
+                        { ga
+                            | scope = target
+                            , scopeGuest = Maybe.map AccountScope.isGuest candidate == Just True
+                            , listsLoadedFor = Nothing
+                            , pendingOps = carried
+                            , sessionOps = AccountScope.emptyOps
+                            , alertQueue = Dict.empty
+                            , alertTags = Dict.empty
+                            , alertTagOrder = []
+                            , clearWatermark = Dict.empty
+                            , importReview = Nothing
+                            , protectPassword = ""
+                            , protectPending = Nothing
+                            , protectError = Nothing
+                            , protectNotice = Nothing
+                            , recoverPending = Nothing
+                            , recoverStatus = Nothing
+                            , recognize = []
+                            , recognizeStatus = Nothing
+                            , groupNicks = []
+                            , groupStatus = Nothing
+                        }
+                }
+
+            request =
+                case ( target, candidate ) of
+                    ( Just key, Just cand ) ->
+                        [ GapAccountFx (GapAccount.ScopedListsRequest { scope = key, solidOwners = AccountScope.solidOwnerKeys m.endpoint cand }) ]
+
+                    _ ->
+                        []
+        in
+        ( reset, request, True )
+
+    else if isLoad || priorLists == nowLists then
+        ( m, [], False )
+
+    else
+        case ( ga.scope, ga.listsLoadedFor ) of
+            ( Just key, Just loaded ) ->
+                if key == loaded then
+                    ( { m
+                        | gapAccount =
+                            { ga
+                                | sessionOps =
+                                    if ga.scopeGuest then
+                                        AccountScope.recordDiff priorLists nowLists ga.sessionOps
+
+                                    else
+                                        ga.sessionOps
+                            }
+                      }
+                    , gapSaveLists key priorLists nowLists
+                    , False
+                    )
+
+                else
+                    ( { m | gapAccount = { ga | pendingOps = AccountScope.recordDiff priorLists nowLists ga.pendingOps } }, [], False )
+
+            _ ->
+                ( { m | gapAccount = { ga | pendingOps = AccountScope.recordDiff priorLists nowLists ga.pendingOps } }, [], False )
+
+
+{-| The encrypted-DM preference takes effect live (every gate reads
+`model.e2eeDms`). Turning it on publishes this device's key and asks
+for the open DM peer's key; turning it off releases a pending hold's
+notice but never sends the held draft — the user sends again, now by
+their explicit choice. -}
+gapSettleE2ee : Model -> Model -> ( Model, List Outbound )
+gapSettleE2ee prior m =
+    if prior.prefs.e2eeDms == m.prefs.e2eeDms || m.e2eeDms == m.prefs.e2eeDms then
+        ( m, [] )
+
+    else if m.prefs.e2eeDms then
+        let
+            on =
+                { m | e2eeDms = True }
+
+            publish =
+                if on.connection == Live then
+                    [ DmPublishKey ]
+
+                else
+                    []
+
+            ( looked, lookOuts ) =
+                case activeDmPeer on of
+                    Just peer ->
+                        if on.connection == Live && dmKeyUnresolved on peer then
+                            requestDmKeyLookup on peer
+
+                        else
+                            ( on, [] )
+
+                    Nothing ->
+                        ( on, [] )
+
+            queuedDms =
+                List.length (List.filter (\row -> not (isChannelName m row.target)) m.outbox)
+
+            warned =
+                if queuedDms > 0 then
+                    addToast
+                        { variant = ToastWarning
+                        , title = "Queued direct messages aren't encrypted"
+                        , description =
+                            Just
+                                (String.fromInt queuedDms
+                                    ++ " direct message"
+                                    ++ (if queuedDms == 1 then
+                                            " was"
+
+                                        else
+                                            "s were"
+                                       )
+                                    ++ " queued while encryption was off and will send unencrypted on reconnect. Discard them in Preferences → History & data if you'd rather not."
+                                )
+                        , duration = Nothing
+                        , groupKey = Just "gap-e2ee-queued"
+                        , undo = Nothing
+                        }
+                        m.nowMs
+                        looked
+
+                else
+                    looked
+        in
+        ( warned, publish ++ lookOuts )
+
+    else
+        let
+            heldCopy =
+                Maybe.map holdDmCopy m.dmKeyHold
+        in
+        ( { m
+            | e2eeDms = False
+            , dmKeyHold = Nothing
+            , dmKeyPending = Dict.empty
+            , composerError =
+                if heldCopy /= Nothing && m.composerError == heldCopy then
+                    Nothing
+
+                else
+                    m.composerError
+          }
+        , []
+        )
+
+
+gapSettleSearchStatus : Msg -> Model -> Model
+gapSettleSearchStatus msg m =
+    let
+        status text =
+            setGap (\g -> { g | searchStatus = Just text, searchClearConfirm = False }) m
+    in
+    case msg of
+        SearchClearedReceived { cleared } ->
+            if cleared then
+                status "Saved searches cleared on this device."
+
+            else
+                status "Couldn't clear saved searches. Try again."
+
+        SearchImportedReceived { imported } ->
+            status ("Imported " ++ PrefsPanel.countLabel imported "saved search" ++ ".")
+
+        SearchExportedReceived { json } ->
+            if String.isEmpty json then
+                status "Saved searches aren't available in this browser."
+
+            else
+                status "Saved searches exported."
+
+        _ ->
+            m
+
+
+{-| Fold the account-protection / name / recognition / group replies
+this slice owns from a socket batch. -}
+gapFoldReplies : Msg -> Model -> ( Model, List Outbound )
+gapFoldReplies msg m =
+    case msg of
+        WsBatchReceived batch ->
+            List.foldl
+                (\raw ( acc, outs ) ->
+                    if GapAccount.replyLooksRelevant raw then
+                        case GapAccount.classifyReply (Wire.parseIrcMessage raw) of
+                            Just reply ->
+                                let
+                                    ( next, more ) =
+                                        gapApplyReply reply acc
+                                in
+                                ( next, outs ++ more )
+
+                            Nothing ->
+                                ( acc, outs )
+
+                    else
+                        ( acc, outs )
+                )
+                ( m, [] )
+                batch.lines
+
+        _ ->
+            ( m, [] )
+
+
+gapApplyReply : GapAccount.Reply -> Model -> ( Model, List Outbound )
+gapApplyReply reply m =
+    let
+        ga =
+            m.gapAccount
+    in
+    case reply of
+        GapAccount.ProtectSaved field ->
+            case ga.protectPending of
+                Just pending ->
+                    if pending.field == field then
+                        let
+                            ( refreshed, outs ) =
+                                requestAccountInfo
+                                    (setGap (\g -> { g | protectPending = Nothing, protectError = Nothing, protectNotice = Just (gapProtectSavedCopy pending) }) m)
+                                    Nothing
+                        in
+                        ( refreshed, outs )
+
+                    else
+                        ( m, [] )
+
+                Nothing ->
+                    ( m, [] )
+
+        GapAccount.ProtectWrongPassword ->
+            if ga.protectPending /= Nothing then
+                ( setGap (\g -> { g | protectPending = Nothing, protectNotice = Nothing, protectError = Just "That password didn't match. Nothing was changed." }) m, [] )
+
+            else
+                ( m, [] )
+
+        GapAccount.ProtectFailed text ->
+            if ga.protectPending /= Nothing then
+                ( setGap (\g -> { g | protectPending = Nothing, protectNotice = Nothing, protectError = Just text }) m, [] )
+
+            else
+                ( m, [] )
+
+        GapAccount.RecoverNotice r ->
+            case ga.recoverPending of
+                Just pending ->
+                    if pending.verb == r.verb then
+                        let
+                            settled =
+                                setGap (\g -> { g | recoverPending = Nothing, recoverStatus = Just { ok = r.ok, text = r.text } }) m
+
+                            -- RECOVER frees the nick and holds it briefly
+                            -- for the owner: take it back now.
+                            reclaim =
+                                if r.verb == "RECOVER" && r.ok && r.nick /= Nothing && String.toLower pending.nick /= String.toLower m.ourNick then
+                                    [ SendLine (Wire.formatIrcLine "NICK" [ pending.nick ]) ]
+
+                                else
+                                    []
+                        in
+                        ( settled, reclaim )
+
+                    else
+                        ( m, [] )
+
+                Nothing ->
+                    ( m, [] )
+
+        GapAccount.RecoverFailed r ->
+            case ga.recoverPending of
+                Just pending ->
+                    if pending.verb == r.verb then
+                        ( setGap (\g -> { g | recoverPending = Nothing, recoverStatus = Just { ok = False, text = r.text } }) m, [] )
+
+                    else
+                        ( m, [] )
+
+                Nothing ->
+                    ( m, [] )
+
+        GapAccount.RecognizeRow mask ->
+            if List.member mask ga.recognize || List.length ga.recognize >= GapAccount.maxRecognizeMasks then
+                ( setGap (\g -> { g | recognizeLoading = False }) m, [] )
+
+            else
+                ( setGap (\g -> { g | recognize = g.recognize ++ [ mask ], recognizeLoading = False }) m, [] )
+
+        GapAccount.RecognizeEmpty ->
+            ( setGap (\g -> { g | recognize = [], recognizeLoading = False }) m, [] )
+
+        GapAccount.RecognizeResult r ->
+            let
+                settled =
+                    setGap (\g -> { g | recognizeStatus = Just { ok = r.ok, text = gapRecognizeCopy r } }) m
+            in
+            if r.ok then
+                gapRecognizeList settled
+
+            else
+                ( settled, [] )
+
+        GapAccount.RecognizeDenied text ->
+            ( setGap (\g -> { g | recognizeLoading = False, recognizeStatus = Just { ok = False, text = text } }) m, [] )
+
+        GapAccount.GroupRow row ->
+            ( setGap (\g -> { g | groupNicks = GapAccount.upsertGroupNick row g.groupNicks }) m, [] )
+
+        GapAccount.GroupEnd ->
+            ( setGap (\g -> { g | groupLoading = False }) m, [] )
+
+        GapAccount.GroupResult r ->
+            let
+                settled =
+                    setGap (\g -> { g | groupStatus = Just r, groupLoading = False }) m
+            in
+            if r.ok then
+                gapGroupList settled
+
+            else
+                ( settled, [] )
+
+        GapAccount.GroupFailed text ->
+            ( setGap (\g -> { g | groupLoading = False, groupStatus = Just { ok = False, text = text } }) m, [] )
+
+
+gapProtectSavedCopy : { field : String, on : Bool } -> String
+gapProtectSavedCopy pending =
+    case ( pending.field, pending.on ) of
+        ( "secure", True ) ->
+            "Saved. You're recognised only after you sign in."
+
+        ( "secure", False ) ->
+            "Saved. Sign-in is no longer required to be recognised."
+
+        ( "enforce", True ) ->
+            "Saved. Guests can't keep your name."
+
+        _ ->
+            "Saved. Your name is no longer held for you."
+
+
+gapRecognizeCopy : { mask : String, ok : Bool, text : String } -> String
+gapRecognizeCopy r =
+    if String.startsWith "added" r.text then
+        r.mask ++ " added."
+
+    else if String.startsWith "removed" r.text then
+        r.mask ++ " removed."
+
+    else if String.startsWith "is already" r.text then
+        r.mask ++ " is already on your list."
+
+    else if String.startsWith "was not" r.text then
+        r.mask ++ " wasn't on your list."
+
+    else if String.contains "full" r.text then
+        "Your list is full. Remove an address first."
+
+    else if String.contains "invalid" r.text then
+        "That address pattern isn't valid. Use a form like nick!user@host."
+
+    else
+        r.text
+
+
+gapRecognizeList : Model -> ( Model, List Outbound )
+gapRecognizeList m =
+    if m.connection /= Live || m.accountName == Nothing then
+        ( m, [] )
+
+    else
+        case GapAccount.recognizeLine "LIST" Nothing of
+            Just line ->
+                ( setGap (\g -> { g | recognize = [], recognizeLoading = True }) m, [ SendLine line ] )
+
+            Nothing ->
+                ( m, [] )
+
+
+gapGroupList : Model -> ( Model, List Outbound )
+gapGroupList m =
+    if m.connection /= Live || m.accountName == Nothing then
+        ( m, [] )
+
+    else
+        case GapAccount.groupLine "LIST" Nothing of
+            Just line ->
+                ( setGap (\g -> { g | groupNicks = [], groupLoading = True }) m, [ SendLine line ] )
+
+            Nothing ->
+                ( m, [] )
+
+
+{-| Hold a throttled desktop alert so it coalesces instead of being
+dropped (mirroring the oracle's `queueCoalesced`). -}
+gapQueueAlert : String -> { title : String, label : String, body : String, sender : String, isDm : Bool } -> Model -> Model
+gapQueueAlert key alert model =
+    let
+        private =
+            alert.body == "New encrypted message"
+
+        queue =
+            model.gapAccount.alertQueue
+    in
+    case Dict.get key queue of
+        Just held ->
+            setGap
+                (\g ->
+                    { g
+                        | alertQueue =
+                            Dict.insert key
+                                { held
+                                    | count = min 999 (held.count + 1)
+                                    , body = alert.body
+                                    , title = alert.title
+                                    , sender = alert.sender
+                                    , private = held.private || private
+                                }
+                                queue
+                    }
+                )
+                model
+
+        Nothing ->
+            if Dict.size queue >= GapAccount.maxQueuedAlerts then
+                model
+
+            else
+                setGap
+                    (\g ->
+                        { g
+                            | alertQueue =
+                                Dict.insert key
+                                    { title = alert.title
+                                    , label = alert.label
+                                    , body = alert.body
+                                    , private = private
+                                    , count = 1
+                                    , sender = alert.sender
+                                    , isDm = alert.isDm
+                                    , queuedAt = model.nowMs
+                                    }
+                                    queue
+                        }
+                    )
+                    model
+
+
+{-| On each Tick, show queued alerts whose throttle window has passed
+— re-deciding against the CURRENT policy (mute, DND, focus, permission
+may all have changed since they were queued). -}
+gapFlushAlerts : Msg -> Model -> ( Model, List Outbound )
+gapFlushAlerts msg m =
+    case msg of
+        Tick _ ->
+            let
+                due =
+                    Dict.filter
+                        (\key _ -> m.nowMs - Maybe.withDefault 0 (Dict.get key m.lastDesktopAt) >= 6000)
+                        m.gapAccount.alertQueue
+            in
+            if Dict.isEmpty due then
+                ( m, [] )
+
+            else
+                Dict.foldl gapFlushOne
+                    ( setGap (\g -> { g | alertQueue = Dict.diff g.alertQueue due }) m, [] )
+                    due
+
+        _ ->
+            ( m, [] )
+
+
+gapFlushOne : String -> GapAccount.QueuedAlert -> ( Model, List Outbound ) -> ( Model, List Outbound )
+gapFlushOne key alert ( acc, outs ) =
+    let
+        open =
+            Maybe.map String.toLower acc.activeChannel == Just key
+
+        muted =
+            if alert.isDm then
+                Set.member key acc.mutedDMs || Set.member (String.toLower alert.sender) acc.mutedDMs
+
+            else
+                notifyLevel acc key == "none"
+
+        decision =
+            Notify.shouldNotify
+                { kind =
+                    if alert.isDm then
+                        Notify.Dm
+
+                    else
+                        Notify.Mention
+                , isSelf = False
+                , muted = muted
+                , smartMuted = Set.member (String.toLower alert.sender) acc.ignoredUsers
+                , pushEnabled = acc.pushEnabled
+                , soundEnabled = False
+                , dnd = notifyDndActive acc
+                , permission = acc.notifyPermission
+                , pageVisible = acc.pageVisible
+                , appFocused = acc.appFocused
+                , nowMs = acc.nowMs
+                , lastDesktopAtMs = Nothing
+                , lastSoundAtMs = Nothing
+                , desktopThrottleMs = Nothing
+                , soundThrottleMs = Nothing
+                }
+    in
+    if decision.desktop && not open then
+        ( { acc | lastDesktopAt = Dict.insert key acc.nowMs acc.lastDesktopAt }
+        , outs
+            ++ [ NotifyAlert
+                    { title = GapAccount.coalescedTitle alert
+                    , body =
+                        if alert.private then
+                            "New encrypted message"
+
+                        else
+                            alert.body
+                    , tag = "onyx-" ++ key
+                    , desktop = True
+                    , sound = False
+                    , volume = acc.soundVolume
+                    }
+               ]
+        )
+
+    else
+        ( acc, outs )
+
+
+{-| Remember which identity raised each desktop alert (click guard). -}
+gapRecordAlertTags : List Outbound -> Model -> Model
+gapRecordAlertTags outs m =
+    List.foldl
+        (\out acc ->
+            case out of
+                NotifyAlert req ->
+                    if req.desktop then
+                        setGap (GapAccount.rememberAlertTag req.tag (Maybe.withDefault "" acc.gapAccount.scope)) acc
+
+                    else
+                        acc
+
+                _ ->
+                    acc
+        )
+        m
+        outs
+
+
+settleStepGapAccount : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapAccount msg prior ( m0, outs0 ) =
+    let
+        -- The device-global list writers stay in the intent stream
+        -- (Main drops them); persistence is per scope, diff-based.
+        outs1 =
+            outs0
+
+        m1 =
+            setGap (\g -> { g | socketAccount = gapSocketAccount msg prior m0 }) m0
+
+        ( m2, scopeOuts, scopeChanged ) =
+            gapSettleScope msg prior m1
+
+        ( m3, e2eeOuts ) =
+            gapSettleE2ee prior m2
+
+        ( m4, replyOuts ) =
+            gapFoldReplies msg m3
+
+        m5 =
+            gapSettleSearchStatus msg m4
+
+        ( m6, flushOuts ) =
+            gapFlushAlerts msg m5
+
+        -- The Account sheet closing forgets typed secrets and drafts;
+        -- opening it lists the recognition masks and grouped names.
+        ( m7, panelOuts ) =
+            if prior.accountOpen && not m6.accountOpen then
+                ( setGap (\g -> { g | protectPassword = "", protectError = Nothing, protectNotice = Nothing, recoverStatus = Nothing, recognizeDraft = "", recognizeStatus = Nothing, groupDraft = "", groupStatus = Nothing }) m6, [] )
+
+            else if not prior.accountOpen && m6.accountOpen then
+                let
+                    ( listed, recognizeOuts ) =
+                        gapRecognizeList m6
+
+                    ( grouped, groupOuts ) =
+                        gapGroupList listed
+                in
+                ( grouped, recognizeOuts ++ groupOuts )
+
+            else
+                ( m6, [] )
+
+        outs2 =
+            gapGateVault scopeChanged m7 (outs1 ++ e2eeOuts ++ replyOuts ++ flushOuts ++ panelOuts)
+
+        m8 =
+            gapRecordAlertTags outs2 m7
+
+        -- The tab title and the installed-app badge read this count
+        -- (Main pushes the badge when it moves).
+        attention =
+            gapAttention m8
+
+        m9 =
+            if attention /= m8.gapAccount.badge then
+                setGap (\g -> { g | badge = attention }) m8
+
+            else
+                m8
+    in
+    ( m9, scopeOuts ++ outs2 )
+
+
+{-| Erase the local vault (turning history off, or Clear). Rows already
+in memory are watermarked so they are not written straight back. -}
+gapStartErase : Model -> List Outbound -> ( Model, List Outbound )
+gapStartErase model outs =
+    ( setGap
+        (\g ->
+            { g
+                | erase = GapAccount.Erasing
+                , clearConfirm = False
+                , historyStatus = Just "Erasing conversations saved in this browser…"
+                , clearWatermark = Dict.union (gapWatermark model) g.clearWatermark
+            }
+        )
+        { model | vaultRawHits = [], vaultDmPrivacy = Dict.empty }
+    , outs ++ [ GapAccountFx GapAccount.VaultClear ]
+    )
+
+
+{-| Parse a picked portable-vault file into the rows it would merge. -}
+gapImportPlan : String -> Result String ( VaultImport.VaultImportSnapshot, List Outbound )
+gapImportPlan json =
+    if String.isEmpty (String.trim json) then
+        Err "That file is empty."
+
+    else
+        case Decode.decodeString Decode.value json of
+            Err _ ->
+                Err "That file isn't valid JSON."
+
+            Ok value ->
+                case VaultImport.parseVaultExport value of
+                    Nothing ->
+                        Err "That file isn't an Onyx vault export."
+
+                    Just snap ->
+                        let
+                            persists =
+                                List.filterMap
+                                    (\importedTarget ->
+                                        case List.map importVaultRow importedTarget.messages of
+                                            [] ->
+                                                Nothing
+
+                                            rows ->
+                                                Just (VaultPersist { target = importedTarget.target, rows = rows })
+                                    )
+                                    snap.targets
+                        in
+                        if List.isEmpty persists then
+                            Err "That export holds no messages to import."
+
+                        else
+                            Ok ( snap, persists )
+
+
+{-| Stage a picked file for review: nothing reaches the vault until
+the user confirms (Preferences → Import & export). -}
+gapStageImport : String -> Model -> ( Model, List Outbound )
+gapStageImport json model =
+    let
+        ( opened, openOuts ) =
+            if model.prefsOpen then
+                ( model, [] )
+
+            else
+                prefsOpen model
+
+        shown =
+            { opened | prefsCategory = PrefsPanel.Transfer }
+    in
+    case gapImportPlan json of
+        Err reason ->
+            ( setGap (\g -> { g | importReview = Nothing, importStatus = Just reason }) shown, openOuts )
+
+        Ok ( snap, persists ) ->
+            ( setGap
+                (\g ->
+                    { g
+                        | importStatus = Nothing
+                        , importReview =
+                            Just
+                                { json = json
+                                , conversations = List.length persists
+                                , messages = List.sum (List.map (List.length << .messages) snap.targets)
+                                , exportedAt = snap.exportedAt
+                                }
+                    }
+                )
+                shown
+            , openOuts
+            )
+
+
+gapProtectError : String -> Model -> ( Model, List Outbound )
+gapProtectError text model =
+    ( setGap (\g -> { g | protectError = Just text, protectNotice = Nothing }) model, [] )
+
+
+gapRecoverSend : String -> Model -> ( Model, List Outbound )
+gapRecoverSend verb model =
+    let
+        ga =
+            model.gapAccount
+
+        nick =
+            String.trim
+                (if String.isEmpty (String.trim ga.recoverNick) then
+                    Maybe.withDefault "" model.accountName
+
+                 else
+                    ga.recoverNick
+                )
+
+        fail text =
+            ( setGap (\g -> { g | recoverStatus = Just { ok = False, text = text } }) model, [] )
+    in
+    if model.accountName == Nothing then
+        fail "Sign in to the account that owns the name first."
+
+    else if model.connection /= Live then
+        fail "Reconnect to do this."
+
+    else if ga.recoverPending /= Nothing then
+        ( model, [] )
+
+    else if not (GapAccount.isValidNickToken nick) then
+        fail "Enter a valid name (no spaces)."
+
+    else
+        case
+            if verb == "RECOVER" then
+                Services.recover nick
+
+            else
+                Services.releaseNick nick
+        of
+            Just line ->
+                ( setGap (\g -> { g | recoverPending = Just { verb = verb, nick = nick }, recoverStatus = Nothing }) model, [ SendLine line ] )
+
+            Nothing ->
+                fail "Enter a valid name (no spaces)."
+
+
+updateGapAccount : GapAccount.Msg -> Model -> ( Model, List Outbound )
+updateGapAccount sub model =
+    let
+        ga =
+            model.gapAccount
+    in
+    case sub of
+        GapAccount.LocalHistorySet on ->
+            if on == model.prefs.localHistory || ga.erase == GapAccount.Erasing then
+                ( model, [] )
+
+            else
+                let
+                    prefs =
+                        model.prefs
+
+                    next =
+                        { prefs | localHistory = on }
+
+                    updated =
+                        { model | prefs = next }
+
+                    stored =
+                        [ AppearanceStorePrefs { json = Prefs.encodePreferences next }, appearanceApplyFor updated ]
+                in
+                if on then
+                    ( setGap (\g -> { g | erase = GapAccount.EraseIdle, historyStatus = Just "This browser will remember new conversations again." }) updated, stored )
+
+                else
+                    -- Writes stop first (the settle gate reads the pref);
+                    -- a failed erase never silently resumes persistence.
+                    gapStartErase updated stored
+
+        GapAccount.HistoryClearAsk ->
+            ( setGap (\g -> { g | clearConfirm = True, historyStatus = Nothing }) model, [] )
+
+        GapAccount.HistoryClearCancel ->
+            ( setGap (\g -> { g | clearConfirm = False }) model, [] )
+
+        GapAccount.HistoryClearConfirm ->
+            if ga.erase == GapAccount.Erasing then
+                ( model, [] )
+
+            else
+                gapStartErase model []
+
+        GapAccount.VaultCleared { ok } ->
+            let
+                off =
+                    not model.prefs.localHistory
+
+                status =
+                    case ( ok, off ) of
+                        ( True, True ) ->
+                            "Local history is off. Conversations saved in this browser were erased."
+
+                        ( True, False ) ->
+                            "Local history cleared on this device."
+
+                        ( False, True ) ->
+                            "Local history is off, so Onyx won't save new conversations — but stored conversations may remain because the erase couldn't be verified. Try again."
+
+                        ( False, False ) ->
+                            "Couldn't clear all local history. Try again after freeing browser storage."
+            in
+            ( setGap
+                (\g ->
+                    { g
+                        | erase =
+                            if ok then
+                                GapAccount.EraseVerified
+
+                            else
+                                GapAccount.EraseFailed
+                        , historyStatus = Just status
+                    }
+                )
+                { model | vaultRawHits = [], vaultDmPrivacy = Dict.empty }
+            , []
+            )
+
+        GapAccount.SearchClearAsk ->
+            ( setGap (\g -> { g | searchClearConfirm = True, searchStatus = Nothing }) model, [] )
+
+        GapAccount.SearchClearCancel ->
+            ( setGap (\g -> { g | searchClearConfirm = False }) model, [] )
+
+        GapAccount.SearchClearConfirm ->
+            ( setGap (\g -> { g | searchClearConfirm = False, searchStatus = Just "Clearing saved searches…" }) model, [ SearchClearRequest ] )
+
+        GapAccount.SearchExport ->
+            ( setGap (\g -> { g | searchStatus = Nothing }) model, [ SearchExportRequest ] )
+
+        GapAccount.SearchImport ->
+            ( setGap (\g -> { g | searchStatus = Nothing }) model, [ SearchImportPick ] )
+
+        GapAccount.ExportAsk ->
+            ( setGap (\g -> { g | exportConfirm = True, importStatus = Nothing }) { model | prefsTransferStatus = Nothing }, [] )
+
+        GapAccount.ExportCancel ->
+            ( setGap (\g -> { g | exportConfirm = False }) model, [] )
+
+        GapAccount.ExportConfirm ->
+            updateCore PrefsVaultExport (setGap (\g -> { g | exportConfirm = False }) model)
+
+        GapAccount.ImportCancel ->
+            ( setGap (\g -> { g | importReview = Nothing, importStatus = Just "Import canceled. Nothing was added." }) model, [] )
+
+        GapAccount.ImportConfirm ->
+            case ga.importReview of
+                Nothing ->
+                    ( model, [] )
+
+                Just review ->
+                    if not model.prefs.localHistory then
+                        ( setGap (\g -> { g | importStatus = Just "Local history is off, so there's nowhere to import into. Turn it on in History & data first." }) model, [] )
+
+                    else if ga.scope == Nothing then
+                        ( setGap (\g -> { g | importStatus = Just "Connect first — imported history belongs to the account you're signed in as." }) model, [] )
+
+                    else
+                        case gapImportPlan review.json of
+                            Err reason ->
+                                ( setGap (\g -> { g | importReview = Nothing, importStatus = Just reason }) model, [] )
+
+                            Ok ( _, persists ) ->
+                                ( setGap
+                                    (\g ->
+                                        { g
+                                            | importReview = Nothing
+                                            , importStatus =
+                                                Just
+                                                    ("Imported "
+                                                        ++ PrefsPanel.countLabel review.messages "message"
+                                                        ++ " into "
+                                                        ++ PrefsPanel.countLabel review.conversations "conversation"
+                                                        ++ "."
+                                                    )
+                                        }
+                                    )
+                                    model
+                                , persists
+                                )
+
+        GapAccount.ImportRefused { reason } ->
+            ( setGap (\g -> { g | importReview = Nothing, importStatus = Just reason }) model, [] )
+
+        GapAccount.ProtectPassword value ->
+            ( setGap (\g -> { g | protectPassword = String.left 512 value, protectError = Nothing }) model, [] )
+
+        GapAccount.ProtectToggle field on ->
+            case model.accountName of
+                Nothing ->
+                    gapProtectError "Sign in first." model
+
+                Just acct ->
+                    if field /= "secure" && field /= "enforce" then
+                        ( model, [] )
+
+                    else if model.connection /= Live then
+                        gapProtectError "Reconnect to change protection." model
+
+                    else if ga.protectPending /= Nothing then
+                        ( model, [] )
+
+                    else if String.isEmpty ga.protectPassword then
+                        gapProtectError "Enter your account password to change protection." model
+
+                    else
+                        case
+                            Services.accountSet acct
+                                ga.protectPassword
+                                field
+                                (if on then
+                                    "on"
+
+                                 else
+                                    "off"
+                                )
+                        of
+                            Nothing ->
+                                -- the secret is cleared either way
+                                ( setGap (\g -> { g | protectPassword = "", protectError = Just "That password can't be sent here (it contains spaces or control characters)." }) model, [] )
+
+                            Just line ->
+                                ( setGap
+                                    (\g ->
+                                        { g
+                                            | protectPassword = ""
+                                            , protectPending = Just { field = field, on = on }
+                                            , protectError = Nothing
+                                            , protectNotice = Nothing
+                                        }
+                                    )
+                                    model
+                                , [ SendLine line ]
+                                )
+
+        GapAccount.RecoverNickInput value ->
+            ( setGap (\g -> { g | recoverNick = String.left 64 value }) model, [] )
+
+        GapAccount.RecoverSubmit ->
+            gapRecoverSend "RECOVER" model
+
+        GapAccount.ReleaseSubmit ->
+            gapRecoverSend "RELEASE" model
+
+        GapAccount.RecognizeDraft value ->
+            ( setGap (\g -> { g | recognizeDraft = String.left 255 value }) model, [] )
+
+        GapAccount.RecognizeAdd ->
+            if model.connection /= Live || model.accountName == Nothing then
+                ( model, [] )
+
+            else
+                case GapAccount.recognizeLine "ADD" (Just ga.recognizeDraft) of
+                    Just line ->
+                        ( setGap (\g -> { g | recognizeDraft = "", recognizeStatus = Nothing }) model, [ SendLine line ] )
+
+                    Nothing ->
+                        ( setGap (\g -> { g | recognizeStatus = Just { ok = False, text = "Enter one address pattern with no spaces, like nick!user@host." } }) model, [] )
+
+        GapAccount.RecognizeRemove mask ->
+            if model.connection /= Live then
+                ( model, [] )
+
+            else
+                case GapAccount.recognizeLine "DEL" (Just mask) of
+                    Just line ->
+                        ( setGap (\g -> { g | recognizeStatus = Nothing }) model, [ SendLine line ] )
+
+                    Nothing ->
+                        ( model, [] )
+
+        GapAccount.RecognizeRefresh ->
+            gapRecognizeList model
+
+        GapAccount.GroupDraft value ->
+            ( setGap (\g -> { g | groupDraft = String.left 64 value }) model, [] )
+
+        GapAccount.GroupAdd ->
+            if model.connection /= Live || model.accountName == Nothing then
+                ( model, [] )
+
+            else
+                case GapAccount.groupLine "ADD" (Just ga.groupDraft) of
+                    Just line ->
+                        ( setGap (\g -> { g | groupDraft = "", groupStatus = Nothing }) model, [ SendLine line ] )
+
+                    Nothing ->
+                        ( setGap (\g -> { g | groupStatus = Just { ok = False, text = "Enter one name with no spaces." } }) model, [] )
+
+        GapAccount.GroupRemove nick ->
+            gapGroupVerb "DEL" nick model
+
+        GapAccount.GroupPrimary nick ->
+            gapGroupVerb "PRIMARY" nick model
+
+        GapAccount.GroupRefresh ->
+            gapGroupList model
+
+        GapAccount.ScopedListsLoaded value ->
+            case GapAccount.decodeLoaded value of
+                Nothing ->
+                    ( model, [] )
+
+                Just loaded ->
+                    if Just loaded.scope /= ga.scope then
+                        -- an answer for a scope we already left
+                        ( model, [] )
+
+                    else
+                        let
+                            stored =
+                                { ignored = parseNameBlocklist 512 128 loaded.ignored
+                                , muted = parseNameBlocklist 512 128 loaded.muted
+                                , highlights = parseHighlightWords loaded.highlights
+                                , notify = parseChannelNotifyEntries loaded.notify
+                                }
+
+                            merged =
+                                gapNormalizeLists (AccountScope.applyOps ga.pendingOps stored)
+                        in
+                        ( gapWithLists merged
+                            (setGap (\g -> { g | listsLoadedFor = Just loaded.scope, pendingOps = AccountScope.emptyOps }) model)
+                        , gapSaveLists loaded.scope stored merged
+                        )
+
+        GapAccount.NotifyClicked { tag } ->
+            case Dict.get tag ga.alertTags of
+                Just owner ->
+                    if Just owner /= ga.scope then
+                        -- raised for another identity: never navigate it
+                        ( model, [] )
+
+                    else
+                        case Dict.get (String.dropLeft 5 tag) model.channels of
+                            Just ch ->
+                                let
+                                    ( selected, outs ) =
+                                        updateCore (ChannelSelect ch.name) { model | searchOpen = False }
+                                in
+                                ( selected
+                                , (if model.route /= Route.App then
+                                    [ PushUrl "/app" ]
+
+                                   else
+                                    []
+                                  )
+                                    ++ outs
+                                )
+
+                            Nothing ->
+                                ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+
+gapGroupVerb : String -> String -> Model -> ( Model, List Outbound )
+gapGroupVerb verb nick model =
+    if model.connection /= Live then
+        ( model, [] )
+
+    else
+        case GapAccount.groupLine verb (Just nick) of
+            Just line ->
+                ( setGap (\g -> { g | groupStatus = Nothing }) model, [ SendLine line ] )
+
+            Nothing ->
+                ( model, [] )

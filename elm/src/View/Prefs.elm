@@ -24,6 +24,7 @@ import Nav
 import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
+import View.GapAccount
 import View.Sheet as Sheet
 
 
@@ -213,29 +214,17 @@ panelBody model category =
                 , onSelect = \value -> SetVaultSearchMode (App.parseVaultSearchMode value)
                 }
             , retentionCard model
-            , queuedCard model
-            , draftsCard model
             ]
+                -- v3/gap-account: local history on/off, verified clear, saved searches
+                ++ View.GapAccount.historyCards model
+                ++ [ queuedCard model
+                   , draftsCard model
+                   ]
 
         Transfer ->
-            [ sectionHead "Import & export" "Move portable conversation data into or out of this browser."
-            , section [ class "pref-group pref-vault-portable", attribute "aria-labelledby" "pref-vault-portable-title" ]
-                [ div [ class "pref-group-head" ]
-                    [ h3 [ class "pref-label", id "pref-vault-portable-title" ] [ text "Portable vault" ] ]
-                , p [ class "pref-desc" ]
-                    [ text "Export or merge this device's local message history as portable JSON. Passwords, session tokens, and decrypted DM plaintext are not exported." ]
-                , div [ class "pref-actions" ]
-                    [ button [ type_ "button", class "pref-reset", onClick PrefsVaultExport ] [ text "Export vault" ]
-                    , button [ type_ "button", class "pref-reset", onClick PrefsVaultImport ] [ text "Import portable JSON" ]
-                    ]
-                , case model.prefsTransferStatus of
-                    Just status ->
-                        p [ class "pref-status", attribute "role" "status" ] [ text status ]
-
-                    Nothing ->
-                        text ""
-                ]
-            ]
+            sectionHead "Import & export" "Move portable conversation data into or out of this browser."
+                -- v3/gap-account: export review, staged import review, saved searches
+                :: View.GapAccount.transferCards model
 
         Accessibility ->
             [ sectionHead "Accessibility" "Motion, transparency, contrast, and verified access surfaces on this device."

@@ -14,6 +14,7 @@ rail — under a global top bar; one column + bottom nav under 768px.
 
 -}
 
+import AccountScope
 import App exposing (Model, Msg, inviteCard)
 import Invite exposing (inviteTitle)
 import Browser
@@ -192,12 +193,15 @@ documentTitle model =
                             "Onyx roadmap — rooms, calls, catch-up"
 
                         _ ->
-                            case model.activeChannel of
-                                Just name ->
-                                    name ++ " — Onyx"
+                            -- v3/gap-account: "(N) …" while mentions / DMs wait
+                            AccountScope.attentionTitle model.gapAccount.badge
+                                (case model.activeChannel of
+                                    Just name ->
+                                        name ++ " — Onyx"
 
-                                Nothing ->
-                                    "Onyx"
+                                    Nothing ->
+                                        "Onyx"
+                                )
 
 
 {-| v3/frame — the ONE app frame grid (see `.onyx-frame` in app.css):

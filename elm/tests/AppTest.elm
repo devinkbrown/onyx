@@ -13,6 +13,7 @@ import Cadence
 import Dict
 import DmCipher
 import Expect
+import GapAccount
 import GroupCommit
 import GroupControl
 import GroupDirectory
@@ -6561,17 +6562,39 @@ suite =
                 Expect.equal
                     "Vault exported (40 messages, 2 targets)."
                     (Maybe.withDefault "" (List.head m.serviceLog))
-        , test "VaultImportFile merges validated rows through VaultPersist" <|
+        , test "VaultImportFile stages for review; Import merges validated rows through VaultPersist" <|
+            -- v3/gap-account: nothing reaches the vault before the user confirms.
             \_ ->
                 let
                     json =
                         "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#C\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000},{\"id\":\"m2\",\"from\":\"b\",\"text\":\"yo\",\"type\":\"notice\",\"time\":2000}]}]}"
 
-                    ( m, outbound ) =
+                    ( staged, stageOut ) =
                         update (VaultImportFile { json = json }) blank
+
+                    scoped =
+                        let
+                            ga =
+                                staged.gapAccount
+                        in
+                        { staged | gapAccount = { ga | scope = Just "[\"onyx\",\"guest\"]" } }
+
+                    ( merged, outbound ) =
+                        update (GapAccountMsg GapAccount.ImportConfirm) scoped
+
+                    ( unscopedTry, unscopedOut ) =
+                        update (GapAccountMsg GapAccount.ImportConfirm) staged
+
+                    ( canceled, cancelOut ) =
+                        update (GapAccountMsg GapAccount.ImportCancel) scoped
                 in
                 Expect.all
-                    [ \_ ->
+                    [ \_ -> Expect.equal [] (List.filter isPersist stageOut)
+                    , \_ ->
+                        Expect.equal (Just { conversations = 1, messages = 2 })
+                            (Maybe.map (\r -> { conversations = r.conversations, messages = r.messages }) staged.gapAccount.importReview)
+                    , \_ -> Expect.equal True staged.prefsOpen
+                    , \_ ->
                         Expect.equal
                             [ VaultPersist
                                 { target = "#c"
@@ -6582,38 +6605,28 @@ suite =
                                 }
                             ]
                             outbound
-                    , \_ ->
-                        Expect.equal "Importing 2 messages into 1 conversations."
-                            (Maybe.withDefault "" (List.head m.serviceLog))
+                    , \_ -> Expect.equal Nothing merged.gapAccount.importReview
+                    , \_ -> Expect.equal (Just "Imported 2 messages into 1 conversation.") merged.gapAccount.importStatus
+                    , \_ -> Expect.equal [] (List.filter isPersist unscopedOut)
+                    , \_ -> Expect.notEqual Nothing unscopedTry.gapAccount.importReview
+                    , \_ -> Expect.equal ( [], Nothing ) ( List.filter isPersist cancelOut, canceled.gapAccount.importReview )
                     ]
                     ()
         , test "VaultImportFile refuses blank, broken, and empty snapshots" <|
             \_ ->
                 let
-                    ( blanked, blankedOut ) =
-                        update (VaultImportFile { json = "   " }) blank
-
-                    ( broken, _ ) =
-                        update (VaultImportFile { json = "{oops" }) blank
-
-                    ( wrong, _ ) =
-                        update (VaultImportFile { json = "{\"kind\":\"other\",\"version\":1,\"targets\":[]}" }) blank
-
-                    ( empty, _ ) =
-                        update (VaultImportFile { json = "{\"kind\":\"onyx-vault\",\"version\":1,\"targets\":[]}" }) blank
+                    statusOf json =
+                        let
+                            ( m, out ) =
+                                update (VaultImportFile { json = json }) blank
+                        in
+                        ( m.gapAccount.importStatus, m.gapAccount.importReview == Nothing, List.filter isPersist out )
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] blankedOut
-                    , \_ -> Expect.equal [] blanked.serviceLog
-                    , \_ ->
-                        Expect.equal "Vault import file could not be read as JSON."
-                            (Maybe.withDefault "" (List.head broken.serviceLog))
-                    , \_ ->
-                        Expect.equal "Vault import file held no valid vault snapshot."
-                            (Maybe.withDefault "" (List.head wrong.serviceLog))
-                    , \_ ->
-                        Expect.equal "Vault import file held no importable messages."
-                            (Maybe.withDefault "" (List.head empty.serviceLog))
+                    [ \_ -> Expect.equal ( Just "That file is empty.", True, [] ) (statusOf "   ")
+                    , \_ -> Expect.equal ( Just "That file isn't valid JSON.", True, [] ) (statusOf "{oops")
+                    , \_ -> Expect.equal ( Just "That file isn't an Onyx vault export.", True, [] ) (statusOf "{\"kind\":\"other\",\"version\":1,\"targets\":[]}")
+                    , \_ -> Expect.equal ( Just "That export holds no messages to import.", True, [] ) (statusOf "{\"kind\":\"onyx-vault\",\"version\":1,\"targets\":[]}")
                     ]
                     ()
         , test "WsBatchReceived folds every line in order" <|
@@ -24354,3 +24367,13 @@ withoutSafetyLoads =
                 _ ->
                     True
         )
+
+
+isPersist : Outbound -> Bool
+isPersist out =
+    case out of
+        VaultPersist _ ->
+            True
+
+        _ ->
+            False
