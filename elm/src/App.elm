@@ -3234,6 +3234,8 @@ type Msg
     | CallsChooseRoom
     | CallsReturnToCall String
     | CallJoin { channel : String, video : Bool }
+    -- v3/rx-calls: a guest with an account leaves for the sign-in form
+    | CallGuestSignIn
     | CallLeave
     | CallToggleMute
     | CallHubChanged Media.CallHub
@@ -4843,7 +4845,15 @@ foldLine model message =
                     ( model, [] )
 
         "376" ->
-            ( finishMotd model, [] )
+            -- v3/rx-calls: the welcome burst is over — a signed-in
+            -- account enrolls its device key now even without an
+            -- ACCOUNTRESIDENCE token (call E2EE needs it).
+            fireAttribution Attribution.foldRegistered (finishMotd model)
+
+        -- v3/rx-calls: ERR_NOMOTD ends the welcome burst too (still
+        -- logged like any numeric).
+        "422" ->
+            fireAttribution Attribution.foldRegistered (logNumeric model message)
 
         "353" ->
             ( foldNames model message, [] )
@@ -40007,14 +40017,20 @@ callsC6Snapshot raw model =
             else
                 accepted
     in
-    case Maybe.andThen CallDock.codecToast kind of
+    -- v3/rx-calls: every media failure word gets a calm toast
+    case CallDock.mediaToast raw of
         Just toast ->
             addToast
-                { variant = ToastError
+                { variant =
+                    if toast.warn then
+                        ToastWarning
+
+                    else
+                        ToastError
                 , title = toast.title
                 , description = Just toast.description
                 , duration = Nothing
-                , groupKey = Just ("voice-" ++ Maybe.withDefault "" kind)
+                , groupKey = Just toast.group
                 , undo = Nothing
                 }
                 classified.nowMs
@@ -44937,6 +44953,22 @@ updateCore msg model =
             if model.connection /= Live || String.isEmpty channel then
                 ( model, [] )
 
+            else if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing && CallUi.sameTarget model.calls.channel channel then
+                -- v3/rx-calls: this join is already in flight (a double
+                -- press must not cancel and restart it).
+                ( model, [] )
+
+            else if CallUi.needsAccount model then
+                -- v3/rx-calls: calls are end-to-end encrypted and need an
+                -- account; nothing goes out — the room shows the
+                -- sign-in banner instead (even if it was hidden).
+                ( { model
+                    | callJoinTarget = Just channel
+                    , callBannerDismissed = Set.remove (String.toLower (String.trim channel)) model.callBannerDismissed
+                  }
+                , []
+                )
+
             else
                 let
                     leaveFirst =
@@ -44957,6 +44989,11 @@ updateCore msg model =
                 ( { model
                     | callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8: the stored pref
                     , callJoinTarget = Just channel
+                    -- v3/rx-calls: provisional at once ("Connecting to the
+                    -- call…" + the permission hint) while capture and the
+                    -- device-key enrollment run; the engine snapshot
+                    -- confirms it, a failed join rolls it back to idle.
+                    , calls = { lifecycle = Media.InCall, channel = Just channel, withPeer = "", startedAt = Nothing, outcome = Nothing }
                     -- v3/calls-c4: camera intent from the join verb.
                     , callLocal = { blankCallLocal | camera = video && model.callLocal.cameraSupported, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported, cameraSupported = model.callLocal.cameraSupported }
                     , callMoreOpen = False
@@ -44977,7 +45014,12 @@ updateCore msg model =
             -- `leaveVoiceChannel`'s idle no-op).
             case model.calls.channel of
                 Just current ->
-                    if model.calls.lifecycle /= Media.Idle then
+                    if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing then
+                        -- v3/rx-calls: leaving a join still in flight cancels
+                        -- it; idle at once (the engine confirms quietly).
+                        ( { model | callSelfMuted = False, calls = Media.blankCallHub }, [ VoiceLeave { channel = current } ] )
+
+                    else if model.calls.lifecycle /= Media.Idle then
                         ( { model | callSelfMuted = False }, [ VoiceLeave { channel = current } ] )
 
                     else
@@ -45038,6 +45080,23 @@ updateCore msg model =
 
             else
                 ( { model | callBannerDismissed = Set.insert (String.toLower (String.trim room)) model.callBannerDismissed }, [] )
+
+        -- v3/rx-calls: "Sign in" from the guest call banner — a
+        -- deliberate disconnect back to the connect form, in sign-in
+        -- mode (the guest session cannot become another account).
+        CallGuestSignIn ->
+            if CallUi.needsAccount model then
+                let
+                    ( left, leftOut ) =
+                        updateCore SessionDisconnect model
+
+                    ( moded, modeOut ) =
+                        updateCore (ConnectModeSet ConnectSignIn) left
+                in
+                ( moded, leftOut ++ modeOut )
+
+            else
+                ( model, [] )
 
         CallMoreToggle ->
             ( { model | callMoreOpen = not model.callMoreOpen && model.calls.lifecycle /= Media.Idle }, [] )
@@ -45163,7 +45222,8 @@ updateCore msg model =
         CallToggleShare ->
             case ( callMediaTarget model, CallMedia.requestShare model.callLocal ) of
                 ( Just target, Just ( local, on ) ) ->
-                    ( { model | callLocal = local, callShareOptOut = Nothing }
+                    -- v3/rx-calls: the tool was used — the More tray closes
+                    ( { model | callLocal = local, callShareOptOut = Nothing, callMoreOpen = False }
                     , [ VoiceCommand { verb = "share", on = on, channel = target, tile = "" } ]
                     )
 
@@ -45222,6 +45282,8 @@ updateCore msg model =
             ( { model | callClockMs = max model.callClockMs now }, [] )
 
         CallLayoutToggle ->
+            -- v3/rx-calls: layout and size change what is behind the tray, so
+            -- the tray closes (Deafen stays: its label is its feedback).
             ( { model
                 | callLayout =
                     if model.callLayout == CallMedia.LayoutGrid then
@@ -45229,12 +45291,13 @@ updateCore msg model =
 
                     else
                         CallMedia.LayoutGrid
+                , callMoreOpen = False
               }
             , []
             )
 
         CallStageSizeCycle ->
-            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize }, [] )
+            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize, callMoreOpen = False }, [] )
 
         CallStageSizeSet size ->
             ( { model | callStageSize = size }, [] )
@@ -45556,7 +45619,8 @@ updateCore msg model =
             )
 
         InviteShareOpen channel ->
-            ( { model | inviteShare = Just (InviteShare.open channel) }, [] )
+            -- v3/rx-calls: opened from the call's More tray too — it closes
+            ( { model | inviteShare = Just (InviteShare.open channel), callMoreOpen = False }, [] )
 
         InviteShareClose ->
             ( { model | inviteShare = Nothing }, [] )

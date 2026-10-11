@@ -72,6 +72,7 @@ base =
         | ourNick = "odalys"
         , channels = Dict.fromList [ ( "#harbor", harbor ) ]
         , activeChannel = Just "#harbor"
+        , accountName = Just "odalys" -- v3/rx-calls: calls need an account
     }
 
 
@@ -409,7 +410,9 @@ stage =
                 Expect.all
                     [ \_ -> q |> Query.find [ testid "voice-stage" ] |> Query.has [ aria "Voice call participants", Selector.attribute (Attr.attribute "role" "region") ]
                     , \_ -> q |> Query.find [ testid "voice-stage-state" ] |> Query.has [ Selector.text "Call is live · Protected connection" ]
-                    , \_ -> q |> Query.find [ testid "voice-bar" ] |> Query.has [ aria "Voice call controls", Selector.attribute (Attr.attribute "role" "toolbar"), Selector.text "· 3 people" ]
+                    , \_ -> q |> Query.find [ testid "voice-bar" ] |> Query.has [ aria "Voice call controls", Selector.attribute (Attr.attribute "role" "toolbar") ]
+                    -- v3/rx-calls: call facts moved to the stage head; the toolbar is controls only
+                    , \_ -> q |> Query.find [ testid "call-meta" ] |> Query.has [ Selector.text "· 3 people" ]
                     , \_ -> q |> Query.findAll [ Selector.class "onyx-call-person" ] |> Query.count (Expect.equal 3)
                     , \_ -> q |> Query.findAll [ testid "call-join-banner" ] |> Query.count (Expect.equal 0)
                     ]

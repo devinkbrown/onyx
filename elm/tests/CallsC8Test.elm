@@ -65,6 +65,7 @@ base =
         , channels = Dict.fromList [ ( "#harbor", harbor ) ]
         , activeChannel = Just "#harbor"
         , nowMs = 100000
+        , accountName = Just "odalys" -- v3/rx-calls: calls need an account
     }
 
 

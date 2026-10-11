@@ -11,6 +11,7 @@ module Attribution exposing
     , foldAddedNotice
     , foldEnrollReply
     , foldNode
+    , foldRegistered
     , foldPublishedNotice
     , foldResidenceReply
     , foldStaleEpoch
@@ -39,6 +40,16 @@ lives behind ports — this module owns validation, trigger
 transitions, and staleness guards. Fail-closed throughout: no
 token, no account, or any malformed reply means NOTHING is sent —
 the account stays on the daemon's conservative UID path.
+
+v3/rx-calls — enrollment no longer waits for the token. Call media
+E2EE is signed with the same device key and the server admits a
+handshake only once that key is enrolled on the account, but a live
+node never advertises `ACCOUNTRESIDENCE` at sign-in (the daemon builds
+the ISUPPORT list before the node identity is set). So once the
+welcome burst ends (376 / 422, `foldRegistered`) with an account and
+no node, Elm requests a node-less enrollment (`RequestEnroll` with
+`nodeHex = ""`): `IDENTITY ADD` only, never a residence proof. The
+voice adapter's own enrollment stays as a belt-and-braces path.
 -}
 
 
@@ -74,6 +85,11 @@ type alias AttributionSession =
     , gen : Int
     , stopped : Bool
     , refreshDueMs : Maybe Float
+    -- v3/rx-calls: the welcome burst finished on this connection
+    , registered : Bool
+    -- v3/rx-calls: a node-less enrollment was already requested for
+    -- this account on this connection
+    , enrollOnly : Bool
     }
 
 
@@ -98,6 +114,8 @@ type alias ResidenceReply =
     }
 
 
+{-| `RequestEnroll` with `nodeHex = ""` is a node-less enrollment
+(v3/rx-calls): the reply may only lead to `SendIdentityAdd`. -}
 type AttributionEffect
     = NoEffect
     | RequestEnroll { serverUrl : String, account : String, nodeHex : String, gen : Int }
@@ -119,6 +137,8 @@ blankSession =
     , gen = 0
     , stopped = False
     , refreshDueMs = Nothing
+    , registered = False
+    , enrollOnly = False
     }
 
 
@@ -135,6 +155,8 @@ resetSession session =
         , pendingEnroll = Nothing
         , staleRetried = False
         , refreshDueMs = Nothing
+        , registered = False
+        , enrollOnly = False
     }
 
 
@@ -221,7 +243,24 @@ foldAccount session account =
                         , pendingEnroll = Nothing
                         , staleRetried = False
                         , refreshDueMs = Nothing
+                        , enrollOnly = False
                     }
+
+
+{-| v3/rx-calls — the welcome burst ended (376 / 422). With an account
+and no advertised node this is where the node-less enrollment starts;
+with a node the normal path already ran from `foldNode`. -}
+foldRegistered : AttributionSession -> ( AttributionSession, AttributionEffect )
+foldRegistered session =
+    let
+        next =
+            { session | registered = True }
+    in
+    if session.nodeHex == Nothing then
+        kickAttribution next
+
+    else
+        ( next, NoEffect )
 
 
 {-| Emit the enroll request when an unsigned proof is owed
@@ -244,6 +283,18 @@ kickAttribution session =
                     , RequestEnroll { serverUrl = session.serverUrl, account = account, nodeHex = nodeHex, gen = session.gen }
                     )
 
+            ( Just account, Nothing ) ->
+                -- v3/rx-calls: no ACCOUNTRESIDENCE — enroll the device
+                -- key anyway (call E2EE needs it), once per account per
+                -- connection, after the welcome burst.
+                if session.registered && not session.enrollOnly then
+                    ( { session | enrollOnly = True }
+                    , RequestEnroll { serverUrl = session.serverUrl, account = account, nodeHex = "", gen = session.gen }
+                    )
+
+                else
+                    ( session, NoEffect )
+
             _ ->
                 ( session, NoEffect )
 
@@ -259,7 +310,16 @@ foldEnrollReply session nowMs reply =
     else if Just reply.account /= session.account then
         ( session, NoEffect )
 
-    else if Just reply.nodeHex /= session.nodeHex then
+    else if
+        (reply.nodeHex /= "" && Just reply.nodeHex /= session.nodeHex)
+            || (reply.nodeHex == "" && session.nodeHex /= Nothing)
+    then
+        -- A node-less reply (v3/rx-calls) is stale once a node is known:
+        -- the node path re-requested with it.
+        ( session, NoEffect )
+
+    else if reply.nodeHex == "" && reply.alreadyEnrolled then
+        -- v3/rx-calls: node-less and already enrolled — nothing to sign.
         ( session, NoEffect )
 
     else if reply.alreadyEnrolled then
