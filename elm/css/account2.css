@@ -3,7 +3,7 @@
    sidebar friend presence. Tokens come from :root in app.css. */
 
 .a2-sheet { width: min(520px, 100%); }
-.a2-body { display: flex; flex-direction: column; gap: var(--gap-section); padding: var(--pad-panel); overflow-y: auto; }
+.a2-body { display: flex; flex-direction: column; gap: var(--gap-section); }
 .a2-section { display: flex; flex-direction: column; gap: var(--space-2); }
 .a2-heading { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--onyx-text); }
 .a2-hint { margin: 0; font-size: var(--text-xs); color: var(--onyx-dim); line-height: var(--leading-snug); }
@@ -15,7 +15,7 @@
 .a2-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
 .a2-row--between { justify-content: space-between; }
 .a2-row--fill { flex-wrap: nowrap; }
-.a2-row--fill > .a2-input { flex: 1 1 auto; min-width: 0; }
+.a2-row--fill > .a2-input { min-width: 0; }
 
 .a2-input,
 .a2-select,
@@ -48,7 +48,6 @@
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 .a2-link { border-color: transparent; color: var(--onyx-dim); }
 .a2-btn:hover,
@@ -119,7 +118,7 @@
 .a2-reclaim__dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 
 /* You hub status block. */
-.a2-status { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.a2-status { display: flex; flex-direction: column; gap: var(--space-2); }
 .a2-status__current { align-items: flex-start; }
 .a2-status__text { flex: 1 1 auto; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
 .a2-status__form { display: flex; flex-direction: column; gap: var(--space-2); }

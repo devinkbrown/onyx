@@ -86,7 +86,6 @@
 .onyx-call-caption-tr { flex-basis: 100%; color: var(--onyx-dim); font-size: var(--text-sm); }
 
 /* C9 · voice settings sheet */
-.onyx-voice-settings { width: min(520px, 100%); }
 .onyx-vs-body { display: grid; gap: var(--space-5); }
 .onyx-vs-section { display: grid; gap: var(--space-3); }
 .onyx-vs-title { margin: 0; font-size: var(--text-2xs); font-weight: 650; color: var(--onyx-faint); text-transform: uppercase; letter-spacing: var(--tracking-kicker); }
@@ -105,7 +104,7 @@
 .onyx-vs-output { display: grid; gap: var(--space-2); justify-items: start; }
 .onyx-vs-output > .onyx-vs-field { justify-self: stretch; }
 .onyx-vs-toggle { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
-.onyx-vs-toggle input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--onyx-text); }
+.onyx-vs-toggle input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; }
 .onyx-vs-toggle-text { display: grid; gap: 2px; min-width: 0; }
 .onyx-vs-toggle-label { font-weight: 650; }
 .onyx-vs-key-row { display: flex; align-items: flex-end; flex-wrap: wrap; gap: var(--space-2); }

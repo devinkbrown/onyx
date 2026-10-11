@@ -128,7 +128,7 @@
 
 /* ── 3. Sections ─────────────────────────────────────────────────────── */
 
-.onyx-mlist-groups { display: grid; gap: var(--space-3); }
+.onyx-mlist-groups { display: grid; }
 
 .onyx-roster .onyx-roster-group { margin: 0; }
 
@@ -167,7 +167,6 @@
   margin-left: auto;
   color: var(--onyx-faint);
   opacity: 0;
-  transition: transform var(--dur-fast) var(--ease), opacity var(--dur-micro) var(--ease);
 }
 .onyx-mlist-group-head:hover > .pt-ico,
 .onyx-mlist-group-head:focus-visible > .pt-ico,
@@ -346,7 +345,6 @@
     border: 0;
     border-left: 1px solid var(--onyx-line);
     box-shadow: var(--elev-3);
-    animation: ui-sheet-pop var(--dur-base) var(--ease);
   }
   .onyx-roster::backdrop { background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-roster:popover-open .onyx-mlist-close { display: grid; }
@@ -389,7 +387,7 @@
   .onyx-roster:popover-open .onyx-mlist-close { width: var(--target-min); height: var(--target-min); }
   .onyx-roster:popover-open .onyx-mlist-find .pt-ico,
   .onyx-roster:popover-open .onyx-mlist-close .pt-ico { width: 20px; height: 20px; }
-  .onyx-roster:popover-open .onyx-roster-filter-input { min-height: 40px; font-size: 16px; }
+  .onyx-roster:popover-open .onyx-roster-filter-input { font-size: 16px; }
   .onyx-roster:popover-open .onyx-mlist-group-head { min-height: 36px; }
   .onyx-roster:popover-open .onyx-mlist-group-head > .pt-ico { opacity: 1; }
   /* v3/rx-shell: 48px rows — thumb-sized, and a 60-person room still
