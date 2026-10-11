@@ -1244,14 +1244,14 @@
   .onyx-frame .onyx-room-header-sub { padding: 0 var(--space-3) var(--space-1); font-size: var(--text-xs); }
 
   /* More → a bottom action sheet over a dim scrim. */
-  .onyx-frame .onyx-room-more-scrim { z-index: 58; background: color-mix(in srgb, #000 55%, transparent); }
+  .onyx-frame .onyx-room-more-scrim { z-index: var(--z-menu-sheet); background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-frame .onyx-room-more-menu {
     position: fixed;
     top: auto;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 59;
+    z-index: calc(var(--z-menu-sheet) + 1);
     min-width: 0;
     max-height: 85dvh;
     padding: 0 var(--space-2) calc(var(--space-3) + var(--safe-bottom, 0px));

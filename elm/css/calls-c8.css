@@ -22,7 +22,7 @@
 
 /* C8 · React menu: one row of 8, anchored above the bar centre */
 .onyx-call-react-menu {
-  position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%); z-index: 21;
+  position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%); z-index: calc(var(--z-header) + 1);
   display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); max-width: calc(100vw - 32px);
   padding: var(--space-1); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel);
 }
@@ -35,7 +35,7 @@
 .onyx-call-react-item:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 /* C8 · reaction chips: bottom-right of the stage body, above the bar */
-.onyx-call-reactions { position: relative; height: 0; z-index: 3; }
+.onyx-call-reactions { position: relative; height: 0; z-index: calc(var(--z-raised) + 2); }
 .onyx-call-reactions-stack {
   position: absolute; right: var(--space-3); bottom: var(--space-2);
   display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none;

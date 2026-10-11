@@ -228,7 +228,7 @@
 .hi-review-foot {
   position: sticky;
   bottom: 0;
-  z-index: 2;
+  z-index: calc(var(--z-raised) + 1);
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;

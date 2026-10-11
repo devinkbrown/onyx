@@ -31,7 +31,7 @@
 .ap-background-host {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: var(--z-under);
   pointer-events: none;
   background: var(--onyx-bg);
 }
@@ -39,7 +39,7 @@
 .ap-bar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-bar);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -74,7 +74,7 @@
 
 .ap-wrap {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   width: 100%;
   margin: 0 auto;
   padding: clamp(28px, 6vw, 72px) clamp(16px, 5vw, 48px) 14vh;

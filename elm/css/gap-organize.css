@@ -679,7 +679,7 @@
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 12px);
   right: calc(env(safe-area-inset-right, 0px) + var(--space-4));
-  z-index: 40;
+  z-index: var(--z-popover);
   display: flex;
   align-items: center;
   gap: var(--space-2);

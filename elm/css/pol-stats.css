@@ -823,7 +823,7 @@
 .stats-page .stats-heatmap { width: 100%; min-width: 40rem; border-collapse: separate; border-spacing: 2px; }
 .stats-page .stats-heatmap th { height: 1.4rem; color: var(--pg-faint); font: var(--text-2xs) / 1.2 var(--font-mono); font-weight: 400; text-align: center; }
 .stats-page .stats-heatmap tbody th,
-.stats-page .stats-heatmap thead th:first-child { position: sticky; left: 0; z-index: 1; min-width: 2.75rem; padding-inline-end: var(--space-2); background: var(--pg-panel); text-align: start; }
+.stats-page .stats-heatmap thead th:first-child { position: sticky; left: 0; z-index: var(--z-raised); min-width: 2.75rem; padding-inline-end: var(--space-2); background: var(--pg-panel); text-align: start; }
 .stats-page .stats-heatmap td {
   width: 1.25rem;
   height: 1.25rem;

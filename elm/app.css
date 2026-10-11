@@ -71,6 +71,28 @@
   --focus-ring: 1px solid var(--onyx-accent);
   --focus-offset: -1px;
 
+  /* Layering: ONE ladder, low to high. Every z-index in the stylesheets is
+     one of these rungs (or a rung +/- a small calc offset, e.g. a menu one
+     above its scrim). Components that need to sit "just above" a rung say
+     so with calc(var(--z-x) + 1) instead of inventing a number. Overlay
+     families (sheets, dialogs, toasts) are 60+; in-flow chrome is below 50.
+     The numbers are the values the shell has always rendered with. */
+  --z-under: -1;      /* decorative canvas behind the shell */
+  --z-raised: 1;      /* a child above its siblings (+1, +2, +3 for sticky heads inside a pane) */
+  --z-sticky: 5;      /* jump-to-latest pill, primary nav rail */
+  --z-stage: 6;       /* in-thread call stage / join banner, thread pop-over, watch strip */
+  --z-bar: 10;        /* /appearance action bar */
+  --z-header: 20;     /* public site header (+1 / -1: react menu, mobile nav page) */
+  --z-popover: 40;    /* composer popovers, message menu scrim; +1 for the menu itself */
+  --z-panel: 45;      /* inbox dropdown panel */
+  --z-call: 50;       /* full-screen call stage, call pip */
+  --z-menu-sheet: 58; /* phone room-more action sheet scrim; +1 for the sheet */
+  --z-sheet: 60;      /* .onyx-overlays and every sheet layer; +1 for a menu over a sheet */
+  --z-notice: 70;     /* update strip, drop zone, phone message-menu scrim; +1 for its menu */
+  --z-dialog: 80;     /* command palette, incoming-call ring */
+  --z-toast: 90;      /* toasts: above every dialog */
+  --z-top: 100;       /* lightbox, skip link */
+
   /* Motion: 100 / 160 / 220ms; zeroed under reduced motion. */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-micro: 100ms;
@@ -1016,7 +1038,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 40;
+  z-index: var(--z-popover);
 }
 
 .onyx-schedule-head { display: flex; gap: 8px; align-items: flex-start; }
@@ -1498,8 +1520,8 @@ html, body {
 }
 .onyx-msg-menu-delete-confirm-cancel { background: transparent; color: var(--onyx-text); }
 .onyx-msg-menu-delete-confirm-delete { background: transparent; border-color: var(--onyx-bad); color: var(--onyx-bad); }
-.onyx-msg-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
-.onyx-msg-menu { position: relative; z-index: 41; }
+.onyx-msg-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-popover); }
+.onyx-msg-menu { position: relative; z-index: calc(var(--z-popover) + 1); }
 .onyx-msg-menu-translation { border-top: 1px solid var(--onyx-line); display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 8px 10px 4px; }
 .onyx-msg-menu-translation-head { color: var(--onyx-dim); font-size: 0.75rem; }
 .onyx-msg-menu-translation-text { font-size: 0.8125rem; margin: 0; }
@@ -2359,7 +2381,7 @@ html, body {
   flex-direction: column;
   align-items: stretch;
   gap: 6px;
-  z-index: 40;
+  z-index: var(--z-popover);
   pointer-events: none;
 }
 
@@ -2883,7 +2905,7 @@ html, body {
   position: sticky;
   bottom: 8px;
   align-self: center;
-  z-index: 5;
+  z-index: var(--z-sticky);
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -3325,7 +3347,7 @@ html, body {
   min-height: 0;
   overflow: visible;
   position: relative;
-  z-index: 5;
+  z-index: var(--z-sticky);
 }
 
 .onyx-frame > .onyx-topbar { grid-area: topbar; min-width: 0; }
@@ -3368,7 +3390,7 @@ html, body {
   left: 0;
   width: 0;
   height: 0;
-  z-index: 60;
+  z-index: var(--z-sheet);
 }
 
 /* Desktop rail: 56px icons, labels on hover / keyboard focus. */
@@ -3479,7 +3501,7 @@ html, body {
   position: absolute;
   top: calc(100% + var(--space-1));
   right: 0;
-  z-index: 45;
+  z-index: var(--z-panel);
   width: min(360px, calc(100vw - 2 * var(--space-4)));
   max-height: 70vh;
   overflow-y: auto;
@@ -3554,13 +3576,13 @@ html, body {
 }
 
 .onyx-room-more { position: relative; }
-.onyx-room-more-scrim { position: fixed; inset: 0; z-index: 40; }
+.onyx-room-more-scrim { position: fixed; inset: 0; z-index: var(--z-popover); }
 
 .onyx-room-more-menu {
   position: absolute;
   top: calc(100% + var(--space-1));
   right: 0;
-  z-index: 41;
+  z-index: calc(var(--z-popover) + 1);
   display: flex;
   flex-direction: column;
   min-width: 200px;

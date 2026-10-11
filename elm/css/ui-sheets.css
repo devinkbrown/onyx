@@ -76,7 +76,7 @@
    1. Layer, veil, panel (desktop first)
    =================================================================== */
 
-.onyx-sheet-layer { z-index: 60; padding: var(--space-6) var(--space-4); }
+.onyx-sheet-layer { z-index: var(--z-sheet); padding: var(--space-6) var(--space-4); }
 
 .onyx-sheet-backdrop {
   background: var(--sheet-veil);
@@ -173,7 +173,7 @@
 .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head) {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: calc(var(--z-raised) + 3);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
@@ -425,7 +425,7 @@
    5. Command palette (Ctrl+K) + keyboard shortcuts
    =================================================================== */
 
-.onyx-spotlight { z-index: 80; padding-top: min(14vh, 120px); }
+.onyx-spotlight { z-index: var(--z-dialog); padding-top: min(14vh, 120px); }
 .onyx-spotlight-backdrop { background: var(--sheet-veil); animation: ui-sheet-veil-in var(--dur-fast) var(--ease); }
 
 .onyx-spotlight-panel {
@@ -789,7 +789,7 @@
    =================================================================== */
 
 .onyx-toaster {
-  z-index: 90;
+  z-index: var(--z-toast);
   right: var(--space-5);
   bottom: calc(var(--composer-h) + var(--space-6));
   max-width: min(380px, calc(100vw - 2 * var(--space-4)));
@@ -918,7 +918,7 @@
   .onyx-account-body > .onyx-account-nav {
     position: sticky;
     top: var(--account-head-h, 74px);
-    z-index: 3;
+    z-index: calc(var(--z-raised) + 2);
     flex-direction: row;
     gap: var(--space-1);
     margin: 0 calc(-1 * var(--sheet-pad)) var(--space-3);
@@ -974,7 +974,6 @@
 }
 @media (max-width: 599.98px) {
   .onyx-room-more-scrim {
-    z-index: 60;
     background: var(--sheet-veil);
     animation: ui-sheet-veil-in var(--dur-base) var(--ease);
   }
@@ -983,7 +982,6 @@
     top: auto;
     left: 0;
     right: 0;
-    z-index: 61;
     min-width: 0;
     padding: var(--sheet-grip-zone) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     border-width: 1px 0 0;
@@ -1075,7 +1073,7 @@
    card family on desktop, a bottom sheet with a grip under 600px.
    =================================================================== */
 
-.onyx-profile-pop:not(.onyx-sheet-layer) { z-index: 60; }
+.onyx-profile-pop:not(.onyx-sheet-layer) { z-index: var(--z-sheet); }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-profile-backdrop { background: var(--sheet-veil); animation: ui-sheet-veil-in var(--dur-base) var(--ease); }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card {
   width: min(380px, 100%);
@@ -1462,7 +1460,7 @@
   top: 8px;
   right: 8px;
   margin: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .onyx-member-card > .onyx-member-identity { padding-inline: calc(var(--sheet-close) + 4px); }
 @media (max-width: 599.98px) {
@@ -1553,7 +1551,7 @@ html:has(.onyx-overlays [data-shortcut-scope]) .onyx-roster:popover-open { visib
     /* A long menu scrolls; Cancel stays pinned at the sheet's foot. */
     position: sticky;
     bottom: 0;
-    z-index: 2;
+    z-index: calc(var(--z-raised) + 1);
     background: var(--onyx-panel);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

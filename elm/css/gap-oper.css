@@ -43,7 +43,7 @@
 .oc-tabs {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: calc(var(--z-raised) + 3);
   display: flex;
   margin: 0 calc(-1 * var(--sheet-pad, 20px));
   padding: var(--space-2) calc(var(--sheet-pad, 20px) + 44px) 0 var(--sheet-pad, 20px);

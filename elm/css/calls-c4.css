@@ -61,7 +61,7 @@
 /* C5 · stage sizes */
 .onyx-call-stage[data-size="expanded"] .onyx-call-video { min-height: 60vh; }
 .onyx-call-stage[data-size="fullscreen"] {
-  position: fixed; inset: 0; z-index: 50; margin: 0; border: 0; border-radius: 0;
+  position: fixed; inset: 0; z-index: var(--z-call); margin: 0; border: 0; border-radius: 0;
 }
 .onyx-call-stage[data-size="fullscreen"] .onyx-call-video { flex: 1 1 auto; min-height: 0; }
 .onyx-call-stage[data-size="fullscreen"] .onyx-call-bar { border-radius: 0; }
@@ -92,7 +92,7 @@
 }
 .onyx-tile-video:not([data-bound="true"]) { display: none; }
 .onyx-tile-top, .onyx-tile-bottom {
-  position: absolute; left: var(--space-1); right: var(--space-1); z-index: 1;
+  position: absolute; left: var(--space-1); right: var(--space-1); z-index: var(--z-raised);
   display: flex; align-items: center; gap: var(--space-1); min-width: 0;
 }
 .onyx-tile-top { top: var(--space-1); flex-wrap: wrap; }

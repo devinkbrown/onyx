@@ -416,7 +416,7 @@
 .onyx-roster .onyx-roster-head {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: calc(var(--z-raised) + 2);
   flex: none;
   min-height: var(--rs-head);
   background: var(--onyx-panel);
@@ -425,7 +425,7 @@
 .onyx-roster .onyx-roster-filter {
   position: sticky;
   top: var(--rs-head);
-  z-index: 3;
+  z-index: calc(var(--z-raised) + 2);
   flex: none;
   box-sizing: border-box;
   height: 34px;
@@ -438,7 +438,7 @@
 .onyx-roster .onyx-mlist-group-head {
   position: sticky;
   top: calc(var(--rs-head) + var(--rs-filter));
-  z-index: 2;
+  z-index: calc(var(--z-raised) + 1);
   background: var(--onyx-panel);
 }
 .onyx-roster .onyx-mlist-groups { gap: var(--space-2); }

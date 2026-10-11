@@ -32,7 +32,7 @@
 .onyx-watch {
   position: sticky;
   top: 0;
-  z-index: 6;
+  z-index: var(--z-stage);
   flex: none;
   box-sizing: border-box;
   width: 100%;

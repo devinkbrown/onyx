@@ -54,7 +54,7 @@
 /* ---------- docking in the conversation scroller ---------- */
 .onyx-thread-pane > .onyx-call-stage,
 .onyx-thread-pane > .onyx-join-banner {
-  position: sticky; top: 0; z-index: 6; flex: none;
+  position: sticky; top: 0; z-index: var(--z-stage); flex: none;
   /* Inline alignment follows the transcript column rule (app.css
      `.onyx-main > .onyx-thread-pane > *`), so the dock lines up with
      the messages however that column is placed. */
@@ -152,7 +152,7 @@
 .onyx-call-head-faces { display: none; align-items: center; flex: none; }
 .onyx-call-head-faces .onyx-call-avatar { margin-left: -4px; border-color: var(--onyx-bg); }
 .onyx-call-head-faces .onyx-call-avatar:first-child { margin-left: 0; }
-.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"] { position: relative; z-index: 1; border-color: var(--onyx-accent); box-shadow: 0 0 0 1px var(--onyx-accent); }
+.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"] { position: relative; z-index: var(--z-raised); border-color: var(--onyx-accent); box-shadow: 0 0 0 1px var(--onyx-accent); }
 .onyx-call-head-faces .onyx-call-avatar[data-hand="true"] { border-color: var(--onyx-warn); }
 .onyx-call-head-more { margin-left: var(--space-1); font-size: var(--text-sm); color: var(--onyx-dim); }
 
@@ -178,9 +178,9 @@
 .onyx-call-more-wrap { display: flex; position: static; min-width: 0; }
 
 /* More → a row of tools under the controls (roomy stages). */
-.onyx-call-more-scrim { position: fixed; inset: 0; z-index: 60; background: transparent; }
+.onyx-call-more-scrim { position: fixed; inset: 0; z-index: var(--z-sheet); background: transparent; }
 .onyx-call-more {
-  position: relative; z-index: 61; bottom: auto; left: auto; transform: none;
+  position: relative; z-index: calc(var(--z-sheet) + 1); bottom: auto; left: auto; transform: none;
   display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1) var(--space-2);
   flex: 1 1 100%; min-width: 0; margin: 0; padding: var(--space-2) 0 0;
   border: 0; border-top: 1px solid var(--onyx-line); border-radius: 0; background: var(--onyx-panel);
@@ -247,7 +247,7 @@
 @media (max-width: 640px), (max-height: 500px) {
   .onyx-call-more-scrim { background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-call-more {
-    position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 61;
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: calc(var(--z-sheet) + 1);
     display: block; width: auto; max-width: 560px; margin: 0 auto; min-width: 0;
     max-height: min(80dvh, 460px); overflow-y: auto; overscroll-behavior: contain;
     padding: var(--space-2) max(var(--space-2), env(safe-area-inset-right, 0px)) calc(var(--space-2) + env(safe-area-inset-bottom, 0px)) max(var(--space-2), env(safe-area-inset-left, 0px));
@@ -400,7 +400,7 @@
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-person { width: 144px; }
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-video { --grid-h: calc(100dvh - 9rem); }
 }
-.onyx-thread-pane > .onyx-call-stage[data-size="fullscreen"] { z-index: 50; }
+.onyx-thread-pane > .onyx-call-stage[data-size="fullscreen"] { z-index: var(--z-call); }
 
 /* ---------- phones: expanded / fullscreen = the full-screen call screen ---------- */
 @media (max-width: 640px), (max-height: 500px) {
@@ -408,7 +408,7 @@
   .onyx-call-stage[data-size="fullscreen"],
   .onyx-thread-pane > .onyx-call-stage[data-size="expanded"],
   .onyx-thread-pane > .onyx-call-stage[data-size="fullscreen"] {
-    position: fixed; inset: 0; z-index: 50; margin: 0; border: 0; border-radius: 0;
+    position: fixed; inset: 0; z-index: var(--z-call); margin: 0; border: 0; border-radius: 0;
     display: flex; flex-flow: column nowrap; align-items: stretch;
     height: 100vh; height: 100dvh; min-height: 0;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);

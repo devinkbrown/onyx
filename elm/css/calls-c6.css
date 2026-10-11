@@ -15,7 +15,7 @@
 
 /* ---------- C6 · ring dialogs ---------- */
 
-.onyx-sheet-layer.onyx-call-ring-layer { z-index: 80; }
+.onyx-sheet-layer.onyx-call-ring-layer { z-index: var(--z-dialog); }
 
 .onyx-sheet.onyx-call-ring {
   width: min(380px, 100%);
@@ -87,7 +87,7 @@
 
 .onyx-call-pip-card {
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-call);
   width: min(300px, calc(100vw - 24px));
   box-sizing: border-box;
   color: var(--onyx-text);

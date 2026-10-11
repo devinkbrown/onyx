@@ -52,7 +52,7 @@
   position: fixed;
   top: var(--space-3);
   left: var(--space-3);
-  z-index: 100;
+  z-index: var(--z-top);
   display: inline-flex;
   align-items: center;
   min-height: var(--target-min);
@@ -70,7 +70,7 @@
 .public-frame__header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-header);
   padding-top: env(safe-area-inset-top);
   background: var(--onyx-bg);
   border-bottom: 1px solid var(--onyx-line);
@@ -272,7 +272,7 @@
     right: 0;
     bottom: 0;
     left: 0;
-    z-index: 19;
+    z-index: calc(var(--z-header) - 1);
     display: none;
     flex-direction: column;
     align-items: stretch;
