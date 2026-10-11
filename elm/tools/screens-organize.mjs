@@ -215,6 +215,14 @@ async function homeTab(page, h) {
   await clickVisible(page, ['[data-testid="room-back"]'], h);
   await clickVisible(page, ['.onyx-mobile-nav [data-testid="nav-home"]', '.onyx-primary-nav [data-testid="nav-home"]'], h, 600);
   await page.mouse.move(5, 5);
+  // Home opens at its top: scroll every scrolling ancestor back up.
+  await page.evaluate(() => {
+    for (let el = document.querySelector('[data-testid="home"]'); el; el = el.parentElement) {
+      if (el.scrollTop > 0) el.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+  });
+  await h.settle(page, 200);
 }
 
 async function openYou(page, h) {
