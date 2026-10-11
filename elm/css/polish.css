@@ -384,3 +384,25 @@
   .time-scrubber__bar-fill { background: CanvasText; }
   .time-scrubber__bar--now .time-scrubber__bar-fill { background: Highlight; }
 }
+
+/* v3/rx-convo — the tools tray never runs past the top of the visible
+   screen (the keyboard-aware --vvh from ports.js when it is up): it
+   scrolls inside instead. On short landscape screens the rows drop
+   their second line. */
+.shell-composer-tools {
+  max-height: calc(var(--vvh, 100dvh) - var(--composer-h) - var(--space-6));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Touch at any width: the tray keeps comfortable rows. */
+@media (pointer: coarse) and (min-width: 768px) {
+  .onyx-composer .shell-composer-tools-item { min-height: 52px; }
+  .shell-composer-tools { width: min(360px, calc(100vw - 2 * var(--space-4))); }
+}
+
+@media (max-height: 500px) {
+  .onyx-composer .shell-composer-tools-item { min-height: var(--target-min); padding-block: var(--space-1); }
+  .onyx-composer .shell-composer-tools-item > .shell-composer-tools-item-desc { display: none; }
+  .shell-composer-tools-tip > .shell-composer-tools-item-desc { display: none; }
+}

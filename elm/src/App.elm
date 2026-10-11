@@ -394,6 +394,8 @@ type alias Model =
     , linkPreviewInflight : Set String
     , previewMediaFailed : Set String
     , mediaLightbox : Maybe String
+      -- v3/rx-convo: the lightbox shows the picture at full size (panning)
+    , mediaLightboxZoomed : Bool
     , mediaIndexOpen : Bool
     , mediaIndexFilter : RoomMediaFilter
     , mediaIndexTarget : String
@@ -3034,6 +3036,8 @@ type Msg
     | PreviewMediaFailed String
     | MediaLightboxOpen String
     | MediaLightboxClose
+      -- v3/rx-convo
+    | MediaLightboxZoom Bool
     | MediaSave String
     | MessageCopyMoment { target : String, at : Int }
     | MessageQuote { target : String, from : String, body : String }
@@ -3563,6 +3567,7 @@ init nick url =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -4171,6 +4176,7 @@ blank =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -9773,6 +9779,7 @@ quarantineOwnerChange model =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -41816,10 +41823,14 @@ updateCore msg model =
             ( { model | previewMediaFailed = Set.insert url model.previewMediaFailed }, [] )
 
         MediaLightboxOpen url ->
-            ( { model | mediaLightbox = Just url }, [] )
+            ( { model | mediaLightbox = Just url, mediaLightboxZoomed = False }, [] )
 
         MediaLightboxClose ->
-            ( { model | mediaLightbox = Nothing }, [] )
+            ( { model | mediaLightbox = Nothing, mediaLightboxZoomed = False }, [] )
+
+        -- v3/rx-convo: fit ↔ full size (only while a picture is open)
+        MediaLightboxZoom zoomed ->
+            ( { model | mediaLightboxZoomed = zoomed && model.mediaLightbox /= Nothing }, [] )
 
         MediaIndexOpen ->
             case model.activeChannel of

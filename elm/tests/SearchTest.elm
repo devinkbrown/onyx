@@ -302,6 +302,41 @@ suite =
                         , \q -> q |> Query.has [ Selector.text "0 of 0" ]
                         ]
                         (query open)
+            , -- v3/rx-convo: the panel belongs to the conversation it searches:
+              -- it opens in the main column under the room header and no
+              -- longer in the full-width notices row (which pushed the room
+              -- list and the roster down).
+              test "open panel sits in the conversation column, not the notices row" <|
+                \_ ->
+                    let
+                        open =
+                            Tuple.first (update SearchOpen channelModel)
+                    in
+                    Expect.all
+                        [ \q ->
+                            q
+                                |> Query.find [ Selector.class "onyx-main" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "role" "search") ]
+                        , \q ->
+                            q
+                                |> Query.find [ Selector.class "onyx-notices" ]
+                                |> Query.hasNot [ Selector.attribute (Attr.attribute "role" "search") ]
+                        ]
+                        (query open)
+            , test "the find row carries the query, previous, next and close" <|
+                \_ ->
+                    let
+                        open =
+                            Tuple.first (update SearchOpen channelModel)
+                    in
+                    query open
+                        |> Query.find [ Selector.class "onyx-message-search__surface" ]
+                        |> Expect.all
+                            [ Query.has [ Selector.class "onyx-message-search__input" ]
+                            , Query.has [ Selector.attribute (Attr.attribute "aria-label" "Previous match") ]
+                            , Query.has [ Selector.attribute (Attr.attribute "aria-label" "Next match") ]
+                            , Query.has [ Selector.attribute (Attr.attribute "aria-label" "Close search") ]
+                            ]
             , test "typing filters and navigation steps through matches" <|
                 \_ ->
                     let

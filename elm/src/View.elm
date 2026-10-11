@@ -269,12 +269,6 @@ appFrame model =
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
-                ++ (if model.searchOpen then
-                        [ panel model ]
-
-                    else
-                        []
-                   )
             )
          ]
             ++ (if model.callsOpen then
@@ -285,11 +279,22 @@ appFrame model =
                 else
                     [ rail model
                     , main_ [ class "onyx-main" ]
-                        [ roomHeader model
-                        , View.Polish.timeScrubber model -- v3/polish
-                        , thread model
-                        , composer model
-                        ]
+                        ([ roomHeader model ]
+                            -- v3/rx-convo: message search belongs to the conversation it
+                            -- searches: it opens under the room header, in the main column
+                            -- (it used to sit in the full-width notices row and pushed the
+                            -- room list and the roster down with it).
+                            ++ (if model.searchOpen then
+                                    [ panel model ]
+
+                                else
+                                    []
+                               )
+                            ++ [ View.Polish.timeScrubber model -- v3/polish
+                               , thread model
+                               , composer model
+                               ]
+                        )
                     , roster model
                     ]
                )
