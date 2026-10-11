@@ -323,6 +323,40 @@ test("suggestions: channel and nick shaping", () => {
   assert.equal(P.nickSuggestion("🙂"), "");
 });
 
+/* Hostile lines: long runs of whitespace / separators after every
+   supported log head used to send the pipe-table and HexChat patterns
+   cubic (6,000 spaces took ~96 s). Every shape must now stay linear. */
+test("pathological log lines stay linear-time (no regex blow-up)", () => {
+  const heads = ["2024-01-02 10:00:00\t", "2024-01-02 10:00  ", "10:00 ", "10:00  * ", "[10:00] ", "[10:00] <", "[10:00:00] ", "Jan 02 10:00:00 ",
+    "[2024-01-02T10:00:00Z] ", "10:00 <@", "10:00 * ", "--- Log opened "];
+  const fills = [" ", "\t", "<", "-", "[", "|", "* ", "a "];
+  const started = Date.now();
+  for (const head of heads) {
+    for (const fill of fills) {
+      const line = head + fill.repeat(Math.ceil(40000 / fill.length)) + "\n";
+      const acc = P.accumulator("irc");
+      const scanner = P.ircLog(acc, { name: "x.log", size: line.length, lastModified: 0 });
+      const t0 = Date.now();
+      scanner.push(line); scanner.push(""); scanner.end();
+      assert.ok(Date.now() - t0 < 1500, `${JSON.stringify(head)} + ${JSON.stringify(fill)} took ${Date.now() - t0}ms`);
+    }
+  }
+  assert.ok(Date.now() - started < 20000);
+});
+
+test("pathological Slack markup stays linear-time", async () => {
+  const text = "<http://".repeat(14000) + " <@U1|".repeat(10000);
+  const files = [
+    new File([JSON.stringify([{ id: "C1", name: "general" }])], "channels.json"),
+    new File([JSON.stringify([{ id: "U1", name: "ana" }])], "users.json"),
+    new File([JSON.stringify([{ type: "message", user: "U1", text, ts: "1704189600.000100" }])], "general/2024-01-02.json"),
+  ];
+  const t0 = Date.now();
+  const { result } = await run("slack", ["channels.json", "users.json", "general/2024-01-02.json"], files);
+  assert.ok(Date.now() - t0 < 4000, `took ${Date.now() - t0}ms`);
+  assert.equal(result.messages, 1);
+});
+
 test("the worker source is self-contained and evaluates", () => {
   const src = H.workerSource();
   const posted = [];

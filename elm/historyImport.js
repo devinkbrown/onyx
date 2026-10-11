@@ -465,12 +465,12 @@
       }
       function rewrite(text) {
         return text
-          .replace(/<@([A-Z0-9]+)(?:\|([^>]*))?>/g, function (all, id, label) { var n = userName(id) || wireToken(label, MAX_SENDER); return n ? "@" + n : all; })
-          .replace(/<#([A-Z0-9]+)(?:\|([^>]*))?>/g, function (all, id, label) { var e = channelIds.get(id); var n = (e && e.name) || label; return n ? "#" + n : all; })
-          .replace(/<!(here|channel|everyone)(?:\|[^>]*)?>/g, "@$1")
-          .replace(/<(https?:\/\/[^|>\s]+)\|([^>]*)>/g, function (all, url, label) { return label && label !== url ? label + " (" + url + ")" : url; })
-          .replace(/<(https?:\/\/[^>\s]+)>/g, "$1")
-          .replace(/<mailto:[^|>]+\|([^>]*)>/g, "$1")
+          .replace(/<@([A-Z0-9]+)(?:\|([^<>]*))?>/g, function (all, id, label) { var n = userName(id) || wireToken(label, MAX_SENDER); return n ? "@" + n : all; })
+          .replace(/<#([A-Z0-9]+)(?:\|([^<>]*))?>/g, function (all, id, label) { var e = channelIds.get(id); var n = (e && e.name) || label; return n ? "#" + n : all; })
+          .replace(/<!(here|channel|everyone)(?:\|[^<>]*)?>/g, "@$1")
+          .replace(/<(https?:\/\/[^|<>\s]+)\|([^<>]*)>/g, function (all, url, label) { return label && label !== url ? label + " (" + url + ")" : url; })
+          .replace(/<(https?:\/\/[^<>\s]+)>/g, "$1")
+          .replace(/<mailto:[^|<>]+\|([^<>]*)>/g, "$1")
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
       }
       function messagesInto(c, channelId, list) {
@@ -602,6 +602,24 @@
     var SYSTEM_LINE = /^(?:-!-|-->|<--|--|\*\*\*|=!=)(?:\s|$)|^\*\s+(?:Joins|Parts|Quits|Topic is|Set by|Now talking in|Disconnected|Attempting|Retrieving|Rejoined)\b|^\*\s+\S+\s+(?:is now known as|sets mode|changes topic to|has (?:joined|left|quit)|was kicked)\b/;
     var SYSTEM_MARKER = /^(?:-!-|-->|<--|--|=!=|\*\*\*)$/;
 
+    /* Linear-time splitters for the two table-shaped log formats. A
+       single-character-class search plus slices: no pattern here can
+       backtrack across the line more than once. */
+    function pipeSplit(text) {
+      var at = text.search(/\s\|\s/);
+      if (at < 1) return null;
+      var sep = text.slice(0, at).trim();
+      return sep ? { sep: sep, rest: text.slice(at + 3) } : null;
+    }
+
+    function tabSplit(text) {
+      var at = text.indexOf("\t");
+      return at < 0 ? null : { sep: text.slice(0, at), rest: text.slice(at + 1) };
+    }
+
+    var ISO_PIPE_HEAD = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?\s{2,}/;
+    var HEXCHAT_HEAD = /^([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+/;
+
     /* → { from, text, type } | "system" | null. */
     function lineBody(marker, rest) {
       if (marker !== null) {
@@ -666,23 +684,23 @@
         var marker = /^(?:---\s+(?:Log opened|Day changed)|Session (?:Start|Time):|\*\*\*\*\s+BEGIN LOGGING AT)\s+(.*)$/i.exec(line);
         if (marker) { var dm = dayFromWords(marker[1]); if (dm) { day = dm; lastTod = null; } return; }
         if (/^(?:---\s+Log closed|Session Close:|\*\*\*\*\s+ENDING LOGGING)/i.test(line)) return;
-        var date = null, zone = "", t = null, sep = null, rest = null, m;
+        var date = null, zone = "", t = null, sep = null, rest = null, m, split;
         if ((m = /^\[?(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?\]?\t([^\t]*)\t([\s\S]*)$/.exec(line))) {
           date = validDay(+m[1], +m[2], +m[3]); t = clock(m[4], m[5], m[6]); zone = m[7] || ""; sep = m[8]; rest = m[9];
           if (!date) { acc.skipped += 1; return; }
-        } else if ((m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?\s{2,}(.+?)\s+\|\s([\s\S]*)$/.exec(line))) {
-          date = validDay(+m[1], +m[2], +m[3]); t = clock(m[4], m[5], m[6]); sep = m[7]; rest = m[8];
+        } else if ((m = ISO_PIPE_HEAD.exec(line)) && (split = pipeSplit(line.slice(m[0].length)))) {
+          date = validDay(+m[1], +m[2], +m[3]); t = clock(m[4], m[5], m[6]); sep = split.sep; rest = split.rest;
           if (!date) { acc.skipped += 1; return; }
         } else if ((m = /^\[?(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?\]?\s+([\s\S]+)$/.exec(line))) {
           date = validDay(+m[1], +m[2], +m[3]); t = clock(m[4], m[5], m[6]); zone = m[7] || ""; rest = m[8];
           if (!date) { acc.skipped += 1; return; }
-        } else if ((m = /^([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+([^\t]*)\t([\s\S]*)$/.exec(line))) {
+        } else if ((m = HEXCHAT_HEAD.exec(line)) && (split = tabSplit(line.slice(m[0].length)))) {
           // HexChat "Jan 02 10:00:00 <nick>\tmessage": the year comes from
           // the BEGIN LOGGING line (else the file date).
           var base = day || fileDay;
           if (!base) acc.datesEstimated = true;
           date = validDay(base ? base.y : 2000, MONTHS[m[1].toLowerCase()] || 0, +m[2]);
-          t = clock(m[3], m[4], m[5]); sep = m[6]; rest = m[7];
+          t = clock(m[3], m[4], m[5]); sep = split.sep; rest = split.rest;
           if (!date) { acc.skipped += 1; return; }
         } else if ((m = /^\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]\s+([\s\S]+)$/.exec(line))) {
           t = clock(m[1], m[2], m[3]); rest = m[4];
