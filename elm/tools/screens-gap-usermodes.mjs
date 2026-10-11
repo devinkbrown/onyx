@@ -197,17 +197,144 @@ async function scrollSheet(page, h, sel) {
   await h.settle(page, 200);
 }
 
+async function openTab(page, h, id) {
+  await clickVisible(page, [`#pref-category-tab-${id}`], h);
+}
+
+async function openNotify(page, h) {
+  await openYou(page, h);
+  await clickVisible(page, ['[data-testid="shell-notifications"]'], h);
+}
+
+async function openInbox(page, h) {
+  if (isPhone(page)) await clickVisible(page, ['[data-testid="room-back"]'], h);
+  await clickVisible(page, ['[data-testid="inbox-bell"]'], h);
+}
+
+async function dm(page, h, inject, from, text = 'hey, got a minute?') {
+  await inject(`@time=${new Date().toISOString()} :${from}!u@${NET} PRIVMSG kn :${text}`);
+}
+
 export default {
   ...shell,
-  'um-base-prefs': async (page, h) => { await boot(page, h); await openPrefs(page, h); },
-  'um-base-notify': async (page, h) => { await boot(page, h, { account: 'kn' }); await palette(page, h, 'Notifications'); await scrollSheet(page, h); },
-  'um-base-inbox': async (page, h) => { await boot(page, h); await clickVisible(page, ['[data-testid="inbox-bell"]'], h); },
-  'um-base-account': async (page, h) => { await boot(page, h, { account: 'kn' }); await openYou(page, h); await clickVisible(page, ['[data-testid="you-open-account"]'], h); },
-  'um-base-schedule': async (page, h) => {
+  'um-privacy': async (page, h) => {
+    await boot(page, h, { account: 'kn', modes: ['x', 'R', 'i'] });
+    await openPrefs(page, h);
+    await openTab(page, h, 'privacy');
+  },
+  'um-privacy-approve': async (page, h) => {
+    const inject = await boot(page, h, { account: 'kn', modes: ['x', 'g'], accepts: ['alice', 'bo'] });
+    await dm(page, h, inject, 'carol');
+    await dm(page, h, inject, 'dave');
+    await openPrefs(page, h);
+    await openTab(page, h, 'privacy');
+    await scrollSheet(page, h, '.pref-category-content');
+  },
+  'um-privacy-guest': async (page, h) => {
+    await boot(page, h, { modes: ['x'] });
+    await openPrefs(page, h);
+    await openTab(page, h, 'privacy');
+  },
+  'um-requests': async (page, h) => {
+    const inject = await boot(page, h, { account: 'kn', modes: ['x', 'g'] });
+    await inject(`:${NET} 718 kn mira u@cloak-3.${NET} :is messaging you, and you have umode +g set. Use ACCEPT to allow`);
+    await inject(`:${NET} 718 kn tobias u@cloak-9.${NET} :is messaging you, and you have umode +g set. Use ACCEPT to allow`);
+    await openInbox(page, h);
+  },
+  'um-dm-note': async (page, h) => {
+    const inject = await boot(page, h, { account: 'kn' });
+    await dm(page, h, inject, 'mira');
+    await clickVisible(page, ['[data-testid="room-back"]'], h).catch(() => {});
+    await slash(page, h, '/query mira');
+    await inject(`:${NET} 716 kn mira :is in +g mode (must be accepted)`, `:${NET} 717 kn mira :has been informed that you messaged them`);
+  },
+  'um-memo': async (page, h) => {
+    await boot(page, h, {
+      account: 'kn',
+      memos: [{ from: 'mira', text: 'Call me when you are back — the venue confirmed Friday.' }, { from: 'jun', text: 'Left the keys with the front desk.' }],
+    });
+    await openInbox(page, h);
+    await clickVisible(page, ['[data-testid="inbox-offline-messages"]'], h);
+    await h.settle(page, 500);
+  },
+  'um-memo-send': async (page, h) => {
+    await boot(page, h, { account: 'kn' });
+    await openInbox(page, h);
+    await clickVisible(page, ['[data-testid="inbox-offline-messages"]'], h);
+    await page.evaluate(() => document.querySelectorAll('.um-memo details').forEach((d) => { d.open = true; }));
+    await page.fill('#um-memo-to', 'mira');
+    await page.fill('#um-memo-text', 'Running ten minutes late.');
+    await h.settle(page, 300);
+  },
+  'um-blocks': async (page, h) => {
+    const inject = await boot(page, h, { account: 'kn', silence: ['zed!*@*', '*!*@spam.example'] });
+    await inject(`:${NET} 005 kn SILENCE=32 :are supported`);
+    await slash(page, h, '/ignore bob');
+    await slash(page, h, '/ignore carol');
+    await openNotify(page, h);
+    await page.evaluate(() => { const el = document.getElementById('pref-ignored-users-title'); if (el) el.scrollIntoView({ block: 'start' }); });
+    await h.settle(page, 300);
+    await clickVisible(page, ['[data-testid="um-serverignore"]'], h);
+    await page.evaluate(() => { const el = document.getElementById('pref-ignored-users-title'); if (el) el.scrollIntoView({ block: 'start' }); });
+    await h.settle(page, 300);
+  },
+  'um-blocks-guest': async (page, h) => {
+    await boot(page, h, {});
+    await slash(page, h, '/ignore bob');
+    await openNotify(page, h);
+    await page.evaluate(() => { const el = document.getElementById('pref-ignored-users-title'); if (el) el.scrollIntoView({ block: 'start' }); });
+    await h.settle(page, 300);
+  },
+  'um-account': async (page, h) => {
+    await boot(page, h, { account: 'kn', autojoin: ['#lounge', '#design', '#elm'] });
+    await openYou(page, h);
+    await clickVisible(page, ['[data-testid="you-open-account"]'], h);
+    await page.evaluate(() => { const el = document.getElementById('acct-autojoin-title'); if (el) el.scrollIntoView({ block: 'start' }); });
+    await h.settle(page, 400);
+  },
+  'um-selfname': async (page, h) => {
+    await boot(page, h, { account: 'kn' });
+    await page.evaluate(() => { const btn = [...document.querySelectorAll('button')].find((b) => /^kn$/.test((b.textContent || '').trim()) || /kn/.test(b.getAttribute('aria-label') || '')); if (btn) btn.click(); });
+    await h.settle(page, 500);
+  },
+  'um-offline-profile': async (page, h) => {
+    await boot(page, h, { offline: ['wren'], account: 'kn' });
+    await slash(page, h, '/whois wren');
+    await h.settle(page, 900);
+  },
+  'um-schedule': async (page, h) => {
     await boot(page, h, { account: 'kn' });
     await page.fill('#shell-composer-input', 'see you at six');
     await h.tryClick(page, '[data-testid="composer-more-tools"]');
     await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await h.settle(page, 400);
   },
-  'um-base-profile': async (page, h) => { await boot(page, h, { offline: ['wren'] }); await slash(page, h, '/whois wren'); },
+  'um-schedule-server': async (page, h) => {
+    await boot(page, h, { account: 'kn' });
+    await page.fill('#shell-composer-input', 'see you at six');
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await clickVisible(page, ['[data-testid="um-where-server"]'], h);
+    await h.settle(page, 300);
+  },
+  'um-schedule-guest': async (page, h) => {
+    await boot(page, h, {});
+    await page.fill('#shell-composer-input', 'see you at six');
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await h.settle(page, 400);
+  },
+  'um-held': async (page, h) => {
+    await boot(page, h, { account: 'kn' });
+    await page.fill('#shell-composer-input', 'see you at six');
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await clickVisible(page, ['[data-testid="um-where-server"]'], h);
+    await clickVisible(page, ['.onyx-schedule-preset'], h);
+    await h.settle(page, 500);
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await clickVisible(page, ['.onyx-schedule-view'], h);
+    await h.settle(page, 400);
+  },
 };

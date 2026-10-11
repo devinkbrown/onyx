@@ -44606,7 +44606,17 @@ settleStepUserModes msg prior ( model, outs ) =
             case owner of
                 Just o ->
                     if owner /= closed.userModesOwner then
-                        ( { closed | userModesOwner = owner, userModes = UserModes.clearOwned closed.userModes }
+                        ( { closed
+                            | userModesOwner = owner
+                            , userModes =
+                                -- The first owner starts from nothing; a new
+                                -- owner must not inherit the previous one's.
+                                if closed.userModesOwner == Nothing then
+                                    closed.userModes
+
+                                else
+                                    UserModes.clearOwned closed.userModes
+                          }
                         , [ UserModesRequest { serverUrl = o.serverUrl, identity = o.identity } ]
                         )
 
@@ -44633,6 +44643,11 @@ settleStepUserModes msg prior ( model, outs ) =
                     []
                 , if loading.accountOpen && not prior.accountOpen then
                     [ UserModes.AutojoinRefresh ]
+
+                  else
+                    []
+                , if loading.showNotificationCenter && not prior.showNotificationCenter && loading.userModes.requestsUnseen > 0 then
+                    [ UserModes.RequestsSeen ]
 
                   else
                     []

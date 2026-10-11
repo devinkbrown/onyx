@@ -1016,8 +1016,6 @@ clearOwned state =
         , memoForward = Nothing
         , memoForwardKnown = False
         , memoIgnores = []
-        , requests = []
-        , requestsUnseen = 0
     }
 
 
