@@ -21,7 +21,7 @@
  *   node elm/tools/css-regress.mjs noise --out /tmp/rx/n1   # shoot twice, diff: proves determinism
  *   node elm/tools/css-regress.mjs list                     # the matrix, with shot counts
  *
- * What gets shot (elm/tools/screens-css-regress.mjs `SET`; ~600 shots):
+ * What gets shot (elm/tools/screens-css-regress.mjs `SET`; 635 shots + ~100 keyboard-focus / hover state PNGs = 735 files):
  *   core    every shell surface at all 15 matrix viewports (se … ultrawide-qhd)
  *   sheets  every sheet/overlay/call/gap surface at phone, phone-land, desktop
  *   public  public + connect pages, FULL PAGE, DPR 1, at se/phone/tablet/desktop/ultrawide
@@ -31,9 +31,9 @@
  *   keyboard-focus tours and hover states that write extra PNGs.
  *
  * Determinism (so a non-zero diff always means a CSS change): screens.mjs is
- * run with --freeze (the fake server's timestamps AND the page clock are fixed,
- * TZ=UTC, locale en-US, the node-side scenario clock frozen too, a stable
- * port per job), --stable (animations disabled, caret hidden; it
+ * run with --freeze (the fake server's timestamps and the node-side scenario
+ * clock are fixed, every page load starts its Date at the same instant,
+ * TZ=UTC, locale en-US, a stable port per job), --stable (animations disabled, caret hidden; it
  * already emulates prefers-reduced-motion). `noise` shoots twice and diffs, so
  * flaky scenarios are visible before they can fool a refactor; flaky shots
  * can be excluded with --skip name,name (matched against file-name prefixes).
@@ -46,6 +46,16 @@
  * --only substr (filter file names), --noise A B (two baseline runs of the
  * same build: pixels where A and B differ, dilated 3px, are ignored, so a
  * flaky shot only fails on changes OUTSIDE its own flaky regions).
+ *
+ * Flakes: a few scenarios are not deterministic however carefully the run is
+ * pinned (the message-search panel, a toast racing the screenshot, call
+ * timers, the animated scene canvas, a sticky header in a full-page shot). The
+ * workflow that keeps them from fooling a refactor: shoot the baseline TWICE
+ * and pass both to every diff as `--noise A B`; use `--tolerance 3` (canvas
+ * dither is 1-2 levels); and re-shoot any remaining shot with `--only-list
+ * scenario__file`: a flake gives the same pixel count / region again against
+ * the SAME build, a real change does not. Chasing a diff down to a flake is
+ * the expected cost of a 735-shot suite, not a sign the harness is wrong.
  *
  * Needs: the system Chromium and playwright-core from the repo's pnpm store
  * (same lookup as screens.mjs); the PNG codec is playwright-core's bundled
