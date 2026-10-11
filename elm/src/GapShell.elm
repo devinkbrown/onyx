@@ -122,7 +122,6 @@ type Msg
     | JoinNameSubmit
     | MotdDismiss
     | MotdToggle
-    | ConnectSignInAs String
     | ShellEventReceived Decode.Value
 
 

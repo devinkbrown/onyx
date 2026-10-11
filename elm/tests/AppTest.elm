@@ -10504,7 +10504,7 @@ suite =
                     , \_ -> Expect.equal Dict.empty m4.pendingSeals
                     ]
                     ()
-        , test "DmSealFailed with keyChanged flags silently" <|
+        , test "DmSealFailed with keyChanged flags once with the oracle toast and keeps the text" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -10519,8 +10519,11 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [] (withoutSafetyLoads outbound)
                     , \_ -> Expect.equal True (Set.member "dave" m3.peerKeyChanges)
-                    , \_ -> Expect.equal [] m3.toasts
+                    , -- v3/gap-pwa-safety: `_flagPeerKeyChange` toasts once per change
+                      \_ -> Expect.equal [ "Encryption key changed" ] (List.map .title m3.toasts)
                     , \_ -> Expect.equal Dict.empty m3.pendingSeals
+                    , -- v3/gap-pwa-safety: the held text returns to the draft
+                      \_ -> Expect.equal "hi dave" m3.composer
                     ]
                     ()
         , test "DmSealFailed without keyChanged toasts verbatim" <|
@@ -17549,8 +17552,10 @@ suite =
 
                             ( m7, out7 ) =
                                 -- An aliased 900 reclaims the account
-                                -- nick at once; nothing else may escape
-                                -- this publisher-failure vector.
+                                -- nick at once; nothing else may reach
+                                -- the wire from this publisher-failure
+                                -- vector (v3/gap-pwa-safety: the login's
+                                -- push reconcile is a local browser read).
                                 feed m6 ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
                         in
                         Expect.all
@@ -17561,7 +17566,7 @@ suite =
                             , \_ -> Expect.equal True (List.any isAddLine out5)
                             , \_ -> Expect.equal (Just GroupPublisher.ServerRejected) m6.publisher.failure
                             , \_ -> Expect.equal [] out6
-                            , \_ -> Expect.equal [ SendLine "NICK alice\r\n" ] out7
+                            , \_ -> Expect.equal [ SendLine "NICK alice\r\n", WebPushCheckActive { serverUrl = "wss://irc.example", account = "alice" } ] out7
                             ]
                             ()
                 , test "socket close invalidates the pending publication" <|
@@ -19344,7 +19349,7 @@ suite =
                         [ \_ -> Expect.equal [] outbound
                         , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
                         , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        , \_ -> Expect.equal [ "Encryption key changed", "Scheduled admission uncertain" ] (List.map .title m1.toasts)
                         ]
                         ()
             , test "scheduled seal failure holds the claim uncertain" <|
@@ -19388,7 +19393,7 @@ suite =
                         , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
                         , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
                         , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        , \_ -> Expect.equal [ "Encryption key changed", "Scheduled admission uncertain" ] (List.map .title m1.toasts)
                         ]
                         ()
             ]
@@ -23459,28 +23464,54 @@ suite =
                         , \_ -> Expect.equal False next.webPushOn
                         ]
                         ()
-            , test "login reconciles push only for opt-ins" <|
+            , test "login reconciles push for every signed-in owner (the bit boots off; ports keep it opt-in)" <|
                 \_ ->
                     let
                         ( signedOut, outSignedOut ) =
                             requestWebPushCheck blank
 
-                        ( optedOut, outOptedOut ) =
+                        ( _, outAfterReload ) =
                             requestWebPushCheck pushLive
 
-                        ( optedIn, outOptedIn ) =
+                        ( _, outOptedIn ) =
                             requestWebPushCheck { pushLive | webPushOn = True }
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] outSignedOut
                         , \_ -> Expect.equal False signedOut.webPushOn
-                        , \_ -> Expect.equal [] outOptedOut
+                        , \_ ->
+                            Expect.equal
+                                [ WebPushCheckActive { serverUrl = "wss://irc.example", account = "kai" } ]
+                                outAfterReload
                         , \_ ->
                             Expect.equal
                                 [ WebPushCheckActive { serverUrl = "wss://irc.example", account = "kai" } ]
                                 outOptedIn
                         ]
                         ()
+            , test "after a reload the active check recovers an opted-in owner silently" <|
+                \_ ->
+                    let
+                        ( next, out ) =
+                            update (WebPushActiveState { active = False, intentDesired = True }) pushLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False next.webPushOn
+                        , \_ ->
+                            case out of
+                                [ WebPushRecover r ] ->
+                                    Expect.equal ( r.serverUrl, r.account ) ( "wss://irc.example", "kai" )
+
+                                other ->
+                                    Expect.fail (Debug.toString other)
+                        ]
+                        ()
+            , test "a browser that still holds this owner's endpoint shows push on after a reload" <|
+                \_ ->
+                    update (WebPushActiveState { active = True, intentDesired = True }) pushLive
+                        |> Tuple.first
+                        |> .webPushOn
+                        |> Expect.equal True
             ]
         , describe "webhooks"
             [ test "create sends WEBHOOK CREATE with the trimmed name" <|

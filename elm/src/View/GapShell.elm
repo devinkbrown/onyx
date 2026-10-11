@@ -1,6 +1,5 @@
 module View.GapShell exposing
     ( activitySheet
-    , connectAction
     , leaveConfirm
     , motdCard
     , railExtras
@@ -25,8 +24,6 @@ module View.GapShell exposing
     `HarborConfirmSheet` copy and ids).
   - `motdCard` — the server's message of the day and onboarding
     welcome pack on Home, dismissible for the day.
-  - `connectAction` — "Sign in as X" under the connect gate's status
-    when the name belongs to an account.
 
 -}
 
@@ -633,28 +630,3 @@ motdCard model =
                     , ul [ class "gs-motd-pack-list" ] (List.map (\line -> li [] [ text line ]) pack)
                     ]
             ]
-
-
-
--- CONNECT GATE
-
-
-{-| "Sign in as X" when the chosen name belongs to an account. -}
-connectAction : Model -> Html Msg
-connectAction model =
-    case ( App.connectPhase model, model.gapShell.connectFailure, model.connectForm.mode ) of
-        ( App.ConnectError, Just (FailRegisteredNick nick), mode ) ->
-            if mode == App.ConnectSignIn then
-                text ""
-
-            else
-                button
-                    [ type_ "button"
-                    , class "conn-link gs-conn-signin"
-                    , attribute "data-testid" "conn-signin-as"
-                    , onClick (gap (GapShell.ConnectSignInAs nick))
-                    ]
-                    [ text ("Sign in as " ++ nick) ]
-
-        _ ->
-            text ""

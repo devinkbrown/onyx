@@ -1,10 +1,9 @@
-/* v3/gap-shell smoke — the browser lifecycle bridge (`wireGapShell`:
-   boot state, offline/online, bfcache restore and freeze/resume each
-   becoming one `shellEvent`), the single allowlisted `onyx:*` device
-   value, the Start-a-room "next hang" label, and the roving arrow keys
-   of the rail and the room More menu (mirroring the oracle
-   `connectPageLifecycle.ts`, the store's OS network listeners and the
-   `ChannelSidebar` / `PresenceRibbon` menus).
+/* v3/gap-shell smoke — the browser connectivity bridge (`wireGapShell`:
+   boot state and offline/online each becoming one `shellEvent`), the
+   single allowlisted `onyx:*` device value, the Start-a-room "next hang"
+   label, and the roving arrow keys of the rail and the room More menu
+   (mirroring the store's OS network listeners and the `ChannelSidebar` /
+   `PresenceRibbon` menus). Page restore belongs to v3/gap-pwa-safety.
    Run with: node --test elm/gapShell.smoke.mjs */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -88,28 +87,13 @@ test("offline and online become one event each", () => {
   assert.deepEqual(events.slice(1), [{ event: "offline", online: false }, { event: "online", online: true }]);
 });
 
-test("a bfcache restore reports once; a plain pageshow does not", () => {
-  const { events, win } = bridge();
-  win.dispatch("pageshow", { persisted: false });
-  assert.equal(events.length, 1, "first load is not a restore");
+test("page restore is gap-pwa-safety's job: no second restore signal from here", () => {
+  const { events, win, doc } = bridge();
   win.dispatch("pagehide", { persisted: true });
   win.dispatch("pageshow", { persisted: true });
-  win.dispatch("pageshow", { persisted: true });
-  assert.deepEqual(events.slice(1), [{ event: "restored" }], "the duplicate pageshow is dropped");
-  win.dispatch("pagehide", { persisted: true });
-  win.dispatch("pageshow", { persisted: true });
-  assert.equal(events.length, 3, "the next trip reports again");
-});
-
-test("freeze then resume reports a restore; a resume with no freeze does not", () => {
-  const { events, doc } = bridge();
-  doc.dispatch("resume");
-  assert.equal(events.length, 1);
   doc.dispatch("freeze");
   doc.dispatch("resume");
-  assert.deepEqual(events.slice(1), [{ event: "restored" }]);
-  doc.dispatch("resume");
-  assert.equal(events.length, 2, "one restore per freeze");
+  assert.equal(events.length, 1, "only the boot event: restoring is not announced twice");
 });
 
 test("the device store writes only the allowlisted key and caps the value", () => {

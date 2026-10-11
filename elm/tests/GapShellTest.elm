@@ -212,7 +212,7 @@ signIn =
                         step (WsClosed { clean = True, reason = "" }) refused
 
                     signIn_ =
-                        step (GapShellMsg (GapShell.ConnectSignInAs "kai")) closed
+                        step ConnectSignInAs closed
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ WsDisconnect ] out
@@ -624,23 +624,6 @@ lifecycle =
                     , \_ -> Expect.equal False back.gapShell.browserOffline
                     ]
                     ()
-        , test "a restored page with a live socket reconnects now" <|
-            \_ ->
-                let
-                    ( restored, out ) =
-                        update (shellEvent "restored" []) { settledLive | connection = Live }
-
-                    ( _, closeOut ) =
-                        update (WsClosed { clean = False, reason = "" }) restored
-                in
-                Expect.all
-                    [ \_ -> Expect.equal [ WsDisconnect ] out
-                    , \_ -> Expect.equal True (hasWsConnect closeOut)
-                    ]
-                    ()
-        , test "a restored page that was already offline redials" <|
-            \_ ->
-                Expect.equal True (hasWsConnect (Tuple.second (update (shellEvent "restored" []) { settledLive | connection = Offline })))
         , test "boot carries online state, the hang label and the MOTD dismissal" <|
             \_ ->
                 let
@@ -888,13 +871,20 @@ views =
                     |> query
                     |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "harbor-confirm") ]
                     |> Query.has [ Selector.text "Leave #lounge?" ]
-        , test "the connect gate offers Sign in as for a registered name" <|
+        , test "the connect gate says the name is registered and offers Sign in as" <|
             \_ ->
-                { gate | connection = Registering }
-                    |> feedM ":s 432 kai kai :Nickname is registered; authenticate as this account before using it"
-                    |> step (WsClosed { clean = True, reason = "" })
-                    |> query
-                    |> Query.has [ Selector.attribute (Html.Attributes.attribute "data-testid" "conn-signin-as"), Selector.text "Sign in as kai" ]
+                let
+                    gateQuery =
+                        { gate | connection = Registering }
+                            |> feedM ":s 432 kai kai :Nickname is registered; authenticate as this account before using it"
+                            |> step (WsClosed { clean = True, reason = "" })
+                            |> query
+                in
+                Expect.all
+                    [ \q -> Query.has [ Selector.text "belongs to an account" ] q
+                    , \q -> Query.has [ Selector.attribute (Html.Attributes.attribute "data-testid" "conn-signin-as"), Selector.text "Sign in as kai" ] q
+                    ]
+                    gateQuery
         , test "the Activity sheet renders the log" <|
             \_ ->
                 settledLive

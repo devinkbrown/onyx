@@ -12,8 +12,9 @@ state; no focus juggling (buttons stay natively keyboard-reachable).
 
 import App exposing (Msg(..))
 import Html exposing (Html, a, dd, div, dl, dt, h1, h2, li, nav, p, section, span, text, ul)
-import Html.Attributes exposing (attribute, class, href, id)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (attribute, class, href, id, tabindex)
+import Html.Events exposing (onClick, preventDefaultOn)
+import Json.Decode as Decode
 
 
 type alias BoardRoute =
@@ -89,6 +90,22 @@ activeRoute tab =
             , href = "/invite?join=%23root"
             , note = "The room link opens with the public room ready; this page does not show who is online."
             }
+
+
+{-| Arrow / Home / End on a board tab (other keys keep their default). -}
+onTabKey : Html.Attribute Msg
+onTabKey =
+    preventDefaultOn "keydown"
+        (Decode.field "key" Decode.string
+            |> Decode.andThen
+                (\key ->
+                    if List.member key [ "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End" ] then
+                        Decode.succeed ( BoardTabKey { key = key }, True )
+
+                    else
+                        Decode.fail "not a roving key"
+                )
+        )
 
 
 {-| Decorative room sketch beside the hero: an illustration of a
@@ -207,17 +224,23 @@ landing tab =
             , div [ class "onyx-land-tabs", attribute "role" "tablist", attribute "aria-label" "Choose a first-room route" ]
                 (List.map
                     (\route ->
+                        -- v3/rx-public: roving tabindex; Arrow / Home /
+                        -- End move selection and focus together.
                         Html.button
                             [ attribute "role" "tab"
                             , attribute "type" "button"
+                            , id ("board-tab-" ++ route.id)
+                            , attribute "aria-controls" "board-panel"
                             , attribute "aria-selected" (if route.id == active.id then "true" else "false")
+                            , tabindex (if route.id == active.id then 0 else -1)
                             , onClick (SelectBoardTab route.id)
+                            , onTabKey
                             ]
                             [ text route.tab ]
                     )
                     boardRoutes
                 )
-            , div [ class "onyx-land-panel", attribute "role" "tabpanel" ]
+            , div [ class "onyx-land-panel", id "board-panel", attribute "role" "tabpanel", attribute "aria-labelledby" ("board-tab-" ++ active.id) ]
                 [ div [ class "onyx-land-panel-copy" ]
                     [ h2 [ class "onyx-land-h3" ] [ text active.title ]
                     , p [] [ text active.copy ]
