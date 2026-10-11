@@ -16,7 +16,7 @@ import App exposing (ConnectionState(..), Model, Msg(..), StewardView, stewardMe
 import GapPeople
 import Dict
 import Html exposing (Html, button, div, h2, h3, input, label, li, option, p, section, select, span, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, value)
+import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, selected, value)
 import Html.Events exposing (onClick, onInput)
 import Stewardship
 import View.Sheet as Sheet
@@ -350,9 +350,9 @@ transferSection model view =
                                 , value model.stewardSuccessor
                                 , onInput StewardSuccessorInput
                                 ]
-                                (option [ value "" ] [ text "Choose a person" ]
+                                (option [ value "", selected (model.stewardSuccessor == "") ] [ text "Choose a person" ]
                                     :: List.map
-                                        (\member -> option [ value member.nick ] [ text member.nick ])
+                                        (\member -> option [ value member.nick, selected (model.stewardSuccessor == member.nick) ] [ text member.nick ])
                                         (transferCandidates model view)
                                 )
                             , div [ class "onyx-steward-actions" ]

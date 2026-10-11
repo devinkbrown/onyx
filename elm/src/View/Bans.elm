@@ -14,7 +14,7 @@ get the read-only fallback.
 import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
 import Dict
 import Html exposing (Html, button, code, div, h4, input, label, li, option, p, section, select, span, text, ul)
-import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, type_, value)
+import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, selected, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
 import GapPeople
 import ModAuthority
@@ -180,7 +180,7 @@ addFormFields _ channel live form =
                     text ""
 
                  else
-                    p [ class "moderation-cockpit__hint", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
+                    p [ class "moderation-cockpit__hint moderation-desk__error", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
                         [ text form.error ]
                , div [ class "onyx-steward-actions" ]
                     [ button
@@ -211,7 +211,7 @@ extBuilder form =
             , onInput BanAddExtType
             ]
             (List.map
-                (\t -> option [ value (String.fromChar t) ] [ text (Modes.extBanTypeLabel t) ])
+                (\t -> option [ value (String.fromChar t), selected (form.extType == String.fromChar t) ] [ text (Modes.extBanTypeLabel t) ])
                 (String.toList Modes.extBanTypes)
             )
         , label [ class "onyx-steward-label", for "ban-add-ext-pattern" ] [ text "Pattern" ]
@@ -558,8 +558,10 @@ deskMemberForm model channel live =
             , onInput ModerationDeskMember
             , value desk.member
             ]
-            (option [ value "" ] [ text "Choose a member" ]
-                :: List.map (\nick -> option [ value nick ] [ text nick ]) candidates
+            -- `selected` on the options too: a select whose `value` is set
+            -- before its options exist can paint blank.
+            (option [ value "", selected (desk.member == "") ] [ text "Choose a member" ]
+                :: List.map (\nick -> option [ value nick, selected (desk.member == nick) ] [ text nick ]) candidates
             )
          , select
             [ id "desk-action-select"
@@ -570,7 +572,7 @@ deskMemberForm model channel live =
             , value desk.action
             ]
             (List.map
-                (\kind -> option [ value (Moderation.kindToString kind) ] [ text (Moderation.kindLabel kind) ])
+                (\kind -> option [ value (Moderation.kindToString kind), selected (desk.action == Moderation.kindToString kind) ] [ text (Moderation.kindLabel kind) ])
                 kinds
             )
          ]

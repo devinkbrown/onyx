@@ -77,7 +77,9 @@
 }
 .onyx-member-mod-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Two across where they fit ("Remove from room" needs ~9rem); one per
+     row on the narrowest phones instead of an ellipsis. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
   gap: var(--space-2);
 }
 .onyx-member-mod-row .onyx-member-action {
@@ -123,6 +125,19 @@
   display: block;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+/* The timed-block form's checkboxes share the sheet's label rhythm
+   (the browse-rooms `.chb-check` is a sibling pattern). */
+.moderation-desk__ban-add .chb-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+}
+.moderation-desk__ban-add .chb-check > input { flex: none; margin: 0; }
+.moderation-desk__error { color: var(--onyx-warn); }
+@media (hover: none) {
+  .moderation-desk__ban-add .chb-check { min-height: var(--target-min); }
 }
 
 /* ── 5. Room settings tools ─────────────────────────────────────────── */

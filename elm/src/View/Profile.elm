@@ -803,10 +803,10 @@ moderationControls model nick channel _ isSelf =
                     modButton ("Remove speak from " ++ nick) (Moderation.kindLabel kind) False (propose kind)
 
                 Moderation.Kick ->
-                    modButton ("Remove " ++ nick ++ " from " ++ channel) "Remove" True (propose kind)
+                    modButton ("Remove " ++ nick ++ " from " ++ channel) "Remove from room" True (propose kind)
 
                 _ ->
-                    modButton ("Block " ++ nick ++ " from " ++ channel) "Block" True (propose kind)
+                    modButton ("Block " ++ nick ++ " from " ++ channel) "Block from room" True (propose kind)
     in
     if List.isEmpty kinds then
         text ""

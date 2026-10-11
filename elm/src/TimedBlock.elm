@@ -27,8 +27,10 @@ but the review says what negation means.
 
 -}
 
+import Array
 import Moderation
 import Modes
+import Set
 
 
 {-| The person adding the block. -}
@@ -153,43 +155,61 @@ matchesNick nick mask =
         && onlyWildcards (String.filter (\c -> c /= '@') rest)
 
 
-{-| Case-insensitive IRC glob: `*` any run, `?` one character. -}
+{-| Case-insensitive IRC glob: `*` any run, `?` one character. Runs as
+a set of live pattern positions per character (never backtracks), so a
+hostile pattern like `*a*a*a*a*b` cannot stall the page. -}
 globMatch : String -> String -> Bool
 globMatch pattern value =
-    globChars (String.toList (String.toLower pattern)) (String.toList (String.toLower value))
+    let
+        chars =
+            Array.fromList (String.toList (String.toLower pattern))
 
+        size =
+            Array.length chars
 
-globChars : List Char -> List Char -> Bool
-globChars pattern value =
-    case pattern of
-        [] ->
-            List.isEmpty value
+        -- A star may match nothing: its successor is live with it.
+        close states =
+            Set.foldl
+                (\i acc ->
+                    let
+                        spread j live =
+                            if Array.get j chars == Just '*' && not (Set.member (j + 1) live) then
+                                spread (j + 1) (Set.insert (j + 1) live)
 
-        '*' :: rest ->
-            globChars rest value
-                || (case value of
-                        [] ->
-                            False
+                            else
+                                live
+                    in
+                    spread i acc
+                )
+                states
+                states
 
-                        _ :: more ->
-                            globChars pattern more
-                   )
+        step c states =
+            Set.foldl
+                (\i acc ->
+                    case Array.get i chars of
+                        Just '*' ->
+                            Set.insert i acc
 
-        '?' :: rest ->
-            case value of
-                [] ->
-                    False
+                        Just '?' ->
+                            Set.insert (i + 1) acc
 
-                _ :: more ->
-                    globChars rest more
+                        Just p ->
+                            if p == c then
+                                Set.insert (i + 1) acc
 
-        c :: rest ->
-            case value of
-                v :: more ->
-                    c == v && globChars rest more
+                            else
+                                acc
 
-                [] ->
-                    False
+                        Nothing ->
+                            acc
+                )
+                Set.empty
+                states
+                |> close
+    in
+    List.foldl step (close (Set.singleton 0)) (String.toList (String.toLower value))
+        |> Set.member size
 
 
 {-| Review notes for a mask that passed `check`. -}

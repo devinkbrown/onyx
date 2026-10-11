@@ -322,6 +322,16 @@ timedBlockTests =
                     (List.map (TimedBlock.check me)
                         [ "*!*@*", "*", "kn!*@*", "k*", "kn!*@1.2.3.4", "spam!*@*", "$a:*", "$a:kain", "$~a:other", "$~a:kain", "$r:*", "$m:*!*@*", "$o" ]
                     )
+        , test "glob matching is case-insensitive, handles * and ?, and never backtracks" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal [ True, True, True, True, False, False, True, False ] (List.map (\( p, v ) -> TimedBlock.globMatch p v) [ ( "KN", "kn" ), ( "k*", "kn" ), ( "*n", "kn" ), ( "k?", "kn" ), ( "k", "kn" ), ( "?", "kn" ), ( "***", "" ), ( "a*b", "a" ) ])
+                    , \_ ->
+                        -- 40 stars against a long non-match: exponential for a
+                        -- backtracking matcher, instant here.
+                        Expect.equal False (TimedBlock.globMatch (String.repeat 40 "*a" ++ "b") (String.repeat 60 "a"))
+                    ]
+                    ()
         , test "submit reviews, edits drop the review, confirm re-checks authority" <|
             \_ ->
                 let
