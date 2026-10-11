@@ -36,6 +36,7 @@ import View.Account2
 import View.CallPresence
 -- v3/gap-organize
 import View.Organize
+import View.GapShell -- v3/gap-shell
 
 
 {-| Which collection the sidebar shows. -}
@@ -167,6 +168,7 @@ rail model =
                         , text "Start a room"
                         ]
                     ]
+               , View.GapShell.railExtras model -- v3/gap-shell
                ]
         )
 

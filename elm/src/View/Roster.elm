@@ -135,6 +135,7 @@ membersToggle model =
                     , class "onyx-members-toggle onyx-room-header-btn"
                     , attribute "popovertarget" sheetId
                     , attribute "data-testid" "members-toggle"
+                    , attribute "aria-keyshortcuts" "Alt+M" -- v3/gap-commands
                     , attribute "aria-label"
                         ("Members, "
                             ++ String.fromInt total
