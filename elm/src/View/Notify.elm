@@ -17,6 +17,7 @@ import Html.Attributes exposing (attribute, class, classList, disabled, for, id,
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Notify exposing (Permission(..))
 import NotifyCenter exposing (NotifyMode(..))
+import Push
 import Set
 import View.Attention -- v3/gap-organize
 import View.Sheet as Sheet
@@ -130,6 +131,64 @@ notifySheet model =
                 ]
 
 
+{-| v3/gap-pwa-safety — closed-tab alerts (WEBPUSH), mirroring the
+oracle `YouNotifications` push row: the same `WebPushToggle` machine as
+the Account panel, so arming is reachable where alerts are configured.
+Guests see why it is unavailable instead of a dead toggle.
+-}
+closedTabRow : Model -> Html Msg
+closedTabRow model =
+    let
+        signedIn =
+            not (String.isEmpty (String.trim (Maybe.withDefault "" model.accountName)))
+
+        label =
+            if model.webPushOn then
+                "Turn off alerts when the tab is closed"
+
+            else
+                "Turn on alerts when the tab is closed"
+    in
+    div [ class "notify-row", attribute "data-testid" "notify-push-row" ]
+        [ div [ class "notify-row-copy" ]
+            [ span [ class "notify-row-title" ] [ text "Alerts when the tab is closed" ]
+            , span [ class "notify-row-hint", attribute "data-testid" "notify-push-status" ]
+                [ text
+                    (if signedIn then
+                        Push.statusCopy { busy = model.webPushBusy, on = model.webPushOn, error = model.webPushError }
+
+                     else
+                        "Sign in to get mentions, DMs, and calls when the tab is closed."
+                    )
+                ]
+            ]
+        , button
+            [ attribute "type" "button"
+            , class "notify-toggle"
+            , attribute "aria-label" label
+            , title label
+            , attribute "aria-pressed"
+                (if model.webPushOn then
+                    "true"
+
+                 else
+                    "false"
+                )
+            , attribute "data-testid" "notify-push-toggle"
+            , disabled (not signedIn || model.webPushBusy)
+            , onClick WebPushToggle
+            ]
+            [ text
+                (if model.webPushOn then
+                    "On"
+
+                 else
+                    "Off"
+                )
+            ]
+        ]
+
+
 {-| Desktop + sound rows, mirroring the `NotificationControls` desktop
 and sound toggles (copy kept: blocked / unsupported / on / off).
 -}
@@ -204,6 +263,7 @@ desktopSection model =
                     )
                 ]
             ]
+        , closedTabRow model
         , div [ class "notify-row" ]
             [ div [ class "notify-row-copy" ]
                 [ span [ class "notify-row-title" ] [ text "Notification sound" ]

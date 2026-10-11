@@ -5,6 +5,7 @@ module Push exposing
     , pushOnToast
     , pushUnavailableToast
     , recoverReadiness
+    , statusCopy
     , vapidKeyBytes
     )
 
@@ -225,3 +226,26 @@ pushUnavailableToast reason =
     { title = "Push unavailable"
     , description = reason
     }
+
+
+{-| Status line for the closed-tab push toggle (Account panel and the
+Notifications sheet share it, v3/gap-pwa-safety). -}
+statusCopy : { busy : Bool, on : Bool, error : Maybe String } -> String
+statusCopy input =
+    if input.busy && not input.on then
+        "Turning on…"
+
+    else if input.busy then
+        "Turning off…"
+
+    else
+        case input.error of
+            Just reason ->
+                reason
+
+            Nothing ->
+                if input.on then
+                    "Push is on for this browser."
+
+                else
+                    "Push is off."

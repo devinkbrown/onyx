@@ -268,12 +268,16 @@ banner =
         , test "banner buttons map 1:1 to CallJoin" <|
             \_ ->
                 let
+                    local =
+                        base.callLocal
+
                     q =
-                        query (withVoice [ "mara" ] base)
+                        query (withVoice [ "mara" ] { base | callLocal = { local | cameraSupported = True } })
                 in
                 Expect.all
                     [ \_ -> q |> Query.find [ aria "Join call in #harbor" ] |> Event.simulate Event.click |> Event.expect (CallJoin { channel = "#harbor", video = False })
                     , \_ -> q |> Query.find [ aria "Join with video in #harbor" ] |> Event.simulate Event.click |> Event.expect (CallJoin { channel = "#harbor", video = True })
+                    , \_ -> query (withVoice [ "mara" ] base) |> Query.findAll [ aria "Join with video in #harbor" ] |> Query.count (Expect.equal 0)
                     , \_ -> q |> Query.find [ aria "Hide voice banner" ] |> Event.simulate Event.click |> Event.expect (CallBannerDismiss "#harbor")
                     ]
                     ()

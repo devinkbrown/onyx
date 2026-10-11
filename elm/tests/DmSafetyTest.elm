@@ -125,12 +125,12 @@ requested =
 opened : Model
 opened =
     step (DmSafetyToggle "Trev") dm
-        |> step (DmSafetyResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Nothing })
+        |> step (DmSafetyResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Nothing, pendingKeys = [] })
 
 
 changedWithEvidence : Model
 changedWithEvidence =
-    step (DmSafetyResult { peer = "trev", keys = [ k2 ], current = Just sn, pending = Just snNew })
+    step (DmSafetyResult { peer = "trev", keys = [ k2 ], current = Just sn, pending = Just snNew, pendingKeys = [ k2 ] })
         (step DmSafetyClose keyChanged)
 
 
@@ -140,6 +140,7 @@ suite =
         [ pure
         , safetyPanel
         , keyChangeRow
+        , gapSafety
         , inviteShare
         ]
 
@@ -202,7 +203,7 @@ pure =
             \_ ->
                 DmSafety.blank
                     |> DmSafety.markLoading { peer = "trev", keys = [ k2 ], keyChanged = True }
-                    |> DmSafety.foldResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Just snNew }
+                    |> DmSafety.foldResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Just snNew, pendingKeys = [ k1 ] }
                     |> DmSafety.currentNumber "trev"
                     |> Expect.equal Nothing
         , test "needsLoad tracks the (keys, key-change) stamp" <|
@@ -262,7 +263,7 @@ safetyPanel =
                 in
                 Expect.all
                     [ \_ -> Expect.equal (requested out) [ { peer = "trev", keys = [ k1 ] } ]
-                    , \_ -> Expect.equal (requested (outs (DmSafetyResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Nothing }) next)) []
+                    , \_ -> Expect.equal (requested (outs (DmSafetyResult { peer = "trev", keys = [ k1 ], current = Just sn, pending = Nothing, pendingKeys = [] }) next)) []
                     , \_ -> query next |> Query.find [ testid "dm-safety-verify" ] |> Query.has [ Selector.attribute (Html.Attributes.attribute "aria-expanded" "true") ]
                     , \_ -> query next |> Query.has [ Selector.text "Loading this device’s safety number…" ]
                     , \_ -> query dm |> Query.find [ testid "dm-safety-verify" ] |> Query.has [ Selector.attribute (Html.Attributes.attribute "aria-expanded" "false") ]
@@ -346,7 +347,7 @@ safetyPanel =
                     loading =
                         step (DmSafetyToggle "Trev") dm
                 in
-                step (DmSafetyResult { peer = "trev", keys = [ k2 ], current = Just snNew, pending = Nothing }) loading
+                step (DmSafetyResult { peer = "trev", keys = [ k2 ], current = Just snNew, pending = Nothing, pendingKeys = [] }) loading
                     |> .dmSafety
                     |> DmSafety.currentNumber "trev"
                     |> Expect.equal Nothing
@@ -404,29 +405,42 @@ keyChangeRow =
         , test "Accept is refused until both exact numbers are in" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal (outs (DmKeyAccept "Trev") (step DmSafetyClose keyChanged)) []
+                    [ \_ -> Expect.equal (outs (DmKeyAccept { peer = "Trev", pending = snNew }) (step DmSafetyClose keyChanged)) []
                     , \_ ->
                         query (step DmSafetyClose keyChanged)
                             |> Query.find [ testid "dm-keychange-accept" ]
                             |> Query.has [ Selector.disabled True ]
                     ]
                     ()
-        , test "Accept re-pins the exact live key set" <|
+        , test "Accept names only the reviewed pending keys, bound to the shown number" <|
             \_ ->
-                case outs (DmKeyAccept "Trev") changedWithEvidence of
+                case outs (DmKeyAccept { peer = "Trev", pending = snNew }) changedWithEvidence of
                     [ DmKeyAcceptRequested r ] ->
-                        Expect.equal ( r.peer, r.keys ) ( "trev", [ k2 ] )
+                        Expect.equal ( ( r.peer, r.keys ), ( r.pendingKeys, r.pending ) ) ( ( "trev", [ k2 ] ), ( [ k2 ], snNew ) )
 
                     other ->
                         Expect.fail (Debug.toString other)
+        , test "the Accept button carries the number it shows" <|
+            \_ ->
+                query changedWithEvidence
+                    |> Query.find [ testid "dm-keychange-accept" ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (DmKeyAccept { peer = "Trev", pending = snNew })
+        , test "a click carrying another number (evidence reloaded under it) is refused" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (outs (DmKeyAccept { peer = "Trev", pending = sn }) changedWithEvidence) []
+                    , \_ -> Expect.equal (outs (DmKeyAccept { peer = "Trev", pending = "" }) changedWithEvidence) []
+                    ]
+                    ()
         , test "a persisted accept clears the warning" <|
             \_ ->
                 let
                     accepting =
-                        step (DmKeyAccept "Trev") changedWithEvidence
+                        step (DmKeyAccept { peer = "Trev", pending = snNew }) changedWithEvidence
 
                     done =
-                        step (DmKeyAccepted { peer = "trev", keys = [ k2 ], ok = True }) accepting
+                        step (DmKeyAccepted { peer = "trev", keys = [ k2 ], pendingKeys = [ k2 ], ok = True, trusted = True }) accepting
                 in
                 Expect.all
                     [ \_ -> query accepting |> Query.has [ Selector.text "Saving trusted key…" ]
@@ -439,26 +453,26 @@ keyChangeRow =
             \_ ->
                 let
                     failed =
-                        step (DmKeyAccept "Trev") changedWithEvidence
-                            |> step (DmKeyAccepted { peer = "trev", keys = [ k2 ], ok = False })
+                        step (DmKeyAccept { peer = "Trev", pending = snNew }) changedWithEvidence
+                            |> step (DmKeyAccepted { peer = "trev", keys = [ k2 ], pendingKeys = [ k2 ], ok = False, trusted = False })
                 in
                 Expect.all
                     [ \_ -> Expect.equal (Set.member "trev" failed.peerKeyChanges) True
                     , \_ -> query failed |> Query.has [ Selector.text "Retry saving trusted key" ]
                     , \_ -> query failed |> Query.has [ Selector.text "The new key was not saved. Messages remain locked. Try accepting again." ]
-                    , \_ -> Expect.notEqual (outs (DmKeyAccept "Trev") failed) []
+                    , \_ -> Expect.notEqual (outs (DmKeyAccept { peer = "Trev", pending = snNew }) failed) []
                     ]
                     ()
         , test "never clears the warning for a key set the directory moved past" <|
             \_ ->
                 let
                     accepting =
-                        step (DmKeyAccept "Trev") changedWithEvidence
+                        step (DmKeyAccept { peer = "Trev", pending = snNew }) changedWithEvidence
 
                     rotated =
                         { accepting | dmDirectory = { primary = Dict.singleton "trev" k1, devices = Dict.singleton "trev" [ k1 ] } }
                 in
-                step (DmKeyAccepted { peer = "trev", keys = [ k2 ], ok = True }) rotated
+                step (DmKeyAccepted { peer = "trev", keys = [ k2 ], pendingKeys = [ k2 ], ok = True, trusted = True }) rotated
                     |> .peerKeyChanges
                     |> Set.member "trev"
                     |> Expect.equal True
@@ -482,6 +496,216 @@ keyChangeRow =
                             |> Query.find [ testid "dm-keychange-dismiss" ]
                             |> Event.simulate Event.click
                             |> Event.expect (DmKeyKeepLocked "Trev")
+                    ]
+                    ()
+        ]
+
+
+k3 : String
+k3 =
+    validKey 0x11
+
+
+{-| Trev had one pinned device (k1) and now also advertises k2; the key
+change is flagged and the evidence names k2 as the only pending key. -}
+added : Model
+added =
+    { dm | peerKeyChanges = Set.singleton "trev", dmDirectory = { primary = Dict.singleton "trev" k1, devices = Dict.singleton "trev" [ k1, k2 ] } }
+
+
+addedWithEvidence : Model
+addedWithEvidence =
+    step (DmSafetyResult { peer = "trev", keys = [ k1, k2 ], current = Just sn, pending = Just snNew, pendingKeys = [ k2 ] })
+        (step DmSafetyClose added)
+
+
+feed : String -> Model -> ( Model, List Outbound )
+feed line model =
+    update (WsLineReceived line) model
+
+
+keyChecks : List Outbound -> List { peer : String, keys : List String }
+keyChecks =
+    List.filterMap
+        (\o ->
+            case o of
+                DmKeyCheckRequested r ->
+                    Just { peer = r.peer, keys = r.keys }
+
+                _ ->
+                    Nothing
+        )
+
+
+sealsOrPlain : List Outbound -> List Outbound
+sealsOrPlain =
+    List.filter
+        (\o ->
+            case o of
+                DmSealRequested _ ->
+                    True
+
+                SendLine line ->
+                    String.contains "PRIVMSG" line
+
+                _ ->
+                    False
+        )
+
+
+toastTitles : Model -> List String
+toastTitles model =
+    List.map .title model.toasts
+
+
+{-| v3/gap-pwa-safety: acceptance trusts only reviewed keys; directory
+updates raise the review; a pending change holds sends. -}
+gapSafety : Test
+gapSafety =
+    describe "v3/gap-pwa-safety"
+        [ test "a device-add review accepts only the added key" <|
+            \_ ->
+                case outs (DmKeyAccept { peer = "Trev", pending = snNew }) addedWithEvidence of
+                    [ DmKeyAcceptRequested r ] ->
+                        Expect.equal ( r.keys, r.pendingKeys, r.pending ) ( [ k1, k2 ], [ k2 ], snNew )
+
+                    other ->
+                        Expect.fail (Debug.toString other)
+        , test "a device the peer adds after the review is not trusted by that acceptance" <|
+            \_ ->
+                let
+                    accepting =
+                        step (DmKeyAccept { peer = "Trev", pending = snNew }) addedWithEvidence
+
+                    -- k3 lands (METADATA push) while the acceptance persists.
+                    ( grown, grownOut ) =
+                        feed (":trev!t@onyx.test METADATA trev ocean.dm-keys * :" ++ String.join "," [ k1, k2, k3 ]) accepting
+
+                    ( done, doneOut ) =
+                        update (DmKeyAccepted { peer = "trev", keys = [ k1, k2 ], pendingKeys = [ k2 ], ok = True, trusted = True }) grown
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (keyChecks grownOut) [ { peer = "trev", keys = [ k1, k2, k3 ] } ]
+                    , \_ -> Expect.equal (requested grownOut) [ { peer = "trev", keys = [ k1, k2, k3 ] } ]
+                    , \_ -> Expect.equal (Set.member "trev" done.peerKeyChanges) True
+                    , \_ -> Expect.equal doneOut []
+                    , \_ -> query done |> Query.has [ testid "dm-keychange" ]
+                    , \_ -> Expect.equal (outs (DmKeyAccept { peer = "Trev", pending = snNew }) done) []
+                    ]
+                    ()
+        , test "a persisted acceptance that leaves an unreviewed key keeps the review and reloads" <|
+            \_ ->
+                let
+                    accepting =
+                        step (DmKeyAccept { peer = "Trev", pending = snNew }) addedWithEvidence
+
+                    ( partial, out ) =
+                        update (DmKeyAccepted { peer = "trev", keys = [ k1, k2 ], pendingKeys = [ k2 ], ok = True, trusted = False }) accepting
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Set.member "trev" partial.peerKeyChanges) True
+                    , \_ -> Expect.equal (requested out) [ { peer = "trev", keys = [ k1, k2 ] } ]
+                    , \_ -> Expect.equal (Set.member "trev" partial.dmSafety.accepting) False
+                    ]
+                    ()
+        , test "a pushed or replied device key asks ports for a pin verdict, flagging nothing yet" <|
+            \_ ->
+                let
+                    ( pushed, pushOut ) =
+                        feed (":trev!t@onyx.test METADATA trev ocean.dm-key * :" ++ k2) dm
+
+                    ( replied, replyOut ) =
+                        feed (":onyx.test 761 me trev ocean.dm-keys * :" ++ k2) dm
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (keyChecks pushOut) [ { peer = "trev", keys = sealKeysFor pushed "trev" } ]
+                    , \_ -> Expect.equal (Dict.get "trev" pushed.dmDirectory.primary) (Just k2)
+                    , \_ -> Expect.equal (List.member k2 (sealKeysFor pushed "trev")) True
+                    , \_ -> Expect.equal (keyChecks replyOut) [ { peer = "trev", keys = sealKeysFor replied "trev" } ]
+                    , \_ -> Expect.equal (Set.member "trev" pushed.peerKeyChanges) False
+                    , \_ -> Expect.equal (List.length pushed.toasts) (List.length dm.toasts)
+                    ]
+                    ()
+        , test "the same key set, our own entry, or no owner asks nothing" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (keyChecks (Tuple.second (feed (":onyx.test 761 me trev ocean.dm-key * :" ++ k1) dm))) []
+                    , \_ -> Expect.equal (keyChecks (Tuple.second (feed (":onyx.test 761 me * ocean.dm-key * :" ++ k2) dm))) []
+                    , \_ -> Expect.equal (keyChecks (Tuple.second (feed (":onyx.test 761 me trev ocean.dm-key * :" ++ k2) { dm | endpoint = Nothing }))) []
+                    ]
+                    ()
+        , test "a changed verdict raises the review once, with a toast and an Inbox row" <|
+            \_ ->
+                let
+                    pushed =
+                        Tuple.first (feed (":trev!t@onyx.test METADATA trev ocean.dm-key * :" ++ k2) dm)
+
+                    ( flagged, out ) =
+                        update (DmKeyChecked { peer = "trev", keys = sealKeysFor pushed "trev", status = "changed" }) pushed
+
+                    again =
+                        step (DmOpenFailed { peer = "Trev", messageId = 1, keyChanged = True }) flagged
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (Set.member "trev" flagged.peerKeyChanges) True
+                    , \_ -> Expect.equal (List.filter ((==) "Encryption key changed") (toastTitles flagged)) [ "Encryption key changed" ]
+                    , \_ -> Expect.equal (List.map .text (List.filter (\n -> n.kind == NotifError) flagged.notifications)) [ "Trev's encryption key changed — verify before continuing." ]
+                    , \_ -> Expect.equal (requested out) [ { peer = "trev", keys = sealKeysFor pushed "trev" } ]
+                    , \_ -> query flagged |> Query.has [ testid "dm-keychange" ]
+                    , \_ -> Expect.equal (List.length again.toasts) (List.length flagged.toasts)
+                    , \_ -> Expect.equal (List.length again.notifications) (List.length flagged.notifications)
+                    ]
+                    ()
+        , test "seal- and open-time key changes toast and notify too" <|
+            \_ ->
+                let
+                    opened_ =
+                        step (DmOpenFailed { peer = "Trev", messageId = 1, keyChanged = True }) dm
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (List.member "Encryption key changed" (toastTitles opened_)) True
+                    , \_ -> Expect.equal (List.any (\n -> n.text == "Trev's encryption key changed — verify before continuing.") opened_.notifications) True
+                    ]
+                    ()
+        , test "stale or benign verdicts never flag" <|
+            \_ ->
+                let
+                    pushed =
+                        Tuple.first (feed (":trev!t@onyx.test METADATA trev ocean.dm-key * :" ++ k2) dm)
+
+                    verdict status keys =
+                        (step (DmKeyChecked { peer = "trev", keys = keys, status = status }) pushed).peerKeyChanges
+                            |> Set.member "trev"
+                in
+                Expect.equal
+                    [ verdict "changed" [ k1 ], verdict "unchanged" (sealKeysFor pushed "trev"), verdict "first-use" (sealKeysFor pushed "trev"), verdict "unreadable" (sealKeysFor pushed "trev") ]
+                    [ False, False, False, False ]
+        , test "a pending key change holds the send: draft kept, nothing sealed, nothing plain" <|
+            \_ ->
+                let
+                    ( held, out ) =
+                        update ComposerSend { keyChanged | composer = "meet at 6?" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal (sealsOrPlain out) []
+                    , \_ -> Expect.equal held.composer "meet at 6?"
+                    , \_ -> Expect.equal held.composerError (Just (DmSafety.keyChangeHoldCopy "Trev"))
+                    ]
+                    ()
+        , test "a seal refused for a key change returns its text to the draft" <|
+            \_ ->
+                let
+                    sealing =
+                        { dm | composer = "", pendingSeals = Dict.singleton "trev" { text = "meet at 6?", keys = [ k1 ] } }
+
+                    refused =
+                        step (DmSealFailed { target = "Trev", keyChanged = True, schedId = Nothing }) sealing
+                in
+                Expect.all
+                    [ \_ -> Expect.equal refused.composer "meet at 6?"
+                    , \_ -> Expect.equal (Set.member "trev" refused.peerKeyChanges) True
+                    , \_ -> Expect.equal (Dict.member "trev" refused.pendingSeals) False
+                    , \_ -> Expect.equal refused.composerError (Just (DmSafety.keyChangeHoldCopy "Trev"))
                     ]
                     ()
         ]
