@@ -13,6 +13,7 @@
  * Device state is seeded through localStorage before the app boots (the
  * same keys the app writes), so every shot is a cold load of that state.
  */
+/* global matchMedia, getComputedStyle -- used inside page.evaluate callbacks */
 import shell from './screens-shell.mjs';
 import { auditContrast, assertContrast, auditSceneContrast } from './contrast-audit.mjs';
 
