@@ -28,6 +28,7 @@ import Html.Events exposing (onClick)
 import Nav
 import Sidebar
 import View.Account2
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 -- v3/calls-c8
 import View.VoiceSettings
@@ -350,6 +351,8 @@ youHub model =
 
                         -- v3/calls-c8
                         , View.VoiceSettings.youEntry
+                        -- v3/gap-organize
+                        , View.Organize.youEntry model
                         -- v3/account2
                         , (View.Account2.youEntries model).people
                         , (View.Account2.youEntries model).themeShare

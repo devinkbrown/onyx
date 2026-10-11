@@ -74,6 +74,9 @@ import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
 import View.Polish -- v3/polish
+-- v3/gap-organize
+import View.Attention
+import View.Organize
 
 
 view : Model -> Browser.Document Msg
@@ -236,6 +239,7 @@ appFrame model =
              else
                 "false"
             )
+        , View.Attention.readerAttr model -- v3/gap-organize: reader mode
         , -- v3/ui-mobile-shell: a conversation is showing (phones push it
           -- as its own page: no global bar, no bottom nav, a back control)
           attribute "data-convo"
@@ -336,6 +340,9 @@ overlays model =
         , reclaimDialog model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
+        -- v3/gap-organize: row menu, folder picker, saved messages; reader exit
+        , View.Organize.sheets model
+        , View.Attention.readerPill model
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model

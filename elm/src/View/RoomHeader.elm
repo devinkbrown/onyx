@@ -51,6 +51,7 @@ import View.CallDock -- v3/calls-c6
 import View.CallPresence
 import View.DmSafety
 import View.ModDesk
+import View.Organize -- v3/gap-organize
 import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
@@ -279,6 +280,7 @@ moreMenu model name isRoom channel =
                                , View.Polish.scrubberToggle model -- v3/polish
                                ]
                             ++ View.ModDesk.moderationToggle model
+                            ++ View.Organize.roomMoreItems model name isRoom -- v3/gap-organize
                         )
                     ]
 
