@@ -1709,10 +1709,10 @@ suite =
                     [ \_ ->
                         query carded
                             |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Moderate alice") ]
-                            |> Query.has [ Selector.text "Kick", Selector.text "Ban" ]
+                            |> Query.has [ Selector.text "Remove", Selector.text "Block", Selector.text "Give moderator", Selector.text "Give speak" ]
                     , \_ ->
                         query carded
-                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Kick alice from #c") ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Remove alice from #c") ]
                             |> Event.simulate Event.click
                             |> Event.expect (ModerationPropose { kind = Moderation.Kick, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing })
                     , \_ ->
@@ -1744,9 +1744,11 @@ suite =
                             |> Query.find [ Selector.class "onyx-moderation-review" ]
                             |> Query.has [ Selector.text "Reconnect to send this change." ]
                     , \_ ->
+                        -- v3/gap-people: the room role gates the controls, not
+                        -- the experience level.
                         query standardCard
-                            |> Query.find [ Selector.class "onyx-member-card" ]
-                            |> Query.hasNot [ Selector.text "Kick" ]
+                            |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Moderate alice") ]
+                            |> Query.has [ Selector.text "Remove", Selector.text "Block" ]
                     ]
                     ()
         , test "person safety sheet confirms blocks and drafts reports" <|
@@ -5735,61 +5737,6 @@ suite =
                         |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "account-push-status") ]
                         |> Query.has [ Selector.text "denied" ]
             ]
-        , describe "room webhooks"
-            [ test "management view offers create, list, and delete" <|
-                \_ ->
-                    let
-                        q =
-                            query stewardModel
-                    in
-                    Expect.all
-                        [ \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-name") ] q
-                                |> Query.has [ Selector.attribute (Attr.value "ci") ]
-                        , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-create") ] q
-                                |> Query.has [ Selector.text "Create webhook" ]
-                        , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-list") ] q
-                                |> Query.has [ Selector.text "List webhooks" ]
-                        , \_ ->
-                            Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-delete") ] q
-                                |> Query.has [ Selector.text "Delete webhook", Selector.disabled True ]
-                        ]
-                        ()
-            , test "create click sends the owner verb for the room" <|
-                \_ ->
-                    query stewardModel
-                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-create") ]
-                        |> Event.simulate Event.click
-                        |> Event.expect (WebhookCreate "#harbor")
-            , test "recent webhook notices render newest first" <|
-                \_ ->
-                    let
-                        q =
-                            query
-                                { stewardModel
-                                    | serviceLog =
-                                        [ "Webhook: second"
-                                        , "Account: other"
-                                        , "Webhook: first"
-                                        ]
-                                }
-                    in
-                    Expect.all
-                        [ \_ ->
-                            Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-notice") ] q
-                                |> Query.count (Expect.equal 2)
-                        , \_ ->
-                            Query.findAll [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-notice") ] q
-                                |> Query.first
-                                |> Query.has [ Selector.text "Webhook: second" ]
-                        ]
-                        ()
-            , test "non-owners see the hosts-managed hint" <|
-                \_ ->
-                    query { stewardModel | ourNick = "drew" }
-                        |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "steward-webhook-readonly") ]
-                        |> Query.has [ Selector.text "Managed by room hosts." ]
-            ]
+        -- v3/gap-people: webhooks moved from Room care to Room settings
+        -- (any room host, any room size) — see GapPeopleTest.
         ]

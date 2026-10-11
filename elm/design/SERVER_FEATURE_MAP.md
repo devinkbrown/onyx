@@ -373,7 +373,7 @@ Module line = registration site. Handler = `src/daemon/server.zig` unless noted.
 | USERHOST | `:76` / `handleUserhost:24028` | → 302 | reg | **N/A** | — |
 | WHOIS | `:77` / `handleWhois:24478`, `src/daemon/whois.zig` | 311,312,313,317,318,319,320,330,335,338,276,671,301,401; remote mesh WHOIS | reg | **FULL** | `foldWhois:5945`, `src/View/Profile.elm:26-330` |
 | LIST | `:78` / `handleList:24287` | ELIST filters → 321/322/323 | reg | **PARTIAL** | browse `refreshChannelList:16478`, `src/View/Browser.elm`; no server-side filters |
-| WHO / WHOX | `:79-80` / `handleWho:24189`, `handleWhox:24051` | 352/354/315; sealed → `FAIL WHO MEMBERSHIP_SEALED` | reg | **PARTIAL** | WHO on join (`src/App.elm:4785`, `foldWhoReply:17943`); 354 goes to the invisible sink |
+| WHO / WHOX | `:79-80` / `handleWho:24189`, `handleWhox:24051` | 352/354/315; sealed → `FAIL WHO MEMBERSHIP_SEALED` | reg | **FULL** | v3/gap-people: our own join sends `WHO #room %tcnfa,616`; the 354 rows (token 616) set away and the peer account (`PeerAccount.parseWhoxRow`); other 354 replies still reach the numeric log |
 | WHOWAS | `:81` / `handleWhowas:25080` | → 314/312/369/406 | reg | **RAW** | `Services.whowas` is never called |
 | AWAY | `:82` / `handleAway:43289` | → 305/306 | reg | **FULL** | `/away` `/back` `setUserStatus:19562`, 305/306 arms |
 | SETNAME | `:83` / `handleSetname:43339` | `SETNAME :realname` | reg | **MISSING** | inbound only (`foldSetname:6007`) |
@@ -454,7 +454,7 @@ Module line = registration site. Handler = `src/daemon/server.zig` unless noted.
 | MODULES / MODLIST | `introspect.zig:326` | `MODULES [id]` | oper | **RAW** | — |
 | COMMANDS | `introspect.zig:344` | `COMMANDS [name]` → 371 lines | any | **RAW** | useful for slash autocomplete; not used |
 | OROWASM | `introspect.zig:345` | `OROWASM [STATUS\|ABI\|WIT\|PLUGINS]` | oper | **RAW** | — |
-| WEBHOOK | `webhook.zig:24` / `handleWebhook:7117` | `WEBHOOK CREATE #c [name] \| LIST #c \| DELETE <id>` → one-time secret URL NOTICE | op/oper, cfg:webhook | **FULL** | `requestWebhook*:21573-21610`, `foldWebhookNotice:26637`, `src/View/Stewardship.elm:423`, `/webhook:12987` |
+| WEBHOOK | `webhook.zig:24` / `handleWebhook:7117` | `WEBHOOK CREATE #c [name] \| LIST #c \| DELETE <id>` → one-time secret URL NOTICE | op/oper, cfg:webhook | **FULL** | `requestWebhook*` (any op via `webhookGate`), `foldWebhookNotice`, `View/RoomTools.elm`, `/webhook` |
 
 ## 6. Subcommand deep dives
 
@@ -479,7 +479,7 @@ replies are server NOTICEs.
 | `SET #c DESC\|URL <text>` | `:47486-47505` | `DESC set\|cleared`, `URL set to …` | founder | **FULL** (a description can be replaced, not blanked: the server parser refuses empty values) |
 | `ACCESS #c LIST\|ADD\|DEL <acct> <FOUNDER\|OP\|VOICE>` | `:47510-47545` | `ACCESS #c acct LEVEL`, `End of ACCESS list` | founder | **FULL** ("Account access"; distinct from the IRCX mask `ACCESS` in Roles) |
 | `AKICK #c LIST\|ADD <mask\|account:x> [reason]\|DEL <mask>` | `:47546-47604` | `AKICK #c mask :reason`, `AKICK added/removed …`; enforced at JOIN (474) | founder/admin | **FULL** ("Auto-kick") |
-| `TRANSFER #c <acct>` | `:47605-47613` | `Channel #c founder transferred to <acct>` | founder | **HELPER ONLY** (`Chanserv.transferLine` + receipt fold; the confirmation flow is the ownership slice's, v3/gap-people) |
+| `TRANSFER #c <acct>` | `:47605-47613` | `Channel #c founder transferred to <acct>` | founder | **FULL** | v3/gap-people: Room care "Hand it over" sends it for registered (`+r`) rooms when the recipient's account is known (`RoomTransfer.handoverPlan`), plus `MODE +q`/`-q`. The server has no offer/accept step or pending-transfer state; the offer travels as a client-tag `TAGMSG` (`+onyx/room-transfer`) |
 | `SUCCESSOR #c SHOW\|SET\|CLEAR` (top-level) | `handleSuccessor:44761` | NOTICEs; FAIL `ACCOUNT_UNKNOWN NOT_FOUNDER INVALID_VALUE …` | founder/oper | **FULL** ("Successor") |
 | `LISTCHANS` (top-level) | `handleListchans:25648` | `LISTCHANS #c level` … `End of LISTCHANS (n)` | acct | **FULL** (Account sheet "Your rooms") |
 

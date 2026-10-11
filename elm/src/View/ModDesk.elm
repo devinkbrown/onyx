@@ -52,22 +52,43 @@ deskToggles model =
 
 
 {-| v3/frame — the room-scoped Moderation entry (the room header's
-More menu); empty unless we moderate the active room.
+More menu). v3/gap-people: room moderators get "Moderation"; members
+get "Room safety", the read-only desk (safeguards, who moderates,
+the open-wire mode state). Empty outside rooms we are in.
 -}
 moderationToggle : Model -> List (Html Msg)
 moderationToggle model =
     case model.activeChannel of
         Just channel ->
-            if isChannelOp model channel then
+            let
+                moderator =
+                    isChannelOp model channel
+            in
+            if moderator || App.isRoomMember model channel then
                 [ button
                     [ type_ "button"
                     , class "onyx-moddesk-toggle"
                     , attribute "aria-pressed" (boolAttr model.moderationOpen)
-                    , attribute "aria-label" ("Moderation for " ++ channel)
+                    , attribute "aria-label"
+                        ((if moderator then
+                            "Moderation for "
+
+                          else
+                            "Room safety for "
+                         )
+                            ++ channel
+                        )
                     , attribute "data-testid" "moderation-open"
                     , onClick ModerationSheetOpen
                     ]
-                    [ text "Moderation" ]
+                    [ text
+                        (if moderator then
+                            "Moderation"
+
+                         else
+                            "Room safety"
+                        )
+                    ]
                 ]
 
             else

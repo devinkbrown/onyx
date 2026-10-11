@@ -14,12 +14,14 @@ get the read-only fallback.
 import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)
 import Dict
 import Html exposing (Html, button, code, div, h4, input, label, li, option, p, section, select, span, text, ul)
-import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, type_, value)
+import Html.Attributes exposing (attribute, checked, class, disabled, for, id, placeholder, selected, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput)
+import GapPeople
+import ModAuthority
 import Moderation
 import Modes
-import Prefs
 import String
+import TimedBlock
 
 
 banPanel : Model -> String -> Html Msg
@@ -28,11 +30,20 @@ banPanel model channel =
         -- Non-moderators get the read-only context (mirroring the
         -- cockpit fallback): the boundary copy plus the last known
         -- mode state, and no rule-changing surface.
-        div [ class "moderation-cockpit__empty-wrap" ]
-            [ p [ class "moderation-cockpit__empty" ]
+        -- v3/gap-people: reachable now (members open the desk from
+        -- the More menu); it also shows the safeguards and who
+        -- moderates the room.
+        div [ class "moderation-cockpit__empty-wrap", attribute "data-testid" "desk-readonly" ]
+            ([ p [ class "moderation-cockpit__empty" ]
                 [ text "You can view this room’s context, but only room moderators can change its rules or invite people." ]
-            , protocolDisclosure model channel
-            ]
+             ]
+                ++ readOnlySafeguards model channel
+                ++ readOnlyModerators model channel
+                ++ [ p [ class "moderation-cockpit__hint" ]
+                        [ text "To stop seeing someone, use Block on their card — it only affects this device." ]
+                   , protocolDisclosure model channel
+                   ]
+            )
 
     else
         let
@@ -79,6 +90,57 @@ addForm model channel live =
         form =
             model.banAdd
     in
+    case model.tempBanReview of
+        Just review ->
+            if String.toLower review.channel == String.toLower channel then
+                timedBlockReview model review live
+
+            else
+                addFormFields model channel live form
+
+        Nothing ->
+            addFormFields model channel live form
+
+
+{-| v3/gap-people — the timed block's review step: what will be
+blocked, where and for how long, with Add block / Back. -}
+timedBlockReview : Model -> { channel : String, mask : String, minutes : Int } -> Bool -> List (Html Msg)
+timedBlockReview _ review live =
+    [ section
+        [ class "moderation-desk__ban-add moderation-desk__ban-review"
+        , attribute "data-testid" "ban-add-form"
+        , attribute "role" "group"
+        , attribute "aria-labelledby" "ban-add-review-title"
+        ]
+        ([ div [ class "moderation-cockpit__head" ]
+            [ h4 [ id "ban-add-review-title" ] [ text "Review timed block" ] ]
+         , p [ class "moderation-desk__review-summary", attribute "data-testid" "ban-add-review" ]
+            [ text (TimedBlock.reviewSummary { mask = review.mask, room = review.channel, minutes = review.minutes }) ]
+         , code [ class "moderation-desk__ban-mask" ] [ text review.mask ]
+         ]
+            ++ List.map (\note -> p [ class "moderation-cockpit__hint" ] [ text note ]) (TimedBlock.notes review.mask)
+            ++ [ div [ class "onyx-steward-actions" ]
+                    [ button
+                        [ class "onyx-steward-btn"
+                        , attribute "data-testid" "ban-add-back"
+                        , onClick (GapPeopleMsg GapPeople.TempBanCancel)
+                        ]
+                        [ text "Back" ]
+                    , button
+                        [ class "onyx-steward-btn onyx-steward-btn-danger"
+                        , attribute "data-testid" "ban-add-confirm"
+                        , disabled (not live)
+                        , onClick (GapPeopleMsg GapPeople.TempBanConfirm)
+                        ]
+                        [ text "Add block" ]
+                    ]
+               ]
+        )
+    ]
+
+
+addFormFields : Model -> String -> Bool -> App.BanAddForm -> List (Html Msg)
+addFormFields _ channel live form =
     [ section [ class "moderation-desk__ban-add", attribute "data-testid" "ban-add-form" ]
         ([ div [ class "moderation-cockpit__head" ]
             [ h4 [] [ text "Add a timed block" ] ]
@@ -118,7 +180,7 @@ addForm model channel live =
                     text ""
 
                  else
-                    p [ class "moderation-cockpit__hint", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
+                    p [ class "moderation-cockpit__hint moderation-desk__error", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
                         [ text form.error ]
                , div [ class "onyx-steward-actions" ]
                     [ button
@@ -127,7 +189,7 @@ addForm model channel live =
                         , disabled (not live)
                         , onClick (BanAddSubmit channel)
                         ]
-                        [ text "Add block" ]
+                        [ text "Review block" ]
                     ]
                ]
         )
@@ -149,7 +211,7 @@ extBuilder form =
             , onInput BanAddExtType
             ]
             (List.map
-                (\t -> option [ value (String.fromChar t) ] [ text (Modes.extBanTypeLabel t) ])
+                (\t -> option [ value (String.fromChar t), selected (form.extType == String.fromChar t) ] [ text (Modes.extBanTypeLabel t) ])
                 (String.toList Modes.extBanTypes)
             )
         , label [ class "onyx-steward-label", for "ban-add-ext-pattern" ] [ text "Pattern" ]
@@ -472,8 +534,10 @@ deskMemberForm model channel live =
         desk =
             model.moderationDesk
 
+        -- v3/gap-people: the kinds this room role may stage (empty for
+        -- members, which hides the form instead of staging a kick).
         kinds =
-            Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)
+            ModAuthority.deskKinds (App.moderationActor model channel)
 
         candidates =
             deskCandidates model channel
@@ -481,6 +545,10 @@ deskMemberForm model channel live =
         showReason =
             desk.action == "kick" || desk.action == "ban"
     in
+    if List.isEmpty kinds then
+        []
+
+    else
     [ section [ class "moderation-member-form", attribute "data-testid" "desk-member-form" ]
         ([ label [ class "onyx-steward-label", for "desk-member-select" ] [ text "Room member action" ]
          , select
@@ -490,8 +558,13 @@ deskMemberForm model channel live =
             , onInput ModerationDeskMember
             , value desk.member
             ]
-            (option [ value "" ] [ text "Choose a member" ]
-                :: List.map (\nick -> option [ value nick ] [ text nick ]) candidates
+            -- The placeholder's value goes in as an attribute: Elm applies the
+            -- `value` property before the option has its text, so for ""
+            -- the browser kept no value attribute, the option read as its
+            -- text, and the next patch's `select.value = ""` matched nothing
+            -- (a blank select). `selected` marks the live choice as well.
+            (option [ attribute "value" "", selected (desk.member == "") ] [ text "Choose a member" ]
+                :: List.map (\nick -> option [ value nick, selected (desk.member == nick) ] [ text nick ]) candidates
             )
          , select
             [ id "desk-action-select"
@@ -502,7 +575,7 @@ deskMemberForm model channel live =
             , value desk.action
             ]
             (List.map
-                (\kind -> option [ value (Moderation.kindToString kind) ] [ text (Moderation.kindLabel kind) ])
+                (\kind -> option [ value (Moderation.kindToString kind), selected (desk.action == Moderation.kindToString kind) ] [ text (Moderation.kindLabel kind) ])
                 kinds
             )
          ]
@@ -663,6 +736,82 @@ deskLastUpdateLabel model channel =
 
         Just at ->
             App.formatRowClock model.zone model.prefs.clock at
+
+
+{-| v3/gap-people — the room safeguards as read-only facts. -}
+readOnlySafeguards : Model -> String -> List (Html Msg)
+readOnlySafeguards model channel =
+    let
+        flags =
+            case Dict.get (String.toLower channel) model.channels of
+                Nothing ->
+                    []
+
+                Just room ->
+                    (Modes.parseChannelModeString room.modes).flags
+
+        fact letter label =
+            div []
+                [ span [] [ text label ]
+                , span []
+                    [ text
+                        (if List.member letter flags then
+                            "On"
+
+                         else
+                            "Off"
+                        )
+                    ]
+                ]
+    in
+    [ div [ class "moderation-desk__rail", attribute "aria-label" "Room safeguards", attribute "data-testid" "desk-readonly-safeguards" ]
+        [ fact 'm' "Moderated"
+        , fact 'i' "Invite-only"
+        , fact 't' "Protected topic"
+        ]
+    ]
+
+
+{-| v3/gap-people — who to ask: the room's moderators, by rank. -}
+readOnlyModerators : Model -> String -> List (Html Msg)
+readOnlyModerators model channel =
+    let
+        moderators =
+            case Dict.get (String.toLower channel) model.channels of
+                Nothing ->
+                    []
+
+                Just room ->
+                    room.members
+                        |> Dict.values
+                        |> List.filter (\member -> ModAuthority.rankOf member.modes >= Modes.statusRank 'o')
+                        |> List.sortBy (\member -> ( negate (ModAuthority.rankOf member.modes), String.toLower member.nick ))
+                        |> List.map .nick
+
+        shown =
+            List.take 8 moderators
+
+        more =
+            List.length moderators - List.length shown
+    in
+    [ p [ class "moderation-cockpit__hint", attribute "data-testid" "desk-readonly-moderators" ]
+        [ text
+            (if List.isEmpty moderators then
+                "No moderators are here right now."
+
+             else
+                "Moderators here: "
+                    ++ String.join ", " shown
+                    ++ (if more > 0 then
+                            " and " ++ String.fromInt more ++ " more"
+
+                        else
+                            ""
+                       )
+                    ++ "."
+            )
+        ]
+    ]
 
 
 {-| Desk member candidates (mirroring the cockpit `candidates`:
