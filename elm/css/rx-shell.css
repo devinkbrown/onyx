@@ -567,6 +567,26 @@
   .onyx-frame .onyx-primary-nav .onyx-nav-btn { min-height: 44px; }
 }
 
+/* Landscape phones: the sidebar head is ~240px wide, too narrow for a
+   "Jump to…" field beside New, Inbox and You, so the launcher is the same
+   44px glyph as on portrait phones (the field returns on wider screens). */
+@media (min-width: 600px) and (max-width: 959.98px) and (max-height: 520px) and (hover: none) {
+  .onyx-frame .onyx-topbar .onyx-palette-launcher {
+    flex: none;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    color: var(--onyx-dim);
+    background: transparent;
+    border-color: transparent;
+  }
+  .onyx-topbar .onyx-palette-launcher::before { width: 22px; height: 22px; }
+  .onyx-topbar .onyx-palette-launcher-label,
+  .onyx-topbar .onyx-palette-kbd { display: none; }
+  .onyx-frame .onyx-topbar-search { flex: 1 1 auto; }
+}
+
 /* Short phones (landscape SE): a compact bottom nav and bars. */
 @media (max-width: 599.98px) and (max-height: 520px) {
   :root { --mobile-nav-h: 48px; }
