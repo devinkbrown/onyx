@@ -757,6 +757,25 @@ assistPopovers model =
         ]
 
 
+{-| v3/rx-convo — Escape closes the emoji picker from anywhere in it
+and from the toggle that opened it (a keyboard user who opens the
+picker with Enter or Space stays on the button until they Tab in; the
+field's own handler never sees that Escape). -}
+emojiEscape : Html.Attribute Msg
+emojiEscape =
+    custom "keydown"
+        (Decode.field "key" Decode.string
+            |> Decode.andThen
+                (\key ->
+                    if key == "Escape" then
+                        Decode.succeed { message = ComposerEmojiClose, stopPropagation = True, preventDefault = True }
+
+                    else
+                        Decode.fail "not-escape"
+                )
+        )
+
+
 emojiPicker : Model -> Html Msg
 emojiPicker model =
     div
@@ -765,17 +784,7 @@ emojiPicker model =
         , attribute "role" "dialog"
         , attribute "aria-modal" "false"
         , attribute "aria-label" "Emoji picker"
-        , custom "keydown"
-            (Decode.field "key" Decode.string
-                |> Decode.andThen
-                    (\key ->
-                        if key == "Escape" then
-                            Decode.succeed { message = ComposerEmojiClose, stopPropagation = True, preventDefault = True }
-
-                        else
-                            Decode.fail "not-escape"
-                    )
-            )
+        , emojiEscape
         ]
         [ label [ class "sr-only", attribute "for" "shell-emoji-search" ] [ text "Search emoji" ]
         , input
@@ -819,7 +828,7 @@ emojiButton model ready =
          , onClick ComposerEmojiToggle
          ]
             ++ (if model.composerAssist.emojiOpen then
-                    [ attribute "aria-controls" "shell-emoji-picker" ]
+                    [ attribute "aria-controls" "shell-emoji-picker", emojiEscape ]
 
                 else
                     []

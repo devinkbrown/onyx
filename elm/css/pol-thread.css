@@ -1427,14 +1427,18 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   border-bottom: 1px solid var(--onyx-line);
   color: var(--onyx-text);
 }
+/* In the conversation's column, under the room header (View.appFrame):
+   a band that never shrinks; its body scrolls inside. */
+.onyx-main > .onyx-message-search { flex: none; }
 .onyx-message-search__surface,
 .onyx-message-search__body { width: min(var(--pt-measure), 100%); min-width: 0; }
 
+/* The find row: query (+ count) · previous · next · close. */
 .onyx-message-search__surface {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: 2px 2px 2px var(--space-3);
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
@@ -1493,20 +1497,20 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 }
 .onyx-message-search__button:hover:not(:disabled) { color: var(--onyx-text); background: var(--onyx-panel-2); }
 .onyx-message-search__button:disabled { opacity: 0.4; cursor: not-allowed; }
-.onyx-message-search__button--close { border-color: transparent; font-size: var(--text-xl); }
+.onyx-message-search__button--close,
+.onyx-message-search__controls > .onyx-message-search__button { border-color: transparent; }
+.onyx-message-search__button--close { font-size: var(--text-xl); }
 
-/* Body: "Searching in …" + prev/next share the first line; every
-   section below spans the full width. */
+/* Body: "Searching in …" first, then every section at full width. */
 .onyx-message-search__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2);
   max-height: min(50vh, 28rem);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.onyx-message-search__body > :not(.onyx-message-search__target):not(.onyx-message-search__controls) { grid-column: 1 / -1; }
 
 .onyx-message-search__target {
   display: flex;
@@ -1518,7 +1522,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 }
 .onyx-message-search__target strong { min-width: 0; overflow-wrap: anywhere; }
 .onyx-message-search__target-kicker { color: var(--onyx-dim); }
-.onyx-message-search__controls { display: flex; gap: var(--space-1); }
+.onyx-message-search__controls { display: flex; gap: 2px; }
 
 .onyx-message-search__status { margin: 0; color: var(--onyx-dim); font-size: var(--text-xs); }
 .onyx-message-search__status:empty { display: none; }
@@ -1670,7 +1674,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .onyx-message-search__saved-delete:hover { color: var(--onyx-bad); border-color: var(--onyx-line); }
 
 @media (max-width: 767.98px) {
-  .onyx-message-search { padding: var(--space-2) var(--space-3); }
+  .onyx-message-search { padding: var(--space-2); }
   .onyx-message-search__button { width: var(--target-min); min-width: var(--target-min); height: var(--target-min); }
   .onyx-message-search__input { font-size: 16px; }
   .onyx-message-search__server-row { grid-template-columns: auto minmax(0, 1fr); }
@@ -2413,6 +2417,13 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-message-search { padding-block: var(--space-1); }
   .onyx-message-search__body { max-height: 26dvh; }
 }
+/* The count also reads in the status line; under 400px the find row
+   gives its width to the query. With the keyboard up the body keeps to
+   a fifth of what is visible (the matches stay on screen). */
+@media (max-width: 399.98px) {
+  .onyx-message-search__count { display: none; }
+}
+:root[data-kb="open"] .onyx-message-search__body { max-height: calc(var(--vvh, 100dvh) * 0.2); }
 
 /* Hover feedback only where hover exists (a tap must not leave a pin or
    media row looking selected). */
@@ -2456,7 +2467,8 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-composer .onyx-composer-bar > .onyx-audience-toggle::after { content: ""; position: absolute; inset: -9px -2px; }
   .onyx-composer .shell-composer-context-close { position: relative; }
   .onyx-composer .shell-composer-context-close::after { content: ""; position: absolute; inset: -8px; }
-  .onyx-frame .onyx-composer .shell-composer-tools-action { min-height: var(--target-min); }
+  .onyx-frame .onyx-composer .shell-composer-tools-action,
+  .onyx-frame .onyx-composer button.shell-composer-tools-item { min-height: var(--target-min); }
   .onyx-composer .shell-emoji-search { min-height: var(--target-min); font-size: 16px; }
   .onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
   .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 24px; }
@@ -2475,4 +2487,17 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-frame .pins-panel button.pins-item-unpin { width: var(--target-min); height: var(--target-min); }
   .onyx-frame .pins-item-unpin { margin-top: 0; }
   .pins-ledger { min-height: var(--target-min); }
+
+  /* Message search: chips keep a calm 36px look with a 44px hit area;
+     the section controls and result rows are full 44px rows. */
+  .onyx-message-search__recall { gap: var(--space-2); }
+  .onyx-frame .onyx-message-search button.onyx-message-search__recall-chip { position: relative; min-height: 36px; }
+  .onyx-message-search__recall-chip::after { content: ""; position: absolute; inset: -4px -2px; }
+  .onyx-message-search__save-toggle { min-height: var(--target-min); }
+  .onyx-message-search__save-input { min-height: var(--target-min); }
+  .onyx-frame .onyx-message-search button.onyx-message-search__deep,
+  .onyx-frame .onyx-message-search button.onyx-message-search__vault-mode,
+  .onyx-frame .onyx-message-search button.onyx-message-search__saved-delete,
+  .onyx-frame .onyx-message-search button.onyx-message-search__saved-run,
+  .onyx-frame .onyx-message-search button.onyx-message-search__server-row { min-height: var(--target-min); }
 }

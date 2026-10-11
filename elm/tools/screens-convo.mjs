@@ -489,9 +489,25 @@ export default {
       }
       return [...new Set(bad)];
     }, SCOPE);
+    const skipped = [];
+    const rowTap = async (row, key) => {
+      const btn = await row.$(`[data-row-action="${key}"]`);
+      if (!btn) { skipped.push(`no ${key} action on the row`); return false; }
+      try { await btn.click({ timeout: 5000 }); await page.waitForTimeout(350); return true; } catch (e) {
+        skipped.push(`could not tap the row ${key} action: ${e.message.split('\n').filter((l) => /intercepts|obscur|not visible|outside/i.test(l)).slice(0, 2).join(' / ').trim() || e.message.split('\n')[0]}`);
+        return false;
+      }
+    };
     const states = [];
     const seen = new Set();
+    let step = 'start';
+    const tap = async (el, what) => {
+      try { await el.click({ timeout: 5000 }); } catch (e) {
+        throw new Error(`could not tap the ${what} while auditing "${step}": ${e.message.split('\n').filter((l) => /intercepts|obscur|not visible|outside/i.test(l)).slice(0, 2).join(' / ') || e.message.split('\n')[0]}`);
+      }
+    };
     const note = async (name) => {
+      step = name;
       const fresh = (await measure()).filter((x) => !seen.has(x.replace(/ "[^"]*"$/, '')));
       for (const x of fresh) seen.add(x.replace(/ "[^"]*"$/, ''));
       states.push([name, fresh]);
@@ -500,7 +516,7 @@ export default {
     const row = await reveal(page, 'projector');
     if (row) {
       await note('row-toolbar');
-      if (await rowAction(page, row, 'more')) { await note('row-menu'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+      if (await rowTap(row, 'more')) { await note('row-menu'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
     }
     await h.tryClick(page, '[data-testid="composer-more-tools"]');
     await h.settle(page, 300);
@@ -515,13 +531,13 @@ export default {
     await note('slash');
     await page.fill('#shell-composer-input', '');
     const rr = await reveal(page, 'Sounds good');
-    if (rr && (await rowAction(page, rr, 'react'))) { await note('react-picker'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+    if (rr && (await rowTap(rr, 'react'))) { await note('react-picker'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
     const rp = await reveal(page, 'photos from the meetup');
-    if (rp && (await rowAction(page, rp, 'reply'))) { await note('reply-context'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+    if (rp && (await rowTap(rp, 'reply'))) { await note('reply-context'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
     const ind = await page.$('.onyx-thread-indicator');
     if (ind) {
       await ind.scrollIntoViewIfNeeded();
-      await ind.click();
+      await tap(ind, 'thread link');
       await h.settle(page, 500);
       await note('thread');
       await page.keyboard.press('Escape');
@@ -530,7 +546,7 @@ export default {
     const pic = await page.$('.shell-msg-media-open');
     if (pic) {
       await pic.scrollIntoViewIfNeeded();
-      await pic.click();
+      await tap(pic, 'inline picture');
       await h.settle(page, 400);
       await note('lightbox');
       await page.keyboard.press('Escape');
@@ -538,6 +554,9 @@ export default {
     }
     await page.keyboard.press('Control+f');
     await h.settle(page, 300);
+    const q = await page.$('.onyx-message-search__input');
+    if (q) { await q.fill('the'); await page.keyboard.press('Enter'); await h.settle(page, 400); }
+    await h.tryClick(page, '.onyx-message-search__save-toggle');
     await note('search');
     await page.keyboard.press('Escape');
     await h.tryClick(page, '[data-testid="room-more"]');
@@ -553,6 +572,7 @@ export default {
     await page.keyboard.press('Escape');
     await h.settle(page, 200);
     const problems = states.filter(([, b]) => b.length).map(([n, b]) => `${n}: ${b.slice(0, 10).join('; ')}`);
+    if (skipped.length) problems.push(`skipped: ${skipped.join('; ')}`);
     if (problems.length) throw new Error(`touch targets under 44px — ${problems.join(' | ')}`);
   },
 
