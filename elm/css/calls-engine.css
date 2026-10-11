@@ -36,7 +36,7 @@
 .onyx-voice-chip { flex: 0 1 auto; min-width: 0; max-width: 24rem; height: 32px; }
 .onyx-voice-chip-count { flex: none; }
 .onyx-voice-chip-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.onyx-voice-chip:focus-visible, .onyx-call-join:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-voice-chip:focus-visible, .onyx-call-join:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .onyx-call-join { min-height: 32px; }
 @media (max-width: 1180px) {
   /* Tablets and landscape phones: the count says enough. */
@@ -189,7 +189,7 @@
   width: auto; min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--onyx-line); white-space: nowrap;
 }
 .onyx-call-more-item:hover { background: var(--onyx-panel-2); }
-.onyx-call-more-item:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-call-more-item:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .onyx-call-more-item .onyx-ci { width: 16px; height: 16px; }
 
 /* Narrow stage: icon-only controls in one even row. */

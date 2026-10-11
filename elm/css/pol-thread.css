@@ -482,7 +482,7 @@
   height: 1px;
   background: color-mix(in oklab, var(--onyx-bad) 70%, transparent);
 }
-.onyx-unread-divider:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-unread-divider:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .onyx-unread-divider-label {
   flex: none;
   font-size: var(--text-xs);

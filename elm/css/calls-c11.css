@@ -155,7 +155,7 @@
 :where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-sheet, .onyx-stage-panel, .onyx-header-voice,
   .onyx-join-banner) :where(button):focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset-out);
 }
 
 /* Reduced motion (spec §3.4): the in-app "still" scene setting stops the

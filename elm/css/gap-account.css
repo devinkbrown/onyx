@@ -38,7 +38,7 @@
 }
 .gap-btn--primary:disabled { color: var(--onyx-faint); background: transparent; border-color: var(--onyx-line); }
 .gap-btn--quiet { border-color: transparent; color: var(--onyx-dim); }
-.gap-btn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.gap-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 
 /* ---------- Account: Protection / Names ---------- */
 

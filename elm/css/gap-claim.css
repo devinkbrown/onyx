@@ -129,7 +129,7 @@
 }
 .gc-btn--primary:hover:not(:disabled) { border-color: var(--onyx-accent); filter: brightness(1.08); }
 .gc-btn--primary:disabled { border-color: var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-faint); }
-.gc-btn--primary:focus-visible { outline-color: var(--onyx-text); outline-offset: 2px; }
+.gc-btn--primary:focus-visible { outline-color: var(--onyx-text); outline-offset: var(--focus-offset-out); }
 .gc-btn--quiet { border-color: transparent; background: transparent; color: var(--onyx-dim); }
 .gc-btn--quiet:hover:not(:disabled) { border-color: var(--onyx-bad); color: var(--onyx-bad); }
 .gc-btn--danger { border-color: var(--onyx-bad); color: var(--onyx-bad); }

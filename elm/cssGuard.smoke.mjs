@@ -5,7 +5,11 @@
      1. no `:not(#_)` specificity hacks (the frame's 24px button floor is a
         zero-specificity `:where()` rule, so nothing needs to out-rank it);
      2. every z-index is a rung of the one --z-* ladder defined in app.css;
-     3. one mobile/desktop seam at 768px: `max-width: 767.98px` below,
+     3. one focus ring: every focus outline is `outline: var(--focus-ring)` with
+        an inset (--focus-offset) or outside (--focus-offset-out) placement —
+        no hard-coded `2px solid var(--onyx-accent)` / `outline-offset: 2px`,
+        which ignored the high-contrast width and the theme's focus colour;
+     4. one mobile/desktop seam at 768px: `max-width: 767.98px` below,
         `min-width: 768px` from — never `767px`, `768px` (inclusive max) or
         `769px`.
 
@@ -46,6 +50,21 @@ test("every --z-* token that is used is defined once in app.css :root", () => {
   for (const f of files.filter((x) => x !== "app.css")) {
     assert.doesNotMatch(sources[f], /(--z-[a-z0-9-]+)\s*:/, `${f} redefines a --z token`);
   }
+});
+
+test("focus rings come from the --focus-* tokens", () => {
+  const bad = [];
+  for (const [f, css] of Object.entries(sources)) {
+    for (const m of css.matchAll(/outline\s*:\s*[^;}]*;?/g)) {
+      const v = m[0];
+      if (/Highlight|none|0\b/.test(v) && !/var\(--onyx-accent\)/.test(v)) continue;
+      if (/\d+px\s+solid\s+var\(--onyx-accent\)/.test(v) && !/outline-offset:\s*0/.test(css.slice(m.index, m.index + 80))) bad.push(`${f}: ${v.trim()}`);
+    }
+    for (const m of css.matchAll(/outline-offset\s*:\s*(-?\d+(?:\.\d+)?px)/g)) {
+      if (m[1] === "2px") bad.push(`${f}: outline-offset: 2px`);
+    }
+  }
+  assert.deepEqual(bad, []);
 });
 
 test("the 768px seam is written one way: max-width 767.98px below, min-width 768px from", () => {

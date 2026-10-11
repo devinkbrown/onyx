@@ -95,7 +95,7 @@
 .onyx-moddesk-sheet .oper-desk .oc-tab:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 .oc-tabpanel { min-width: 0; outline: none; }
-.oc-tabpanel:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.oc-tabpanel:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 
 .oc-panel {
   display: flex;
@@ -412,7 +412,7 @@
 
 .conn-foot .ap-footlink { display: inline-flex; align-items: center; min-height: var(--target-min); padding: 0; border: 0; background: transparent; color: var(--onyx-faint); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; touch-action: manipulation; }
 .conn-foot .ap-footlink:hover, .conn-foot .ap-footlink:active { color: var(--onyx-text); }
-.conn-foot .ap-footlink:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-foot .ap-footlink:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .ap-form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .ap-sheet .ap-form { padding: 0 var(--space-4) var(--space-4); }
 .ap-lede, .ap-hint, .ap-status { margin: 0; font-size: 0.875rem; line-height: var(--leading-snug); color: var(--onyx-dim); }
@@ -425,7 +425,7 @@
 .ap-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ap-btn { min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--onyx-accent); border-radius: var(--radius); background: var(--onyx-accent); color: var(--onyx-accent-ink); font: inherit; font-size: 0.875rem; font-weight: 650; cursor: pointer; }
 .ap-btn:disabled { opacity: 0.45; cursor: default; }
-.ap-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.ap-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .ap-status-good { color: var(--onyx-accent); }
 .ap-status-bad { color: var(--onyx-bad); }
 .onyx-sheet-layer > .ap-sheet { width: min(var(--sheet-w-sm, 440px), 100%); }

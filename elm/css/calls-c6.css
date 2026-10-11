@@ -78,7 +78,7 @@
 .onyx-call-pip-card:focus-visible,
 .onyx-call-lost .onyx-call-btn:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset-out);
 }
 
 /* ---------- C6 · DM call entry (room header More menu) ---------- */
