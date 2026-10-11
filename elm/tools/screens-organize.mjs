@@ -127,7 +127,7 @@ async function rowMore(page, h, name) {
     const label = await li.$eval('.onyx-rail-name', (n) => n.textContent).catch(() => '');
     if (label.trim().toLowerCase() === name.toLowerCase()) {
       await li.hover().catch(() => {});
-      const more = await li.$('[data-testid="sidebar-organize-more"]');
+      const more = await li.$('[data-testid="sidebar-row-more"]');
       if (more) { await more.click().catch(() => {}); await h.settle(page, 400); return true; }
     }
   }
