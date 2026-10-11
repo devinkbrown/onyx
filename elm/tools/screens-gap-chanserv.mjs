@@ -315,6 +315,18 @@ export default {
     await clickVisible(page, ['[data-testid="inbox-bell"]', '.shell-ribbon-bell'], h);
     await h.settle(page, 400);
   },
+  // The room's welcome message (ONJOIN notice) as a system row in the room.
+  'cs-welcome': async (page, h) => {
+    const { inject } = await boot(page, h);
+    await inject(`:${NET} NOTICE kn :[#lounge] Welcome to the harbour. Be kind, and say hello in #intros.`);
+    await dismissAsks(page, h);
+  },
+  // A 404 (slowmode) refusal reads in words, with no raw numeric text.
+  'cs-slow-refused': async (page, h) => {
+    const { inject } = await boot(page, h, { props: { SLOWMODE: '30' } });
+    await inject(`:${NET} 404 kn #lounge :Cannot send to channel (slowmode)`);
+    await dismissAsks(page, h);
+  },
   // Slow mode: the countdown line over the composer after a send.
   'cs-slow-composer': async (page, h) => {
     await boot(page, h, { props: { SLOWMODE: '30' } });

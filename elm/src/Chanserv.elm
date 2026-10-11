@@ -1263,6 +1263,19 @@ beginDelete input state =
         pending stage =
             Just { channel = input.channel, stage = stage, others = input.others, founderRank = input.founderRank }
     in
+    if not input.founderRank && List.length input.others > maxKicksToClear then
+        -- An owner (not the founder) has no `CLEAR`: one KICK per person
+        -- would read as a flood to the server. Say so instead of half-deleting.
+        ( { state | pendingDelete = Nothing }
+        , [ Toast ToneError ("Couldn't delete " ++ input.channel) (Just "Too many people are in the room to remove one by one. Ask its founder to delete it.") ]
+        )
+
+    else
+        beginDeleteChecked input pending state
+
+
+beginDeleteChecked : { channel : String, signedIn : Bool, others : List String, founderRank : Bool } -> (DeleteStage -> Maybe PendingDelete) -> State -> ( State, List Effect )
+beginDeleteChecked input pending state =
     case ( registrationOf input.channel state, input.signedIn ) of
         ( _, False ) ->
             -- A guest cannot have registered the room (CHANNEL needs an
@@ -1277,6 +1290,12 @@ beginDelete input state =
 
         _ ->
             ( { state | pendingDelete = pending DeleteAwaitInfo }, [ Send (infoLine input.channel) ] )
+
+
+{-| The most people an owner (without `CLEAR`) removes one KICK at a time. -}
+maxKicksToClear : Int
+maxKicksToClear =
+    25
 
 
 {-| Empty the room, then leave: an unregistered room stops existing when

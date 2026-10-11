@@ -2472,7 +2472,7 @@ Walked Solid `src/lib/store/store.ts` `_handleMessage` 10432–15569 (pre-switch
 | C99 | 475 → join prompt "Incorrect channel password" (no inbox) | `store.ts:15229` | FULL | `App.elm:17241-17244` | |
 | C100 | 482 → inbox "You need operator privileges in #x" + ban panel error | `store.ts:15243-15259` | FULL | `App.elm:17248-17271` | |
 | C101 | 477 (+R/+a room), 480 (join throttle), 407 → Activity text | default (Activity) | PARTIAL | `App.elm:5671,5720-5730` | Log only; browser waits 8 s, then shows "did not confirm" |
-| C102 | KNOCK replies 710/711/713/714 | default (Activity) | PARTIAL | `App.elm:4673-4690` | Log only (invisible) |
+| C102 | KNOCK replies 710/711/713/714 | default (Activity) | FULL | `Chanserv.elm` `fold` (710 → inbox row with Invite, 711/713/714 → toasts and prompt state); `View/Chanserv.elm` | v3/gap-chanserv: Ask to join on the 471/473/475 prompt; Elm better than the oracle's log line |
 | C103 | 600/601/604/605 WATCH → watch-list online/last-seen | `store.ts:14943-14967` | FULL | `App.elm:5571-5590,25779,25797` | |
 | C104 | 367/368 ban list → ban panel | `store.ts:15044-15092` | FULL | `App.elm:5803-5807,19108,19232` | |
 | C105 | 801–805 ACCESS → Roles access manager | `store.ts:15094-15203` | FULL | `App.elm:5782-5796,8446`; `View/RoomSettings.elm:482` | |

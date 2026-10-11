@@ -5812,14 +5812,14 @@ foldLine model message =
             foldErrorNumeric model message
 
         "477" ->
-            -- Registered/account-only room (`+a`/`+R`): the oracle
-            -- has no 477 path either (generic numeric log), so
-            -- this stays on it rather than inventing a prompt.
+            -- Account-only room (`+a`) or a DM to a `+R` person. v3/gap-chanserv:
+            -- `foldErrorNumeric` explains it (join prompt / inbox row) and
+            -- the raw line still reaches the service log.
             foldErrorNumeric model message
 
         "480" ->
-            -- Join throttle (`+j`, contract §11): no oracle path;
-            -- the generic numeric log carries the retry-after text.
+            -- Join throttle (`+j`). v3/gap-chanserv: explained as a join
+            -- prompt ("busy, try again"); the raw line stays in the log.
             foldErrorNumeric model message
 
         -- v3/gap-chanserv: refusals the server explains in words

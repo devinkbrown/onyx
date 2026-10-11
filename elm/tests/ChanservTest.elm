@@ -1029,6 +1029,24 @@ deleteRoom =
                     , \_ -> Expect.equal Nothing after.pendingDelete
                     ]
                     ()
+        , test "an owner without CLEAR is not asked to KICK a crowd one by one; a founder is not limited" <|
+            \_ ->
+                let
+                    crowd =
+                        List.range 1 30 |> List.map (\i -> "user" ++ String.fromInt i)
+
+                    owner =
+                        Chanserv.beginDelete { channel = "#c", signedIn = False, others = crowd, founderRank = False } Chanserv.blank
+
+                    founder =
+                        Chanserv.beginDelete { channel = "#c", signedIn = False, others = crowd, founderRank = True } Chanserv.blank
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (sends (Tuple.second owner))
+                    , \_ -> Expect.equal [ Chanserv.Toast ToneError "Couldn't delete #c" (Just "Too many people are in the room to remove one by one. Ask its founder to delete it.") ] (Tuple.second owner)
+                    , \_ -> Expect.equal [ wire "MODE #c +si", wire "CLEAR #c USERS", wire "PART #c :Room deleted" ] (sends (Tuple.second founder))
+                    ]
+                    ()
         , test "a socket close abandons an unanswered delete" <|
             \_ ->
                 let
