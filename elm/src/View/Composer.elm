@@ -15,6 +15,7 @@ a nested form, so Enter in the composer still sends.
 -}
 
 import App exposing (Model, Msg(..))
+import BlockKit -- v3/gap-import
 import ComposerAssist
 import Dict
 import Emoji
@@ -29,6 +30,7 @@ import Schedule
 import View.Chanserv -- v3/gap-chanserv
 import View.Icon exposing (icon)
 import View.Polish
+import View.UserModes -- v3/gap-usermodes
 
 
 composer : Model -> Html Msg
@@ -318,7 +320,7 @@ replyBar model =
                     in
                     div [ class "shell-composer-context", attribute "role" "status", attribute "aria-live" "polite" ]
                         [ span [ class "shell-composer-context-label" ] [ text ("Replying to " ++ shown.from) ]
-                        , span [ class "shell-composer-context-text" ] [ text (clippedText shown.preview) ]
+                        , span [ class "shell-composer-context-text" ] [ text (clippedText (BlockKit.summary shown.preview)) ]
                         , button
                             [ type_ "button"
                             , class "shell-composer-context-close"
@@ -523,6 +525,8 @@ schedulePopover model =
                 ]
                 [ icon "x" ]
             ]
+        , -- v3/gap-usermodes: on this device (cancellable) or on the server
+          View.UserModes.scheduleWhere model
         , div [ class "onyx-schedule-presets" ]
             (List.indexedMap (schedulePreset model) Schedule.schedulePresets)
         , div [ class "onyx-schedule-custom" ]

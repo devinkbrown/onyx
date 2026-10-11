@@ -24,8 +24,10 @@ import Nav
 import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
+import View.HistoryImport -- v3/gap-import
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
+import View.UserModes
 
 
 prefsSheet : Model -> Html Msg
@@ -220,6 +222,10 @@ panelBody model category =
             , View.Organize.prefsOrganize model -- v3/gap-organize
             ]
 
+        Privacy ->
+            -- v3/gap-usermodes
+            View.UserModes.privacyPanel model
+
         History ->
             [ sectionHead "History & data" "How this browser remembers, finds, retains, and erases local conversation data."
             , segmented
@@ -236,24 +242,9 @@ panelBody model category =
             ]
 
         Transfer ->
-            [ sectionHead "Import & export" "Move portable conversation data into or out of this browser."
-            , section [ class "pref-group pref-vault-portable", attribute "aria-labelledby" "pref-vault-portable-title" ]
-                [ div [ class "pref-group-head" ]
-                    [ h3 [ class "pref-label", id "pref-vault-portable-title" ] [ text "Portable vault" ] ]
-                , p [ class "pref-desc" ]
-                    [ text "Export or merge this device's local message history as portable JSON. Passwords, session tokens, and decrypted DM plaintext are not exported." ]
-                , div [ class "pref-actions" ]
-                    [ button [ type_ "button", class "pref-reset", onClick PrefsVaultExport ] [ text "Export vault" ]
-                    , button [ type_ "button", class "pref-reset", onClick PrefsVaultImport ] [ text "Import portable JSON" ]
-                    ]
-                , case model.prefsTransferStatus of
-                    Just status ->
-                        p [ class "pref-status", attribute "role" "status" ] [ text status ]
-
-                    Nothing ->
-                        text ""
-                ]
-            ]
+            -- v3/gap-import: import review, sources, portable vault, past imports
+            sectionHead "Import & export" "Move conversation history into or out of this browser."
+                :: View.HistoryImport.transfer model
 
         Accessibility ->
             [ sectionHead "Accessibility" "Motion, transparency, contrast, and verified access surfaces on this device."

@@ -1,0 +1,5 @@
+[
+  { "ID": 500000000000000001, "Timestamp": "2024-03-01 09:00:00", "Contents": "my own message", "Attachments": "" },
+  { "ID": 500000000000000002, "Timestamp": "2024-03-01 09:05:00", "Contents": "with a file", "Attachments": "https://cdn.example.test/f.txt https://cdn.example.test/g.txt" },
+  { "ID": 500000000000000003, "Timestamp": "garbage", "Contents": "skipped", "Attachments": "" }
+]

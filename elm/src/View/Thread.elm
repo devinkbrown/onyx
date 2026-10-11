@@ -6,6 +6,7 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Avatar
+import BlockKit -- v3/gap-import
 import Dict
 import Emoji
 import Topic
@@ -24,6 +25,7 @@ import Translate
 -- v3/transcript
 import TranscriptRows
 import Upload
+import View.BlockKit as BlockKitView -- v3/gap-import
 import View.DmSafety
 import View.GapCommands
 import View.Home
@@ -383,7 +385,7 @@ richRow : Model -> String -> TranscriptRows.RowFlags -> String -> App.ChatMessag
 richRow model target flags title m =
     rowShell
         { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m }
-        (messageBody model m)
+        (messageBody model target m)
         (messageMenuButton model target m)
         [ messageMenuPanel model target m
         , reactionPickerPanel model target m
@@ -2280,11 +2282,26 @@ passes, everything else renders a `FileChip` link with
 `target=_blank`, so no `javascript:` href can reach the DOM),
 plus one inline-media unfurl per direct image/video/audio URL,
 plus the first-link OG preview card when fetched. -}
-messageBody : Model -> App.ChatMessage -> List (Html Msg)
-messageBody model m =
+messageBody : Model -> String -> App.ChatMessage -> List (Html Msg)
+messageBody model target m =
     let
-        presented =
+        shown =
             Upload.extractAttachmentPresentation (App.displayBody m)
+
+        -- v3/gap-import: strictly decoded `[onyx:block]` lines leave the
+        -- text and render as structured cards; anything else stays text.
+        kit =
+            BlockKit.extract shown.caption
+
+        presented =
+            { shown | caption = kit.text }
+
+        body =
+            if List.isEmpty kit.blocks then
+                App.displayBody m
+
+            else
+                kit.text
     in
     (case m.replyTo of
         Just ref ->
@@ -2293,10 +2310,16 @@ messageBody model m =
         Nothing ->
             []
     )
-        ++ [ messageText model.ourNick presented.caption ]
+        ++ (if List.isEmpty kit.blocks || not (String.isEmpty (String.trim kit.text)) then
+                [ messageText model.ourNick presented.caption ]
+
+            else
+                []
+           )
+        ++ BlockKitView.cards model { target = target, key = TranscriptRows.rowKey m } kit.blocks
         ++ List.map (attachmentCard model m) presented.attachments
         ++ mediaUnfurls model m presented
-        ++ [ previewCard model m (App.displayBody m) ]
+        ++ [ previewCard model m body ]
 
 
 {-| Reply context line (mirrors the oracle `shell-msg-reply` block:
@@ -2314,7 +2337,7 @@ clippedReplyPreview : String -> String
 clippedReplyPreview text =
     let
         safe =
-            App.sanitizePersistedReplyPreviewText text
+            App.sanitizePersistedReplyPreviewText (BlockKit.summary text)
     in
     if String.length safe > 80 then
         String.left 80 safe ++ "…"

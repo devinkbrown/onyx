@@ -18,6 +18,7 @@ import GroupControl
 import GroupDirectory
 import GroupEnvelope
 import GroupPublisher
+import HistoryImport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Labels
@@ -26,6 +27,7 @@ import Schedule
 import Services
 import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
+import PrefsPanel
 import RoomMedia exposing (RoomMediaFilter(..))
 import Moderation
 import Session
@@ -6561,17 +6563,33 @@ suite =
                 Expect.equal
                     "Vault exported (40 messages, 2 targets)."
                     (Maybe.withDefault "" (List.head m.serviceLog))
-        , test "VaultImportFile merges validated rows through VaultPersist" <|
+        , test "VaultImportFile stages a review first; Import then merges the validated rows through VaultPersist" <|
             \_ ->
                 let
                     json =
                         "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#C\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000},{\"id\":\"m2\",\"from\":\"b\",\"text\":\"yo\",\"type\":\"notice\",\"time\":2000}]}]}"
 
-                    ( m, outbound ) =
+                    ( staged, stagedOut ) =
                         update (VaultImportFile { json = json }) blank
+
+                    ( _, confirmOut ) =
+                        update (HistoryImportMsg HistoryImport.Confirm) staged
+
+                    persists out =
+                        List.filter
+                            (\o ->
+                                case o of
+                                    VaultPersist _ ->
+                                        True
+
+                                    _ ->
+                                        False
+                            )
+                            out
                 in
                 Expect.all
-                    [ \_ ->
+                    [ \_ -> Expect.equal [] (persists stagedOut)
+                    , \_ ->
                         Expect.equal
                             [ VaultPersist
                                 { target = "#c"
@@ -6581,10 +6599,10 @@ suite =
                                     ]
                                 }
                             ]
-                            outbound
+                            (persists confirmOut)
                     , \_ ->
-                        Expect.equal "Importing 2 messages into 1 conversations."
-                            (Maybe.withDefault "" (List.head m.serviceLog))
+                        Expect.equal "Vault import file staged for review (2 messages, 1 conversations)."
+                            (Maybe.withDefault "" (List.head staged.serviceLog))
                     ]
                     ()
         , test "VaultImportFile refuses blank, broken, and empty snapshots" <|
@@ -10581,7 +10599,8 @@ suite =
                     ( _, outbound ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                -- v3/gap-usermodes: a fresh registration also asks for the user modes.
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
@@ -10599,7 +10618,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -12459,6 +12478,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12497,6 +12517,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12662,7 +12683,9 @@ suite =
                         , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
                         , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
                         , \_ -> Expect.equal 2 m.whoisTimerGen
-                        , \_ -> Expect.equal [] outs
+                        -- v3/gap-usermodes: an open profile that is offline asks
+                        -- WHOWAS (the only line this fold sends).
+                        , \_ -> Expect.equal [ SendLine "WHOWAS ghost 1\r\n" ] outs
                         ]
                         ()
             , test "401 off the active sheet lands nothing" <|
@@ -24013,13 +24036,17 @@ suite =
                         , \_ -> Expect.equal [ "Export scrollback" ] (List.map .title exported.toasts)
                         ]
                         ()
-            , test "slash import fires the vault file picker" <|
+            , test "slash import opens Import & export and asks for the vault file picker" <|
                 \_ ->
                     let
-                        ( _, out ) =
+                        ( m, out ) =
                             update ComposerSend { blank | activeChannel = Just "#c", composer = "/import" }
                     in
-                    Expect.equal [ VaultImportPick ] out
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (HistoryImportPick { job = 1, kind = "portable" }) out)
+                        , \_ -> Expect.equal True (m.prefsOpen && m.prefsCategory == PrefsPanel.Transfer)
+                        ]
+                        ()
         , describe "retention policy"
             [ test "keep selection saves and parks the applying status" <|
                 \_ ->
