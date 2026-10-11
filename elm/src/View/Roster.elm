@@ -37,7 +37,11 @@ import Html exposing (Html, button, details, div, h2, input, label, li, p, secti
 import Html.Attributes exposing (attribute, class, classList, for, id, placeholder, title, type_, value)
 import Html.Events exposing (onClick, onInput, preventDefaultOn, stopPropagationOn)
 import Json.Decode as Decode
+import GapPeople
+import Html.Keyed
+import Html.Lazy
 import Roster
+import RosterWindow
 import View.Icon exposing (icon)
 import View.Stewardship exposing (roomCareButton)
 
@@ -75,45 +79,68 @@ roster model =
         ]
         (case ( model.activeChannel, activeChannel ) of
             ( Just name, Just channel ) ->
-                let
-                    groups =
-                        Roster.groupMembers model.isupport.prefixOrder model.isupport.modeToPrefix (Dict.values channel.members)
-
-                    total =
-                        Roster.totalCount groups
-
-                    visible =
-                        Roster.presenceGroups (Roster.filterGroups model.memberFilter groups)
-
-                    filterOpen =
-                        total > filterAlwaysAbove || not (String.isEmpty (String.trim model.memberFilter))
-                in
-                [ header model.memberFilter (Roster.totalCount visible) total (not (List.isEmpty groups)) filterOpen ]
-                    ++ (if List.isEmpty groups then
-                            [ p [ class "onyx-roster-empty" ] [ text "No one here yet" ] ]
-
-                        else
-                            filterField model.memberFilter filterOpen
-                                :: (if List.isEmpty visible then
-                                        [ p
-                                            [ class "onyx-roster-empty"
-                                            , attribute "data-testid" "member-filter-empty"
-                                            , attribute "role" "status"
-                                            ]
-                                            [ text ("No members match “" ++ String.trim model.memberFilter ++ "”.") ]
-                                        ]
-
-                                    else
-                                        [ div [ class "onyx-mlist-groups" ] (List.map (rosterGroup model channel) visible) ]
-                                   )
-                       )
-                    ++ [ div [ class "onyx-mlist-foot" ] [ roomCareButton model name ] ]
+                -- v3/gap-people: the body is lazy over exactly what it
+                -- reads (the member Dict keeps its identity across
+                -- unrelated updates), so typing in a 4,000-person room
+                -- no longer re-sorts and re-diffs the whole list.
+                [ Html.Lazy.lazy7 rosterBody
+                    model.ourNick
+                    channel.name
+                    channel.members
+                    model.memberFilter
+                    model.isupport.prefixOrder
+                    model.isupport.modeToPrefix
+                    model.rosterLimits
+                , div [ class "onyx-mlist-foot" ] [ roomCareButton model name ]
+                ]
 
             _ ->
                 [ div [ class "onyx-roster-head" ]
                     [ h2 [ class "onyx-mlist-title" ] [ text "Members" ] ]
                 , div [ class "onyx-empty-small" ] [ text "—" ]
                 ]
+        )
+
+
+{-| Header, filter and the windowed groups (v3/gap-people). -}
+rosterBody : String -> String -> Dict.Dict String App.Member -> String -> List Char -> Dict.Dict Char Char -> RosterWindow.Limits -> Html Msg
+rosterBody ourNick channelName members memberFilter prefixOrder modeToPrefix limits =
+    let
+        groups =
+            Roster.groupMembers prefixOrder modeToPrefix (Dict.values members)
+
+        total =
+            Roster.totalCount groups
+
+        visible =
+            Roster.presenceGroups (Roster.filterGroups memberFilter groups)
+
+        filterOpen =
+            total > filterAlwaysAbove || not (String.isEmpty (String.trim memberFilter))
+
+        me =
+            { ourNick = ourNick }
+    in
+    div [ class "onyx-roster-body" ]
+        ([ header memberFilter (Roster.totalCount visible) total (not (List.isEmpty groups)) filterOpen ]
+            ++ (if List.isEmpty groups then
+                    [ p [ class "onyx-roster-empty" ] [ text "No one here yet" ] ]
+
+                else
+                    filterField memberFilter filterOpen
+                        :: (if List.isEmpty visible then
+                                [ p
+                                    [ class "onyx-roster-empty"
+                                    , attribute "data-testid" "member-filter-empty"
+                                    , attribute "role" "status"
+                                    ]
+                                    [ text ("No members match “" ++ String.trim memberFilter ++ "”.") ]
+                                ]
+
+                            else
+                                [ div [ class "onyx-mlist-groups" ] (List.map (rosterGroup me channelName limits) visible) ]
+                           )
+               )
         )
 
 
@@ -234,14 +261,19 @@ escapeClears query =
             )
 
 
-rosterGroup : Model -> Channel -> Roster.Group { away : Bool } -> Html Msg
-rosterGroup model channel group =
+rosterGroup : { m | ourNick : String } -> String -> RosterWindow.Limits -> Roster.Group { away : Bool } -> Html Msg
+rosterGroup model channelName limits group =
     let
         count =
             List.length group.members
 
         startsOpen =
             group.key /= "away" || count <= awayFoldAbove
+
+        -- v3/gap-people: paint a window of the group; the heading keeps
+        -- the real count.
+        win =
+            RosterWindow.window (RosterWindow.limitFor group.key limits) group.members
     in
     details
         ([ classList
@@ -264,12 +296,39 @@ rosterGroup model channel group =
                 ]
             , icon "chevron-down"
             ]
-        , ul [ class "onyx-mlist-rows" ] (List.map (\e -> rosterRow model channel.name group.key e) group.members)
+        , Html.Keyed.ul [ class "onyx-mlist-rows" ]
+            (List.indexedMap (\i e -> ( String.toLower e.member.nick, rosterRow model channelName group.key i e )) win.shown)
+        , if win.hidden > 0 then
+            showMore group.key group.label win.hidden
+
+          else
+            text ""
         ]
 
 
-rosterRow : Model -> String -> String -> Roster.Entry { away : Bool } -> Html Msg
-rosterRow model channel groupKey entry =
+{-| v3/gap-people — paint the next window of a long group. -}
+showMore : String -> String -> Int -> Html Msg
+showMore groupKey label hidden =
+    let
+        next =
+            min RosterWindow.step hidden
+    in
+    div [ class "onyx-roster-more-wrap" ]
+        [ button
+            [ type_ "button"
+            , class "onyx-roster-more"
+            , attribute "data-testid" "roster-show-more"
+            , attribute "aria-label" ("Show " ++ String.fromInt next ++ " more in " ++ label ++ ", " ++ String.fromInt hidden ++ " not shown")
+            , onClick (GapPeopleMsg (GapPeople.RosterShowMore groupKey))
+            ]
+            [ text ("Show " ++ String.fromInt next ++ " more") ]
+        , span [ class "onyx-roster-more-hint", attribute "aria-hidden" "true" ]
+            [ text (String.fromInt hidden ++ " not shown · filter to find someone") ]
+        ]
+
+
+rosterRow : { m | ourNick : String } -> String -> String -> Int -> Roster.Entry { away : Bool } -> Html Msg
+rosterRow model channel groupKey index entry =
     let
         member =
             entry.member
@@ -305,6 +364,7 @@ rosterRow model channel groupKey entry =
         ([ button
             [ type_ "button"
             , class "onyx-mlist-main"
+            , id (RosterWindow.rowId groupKey index)
             , attribute "aria-label" ("View member card for " ++ member.nick)
             , onClick (App.UserProfileOpened { nick = member.nick, channel = channel })
             ]

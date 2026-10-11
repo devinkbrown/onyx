@@ -16,7 +16,7 @@ import Json.Decode as Decode
 import Modes
 import Moderation
 import PersonSafety
-import Prefs
+import PeerAccount
 import Services
 import Set
 import View.Sheet as Sheet
@@ -450,16 +450,27 @@ cardFor model nick channel =
             Maybe.map .away member |> Maybe.withDefault False
 
         account =
-            case Maybe.andThen .account profile of
-                Just stored ->
-                    if String.isEmpty (String.trim stored) then
-                        Maybe.andThen .account info
+            -- v3/gap-people: live account knowledge (extended-join,
+            -- account-notify, account-tag, WHOX) wins; WHOIS and the
+            -- cached profile fill in when the peer is unknown.
+            case App.peerKnowledge model nick of
+                PeerAccount.SignedIn known ->
+                    Just known
 
-                    else
-                        Just (String.trim stored)
+                PeerAccount.Guest ->
+                    Nothing
 
-                Nothing ->
-                    Maybe.andThen .account info
+                PeerAccount.Unknown ->
+                    case Maybe.andThen .account profile of
+                        Just stored ->
+                            if String.isEmpty (String.trim stored) then
+                                Maybe.andThen .account info
+
+                            else
+                                Just (String.trim stored)
+
+                        Nothing ->
+                            Maybe.andThen .account info
 
         cardId =
             "people-card-" ++ slug nick ++ "-" ++ slug channel
@@ -759,28 +770,45 @@ cardEscapeDecoder =
             )
 
 
-{-| Card moderation controls (mirroring the oracle `showRoomModeration`
-/ `showIrcRoleControls` gates: room op, not self, and the experience
-mode publishing kick (room actions) or op (role controls)). -}
+{-| Card moderation controls — v3/gap-people: gated on the room role
+the server enforces (`ModAuthority`), not on a local experience level.
+Room moderators see the role toggles that fit the person's current
+state plus Remove / Block, for people at or below their own rank;
+everyone else sees nothing. Every control stages a review. -}
 moderationControls : Model -> String -> String -> Maybe App.Member -> Bool -> Html Msg
-moderationControls model nick channel member isSelf =
+moderationControls model nick channel _ isSelf =
     let
         kinds =
-            Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)
+            if isSelf then
+                []
 
-        canModerate =
-            App.isChannelOp model channel
-
-        modes =
-            Maybe.map .modes member |> Maybe.withDefault Set.empty
+            else
+                App.moderationCardKinds model channel nick
 
         propose kind =
             App.ModerationPropose { kind = kind, channel = channel, target = Just nick, mask = Nothing, reason = Nothing }
-    in
-    if not canModerate || isSelf then
-        text ""
 
-    else if not (List.member Moderation.Kick kinds) then
+        control kind =
+            case kind of
+                Moderation.Op ->
+                    modButton ("Make " ++ nick ++ " a moderator") (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Deop ->
+                    modButton ("Remove moderator from " ++ nick) (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Voice ->
+                    modButton ("Let " ++ nick ++ " speak") (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Devoice ->
+                    modButton ("Remove speak from " ++ nick) (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Kick ->
+                    modButton ("Remove " ++ nick ++ " from " ++ channel) "Remove" True (propose kind)
+
+                _ ->
+                    modButton ("Block " ++ nick ++ " from " ++ channel) "Block" True (propose kind)
+    in
+    if List.isEmpty kinds then
         text ""
 
     else
@@ -789,35 +817,23 @@ moderationControls model nick channel member isSelf =
             , attribute "role" "group"
             , attribute "aria-label" ("Moderate " ++ nick)
             ]
-            ([]
-                ++ (if List.member Moderation.Op kinds then
-                        [ if Set.member 'o' modes then
-                            modButton ("Remove op from " ++ nick) "Deop" (propose Moderation.Deop)
-
-                          else
-                            modButton ("Give op to " ++ nick) "Op" (propose Moderation.Op)
-                        , if Set.member 'v' modes then
-                            modButton ("Remove voice from " ++ nick) "Devoice" (propose Moderation.Devoice)
-
-                          else
-                            modButton ("Give voice to " ++ nick) "Voice" (propose Moderation.Voice)
-                        ]
-
-                    else
-                        []
-                   )
-                ++ [ modButton ("Kick " ++ nick ++ " from " ++ channel) "Kick" (propose Moderation.Kick)
-                   , modButton ("Ban " ++ nick ++ " from " ++ channel) "Ban" (propose Moderation.Ban)
-                   ]
-            )
+            [ p [ class "onyx-member-mod-title", attribute "aria-hidden" "true" ] [ text "Room moderation" ]
+            , div [ class "onyx-member-mod-row" ] (List.map control kinds)
+            ]
 
 
 {-| One moderation control button. -}
-modButton : String -> String -> Msg -> Html Msg
-modButton label visible msg =
+modButton : String -> String -> Bool -> Msg -> Html Msg
+modButton label visible danger msg =
     button
         [ attribute "type" "button"
-        , class "onyx-member-action"
+        , class
+            (if danger then
+                "onyx-member-action onyx-member-action--danger"
+
+             else
+                "onyx-member-action"
+            )
         , attribute "aria-label" label
         , onClick msg
         ]
@@ -869,7 +885,8 @@ moderationReview model =
                         Just "You no longer have moderator permission in this room."
 
                     else
-                        Nothing
+                        -- v3/gap-people: the server's rank rule.
+                        App.moderationRefusal model draft
 
                 canSend =
                     review /= Nothing && blockedReason == Nothing

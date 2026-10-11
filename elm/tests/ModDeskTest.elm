@@ -392,11 +392,14 @@ suite =
                         |> Query.has [ Selector.disabled True ]
             ]
         , describe "moderation sheet"
-            [ test "the Moderation button shows only for room moderators" <|
+            [ test "moderators get Moderation; members get the read-only Room safety entry" <|
                 \_ ->
+                    -- v3/gap-people: members reach the read-only desk.
                     Expect.all
                         [ \_ -> query (menuOpen (roomModel (Set.singleton 'o'))) |> Query.find [ testId "moderation-open" ] |> Event.simulate Event.click |> Event.expect ModerationSheetOpen
-                        , \_ -> query (menuOpen (roomModel (Set.singleton 'v'))) |> Query.findAll [ testId "moderation-open" ] |> Query.count (Expect.equal 0)
+                        , \_ -> query (menuOpen (roomModel (Set.singleton 'o'))) |> Query.find [ testId "moderation-open" ] |> Query.has [ Selector.text "Moderation" ]
+                        , \_ -> query (menuOpen (roomModel (Set.singleton 'v'))) |> Query.find [ testId "moderation-open" ] |> Query.has [ Selector.text "Room safety" ]
+                        , \_ -> query (menuOpen (roomModel (Set.singleton 'v'))) |> Query.find [ testId "moderation-open" ] |> Event.simulate Event.click |> Event.expect ModerationSheetOpen
                         ]
                         ()
             , test "the ban desk no longer renders inline in the main column" <|
@@ -406,12 +409,24 @@ suite =
                         , \_ -> query (roomModel (Set.singleton 'o')) |> Query.findAll [ testId "moderation-cockpit" ] |> Query.count (Expect.equal 0)
                         ]
                         ()
-            , test "opening is gated on room authority" <|
+            , test "opening needs a room we are in; members get the read-only desk" <|
                 \_ ->
+                    let
+                        member =
+                            Tuple.first (update ModerationSheetOpen (roomModel (Set.singleton 'v')))
+
+                        q =
+                            query member |> Query.find [ testId "moderation-cockpit" ]
+                    in
                     Expect.all
                         [ \_ -> Expect.equal True (Tuple.first (update ModerationSheetOpen (roomModel (Set.singleton 'o')))).moderationOpen
-                        , \_ -> Expect.equal False (Tuple.first (update ModerationSheetOpen (roomModel (Set.singleton 'v')))).moderationOpen
+                        , \_ -> Expect.equal True member.moderationOpen
                         , \_ -> Expect.equal False (Tuple.first (update ModerationSheetOpen { blank | connection = Live })).moderationOpen
+                        , \_ -> q |> Query.has [ Selector.text "You are a member here." ]
+                        , \_ -> q |> Query.findAll [ testId "desk-readonly" ] |> Query.count (Expect.equal 1)
+                        , \_ -> q |> Query.find [ testId "desk-readonly-safeguards" ] |> Query.has [ Selector.text "Moderated", Selector.text "Off" ]
+                        , \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 0)
+                        , \_ -> q |> Query.findAll [ testId "ban-add-form" ] |> Query.count (Expect.equal 0)
                         ]
                         ()
             , test "the open sheet carries the current-room header and the desk" <|

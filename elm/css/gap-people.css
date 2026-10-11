@@ -1,0 +1,167 @@
+/* v3/gap-people — moderation, people and room-care surfaces.
+
+   Owned by the gap-people slice; linked before css/ui-sheets.css so the
+   sheet family keeps the last word on sheet geometry. Tokens come from
+   app.css :root. Covers:
+     1. the windowed member list ("Show more", content-visibility)
+     2. the member card's role-gated moderation group
+     3. Room care (offer entry, notes)
+     4. the room desk (timed-block review, read-only facts)
+     5. Room settings tools (webhooks, transcript export) */
+
+/* ── 1. Member list ─────────────────────────────────────────────────── */
+
+/* The lazy roster body is a wrapper only: the header, filter and groups
+   keep laying out as direct children of the rail / sheet. */
+.onyx-roster-body { display: contents; }
+
+/* Off-screen rows skip layout and paint (a 4,000-person room paints a
+   window, but long windows stay cheap while scrolling). `auto` keeps
+   each row's last real height once it has been on screen. */
+.onyx-roster .onyx-member {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
+}
+.onyx-roster:popover-open .onyx-member { contain-intrinsic-size: auto 52px; }
+
+.onyx-roster-more-wrap {
+  display: grid;
+  gap: 2px;
+  margin: var(--space-1) 0 var(--space-2);
+  padding: 0 var(--space-1);
+}
+.onyx-roster-more {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-roster-more:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (hover: hover) {
+  .onyx-roster-more:hover { background: var(--onyx-panel-2); }
+}
+.onyx-roster-more-hint {
+  padding: 0 var(--space-1);
+  color: var(--onyx-faint);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug, 1.35);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+@media (hover: none) {
+  .onyx-roster-more { min-height: var(--target-min); }
+}
+.onyx-roster:popover-open .onyx-roster-more { min-height: var(--target-min); font-size: 15px; }
+
+/* ── 2. Member card: moderation ─────────────────────────────────────── */
+
+.onyx-member-card .onyx-member-mod {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+}
+.onyx-member-mod-title {
+  margin: 0;
+  color: var(--onyx-dim);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+.onyx-member-mod-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.onyx-member-mod-row .onyx-member-action {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onyx-member-action--danger {
+  color: var(--onyx-bad);
+  border-color: color-mix(in oklab, var(--onyx-bad) 45%, var(--onyx-line));
+}
+@media (hover: hover) {
+  .onyx-member-action--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 10%, transparent); }
+}
+@media (hover: none) {
+  .onyx-member-mod-row .onyx-member-action { min-height: var(--target-min); }
+}
+
+/* ── 3. Room care ───────────────────────────────────────────────────── */
+
+/* An offer waiting for us is the one call to action in the list foot. */
+.onyx-roster-care--offer {
+  color: var(--onyx-accent);
+  font-weight: 650;
+}
+.onyx-steward-note {
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+}
+
+/* ── 4. Room desk ───────────────────────────────────────────────────── */
+
+.moderation-desk__ban-review {
+  border-color: color-mix(in oklab, var(--onyx-bad) 40%, var(--onyx-line));
+}
+.moderation-desk__review-summary {
+  margin: 0;
+  color: var(--onyx-text);
+  line-height: 1.45;
+}
+.moderation-desk__ban-review .moderation-desk__ban-mask {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ── 5. Room settings tools ─────────────────────────────────────────── */
+
+.gp-webhooks,
+.gp-export { display: grid; gap: var(--space-2); }
+.gp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.gp-actions > .rset-btn { min-width: 0; }
+.gp-btn-danger {
+  color: var(--onyx-bad);
+  border-color: color-mix(in oklab, var(--onyx-bad) 45%, var(--onyx-line));
+}
+.gp-btn-danger:disabled { color: var(--onyx-faint); border-color: var(--onyx-line); }
+.gp-status { color: var(--onyx-warn); }
+.gp-notices {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+}
+.gp-notice {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--text-xs);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+@media (hover: none) {
+  .gp-actions > .rset-btn { min-height: var(--target-min); }
+}
+
+@media (forced-colors: active) {
+  .onyx-member-action--danger,
+  .gp-btn-danger { border-color: ButtonText; }
+}
