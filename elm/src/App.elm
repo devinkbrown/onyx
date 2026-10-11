@@ -130,6 +130,8 @@ import Wire
 -- v3/gap-account
 import AccountScope
 import GapAccount
+-- v3/gap-claim
+import GapClaim
 
 
 type ConnectionState
@@ -989,6 +991,9 @@ type alias Model =
 
     -- v3/gap-account
     , gapAccount : GapAccount.State
+
+    -- v3/gap-claim
+    , gapClaim : GapClaim.State
     -- v3/gap-auth
     , authGate : AuthGate.State
 
@@ -1261,6 +1266,9 @@ type Outbound
     | CtcpTimeReply { to : String }
       -- v3/gap-account
     | GapAccountFx GapAccount.Effect
+      -- v3/gap-claim: scan / attach / delete / dismiss for history that
+      -- predates owner scoping (ports `gapClaimRequest`).
+    | GapClaimFx { op : String, scope : String }
     -- v3/gap-auth: the auth-gate port (PoW solve, held-password
     -- IDENTIFY, SETPASS credential staging).
     | AuthGatePort Encode.Value
@@ -3410,6 +3418,8 @@ type Msg
     | SessionReclaimSignIn
       -- v3/gap-account
     | GapAccountMsg GapAccount.Msg
+      -- v3/gap-claim
+    | GapClaimMsg GapClaim.Msg
     -- v3/gap-auth
     | AuthGateMsg AuthGate.Msg
     | AuthGatePortIn Decode.Value
@@ -4103,6 +4113,9 @@ init nick url =
 
     -- v3/gap-account
     , gapAccount = GapAccount.blank
+
+    -- v3/gap-claim
+    , gapClaim = GapClaim.blank
     -- v3/gap-auth
     , authGate = AuthGate.blank
 
@@ -4717,6 +4730,9 @@ blank =
 
     -- v3/gap-account
     , gapAccount = GapAccount.blank
+
+    -- v3/gap-claim
+    , gapClaim = GapClaim.blank
     -- v3/gap-auth
     , authGate = AuthGate.blank
 
@@ -39782,6 +39798,7 @@ settleSteps =
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepGapAccount -- v3/gap-account
+    , settleStepGapClaim -- v3/gap-claim
     , settleStepAuth -- v3/gap-auth
 
     , settleStepRxShell -- v3/rx-shell
@@ -45948,6 +45965,10 @@ updateCore msg model =
         -- v3/gap-account
         GapAccountMsg sub ->
             updateGapAccount sub model
+
+        -- v3/gap-claim
+        GapClaimMsg sub ->
+            updateGapClaim sub model
 
         RoomMenuToggle ->
             ( { model | roomMenuOpen = not model.roomMenuOpen }, [] )
@@ -54385,3 +54406,113 @@ gapGroupVerb verb nick model =
 
             Nothing ->
                 ( model, [] )
+
+
+-- v3/gap-claim
+
+
+gapClaimCtx : Model -> GapClaim.Ctx
+gapClaimCtx model =
+    { scope = model.gapAccount.scope
+    , localHistory = model.prefs.localHistory
+    }
+
+
+{-| Fold claim effects: port requests become outbounds; a changed vault
+voids the per-conversation DM privacy proofs and hydrates every open,
+still-empty buffer, so attached history shows without a reload. -}
+gapClaimApply : List GapClaim.Effect -> Model -> ( Model, List Outbound )
+gapClaimApply effects model =
+    List.foldl
+        (\fx ( m, outs ) ->
+            case fx of
+                GapClaim.Request req ->
+                    ( m, outs ++ [ GapClaimFx req ] )
+
+                GapClaim.HistoryChanged ->
+                    let
+                        hydrate =
+                            Dict.toList m.channels
+                                |> List.filterMap
+                                    (\( key, channel ) ->
+                                        if List.isEmpty channel.messages then
+                                            Just (VaultFetch { target = key, limit = keepMessages })
+
+                                        else
+                                            Nothing
+                                    )
+                    in
+                    ( { m | vaultDmPrivacy = Dict.empty }, outs ++ hydrate )
+        )
+        ( model, [] )
+        effects
+
+
+updateGapClaim : GapClaim.Msg -> Model -> ( Model, List Outbound )
+updateGapClaim sub model =
+    let
+        ( next, effects ) =
+            GapClaim.update (gapClaimCtx model) sub model.gapClaim
+
+        place =
+            if model.prefsOpen then
+                "prefs"
+
+            else
+                "home"
+
+        -- Keyboard focus follows the person's own step (the controls
+        -- they used are replaced): confirm lands on the safe choice,
+        -- cancel returns to Delete, a started operation to its status.
+        focus =
+            if next.phase == model.gapClaim.phase then
+                []
+
+            else
+                case sub of
+                    GapClaim.DeleteAsked ->
+                        [ PrefsFocus { id = GapClaim.elementId place "keep" } ]
+
+                    GapClaim.DeleteCancelled ->
+                        [ PrefsFocus { id = GapClaim.elementId place "delete" } ]
+
+                    GapClaim.AttachClicked ->
+                        [ PrefsFocus { id = GapClaim.elementId place "status" } ]
+
+                    GapClaim.DeleteConfirmed ->
+                        [ PrefsFocus { id = GapClaim.elementId place "status" } ]
+
+                    _ ->
+                        []
+
+        ( applied, outs ) =
+            gapClaimApply effects { model | gapClaim = next }
+    in
+    ( applied, outs ++ focus )
+
+
+{-| Scan when a scope settles (signed-in or guest), reset per-scope claim
+state when it moves, and re-count after a local-history erase (which
+removes the unstamped rows too). Never attaches anything by itself. -}
+settleStepGapClaim : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapClaim msg _ ( m0, outs0 ) =
+    let
+        ( s1, fx1 ) =
+            GapClaim.scopeChanged m0.gapAccount.scope m0.gapClaim
+
+        ( s2, fx2 ) =
+            case msg of
+                GapAccountMsg (GapAccount.VaultCleared { ok }) ->
+                    if ok then
+                        GapClaim.update (gapClaimCtx m0) GapClaim.Rescan s1
+
+                    else
+                        ( s1, [] )
+
+                _ ->
+                    ( s1, [] )
+
+        ( m1, outs1 ) =
+            gapClaimApply (fx1 ++ fx2) { m0 | gapClaim = s2 }
+    in
+    ( m1, outs0 ++ outs1 )

@@ -121,6 +121,7 @@ import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
 import HistoryImport -- v3/gap-import
+import GapClaim -- v3/gap-claim
 import Media
 import Nodes
 import Organizer -- v3/gap-organize
@@ -997,6 +998,16 @@ port gapAppBadge : Int -> Cmd msg
 port gapNotifyClicked : ({ tag : String } -> msg) -> Sub msg
 
 
+-- v3/gap-claim: history from before owner scoping — scan, attach to the
+-- settled scope, delete, or remember "Not now" (ports.js `gapClaim`).
+
+
+port gapClaimRequest : { op : String, scope : String } -> Cmd msg
+
+
+port gapClaimAnswer : (Decode.Value -> msg) -> Sub msg
+
+
 type alias Flags =
     { wsUrl : String
     , nick : String
@@ -1710,6 +1721,10 @@ perform key outbound =
         App.GapAccountFx fx ->
             performGapAccount fx
 
+        -- v3/gap-claim
+        App.GapClaimFx req ->
+            gapClaimRequest req
+
         App.PasskeyCreate args ->
             passkeyCreate
                 (Encode.object
@@ -2095,6 +2110,7 @@ subscriptions model =
         , gapScopedListsLoaded (App.GapAccountMsg << GapAccount.ScopedListsLoaded)
         , gapVaultCleared (App.GapAccountMsg << GapAccount.VaultCleared)
         , gapNotifyClicked (App.GapAccountMsg << GapAccount.NotifyClicked)
+        , gapClaimAnswer (App.GapClaimMsg << GapClaim.Answered) -- v3/gap-claim
         -- v3/gap-auth
         , authGateIn App.AuthGatePortIn
         ]
