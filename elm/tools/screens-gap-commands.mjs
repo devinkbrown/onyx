@@ -9,9 +9,8 @@
  *   node elm/tools/screens.mjs --vp all --extra elm/tools/screens-gap-commands.mjs \
  *     --only actions,actions-compact,help,palette-people,palette-recent,shortcuts,shortcuts-end
  */
+/* global MessageEvent */
 import shell from './screens-shell.mjs';
-
-const isPhone = (page) => (page.viewportSize()?.width ?? 1440) < 768;
 
 async function dismissAsks(page, h) {
   for (let i = 0; i < 3 && (await page.$('[role="dialog"]')); i += 1) {
