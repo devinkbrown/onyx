@@ -16,6 +16,8 @@ module OperPlan exposing
     , maxReasonLength
     , plan
     , preview
+    , serverQueries
+
     , toLine
     , tooBroad
     , wardActions
@@ -264,7 +266,7 @@ type Intent
     | ShunAdd { mask : String, duration : Duration, reason : String }
     | ShunRemove String
     | ShunList
-    | GagSet { nick : String, on : Bool }
+    | GagUser { nick : String, on : Bool }
     | Quarantine { nick : String, channel : String, reason : String }
     | AbuseCheck String
     | ClonesScan
@@ -286,6 +288,31 @@ type Intent
     | MinSeverity String
     | EventsReport
     | EventStats
+    | ServerQuery { verb : String, arg : String }
+
+
+{-| Read-only server queries the Network tab offers, each with the
+argument shapes the daemon accepts (`MESH [LOG|GRANTS|ADMISSION]`,
+`STATS <letter>`, `AUDIT [count]`). -}
+serverQueries : List { verb : String, arg : String, label : String, hint : String }
+serverQueries =
+    [ { verb = "MESH", arg = "", label = "Mesh peers", hint = "Linked nodes, their round-trip times and whether the mesh is split." }
+    , { verb = "MESH", arg = "LOG", label = "Mesh event log", hint = "Recent link, split and rejoin events." }
+    , { verb = "MESH", arg = "GRANTS", label = "Cross-mesh grants", hint = "Operator grants other nodes recognise." }
+    , { verb = "MESH", arg = "ADMISSION", label = "Mesh admission", hint = "How nodes are admitted to the mesh." }
+    , { verb = "NETHEALTH", arg = "", label = "Network health", hint = "Which nodes answer, how fast, and whether this node holds quorum." }
+    , { verb = "ROUTE", arg = "", label = "Routes", hint = "Which node is the next hop for each destination." }
+    , { verb = "GRANTS", arg = "", label = "Operator grants", hint = "Runtime operator grants on this node." }
+    , { verb = "AUDIT", arg = "20", label = "Recent audit rows", hint = "The last 20 operator actions, with their proof ids." }
+    , { verb = "STATS", arg = "u", label = "Uptime", hint = "How long this node has been running." }
+    , { verb = "STATS", arg = "o", label = "Operator accounts", hint = "Configured operator bindings." }
+    , { verb = "STATS", arg = "k", label = "Server bans", hint = "Active K-lines." }
+    , { verb = "STATS", arg = "d", label = "Address bans", hint = "Active D-lines." }
+    , { verb = "STATS", arg = "y", label = "Connection classes", hint = "Limits and live counts for each connection class." }
+    , { verb = "STATS", arg = "l", label = "Server links", hint = "Established links with queue sizes and uptime." }
+    , { verb = "STATS", arg = "z", label = "Runtime counters", hint = "Internal counters for this node." }
+    , { verb = "STATS", arg = "m", label = "Command usage", hint = "How often each command has run." }
+    ]
 
 
 maxReasonLength : Int
@@ -368,7 +395,7 @@ plan intent =
         ShunList ->
             Ok (mk Silence "SHUN" [] Nothing "List the active shuns." False False)
 
-        GagSet { nick, on } ->
+        GagUser { nick, on } ->
             nickOf nick
                 |> Result.map
                     (\n ->
@@ -611,6 +638,26 @@ plan intent =
 
         EventStats ->
             Ok (mk Live "EVENT" [ "STATS", "JSON" ] Nothing "Count the events the node has published since it started." False False)
+
+        ServerQuery { verb, arg } ->
+            if List.any (\q -> q.verb == verb && q.arg == arg) serverQueries then
+                Ok
+                    (mk Network
+                        verb
+                        (if arg == "" then
+                            []
+
+                         else
+                            [ arg ]
+                        )
+                        Nothing
+                        ("Ask this node for " ++ String.toLower verb ++ (if arg == "" then "" else " " ++ arg) ++ ".")
+                        False
+                        False
+                    )
+
+            else
+                Err [ "That query is not one the desk offers." ]
 
 
 mk : Section -> String -> List String -> Maybe String -> String -> Bool -> Bool -> Command

@@ -143,9 +143,9 @@ suite =
             , test "UNSHUN and the bare SHUN list" <|
                 \_ -> Expect.equal [ Ok "UNSHUN *!*@bad.example", Ok "SHUN" ] [ line (ShunRemove "*!*@bad.example"), line ShunList ]
             , test "GAG rides on MODE +z and -z" <|
-                \_ -> Expect.equal [ Ok "MODE bob +z", Ok "MODE bob -z" ] [ line (GagSet { nick = "bob", on = True }), line (GagSet { nick = "bob", on = False }) ]
+                \_ -> Expect.equal [ Ok "MODE bob +z", Ok "MODE bob -z" ] [ line (GagUser { nick = "bob", on = True }), line (GagUser { nick = "bob", on = False }) ]
             , test "GAG refuses a wildcard nick" <|
-                \_ -> Expect.equal True (isErr (OperPlan.plan (GagSet { nick = "b*", on = True })))
+                \_ -> Expect.equal True (isErr (OperPlan.plan (GagUser { nick = "b*", on = True })))
             , test "QUARANTINE names the nick, the room and the reason" <|
                 \_ ->
                     Expect.equal (Ok "QUARANTINE bob #quarantine :spam wave")
