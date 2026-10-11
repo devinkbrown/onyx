@@ -17,11 +17,13 @@
 # written by ./deploy.sh alone). Smoke the result with:
 #   ONYX_ELM_DIST=elm/dist-elm node --test elm/bundleBoot.smoke.mjs
 #
-# Usage: elm/tools/build.sh          (ELM=<elm 0.19.1 binary> to override)
+# Usage: elm/tools/build.sh          (ELM=<elm 0.19.1 binary> to override;
+#        ELM_OUT=<dir> builds somewhere other than elm/dist-elm, e.g. a side
+#        build while screenshots read the main one)
 set -euo pipefail
 
 ELM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$ELM_DIR/dist-elm"
+OUT="${ELM_OUT:-$ELM_DIR/dist-elm}"
 ELM_BIN="${ELM:-elm}"
 
 case "$OUT" in

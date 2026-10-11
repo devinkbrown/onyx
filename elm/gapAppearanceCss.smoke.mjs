@@ -79,6 +79,16 @@ test("Text size, Density and Conversation width each have rules", () => {
   assert.ok(compactRows, "compact row heights are fine-pointer only");
 });
 
+test("Conversation width: the measure reaches the log and composer (display: contents frame)", () => {
+  // The old `.onyx-thread-pane > *` cap cannot touch rows inside the
+  // display:contents frame, so the gutters carry it instead.
+  assert.match(read("app.css"), /\.onyx-thread-frame \{ display: contents; \}/);
+  const wide = block(gap, "@media (min-width: 1200px)");
+  assert.match(wide, /:root:not\(\[data-width='full'\]\) \.onyx-main > \.onyx-thread-pane/);
+  assert.match(wide, /:root:not\(\[data-width='full'\]\) \.onyx-main > \.onyx-composer/);
+  assert.match(wide, /padding-inline:\s*max\(var\(--space-4\),\s*calc\(\(100% - var\(--shell-measure\)\) \/ 2\)\)/);
+});
+
 test("no shell font-size is left in px (Text size reaches everything)", () => {
   const files = ["app.css", ...readdirSync(join(here, "css")).filter((f) => f.endsWith(".css") && f !== "gap-appearance.css").map((f) => `css/${f}`)];
   const offenders = [];

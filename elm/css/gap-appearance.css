@@ -205,6 +205,20 @@ html { font-size: 100%; }
 
 :root[data-width='full'] .onyx-frame { --shell-measure: none; }
 
+/* The measure has to reach the transcript itself: `.onyx-thread-frame` is
+   `display: contents`, so the old `> *` cap on the pane's children never
+   touched the rows, and on a wide screen Measured and Full looked the same.
+   The pane and the composer instead grow equal side gutters, so the log and
+   the composer share one centred column of `--shell-measure` while the
+   scrollbar and the composer band keep the column's edges. Only where the
+   column is wider than the measure (a narrower one keeps its own padding). */
+@media (min-width: 1200px) {
+  :root:not([data-width='full']) .onyx-main > .onyx-thread-pane,
+  :root:not([data-width='full']) .onyx-main > .onyx-composer {
+    padding-inline: max(var(--space-4), calc((100% - var(--shell-measure)) / 2));
+  }
+}
+
 /* ── 8. Light grounds ─────────────────────────────────────────────────
    Nick tints are light hues made for a dark ground (inline style from
    Avatar.nickTint); on a light shell the same hue darkens to read AA. */
