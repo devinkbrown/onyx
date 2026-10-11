@@ -88,6 +88,8 @@ import Retention
 import RoomMedia exposing (RoomMediaFilter(..))
 -- v3/roomsettings
 import RoomSettings
+import Credentials -- v3/rx-public
+import Remembered -- v3/rx-public
 import Route exposing (Route)
 import SavedSearches
 import Schedule
@@ -918,6 +920,9 @@ type alias Model =
 
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
+
+    -- v3/rx-public — remembered identities + "Stay signed in" (metadata only).
+    , rememberedIds : Remembered.State
     }
 
 
@@ -1157,6 +1162,13 @@ type Outbound
     | WatchListSave { serverUrl : String, identity : String, entries : Maybe String }
     | CtcpConfigRequest { serverUrl : String, identity : String }
     | CtcpTimeReply { to : String }
+    -- v3/rx-public — the remembered-identity store (`credentialsRequest`
+    -- port; `op` = list | select | use | forget | remember). Carries ids
+    -- and slot names only, never a secret.
+    | CredentialsRequest { op : String, id : String, server : String, nick : String, display : String, remember : Bool }
+    -- v3/rx-public — public page navigation: scroll to the top, or to
+    -- (and focus) the `#fragment` target (`pageNavigated` port).
+    | PageNavigated { fragment : String }
 
 
 {-| One vault row. `id` is `lower-target ++ ":" ++ seq` where `seq` is
@@ -3189,6 +3201,9 @@ type Msg
     | CallLeaveConfirmClose
     | CallLeaveConfirmed
     | SelectBoardTab String
+    -- v3/rx-public
+    | RouteEntered Url.Url
+    | BoardTabKey { key : String }
     -- v3/roster
     | MemberFilterInput String
 
@@ -3261,6 +3276,15 @@ type Msg
     | PortableImportSubmit
     | SessionReclaimDismiss
     | SessionReclaimSignIn
+    -- v3/rx-public — remembered identities on the join screen.
+    | RememberedListed Decode.Value
+    | RememberedReady { id : String, nick : String, held : Bool }
+    | RememberedSelect String
+    | RememberedAct
+    | RememberedForget String
+    | RememberedDismiss
+    | ConnectStaySignedIn Bool
+    | ConnectSignInAs
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3412,7 +3436,17 @@ init nick url =
     , recoveryCodes = blankRecoveryCodes
     , pendingRecoveryLogin = Nothing
     , connectGate = False
-    , connectForm = { blankConnectForm | nick = bootGuestName }
+    , connectForm =
+        { blankConnectForm
+            | nick = bootGuestName
+            , mode =
+                -- v3/rx-public: the invite page's "Sign in" link.
+                if signInParam bootParams then
+                    ConnectSignIn
+
+                else
+                    ConnectGuest
+        }
     , wsPin = Nothing
     -- v3/dm-key-hold
     , dmKeyPending = Dict.empty
@@ -3910,6 +3944,9 @@ init nick url =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/rx-public
+    , rememberedIds = Remembered.blank
     }
 
 
@@ -4490,6 +4527,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/rx-public
+    , rememberedIds = Remembered.blank
     }
 
 
@@ -24265,10 +24305,10 @@ Modes reuse the existing folds rather than new wire paths:
 The optional Room field becomes the pending `?join=` target, fired on
 001 by `firePendingDeepLinkJoin`.
 
-Narrowings: remembered identities and "Stay signed in" are not offered
-(their secrets live in the ports-side credential store, which exposes no
-listing port yet); passkey sign-in is hidden like the oracle's
-`PRESENT_PASSKEY_SIGNIN = false`.
+Remembered identities and "Stay signed in" (v3/rx-public) ride a
+metadata-only port seam over the ports-side credential store — see the
+`mapRemembered` block. Narrowing: passkey sign-in is hidden like the
+oracle's `PRESENT_PASSKEY_SIGNIN = false`.
 -}
 type ConnectMode
     = ConnectGuest
@@ -24794,6 +24834,452 @@ settleConnectGate model =
 
         _ ->
             ( settled, [] )
+
+
+{- v3/rx-public — public navigation. -}
+
+
+{-| Same-origin paths that are files, not routes: anything under
+`/downloads/` or `/source/`, or a last segment with an extension
+(`.txt`, `.sha256`, `.c`, `.json` …). -}
+isStaticFilePath : String -> Bool
+isStaticFilePath path =
+    let
+        last =
+            String.split "/" path |> List.reverse |> List.head |> Maybe.withDefault ""
+
+        hasExtension =
+            case String.split "." last of
+                _ :: ext :: _ ->
+                    not (String.isEmpty ext) && not (String.startsWith "." last)
+
+                _ ->
+                    False
+    in
+    String.startsWith "/downloads/" path
+        || String.startsWith "/source/" path
+        || hasExtension
+
+
+{-| Scroll/focus for a public navigation: a `#fragment` target is
+scrolled to and focused (the skip link, section navs, roadmap cards);
+otherwise a new path starts at the top. The app shell keeps its own
+scroll, so `/app` never asks.
+-}
+pageNavigationOut : Model -> Url.Url -> List Outbound
+pageNavigationOut prior url =
+    if Route.fromUrl url == Route.App then
+        []
+
+    else
+        case url.fragment of
+            Just fragment ->
+                if String.isEmpty fragment then
+                    []
+
+                else
+                    [ PageNavigated { fragment = fragment } ]
+
+            Nothing ->
+                if url.path /= prior.navPath then
+                    [ PageNavigated { fragment = "" } ]
+
+                else
+                    []
+
+
+{-| Arriving at `/app` by navigation (not a cold load, which `init`
+already parsed): the deep-link query (`join` / `at` / `topic`) queues
+the room, `as` seats the guest name, and `signin=1` opens Sign in —
+mirroring the oracle reading them on every AppRoute mount. Only while
+the gate is up; a live session ignores them.
+-}
+seedAppQuery : Url.Url -> Model -> Model
+seedAppQuery url model =
+    if model.connection /= Offline then
+        model
+
+    else
+        let
+            deepLink =
+                parseDeepLinkQuery url.query
+
+            params =
+                Invite.parseQueryParams (Maybe.withDefault "" url.query)
+
+            withLink =
+                case deepLink.join of
+                    Just _ ->
+                        { model | pendingDeepLinkJoin = deepLink.join, pendingDeepLinkAt = deepLink.at, pendingDeepLinkTopic = deepLink.topic }
+
+                    Nothing ->
+                        model
+
+            guestName =
+                Invite.parseGuestName (Dict.get "as" params)
+        in
+        withLink
+            |> setConnectForm
+                (\f ->
+                    { f
+                        | nick = Maybe.withDefault f.nick guestName
+                        , mode =
+                            if signInParam params then
+                                ConnectSignIn
+
+                            else
+                                f.mode
+                    }
+                )
+
+
+{-| `?signin=1` (the invite page's "Sign in" link): `1` or `true`. -}
+signInParam : Dict String String -> Bool
+signInParam params =
+    case Dict.get "signin" params |> Maybe.map String.toLower of
+        Just "1" ->
+            True
+
+        Just "true" ->
+            True
+
+        _ ->
+            False
+
+
+{-| Route entry shared by `RouteEntered` (cold load) and `UrlChanged`:
+start the status / download catalog / stats feeds and seed the stats
+share state (`?room` / `?compare` / `?window`) from the query.
+-}
+routeEntry : Url.Url -> Model -> ( Model, List Outbound )
+routeEntry url model =
+    if model.route == Route.Status then
+        requestStatus model
+
+    else if model.route == Route.Download then
+        requestDownloadCatalog model
+
+    else if model.route == Route.Stats then
+        let
+            query =
+                Maybe.withDefault "" url.query
+
+            seeded =
+                { model
+                    | statsInspected = Stats.parseStatsRoomQuery query
+                    , statsCompare = Stats.parseStatsCompareQuery query
+                    , statsWindow = Stats.parseStatsWindowQuery query
+                    , statsShare = StatsShareIdle
+                }
+
+            ( withIndex, indexOut ) =
+                requestStatsIndex True seeded
+        in
+        if String.isEmpty withIndex.statsInspected then
+            ( withIndex, indexOut )
+
+        else
+            let
+                ( withDetail, detailOut ) =
+                    requestStatsDetailFor withIndex withIndex.statsInspected
+            in
+            ( withDetail, indexOut ++ detailOut )
+
+    else
+        ( model, [] )
+
+
+{-| Arrow / Home / End roving over a tab list (wraps). -}
+rovingStep : List String -> String -> String -> String
+rovingStep ids current key =
+    let
+        count =
+            List.length ids
+
+        index =
+            ids
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( _, id ) -> id == current)
+                |> List.head
+                |> Maybe.map Tuple.first
+                |> Maybe.withDefault 0
+
+        at i =
+            ids |> List.drop (modBy count i) |> List.head |> Maybe.withDefault current
+    in
+    if count == 0 then
+        current
+
+    else
+        case key of
+            "ArrowRight" ->
+                at (index + 1)
+
+            "ArrowDown" ->
+                at (index + 1)
+
+            "ArrowLeft" ->
+                at (index - 1 + count)
+
+            "ArrowUp" ->
+                at (index - 1 + count)
+
+            "Home" ->
+                at 0
+
+            "End" ->
+                at (count - 1)
+
+            _ ->
+                current
+
+
+{- v3/rx-public — remembered identities + "Stay signed in", mirroring
+the Solid `Connect.tsx` identity switcher. Elm holds metadata only
+(`Remembered.State`); `ports.js` owns the `onyx:credentials` slots.
+
+  - Listing: requested at boot and whenever the gate re-arms; every
+    store op answers with a fresh listing (`RememberedListed`).
+  - Select: prefills the sign-in form (no password) and marks the
+    identity active ports-side.
+  - Act: "Use identity" (no stored secret) prefills sign-in; "Sign in" /
+    "Resume" ask the ports to arm the SASL holder from the stored
+    password (`use`), and dial only once they answer `held = True`; a
+    Resume without a stored password falls back to the prefilled
+    sign-in form (the server needs fresh account proof first).
+  - Stay signed in: a password sign-in stages the switch as `pending`;
+    once the server accepts the account on a live socket,
+    `settleStepRemembered` sends `remember` (opt in: the ports copy the
+    password they already hold; opt out: they drop it). Remembered
+    identities used from the list stay remembered (the switch is shown
+    on), diverging from the oracle's one-shot resume with the switch off.
+-}
+
+
+mapRemembered : (Remembered.State -> Remembered.State) -> Model -> Model
+mapRemembered f model =
+    { model | rememberedIds = f model.rememberedIds }
+
+
+credentialsOp : String -> String -> Outbound
+credentialsOp op id =
+    CredentialsRequest { op = op, id = id, server = "", nick = "", display = "", remember = False }
+
+
+{-| Prefill the sign-in door for a remembered identity (no password). -}
+rememberedPrefill : String -> Model -> Model
+rememberedPrefill nick model =
+    model
+        |> setConnectForm
+            (\f ->
+                { f
+                    | mode = ConnectSignIn
+                    , nick = nick
+                    , password = ""
+                    , recoveryOpen = False
+                    , recoveryCode = ""
+                    , nickError = Nothing
+                    , passwordError = Nothing
+                }
+            )
+        |> mapRemembered (\r -> { r | stay = True })
+
+
+{-| A fresh listing. Unlike the oracle's mount-time `prefillNick`, the
+guest name is never prefilled from a remembered account: joining as a
+guest under an account's name only fails ("belongs to an account"), and
+the panel's own action already carries the identity.
+-}
+rememberedListed : List Remembered.Identity -> Model -> ( Model, List Outbound )
+rememberedListed identities model =
+    ( mapRemembered (Remembered.listed identities) model, [] )
+
+
+rememberedSelect : String -> Model -> ( Model, List Outbound )
+rememberedSelect id model =
+    case List.filter (\i -> i.id == id) model.rememberedIds.identities of
+        identity :: _ ->
+            ( model
+                |> mapRemembered (Remembered.select id)
+                |> rememberedPrefill identity.nick
+            , [ credentialsOp "select" id ]
+            )
+
+        [] ->
+            ( model, [ credentialsOp "list" "" ] )
+
+
+rememberedAct : Model -> ( Model, List Outbound )
+rememberedAct model =
+    case Remembered.selected model.rememberedIds of
+        Nothing ->
+            ( model, [] )
+
+        Just identity ->
+            if connectPhase model == ConnectConnecting || model.connection /= Offline || model.rememberedIds.using /= Nothing then
+                ( model, [] )
+
+            else
+                case identity.access of
+                    Credentials.IdentityOnlyAccess ->
+                        ( rememberedPrefill identity.nick model, [ credentialsOp "select" identity.id ] )
+
+                    _ ->
+                        ( mapRemembered (\r -> { r | using = Just identity.id }) model
+                        , [ credentialsOp "use" identity.id ]
+                        )
+
+
+{-| The ports armed (or could not arm) the SASL holder for the identity
+in flight. `held` means the stored password is in place: dial exactly
+like a typed sign-in, minus the `SaslCredentialsStored` handoff (which
+would overwrite the armed secret).
+-}
+rememberedReady : { id : String, nick : String, held : Bool } -> Model -> ( Model, List Outbound )
+rememberedReady ready model =
+    if model.rememberedIds.using /= Just ready.id then
+        ( model, [] )
+
+    else
+        let
+            cleared =
+                mapRemembered (\r -> { r | using = Nothing }) model
+        in
+        case Credentials.sanitizeCredentialNick ready.nick of
+            Nothing ->
+                ( cleared, [ credentialsOp "list" "" ] )
+
+            Just nick ->
+                if not ready.held then
+                    ( rememberedPrefill nick cleared, [] )
+
+                else if connectPhase cleared == ConnectConnecting || cleared.connection /= Offline then
+                    ( cleared, [] )
+
+                else
+                    case normalizeConnectRoom cleared.connectForm.room of
+                        Err () ->
+                            ( rememberedPrefill nick cleared
+                                |> setConnectForm (\f -> { f | roomError = Just "Room names look like #lounge — no spaces or commas." })
+                            , []
+                            )
+
+                        Ok room ->
+                            let
+                                staged =
+                                    { cleared
+                                        | saslAccount = Just nick
+                                        , saslPasswordHeld = True
+                                        , saslClientCert = False
+                                        , pendingDeepLinkJoin =
+                                            case room of
+                                                Just _ ->
+                                                    room
+
+                                                Nothing ->
+                                                    cleared.pendingDeepLinkJoin
+                                    }
+                                        |> rememberedPrefill nick
+                                        |> mapRemembered (\r -> { r | pending = Just True })
+                            in
+                            dialConnect staged nick
+
+
+rememberedForget : String -> Model -> ( Model, List Outbound )
+rememberedForget id model =
+    let
+        gone =
+            List.filter (\i -> i.id == id) model.rememberedIds.identities |> List.head
+
+        wasSelected =
+            model.rememberedIds.selectedId == Just id
+
+        cleared =
+            case gone of
+                Just identity ->
+                    if wasSelected && String.toLower (String.trim model.connectForm.nick) == String.toLower identity.nick then
+                        setConnectForm (\f -> { f | nick = "", password = "" }) model
+
+                    else
+                        model
+
+                Nothing ->
+                    model
+    in
+    ( mapRemembered (Remembered.forget id) cleared, [ credentialsOp "forget" id ] )
+
+
+{-| Post-update step for remembered identities:
+
+  - a submit stages the switch for a password sign-in (anything else
+    clears it, so a later guest session never inherits it);
+  - a socket that closes before the account was accepted drops it;
+  - an accepted account on a live socket sends `remember`;
+  - the gate re-arming (deliberate disconnect) asks for a fresh listing.
+-}
+settleStepRemembered : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRemembered msg prior ( m, outs ) =
+    let
+        staged =
+            case msg of
+                ConnectSubmit ->
+                    let
+                        typedSignIn =
+                            m.connectForm.mode == ConnectSignIn && m.saslPasswordHeld && m.connectForm.dialing
+                    in
+                    mapRemembered
+                        (\r ->
+                            { r
+                                | pending =
+                                    if typedSignIn then
+                                        Just r.stay
+
+                                    else
+                                        Nothing
+                            }
+                        )
+                        m
+
+                WsClosed _ ->
+                    if m.accountName == Nothing then
+                        mapRemembered (\r -> { r | pending = Nothing }) m
+
+                    else
+                        m
+
+                _ ->
+                    m
+
+        ( remembered, rememberOut ) =
+            case ( staged.rememberedIds.pending, staged.accountName, staged.connection ) of
+                ( Just keep, Just account, Live ) ->
+                    let
+                        slot =
+                            credentialSlot staged
+                    in
+                    ( mapRemembered (\r -> { r | pending = Nothing }) staged
+                    , [ CredentialsRequest
+                            { op = "remember"
+                            , id = ""
+                            , server = slot.server
+                            , nick = slot.nick
+                            , display = account
+                            , remember = keep
+                            }
+                      ]
+                    )
+
+                _ ->
+                    ( staged, [] )
+
+        rearmed =
+            if connectGateVisible remembered && not (connectGateVisible prior) && prior.rememberedIds.loaded then
+                [ credentialsOp "list" "" ]
+
+            else
+                []
+    in
+    ( remembered, outs ++ rememberOut ++ rearmed )
 
 
 {- Guest claim flow, mirroring `GuestClaimPrompt.tsx` + the
@@ -36206,6 +36692,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepRemembered -- v3/rx-public
     ]
 
 
@@ -36783,7 +37270,14 @@ updateCore msg model =
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, [ PushUrl (Url.toString url) ] )
+                    -- v3/rx-public: a same-origin file (download notice,
+                    -- checksum, OnyxOS source) is a document load, never
+                    -- an SPA route (it would render the 404 terminus).
+                    if isStaticFilePath url.path then
+                        ( model, [ LoadUrl (Url.toString url) ] )
+
+                    else
+                        ( model, [ PushUrl (Url.toString url) ] )
 
                 Browser.External href ->
                     ( model, [ LoadUrl href ] )
@@ -36833,54 +37327,71 @@ updateCore msg model =
 
                     else
                         []
+
+                -- v3/rx-public: a page change starts at the top (or at
+                -- its #fragment, focused), and arriving at /app from a
+                -- public page honours the invite/deep-link query.
+                pageOut =
+                    pageNavigationOut model url
+
+                arrived =
+                    if navigated.route == Route.App && model.route /= Route.App then
+                        seedAppQuery url navigated
+
+                    else
+                        navigated
             in
-            if navigated.route == Route.Status then
-                let
-                    ( statusModel, statusOut ) =
-                        requestStatus navigated
-                in
-                ( statusModel, statusOut ++ leaveOut )
-
-            else if navigated.route == Route.Download then
-                let
-                    ( downloadModel, downloadOut ) =
-                        requestDownloadCatalog navigated
-                in
-                ( downloadModel, downloadOut ++ leaveOut )
-
-            else if navigated.route == Route.Appearance then
+            if arrived.route == Route.Appearance then
                 -- Remount semantics: the staged candidate reseats on
                 -- the stored background and any preview clears.
-                ( { navigated | backgroundCandidate = navigated.backgroundId, backgroundPreview = Nothing }, leaveOut )
-
-            else if navigated.route == Route.Stats then
-                let
-                    query =
-                        Maybe.withDefault "" url.query
-
-                    seeded =
-                        { navigated
-                            | statsInspected = Stats.parseStatsRoomQuery query
-                            , statsCompare = Stats.parseStatsCompareQuery query
-                            , statsWindow = Stats.parseStatsWindowQuery query
-                            , statsShare = StatsShareIdle
-                        }
-
-                    ( withIndex, indexOut ) =
-                        requestStatsIndex True seeded
-                in
-                if String.isEmpty withIndex.statsInspected then
-                    ( withIndex, indexOut ++ leaveOut )
-
-                else
-                    let
-                        ( withDetail, detailOut ) =
-                            requestStatsDetailFor withIndex withIndex.statsInspected
-                    in
-                    ( withDetail, indexOut ++ detailOut ++ leaveOut )
+                ( { arrived | backgroundCandidate = arrived.backgroundId, backgroundPreview = Nothing }, leaveOut ++ pageOut )
 
             else
-                ( navigated, leaveOut )
+                let
+                    ( entered, entryOut ) =
+                        routeEntry url arrived
+                in
+                ( entered, entryOut ++ leaveOut ++ pageOut )
+
+        -- v3/rx-public: the cold-load half of route entry (Main.init
+        -- sends it once), so /download, /status and /stats share links
+        -- fetch and seed on a direct visit, not only after navigation.
+        RouteEntered url ->
+            let
+                ( entered, entryOut ) =
+                    routeEntry url model
+
+                fragmentOut =
+                    case ( url.fragment, model.route ) of
+                        ( _, Route.App ) ->
+                            []
+
+                        ( Just fragment, _ ) ->
+                            if String.isEmpty fragment then
+                                []
+
+                            else
+                                [ PageNavigated { fragment = fragment } ]
+
+                        _ ->
+                            []
+            in
+            ( entered, entryOut ++ fragmentOut )
+
+        -- v3/rx-public: landing board tabs rove with the arrow keys.
+        BoardTabKey { key } ->
+            let
+                ids =
+                    [ "public-room", "bring-people", "learn" ]
+
+                next =
+                    rovingStep ids model.landingBoardTab key
+            in
+            if next == model.landingBoardTab then
+                ( model, [] )
+
+            else
+                ( { model | landingBoardTab = next }, [ PrefsFocus { id = "board-tab-" ++ next } ] )
 
         WsLineReceived line ->
             foldParsed model (Wire.parseIrcMessage line)
@@ -37756,6 +38267,53 @@ updateCore msg model =
 
         ConnectSubmit ->
             submitConnect model
+
+        -- v3/rx-public
+        RememberedListed value ->
+            rememberedListed (Remembered.decodeListing value) model
+
+        RememberedReady ready ->
+            rememberedReady ready model
+
+        RememberedSelect id ->
+            rememberedSelect id model
+
+        RememberedAct ->
+            rememberedAct model
+
+        RememberedForget id ->
+            rememberedForget id model
+
+        RememberedDismiss ->
+            ( mapRemembered (\r -> { r | dismissed = True }) model, [] )
+
+        ConnectStaySignedIn on ->
+            ( mapRemembered (\r -> { r | stay = on }) model, [] )
+
+        ConnectSignInAs ->
+            -- "Sign in as X" after a guest join hit an account's name
+            -- (or a name in use): the same name, a fresh sign-in door,
+            -- focus on the password. Signing in reclaims the name (the
+            -- post-900 NICK reclaim takes it back from a ghost alias).
+            if connectPhase model == ConnectConnecting then
+                ( model, [] )
+
+            else
+                ( setConnectForm
+                    (\f ->
+                        { f
+                            | mode = ConnectSignIn
+                            , attempted = False
+                            , password = ""
+                            , recoveryOpen = False
+                            , nickError = Nothing
+                            , passwordError = Nothing
+                            , roomError = Nothing
+                        }
+                    )
+                    model
+                , [ PrefsFocus { id = "conn-password" } ]
+                )
 
         ConnectCancel ->
             -- Abandon a dial in flight: the socket (if any) closes and the
@@ -41162,7 +41720,9 @@ updateCore msg model =
                     ( model, [ LoadUrl (inviteJoinHref model) ] )
 
                 Just err ->
-                    ( { model | inviteNameError = Just err }, [] )
+                    -- v3/rx-public: focus returns to the field, like the
+                    -- oracle.
+                    ( { model | inviteNameError = Just err }, [ PrefsFocus { id = "invite-display-name" } ] )
 
         SelectOnyxosStage { stage } ->
             -- Unknown ids (including forged events) keep the old
@@ -41175,9 +41735,17 @@ updateCore msg model =
                 ( model, [] )
 
         OnyxosStageKey { key } ->
-            -- Arrow/Home/End roving; anything else holds. Moving DOM
-            -- focus onto the newly selected tab stays ports-side.
-            ( { model | onyxosStage = stepOnyxosStage model.onyxosStage key }, [] )
+            -- Arrow/Home/End roving; anything else holds. v3/rx-public:
+            -- DOM focus follows the selection (roving tabindex).
+            let
+                next =
+                    stepOnyxosStage model.onyxosStage key
+            in
+            if next == model.onyxosStage then
+                ( model, [] )
+
+            else
+                ( { model | onyxosStage = next }, [ PrefsFocus { id = "onyxos-method-tab-" ++ next } ] )
 
         StatusRefetch ->
             requestStatus model
