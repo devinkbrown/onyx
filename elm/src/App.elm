@@ -77,6 +77,8 @@ import Notify
 -- v3/moddesk
 import EventReplay
 import OperDesk
+import OperConsole -- v3/gap-oper
+import OperFeed -- v3/gap-oper
 import NotifyCenter
 import Outbox
 import Passkey
@@ -395,6 +397,8 @@ type alias Model =
     , operDeskOpen : Bool
     , operDesk : OperDesk.Desk
     , operEventReplay : EventReplay.EventReplayFeed
+    -- v3/gap-oper
+    , operConsole : OperConsole.State
     , isAway : Bool
     , latencyMs : Maybe Int
     , latencyHistory : List Int
@@ -2882,6 +2886,8 @@ type Msg
     | OperDeskCancel
     | OperEventReplayLimit Int
     | OperEventReplayRequested
+    -- v3/gap-oper
+    | OperConsoleMsg OperConsole.Msg
     | OverrideToggleSoftIgnore String
     | OverrideSetNickColor { nick : String, color : String }
     | OverrideClearNickColor String
@@ -3499,6 +3505,7 @@ init nick url =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -4087,6 +4094,7 @@ blank =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -8553,6 +8561,10 @@ foldEvent model message =
                 , params = params
                 , raw = message.raw
                 }
+
+        -- v3/gap-oper: operator planes feed the desk's live feed.
+        Spine.EventAsFeed draft ->
+            ( { model | operConsole = OperConsole.observeEvent (operConsoleCtx model) draft model.operConsole }, [] )
 
 
 {-| True when a DM peer is designated for E2EE and must never fall
@@ -17749,8 +17761,142 @@ requestOperEventReplay model =
         )
 
 
+-- v3/gap-oper
+
+
+{-| What the operator console needs from the model. -}
+operConsoleCtx : Model -> OperConsole.Ctx
+operConsoleCtx model =
+    { live = model.connection == Live
+    , isOper = model.isOper
+    , nowMs = model.nowMs
+    }
+
+
+operConsoleStep : OperConsole.Msg -> Model -> ( Model, List Outbound )
+operConsoleStep consoleMsg model =
+    let
+        ( next, lines ) =
+            OperConsole.update (operConsoleCtx model) consoleMsg model.operConsole
+
+        focus =
+            case consoleMsg of
+                OperConsole.TabKey _ ->
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                _ ->
+                    []
+    in
+    ( { model | operConsole = next }, List.map SendLine lines ++ focus )
+
+
+{-| The console reads the daemon's replies after every update: opening
+the desk learns which categories this session follows, every inbound
+reply line is offered to the console (it claims only the operator
+patterns and, for a person mid-appeal, their own answer), and a closed
+socket forgets session-scoped state. -}
+settleStepOper : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOper msg prior ( m, outs ) =
+    case msg of
+        OperDeskOpen ->
+            if m.operDeskOpen && not prior.operDeskOpen then
+                let
+                    ( next, lines ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Opened m.operConsole
+                in
+                ( { m | operConsole = next }, outs ++ List.map SendLine lines )
+
+            else
+                ( m, outs )
+
+        WsLineReceived line ->
+            ( observeOperLines [ line ] m, outs )
+
+        WsBatchReceived batch ->
+            ( observeOperLines batch.lines m, outs )
+
+        WsClosed _ ->
+            let
+                ( next, _ ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Disconnected m.operConsole
+            in
+            ( { m | operConsole = next }, outs )
+
+        _ ->
+            ( m, outs )
+
+
+observeOperLines : List String -> Model -> Model
+observeOperLines lines m =
+    let
+        asking =
+            m.operConsole.userAppeal == OperConsole.AppealSending
+    in
+    if not (m.isOper || asking) then
+        m
+
+    else
+        let
+            ctx =
+                operConsoleCtx m
+
+            fold line console =
+                if operLineCandidate line then
+                    OperConsole.observeLine ctx (Wire.parseIrcMessage line) console
+
+                else
+                    console
+        in
+        { m | operConsole = List.foldl fold m.operConsole lines }
+
+
+{-| A cheap command-token check so history bursts are not parsed twice:
+only NOTICE, FAIL, MODE and three-digit numerics can be operator
+replies. -}
+operLineCandidate : String -> Bool
+operLineCandidate line =
+    let
+        afterTags =
+            if String.startsWith "@" line then
+                String.dropLeft 1 (dropWord line)
+
+            else
+                line
+
+        afterPrefix =
+            if String.startsWith ":" afterTags then
+                dropWord afterTags
+
+            else
+                afterTags
+
+        command =
+            String.toUpper (String.left 7 (String.trim (String.left 8 afterPrefix)))
+                |> String.words
+                |> List.head
+                |> Maybe.withDefault ""
+    in
+    List.member command [ "NOTICE", "FAIL", "MODE" ]
+        || (String.length command == 3 && String.all Char.isDigit command)
+
+
+dropWord : String -> String
+dropWord text =
+    case String.indexes " " text of
+        i :: _ ->
+            String.dropLeft (i + 1) text
+
+        [] ->
+            ""
+
+
 foldAccountSessionBody : Model -> String -> Maybe ( Model, List Outbound )
 foldAccountSessionBody model body =
+
     case Session.parseSessionListLine body of
         Just row ->
             Just
@@ -36693,6 +36839,7 @@ settleSteps =
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepRemembered -- v3/rx-public
+    , settleStepOper -- v3/gap-oper
     ]
 
 
@@ -43306,7 +43453,12 @@ updateCore msg model =
         OperEventReplayRequested ->
             requestOperEventReplay model
 
+        -- v3/gap-oper
+        OperConsoleMsg consoleMsg ->
+            operConsoleStep consoleMsg model
+
         OverrideToggleSoftIgnore nick ->
+
             -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
             -- owner-gated, nick-normalized, field toggled, journal
             -- saved; without an owner nothing moves).

@@ -20,12 +20,14 @@ module OperConsole exposing
     , refreshLines
     , sectionLog
     , setField
+    , tabId
+    , tabKeyHandled
     , update
     )
 
 {-| v3/gap-oper — the operator console's state machine.
 
-The desk is a set of tabs (Live, Bans, Silence, Abuse, Appeals, Content,
+The desk is a set of tabs (Feed, Bans, Silence, Abuse, Appeals, Content,
 Network). This module owns everything behind them and nothing about how
 they look:
 
@@ -172,6 +174,7 @@ type alias Forms =
     , holdNick : String
     , challengeQuestion : String
     , challengeAnswer : String
+    , reportPick : String
     }
 
 
@@ -206,6 +209,7 @@ blankForms =
     , holdNick = ""
     , challengeQuestion = ""
     , challengeAnswer = ""
+    , reportPick = "MESH|"
     }
 
 
@@ -237,7 +241,7 @@ type alias State =
 
 blank : State
 blank =
-    { tab = Live
+    { tab = Feed
     , feed = OperFeed.empty
     , subscribed = Nothing
     , floor = Nothing
@@ -257,7 +261,7 @@ blank =
     , errors = []
     , log = []
     , claimUntilMs = 0
-    , claimSection = Live
+    , claimSection = Feed
     , userAppeal = AppealIdle
     }
 
@@ -303,6 +307,7 @@ type Field
     | HoldNick
     | ChallengeQuestionText
     | ChallengeAnswerText
+    | ReportPick
     | FeedFilterText
 
 
@@ -427,6 +432,9 @@ setField field value forms =
         ChallengeAnswerText ->
             { forms | challengeAnswer = value }
 
+        ReportPick ->
+            { forms | reportPick = value }
+
         FeedFilterText ->
             forms
 
@@ -468,6 +476,7 @@ withUnit value duration =
 
 type Msg
     = SelectTab Section
+    | TabKey String
     | Edit Field String
     | Run Intent
     | Confirm
@@ -479,10 +488,12 @@ type Msg
     | FeedResume
     | FeedClear
     | FeedToggleCategory String
+    | FeedCategory String
     | FeedSeverity String
     | FeedText String
     | FeedReset
     | FollowToggle String
+    | SetFloor String
     | ClearLog Section
     | AnswerAppeal (Maybe Int)
     | SendUserAppeal
@@ -496,13 +507,24 @@ update ctx msg state =
         SelectTab section ->
             let
                 moved =
-                    { state | tab = section, errors = [] }
+                    { state | tab = section, errors = [], pending = Nothing }
             in
             if needsLoad section moved then
                 refreshLines ctx section moved
 
             else
                 ( moved, [] )
+
+        TabKey key ->
+            let
+                next =
+                    rovingTab key state.tab
+            in
+            if next == state.tab then
+                ( state, [] )
+
+            else
+                update ctx (SelectTab next) state
 
         Edit field value ->
             ( { state | forms = setField field value state.forms, errors = [] }, [] )
@@ -580,6 +602,27 @@ update ctx msg state =
             in
             ( { state | feed = OperFeed.setFilter { filter | categories = next } state.feed }, [] )
 
+        FeedCategory category ->
+            let
+                filter =
+                    state.feed.filter
+            in
+            ( { state
+                | feed =
+                    OperFeed.setFilter
+                        { filter
+                            | categories =
+                                if category == "" then
+                                    Set.empty
+
+                                else
+                                    Set.singleton category
+                        }
+                        state.feed
+              }
+            , []
+            )
+
         FeedSeverity severity ->
             let
                 filter =
@@ -605,6 +648,13 @@ update ctx msg state =
                         |> Maybe.withDefault False
             in
             run ctx (Follow { category = category, on = not following }) state
+
+        SetFloor severity ->
+            if severity == "" then
+                ( state, [] )
+
+            else
+                run ctx (MinSeverity severity) state
 
         ClearLog section ->
             ( { state | log = List.filter (\l -> l.section /= section) state.log }, [] )
@@ -635,7 +685,52 @@ update ctx msg state =
                         ( { state | userAppeal = AppealSending }, [ OperPlan.toLine cmd ] )
 
 
+{-| Arrow / Home / End over the tab list, wrapping. -}
+rovingTab : String -> Section -> Section
+rovingTab key current =
+    let
+        all =
+            OperReply.sections
+
+        count =
+            List.length all
+
+        index =
+            all
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( _, s ) -> s == current)
+                |> List.head
+                |> Maybe.map Tuple.first
+                |> Maybe.withDefault 0
+
+        at i =
+            all |> List.drop (modBy count i) |> List.head |> Maybe.withDefault current
+    in
+    case key of
+        "ArrowRight" ->
+            at (index + 1)
+
+        "ArrowDown" ->
+            at (index + 1)
+
+        "ArrowLeft" ->
+            at (index - 1 + count)
+
+        "ArrowUp" ->
+            at (index - 1 + count)
+
+        "Home" ->
+            at 0
+
+        "End" ->
+            at (count - 1)
+
+        _ ->
+            current
+
+
 canSend : Ctx -> Bool
+
 canSend ctx =
     ctx.live && ctx.isOper
 
@@ -869,7 +964,7 @@ refreshLines ctx section state =
         let
             intents =
                 case section of
-                    Live ->
+                    Feed ->
                         [ EventsReport, EventStats ]
 
                     Bans ->
@@ -911,7 +1006,7 @@ refreshLines ctx section state =
 needsLoad : Section -> State -> Bool
 needsLoad section state =
     case section of
-        Live ->
+        Feed ->
             state.subscribed == Nothing
 
         Bans ->
@@ -1418,3 +1513,15 @@ abuseHeadline abuse =
 
         found ->
             abuse.nick ++ " is flagged: " ++ String.join ", " (List.map Tuple.first found) ++ "."
+
+
+{-| DOM id of a tab button (focus moves to it after a key press). -}
+tabId : Section -> String
+tabId section =
+    "oper-tab-" ++ String.toLower (OperReply.sectionLabel section)
+
+
+{-| The keys the tab list handles (and prevents the default of). -}
+tabKeyHandled : String -> Bool
+tabKeyHandled key =
+    List.member key [ "ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End" ]

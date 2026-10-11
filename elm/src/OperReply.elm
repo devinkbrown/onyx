@@ -39,7 +39,7 @@ import Wire
 
 {-| The desk's tabs that own replies. -}
 type Section
-    = Live
+    = Feed
     | Bans
     | Silence
     | Abuse
@@ -50,13 +50,13 @@ type Section
 
 sections : List Section
 sections =
-    [ Live, Bans, Silence, Abuse, Appeals, Content, Network ]
+    [ Feed, Bans, Silence, Abuse, Appeals, Content, Network ]
 
 
 sectionLabel : Section -> String
 sectionLabel section =
     case section of
-        Live ->
+        Feed ->
             "Live"
 
         Bans ->
@@ -340,10 +340,10 @@ classifyNotice text =
         Just (EventStatsText text)
 
     else if String.startsWith "All event subscriptions cleared" text then
-        Just (Said { section = Live, text = text })
+        Just (Said { section = Feed, text = text })
 
     else if String.startsWith "OBSERVE:" text then
-        Just (Said { section = Live, text = text })
+        Just (Said { section = Feed, text = text })
 
     else if String.startsWith "KILL:" text then
         Just (Said { section = Network, text = text })
@@ -810,13 +810,13 @@ sectionOf reply =
             Network
 
         EventCategories _ ->
-            Live
+            Feed
 
         EventSeverityIs _ ->
-            Live
+            Feed
 
         EventStatsText _ ->
-            Live
+            Feed
 
         PrivilegeList _ ->
             Network

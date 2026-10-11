@@ -606,7 +606,7 @@ plan intent =
 
         Follow { category, on } ->
             Ok
-                (mk Live
+                (mk Feed
                     "EVENT"
                     [ if on then
                         "ADD"
@@ -628,16 +628,16 @@ plan intent =
 
         MinSeverity floor ->
             if List.member floor [ "debug", "info", "notice", "warn", "error", "critical" ] then
-                Ok (mk Live "EVENT" [ "SEVERITY", floor ] Nothing ("Only deliver " ++ floor ++ " and louder events to this session.") False False)
+                Ok (mk Feed "EVENT" [ "SEVERITY", floor ] Nothing ("Only deliver " ++ floor ++ " and louder events to this session.") False False)
 
             else
                 Err [ "Pick a severity from the list." ]
 
         EventsReport ->
-            Ok (mk Live "EVENT" [ "LIST" ] Nothing "Ask which categories this session follows." False False)
+            Ok (mk Feed "EVENT" [ "LIST" ] Nothing "Ask which categories this session follows." False False)
 
         EventStats ->
-            Ok (mk Live "EVENT" [ "STATS", "JSON" ] Nothing "Count the events the node has published since it started." False False)
+            Ok (mk Feed "EVENT" [ "STATS", "JSON" ] Nothing "Count the events the node has published since it started." False False)
 
         ServerQuery { verb, arg } ->
             if List.any (\q -> q.verb == verb && q.arg == arg) serverQueries then
