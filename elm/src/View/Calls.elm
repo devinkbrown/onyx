@@ -249,11 +249,15 @@ callsHub model =
                         , onClick (CallJoin { channel = where_, video = False })
                         ]
                         [ text ("Join call in " ++ where_) ]
-                    , button
-                        [ class "onyx-calls-join-video"
-                        , onClick (CallJoin { channel = where_, video = True })
-                        ]
-                        [ text ("Join with video in " ++ where_) ]
+                    , if model.callLocal.cameraSupported then
+                        button
+                            [ class "onyx-calls-join-video"
+                            , onClick (CallJoin { channel = where_, video = True })
+                            ]
+                            [ text ("Join with video in " ++ where_) ]
+
+                      else
+                        text ""
                     ]
 
             _ ->

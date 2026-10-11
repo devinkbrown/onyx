@@ -146,7 +146,7 @@ function installSocketStub(window, log) {
   window.WebSocket = StubSocket;
 }
 
-async function boot(path) {
+async function boot(path, setup) {
   const root = assetRoot();
   const loader = { fetched: [] };
   const errors = [];
@@ -163,6 +163,7 @@ async function boot(path) {
     virtualConsole,
     beforeParse(window) {
       installSocketStub(window, log);
+      if (setup) setup(window);
       window.addEventListener("error", (e) => errors.push(`window.error: ${e.message}`));
       if (!window.matchMedia) {
         window.matchMedia = (q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
@@ -314,5 +315,34 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
   } finally {
     dom.window.close();
     root.cleanup();
+  }
+});
+
+/* Video is off on the live network: "Join with video" (the join verb's
+   video flag) must not reach the camera either — the engine asks for
+   audio only, so the ~2 Mbit/s camera stream can never publish. */
+test("voice engine: a video join captures audio only while video is off", async () => {
+  const asked = [];
+  const { dom, window, errors } = await boot("/app?ws=" + encodeURIComponent(PIN), (w) => {
+    Object.defineProperty(w.navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia(constraints) {
+          asked.push(constraints);
+          return Promise.reject(Object.assign(new Error("no device"), { name: "NotAllowedError" }));
+        },
+        enumerateDevices: () => Promise.resolve([]),
+        addEventListener() {},
+        removeEventListener() {},
+      },
+    });
+  });
+  try {
+    await assert.rejects(window.OnyxVoiceEngine.joinVoice("#lounge", { video: true }));
+    assert.ok(asked.length > 0, "the join asked for the microphone");
+    for (const c of asked) assert.ok(!c.video, `no camera requested (got ${JSON.stringify(c.video)})`);
+    assert.deepEqual(errors, [], "no runtime errors");
+  } finally {
+    dom.window.close();
   }
 });

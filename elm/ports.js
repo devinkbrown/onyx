@@ -1151,18 +1151,26 @@
   /* Session resume credentials — ports-side subset of
      credentials.ts (`onyx:credentials` localStorage). Only the
      server-issued resume Bearer [REDACTED] (local TOKEN + mesh MTOKEN) live
-     here; passwords, remembered identities, and account handoffs need
-     a login UI the Elm client has not built yet. Shape:
-       { v: 1, slots: { "<server>|<nick>": { sessionToken?,
-         meshToken?, meshExpiresAtMs? } } }
+     here, plus (v3/rx-public) the opted-in remembered identities and
+     their saved password; account handoffs are still Solid-only. Shape:
+       { v: 1, active?, slots: { "<server host>|<nick>": { sessionToken?,
+         meshToken?, meshExpiresAtMs?, remembered?, nick?, savedAt?,
+         password? } } }
+     (plus the Solid client's v2 fields, carried through untouched)
      with per-server/nick keying so an account switch never replays a
      stranger's bearer. Bounds mirror the oracle (4 KiB Bearer [REDACTED]
      no whitespace/control). */
   var CRED_KEY = "onyx:credentials";
   var MAX_RESUME_TOKEN_LENGTH = 4 * 1024;
 
+  /* Slots key on the server HOST, so the session-token capture (Elm
+     passes the full wss:// endpoint it learned), the node probe (winner
+     host) and index.html's boot read (?ws= host) all meet in one slot
+     (v3/rx-public: they used to miss each other). A non-URL server
+     string keys as itself, lowercased. */
   function credentialSlotKey(server, nick) {
-    return String(server || "").toLowerCase() + "|" + String(nick || "").toLowerCase();
+    var host = legacyHost(server);
+    return (host || String(server || "").toLowerCase()) + "|" + String(nick || "").toLowerCase();
   }
 
   function validResumeToken(token) {
@@ -1172,14 +1180,103 @@
       && !/[\s\u0000-\u001f\u007f]/.test(token);
   }
 
+  /* v3/rx-public — one slot store for both clients. The Solid client
+     writes `{ version: 2, activeKey, entries: { "<normalized wss url>|
+     <nick>": { nick, server, password?, sessionToken?, meshToken?,
+     meshTokenExpiry?, savedAt } } }` (or, older still, one bare
+     credentials object). Reading never drops that data: a store with no
+     Elm `slots` yet is migrated in memory (each entry becomes its
+     host|nick slot, marked remembered — Solid only kept identities the
+     user chose to keep), and every write carries the Solid fields
+     through unchanged, so a migrating user's saved identities survive
+     the first Elm token write and a rollback still finds them. Bounds
+     mirror credentials.ts (2 MiB store). */
+  var MAX_CREDENTIALS_STORAGE_CHARS = 2 * 1024 * 1024;
+
+  function isPlainRecord(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function legacyHost(server) {
+    if (typeof server !== "string") return "";
+    var trimmed = server.trim();
+    if (!trimmed || trimmed.length > 2048 || /[\u0000-\u0020\u007f]/.test(trimmed)) return "";
+    try {
+      return new URL(trimmed).host.toLowerCase();
+    } catch (err) {
+      return trimmed.toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\//, "").split(/[/?#]/, 1)[0];
+    }
+  }
+
+  /* One Solid entry -> an Elm slot (null when it fails the oracle's own
+     sanitizers: nick shape, server, token/password bounds). */
+  function slotFromLegacy(entry) {
+    if (!isPlainRecord(entry)) return null;
+    var nick = typeof entry.nick === "string" ? entry.nick.trim() : "";
+    if (!nick || nick.length > 64 || !/^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/.test(nick)) return null;
+    var host = legacyHost(entry.server);
+    if (!host) return null;
+    var slot = { remembered: true, nick: nick };
+    if (typeof entry.savedAt === "string" && entry.savedAt.length <= 64 && isFinite(Date.parse(entry.savedAt))) slot.savedAt = entry.savedAt;
+    if (typeof entry.password === "string" && entry.password.length > 0 && entry.password.length <= 64 * 1024
+      && !/[\u0000-\u001f\u007f]/.test(entry.password)) slot.password = entry.password;
+    if (validResumeToken(entry.sessionToken)) slot.sessionToken = entry.sessionToken;
+    if (validResumeToken(entry.meshToken)) {
+      var expiryRaw = Object.prototype.hasOwnProperty.call(entry, "meshTokenExpiry") ? entry.meshTokenExpiry : entry.tokenExpiry;
+      var expiry = typeof expiryRaw === "string" ? Date.parse(expiryRaw) : NaN;
+      if (expiryRaw === undefined) {
+        slot.meshToken = entry.meshToken;
+      } else if (isFinite(expiry) && expiry > Date.now()) {
+        /* Expired mesh tokens are purged, like the oracle's read. */
+        slot.meshToken = entry.meshToken;
+        slot.meshExpiresAtMs = Math.floor(expiry);
+      }
+    }
+    return { key: host + "|" + nick.toLowerCase(), slot: slot };
+  }
+
   function readCredentialsStore() {
     try {
       var raw = global.localStorage.getItem(CRED_KEY);
-      if (!raw) return { v: 1, slots: {} };
+      if (!raw || raw.length > MAX_CREDENTIALS_STORAGE_CHARS) return { v: 1, slots: {} };
       var parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { v: 1, slots: {} };
-      if (!parsed.slots || typeof parsed.slots !== "object" || Array.isArray(parsed.slots)) return { v: 1, slots: {} };
-      return { v: 1, slots: parsed.slots };
+      if (!isPlainRecord(parsed)) return { v: 1, slots: {} };
+      var legacy = null;
+      var legacyEntries = null;
+      var legacyActive;
+      if (parsed.version === 2 && isPlainRecord(parsed.entries)) {
+        legacy = { kind: "v2", activeKey: typeof parsed.activeKey === "string" ? parsed.activeKey : undefined, entries: parsed.entries };
+        legacyEntries = parsed.entries;
+        legacyActive = legacy.activeKey;
+      } else if (typeof parsed.nick === "string" && typeof parsed.server === "string") {
+        /* The oracle's pre-v2 single-credential object: kept at the top
+           level, where its own reader looks for it. */
+        var single = {};
+        ["nick", "server", "password", "sessionToken", "meshToken", "meshTokenExpiry", "tokenExpiry", "savedAt"].forEach(function (field) {
+          if (Object.prototype.hasOwnProperty.call(parsed, field)) single[field] = parsed[field];
+        });
+        legacy = { kind: "single", object: single };
+        legacyEntries = { single: single };
+        legacyActive = "single";
+      }
+      var slots = isPlainRecord(parsed.slots) ? parsed.slots : null;
+      var active = (slots && typeof parsed.active === "string" && Object.prototype.hasOwnProperty.call(slots, parsed.active))
+        ? parsed.active
+        : undefined;
+      if (!slots) {
+        slots = {};
+        if (legacyEntries) {
+          Object.keys(legacyEntries).forEach(function (legacyKey) {
+            var migrated = slotFromLegacy(legacyEntries[legacyKey]);
+            if (!migrated || Object.prototype.hasOwnProperty.call(slots, migrated.key)) return;
+            slots[migrated.key] = migrated.slot;
+            if (legacyKey === legacyActive) active = migrated.key;
+          });
+        }
+      }
+      var store = { v: 1, slots: slots, active: active };
+      if (legacy) store.legacy = legacy;
+      return store;
     } catch (err) {
       return { v: 1, slots: {} };
     }
@@ -1187,8 +1284,19 @@
 
   function writeCredentialsStore(store) {
     try {
-      var serialized = JSON.stringify({ v: 1, slots: store.slots || {} });
-      if (serialized.length > 64 * 1024) return false;
+      var slots = store.slots || {};
+      var out = { v: 1, slots: slots };
+      if (typeof store.active === "string" && Object.prototype.hasOwnProperty.call(slots, store.active)) out.active = store.active;
+      var legacy = store.legacy;
+      if (legacy && legacy.kind === "v2" && isPlainRecord(legacy.entries)) {
+        out.version = 2;
+        out.entries = legacy.entries;
+        if (typeof legacy.activeKey === "string") out.activeKey = legacy.activeKey;
+      } else if (legacy && legacy.kind === "single" && isPlainRecord(legacy.object)) {
+        Object.keys(legacy.object).forEach(function (field) { out[field] = legacy.object[field]; });
+      }
+      var serialized = JSON.stringify(out);
+      if (serialized.length > MAX_CREDENTIALS_STORAGE_CHARS) return false;
       global.localStorage.setItem(CRED_KEY, serialized);
       return true;
     } catch (err) {
@@ -1250,6 +1358,191 @@
     delete store.slots[key];
     return writeCredentialsStore(store);
   }
+
+  /* v3/rx-public — remembered identities ("Stay signed in"), mirroring
+     `listRememberedIdentities` / `selectRememberedIdentity` /
+     `removeRememberedIdentity` in credentials.ts over this file's slot
+     store. A slot joins the catalogue only after an explicit opt-in
+     (`remembered: true`, written by `remember` once the server accepted
+     the account); the session-token capture above never lists anyone.
+     Elm only ever receives sanitized metadata — { id, nick, server,
+     savedAt, active, access } — never a password or bearer token: `use`
+     hands a stored password straight to the SASL holder and answers
+     `held: true|false`. Bounds mirror the oracle (12 entries, 256-char
+     display fields, 64 KiB password, no control bytes). */
+  var REMEMBERED_MAX = 12;
+  var REMEMBERED_FIELD_MAX = 256;
+  var REMEMBERED_PASSWORD_MAX = 64 * 1024;
+  var REMEMBERED_NICK = /^[A-Za-z[\]\\`_^{|}][A-Za-z0-9[\]\\`_^{|}-]*$/;
+
+  function rememberedNick(value) {
+    if (typeof value !== "string") return null;
+    var nick = value.trim();
+    return nick.length > 0 && nick.length <= 64 && REMEMBERED_NICK.test(nick) ? nick : null;
+  }
+
+  function rememberedPassword(value) {
+    return typeof value === "string"
+      && value.length > 0
+      && value.length <= REMEMBERED_PASSWORD_MAX
+      && !/[\u0000-\u001f\u007f]/.test(value)
+      ? value
+      : null;
+  }
+
+  /* Opaque picker id: the oracle's two 32-bit hashes of the slot key, so
+     the key (which names the server) never crosses into Elm. */
+  function rememberedId(key) {
+    var first = 0x811c9dc5;
+    var second = 0x9e3779b9;
+    for (var i = 0; i < key.length; i++) {
+      var code = key.charCodeAt(i);
+      first = Math.imul(first ^ code, 0x01000193);
+      second = Math.imul(second ^ code, 0x85ebca6b);
+    }
+    return "saved-" + (first >>> 0).toString(36) + "-" + (second >>> 0).toString(36);
+  }
+
+  /* Slot keys are "<server>|<nick>": a host never holds "|", a nick may. */
+  function rememberedServerLabel(key) {
+    var cut = key.indexOf("|");
+    var server = cut >= 0 ? key.slice(0, cut) : key;
+    return server
+      .replace(/[\u0000-\u001f\u007f]/g, "")
+      .split(/[?#]/, 1)[0]
+      .replace(/^([^/]*\/\/)?[^/@]+@/, "$1")
+      .slice(0, REMEMBERED_FIELD_MAX);
+  }
+
+  function rememberedSlotNick(key, slot) {
+    var shown = rememberedNick(slot && slot.nick);
+    if (shown) return shown;
+    var cut = key.indexOf("|");
+    return rememberedNick(cut >= 0 ? key.slice(cut + 1) : "");
+  }
+
+  function rememberedAccess(slot, nowMs) {
+    if (validResumeToken(slot.sessionToken)) return "resume";
+    var meshMs = finiteMs(slot.meshExpiresAtMs);
+    if (validResumeToken(slot.meshToken) && (meshMs === null || meshMs > nowMs)) return "resume";
+    return rememberedPassword(slot.password) ? "sign-in" : "identity-only";
+  }
+
+  function rememberedEntries(store) {
+    var keys = Object.keys(store.slots).filter(function (key) {
+      var slot = store.slots[key];
+      return slot && typeof slot === "object" && !Array.isArray(slot) && slot.remembered === true
+        && rememberedSlotNick(key, slot) !== null;
+    });
+    keys.sort(function (left, right) {
+      if (left === store.active) return -1;
+      if (right === store.active) return 1;
+      var l = Date.parse(store.slots[left].savedAt || "");
+      var r = Date.parse(store.slots[right].savedAt || "");
+      var byTime = (isFinite(r) ? r : 0) - (isFinite(l) ? l : 0);
+      return byTime || (left < right ? -1 : left > right ? 1 : 0);
+    });
+    return keys.slice(0, REMEMBERED_MAX);
+  }
+
+  function findRemembered(store, id) {
+    if (typeof id !== "string" || id.length > 64) return null;
+    var keys = rememberedEntries(store);
+    for (var i = 0; i < keys.length; i++) {
+      if (rememberedId(keys[i]) === id) return keys[i];
+    }
+    return null;
+  }
+
+  var rememberedIdentities = {
+    max: REMEMBERED_MAX,
+    id: rememberedId,
+    /* The secret-free catalogue, active first then newest. */
+    list: function (nowMs) {
+      var now = typeof nowMs === "number" ? nowMs : Date.now();
+      var store = readCredentialsStore();
+      return rememberedEntries(store).map(function (key) {
+        var slot = store.slots[key];
+        return {
+          id: rememberedId(key),
+          nick: rememberedSlotNick(key, slot),
+          server: rememberedServerLabel(key),
+          savedAt: typeof slot.savedAt === "string" ? slot.savedAt.slice(0, 64) : "",
+          active: key === store.active,
+          access: rememberedAccess(slot, now)
+        };
+      });
+    },
+    /* Mark one identity active (the picker's selection). */
+    select: function (id) {
+      var store = readCredentialsStore();
+      var key = findRemembered(store, id);
+      if (!key) return false;
+      store.active = key;
+      return writeCredentialsStore(store);
+    },
+    /* Arm the SASL holder from the stored password (never returned). */
+    use: function (id) {
+      var store = readCredentialsStore();
+      var key = findRemembered(store, id);
+      if (!key) return null;
+      var slot = store.slots[key];
+      var nick = rememberedSlotNick(key, slot);
+      var password = rememberedPassword(slot.password);
+      store.active = key;
+      writeCredentialsStore(store);
+      if (password) sasl.setCredentials(nick, password, false);
+      return { id: id, nick: nick, held: Boolean(password) };
+    },
+    /* Forget: the whole slot goes (password and resume tokens). */
+    forget: function (id) {
+      var store = readCredentialsStore();
+      var key = findRemembered(store, id);
+      if (!key) return false;
+      delete store.slots[key];
+      if (store.active === key) store.active = undefined;
+      return writeCredentialsStore(store);
+    },
+    /* After the server accepted the account: opt in (copy the password
+       the SASL holder already has for this account) or opt out (drop
+       any stored password and the listing flag; resume tokens stay with
+       the session-token capture path). */
+    remember: function (req) {
+      if (!req || typeof req.server !== "string" || typeof req.nick !== "string") return false;
+      var key = credentialSlotKey(req.server, req.nick);
+      if (!req.server || !rememberedNick(req.nick)) return false;
+      var store = readCredentialsStore();
+      var slot = store.slots[key];
+      if (!slot || typeof slot !== "object" || Array.isArray(slot)) slot = {};
+      if (req.remember === true) {
+        var display = rememberedNick(req.display) || rememberedNick(req.nick);
+        var account = String(saslCreds.account || "").toLowerCase();
+        var password = rememberedPassword(saslCreds.password);
+        slot.remembered = true;
+        slot.nick = display;
+        slot.savedAt = new Date().toISOString();
+        if (password && (account === req.nick.toLowerCase() || account === display.toLowerCase())) {
+          slot.password = password;
+        }
+        store.slots[key] = slot;
+        store.active = key;
+      } else {
+        if (!store.slots[key]) return false;
+        delete slot.password;
+        delete slot.remembered;
+        delete slot.nick;
+        delete slot.savedAt;
+        if (store.active === key) store.active = undefined;
+        if (Object.keys(slot).length === 0) delete store.slots[key];
+        else store.slots[key] = slot;
+      }
+      var keep = rememberedEntries(store);
+      Object.keys(store.slots).forEach(function (k) {
+        if (store.slots[k] && store.slots[k].remembered === true && keep.indexOf(k) < 0) delete store.slots[k];
+      });
+      return writeCredentialsStore(store);
+    }
+  };
 
   /* SASL credential exchange, mirroring `client.ts`: secrets live here,
      never in Elm state. Elm owns mechanism selection, the exchange state
@@ -2410,6 +2703,7 @@
         var caps = voiceCapabilities();
         if (!has("shareSupported")) snapshot.shareSupported = caps.shareSupported;
         if (!has("pipSupported")) snapshot.pipSupported = caps.pipSupported;
+        if (!has("cameraSupported")) snapshot.cameraSupported = caps.cameraSupported;
       }
       try {
         if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(snapshot);
@@ -2626,7 +2920,20 @@
     function clear() {
       clearPing();
     }
-    return { schedule: schedule, observed: observed, clear: clear };
+    /* v3/gap-pwa-safety: probe now (a bfcache restore / freeze resume
+       may hand back a socket that died while the page slept). Fires
+       the Elm PING at once and arms the same pong timeout, so a live
+       socket just answers and a dead one closes into the normal
+       reconnect path — never a needless redial. */
+    function probe() {
+      clearPing();
+      try { app.ports.pingDue.send(null); } catch (err) {}
+      pongTimer = setTimeout(function () {
+        pongTimer = null;
+        try { sock.close(4001, "Ping timeout"); } catch (err) {}
+      }, timeoutMs);
+    }
+    return { schedule: schedule, observed: observed, clear: clear, probe: probe };
   }
 
   /* Node probing — mirrors `src/app/nodes.ts` (`pingNode` /
@@ -3668,6 +3975,101 @@ function fetchPublicFeed(url) {
     };
   }
   /* Idempotent document-level install (wired once from `wire`). */
+  /* v3/rx-public — public page navigation (`pageNavigated`): a new
+     page starts at the top; a `#fragment` target scrolls into view and
+     takes focus (a temporary tabindex=-1 when it is not focusable), so
+     the skip link, section navs and roadmap cards work like native
+     anchors. Runs after Elm paints (two frames). */
+  function focusFragment(doc, win, fragment) {
+    if (!doc || !win) return false;
+    if (!fragment) {
+      try { win.scrollTo(0, 0); } catch (err) { /* no viewport */ }
+      return true;
+    }
+    var id = fragment;
+    try { id = decodeURIComponent(fragment); } catch (err) { id = fragment; }
+    var el = null;
+    try { el = doc.getElementById(id); } catch (err) { el = null; }
+    if (!el) return false;
+    var reduce = false;
+    try { reduce = !!(win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (err) { reduce = false; }
+    var focusable = /^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/.test(el.tagName || "");
+    if (!focusable && !(el.hasAttribute && el.hasAttribute("tabindex"))) {
+      try {
+        el.setAttribute("tabindex", "-1");
+        el.addEventListener("blur", function () { el.removeAttribute("tabindex"); }, { once: true });
+      } catch (err) { /* attribute writes blocked */ }
+    }
+    try { el.focus({ preventScroll: true }); } catch (err) { try { el.focus(); } catch (e) { /* not focusable */ } }
+    try { el.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" }); } catch (err) {
+      try { el.scrollIntoView(); } catch (e) { /* no layout */ }
+    }
+    return true;
+  }
+
+  /* v3/rx-public — the public phone menu as a disclosure with focus
+     management (the oracle's PublicNav): opening moves focus to the
+     first link, Tab cycles inside toggle + menu while it is open,
+     closing (toggle, Escape, navigation) returns focus to the toggle
+     when it was inside the menu, and widening past the phone breakpoint
+     closes it (the header shows the links inline there). Observes the
+     toggle's aria-expanded, so Elm stays the owner of the state. */
+  var PUBLIC_MENU_TOGGLE = ".public-frame__menu-toggle";
+  var PUBLIC_MENU_NAV = "#public-primary-navigation";
+  function installPublicMenuFocus(doc, win, Mutation) {
+    if (!doc || !doc.addEventListener || !Mutation) return null;
+    var wasOpen = false;
+    function parts() {
+      var toggle = null;
+      var nav = null;
+      try { toggle = doc.querySelector(PUBLIC_MENU_TOGGLE); nav = doc.querySelector(PUBLIC_MENU_NAV); } catch (err) { /* none */ }
+      return { toggle: toggle, nav: nav };
+    }
+    function isOpen(toggle) {
+      return !!toggle && toggle.getAttribute("aria-expanded") === "true";
+    }
+    function links(nav) {
+      try { return Array.prototype.slice.call(nav.querySelectorAll("a[href]")); } catch (err) { return []; }
+    }
+    function sync() {
+      var p = parts();
+      var open = isOpen(p.toggle);
+      if (open && !wasOpen && p.nav) {
+        var first = links(p.nav)[0];
+        if (first) { try { first.focus(); } catch (err) { /* hidden */ } }
+      } else if (!open && wasOpen && p.toggle) {
+        var active = doc.activeElement;
+        var inside = !!(p.nav && active && p.nav.contains && p.nav.contains(active));
+        if (inside || active === doc.body || !active) { try { p.toggle.focus(); } catch (err) { /* gone */ } }
+      }
+      wasOpen = open;
+    }
+    var observer = new Mutation(sync);
+    try {
+      observer.observe(doc.body || doc.documentElement, { attributes: true, attributeFilter: ["aria-expanded"], subtree: true, childList: true });
+    } catch (err) { return null; }
+    doc.addEventListener("keydown", function (event) {
+      if (event.key !== "Tab") return;
+      var p = parts();
+      if (!isOpen(p.toggle) || !p.nav) return;
+      var ring = [p.toggle].concat(links(p.nav));
+      var at = ring.indexOf(doc.activeElement);
+      if (at < 0) return;
+      var next = event.shiftKey ? (at - 1 + ring.length) % ring.length : (at + 1) % ring.length;
+      event.preventDefault();
+      try { ring[next].focus(); } catch (err) { /* hidden */ }
+    }, true);
+    if (win && win.addEventListener) {
+      win.addEventListener("resize", function () {
+        var p = parts();
+        if (isOpen(p.toggle) && (win.innerWidth || 0) > 768) {
+          try { p.toggle.click(); } catch (err) { /* gone */ }
+        }
+      });
+    }
+    return { sync: sync };
+  }
+
   function installOverlayFocusOnce(doc) {
     if (!doc) return null;
     try {
@@ -5937,6 +6339,18 @@ function fetchPublicFeed(url) {
     if (typeof document !== "undefined" && document) {
       try { installOverlayFocusOnce(document); } catch (err) { /* focus management is best-effort */ }
     }
+    /* v3/rx-public — public page navigation + phone menu focus. */
+    if (typeof document !== "undefined" && document && typeof window !== "undefined") {
+      try { installPublicMenuFocus(document, window, window.MutationObserver); } catch (err) { /* best-effort */ }
+    }
+    if (app.ports.pageNavigated) {
+      app.ports.pageNavigated.subscribe(function (req) {
+        var fragment = req && typeof req.fragment === "string" ? req.fragment.slice(0, 256) : "";
+        if (typeof window === "undefined" || typeof document === "undefined") return;
+        var frame = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+        frame(function () { frame(function () { focusFragment(document, window, fragment); }); });
+      });
+    }
     /* Device vault retention policy (mirroring `readRetentionPolicy` /
        `writeRetentionPolicy` + `applyRetentionPolicy`: the stored JSON
        is the source of truth — `trimTarget` re-reads it on every
@@ -6458,6 +6872,41 @@ function fetchPublicFeed(url) {
     if (app.ports.sessionTokensClear) {
       app.ports.sessionTokensClear.subscribe(function (req) {
         clearResumeTokens(req.server, req.nick);
+      });
+    }
+
+    /* v3/rx-public — remembered identities: one request port in
+       (`op` = list | select | use | forget | remember), sanitized
+       metadata out. Every op answers with a fresh listing; `use` also
+       answers `credentialsReady { id, nick, held }`. */
+    if (app.ports.credentialsRequest) {
+      var sendRemembered = function () {
+        if (!app.ports.credentialsListed) return;
+        try { app.ports.credentialsListed.send(rememberedIdentities.list()); } catch (err) { /* port gone */ }
+      };
+      app.ports.credentialsRequest.subscribe(function (req) {
+        var op = req && typeof req.op === "string" ? req.op : "";
+        var id = req && typeof req.id === "string" ? req.id : "";
+        try {
+          if (op === "select") {
+            rememberedIdentities.select(id);
+          } else if (op === "use") {
+            var used = rememberedIdentities.use(id);
+            if (app.ports.credentialsReady) {
+              app.ports.credentialsReady.send(used || { id: id, nick: "", held: false });
+            }
+          } else if (op === "forget") {
+            rememberedIdentities.forget(id);
+          } else if (op === "remember") {
+            rememberedIdentities.remember({
+              server: req.server,
+              nick: req.nick,
+              display: req.display,
+              remember: req.remember === true
+            });
+          }
+        } catch (err) { /* storage blocked: the listing below says what is true */ }
+        sendRemembered();
       });
     }
 
@@ -7035,7 +7484,12 @@ function fetchPublicFeed(url) {
     var attribution = createAttributionIdentity({});
     wireAttribution(app, attribution);
 
+    /* v3/gap-pwa-safety: register the deployed /sw.js (silent, gated)
+       — push subscriptions and the update strip both ride on it. */
+    var swRegistration = registerServiceWorker();
+
     var webPush = createWebPush({
+      registration: swRegistration,
       sendLine: function (line) {
         if (socket.isOpen()) {
           socket.send(line);
@@ -7066,7 +7520,19 @@ function fetchPublicFeed(url) {
     wireGroupWelcome(app, groupWelcome);
 
     /* v3/polish */
-    wirePolish(app);
+    wirePolish(app, { registration: swRegistration });
+
+    /* v3/gap-pwa-safety: a bfcache restore / freeze resume probes the
+       socket at once (a dead one closes into the reconnect path) and
+       lets Elm redial a session that is already offline. */
+    installPageLifecycle(function () {
+      try { if (keepalive && socket.isOpen()) keepalive.probe(); } catch (err) { /* no socket */ }
+      if (app.ports.pageRestored) {
+        var online = true;
+        try { online = typeof navigator === "undefined" || navigator.onLine !== false; } catch (err) { online = true; }
+        try { app.ports.pageRestored.send({ online: online }); } catch (err) { /* port gone */ }
+      }
+    });
   }
 
   var CEREMONY_TIMEOUT_MS = 120000;
@@ -7724,11 +8190,16 @@ function fetchPublicFeed(url) {
 
     /* v3/dmsafety — safety evidence for the DM header / key-change row
        (mirroring the oracle `loadSafetyNumber` + `loadPendingKeySafetyNumber`):
-       `current` binds our device key to the peer's PINNED set; `pending`
-       binds it to the presented set only when that set is not already
-       pinned. Raw keys never leave this layer; failures resolve null. */
+       `current` binds our device key to the peer's PINNED set.
+       v3/gap-pwa-safety: `pending` binds it to the PENDING keys only —
+       the presented keys that are not pinned yet (`pendingKeys`) — so a
+       peer that adds one device shows the pairwise number that device
+       itself displays (the oracle's `safetyNumber(mine, newKey)`), and
+       acceptance can name exactly the keys the user compared. Keys are
+       public; they already sit in Elm's directory and are never
+       rendered. Failures resolve to nulls / []. */
     function safetyEvidence(account, presentedKeys, owner) {
-      var none = { current: null, pending: null };
+      var none = { current: null, pending: null, pendingKeys: [] };
       var presented = e2eeNormalizeKeys(Array.isArray(presentedKeys) ? presentedKeys : []);
       var recordKey = pinRecordKey(account, owner);
       if (!recordKey || !usable()) return Promise.resolve(none);
@@ -7742,24 +8213,57 @@ function fetchPublicFeed(url) {
         var pinned = raw === null ? [] : (parsePinnedKeys(raw) || []);
         var set = {};
         pinned.forEach(function (k) { set[k] = true; });
-        var differs = presented.some(function (k) { return !set[k]; });
+        var pendingKeys = presented.filter(function (k) { return !set[k]; });
         return Promise.all([
           pinned.length > 0 ? safetyFor(local, pinned) : Promise.resolve(null),
-          differs && presented.length > 0 ? safetyFor(local, presented) : Promise.resolve(null)
-        ]).then(function (r) { return { current: r[0], pending: r[1] }; });
+          pendingKeys.length > 0 ? safetyFor(local, pendingKeys) : Promise.resolve(null)
+        ]).then(function (r) {
+          return { current: r[0], pending: r[1], pendingKeys: r[1] ? pendingKeys : [] };
+        });
       }).catch(function () { return none; });
     }
 
     /* v3/dmsafety — explicit user acceptance of a key change (mirroring
-       `acceptPeerKeyChange` → `pinPeerKeys`): re-pin the exact presented
-       set. Resolves false on any failure so the App stays fail-closed. */
-    function acceptKeys(account, presentedKeys, owner) {
-      var keys = e2eeNormalizeKeys(Array.isArray(presentedKeys) ? presentedKeys : []);
-      if (keys.length === 0) return Promise.resolve(false);
+       `acceptPeerKeyChange`, which pins only "the exact pending key that
+       is still advertised").
+       v3/gap-pwa-safety: acceptance trusts ONLY the reviewed pending
+       keys. `review.pendingKeys` must all still be presented and must
+       reproduce `review.pending` — the exact number the user compared —
+       or nothing is written. The new pin is the still-presented part of
+       the old pin plus the reviewed keys, so a device the peer adds
+       after the review (present in `presentedKeys` but not reviewed) is
+       never trusted by this click: it stays pending and the next seal,
+       open or directory check flags it again. Resolves false on any
+       failure so the App stays fail-closed. */
+    function acceptKeys(account, presentedKeys, owner, review) {
+      var presented = e2eeNormalizeKeys(Array.isArray(presentedKeys) ? presentedKeys : []);
+      var reviewed = e2eeNormalizeKeys(review && Array.isArray(review.pendingKeys) ? review.pendingKeys : []);
+      var expected = review && typeof review.pending === "string" ? review.pending.trim() : "";
+      if (presented.length === 0 || reviewed.length === 0 || !expected) return Promise.resolve(false);
+      var shown = {};
+      presented.forEach(function (k) { shown[k] = true; });
+      if (!reviewed.every(function (k) { return shown[k]; })) return Promise.resolve(false);
       var recordKey = pinRecordKey(account, owner);
-      if (!recordKey) return Promise.resolve(false);
+      if (!recordKey || !usable()) return Promise.resolve(false);
       return withPinChain("seal:" + recordKey, function () {
-        return pinStore.set(recordKey, keys.length === 1 ? keys[0] : JSON.stringify({ v: 1, k: keys }));
+        return deviceKeys().then(function (keys) {
+          return keys ? exportPublicB64(keys) : null;
+        }).then(function (local) {
+          if (!local) return false;
+          return safetyFor(local, reviewed).then(function (number) {
+            if (!number || number !== expected) return false;
+            return pinStore.get(recordKey).then(function (raw) {
+              if (raw === undefined) return false;
+              var pinned = raw === null ? [] : (parsePinnedKeys(raw) || []);
+              var trusted = {};
+              pinned.forEach(function (k) { trusted[k] = true; });
+              reviewed.forEach(function (k) { trusted[k] = true; });
+              var next = presented.filter(function (k) { return trusted[k]; });
+              if (next.length === 0) return false;
+              return pinStore.set(recordKey, next.length === 1 ? next[0] : JSON.stringify({ v: 1, k: next }));
+            });
+          });
+        });
       }).then(function (ok) { return ok === true; }).catch(function () { return false; });
     }
 
@@ -7795,6 +8299,8 @@ function fetchPublicFeed(url) {
       safetyFor: safetyFor,
       safetyEvidence: safetyEvidence,
       acceptKeys: acceptKeys,
+      /* v3/gap-pwa-safety: pure pin verdict for a directory update. */
+      keyStatus: keyStatus,
       registryId: registryId,
       publishKeys: publishKeys
     };
@@ -8288,16 +8794,45 @@ function fetchPublicFeed(url) {
     }
   }
 
+  /* v3/gap-pwa-safety: `serviceWorker.ready` never settles while no
+     worker is registered, which used to strand the toggle on "Turning
+     on…". Wait for this page's own registration attempt to settle, then
+     give `ready` a bounded window; past it the request fails with a
+     typed reason instead of hanging. */
+  var WEB_PUSH_READY_TIMEOUT_MS = 15000;
+  var WEB_PUSH_NO_WORKER = "Onyx's background worker isn't running in this browser yet. Reload the page and try again.";
+
   function createWebPush(deps) {
     deps = deps || {};
+    var readyTimeoutMs = (typeof deps.readyTimeoutMs === "number" && deps.readyTimeoutMs >= 0)
+      ? deps.readyTimeoutMs
+      : WEB_PUSH_READY_TIMEOUT_MS;
+    var registration = deps.registration;
     var swReady = deps.serviceWorkerReady || function () {
       try {
-        if (typeof navigator === "undefined" || !navigator.serviceWorker) return Promise.resolve(null);
-        var ready = navigator.serviceWorker.ready;
-        if (ready && typeof ready.then === "function") {
-          return ready.then(function (reg) { return reg || null; }, function () { return null; });
-        }
-        return Promise.resolve(null);
+        var container = deps.serviceWorkerContainer !== undefined
+          ? deps.serviceWorkerContainer
+          : ((typeof navigator !== "undefined" && navigator.serviceWorker) || null);
+        if (!container) return Promise.resolve(null);
+        var attempted = (registration && typeof registration.then === "function")
+          ? Promise.resolve(registration).catch(function () { return null; })
+          : Promise.resolve(null);
+        return attempted.then(function () {
+          // Even when this page could not register, a worker from an
+          // earlier visit may still be active: ask `ready`, bounded.
+          var ready = container.ready;
+          if (!ready || typeof ready.then !== "function") return null;
+          return new Promise(function (resolve) {
+            var timer = setTimeout(function () { resolve(null); }, readyTimeoutMs);
+            ready.then(function (reg) {
+              clearTimeout(timer);
+              resolve(reg || null);
+            }, function () {
+              clearTimeout(timer);
+              resolve(null);
+            });
+          });
+        });
       } catch (err) {
         return Promise.resolve(null);
       }
@@ -8460,7 +8995,7 @@ function fetchPublicFeed(url) {
         if (perm === null || perm === undefined) return fail("Requesting notification permission failed.");
         if (perm !== "granted") return fail("Notifications are blocked by the browser.");
         return swReady().then(function (reg) {
-          if (!reg) return fail("Subscribing failed — check site notification settings.");
+          if (!reg) return fail(WEB_PUSH_NO_WORKER);
           if (!socketOpen()) return fail(WEB_PUSH_SESSION_CHANGED);
           return reg.pushManager.getSubscription().then(function (sub) {
             if (!socketOpen()) return fail(WEB_PUSH_SESSION_CHANGED);
@@ -9714,15 +10249,47 @@ function fetchPublicFeed(url) {
       app.ports.dmSafetyRequest.subscribe(function (req) {
         e2ee.safetyEvidence(req.peer, req.keys, req.owner).then(function (ev) {
           try {
-            app.ports.dmSafetyResult.send({ peer: req.peer, keys: req.keys, current: ev.current || null, pending: ev.pending || null });
+            app.ports.dmSafetyResult.send({
+              peer: req.peer,
+              keys: req.keys,
+              current: ev.current || null,
+              pending: ev.pending || null,
+              pendingKeys: Array.isArray(ev.pendingKeys) ? ev.pendingKeys : []
+            });
           } catch (err) { /* port gone */ }
         });
       });
     }
     if (app.ports.dmKeyAcceptRequest) {
       app.ports.dmKeyAcceptRequest.subscribe(function (req) {
-        e2ee.acceptKeys(req.peer, req.keys, req.owner).then(function (ok) {
-          try { app.ports.dmKeyAccepted.send({ peer: req.peer, keys: req.keys, ok: ok }); } catch (err) { /* port gone */ }
+        var review = { pendingKeys: req.pendingKeys, pending: req.pending };
+        e2ee.acceptKeys(req.peer, req.keys, req.owner, review).then(function (ok) {
+          // `trusted`: after this write, is every presented key pinned?
+          // False when the peer added a device the user did not review.
+          var verdict = ok ? e2ee.keyStatus(req.peer, req.keys, req.owner) : Promise.resolve("changed");
+          return verdict.then(function (status) {
+            try {
+              app.ports.dmKeyAccepted.send({
+                peer: req.peer,
+                keys: req.keys,
+                pendingKeys: Array.isArray(req.pendingKeys) ? req.pendingKeys : [],
+                ok: ok,
+                trusted: ok && status === "unchanged"
+              });
+            } catch (err) { /* port gone */ }
+          });
+        });
+      });
+    }
+    /* v3/gap-pwa-safety: a pinned peer's directory entry changed (761
+       reply or METADATA push). Pure read — nothing is pinned here; a
+       `changed` verdict raises the key-change review in Elm. */
+    if (app.ports.dmKeyCheckRequest) {
+      app.ports.dmKeyCheckRequest.subscribe(function (req) {
+        e2ee.keyStatus(req.peer, req.keys, req.owner).then(function (status) {
+          try { app.ports.dmKeyChecked.send({ peer: req.peer, keys: req.keys, status: String(status) }); } catch (err) { /* port gone */ }
+        }, function () {
+          try { app.ports.dmKeyChecked.send({ peer: req.peer, keys: req.keys, status: "unreadable" }); } catch (err) { /* port gone */ }
         });
       });
     }
@@ -9748,6 +10315,183 @@ function fetchPublicFeed(url) {
     }
   }
 
+  /* ── v3/gap-pwa-safety: service-worker registration ────────────────
+     The deploy stamps and ships `/sw.js` (public/sw.js: network-first
+     navigations with `/` + `/app/` shell fallbacks, cache-first hashed
+     `/assets/` — the Elm overlay's `/assets/elm/` included — push with
+     E2EE-redacted bodies, notificationclick → `/app/` deep links, and the
+     `ONYX_SKIP_WAITING` handoff). The Elm build registers it here,
+     mirroring `startServiceWorkerRuntime`
+     (`register('/sw.js', { updateViaCache: 'none' })`), but only:
+       - with a real ServiceWorkerContainer (node / jsdom have none),
+       - on https or a loopback host (localhost, 127.0.0.1, [::1]),
+       - after `load`, so registration never competes with boot,
+       - when a HEAD probe says `/sw.js` is served as JavaScript: an SPA
+         fallback (HTML) or a 404 makes `register()` log a console error
+         even when its rejection is handled, and failures stay silent.
+     Resolves the registration or null; never rejects. A long-lived tab
+     re-checks for a newer worker while visible (at most every 30 min,
+     online only), so the update strip can appear without a navigation. */
+  var SW_URL = "/sw.js";
+  var SW_SCOPE = "/";
+  var SW_UPDATE_EVERY_MS = 30 * 60 * 1000;
+
+  function swLoopbackHost(host) {
+    var h = String(host || "").toLowerCase();
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1" || /\.localhost$/.test(h);
+  }
+
+  function swOriginAllowed(win) {
+    try {
+      var loc = win && win.location;
+      if (!loc) return false;
+      if (win.isSecureContext === false) return false;
+      if (loc.protocol === "https:") return true;
+      return loc.protocol === "http:" && swLoopbackHost(loc.hostname);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function registerServiceWorker(env) {
+    env = env || {};
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var doc = env.document || (win && win.document) || undefined;
+    var fetchFn = env.fetch || null;
+    if (!fetchFn) {
+      try {
+        if (win && typeof win.fetch === "function") fetchFn = win.fetch.bind(win);
+      } catch (e) { fetchFn = null; }
+    }
+    var every = typeof env.updateEveryMs === "number" ? env.updateEveryMs : SW_UPDATE_EVERY_MS;
+    var clock = env.now || function () { return Date.now(); };
+    var everyTimer = env.setInterval || (typeof setInterval === "function" ? setInterval : null);
+    var container = null;
+    try { container = (nav && nav.serviceWorker) || null; } catch (e) { container = null; }
+    if (!container || typeof container.register !== "function" || !fetchFn || !swOriginAllowed(win)) {
+      return Promise.resolve(null);
+    }
+
+    function afterLoad() {
+      return new Promise(function (resolve) {
+        try {
+          if (!doc || doc.readyState === "complete" || !win || typeof win.addEventListener !== "function") {
+            resolve();
+            return;
+          }
+          win.addEventListener("load", function () { resolve(); }, { once: true });
+        } catch (e) {
+          resolve();
+        }
+      });
+    }
+
+    function servedAsScript(res) {
+      if (!res || res.ok !== true || res.redirected === true) return false;
+      var type = "";
+      try { type = (res.headers && typeof res.headers.get === "function" && res.headers.get("content-type")) || ""; } catch (e) { type = ""; }
+      return /javascript|ecmascript/i.test(String(type));
+    }
+
+    function keepChecking(reg) {
+      var last = clock();
+      function check() {
+        try {
+          if (doc && doc.visibilityState && doc.visibilityState !== "visible") return;
+          if (nav && nav.onLine === false) return;
+          if (clock() - last < every) return;
+          last = clock();
+          if (typeof reg.update === "function") Promise.resolve(reg.update()).catch(function () { return null; });
+        } catch (e) { /* an uninstalling registration cannot update */ }
+      }
+      try {
+        if (doc && typeof doc.addEventListener === "function") doc.addEventListener("visibilitychange", check);
+      } catch (e) { /* no visibility events */ }
+      try { if (everyTimer) everyTimer(check, every); } catch (e) { /* no timers */ }
+      return check;
+    }
+
+    return afterLoad().then(function () {
+      return fetchFn(SW_URL, { method: "HEAD", cache: "no-store", credentials: "same-origin" });
+    }).then(function (res) {
+      if (!servedAsScript(res)) return null;
+      return container.register(SW_URL, { scope: SW_SCOPE, updateViaCache: "none" });
+    }).then(function (reg) {
+      if (!reg) return null;
+      keepChecking(reg);
+      return reg;
+    }).catch(function () {
+      return null;
+    });
+  }
+
+  /* ── v3/gap-pwa-safety: page-restore reconcile ──────────────────────
+     Mirrors `src/app/connectPageLifecycle.ts`: a page restored from the
+     back/forward cache (`pageshow` with `persisted`) or resumed after a
+     freeze reconciles the IRC session exactly once per suspension. The
+     caller decides what that means (ports probe the socket, Elm redials
+     an offline session). Returns { stop } or null without a target. */
+  function installPageLifecycle(onRestore, env) {
+    env = env || {};
+    var pageTarget = env.pageTarget || (typeof window !== "undefined" ? window : null);
+    var lifecycleTarget = env.lifecycleTarget || (typeof document !== "undefined" ? document : null);
+    if (!pageTarget || typeof pageTarget.addEventListener !== "function") return null;
+    var supportsFreeze = typeof env.supportsFreezeResume === "boolean"
+      ? env.supportsFreezeResume
+      : !!(lifecycleTarget && ("onfreeze" in lifecycleTarget || "onresume" in lifecycleTarget));
+    var suspended = false;
+    var handled = false;
+
+    function restore() {
+      try { onRestore(); } catch (e) { /* reconcile is best-effort */ }
+    }
+    function begin() {
+      suspended = true;
+      handled = false;
+    }
+    function onPageHide(event) {
+      if (event && event.persisted) { begin(); return; }
+      suspended = false;
+      handled = false;
+    }
+    function onPageShow(event) {
+      if (!(event && event.persisted)) {
+        suspended = false;
+        handled = false;
+        return;
+      }
+      suspended = false;
+      if (handled) return;
+      handled = true;
+      restore();
+    }
+    function onResume() {
+      if (!suspended || handled) return;
+      suspended = false;
+      handled = true;
+      restore();
+    }
+
+    pageTarget.addEventListener("pagehide", onPageHide);
+    pageTarget.addEventListener("pageshow", onPageShow);
+    var freezable = supportsFreeze && lifecycleTarget && typeof lifecycleTarget.addEventListener === "function";
+    if (freezable) {
+      lifecycleTarget.addEventListener("freeze", begin);
+      lifecycleTarget.addEventListener("resume", onResume);
+    }
+    return {
+      stop: function () {
+        pageTarget.removeEventListener("pagehide", onPageHide);
+        pageTarget.removeEventListener("pageshow", onPageShow);
+        if (freezable) {
+          lifecycleTarget.removeEventListener("freeze", begin);
+          lifecycleTarget.removeEventListener("resume", onResume);
+        }
+      }
+    };
+  }
+
   /* ── v3/polish: quiet-ask flags + PWA install/update bridge ──────────
      Mirrors `src/lib/firstHour/firstHour.ts`, `firstRunNotify.ts` and
      `src/pwa/addToHomeScreen.ts`: "1" markers under `onyx:*` keys, the
@@ -9756,13 +10500,19 @@ function fetchPublicFeed(url) {
      `beforeinstallprompt` capture that is only ever `prompt()`ed from the
      user's Add to Home Screen tap, and a service-worker update handoff.
 
-     The Elm build registers NO service worker of its own. Update
-     detection is honest: it only fires when an Onyx service worker
-     already controls this scope (e.g. the deployed `sw.js`) and a new
-     one is installed/waiting. With no registration nothing is ever
+     The deployed `sw.js` is registered by `registerServiceWorker`
+     (v3/gap-pwa-safety) and its promise arrives as `env.registration`.
+     Update detection is honest: it only fires when an Onyx service
+     worker already controls this page and a NEWER one installs. Workers
+     installed by the page's own boot check are never announced —
+     navigations are network-first, so that document is already current
+     and a reload would show the same build; only a later check (the
+     visibility/interval re-check, or one the browser runs on its own)
+     means this tab is stale. With no registration nothing is ever
      announced, so the banner never appears. Approving posts the oracle
      `ONYX_SKIP_WAITING` message and reloads on `controllerchange`; with
-     no waiting worker it is a plain reload. */
+     no waiting worker (sw.js skips waiting on install) it is a plain
+     reload. */
   var POLISH_FLAG_KEYS = [
     "onyx:first-hour-seen",
     "onyx:notify-first-send",
@@ -9897,6 +10647,9 @@ function fetchPublicFeed(url) {
       announced = true;
       send({ kind: "update-available" });
     }
+    function controlled() {
+      try { return !!(container && container.controller); } catch (e) { return false; }
+    }
     function getRegistration() {
       try {
         if (container && typeof container.getRegistration === "function") {
@@ -9906,18 +10659,42 @@ function fetchPublicFeed(url) {
       return Promise.resolve(null);
     }
 
-    getRegistration().then(function (reg) {
-      if (!reg) return;
-      if (reg.waiting && container.controller) announce();
-      if (typeof reg.addEventListener !== "function") return;
-      reg.addEventListener("updatefound", function () {
-        var worker = reg.installing;
-        if (!worker || typeof worker.addEventListener !== "function") return;
-        worker.addEventListener("statechange", function () {
-          if (worker.state === "installed" && container.controller) announce();
-        });
+    /* v3/gap-pwa-safety: until this page's own registration settles,
+       every worker that starts installing belongs to the boot check. */
+    var registration = env.registration;
+    var booting = !!(registration && typeof registration.then === "function");
+    var bootWorkers = [];
+    var watched = [];
+    function isBootWorker(worker) {
+      return bootWorkers.indexOf(worker) !== -1;
+    }
+    function trackWorker(worker) {
+      if (!worker || typeof worker.addEventListener !== "function") return;
+      if (booting && !isBootWorker(worker)) bootWorkers.push(worker);
+      worker.addEventListener("statechange", function () {
+        if (worker.state === "installed" && controlled() && !isBootWorker(worker)) announce();
       });
-    });
+    }
+    function watch(reg) {
+      if (!reg || watched.indexOf(reg) !== -1) return;
+      watched.push(reg);
+      if (reg.waiting && controlled() && !isBootWorker(reg.waiting)) announce();
+      if (typeof reg.addEventListener !== "function") return;
+      reg.addEventListener("updatefound", function () { trackWorker(reg.installing); });
+    }
+
+    getRegistration().then(watch);
+    if (booting) {
+      Promise.resolve(registration).then(function (reg) {
+        if (reg) {
+          [reg.installing, reg.waiting].forEach(function (worker) {
+            if (worker && !isBootWorker(worker)) bootWorkers.push(worker);
+          });
+        }
+        booting = false;
+        watch(reg);
+      }, function () { booting = false; });
+    }
 
     function reload() {
       try { if (win && win.location) win.location.reload(); } catch (e) { /* nothing to reload */ }
@@ -10100,6 +10877,9 @@ function fetchPublicFeed(url) {
       copy: copyTextToClipboard,
       legacyCopy: legacyCopyText
     },
+    rememberedIdentities: rememberedIdentities, /* v3/rx-public */
+    focusFragment: focusFragment, /* v3/rx-public */
+    installPublicMenuFocus: installPublicMenuFocus, /* v3/rx-public */
     resumeCredentials: {
       slotKey: credentialSlotKey,
       validToken: validResumeToken,
@@ -10170,6 +10950,10 @@ function fetchPublicFeed(url) {
     /* v3/polish */
     polishFlags: polishFlags,
     wirePolish: wirePolish,
+    /* v3/gap-pwa-safety */
+    registerServiceWorker: registerServiceWorker,
+    installPageLifecycle: installPageLifecycle,
+    swUrl: SW_URL,
     memKV: memKV
   };
   if (typeof module !== "undefined" && module.exports) {
