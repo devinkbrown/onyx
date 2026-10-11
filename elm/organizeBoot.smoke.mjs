@@ -11,6 +11,7 @@
    Run with:
      node --test elm/organizeBoot.smoke.mjs              (repo root)
    Env: ELM=<elm 0.19.1> (default: `elm` on PATH) or ONYX_ELM_DIST=<built dir>. */
+/* global Response */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -60,7 +61,7 @@ function assetRoot() {
 
 function findEsbuild() {
   if (process.env.ESBUILD) return process.env.ESBUILD;
-  let common = "";
+  let common;
   try {
     common = execFileSync("git", ["-C", here, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).trim();
   } catch (err) { common = ""; }
