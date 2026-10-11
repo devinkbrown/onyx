@@ -31,10 +31,13 @@ module HistoryImport exposing
     , ownerChanged
     , plan
     , progressPercent
+    , removeButtonId
+    , removeConfirmId
     , reviewTitleId
     , sourceFromKey
     , sourceInfo
     , sourceKey
+    , statusId
     , sources
     , update
     )
@@ -825,6 +828,24 @@ reviewTitleId =
     "history-import-review-title"
 
 
+{-| Where focus goes when the control that had it disappears (a review
+closes, an import is removed): the live result line.
+-}
+statusId : String
+statusId =
+    "history-import-status-note"
+
+
+removeButtonId : String -> String
+removeButtonId batch =
+    "history-import-batch-remove-" ++ batch
+
+
+removeConfirmId : String -> String
+removeConfirmId batch =
+    "history-import-remove-" ++ batch
+
+
 {-| What `update` needs from the outside: the clock, the signed-in
 owner, and the device's history retention (the vault trims every
 conversation to it after each write, so an import larger than it would
@@ -948,7 +969,11 @@ update ctx msg state =
                         else
                             Just { message = message, failure = True }
                   }
-                , []
+                , if String.isEmpty message then
+                    []
+
+                  else
+                    [ Focus statusId ]
                 )
 
             else
@@ -957,14 +982,16 @@ update ctx msg state =
         Cancel ->
             case state.phase of
                 Reviewing _ ->
-                    ( { state | phase = Idle, dests = Dict.empty, showAll = False, status = Just { message = "Import cancelled. Nothing was written.", failure = False } }, [] )
+                    ( { state | phase = Idle, dests = Dict.empty, showAll = False, status = Just { message = "Import cancelled. Nothing was written.", failure = False } }
+                    , [ Focus statusId ]
+                    )
 
                 Idle ->
                     ( state, [] )
 
                 _ ->
                     ( { state | phase = Idle, status = Just { message = "Import cancelled. Nothing was written.", failure = False } }
-                    , List.filterMap identity [ Maybe.map (\job -> CancelJob { job = job }) (currentJob state) ]
+                    , List.filterMap identity [ Maybe.map (\job -> CancelJob { job = job }) (currentJob state) ] ++ [ Focus statusId ]
                     )
 
         Toggle key ->
@@ -1031,13 +1058,20 @@ update ctx msg state =
 
         RemoveAsk id ->
             if state.removing == Nothing then
-                ( { state | removeAsk = Just id }, [] )
+                ( { state | removeAsk = Just id }, [ Focus (removeConfirmId id) ] )
 
             else
                 ( state, [] )
 
         RemoveCancel ->
-            ( { state | removeAsk = Nothing }, [] )
+            ( { state | removeAsk = Nothing }
+            , case state.removeAsk of
+                Just id ->
+                    [ Focus (removeButtonId id) ]
+
+                Nothing ->
+                    []
+            )
 
         RemoveConfirm id ->
             if state.removing == Nothing && state.removeAsk == Just id then
@@ -1073,18 +1107,20 @@ update ctx msg state =
                                 { message = "That import could not be removed. Try again.", failure = True }
                             )
                   }
-                , if r.ok then
+                , (if r.ok then
                     [ Touched { targets = r.targets } ]
 
-                  else
+                   else
                     []
+                  )
+                    ++ [ Focus statusId ]
                 )
 
             else
                 ( state, [] )
 
         DismissStatus ->
-            ( { state | status = Nothing, lastBatch = Nothing }, [] )
+            ( { state | status = Nothing, lastBatch = Nothing }, [ Focus "history-import-choose" ] )
 
 
 currentJob : State -> Maybe Int
@@ -1329,6 +1365,7 @@ confirm ctx state staged =
                 , List.map Persist p.persists
                     ++ [ Record { batch = batch, ids = List.map .id rows, prints = List.filter (not << String.isEmpty) (List.map .print rows) }
                        , Touched { targets = p.targets }
+                       , Focus statusId
                        ]
                 )
 

@@ -25,7 +25,7 @@ import App exposing (Model, Msg(..))
 import Dict
 import HistoryImport as HI exposing (Phase(..), Source)
 import Html exposing (Html, button, div, h3, h4, input, label, li, p, section, span, strong, text, ul)
-import Html.Attributes exposing (attribute, autofocus, checked, class, classList, disabled, for, id, placeholder, spellcheck, tabindex, type_, value)
+import Html.Attributes exposing (attribute, checked, class, classList, disabled, for, id, placeholder, spellcheck, tabindex, type_, value)
 import Html.Events exposing (onCheck, onClick, onInput, preventDefaultOn)
 import Json.Decode as Decode
 import PrefsPanel
@@ -116,6 +116,8 @@ activity model =
                                      else
                                         "ok"
                                     )
+                                , id HI.statusId
+                                , tabindex -1
                                 , attribute "data-testid" "history-import-status"
                                 , attribute "role"
                                     (if status.failure then
@@ -752,6 +754,7 @@ batchRow model batch =
                 button
                     [ type_ "button"
                     , class "hi-btn hi-btn--quiet hi-btn--danger"
+                    , id (HI.removeButtonId batch.id)
                     , attribute "aria-label" ("Remove import: " ++ batchName batch)
                     , disabled (working || HI.busy hi)
                     , onClick (msg (HI.RemoveAsk batch.id))
@@ -766,8 +769,7 @@ batchRow model batch =
                     [ button
                         [ type_ "button"
                         , class "hi-btn hi-btn--danger"
-                        , autofocus True
-                        , id ("history-import-remove-" ++ batch.id)
+                        , id (HI.removeConfirmId batch.id)
                         , onClick (msg (HI.RemoveConfirm batch.id))
                         ]
                         [ text "Remove import" ]

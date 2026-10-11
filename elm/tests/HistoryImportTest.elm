@@ -209,10 +209,10 @@ suite =
                         ( s, effects ) =
                             run [ Choose IrcLog, Progress { job = 1, phase = "parsing", done = 1, total = 9, files = 1 }, Cancel ] HistoryImport.blank
                     in
-                    Expect.equal ( s.phase, effects ) ( Idle, [ Pick { job = 1, kind = "irc" }, CancelJob { job = 1 } ] )
+                    Expect.equal ( s.phase, effects ) ( Idle, [ Pick { job = 1, kind = "irc" }, CancelJob { job = 1 }, Focus HistoryImport.statusId ] )
             , test "cancel in review writes nothing" <|
                 \_ ->
-                    Expect.equal (Tuple.second (HistoryImport.update ctx Cancel reviewing)) []
+                    Expect.equal (Tuple.second (HistoryImport.update ctx Cancel reviewing)) [ Focus HistoryImport.statusId ]
             , test "a picker dismissed without files returns quietly; a failure explains" <|
                 \_ ->
                     Expect.equal
@@ -406,7 +406,7 @@ suite =
                     Expect.equal ( effects, ( done.lastBatch, Maybe.map .message done.status ), after )
                         ( [ RemoveBatch { batch = "imp-1700000000000-1" } ]
                         , ( Nothing, Just "Removed 3 imported messages from this device." )
-                        , [ Touched { targets = [ "#general", "bo" ] } ]
+                        , [ Touched { targets = [ "#general", "bo" ] }, Focus HistoryImport.statusId ]
                         )
             , test "removing a listed batch takes two steps" <|
                 \_ ->
@@ -420,7 +420,7 @@ suite =
                         ( _, stray ) =
                             HistoryImport.update ctx (RemoveConfirm "imp-8") asked
                     in
-                    Expect.equal ( none, effects, stray ) ( [], [ RemoveBatch { batch = "imp-9" } ], [] )
+                    Expect.equal ( none, effects, stray ) ( [ Focus (HistoryImport.removeConfirmId "imp-9") ], [ RemoveBatch { batch = "imp-9" } ], [] )
             , test "an owner change aborts a running or staged import" <|
                 \_ ->
                     let
@@ -451,6 +451,7 @@ suite =
             [ test "counts group thousands" <|
                 \_ -> Expect.equal [ HistoryImport.countLabel 1 "message", HistoryImport.countLabel 1234567 "message", HistoryImport.countLabel 0 "room" ] [ "1 message", "1,234,567 messages", "0 rooms" ]
             ]
+        , focusTests
         ]
 
 
@@ -472,3 +473,24 @@ isPersist effect =
 
         _ ->
             False
+
+
+focusTests : Test
+focusTests =
+    describe "focus never falls to the page"
+        [ test "cancelling the remove confirm returns focus to that batch's Remove button" <|
+            \_ ->
+                let
+                    ( asked, _ ) =
+                        HistoryImport.update ctx (RemoveAsk "imp-9") HistoryImport.blank
+                in
+                Expect.equal (Tuple.second (HistoryImport.update ctx RemoveCancel asked)) [ Focus (HistoryImport.removeButtonId "imp-9") ]
+        , test "a failure with a message and a dismissed note both land on a live control" <|
+            \_ ->
+                let
+                    ( failed, failedFx ) =
+                        List.foldl (\m ( st, es ) -> HistoryImport.update ctx m st |> Tuple.mapSecond ((++) es)) ( HistoryImport.blank, [] ) [ Choose Discord, Failed { job = 1, message = "Too big." } ]
+                in
+                Expect.equal ( List.member (Focus HistoryImport.statusId) failedFx, Tuple.second (HistoryImport.update ctx DismissStatus failed) )
+                    ( True, [ Focus "history-import-choose" ] )
+        ]
