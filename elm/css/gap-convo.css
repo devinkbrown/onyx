@@ -357,3 +357,17 @@ button.gap-edited-toggle:focus-visible { outline: var(--focus-ring); outline-off
   .gap-skeleton { gap: var(--space-3); padding-top: var(--space-2); }
   .gap-skeleton-row:nth-child(n + 4) { display: none; }
 }
+
+/* ── Search on a short screen ─────────────────────────────────────────
+   The panel sits above the shell; at phone-landscape height it used to
+   leave the transcript ~20px, so a jump landed out of sight. Cap it and
+   let it scroll as one piece so the row you jumped to stays visible. */
+@media (max-height: 520px) {
+  .onyx-message-search {
+    max-height: 40dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block: var(--space-1);
+  }
+  .onyx-message-search__body { max-height: none; overflow: visible; }
+}

@@ -24,13 +24,17 @@
  *   gc-ctrlf          Ctrl+F keeps the draft
  *   gc-loading        history in flight: placeholders, not "say hi"
  *   gc-caret          an emoji lands at the caret, which stays after it
- *   gc-reply-focus    Reply / Quote hand the keyboard to the composer
+ *   gc-reply-focus    Reply hands the keyboard to the composer
+ *   gc-quote-focus    Quote does too, with the quoted text in it
  *   gc-react-keys     the reaction picker opens on its search and roves with arrows
  *   gc-search-focus   search opens on its field and gives focus back on Escape
+ *   gc-zoom           200% browser zoom (640x360 CSS px) with a larger default font: draft line + staged photo
  */
 
 const T = (minAgo) => new Date(Date.now() - minAgo * 60000).toISOString();
 const isPhone = (page) => page.viewportSize().width < 768;
+/* Touch layouts (phones AND tablets) reveal row actions by a tap, not a hover. */
+const isTouch = (page) => page.evaluate(() => matchMedia('(hover: none)').matches);
 
 function ok(cond, what) {
   if (!cond) throw new Error(`assert: ${what}`);
@@ -133,18 +137,20 @@ async function openSearch(page, h) {
   await h.settle(page, 400);
 }
 
-/* Open the "More" menu on the n-th row (hover on desktop, tap on touch). */
+/* Reveal the n-th row's actions (hover on desktop, a tap on touch layouts
+   - phones AND tablets) and open its "More" menu. Locators re-resolve the
+   row, which re-renders while it is revealed. */
 async function openMenuOnRow(page, n) {
-  const row = (await page.$$('.onyx-message'))[n];
+  const row = page.locator('.onyx-message').nth(n);
   await row.scrollIntoViewIfNeeded();
-  if (isPhone(page)) {
+  if (await isTouch(page)) {
     const box = await row.boundingBox();
     await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
   } else {
     await row.hover();
   }
   await page.waitForTimeout(250);
-  await (await row.$('.onyx-msg-menu-trigger')).click();
+  await page.locator('.onyx-message').nth(n).locator('.onyx-msg-menu-trigger').click();
   await page.waitForTimeout(400);
 }
 
@@ -297,19 +303,7 @@ export default {
 
   'gc-collapsed': async (page, h) => {
     await room(page, h);
-    const row = (await page.$$('.onyx-message'))[3];
-    await row.scrollIntoViewIfNeeded();
-    if (isPhone(page)) {
-      const box = await row.boundingBox();
-      await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
-    } else {
-      await row.hover();
-    }
-    await page.waitForTimeout(250);
-    const trigger = await row.$('.onyx-msg-menu-trigger');
-    ok(!!trigger, 'row menu trigger');
-    await trigger.click();
-    await page.waitForTimeout(300);
+    await openMenuOnRow(page, 3);
     await page.click('.onyx-msg-menu-item[aria-label^="Hide messages from"]');
     await page.waitForTimeout(400);
     ok(!!(await page.$('[data-testid="collapsed-banner"]')), 'banner shows');
@@ -427,7 +421,11 @@ export default {
     await page.click('.onyx-msg-menu-item:has-text("Reply")');
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'Reply hands focus to the composer');
-    await openMenuOnRow(page, 5);
+  },
+
+  'gc-quote-focus': async (page, h) => {
+    await room(page, h);
+    await openMenuOnRow(page, 4);
     await page.click('.onyx-msg-menu-item:has-text("Quote")');
     await page.waitForTimeout(500);
     ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'Quote hands focus to the composer');
@@ -464,19 +462,25 @@ export default {
     ok(where && where !== 'BODY', `focus is not dropped on the page (got ${where})`);
   },
 
+  'gc-zoom': async (page, h) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '125%'; }); });
+    await room(page, h);
+    await page.fill('#shell-composer-input', 'zoomed in, still saving');
+    await pastePhoto(page, { exif: true, w: 2600, h: 1700, name: 'a-rather-long-photo-name-from-the-meetup-last-weekend.jpg' });
+    await page.waitForTimeout(800);
+    ok(!!(await page.$('.gap-attach-quality-opt')), 'the quality choice is reachable at 200% zoom');
+    const clipped = await page.evaluate(() => {
+      const bar = document.querySelector('.onyx-composer');
+      const r = bar.getBoundingClientRect();
+      return r.bottom > window.innerHeight + 1 || r.right > window.innerWidth + 1;
+    });
+    ok(!clipped, 'the composer stays inside the viewport');
+  },
+
   'gc-menu-keys': async (page, h) => {
     await room(page, h);
-    const row = (await page.$$('.onyx-message'))[4];
-    await row.scrollIntoViewIfNeeded();
-    if (isPhone(page)) {
-      const box = await row.boundingBox();
-      await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
-    } else {
-      await row.hover();
-    }
-    await page.waitForTimeout(250);
-    await (await row.$('.onyx-msg-menu-trigger')).click();
-    await page.waitForTimeout(400);
+    await openMenuOnRow(page, 4);
     const first = await page.evaluate(() => document.activeElement && document.activeElement.textContent);
     await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(150);

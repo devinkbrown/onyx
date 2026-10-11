@@ -11414,7 +11414,10 @@ function fetchPublicFeed(url) {
 
     function composerField() {
       var field = doc.getElementById ? doc.getElementById("shell-composer-input") : null;
-      return field && !field.disabled ? field : null;
+      if (!field || field.disabled) return null;
+      /* A modal sheet / dialog owns the screen: files are not staged behind it. */
+      if (typeof doc.querySelector === "function" && doc.querySelector('[aria-modal="true"]')) return null;
+      return field;
     }
     function setDrop(on) {
       if (on === dropOn) return;

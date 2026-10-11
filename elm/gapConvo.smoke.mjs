@@ -581,3 +581,18 @@ test("search panel: when its opener is gone (a phone sheet closed) focus goes to
   focus.settle();
   assert.equal(doc.activeElement.id, "shell-composer-input");
 });
+
+test("drop with a modal dialog open claims the drag but stages nothing behind it", () => {
+  const { picked, drop, ev, doc } = composerSetup();
+  const dialog = doc.createElement("section");
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  doc.body.appendChild(dialog);
+  const f = fileOf("x", "a.jpg", "image/jpeg");
+  const over = ev("dragover", { dataTransfer: { types: ["Files"], files: [f] } }, doc.body);
+  assert.equal(over.defaultPrevented, true);
+  assert.deepEqual(drop, [], "no drop target is shown over a dialog");
+  const dropped = ev("drop", { dataTransfer: { types: ["Files"], files: [f] } }, doc.body);
+  assert.equal(dropped.defaultPrevented, true);
+  assert.equal(picked.length, 0);
+});
