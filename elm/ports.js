@@ -6886,65 +6886,6 @@ function fetchPublicFeed(url) {
       app.ports.retentionPolicyRequest.subscribe(function () { sendRetentionPolicy(); });
       sendRetentionPolicy();
     }
-    function pruneAllTargets(db, onDone) {
-      var seen = [];
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readonly");
-      } catch (err) { onDone(0); return; }
-      var cursor;
-      try {
-        cursor = tx.objectStore(STORE).openCursor();
-      } catch (err) { onDone(0); return; }
-      cursor.onsuccess = function () {
-        var c = cursor.result;
-        if (c) {
-          var plain = vaultPlainRow(c.value);
-          seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at });
-          c.continue();
-        } else {
-          pruneCollectedTargets(db, seen, onDone);
-        }
-      };
-      cursor.onerror = function () { onDone(0); };
-    }
-    function pruneCollectedTargets(db, seen, onDone) {
-      var policy = readRetentionPolicy();
-      var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
-      var byTarget = {};
-      seen.forEach(function (entry) {
-        if (!entry.target) return;
-        (byTarget[entry.target] = byTarget[entry.target] || []).push(entry);
-      });
-      var targets = Object.keys(byTarget);
-      if (targets.length === 0) { onDone(0); return; }
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readwrite");
-      } catch (err) { onDone(0); return; }
-      var store = tx.objectStore(STORE);
-      var deleted = 0;
-      var finished = false;
-      function finish(count) {
-        if (finished) return;
-        finished = true;
-        onDone(count);
-      }
-      tx.oncomplete = function () { finish(deleted); };
-      tx.onerror = function () { finish(deleted); };
-      targets.forEach(function (target) {
-        var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
-        if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
-        var prune = selectPruneIds(byTarget[target], channelPolicy, now);
-        var keyById = {};
-        byTarget[target].forEach(function (entry) { keyById[entry.id] = entry.key; });
-        prune.forEach(function (id) {
-          if (keyById[id] !== undefined) {
-            try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
-          }
-        });
-      });
-    }
     if (app.ports.retentionPolicySave) {
       app.ports.retentionPolicySave.subscribe(function (req) {
         var saved = false;
@@ -11723,6 +11664,74 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* Retention re-applied across every target at once (policy save). Moved
+     to module level so it can be smoke-tested; per target AND per owner
+     scope (see `pruneCollectedTargets`). */
+  function pruneAllTargets(db, onDone) {
+    var seen = [];
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readonly");
+    } catch (err) { onDone(0); return; }
+    var cursor;
+    try {
+      cursor = tx.objectStore(STORE).openCursor();
+    } catch (err) { onDone(0); return; }
+    cursor.onsuccess = function () {
+      var c = cursor.result;
+      if (c) {
+        var plain = vaultPlainRow(c.value);
+        seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at, bucket: vaultRowOwner(c.value) || "" });
+        c.continue();
+      } else {
+        pruneCollectedTargets(db, seen, onDone);
+      }
+    };
+    cursor.onerror = function () { onDone(0); };
+  }
+  function pruneCollectedTargets(db, seen, onDone) {
+    var policy = readRetentionPolicy();
+    var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
+    /* v3/gap-account: retention is per target AND per owner scope (two
+       identities' rows share logical ids and must never evict each
+       other); legacy ownerless rows are their own bucket. */
+    var byTarget = {};
+    seen.forEach(function (entry) {
+      if (!entry.target) return;
+      var group = entry.target + "\u0001" + entry.bucket;
+      (byTarget[group] = byTarget[group] || []).push(entry);
+    });
+    var targets = Object.keys(byTarget);
+    if (targets.length === 0) { onDone(0); return; }
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readwrite");
+    } catch (err) { onDone(0); return; }
+    var store = tx.objectStore(STORE);
+    var deleted = 0;
+    var finished = false;
+    function finish(count) {
+      if (finished) return;
+      finished = true;
+      onDone(count);
+    }
+    tx.oncomplete = function () { finish(deleted); };
+    tx.onerror = function () { finish(deleted); };
+    targets.forEach(function (group) {
+      var target = byTarget[group][0].target;
+      var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
+      if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
+      var prune = selectPruneIds(byTarget[group], channelPolicy, now);
+      var keyById = {};
+      byTarget[group].forEach(function (entry) { keyById[entry.id] = entry.key; });
+      prune.forEach(function (id) {
+        if (keyById[id] !== undefined) {
+          try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
+        }
+      });
+    });
+  }
+
   global.OnyxPorts = {
     /* v3/gap-account */
     gapAccount: {
@@ -11735,7 +11744,8 @@ function fetchPublicFeed(url) {
       ownerArg: ownerArg,
       rowOwned: vaultRowOwned,
       localHistoryEnabled: localHistoryEnabled,
-      openVault: openVault
+      openVault: openVault,
+      pruneAllTargets: pruneAllTargets
     },
     vaultStore: {
       put: vaultPut,

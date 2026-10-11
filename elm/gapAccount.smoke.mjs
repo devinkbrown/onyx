@@ -315,6 +315,23 @@ test("retention trims per owner, so one identity cannot evict another's rows", a
   }
 });
 
+test("re-applying retention across the vault is per owner too (same logical ids, no cross-eviction)", async () => {
+  const db = fakeIdb();
+  await put(db, [row("#c:1", "#c", "k1", 1), row("#c:2", "#c", "k2", 2), row("#c:3", "#c", "k3", 3)], KAI);
+  await put(db, [row("#c:1", "#c", "l1", 4), row("#c:2", "#c", "l2", 5)], LEE);
+  db.data.messages.set("legacy:1", { id: "legacy:1", target: "#c", from: "x", body: "old", at: 6 });
+  globalThis.localStorage.setItem("onyx:vault-retention-policy", JSON.stringify({ keep: 2 }));
+  try {
+    const deleted = await new Promise((resolve) => gapAccount.pruneAllTargets(db, resolve));
+    assert.equal(deleted, 1, "only Kai's oldest row exceeds keep=2");
+    assert.deepEqual((await get(db, "#c", KAI)).rows.map((r) => r.body), ["k2", "k3"]);
+    assert.deepEqual((await get(db, "#c", LEE)).rows.map((r) => r.body), ["l1", "l2"]);
+    assert.ok(db.data.messages.has("legacy:1"));
+  } finally {
+    globalThis.localStorage.removeItem("onyx:vault-retention-policy");
+  }
+});
+
 test("a DM privacy verdict earned by one identity never answers for another", async () => {
   const db = fakeIdb();
   await put(db, [row("alice:1", "alice", "plain hello", 1000)], KAI);
