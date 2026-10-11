@@ -162,6 +162,7 @@ membersToggle model =
                     , class "onyx-members-toggle onyx-room-header-btn"
                     , attribute "popovertarget" sheetId
                     , attribute "data-testid" "members-toggle"
+                    , attribute "aria-keyshortcuts" "Alt+M" -- v3/gap-commands
                     , attribute "aria-label"
                         ("Members, "
                             ++ String.fromInt total
@@ -366,6 +367,11 @@ rosterRow model channel groupKey index entry =
             , class "onyx-mlist-main"
             , id (RosterWindow.rowId groupKey index)
             , attribute "aria-label" ("View member card for " ++ member.nick)
+            , -- v3/gap-organize: on phones the list is a top-layer popover, which
+              -- would sit over the card this opens; choosing someone closes it
+              -- (the browser's own hide action; a no-op where the list is in flow)
+              attribute "popovertarget" sheetId
+            , attribute "popovertargetaction" "hide"
             , onClick (App.UserProfileOpened { nick = member.nick, channel = channel })
             ]
             [ span [ class "onyx-member-avatar-slot" ]

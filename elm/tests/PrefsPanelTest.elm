@@ -209,8 +209,8 @@ categoryVectors =
         [ test "shows one selected category pane, Display first, with the Appearance launcher" <|
             \_ ->
                 Expect.all
-                    [ \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tab") ] |> Query.count (Expect.equal 5)
-                    , \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tabpanel") ] |> Query.count (Expect.equal 5)
+                    [ \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tab") ] |> Query.count (Expect.equal 6)
+                    , \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tabpanel") ] |> Query.count (Expect.equal 6)
                     , \q ->
                         q
                             |> Query.find [ Selector.id "pref-category-tab-display" ]

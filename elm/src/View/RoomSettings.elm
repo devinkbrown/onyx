@@ -45,6 +45,7 @@ import Stats
 import Stewardship
 import Time
 import View.RoomTools
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -114,6 +115,7 @@ roomSettingsSheet model =
                 , notifySection model room
                 -- v3/gap-people
                 , sectionWith "export" "Export transcript" [ View.RoomTools.transcriptExport model room.name ]
+                , View.Organize.roomSettingsSection model room.name -- v3/gap-organize
                 , details [ class "rset-advanced" ]
                     [ summary [] [ text "Advanced" ]
                     , p [ class "rset-hint" ] [ text "Room rules, roles, insights, and integrations. Everyday alerts stay above." ]
@@ -159,7 +161,7 @@ contextLine ctx =
 notPorted : Html Msg
 notPorted =
     p [ class "rset-hint rset-footnote", attribute "data-testid" "chset-not-ported" ]
-        [ text "Invite links live on the room header (Invite friends). Hide and leave are not in this sheet yet." ]
+        [ text "Invite links live on the room header (Invite friends). Leave is not in this sheet yet." ]
 
 
 sectionWith : String -> String -> List (Html Msg) -> Html Msg

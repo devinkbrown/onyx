@@ -67,8 +67,8 @@ opened =
 
 paletteRows : Model -> List Switcher.Matched
 paletteRows model =
-    Switcher.matches model.palette.query
-        (Switcher.entries (App.isChannelName model) model.activeChannel (Dict.values model.channels))
+    -- v3/gap-commands: the rows the app ranks (recents, People, actions)
+    App.paletteMatches model
 
 
 indexOfTitle : String -> Model -> Int

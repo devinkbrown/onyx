@@ -7295,7 +7295,7 @@ suite =
                     , \_ -> Expect.equal 3 m3.nickAliasTryIdx
                     ]
                     ()
-        , test "433 with no aliases left errors and resets the index" <|
+        , test "433 with no aliases left retries nick_ on the same socket (v3/gap-shell)" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -7308,12 +7308,11 @@ suite =
                         feed { m1 | nickAliases = [ "kai" ], nickAliasTryIdx = 1 } ":s 433 me me :Nickname is already in use"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m2.notifications)
-                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m3.notifications)
-                    , \_ -> Expect.equal 0 m3.nickAliasTryIdx
-                    , \_ -> Expect.equal [] outbound3
+                    [ \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound
+                    , \_ -> Expect.equal "me_" m2.ourNick
+                    , \_ -> Expect.equal [] m2.notifications
+                    , \_ -> Expect.equal 1 m2.gapShell.nickRetries
+                    , \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound3
                     ]
                     ()
         , test "433 after registration rotates, then logs when exhausted" <|
@@ -7322,17 +7321,19 @@ suite =
                     live =
                         { blank | nickAliases = [ "kai" ] }
 
+                    -- A NICK change refused after registration names the
+                    -- wanted nick, not the one we hold.
                     ( rotated, outbound ) =
-                        feed live ":s 433 me me :Nickname is already in use"
+                        feed live ":s 433 me taken :Nickname is already in use"
 
                     ( bare, bareOut ) =
-                        feed blank ":s 433 me me :Nickname is already in use"
+                        feed blank ":s 433 me taken :Nickname is already in use"
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
                     , \_ -> Expect.equal "kai" rotated.ourNick
                     , \_ -> Expect.equal [] bareOut
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text bare.notifications)
                     ]
                     ()
         , test "error numerics record verbatim inbox rows" <|
@@ -9875,10 +9876,9 @@ suite =
                         update ComposerSend { blank | activeChannel = Just "#c", composer = "/help frobnicate" }
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "Local slash commands" ] (List.map .title bare.toasts)
-                    , \_ ->
-                        Expect.equal [ "/clear · /ignore · /read · /star · /mute · /autojoin · /highlight · /snooze · /dnd · /color · /share · /export · /notify · /search · /help" ]
-                            (List.filterMap .description bare.toasts)
+                    -- v3/gap-commands: bare /help opens the full slash-commands sheet.
+                    [ \_ -> Expect.equal [] (List.map .title bare.toasts)
+                    , \_ -> Expect.equal ( True, "" ) ( bare.commandsHelpOpen, bare.composer )
                     , \_ -> Expect.equal [] bareOut
                     , \_ -> Expect.equal [ "/mute [#channel]" ] (List.map .title hit.toasts)
                     , \_ ->
@@ -10582,7 +10582,8 @@ suite =
                     ( _, outbound ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                -- v3/gap-usermodes: a fresh registration also asks for the user modes.
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
@@ -10600,7 +10601,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -12469,6 +12470,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12507,6 +12509,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12672,7 +12675,9 @@ suite =
                         , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
                         , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
                         , \_ -> Expect.equal 2 m.whoisTimerGen
-                        , \_ -> Expect.equal [] outs
+                        -- v3/gap-usermodes: an open profile that is offline asks
+                        -- WHOWAS (the only line this fold sends).
+                        , \_ -> Expect.equal [ SendLine "WHOWAS ghost 1\r\n" ] outs
                         ]
                         ()
             , test "401 off the active sheet lands nothing" <|
@@ -15765,9 +15770,13 @@ suite =
                             feed { blank | connection = Live } ":s 433 me taken :In use"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "Erroneous nickname: bad!nick" ] (List.map .text bad.notifications)
-                        , \_ -> Expect.equal [ "Nick/channel temporarily unavailable" ] (List.map .text unavailable.notifications)
-                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text exhausted.notifications)
+                        -- v3/gap-shell: a refused name while registering fails
+                        -- with the reason; 433/437 retry `nick_` instead of erroring.
+                        [ \_ -> Expect.equal [ "“bad!nick” can’t be used here (Erroneous). Pick another name." ] (List.map .text bad.notifications)
+                        , \_ -> Expect.equal [] unavailable.notifications
+                        , \_ -> Expect.equal "me_" unavailable.ourNick
+                        , \_ -> Expect.equal [] exhausted.notifications
+                        , \_ -> Expect.equal "me_" exhausted.ourNick
                         , \_ -> Expect.equal [] retrying.notifications
                         , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] retryOut
                         , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text live.notifications)
@@ -18262,15 +18271,22 @@ suite =
                             Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = text })
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
+                        -- v3/gap-commands: registry verbs Onyx Server has no
+                        -- wire verb for are translated (GapCommandsTest); real
+                        -- server verbs still go out as written.
+                        [ \_ -> Expect.equal [ SendLine "AWAY :Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        -- v3/dm-key-hold: a raw content verb to an unresolved DM peer is refused.
-                        , \_ -> Expect.equal [] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] (send "/nick kai")
+                        , \_ -> Expect.equal [ SendLine "MODE #c +m\r\n" ] (send "/mode #c +m")
+                        -- v3/dm-key-hold: content to an unresolved DM peer never leaves as plaintext.
+                        , \_ -> Expect.equal False (List.any (\o -> o == SendLine "PRIVMSG bob hi\r\n") (send "/msg bob hi"))
                         , \_ ->
-                            Expect.equal [ SendLine "MSG bob hi\r\n" ]
-                                (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
-                        , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
+                            Expect.equal True
+                                (List.member (SendLine "PRIVMSG bob hi\r\n")
+                                    (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
+                                )
+                        , \_ -> Expect.equal [ SendLine "a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
                         ]
                         ()
@@ -21031,7 +21047,7 @@ suite =
                         ()
             ]
         , describe "CTCP queries"
-            [ test "inbound ACTION is swallowed with no row and no reply" <|
+            [ test "inbound ACTION files an action row and never replies" <|
                 \_ ->
                     let
                         room =
@@ -21040,9 +21056,16 @@ suite =
                         ( acted, outs ) =
                             feed room ":bob!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
                     in
+                    -- v3/gap-commands: `/me` lines are messages, not queries.
                     Expect.all
-                        [ \_ -> Expect.equal [] (dmMessages acted "#c")
-                        , \_ -> Expect.equal [] outs
+                        [ \_ -> Expect.equal [ ( "bob", "waves", "action" ) ] (List.map (\m -> ( m.from, m.body, m.msgType )) (dmMessages acted "#c"))
+                        , \_ -> Expect.equal [] (List.filter (\o -> case o of
+                                                                    SendLine _ ->
+                                                                        True
+
+                                                                    _ ->
+                                                                        False
+                                                               ) outs)
                         ]
                         ()
             , test "unknown CTCP is swallowed silently" <|

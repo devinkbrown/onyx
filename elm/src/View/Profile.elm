@@ -19,7 +19,9 @@ import PersonSafety
 import PeerAccount
 import Services
 import Set
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
+import View.UserModes
 
 
 {-| The open WHOIS sheet, or nothing when no sheet is showing. -}
@@ -60,6 +62,8 @@ sheetFor model nick =
                 )
             , profileSummary shown info
             , profileStatus info
+            , -- v3/gap-usermodes: an offline person's last-seen (WHOWAS/SEEN)
+              View.UserModes.offlineBlock model shown
             , profileDetails shown info
             ]
 
@@ -557,8 +561,15 @@ cardFor model nick channel =
                 [ span [ class "onyx-member-dot", attribute "aria-hidden" "true" ] []
                 , span [] [ text role.label ]
                 ]
-            , if isSelf then
+            , -- v3/gap-organize: your private note on them
+              if isSelf then
                 text ""
+
+              else
+                View.Organize.memberNote model nick
+            , if isSelf then
+                -- v3/gap-usermodes: your own network name (SETNAME)
+                View.UserModes.selfNameRow model
 
               else
                 div
@@ -617,6 +628,12 @@ cardFor model nick channel =
                         ]
                         [ text "Close" ]
                     ]
+            , -- v3/gap-usermodes: not in this room -> when were they last here
+              if not isSelf && member == Nothing && App.isChannelName model channel then
+                View.UserModes.lastSeenButton model nick account
+
+              else
+                text ""
             , details [ class "onyx-member-advanced" ]
                 (summary [ class "onyx-member-advanced-toggle" ] [ text "Room and network details" ]
                     :: advancedRows nick channel role account info

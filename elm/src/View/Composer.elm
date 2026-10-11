@@ -28,6 +28,7 @@ import Polish
 import Schedule
 import View.Icon exposing (icon)
 import View.Polish
+import View.UserModes -- v3/gap-usermodes
 
 
 composer : Model -> Html Msg
@@ -124,6 +125,7 @@ composer model =
                  , preventDefaultOn "keydown" (keyDecoder model)
                  , disabled (not ready)
                  , attribute "id" "shell-composer-input"
+                 , attribute "aria-keyshortcuts" "Alt+Enter" -- v3/gap-commands
                  , class "onyx-composer-field"
                  ]
                     ++ assistAria model
@@ -364,6 +366,7 @@ attachButton model =
         , disabled (protected || model.activeChannel == Nothing)
         , title hint
         , attribute "aria-label" "Attach files"
+        , attribute "aria-keyshortcuts" "Control+Shift+U Meta+Shift+U" -- v3/gap-commands
         , onClick AttachPick
         ]
         [ icon "attach" ]
@@ -519,6 +522,8 @@ schedulePopover model =
                 ]
                 [ icon "x" ]
             ]
+        , -- v3/gap-usermodes: on this device (cancellable) or on the server
+          View.UserModes.scheduleWhere model
         , div [ class "onyx-schedule-presets" ]
             (List.indexedMap (schedulePreset model) Schedule.schedulePresets)
         , div [ class "onyx-schedule-custom" ]

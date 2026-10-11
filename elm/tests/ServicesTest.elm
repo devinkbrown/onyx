@@ -124,7 +124,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal (Just "MEMO LIST\r\n") (memo "LIST" [])
                         , \_ -> Expect.equal (Just "MEMO CLEAR\r\n") (memo "CLEAR" [])
-                        , \_ -> Expect.equal (Just "MEMO OFF\r\n") (memo "OFF" [])
+                        , \_ -> Expect.equal (Just "MEMO FORWARD OFF\r\n") (memo "OFF" [])
                         ]
                         ()
             , test "IGNORE ADD shapes the account" <|
@@ -179,8 +179,8 @@ suite =
             , test "SILENCE and ACCEPT take signed entries" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> Expect.equal (Just "SILENCE + *!*@*\r\n") (silenceEntry "+" "*!*@*")
-                        , \_ -> Expect.equal (Just "ACCEPT - bob\r\n") (acceptEntry "-" "bob")
+                        [ \_ -> Expect.equal (Just "SILENCE +*!*@*\r\n") (silenceEntry "+" "*!*@*")
+                        , \_ -> Expect.equal (Just "ACCEPT -bob\r\n") (acceptEntry "-" "bob")
                         , \_ -> Expect.equal Nothing (silenceEntry "=" "*!*@*")
                         ]
                         ()
