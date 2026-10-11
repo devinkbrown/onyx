@@ -90,8 +90,11 @@
   /* Frame geometry. */
   --shell-measure: 1180px;
   --nav-rail-w: 56px;
-  --sidebar-w: 280px;
-  --context-w: 240px;
+  /* v3/rx-shell: the side columns are in rem (1rem = 15px here), so
+     they grow with the reader's default font size instead of
+     squeezing their own labels. */
+  --sidebar-w: 18.5rem;
+  --context-w: 16rem;
   --mobile-nav-h: 56px;
   --composer-h: 64px;
 
@@ -3524,7 +3527,7 @@ html, body {
 }
 
 @media (max-width: 959.98px) {
-  :root { --sidebar-w: 232px; }
+  :root { --sidebar-w: 15.5rem; }
 }
 
 /* 2. Global topbar + room header --------------------------------------- */

@@ -350,7 +350,7 @@
 
 @media (min-width: 600px) and (max-width: 767.98px) {
   :root {
-    --sidebar-w: clamp(216px, 36vw, 264px);
+    --sidebar-w: clamp(14.4rem, 36vw, 17.6rem);
     /* No bottom nav here: offsets that clear it collapse. */
     --mobile-nav-h: 0px;
   }
@@ -425,6 +425,9 @@
   .onyx-mlist-close { width: 44px; height: 44px; }
   .onyx-mlist-group-head { min-height: 36px; }
   .onyx-mlist-group-head > .pt-ico { opacity: 1; }
+
+  .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
+  .onyx-railmenu-notify .room-notify-seg { min-height: 40px; }
 }
 
 /* 6. Short windows (≤520px tall) ----------------------------------------- */
@@ -433,7 +436,7 @@
    the global bar folds into the sidebar head, so it shares one 44px
    row with the room header and the transcript keeps the height. */
 @media (min-width: 600px) and (max-height: 520px) {
-  :root { --sidebar-w: clamp(216px, 28vw, 272px); }
+  :root { --sidebar-w: clamp(14.4rem, 28vw, 18rem); }
 
   .onyx-frame {
     grid-template-rows: auto auto minmax(0, 1fr);
@@ -473,7 +476,7 @@
 
   /* Room header: one 44px row. */
   .onyx-frame .onyx-room-header { min-height: 44px; padding-block: 0; }
-  .onyx-room-header-titles { flex-direction: row; align-items: baseline; }
+  .onyx-room-header-titles { flex-direction: row; align-items: baseline; gap: var(--space-2); }
   .onyx-frame .onyx-room-header-name { font-size: var(--text-md); }
   .onyx-frame .onyx-room-header .onyx-facepile { display: none; }
   .onyx-frame .onyx-room-header-sub { display: none; }
@@ -561,8 +564,8 @@
 
 @media (min-width: 1600px) {
   :root {
-    --sidebar-w: 300px;
-    --context-w: 264px;
+    --sidebar-w: 20rem;
+    --context-w: 17.6rem;
   }
   .onyx-frame > .onyx-topbar { grid-template-columns: minmax(0, 1fr) minmax(240px, 600px) minmax(0, 1fr); }
 }
@@ -588,7 +591,7 @@
    up one notch so the UI keeps its physical size. */
 @media (min-width: 2400px) and (min-height: 1300px) {
   html:has(> body .onyx-frame) { font-size: 106.25%; }
-  :root { --sidebar-w: 320px; --context-w: 280px; --nav-rail-w: 60px; }
+  :root { --nav-rail-w: 60px; }
 }
 
 /* 9. Motion, forced colours ----------------------------------------------- */

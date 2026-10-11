@@ -270,7 +270,7 @@ filterBar model which derived =
                             "Find a room"
 
                         "messages" ->
-                            "Find a conversation"
+                            "Find a person"
 
                         _ ->
                             "Find a room or person"
