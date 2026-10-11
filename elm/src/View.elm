@@ -79,6 +79,7 @@ import View.RoomHeader exposing (roomHeader)
 import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.AuthGate -- v3/gap-auth
 -- v3/gap-organize
 import View.Attention
 import View.Organize
@@ -138,7 +139,13 @@ view model =
                                 View.Roadmap.route model
 
                             _ ->
-                                if App.connectGateVisible model then
+                                -- v3/gap-auth: an auth step (two-step code,
+                                -- challenge question, passkey, password
+                                -- reset) takes over the gate.
+                                if View.AuthGate.takesOver model then
+                                    [ View.AuthGate.gate model ]
+
+                                else if App.connectGateVisible model then
                                     [ connectGate model ]
 
                                 else
