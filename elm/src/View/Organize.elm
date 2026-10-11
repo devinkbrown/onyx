@@ -8,6 +8,8 @@ module View.Organize exposing
     , listed
     , memberNote
     , muteEntry
+    , mutedLabel
+    , mutedMark
     , prefsOrganize
     , railMenuEntries
     , roomMoreItems
@@ -452,6 +454,38 @@ railMenuEntries model channel =
             , extra = locked
             }
         ]
+
+
+dmMuted : Model -> String -> Bool
+dmMuted model nick =
+    Set.member (String.toLower (String.trim nick)) model.mutedDMs
+
+
+{-| A quiet bell-off beside a muted DM's time / unread (the row still
+reads as a conversation; this only says it will not ping). -}
+mutedMark : Model -> String -> Html Msg
+mutedMark model nick =
+    if dmMuted model nick then
+        span
+            [ class "gorg-muted-mark"
+            , attribute "title" "Muted"
+            , attribute "aria-hidden" "true"
+            , attribute "data-testid" "sidebar-dm-muted"
+            ]
+            [ icon "bell-off" ]
+
+    else
+        text ""
+
+
+{-| The same fact for the row's accessible name. -}
+mutedLabel : Model -> String -> String
+mutedLabel model nick =
+    if dmMuted model nick then
+        ", muted"
+
+    else
+        ""
 
 
 {-| Mute / unmute a DM (the existing `MuteDm` / `UnmuteDm` folds). -}

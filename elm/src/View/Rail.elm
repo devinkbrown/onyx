@@ -499,6 +499,7 @@ dmRow model channel =
                 (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline }
                     -- v3/account2
                     ++ View.Account2.friendPresenceLabel model channel.name
+                    ++ View.Organize.mutedLabel model channel.name -- v3/gap-organize
                 )
             , attribute "aria-current"
                 (if active then
@@ -568,6 +569,7 @@ dmRow model channel =
 
                           else
                             text ""
+                        , View.Organize.mutedMark model channel.name -- v3/gap-organize
                         , badge channel
                         ]
                     ]

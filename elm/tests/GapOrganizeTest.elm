@@ -27,6 +27,7 @@ import Test.Html.Event as Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import View
+import View.Organize
 
 
 -- FIXTURE
@@ -266,6 +267,20 @@ lists =
                 view inside
                     |> Query.find [ testid "sidebar-channels" ]
                     |> Query.has [ Selector.text "#elm" ]
+        , test "a muted DM row carries a muted mark and an accessible \"muted\"" <|
+            \_ ->
+                let
+                    muted =
+                        step (MuteDm "mara") world
+                in
+                Expect.all
+                    [ \_ -> view muted |> Query.has [ testid "sidebar-dm-muted" ]
+                    , \_ -> Expect.equal ( View.Organize.mutedLabel muted "Mara", View.Organize.mutedLabel muted "jun" ) ( ", muted", "" )
+                    ]
+                    ()
+        , test "an unmuted DM row has no mark" <|
+            \_ ->
+                view world |> Query.hasNot [ testid "sidebar-dm-muted" ]
         , test "a closed conversation leaves Messages and is counted underneath" <|
             \_ ->
                 view organized

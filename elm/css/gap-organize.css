@@ -168,6 +168,10 @@
 }
 .onyx-rail .gorg-tucked-action:hover { background: var(--onyx-panel-2); }
 
+/* A muted DM carries a quiet bell-off next to its time / unread. */
+.gorg-muted-mark { flex: none; display: inline-grid; place-items: center; color: var(--onyx-faint); }
+.gorg-muted-mark .gorg-i { width: 14px; height: 14px; }
+
 /* The row's overflow: a quiet `…` beside the star on fine pointers
    (shown on hover / focus), always there on touch. */
 .onyx-rail .gorg-row-more {
