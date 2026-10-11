@@ -197,7 +197,8 @@ async function saveRow(page, h, fromEnd) {
   const row = rows[rows.length - fromEnd];
   if (!row) return;
   await row.scrollIntoViewIfNeeded();
-  if (isPhone(page)) {
+  const touch = await page.evaluate(() => window.matchMedia('(hover: none)').matches);
+  if (touch) {
     const box = await row.boundingBox();
     await page.touchscreen.tap(box.x + box.width * 0.6, box.y + Math.min(box.height - 6, 24));
   } else {
