@@ -421,6 +421,17 @@ port ctcpConfigLoaded : (Decode.Value -> msg) -> Sub msg
 port ctcpTimeReply : { to : String } -> Cmd msg
 
 
+-- v3/gap-usermodes: the owner-scoped `onyx:usermodes` slot (privacy modes the
+-- browser keeps on, server-ignore opt-in, real name, server-held sends).
+port userModesRequest : { serverUrl : String, identity : String } -> Cmd msg
+
+
+port userModesLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port userModesSave : { serverUrl : String, identity : String, json : String } -> Cmd msg
+
+
 port watchListRequest : { serverUrl : String, identity : String } -> Cmd msg
 
 
@@ -1328,6 +1339,12 @@ perform key outbound =
         App.CtcpTimeReply req ->
             ctcpTimeReply req
 
+        App.UserModesRequest req ->
+            userModesRequest req
+
+        App.UserModesSave req ->
+            userModesSave req
+
         App.GuestClaimDismissSave req ->
             guestClaimDismissSave req
 
@@ -1764,6 +1781,7 @@ subscriptions model =
         , friendsLoaded App.FriendsLoaded
         , watchListLoaded App.WatchListLoaded
         , ctcpConfigLoaded App.CtcpConfigLoaded
+        , userModesLoaded App.UserModesLoaded
         , guestClaimDismissLoaded App.GuestClaimDismissLoaded
         , tempBanTimerFired (\res -> App.TempBanElapsed { key = res.key })
         , whoisTimeoutFired (\res -> App.WhoisTimeoutElapsed { nick = res.nick, gen = res.gen })

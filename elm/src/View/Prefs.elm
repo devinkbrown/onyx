@@ -26,6 +26,7 @@ import PrefsPanel exposing (Category(..))
 import Retention
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
+import View.UserModes
 
 
 prefsSheet : Model -> Html Msg
@@ -219,6 +220,10 @@ panelBody model category =
                 ]
             , View.Organize.prefsOrganize model -- v3/gap-organize
             ]
+
+        Privacy ->
+            -- v3/gap-usermodes
+            View.UserModes.privacyPanel model
 
         History ->
             [ sectionHead "History & data" "How this browser remembers, finds, retains, and erases local conversation data."
