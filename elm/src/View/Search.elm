@@ -102,7 +102,9 @@ searchKey =
             )
 
 
-{-| The open panel (rendered by the shell above the thread). -}
+{-| The open panel (rendered by the shell in the conversation's column,
+under the room header). The find row — query, count, previous, next,
+close — is one line at every width; everything else scrolls below it. -}
 panel : Model -> Html Msg
 panel model =
     let
@@ -143,23 +145,6 @@ panel model =
                 , span [ class "onyx-message-search__count", attribute "aria-hidden" "true" ]
                     [ text (Search.countLabel count position) ]
                 ]
-            , button
-                [ type_ "button"
-                , class "onyx-message-search__button onyx-message-search__button--close"
-                , attribute "aria-label" "Close search"
-                , attribute "aria-keyshortcuts" "Escape"
-                , title "Close search"
-                , onClick SearchClose
-                ]
-                [ icon "x" ]
-            ]
-        , div [ class "onyx-message-search__body" ]
-            [ div [ class "onyx-message-search__target", attribute "data-testid" "message-search-target" ]
-                [ span [ class "onyx-message-search__target-kicker" ] [ text "Searching in" ]
-                , text " "
-                , strong [] [ text target ]
-                , provenanceBadge Device "Visible message search" "onyx-message-search__provenance"
-                ]
             , div [ class "onyx-message-search__controls", attribute "role" "group", attribute "aria-label" "Search result navigation" ]
                 [ button
                     [ type_ "button"
@@ -179,6 +164,23 @@ panel model =
                     , onClick SearchNext
                     ]
                     [ icon "chevron-down" ]
+                ]
+            , button
+                [ type_ "button"
+                , class "onyx-message-search__button onyx-message-search__button--close"
+                , attribute "aria-label" "Close search"
+                , attribute "aria-keyshortcuts" "Escape"
+                , title "Close search"
+                , onClick SearchClose
+                ]
+                [ icon "x" ]
+            ]
+        , div [ class "onyx-message-search__body" ]
+            [ div [ class "onyx-message-search__target", attribute "data-testid" "message-search-target" ]
+                [ span [ class "onyx-message-search__target-kicker" ] [ text "Searching in" ]
+                , text " "
+                , strong [] [ text target ]
+                , provenanceBadge Device "Visible message search" "onyx-message-search__provenance"
                 ]
             , savedSection model query
             , recallSection model

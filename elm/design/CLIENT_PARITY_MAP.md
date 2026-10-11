@@ -649,7 +649,7 @@ Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/
 | E13 | Queued/pending marker | `MessageView.tsx:2285` (auto) | FULL | `View/Thread.elm:576-583` | Elm adds "delivery uncertain" |
 | E14 | Mention/keyword row highlight | `MessageView.tsx:2238` (auto) | FULL | `View/Thread.elm:560` | |
 | E15 | Edited marker | `MessageView.tsx:2288` (auto) | FULL | `View/Thread.elm:584` | |
-| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | PARTIAL | `View/Thread.elm:2150` | Only a title tooltip with "N revisions"; no list of prior bodies |
+| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | FULL | `View/Thread.elm` `editedMarker` / `revisionItem` | v3/rx-convo: "· edited" on a row we edited on this device is a native `details` disclosure (keyboard operable, announced expanded / collapsed) listing the earlier bodies oldest first with the time each was replaced, "kept on this device only"; without local history it stays a quiet label with the revision-count title |
 | E17 | Reply-context line (sanitized, clipped to 80 chars) | `MessageView.tsx:2292` (auto) | FULL | `View/Thread.elm:2279` | |
 | E18 | Thread indicator opens the thread panel | `MessageView.tsx:576,2306`; `threadIndex.ts` (UI) | FULL | `View/Thread.elm:699`, `App.elm:42666` | |
 | E19 | Thread panel: parent, replies log, missing-parent and empty states | `MessageView.tsx:735-807` (UI) | FULL | `View/Thread.elm:722-860` | Elm adds a reply count |
@@ -2741,4 +2741,4 @@ clauses. All of them are listed here, keyed to the COVERAGE.md line of the row. 
 - Phase 1 lists rows 1.1–1.7 twice and Phase 2 lists 2.4–2.6 twice and Phase 3 lists 3.4–3.7 twice with conflicting statuses (one copy "done", the other blank/size-only).
 - The C1–C12 summary is duplicated with contradicting flags (C4/C5 "**done**" in one line, plain in the other; C6/C7/C10 the reverse).
 - 1.3 says "in-shell sheet not built" (still true); 1.4a "Land on Home… absorbs the catch-up digest" has no status but catch-up (2.7) is not built.
-- Still-open rows with no Elm work at all: 0.3 remembered identities, 0.4 invite aside, 2.7 catch-up digest, 2.8 BlockKit, 2.9 edit-history view, 3.9 Harbor confirm, 4.2 smart mute + folders, 4.5 history import, 6.7 Watch Together, 7.6 visual regression baselines.
+- Still-open rows with no Elm work at all: 0.3 remembered identities, 0.4 invite aside, 2.7 catch-up digest, 2.8 BlockKit, 3.9 Harbor confirm, 4.2 smart mute + folders, 4.5 history import, 6.7 Watch Together, 7.6 visual regression baselines.
