@@ -325,7 +325,7 @@ joinField model =
                         Nothing ->
                             "Join room"
                     )
-                , Html.Attributes.disabled (target == Nothing)
+                , Html.Attributes.disabled (String.isEmpty (String.trim gs.joinName))
                 ]
                 [ text "Join" ]
             ]

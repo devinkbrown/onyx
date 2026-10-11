@@ -239,6 +239,7 @@ classifyEntry line =
     else if
         startsAny [ "sign-in", "that nickname is registered", "message not delivered", "encryption unavailable", "peer key changed" ]
             || String.contains " failed" lower
+            || String.contains " warning:" lower
             || String.contains "error" lower
             || String.contains "denied" lower
             || String.contains "not allowed" lower

@@ -55,7 +55,7 @@
   outline: none;
 }
 .gs-join-input::placeholder { color: var(--onyx-faint); }
-.onyx-rail .gs-join-go {
+.onyx-frame .onyx-rail button.gs-join-go {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -72,13 +72,13 @@
   border-radius: calc(var(--radius) - 2px);
   cursor: pointer;
 }
-.onyx-rail .gs-join-go:hover:not(:disabled) { background: var(--onyx-line); }
-.onyx-rail .gs-join-go:disabled,
-.onyx-rail .gs-join-go:disabled:hover { color: var(--onyx-faint); background: transparent; border-color: transparent; cursor: default; }
-.onyx-rail .gs-join-go:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-frame .onyx-rail button.gs-join-go:hover:not(:disabled) { background: var(--onyx-line); }
+.onyx-frame .onyx-rail button.gs-join-go:disabled,
+.onyx-frame .onyx-rail button.gs-join-go:disabled:hover { color: var(--onyx-faint); background: transparent; border-color: transparent; cursor: default; }
+.onyx-frame .onyx-rail button.gs-join-go:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-join-error { margin: 0; font-size: var(--text-xs); color: var(--onyx-warn); overflow-wrap: anywhere; }
 
-.onyx-rail .gs-rail-activity {
+.onyx-frame .onyx-rail button.gs-rail-activity {
   position: relative;
   display: flex;
   justify-content: flex-start;
@@ -96,8 +96,8 @@
   border-radius: var(--radius);
   cursor: pointer;
 }
-.onyx-rail .gs-rail-activity:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.onyx-rail .gs-rail-activity:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-frame .onyx-rail button.gs-rail-activity:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-frame .onyx-rail button.gs-rail-activity:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-icon-activity { --shi: var(--gs-i-activity); width: 18px; height: 18px; }
 .gs-door-copy { display: flex; align-items: baseline; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
 .gs-door-name { font-size: var(--text-sm); font-weight: 600; color: var(--onyx-text); white-space: nowrap; }
@@ -123,7 +123,7 @@
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
 }
-.gs-seg-btn {
+.onyx-frame .gs-seg button.gs-seg-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -137,9 +137,9 @@
   border-radius: calc(var(--radius) - 2px);
   cursor: pointer;
 }
-.gs-seg-btn:hover { color: var(--onyx-text); }
-.gs-seg-btn[aria-pressed="true"] { color: var(--onyx-text); font-weight: 600; background: var(--onyx-panel-2); }
-.gs-seg-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-frame .gs-seg button.gs-seg-btn:hover { color: var(--onyx-text); }
+.onyx-frame .gs-seg button.gs-seg-btn[aria-pressed="true"] { color: var(--onyx-text); font-weight: 600; background: var(--onyx-panel-2); }
+.onyx-frame .gs-seg button.gs-seg-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-seg-count { font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 400; color: var(--onyx-faint); font-variant-numeric: tabular-nums; }
 
 .gs-activity-conn { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
@@ -240,7 +240,7 @@
 .gs-leave-title { margin: 0; font-size: var(--text-lg); font-weight: 650; line-height: var(--leading-snug); overflow-wrap: anywhere; }
 .gs-leave-body { margin: var(--space-2) 0 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); overflow-wrap: anywhere; }
 .gs-leave-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-5); }
-.gs-btn {
+.onyx-frame .gs-leave button.gs-btn {
   min-height: 40px;
   padding: 0 var(--space-4);
   font: inherit;
@@ -252,11 +252,11 @@
   border-radius: var(--radius);
   cursor: pointer;
 }
-.gs-btn:hover { background: var(--onyx-panel-2); }
-.gs-btn--ghost { color: var(--onyx-text); }
-.gs-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
-.gs-btn--danger { color: var(--onyx-bad); border-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
-.gs-btn--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+.onyx-frame .gs-leave button.gs-btn:hover { background: var(--onyx-panel-2); }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--ghost { color: var(--onyx-text); }
+.onyx-frame .gs-leave button.gs-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--danger { color: var(--onyx-bad); border-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
 
 /* ---------- 5. Home: the network's message ----------------------------- */
 
@@ -279,7 +279,7 @@
   text-transform: uppercase;
   color: var(--onyx-faint);
 }
-.gs-motd-dismiss {
+.onyx-frame .gs-motd button.gs-motd-dismiss {
   display: inline-grid;
   place-items: center;
   flex: none;
@@ -293,14 +293,14 @@
   border-radius: var(--radius);
   cursor: pointer;
 }
-.gs-motd-dismiss .onyx-sheet-x { width: 16px; height: 16px; }
-.gs-motd-dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.gs-motd-dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-frame .gs-motd button.gs-motd-dismiss .onyx-sheet-x { width: 16px; height: 16px; }
+.onyx-frame .gs-motd button.gs-motd-dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-frame .gs-motd button.gs-motd-dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gs-motd-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .gs-motd-line { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); overflow-wrap: anywhere; }
 .gs-motd-line:first-child { font-size: var(--text-md); color: var(--onyx-text); }
 .gs-motd-gap { margin: 0; height: var(--space-2); }
-.gs-motd-more {
+.onyx-frame .gs-motd button.gs-motd-more {
   align-self: flex-start;
   min-height: 28px;
   padding: 0;
@@ -315,8 +315,8 @@
   text-underline-offset: 3px;
   text-decoration-color: var(--onyx-line);
 }
-.gs-motd-more:hover { color: var(--onyx-text); }
-.gs-motd-more:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-frame .gs-motd button.gs-motd-more:hover { color: var(--onyx-text); }
+.onyx-frame .gs-motd button.gs-motd-more:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .gs-motd-pack { margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--onyx-line); }
 .gs-motd-pack-title { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 650; color: var(--onyx-text); }
 .gs-motd-pack-list { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); }
@@ -346,12 +346,15 @@
   .gs-join-field { min-height: 44px; }
   .gs-join-input { height: 42px; font-size: 16px; }
   .onyx-rail .gs-join-field { padding-right: 2px; }
-  .onyx-rail .gs-join-go { min-height: 40px; min-width: 56px; padding: 0 var(--space-3); }
-  .onyx-rail .gs-rail-activity { min-height: 44px; }
-  .gs-seg-btn { min-height: 40px; }
-  .gs-motd-dismiss { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
-  .gs-motd-more { min-height: 44px; }
-  .gs-btn { min-height: 44px; }
+  .onyx-frame .onyx-rail button.gs-join-go { min-height: 40px; min-width: 56px; padding: 0 var(--space-3); }
+  .onyx-frame .onyx-rail button.gs-rail-activity { min-height: 44px; }
+  .onyx-frame .gs-seg button.gs-seg-btn { min-height: 44px; }
+  /* The More menu rows keep one height: 44px for a finger at any width. */
+  .onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > button,
+  .onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger { min-height: 44px; }
+  .onyx-frame .gs-motd button.gs-motd-dismiss { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
+  .onyx-frame .gs-motd button.gs-motd-more { min-height: 44px; }
+  .onyx-frame .gs-leave button.gs-btn { min-height: 44px; }
 }
 
 /* ---------- 8. Phones ---------------------------------------------------- */
@@ -359,7 +362,7 @@
 @media (max-width: 767.98px) {
   .gs-rail-extras { padding: var(--space-3) var(--space-4) 0; gap: var(--space-3); }
   .gs-join-input { font-size: 16px; }
-  .onyx-rail .gs-rail-activity { min-height: 48px; padding: 0 var(--space-3); background: var(--onyx-panel); border: 1px solid var(--onyx-line); }
+  .onyx-frame .onyx-rail button.gs-rail-activity { min-height: 48px; padding: 0 var(--space-3); background: var(--onyx-panel); border: 1px solid var(--onyx-line); }
   .gs-door-name { font-size: var(--text-md); }
   .gs-door-sub { font-size: var(--text-sm); }
   .gs-act-text { font-size: var(--text-md); }
@@ -373,7 +376,7 @@
 
   .onyx-sheet-layer > .onyx-sheet.gs-leave { width: 100%; padding: var(--space-5) var(--sheet-pad, 16px) calc(var(--space-4) + env(safe-area-inset-bottom, 0px)); }
   .gs-leave-actions { flex-direction: column-reverse; align-items: stretch; }
-  .gs-btn { min-height: 48px; font-size: var(--text-md); }
+  .onyx-frame .gs-leave button.gs-btn { min-height: 48px; font-size: var(--text-md); }
 }
 
 /* Short landscape phones: keep the rail extras compact. */
@@ -382,7 +385,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .onyx-rail .gs-rail-activity,
-  .gs-seg-btn,
-  .gs-btn { transition: none; }
+  .onyx-frame .onyx-rail button.gs-rail-activity,
+  .onyx-frame .gs-seg button.gs-seg-btn,
+  .onyx-frame .gs-leave button.gs-btn { transition: none; }
 }

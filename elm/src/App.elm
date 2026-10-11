@@ -10773,10 +10773,22 @@ foldUnknownStandardReply model _ reply =
         description =
             String.trim reply.description
 
+        -- FAIL / WARN read as "<CMD> failed: …" / "<CMD> warning: …" so
+        -- Activity files them under Problems; a NOTE stays "<CMD>: …".
+        lead =
+            case reply.kind of
+                Wire.Fail ->
+                    reply.command ++ " failed: "
+
+                Wire.Warn ->
+                    reply.command ++ " warning: "
+
+                Wire.Note ->
+                    reply.command ++ ": "
+
         line =
             boundSystemEventText
-                (reply.command
-                    ++ ": "
+                (lead
                     ++ (if String.isEmpty description then
                             reply.code
 
@@ -10858,7 +10870,7 @@ gapShellBanner model =
     else if gs.browserOffline then
         Just
             { title = "You’re offline"
-            , detail = "You’re offline. Messages you send wait on this device until you’re back."
+            , detail = "You’re offline. Messages wait on this device."
             , online = False
             }
 
