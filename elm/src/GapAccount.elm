@@ -581,13 +581,15 @@ classifyReply message =
             "464" ->
                 Just ProtectWrongPassword
 
+            -- 481 not identified, 421 services unavailable, 461 usage
             "481" ->
-                case message.params of
-                    _ :: "RECOGNIZE" :: rest ->
-                        Just (RecognizeDenied (lastParam rest))
+                recognizeRefusal message.params
 
-                    _ ->
-                        Nothing
+            "421" ->
+                recognizeRefusal message.params
+
+            "461" ->
+                recognizeRefusal message.params
 
             "FAIL" ->
                 case message.params of
@@ -613,6 +615,16 @@ classifyReply message =
 
             _ ->
                 Nothing
+
+
+recognizeRefusal : List String -> Maybe Reply
+recognizeRefusal params =
+    case params of
+        _ :: "RECOGNIZE" :: rest ->
+            Just (RecognizeDenied (lastParam rest))
+
+        _ ->
+            Nothing
 
 
 failCopy : String -> String -> String

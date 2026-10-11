@@ -1029,7 +1029,7 @@ namesTests =
                         update (GapAccountMsg GapAccount.RecognizeAdd) drafted
 
                     ( confirmed, again ) =
-                        send added [ ":irc.example NOTICE me :Recognize kai!*@home.example: added" ]
+                        send added [ ":irc.example NOTICE me :Recognize kai!*@home.example: added to your recognition list" ]
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ "RECOGNIZE ADD kai!*@home.example\u{000D}\n" ] (sentLines outs)

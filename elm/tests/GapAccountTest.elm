@@ -195,25 +195,36 @@ suite =
                         (classify (server "NOTICE kai :RECOVER: something new"))
             ]
         , describe "classifyReply: recognition and group lists"
-            [ test "recognize rows, empty marker and results" <|
+            [ test "recognize rows, empty marker and results (server texts)" <|
                 \_ ->
                     Expect.equal
                         [ Just (RecognizeRow "kai!*@home.example")
                         , Just RecognizeEmpty
-                        , Just (RecognizeResult { mask = "kai!*@x", ok = True, text = "added" })
-                        , Just (RecognizeResult { mask = "kai!*@x", ok = True, text = "removed" })
-                        , Just (RecognizeResult { mask = "bad", ok = False, text = "invalid_mask" })
+                        , Just (RecognizeResult { mask = "kai!*@x", ok = True, text = "added to your recognition list" })
+                        , Just (RecognizeResult { mask = "kai!*@x", ok = True, text = "removed from your recognition list" })
+                        , Just (RecognizeResult { mask = "bad", ok = False, text = "rejected: invalid mask" })
+                        , Just (RecognizeResult { mask = "kai!*@x", ok = False, text = "is already on your recognition list" })
                         ]
                         [ classify (server "NOTICE kai :Recognize: kai!*@home.example")
                         , classify (server "NOTICE kai :Recognition list for kai is empty")
-                        , classify (server "NOTICE kai :Recognize kai!*@x: added")
-                        , classify (server "NOTICE kai :Recognize kai!*@x: removed")
-                        , classify (server "NOTICE kai :Recognize bad: invalid_mask")
+                        , classify (server "NOTICE kai :Recognize kai!*@x: added to your recognition list")
+                        , classify (server "NOTICE kai :Recognize kai!*@x: removed from your recognition list")
+                        , classify (server "NOTICE kai :Recognize bad: rejected: invalid mask")
+                        , classify (server "NOTICE kai :Recognize kai!*@x: is already on your recognition list")
                         ]
-            , test "481 on RECOGNIZE is a denial" <|
+            , test "481 / 421 / 461 on RECOGNIZE are refusals" <|
                 \_ ->
-                    Expect.equal (Just (RecognizeDenied "Permission Denied"))
-                        (classify (server "481 kai RECOGNIZE :Permission Denied"))
+                    Expect.equal
+                        [ Just (RecognizeDenied "You must be identified to manage your recognition list")
+                        , Just (RecognizeDenied "Account services are unavailable")
+                        , Just (RecognizeDenied "Usage: RECOGNIZE ADD|DEL|LIST [mask]")
+                        , Nothing
+                        ]
+                        [ classify (server "481 kai RECOGNIZE :You must be identified to manage your recognition list")
+                        , classify (server "421 kai RECOGNIZE :Account services are unavailable")
+                        , classify (server "461 kai RECOGNIZE :Usage: RECOGNIZE ADD|DEL|LIST [mask]")
+                        , classify (server "421 kai FOO :Unknown command")
+                        ]
             , test "group rows, end marker and results" <|
                 \_ ->
                     Expect.equal
