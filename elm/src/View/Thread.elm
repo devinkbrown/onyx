@@ -8,6 +8,7 @@ import App exposing (Model, Msg(..))
 import Avatar
 import Dict
 import Emoji
+import GapConvo
 import Topic
 import Html exposing (Html, a, article, audio, button, div, h2, h3, img, input, label, li, p, section, small, span, strong, text, time, ul, video)
 import Html.Attributes exposing (attribute, class, classList, controls, datetime, disabled, for, href, id, placeholder, preload, rel, src, style, tabindex, target, type_, value)
@@ -134,6 +135,7 @@ channelTranscript model channel =
                 , topicFilterBar model channel
                 , topicTools model channel
                 , forumCards model channel
+                , gapCollapsedBanner model channel -- v3/gap-convo
                 , if win.hiddenBefore > 0 then
                     div [ class "onyx-earlier" ]
                         [ button
@@ -289,7 +291,7 @@ rowNode model target rv m =
                 else
                     ""
         in
-        if TranscriptRows.needsRichRow { body = App.displayBody m, menuOpen = rowPopoverOpen model target m } then
+        if TranscriptRows.needsRichRow { body = App.displayBody m, menuOpen = rowPopoverOpen model target m || gapRevisionsShown model m } then
             richRow model target rv.flags title m
 
         else
@@ -334,6 +336,7 @@ type alias RowCtx =
     , editTitle : String
     , flags : TranscriptRows.RowFlags
     , active : Bool
+    , revisionsOpen : Bool -- v3/gap-convo
     }
 
 
@@ -349,7 +352,7 @@ quietRow target zone prefs ourNick title bits m =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
     rowShell
-        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags, active = False }
+        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags, active = False, revisionsOpen = False }
         ((case m.replyTo of
             Just ref ->
                 [ replyContext ref ]
@@ -369,11 +372,12 @@ quietRow target zone prefs ourNick title bits m =
 richRow : Model -> String -> TranscriptRows.RowFlags -> String -> App.ChatMessage -> Html Msg
 richRow model target flags title m =
     rowShell
-        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m }
+        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m, revisionsOpen = gapRevisionsShown model m }
         (messageBody model m)
         (messageMenuButton model target m)
         [ messageMenuPanel model target m
         , reactionPickerPanel model target m
+        , gapRevisionsPanel model m -- v3/gap-convo
         ]
         m
 
@@ -567,6 +571,9 @@ rowShell ctx body menuButton panels m =
         -- v3/ui-messages: focusable (never a tab stop) so a tap on touch
         -- reveals the row's actions through :focus-within.
         , tabindex -1
+
+        -- v3/gap-convo: the scroll bridge lands on rows by this key
+        , attribute "data-row-key" (TranscriptRows.rowKey m)
         ]
             ++ longPressMenu ctx.target m flags.menuButton
         )
@@ -582,7 +589,8 @@ rowShell ctx body menuButton panels m =
                              else
                                 span [ class "onyx-pending-note" ] [ text " · queued" ]
                            , if m.edited && not withdrawn then
-                                span [ class "onyx-edited", attribute "title" ctx.editTitle ] [ text " · edited" ]
+                                -- v3/gap-convo: with earlier versions on file the marker discloses them
+                                gapEditedMarker ctx.editTitle ctx.revisionsOpen m
 
                              else
                                 text ""
@@ -1650,7 +1658,8 @@ messageMenuPanel model target m =
                                     Just
                                         (menuItem ("Quote " ++ actionTarget ++ " in composer")
                                             "Quote in composer"
-                                            (App.MessageQuote { target = target, from = m.from, body = m.body })
+                                            -- v3/gap-convo: the readable text, never the sealed envelope
+                                            (App.MessageQuote { target = target, from = m.from, body = Maybe.withDefault "" (App.loadedActionText m) })
                                         )
 
                                   else
@@ -2729,3 +2738,132 @@ fileChip attachment =
             Nothing ->
                 text ""
         ]
+
+
+
+-- v3/gap-convo
+
+
+{-| "Hiding messages from … · Show all": hidden senders can always be
+brought back (the per-row menus go away with their rows). -}
+gapCollapsedBanner : Model -> App.Channel -> Html Msg
+gapCollapsedBanner model channel =
+    case App.gapCollapsedIn model channel of
+        [] ->
+            text ""
+
+        hidden ->
+            let
+                names =
+                    List.map Tuple.first hidden
+
+                count =
+                    List.sum (List.map Tuple.second hidden)
+
+                who =
+                    case names of
+                        [ one ] ->
+                            one
+
+                        [ one, two ] ->
+                            one ++ " and " ++ two
+
+                        one :: rest ->
+                            one ++ " and " ++ String.fromInt (List.length rest) ++ " others"
+
+                        [] ->
+                            ""
+            in
+            div [ class "gap-collapsed", attribute "role" "status", attribute "data-testid" "collapsed-banner" ]
+                [ span [ class "gap-collapsed-text" ]
+                    [ text
+                        ("Hiding "
+                            ++ String.fromInt count
+                            ++ (if count == 1 then
+                                    " message"
+
+                                else
+                                    " messages"
+                               )
+                            ++ " from "
+                            ++ who
+                            ++ " in this feed"
+                        )
+                    ]
+                , button
+                    [ type_ "button"
+                    , class "gap-collapsed-show"
+                    , attribute "aria-label" ("Show messages from " ++ who)
+                    , onClick (App.GapConvoMsg GapConvo.CollapsedShowAll)
+                    ]
+                    [ text "Show all" ]
+                ]
+
+
+gapRevisionsShown : Model -> App.ChatMessage -> Bool
+gapRevisionsShown model m =
+    m.msgid /= Nothing && model.gapConvo.revisionsOpen == m.msgid
+
+
+{-| The edited marker: a disclosure when this device holds earlier
+versions (the revision count rides in the title), plain text otherwise. -}
+gapEditedMarker : String -> Bool -> App.ChatMessage -> Html Msg
+gapEditedMarker title open m =
+    case m.msgid of
+        Just msgid ->
+            if title /= "Edited" then
+                button
+                    [ type_ "button"
+                    , class "onyx-edited gap-edited-toggle"
+                    , attribute "title" title
+                    , attribute "aria-expanded"
+                        (if open then
+                            "true"
+
+                         else
+                            "false"
+                        )
+                    , attribute "aria-label" (title ++ " — show earlier versions")
+                    , tabindex -1
+                    , onClick (App.GapConvoMsg (GapConvo.RevisionsToggle msgid))
+                    ]
+                    [ text " · edited" ]
+
+            else
+                span [ class "onyx-edited", attribute "title" title ] [ text " · edited" ]
+
+        Nothing ->
+            span [ class "onyx-edited", attribute "title" title ] [ text " · edited" ]
+
+
+{-| Earlier versions of one message kept on this device (newest first). -}
+gapRevisionsPanel : Model -> App.ChatMessage -> Html Msg
+gapRevisionsPanel model m =
+    case m.msgid of
+        Just msgid ->
+            if model.gapConvo.revisionsOpen == Just msgid then
+                case List.reverse (App.revisionsFor model.editHistory msgid) of
+                    [] ->
+                        text ""
+
+                    revs ->
+                        div [ class "gap-revisions", attribute "role" "region", attribute "aria-label" "Earlier versions" ]
+                            [ p [ class "gap-revisions-title" ] [ text "Earlier versions · kept on this device" ]
+                            , ul [ class "gap-revisions-list" ]
+                                (List.map
+                                    (\rev ->
+                                        li [ class "gap-revision" ]
+                                            [ time [ class "gap-revision-time", datetime (App.millisToIso (toFloat rev.editedAt)) ]
+                                                [ text ("Before " ++ App.formatRowClock model.zone model.prefs.clock rev.editedAt) ]
+                                            , span [ class "gap-revision-body" ] [ text rev.body ]
+                                            ]
+                                    )
+                                    revs
+                                )
+                            ]
+
+            else
+                text ""
+
+        Nothing ->
+            text ""

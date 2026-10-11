@@ -122,6 +122,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Media
 import Nodes
+import GapConvo
 import Polish
 import Schedule
 import Switcher
@@ -359,6 +360,34 @@ port scrollPolicy : { action : String, key : String } -> Cmd msg
 
 
 port scrollState : ({ key : String, atBottom : Bool } -> msg) -> Sub msg
+
+
+{-| v3/gap-convo — owner-scoped composer drafts (`onyx:composer-drafts`,
+debounced + write-verified ports-side), the per-file upload variant
+(cleaned / compact / original-with-consent), and the photo-privacy and
+drop-target feeds. -}
+port gapDraftsSave : { serverUrl : String, identity : String, drafts : Encode.Value } -> Cmd msg
+
+
+port gapDraftsRequest : { serverUrl : String, identity : String } -> Cmd msg
+
+
+port gapUploadVariant : { key : String, index : Int, variant : String } -> Cmd msg
+
+
+port gapDraftsLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port gapDraftsSaved : (String -> msg) -> Sub msg
+
+
+port gapPhotoPrepared : (Decode.Value -> msg) -> Sub msg
+
+
+port gapPhotoRefused : ({ key : String, index : Int } -> msg) -> Sub msg
+
+
+port gapDropActive : (Bool -> msg) -> Sub msg
 
 port appearanceRequest : () -> Cmd msg
 
@@ -1351,6 +1380,18 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-convo
+        App.GapConvoOut out ->
+            case out of
+                GapConvo.DraftsSave req ->
+                    gapDraftsSave req
+
+                GapConvo.DraftsRequest req ->
+                    gapDraftsRequest req
+
+                GapConvo.UploadVariant req ->
+                    gapUploadVariant req
+
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()
 
@@ -1720,6 +1761,12 @@ subscriptions model =
         , webPushActiveState App.WebPushActiveState
         , webPushRecoveryHint (\_ -> App.WebPushRecoveryHint)
         , groupWelcomeOpened App.GroupWelcomeOpened
+        -- v3/gap-convo
+        , gapDraftsLoaded (App.GapConvoMsg << GapConvo.DraftsLoaded)
+        , gapDraftsSaved (App.GapConvoMsg << GapConvo.DraftsSaved)
+        , gapPhotoPrepared (App.GapConvoMsg << GapConvo.PhotoPrepared)
+        , gapPhotoRefused (App.GapConvoMsg << GapConvo.PhotoRefused)
+        , gapDropActive (App.GapConvoMsg << GapConvo.DropActive)
         ]
 
 

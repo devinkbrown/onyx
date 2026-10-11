@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), plaintextWouldLeak, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId)
+module App exposing (AttachmentStatus(..), plaintextWouldLeak, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId, gapCollapsedIn, gapDraftStatus, gapPhotoFor, gapDraftPersistable, gapStashOwner)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -29,6 +29,7 @@ import DmCipher
 import DmSafety
 import Download
 import GroupCommit
+import GapConvo
 import Prefs
 import PrefsPanel
 import Stats
@@ -918,6 +919,9 @@ type alias Model =
 
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
+
+    -- v3/gap-convo
+    , gapConvo : GapConvo.State StagedAttachment
     }
 
 
@@ -1135,6 +1139,8 @@ type Outbound
     | NotifyPermissionRequest
       -- v3/polish
     | PolishFlagSave { key : String }
+      -- v3/gap-convo
+    | GapConvoOut GapConvo.Out
     | PwaInstallPrompt
     | PwaUpdateApprove
     | OfflineMemoNotice { channel : String, count : Int, firstMsgId : Int }
@@ -2987,6 +2993,8 @@ type Msg
     | HomeInviteCopy
       -- v3/polish
     | PolishMsg Polish.Msg
+    -- v3/gap-convo
+    | GapConvoMsg GapConvo.Msg
     | ChannelLinkClicked String
     | ThreadShowEarlier
     | PinnedMessageRequest { channel : String, messageId : String }
@@ -3905,6 +3913,9 @@ init nick url =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-convo
+    , gapConvo = GapConvo.blank
     }
 
 
@@ -4485,6 +4496,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-convo
+    , gapConvo = GapConvo.blank
     }
 
 
@@ -6111,6 +6125,8 @@ fold401 model message =
                                         serverText
                             in
                             logService removed (boundSystemEventText ("Message not delivered: " ++ notice))
+                                -- v3/gap-convo: say so, and hand the text back
+                                |> gapNotDelivered pending (Maybe.withDefault pending.target (Ircx.paramAt 1 message.params))
     in
     case activeWhoisNick afterLabel (Maybe.withDefault "" (Ircx.paramAt 1 message.params)) of
         Nothing ->
@@ -36165,6 +36181,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepGapConvo -- v3/gap-convo
     ]
 
 
@@ -38386,10 +38403,11 @@ updateCore msg model =
                     ( stagePicked model key files, [] )
 
         UploadDone done ->
-            settleAttachmentUpload model done
+            -- v3/gap-convo: files staged in another conversation settle there
+            gapSettleUploadDone model done
 
         UploadProgress prog ->
-            ( { model | attachments = applyUploadProgress model.attachments prog }, [] )
+            ( gapUploadProgress model prog, [] )
 
         PreviewArrived arrived ->
             ( settlePreviewArrived model arrived, [] )
@@ -39099,6 +39117,10 @@ updateCore msg model =
             )
 
         -- v3/polish
+        -- v3/gap-convo
+        GapConvoMsg sub ->
+            updateGapConvo sub model
+
         PolishMsg pmsg ->
             polishUpdate pmsg model
 
@@ -39564,7 +39586,8 @@ updateCore msg model =
                 ( model, [] )
 
             else
-                ( scheduleVaultSearch { model | searchOpen = True, composer = "" }, [] )
+                -- v3/gap-convo: the draft stays put (it used to be wiped here)
+                ( scheduleVaultSearch { model | searchOpen = True }, [] )
 
         RetentionKeepSelected raw ->
             -- Keep-count segmented control (mirroring `setKeep`:
@@ -43440,19 +43463,37 @@ nick, exactly as they render.
 -}
 foldParsed : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldParsed model parsed =
-    if isRepeatDelivery model parsed then
-        -- Bouncer/session-sync rewind of an already-folded line: drop
-        -- before the store and the vault (msgid-merge dedup).
-        ( model, [] )
+    -- v3/gap-convo: a `+draft/edit` line re-uses the ORIGINAL msgid, so
+    -- it bypasses the rewind dedup and folds as an in-place edit.
+    case gapEditLine parsed of
+        Just edit ->
+            case divertHistoryBatch model parsed of
+                Just buffered ->
+                    ( buffered, [] )
 
-    else
-        case divertHistoryBatch model parsed of
-            Just buffered ->
-                -- Batched playback child: held for the close merge,
-                -- never folded live.
-                ( buffered, [] )
+                Nothing ->
+                    gapFoldTaggedEdit model parsed edit
 
-            Nothing ->
+        Nothing ->
+            if isRepeatDelivery model parsed then
+                -- Bouncer/session-sync rewind of an already-folded line: drop
+                -- before the store and the vault (msgid-merge dedup) — but a
+                -- replay carrying newer (edited) text refreshes the held row.
+                gapRefreshReplay model parsed
+
+            else
+                case divertHistoryBatch model parsed of
+                    Just buffered ->
+                        -- Batched playback child: held for the close merge,
+                        -- never folded live.
+                        ( buffered, [] )
+
+                    Nothing ->
+                        foldParsedLive model parsed
+
+
+foldParsedLive : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldParsedLive model parsed =
                 let
                     filed =
                         rememberDelivery model parsed
@@ -43461,6 +43502,8 @@ foldParsed model parsed =
                         foldLine filed parsed
                             -- v3/calls-c11
                             |> foldStageWire parsed
+                            -- v3/gap-convo: an edit that beat its row applies now
+                            |> Tuple.mapFirst (gapSettlePendingEdit parsed)
                 in
                 -- A dropped self-echo never reaches the vault: the optimistic send
                 -- already persisted it, and a second row would fork history.
@@ -43952,7 +43995,9 @@ mergeVaultAround model target anchor rows =
                     |> (\m ->
                             { m
                                 | messageSeq = max m.messageSeq (stored + 1)
-                                , historyLanding = nearestRowId anchor rows
+                                -- v3/gap-convo: a vault row id never maps onto a
+                                -- chat row; land on the merged row nearest the anchor
+                                , historyLanding = Maybe.map gapLandingIdOf (gapNearestRow anchor merged)
                             }
                        )
 
@@ -46247,3 +46292,1125 @@ rawContentVerbs =
 rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
+
+
+
+-- v3/gap-convo
+
+
+{-| A `+draft/edit` chat line: onyx-server's only edit fan-out shape
+(`@msgid=<orig>;+draft/edit=<orig>;+draft/revision=1 :nick PRIVMSG
+<target> :<text>`, `server.zig` `handleEdit`), or another client's
+tagged edit (`+draft/edit` relayed as a client tag on a fresh msgid). -}
+gapEditLine : Wire.IrcMessage -> Maybe { ref : String, target : String, body : String }
+gapEditLine parsed =
+    if parsed.command /= "PRIVMSG" && parsed.command /= "NOTICE" then
+        Nothing
+
+    else
+        case ( GapConvo.editRefOf parsed.tags, parsed.params ) of
+            ( Just ref, target :: body :: _ ) ->
+                Just { ref = ref, target = target, body = body }
+
+            _ ->
+                Nothing
+
+
+{-| Rows whose text is end-to-end protected (sealed, or opened from a
+seal): never rewritten in place by an edit. -}
+gapRowSealed : ChatMessage -> Bool
+gapRowSealed m =
+    isEncryptedRow m || m.plaintext /= Nothing
+
+
+gapBodySealed : String -> Bool
+gapBodySealed body =
+    DmCipher.isEnvelope body || GroupEnvelope.isGroupEnvelope body
+
+
+{-| Apply one author edit to the held row with server msgid `ref`
+(`Nothing` when the row is not in the buffer yet). The prior plaintext
+body files into the local revision trail. -}
+gapEditRow : Model -> String -> String -> GapConvo.PendingEdit -> Maybe ( Model, GapConvo.EditOutcome )
+gapEditRow model bucket ref edit =
+    case Dict.get bucket model.channels of
+        Nothing ->
+            Nothing
+
+        Just ch ->
+            case List.filter (\m -> m.msgid == Just ref) ch.messages |> List.head of
+                Nothing ->
+                    Nothing
+
+                Just row ->
+                    let
+                        outcome =
+                            GapConvo.decideEdit
+                                { rowFrom = row.from, rowBody = row.body, rowSealed = gapRowSealed row, rowWithdrawn = row.deleted || row.redacted }
+                                { sender = edit.from, body = edit.body, bodySealed = gapBodySealed edit.body }
+                    in
+                    case outcome of
+                        GapConvo.ApplyEdit ->
+                            let
+                                messages =
+                                    List.map
+                                        (\m ->
+                                            if m.msgid == Just ref then
+                                                { m | body = edit.body, edited = True }
+
+                                            else
+                                                m
+                                        )
+                                        ch.messages
+                            in
+                            Just
+                                ( { model
+                                    | channels = Dict.insert bucket { ch | messages = messages } model.channels
+                                    , editHistory = recordEdit model.editHistory ref row.body (floor model.nowMs)
+                                  }
+                                , outcome
+                                )
+
+                        _ ->
+                            Just ( model, outcome )
+
+
+{-| Fold one `+draft/edit` line: the author's held row is rewritten in
+place (the vault picks the new text up through the buffer signature);
+an edit whose row is not loaded yet waits for it; a client-tagged
+"edit" of somebody else's row is just that sender's own message. Never
+a new row, never an unread bump, never an alert. -}
+gapFoldTaggedEdit : Model -> Wire.IrcMessage -> { ref : String, target : String, body : String } -> ( Model, List Outbound )
+gapFoldTaggedEdit model parsed line =
+    let
+        -- Never filed for rewind dedup: a server edit carries the msgid
+        -- of its ORIGINAL row, which may not have been delivered yet.
+        filed =
+            model
+
+        sender =
+            Maybe.withDefault "" parsed.nick
+
+        bucket =
+            String.toLower (dmMutateBucket filed line.target sender)
+
+        native =
+            msgidOf parsed == Just line.ref
+
+        edit =
+            { from = sender, body = GapConvo.editBody line.body }
+    in
+    case gapEditRow filed bucket line.ref edit of
+        Just ( edited, GapConvo.ApplyEdit ) ->
+            let
+                ( flushed, flushOuts ) =
+                    flushVaultBuffer edited bucket
+
+                ( previewed, previewOuts ) =
+                    requestPreviewForBody flushed edit.body
+            in
+            ( previewed, flushOuts ++ previewOuts )
+
+        Just ( same, GapConvo.SameBody ) ->
+            ( same, [] )
+
+        Just ( refused, GapConvo.RefuseEdit reason ) ->
+            ( logService refused reason, [] )
+
+        Just ( _, GapConvo.NotTheAuthor ) ->
+            if native then
+                ( logService filed "Ignored an edit from someone other than the author.", [] )
+
+            else
+                foldParsedLive model parsed
+
+        Nothing ->
+            if String.isEmpty sender then
+                ( filed, [] )
+
+            else
+                ( { filed | gapConvo = GapConvo.stashEdit (GapConvo.pendingEditKey bucket line.ref) edit filed.gapConvo }, [] )
+
+
+{-| A row just landed: apply an edit that arrived before it. -}
+gapSettlePendingEdit : Wire.IrcMessage -> Model -> Model
+gapSettlePendingEdit parsed model =
+    if Dict.isEmpty model.gapConvo.pendingEdits then
+        model
+
+    else
+        case ( msgidOf parsed, parsed.params ) of
+            ( Just msgid, target :: _ ) ->
+                let
+                    bucket =
+                        String.toLower (dmFileBucket model target (Maybe.withDefault "" parsed.nick))
+                in
+                case GapConvo.takeEdit (GapConvo.pendingEditKey bucket msgid) model.gapConvo of
+                    ( Just edit, rest ) ->
+                        let
+                            taken =
+                                { model | gapConvo = rest }
+                        in
+                        case gapEditRow taken bucket msgid edit of
+                            Just ( edited, GapConvo.RefuseEdit reason ) ->
+                                logService edited reason
+
+                            Just ( edited, _ ) ->
+                                edited
+
+                            Nothing ->
+                                taken
+
+                    ( Nothing, _ ) ->
+                        model
+
+            _ ->
+                model
+
+
+{-| A replayed line whose msgid we already hold: CHATHISTORY replays
+the server's CURRENT text (edits rewrite the history row in place), so
+a held plaintext row from the same author whose text moved while we
+were away takes the new text. Multiline, CTCP, sealed, withdrawn and
+ignored-placeholder rows are never touched. -}
+gapRefreshReplay : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+gapRefreshReplay model parsed =
+    if parsed.command /= "PRIVMSG" then
+        ( model, [] )
+
+    else
+        case ( msgidOf parsed, parsed.params, parsed.nick ) of
+            ( Just msgid, target :: body :: _, Just sender ) ->
+                let
+                    bare =
+                        stripStatusmsgTarget model target
+
+                    bucket =
+                        String.toLower (dmFileBucket model bare sender)
+
+                    fate =
+                        deliveryFate model bare sender
+
+                    resolved =
+                        Tuple.first (resolveInboundReply model bucket parsed body)
+                in
+                if String.contains "\n" body || String.startsWith "\u{0001}" resolved || (fate /= DeliverNormal && fate /= DeliverQuiet) then
+                    ( model, [] )
+
+                else
+                    case Dict.get bucket model.channels |> Maybe.andThen (\ch -> List.filter (\m -> m.msgid == Just msgid) ch.messages |> List.head) of
+                        Just row ->
+                            if String.contains "\n" row.body || row.pending || row.outboxId /= Nothing then
+                                ( model, [] )
+
+                            else
+                                case gapEditRow model bucket msgid { from = sender, body = resolved } of
+                                    Just ( edited, GapConvo.ApplyEdit ) ->
+                                        flushVaultBuffer edited bucket
+
+                                    _ ->
+                                        ( model, [] )
+
+                        Nothing ->
+                            ( model, [] )
+
+            _ ->
+                ( model, [] )
+
+
+{-| A labeled DM the server answered with 401: say so (the oracle
+"Message not delivered" toast) and hand the text back to that
+conversation's composer when its draft is empty, so nothing typed is
+lost. -}
+gapNotDelivered : PendingLabeledSend -> String -> Model -> Model
+gapNotDelivered pending nick model =
+    let
+        key =
+            String.toLower pending.target
+
+        isActive =
+            Maybe.map String.toLower model.activeChannel == Just key
+
+        currentDraft =
+            if isActive then
+                model.composer
+
+            else
+                storedDraftFor pending.target model
+
+        canRestore =
+            String.isEmpty (String.trim currentDraft)
+                && not (String.isEmpty (String.trim pending.text))
+                && (not isActive || activeEditFor model pending.target == Nothing)
+
+        restored =
+            if not canRestore then
+                model
+
+            else if isActive then
+                { model | composer = pending.text, composerDrafts = Dict.insert key pending.text model.composerDrafts }
+
+            else
+                { model | composerDrafts = Dict.insert key pending.text model.composerDrafts }
+    in
+    notDeliveredToast restored (GapConvo.undeliveredCopy nick canRestore)
+
+
+{-| Which conversation's stashed staged files hold an upload `key`. -}
+gapStashOwner : String -> Model -> Maybe String
+gapStashOwner key model =
+    if List.any (\a -> a.key == key) model.attachments then
+        Nothing
+
+    else
+        Dict.foldl
+            (\target items found ->
+                case found of
+                    Just _ ->
+                        found
+
+                    Nothing ->
+                        if List.any (\a -> a.key == key) items then
+                            Just target
+
+                        else
+                            Nothing
+            )
+            Nothing
+            model.gapConvo.stagedByTarget
+
+
+{-| Upload progress for files staged in another conversation moves
+those rows, not the open composer's. -}
+gapUploadProgress : Model -> { key : String, index : Int, loaded : Int, total : Maybe Int } -> Model
+gapUploadProgress model prog =
+    case gapStashOwner prog.key model of
+        Nothing ->
+            { model | attachments = applyUploadProgress model.attachments prog }
+
+        Just target ->
+            let
+                gc =
+                    model.gapConvo
+            in
+            { model | gapConvo = { gc | stagedByTarget = Dict.update target (Maybe.map (\items -> applyUploadProgress items prog)) gc.stagedByTarget } }
+
+
+{-| An upload finished for files staged in another conversation: settle
+it against THAT conversation's files (the receipt message goes to its
+own target) without lending it the open conversation's draft, audience
+or reply; a failure there becomes a toast instead of an error in the
+composer you are looking at. -}
+gapSettleUploadDone : Model -> { key : String, index : Int, ok : Bool, status : Int, body : String, contentType : Maybe String } -> ( Model, List Outbound )
+gapSettleUploadDone model done =
+    case gapStashOwner done.key model of
+        Nothing ->
+            settleAttachmentUpload model done
+
+        Just target ->
+            let
+                stashed =
+                    Maybe.withDefault [] (Dict.get target model.gapConvo.stagedByTarget)
+
+                lent =
+                    { model | attachments = stashed, composer = "", composerAudience = Nothing, composerError = Nothing }
+
+                ( settled, outs ) =
+                    settleAttachmentUpload lent done
+
+                gc =
+                    settled.gapConvo
+
+                stash =
+                    if List.isEmpty settled.attachments then
+                        Dict.remove target gc.stagedByTarget
+
+                    else
+                        Dict.insert target settled.attachments gc.stagedByTarget
+
+                back =
+                    { settled
+                        | attachments = model.attachments
+                        , composer = model.composer
+                        , composerAudience = model.composerAudience
+                        , composerError = model.composerError
+                        , replyingTo =
+                            if activeReplyParent model.replyingTo target /= Nothing then
+                                settled.replyingTo
+
+                            else
+                                model.replyingTo
+                        , gapConvo = { gc | stagedByTarget = stash }
+                    }
+            in
+            case settled.composerError of
+                Just err ->
+                    ( addToast
+                        { variant = ToastError
+                        , title = "Files for " ++ target ++ " were not sent"
+                        , description = Just err
+                        , duration = Nothing
+                        , groupKey = Nothing
+                        , undo = Nothing
+                        }
+                        back.nowMs
+                        back
+                    , outs
+                    )
+
+                Nothing ->
+                    ( back, outs )
+
+
+{-| Staged files belong to the conversation they were staged in: on a
+conversation switch they wait there (with that conversation's draft)
+and the incoming conversation gets its own back. -}
+gapSwapStaged : Model -> Model -> Model
+gapSwapStaged prior next =
+    let
+        before =
+            Maybe.map String.toLower prior.activeChannel
+
+        after =
+            Maybe.map String.toLower next.activeChannel
+    in
+    if before == after then
+        next
+
+    else
+        let
+            gc =
+                next.gapConvo
+
+            stashed =
+                case before of
+                    Just key ->
+                        if List.isEmpty next.attachments then
+                            Dict.remove key gc.stagedByTarget
+
+                        else
+                            Dict.insert key next.attachments gc.stagedByTarget
+
+                    Nothing ->
+                        gc.stagedByTarget
+
+            carried =
+                case before of
+                    Just _ ->
+                        []
+
+                    Nothing ->
+                        next.attachments
+
+            ( restored, remaining ) =
+                case after of
+                    Just key ->
+                        ( carried ++ Maybe.withDefault [] (Dict.get key stashed), Dict.remove key stashed )
+
+                    Nothing ->
+                        ( carried, stashed )
+
+            bounded =
+                if Dict.size remaining <= GapConvo.maxStagedTargets then
+                    remaining
+
+                else
+                    Dict.fromList (List.drop (Dict.size remaining - GapConvo.maxStagedTargets) (Dict.toList remaining))
+        in
+        { next | attachments = restored, gapConvo = { gc | stagedByTarget = bounded } }
+
+
+{-| Photo facts for one staged row (Nothing until the bridge reports). -}
+gapPhotoFor : Model -> StagedAttachment -> Maybe ( GapConvo.PhotoPrep, GapConvo.PhotoChoice )
+gapPhotoFor model item =
+    let
+        key =
+            GapConvo.photoKey item.key item.position
+    in
+    case Dict.get key model.gapConvo.photoPrep of
+        Just prep ->
+            Just ( prep, Maybe.withDefault GapConvo.blankPhotoChoice (Dict.get key model.gapConvo.photoChoice) )
+
+        Nothing ->
+            case Dict.get key model.gapConvo.photoChoice of
+                Just choice ->
+                    if choice.refused then
+                        Just ( { kind = "file", metadata = "unsafe", cleanBytes = Nothing, compactBytes = Nothing }, choice )
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+
+gapStagedKnown : String -> Int -> Model -> Bool
+gapStagedKnown key index model =
+    List.any (\a -> a.key == key && a.position == index) model.attachments
+        || List.any (List.any (\a -> a.key == key && a.position == index)) (Dict.values model.gapConvo.stagedByTarget)
+
+
+{-| Drop photo facts for files no longer staged anywhere. -}
+gapPrunePhotos : Model -> Model
+gapPrunePhotos model =
+    let
+        gc =
+            model.gapConvo
+
+        live =
+            (model.attachments ++ List.concat (Dict.values gc.stagedByTarget))
+                |> List.map (\a -> GapConvo.photoKey a.key a.position)
+                |> Set.fromList
+    in
+    if Dict.isEmpty gc.photoPrep && Dict.isEmpty gc.photoChoice then
+        model
+
+    else
+        { model
+            | gapConvo =
+                { gc
+                    | photoPrep = Dict.filter (\k _ -> Set.member k live) gc.photoPrep
+                    , photoChoice = Dict.filter (\k _ -> Set.member k live) gc.photoChoice
+                }
+        }
+
+
+{-| Composer drafts worth keeping on this device: the stored per-target
+drafts plus the live field (an armed edit keeps its pre-arm draft
+instead), minus encrypted DMs (their plaintext never touches storage)
+and slash commands (a half-typed `/identify` must never persist). -}
+gapDraftSnapshot : Model -> List ( String, String )
+gapDraftSnapshot model =
+    let
+        withActive =
+            case model.activeChannel of
+                Just active ->
+                    let
+                        live =
+                            case activeEditFor model active of
+                                Just edit ->
+                                    edit.draft
+
+                                Nothing ->
+                                    model.composer
+                    in
+                    Dict.insert (String.toLower active) live model.composerDrafts
+
+                Nothing ->
+                    model.composerDrafts
+    in
+    withActive
+        |> Dict.toList
+        |> List.filter (\( target, text ) -> gapDraftPersistable model target && not (String.startsWith "/" (String.trimLeft text)))
+        |> GapConvo.sanitizeDrafts
+
+
+gapDraftPersistable : Model -> String -> Bool
+gapDraftPersistable model target =
+    isChannelName model target || not (model.e2eeDms || dmDesignated model target)
+
+
+{-| The quiet draft line under the composer, if any. -}
+gapDraftStatus : Model -> Maybe String
+gapDraftStatus model =
+    case model.activeChannel of
+        Nothing ->
+            Nothing
+
+        Just active ->
+            if String.isEmpty (String.trim model.composer) || activeEditFor model active /= Nothing || String.startsWith "/" (String.trimLeft model.composer) then
+                Nothing
+
+            else if not model.gapConvo.draftsLoaded || model.gapConvo.draftsOwner /= deviceMemoryOwner model then
+                Nothing
+
+            else
+                GapConvo.draftStatusCopy { persistable = gapDraftPersistable model active, status = model.gapConvo.draftStatus }
+
+
+{-| Owner transitions: forget the previous owner's staged files, pending
+edits and landing, and wait for this owner's drafts. The load itself
+rides the existing owner-transition request (`TopicReadRequest`, which
+`ports.js` also answers with `gapDraftsLoaded`), so owner changes add
+no new outbound of their own. -}
+gapSettleOwner : Model -> Model -> ( Model, List Outbound )
+gapSettleOwner prior next =
+    let
+        before =
+            deviceMemoryOwner prior
+
+        after =
+            deviceMemoryOwner next
+
+        gc =
+            next.gapConvo
+    in
+    if before == after || before == Nothing then
+        ( next, [] )
+
+    else
+        ( { next
+            | gapConvo =
+                { gc
+                    | pendingEdits = Dict.empty
+                    , pendingEditOrder = []
+                    , landing = Nothing
+                    , stagedByTarget = Dict.empty
+                    , photoPrep = Dict.empty
+                    , photoChoice = Dict.empty
+                    , draftsOwner = Nothing
+                    , draftsLoaded = False
+                    , draftStatus = GapConvo.DraftUnknown
+                    , lastDraftSnapshot = []
+                }
+          }
+        , []
+        )
+
+
+{-| Persist the draft snapshot when it moved (the bridge debounces and
+write-verifies; nothing is written before this owner's drafts loaded,
+so an empty boot snapshot never clobbers them). -}
+gapSettleDrafts : Model -> Model -> ( Model, List Outbound )
+gapSettleDrafts prior next =
+    let
+        gc =
+            next.gapConvo
+    in
+    if not gc.draftsLoaded || gc.draftsOwner /= deviceMemoryOwner next then
+        ( next, [] )
+
+    else if prior.composer == next.composer && prior.composerDrafts == next.composerDrafts && prior.activeChannel == next.activeChannel && prior.editingMessage == next.editingMessage && prior.gapConvo.draftsLoaded then
+        ( next, [] )
+
+    else
+        case gc.draftsOwner of
+            Nothing ->
+                ( next, [] )
+
+            Just owner ->
+                let
+                    snapshot =
+                        gapDraftSnapshot next
+                in
+                if snapshot == gc.lastDraftSnapshot then
+                    ( next, [] )
+
+                else
+                    ( { next | gapConvo = { gc | lastDraftSnapshot = snapshot } }
+                    , [ GapConvoOut (GapConvo.DraftsSave { serverUrl = owner.serverUrl, identity = owner.identity, drafts = GapConvo.encodeDrafts snapshot }) ]
+                    )
+
+
+{-| Restore this owner's stored drafts: in-memory drafts win, the open
+conversation's empty composer takes its stored draft. Stale owners drop. -}
+gapDraftsLoaded : Decode.Value -> Model -> Model
+gapDraftsLoaded value model =
+    let
+        decoded =
+            Decode.decodeValue
+                (Decode.map4 (\s i d st -> { serverUrl = s, identity = i, drafts = d, status = st })
+                    (Decode.field "serverUrl" Decode.string)
+                    (Decode.field "identity" Decode.string)
+                    (Decode.oneOf [ Decode.field "drafts" Decode.value, Decode.succeed Encode.null ])
+                    (Decode.oneOf [ Decode.field "status" Decode.string, Decode.succeed "saved" ])
+                )
+                value
+
+        gc =
+            model.gapConvo
+    in
+    case decoded of
+        Err _ ->
+            model
+
+        Ok loaded ->
+            if deviceMemoryOwner model /= Just { serverUrl = loaded.serverUrl, identity = loaded.identity } then
+                model
+
+            else
+                let
+                    stored =
+                        GapConvo.decodeDrafts loaded.drafts
+
+                    merged =
+                        List.foldl
+                            (\( k, v ) acc ->
+                                if String.isEmpty (Maybe.withDefault "" (Dict.get k acc)) then
+                                    Dict.insert k v acc
+
+                                else
+                                    acc
+                            )
+                            model.composerDrafts
+                            (List.filter (\( k, _ ) -> gapDraftPersistable model k) stored)
+
+                    composer =
+                        case model.activeChannel of
+                            Just active ->
+                                if String.isEmpty model.composer && activeEditFor model active == Nothing then
+                                    Maybe.withDefault "" (Dict.get (String.toLower active) merged)
+
+                                else
+                                    model.composer
+
+                            Nothing ->
+                                model.composer
+                in
+                { model
+                    | composerDrafts = merged
+                    , composer = composer
+                    , gapConvo =
+                        { gc
+                            | draftsLoaded = True
+                            , draftsOwner = Just { serverUrl = loaded.serverUrl, identity = loaded.identity }
+                            , draftStatus = GapConvo.draftStatusFromString loaded.status
+                            , lastDraftSnapshot = stored
+                        }
+                }
+
+
+{-| Row index of a landing (Elm buffers newest-first). -}
+gapLandingRow : Model -> GapConvo.Landing -> Maybe ChatMessage
+gapLandingRow model landing =
+    Dict.get landing.target model.channels
+        |> Maybe.andThen (\ch -> List.filter (GapConvo.landingMatches landing.id) ch.messages |> List.head)
+
+
+{-| Nearest row to a moment (ties older-first, like `nearestRowId`). -}
+gapNearestRow : Int -> List ChatMessage -> Maybe ChatMessage
+gapNearestRow anchor rows =
+    List.filter (\m -> m.at > 0) rows
+        |> List.sortBy (\m -> ( abs (m.at - anchor), m.at ))
+        |> List.head
+
+
+gapLandingIdOf : ChatMessage -> String
+gapLandingIdOf m =
+    case m.msgid of
+        Just msgid ->
+            msgid
+
+        Nothing ->
+            GapConvo.landingRowId m.id
+
+
+{-| Land on a message: page the window to it, show its sender if they
+were hidden in this feed, and ask the scroll bridge to bring the row to
+the middle of the pane with a short pulse (and focus, unless a search
+field is driving the jump). A landing whose row is not here yet waits
+for history; one for a conversation you left is dropped. -}
+gapSettleLanding : Model -> Model -> ( Model, List Outbound )
+gapSettleLanding prior next =
+    let
+        gc0 =
+            next.gapConvo
+
+        -- 1. legacy landing writers (pins / media / vault merges)
+        adopted =
+            case next.historyLanding of
+                Just id ->
+                    case next.activeChannel of
+                        Just active ->
+                            { next | historyLanding = Nothing, gapConvo = { gc0 | landing = Just { target = String.toLower active, id = id, focus = True } } }
+
+                        Nothing ->
+                            { next | historyLanding = Nothing }
+
+                Nothing ->
+                    next
+
+        -- 2. a server time-travel window closed: land nearest its moment
+        travelled =
+            case ( prior.pendingTravel, adopted.pendingTravel, adopted.activeChannel ) of
+                ( Just pending, Nothing, Just active ) ->
+                    if String.toLower pending.target == String.toLower active && adopted.gapConvo.landing == Nothing then
+                        case Dict.get (String.toLower active) adopted.channels |> Maybe.andThen (\ch -> gapNearestRow (round pending.at) ch.messages) of
+                            Just row ->
+                                let
+                                    gc =
+                                        adopted.gapConvo
+                                in
+                                { adopted | gapConvo = { gc | landing = Just { target = String.toLower active, id = gapLandingIdOf row, focus = True } } }
+
+                            Nothing ->
+                                adopted
+
+                    else
+                        adopted
+
+                _ ->
+                    adopted
+
+        -- 3. a pinned message's history window settled
+        ( pinned, pinOuts ) =
+            Dict.foldl
+                (\key pinId ( acc, outs ) ->
+                    if Set.member key acc.historyLoading || historyBatchOpenFor acc key then
+                        ( acc, outs )
+
+                    else
+                        let
+                            row =
+                                Dict.get key acc.channels |> Maybe.andThen (\ch -> List.filter (\m -> m.msgid == Just pinId) ch.messages |> List.head)
+
+                            cleared =
+                                { acc | pendingPins = Dict.remove key acc.pendingPins }
+
+                            gc =
+                                cleared.gapConvo
+                        in
+                        case row of
+                            Just _ ->
+                                if Maybe.map String.toLower acc.activeChannel == Just key then
+                                    ( { cleared | gapConvo = { gc | landing = Just { target = key, id = pinId, focus = True } } }, outs )
+
+                                else
+                                    ( cleared, outs )
+
+                            Nothing ->
+                                ( addToast
+                                    { variant = ToastInfo
+                                    , title = "Pinned message not found"
+                                    , description = Just "It is no longer in this room's history."
+                                    , duration = Nothing
+                                    , groupKey = Nothing
+                                    , undo = Nothing
+                                    }
+                                    cleared.nowMs
+                                    cleared
+                                , outs
+                                )
+                )
+                ( travelled, [] )
+                travelled.pendingPins
+    in
+    case pinned.gapConvo.landing of
+        Nothing ->
+            ( pinned, pinOuts )
+
+        Just landing ->
+            let
+                gc =
+                    pinned.gapConvo
+            in
+            if Maybe.map String.toLower pinned.activeChannel /= Just landing.target then
+                ( { pinned | gapConvo = { gc | landing = Nothing } }, pinOuts )
+
+            else
+                case ( gapLandingRow pinned landing, Dict.get landing.target pinned.channels ) of
+                    ( Just row, Just channel ) ->
+                        let
+                            window =
+                                MessageWindow.computeMessageWindow
+                                    { total = toFloat (List.length channel.messages)
+                                    , windowSize = toFloat pinned.threadWindowSize
+                                    , anchorIndex = Maybe.map toFloat (threadRowIndex channel.messages row.id)
+                                    , anchorContext = Nothing
+                                    , pageStart = Nothing
+                                    }
+
+                            shown =
+                                Set.remove (String.toLower (String.trim row.from)) pinned.collapsedNicks
+                        in
+                        ( { pinned
+                            | threadPageStart =
+                                if window.hiddenAfter == 0 then
+                                    Nothing
+
+                                else
+                                    Just window.start
+                            , ignoreUnreadAnchor = True
+                            , collapsedNicks = shown
+                            , gapConvo = { gc | landing = Nothing }
+                          }
+                        , pinOuts
+                            ++ [ TranscriptScroll
+                                    { action =
+                                        if landing.focus then
+                                            "message"
+
+                                        else
+                                            "message-quiet"
+                                    , key = TranscriptRows.rowKey row
+                                    }
+                               ]
+                        )
+
+                    _ ->
+                        if Set.member landing.target pinned.historyLoading || historyBatchOpenFor pinned landing.target || pinned.pendingTravel /= Nothing || Dict.member landing.target pinned.pendingPins then
+                            ( pinned, pinOuts )
+
+                        else
+                            ( { pinned | gapConvo = { gc | landing = Nothing } }, pinOuts )
+
+
+{-| The active search hit scrolls into view (quietly: the search field
+keeps focus so Enter keeps stepping). -}
+gapSettleSearchHit : Model -> Model -> ( Model, List Outbound )
+gapSettleSearchHit prior next =
+    if not next.searchOpen then
+        ( next, [] )
+
+    else if prior.searchOpen && prior.searchIndex == next.searchIndex && prior.searchQuery == next.searchQuery && prior.activeChannel == next.activeChannel then
+        ( next, [] )
+
+    else
+        case ( searchActiveId next, next.activeChannel ) of
+            ( Just rowId, Just active ) ->
+                case Dict.get (String.toLower active) next.channels |> Maybe.andThen (\ch -> List.filter (\m -> m.id == rowId) ch.messages |> List.head) of
+                    Just row ->
+                        ( next, [ TranscriptScroll { action = "message-quiet", key = TranscriptRows.rowKey row } ] )
+
+                    Nothing ->
+                        ( next, [] )
+
+            _ ->
+                ( next, [] )
+
+
+{-| Reply, edit and quote hand the keyboard to the composer. -}
+gapSettleComposerFocus : Msg -> Model -> Model -> List Outbound
+gapSettleComposerFocus msg prior next =
+    let
+        armed =
+            case msg of
+                ReplyArm _ ->
+                    next.replyingTo /= prior.replyingTo && next.replyingTo /= Nothing
+
+                EditArm _ ->
+                    next.editingMessage /= prior.editingMessage && next.editingMessage /= Nothing
+
+                MessageQuote _ ->
+                    next.composer /= prior.composer
+
+                _ ->
+                    False
+    in
+    if armed && next.activeChannel /= Nothing then
+        [ PrefsFocus { id = "shell-composer-input" } ]
+
+    else
+        []
+
+
+{-| A refused photo upload explains itself instead of "Couldn't send". -}
+gapSettleRefusal : Msg -> Model -> Model
+gapSettleRefusal msg next =
+    case msg of
+        UploadDone done ->
+            if done.ok then
+                next
+
+            else
+                case Dict.get (GapConvo.photoKey done.key done.index) next.gapConvo.photoChoice of
+                    Just choice ->
+                        if choice.refused && List.any (\a -> a.key == done.key && a.position == done.index) next.attachments then
+                            let
+                                name =
+                                    List.filter (\a -> a.key == done.key && a.position == done.index) next.attachments
+                                        |> List.head
+                                        |> Maybe.map .name
+                                        |> Maybe.withDefault "this photo"
+                            in
+                            { next | composerError = Just ("Couldn't remove location data from " ++ name ++ ". Remove it, or choose Send with location data.") }
+
+                        else
+                            next
+
+                    Nothing ->
+                        next
+
+        _ ->
+            next
+
+
+settleStepGapConvo : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapConvo msg prior ( next, outs ) =
+    let
+        swapped =
+            gapSwapStaged prior next
+                |> gapSettleRefusal msg
+                |> (\m ->
+                        if m.attachments /= prior.attachments then
+                            gapPrunePhotos m
+
+                        else
+                            m
+                   )
+
+        ( owned, ownerOuts ) =
+            gapSettleOwner prior swapped
+
+        ( drafted, draftOuts ) =
+            gapSettleDrafts prior owned
+
+        ( landed, landingOuts ) =
+            gapSettleLanding prior drafted
+
+        ( searched, searchOuts ) =
+            gapSettleSearchHit prior landed
+    in
+    ( searched, outs ++ ownerOuts ++ draftOuts ++ landingOuts ++ searchOuts ++ gapSettleComposerFocus msg prior searched )
+
+
+updateGapConvo : GapConvo.Msg -> Model -> ( Model, List Outbound )
+updateGapConvo sub model =
+    let
+        gc =
+            model.gapConvo
+
+        choiceFor key index =
+            Maybe.withDefault GapConvo.blankPhotoChoice (Dict.get (GapConvo.photoKey key index) gc.photoChoice)
+
+        setChoice key index choice =
+            { model | gapConvo = { gc | photoChoice = Dict.insert (GapConvo.photoKey key index) choice gc.photoChoice } }
+
+        variantOut key index choice =
+            GapConvoOut
+                (GapConvo.UploadVariant
+                    { key = key
+                    , index = index
+                    , variant = GapConvo.photoUploadVariant (Dict.get (GapConvo.photoKey key index) gc.photoPrep) choice
+                    }
+                )
+    in
+    case sub of
+        GapConvo.PhotoPrepared value ->
+            case GapConvo.decodePhotoPrepared value of
+                Just p ->
+                    if gapStagedKnown p.key p.index model then
+                        ( { model | gapConvo = { gc | photoPrep = Dict.insert (GapConvo.photoKey p.key p.index) p.prep gc.photoPrep } }, [] )
+
+                    else
+                        ( model, [] )
+
+                Nothing ->
+                    ( model, [] )
+
+        GapConvo.PhotoRefused { key, index } ->
+            if gapStagedKnown key index model then
+                let
+                    choice =
+                        choiceFor key index
+                in
+                ( setChoice key index { choice | refused = True }, [] )
+
+            else
+                ( model, [] )
+
+        GapConvo.PhotoQuality { key, index, quality } ->
+            if gapStagedKnown key index model && (quality == "original" || quality == "compact") then
+                let
+                    choice =
+                        choiceFor key index
+
+                    next =
+                        { choice | quality = quality }
+                in
+                ( setChoice key index next, [ variantOut key index next ] )
+
+            else
+                ( model, [] )
+
+        GapConvo.PhotoKeepMetadata { key, index, keep } ->
+            if gapStagedKnown key index model then
+                let
+                    choice =
+                        choiceFor key index
+
+                    next =
+                        { choice | keepMetadata = keep, refused = False }
+
+                    chosen =
+                        setChoice key index next
+
+                    retried =
+                        if keep then
+                            { chosen
+                                | attachments =
+                                    List.map
+                                        (\a ->
+                                            if a.key == key && a.position == index && a.status == StagedFailed then
+                                                { a | status = StagedReady, progress = Nothing }
+
+                                            else
+                                                a
+                                        )
+                                        chosen.attachments
+                                , composerError = Nothing
+                            }
+
+                        else
+                            chosen
+                in
+                ( retried, [ variantOut key index next ] )
+
+            else
+                ( model, [] )
+
+        GapConvo.DraftsLoaded value ->
+            ( gapDraftsLoaded value model, [] )
+
+        GapConvo.DraftsSaved status ->
+            ( { model | gapConvo = { gc | draftStatus = GapConvo.draftStatusFromString status } }, [] )
+
+        GapConvo.DropActive on ->
+            if gc.dropActive == on then
+                ( model, [] )
+
+            else
+                ( { model | gapConvo = { gc | dropActive = on } }, [] )
+
+        GapConvo.CollapsedShowAll ->
+            if Set.isEmpty model.collapsedNicks then
+                ( model, [] )
+
+            else
+                ( addToast
+                    { variant = ToastInfo
+                    , title = "Showing everyone"
+                    , description = Just "Hidden senders are visible in the feed again."
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    model.nowMs
+                    { model | collapsedNicks = Set.empty }
+                , []
+                )
+
+        GapConvo.OpenHistoryPrefs ->
+            let
+                ( opened, outs ) =
+                    prefsOpen (invalidateVaultSearch { model | searchOpen = False })
+            in
+            ( { opened | prefsCategory = PrefsPanel.History }, outs )
+
+        GapConvo.RevisionsToggle msgid ->
+            ( { model
+                | gapConvo =
+                    { gc
+                        | revisionsOpen =
+                            if gc.revisionsOpen == Just msgid then
+                                Nothing
+
+                            else
+                                Just msgid
+                    }
+              }
+            , []
+            )
+
+
+{-| Senders hidden in this feed, with how many of their rows are held. -}
+gapCollapsedIn : Model -> Channel -> List ( String, Int )
+gapCollapsedIn model channel =
+    if Set.isEmpty model.collapsedNicks then
+        []
+
+    else
+        channel.messages
+            |> List.filter (\m -> Set.member (String.toLower (String.trim m.from)) model.collapsedNicks)
+            |> List.foldl (\m acc -> Dict.update (String.trim m.from) (\n -> Just (Maybe.withDefault 0 n + 1)) acc) Dict.empty
+            |> Dict.toList

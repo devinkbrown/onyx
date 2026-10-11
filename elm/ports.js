@@ -3386,7 +3386,51 @@ function fetchPublicFeed(url) {
       settle();
     }
 
+    /* v3/gap-convo — land on one row: centre it in the pane, keep it
+       anchored through later renders, pulse it, and (unless a search
+       field is driving) focus it. Retries a few frames while the
+       window re-renders around it. */
+    function landOn(rowKey, focus) {
+      var tries = 0;
+      function attempt() {
+        sync();
+        var row = null;
+        if (log && typeof log.querySelectorAll === "function") {
+          var rows = log.querySelectorAll("[data-row-key]");
+          for (var i = 0; i < rows.length; i += 1) {
+            if (rows[i].getAttribute("data-row-key") === rowKey) { row = rows[i]; break; }
+          }
+        }
+        if (!row || !pane) {
+          tries += 1;
+          if (tries < 12) raf(attempt);
+          return;
+        }
+        var height = row.getBoundingClientRect().height || 0;
+        var offset = topOf(row) - Math.max(0, (pane.clientHeight - height) / 2);
+        pane.scrollTop = Math.max(0, pane.scrollTop + offset);
+        state.atBottom = distance() < TRANSCRIPT_BOTTOM_THRESHOLD;
+        state.anchor = state.atBottom ? null : row;
+        state.anchorTop = state.anchor ? topOf(row) : 0;
+        report();
+        if (row.classList) {
+          row.classList.remove("gap-landed");
+          void row.offsetWidth;
+          row.classList.add("gap-landed");
+          setTimeout(function () { if (row.classList) row.classList.remove("gap-landed"); }, 1600);
+        }
+        if (focus && typeof row.focus === "function") {
+          try { row.focus({ preventScroll: true }); } catch (err) { /* best-effort */ }
+        }
+      }
+      raf(attempt);
+    }
+
     function policy(req) {
+      if (req && (req.action === "message" || req.action === "message-quiet") && typeof req.key === "string") {
+        landOn(req.key, req.action === "message");
+        return;
+      }
       if (!req || req.action !== "bottom") return;
       state.atBottom = true;
       state.anchor = null;
@@ -6905,6 +6949,8 @@ function fetchPublicFeed(url) {
     /* Upload picker + send wiring (bridge functions live at top
        level beside the node probe so smokes can drive them). */
     var pendingUploadFiles = {};
+    /* v3/gap-convo: photo cleaning, paste/drop, drafts, focus. */
+    var gapUploads = wireGapConvo(app, pendingUploadFiles);
 
     if (app.ports.uploadPick) {
       app.ports.uploadPick.subscribe(function (req) {
@@ -6923,6 +6969,7 @@ function fetchPublicFeed(url) {
               held.push(file);
             }
             pendingUploadFiles[req && req.key] = held;
+            gapUploads.prepare((req && req.key) || "", held); /* v3/gap-convo */
             try {
               app.ports.uploadPicked.send({ key: (req && req.key) || "", files: files });
             } catch (err) { /* port gone */ }
@@ -6935,21 +6982,34 @@ function fetchPublicFeed(url) {
     if (app.ports.uploadSend) {
       app.ports.uploadSend.subscribe(function (req) {
         var held = (req && pendingUploadFiles[req.key]) || [];
-        var file = held[req ? req.index : 0];
+        var raw = held[req ? req.index : 0];
         var key = (req && req.key) || "";
         var index = (req && typeof req.index === "number") ? req.index : 0;
-        var sender;
-        if (typeof XMLHttpRequest !== "undefined") {
-          sender = uploadSendXhr(file, req ? req.endpoint : "", req ? req.fieldName : "file", function (progress) {
+        /* v3/gap-convo: post the CLEANED bytes (or the chosen compact
+           copy); a photo that cannot be cleaned is refused unless the
+           user explicitly kept its metadata — never the original by
+           default, never silently. */
+        var sender = gapUploads.resolve(key, index, raw).then(function (resolved) {
+          if (resolved.refused) {
             try {
-              if (app.ports.uploadProgress) {
-                app.ports.uploadProgress.send({ key: key, index: index, loaded: progress.loaded, total: progress.total });
-              }
+              if (app.ports.gapPhotoRefused) app.ports.gapPhotoRefused.send({ key: key, index: index });
             } catch (err) { /* port gone */ }
-          });
-        } else {
-          sender = uploadSendFile(file, req ? req.endpoint : "", req ? req.fieldName : "file");
-        }
+            return { ok: false, status: 0, body: "", contentType: null };
+          }
+          var file = resolved.file;
+          if (typeof XMLHttpRequest !== "undefined") {
+            return uploadSendXhr(file, req ? req.endpoint : "", req ? req.fieldName : "file", function (progress) {
+              try {
+                if (app.ports.uploadProgress) {
+                  app.ports.uploadProgress.send({ key: key, index: index, loaded: progress.loaded, total: progress.total });
+                }
+              } catch (err) { /* port gone */ }
+            });
+          }
+          return uploadSendFile(file, req ? req.endpoint : "", req ? req.fieldName : "file");
+        }).catch(function () {
+          return { ok: false, status: 0, body: "", contentType: null };
+        });
         sender.then(function (outcome) {
           try {
             app.ports.uploadDone.send({
@@ -10004,6 +10064,801 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* ── v3/gap-convo ─────────────────────────────────────────────────
+     Conversation gaps closed ports-side:
+       - photo privacy: every staged image is sniffed by its BYTES (never
+         its name or MIME) and cleaned before it can be posted — JPEG
+         (APP1 EXIF/XMP, APP12/13, COM, non-ICC APP2 incl. MPF, and every
+         byte after the first EOI; a minimal Orientation-only EXIF is
+         re-written so the photo still displays upright), PNG (allowlist
+         of rendering chunks; text/eXIf/unknown ancillary chunks and
+         trailing bytes drop), WebP (EXIF / XMP chunks and their VP8X
+         flags), HEIF/HEIC/AVIF (Exif and XMP items zero-filled in place
+         via iinf/iloc, offsets untouched). TIFF-family files (DNG, most
+         camera raws) cannot be cleaned here. Anything that cannot be
+         parsed FAILS CLOSED: the upload is refused (`gapPhotoRefused`)
+         unless the user explicitly chose to keep the metadata.
+       - Compact: an opt-in recompressed JPEG (1600px edge, q0.72),
+         offered only when it is actually smaller.
+       - paste / drag-and-drop staging (never sends).
+       - owner-scoped composer drafts (`onyx:composer-drafts:owner:…`,
+         the oracle journal shape), debounced + write-verified.
+       - message landing ("message" scroll action, see the scroller),
+         menu / picker / search focus management. */
+
+  var GAP_HEIF_BRANDS = ["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1", "mif2", "avif", "avis"];
+
+  function gapAscii(b, at, len) {
+    var s = "";
+    for (var i = 0; i < len; i += 1) {
+      var c = b[at + i];
+      s += String.fromCharCode(c === undefined ? 0 : c);
+    }
+    return s;
+  }
+  function gapU16be(b, at) { return ((b[at] << 8) | b[at + 1]) >>> 0; }
+  function gapU32be(b, at) { return b[at] * 0x1000000 + ((b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]); }
+  function gapU32le(b, at) { return (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000; }
+
+  function gapConcat(parts) {
+    var total = 0;
+    for (var i = 0; i < parts.length; i += 1) total += parts[i].length;
+    var out = new Uint8Array(total);
+    var at = 0;
+    for (var j = 0; j < parts.length; j += 1) { out.set(parts[j], at); at += parts[j].length; }
+    return out;
+  }
+
+  /* Container by magic bytes: jpeg | png | webp | heif | tiff | null. */
+  function gapSniff(b) {
+    if (!b || b.length < 4) return null;
+    if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return "jpeg";
+    if (b.length >= 8 && b[0] === 0x89 && gapAscii(b, 1, 3) === "PNG" && b[4] === 0x0D && b[5] === 0x0A && b[6] === 0x1A && b[7] === 0x0A) return "png";
+    if (b.length >= 12 && gapAscii(b, 0, 4) === "RIFF" && gapAscii(b, 8, 4) === "WEBP") return "webp";
+    if (b.length >= 16 && gapAscii(b, 4, 4) === "ftyp") {
+      var size = gapU32be(b, 0);
+      var end = Math.min(b.length, size >= 16 ? size : 16);
+      if (GAP_HEIF_BRANDS.indexOf(gapAscii(b, 8, 4)) >= 0) return "heif";
+      for (var at = 16; at + 4 <= end; at += 4) {
+        if (GAP_HEIF_BRANDS.indexOf(gapAscii(b, at, 4)) >= 0) return "heif";
+      }
+      return null;
+    }
+    if ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2A && b[3] === 0x00) ||
+        (b[0] === 0x4D && b[1] === 0x4D && b[2] === 0x00 && b[3] === 0x2A)) return "tiff";
+    return null;
+  }
+
+  /* EXIF Orientation (1..8) from one APP1 TIFF block, else 0. */
+  function gapExifOrientation(b, tiff, end) {
+    if (tiff + 8 > end) return 0;
+    var le = b[tiff] === 0x49 && b[tiff + 1] === 0x49;
+    var be = b[tiff] === 0x4D && b[tiff + 1] === 0x4D;
+    if (!le && !be) return 0;
+    function u16(at) { return le ? (b[at] | (b[at + 1] << 8)) : ((b[at] << 8) | b[at + 1]); }
+    function u32(at) {
+      return le ? (b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000
+                : b[at] * 0x1000000 + ((b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]);
+    }
+    if (u16(tiff + 2) !== 42) return 0;
+    var ifd = tiff + u32(tiff + 4);
+    if (ifd + 2 > end) return 0;
+    var count = u16(ifd);
+    for (var n = 0; n < count; n += 1) {
+      var e = ifd + 2 + n * 12;
+      if (e + 12 > end) return 0;
+      if (u16(e) === 0x0112) {
+        if (u16(e + 2) !== 3) return 0;
+        var v = u16(e + 8);
+        return (v >= 1 && v <= 8) ? v : 0;
+      }
+    }
+    return 0;
+  }
+
+  /* The only EXIF a cleaned JPEG keeps: one big-endian IFD0 entry,
+     Orientation = v (36 bytes). */
+  function gapOrientationApp1(v) {
+    return new Uint8Array([
+      0xFF, 0xE1, 0x00, 0x22,
+      0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+      0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,
+      0x00, 0x01,
+      0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, v, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00
+    ]);
+  }
+
+  /* { bytes, removed } or null (cannot be cleaned: refuse). */
+  function gapStripJpeg(b) {
+    if (gapSniff(b) !== "jpeg") return null;
+    var out = [b.subarray(0, 2)];
+    var removed = false;
+    var orientation = 0;
+    var insertAt = 1;
+    var sawScan = false;
+    var i = 2;
+    while (i < b.length) {
+      if (b[i] !== 0xFF) return null;
+      var j = i + 1;
+      while (j < b.length && b[j] === 0xFF) j += 1;
+      if (j >= b.length) return null;
+      var marker = b[j];
+      var start = j - 1;
+      if (marker === 0xD9) {
+        out.push(b.subarray(start, start + 2));
+        i = start + 2;
+        break;
+      }
+      if (marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
+        out.push(b.subarray(start, start + 2));
+        i = start + 2;
+        continue;
+      }
+      if (start + 4 > b.length) return null;
+      var len = gapU16be(b, start + 2);
+      var end = start + 2 + len;
+      if (len < 2 || end > b.length) return null;
+      if (marker === 0xDA) {
+        /* Scan header, then entropy-coded data up to the next real marker. */
+        var k = end;
+        while (k < b.length) {
+          if (b[k] === 0xFF && k + 1 < b.length) {
+            var m = b[k + 1];
+            if (m === 0x00 || (m >= 0xD0 && m <= 0xD7)) { k += 2; continue; }
+            if (m === 0xFF) { k += 1; continue; }
+            break;
+          }
+          k += 1;
+        }
+        out.push(b.subarray(start, k));
+        sawScan = true;
+        i = k;
+        if (k >= b.length) break;
+        continue;
+      }
+      var drop = false;
+      if (marker === 0xE1) {
+        if (orientation === 0 && gapAscii(b, start + 4, 6) === "Exif\u0000\u0000") {
+          orientation = gapExifOrientation(b, start + 10, end);
+        }
+        drop = true;
+      } else if (marker === 0xE2) {
+        drop = gapAscii(b, start + 4, 12) !== "ICC_PROFILE\u0000";
+      } else if (marker >= 0xE3 && marker <= 0xEF && marker !== 0xEE) {
+        drop = true;
+      } else if (marker === 0xFE) {
+        drop = true;
+      }
+      if (drop) {
+        removed = true;
+      } else {
+        out.push(b.subarray(start, end));
+        if (marker === 0xE0 && out.length === 2) insertAt = 2;
+      }
+      i = end;
+    }
+    if (!sawScan) return null;
+    if (i < b.length) removed = true;
+    if (orientation > 1) out.splice(insertAt, 0, gapOrientationApp1(orientation));
+    return { bytes: gapConcat(out), removed: removed };
+  }
+
+  var GAP_PNG_KEEP = {
+    IHDR: 1, PLTE: 1, IDAT: 1, IEND: 1, tRNS: 1, gAMA: 1, cHRM: 1, sRGB: 1, iCCP: 1,
+    sBIT: 1, bKGD: 1, pHYs: 1, hIST: 1, sPLT: 1, acTL: 1, fcTL: 1, fdAT: 1, cICP: 1, mDCv: 1, cLLi: 1
+  };
+
+  function gapStripPng(b) {
+    if (gapSniff(b) !== "png") return null;
+    var out = [b.subarray(0, 8)];
+    var removed = false;
+    var sawEnd = false;
+    var i = 8;
+    while (i + 12 <= b.length) {
+      var len = gapU32be(b, i);
+      var type = gapAscii(b, i + 4, 4);
+      var end = i + 12 + len;
+      if (end > b.length || !/^[A-Za-z]{4}$/.test(type)) return null;
+      var critical = type.charCodeAt(0) < 97;
+      if (critical || GAP_PNG_KEEP[type]) out.push(b.subarray(i, end));
+      else removed = true;
+      i = end;
+      if (type === "IEND") { sawEnd = true; break; }
+    }
+    if (!sawEnd) return null;
+    if (i < b.length) removed = true;
+    return { bytes: gapConcat(out), removed: removed };
+  }
+
+  var GAP_WEBP_KEEP = { "VP8 ": 1, "VP8L": 1, "VP8X": 1, "ALPH": 1, "ANIM": 1, "ANMF": 1, "ICCP": 1 };
+
+  function gapStripWebp(b) {
+    if (gapSniff(b) !== "webp") return null;
+    var riffEnd = 8 + gapU32le(b, 4);
+    if (riffEnd > b.length || riffEnd < 12) return null;
+    var parts = [];
+    var removed = riffEnd < b.length;
+    var i = 12;
+    while (i + 8 <= riffEnd) {
+      var type = gapAscii(b, i, 4);
+      var len = gapU32le(b, i + 4);
+      if (i + 8 + len > riffEnd) return null;
+      var end = Math.min(riffEnd, i + 8 + len + (len & 1));
+      if (GAP_WEBP_KEEP[type]) {
+        var chunk = b.slice(i, end);
+        if (type === "VP8X" && chunk.length > 8) chunk[8] = chunk[8] & ~(0x08 | 0x04);
+        parts.push(chunk);
+      } else {
+        removed = true;
+      }
+      i = end;
+    }
+    if (i !== riffEnd) return null;
+    var body = gapConcat(parts);
+    var head = new Uint8Array(12);
+    head.set([0x52, 0x49, 0x46, 0x46], 0);
+    var size = body.length + 4;
+    head[4] = size & 0xFF; head[5] = (size >>> 8) & 0xFF; head[6] = (size >>> 16) & 0xFF; head[7] = (size >>> 24) & 0xFF;
+    head.set([0x57, 0x45, 0x42, 0x50], 8);
+    return { bytes: gapConcat([head, body]), removed: removed };
+  }
+
+  /* ISO-BMFF boxes in [start, end): [{ type, start, body, end }] or null. */
+  function gapBoxes(b, start, end) {
+    var boxes = [];
+    var i = start;
+    while (i + 8 <= end) {
+      var size = gapU32be(b, i);
+      var type = gapAscii(b, i + 4, 4);
+      var header = 8;
+      if (size === 1) {
+        if (i + 16 > end) return null;
+        size = gapU32be(b, i + 8) * 4294967296 + gapU32be(b, i + 12);
+        header = 16;
+      } else if (size === 0) {
+        size = end - i;
+      }
+      if (size < header || i + size > end) return null;
+      boxes.push({ type: type, start: i, body: i + header, end: i + size });
+      i += size;
+    }
+    return i === end ? boxes : null;
+  }
+
+  function gapFind(boxes, type) {
+    for (var i = 0; i < boxes.length; i += 1) if (boxes[i].type === type) return boxes[i];
+    return null;
+  }
+
+  function gapReadN(b, at, n) {
+    if (n === 0) return 0;
+    if (n === 4) return gapU32be(b, at);
+    if (n === 8) return gapU32be(b, at) * 4294967296 + gapU32be(b, at + 4);
+    return NaN;
+  }
+
+  function gapCString(b, at, end) {
+    var s = "";
+    while (at < end && b[at] !== 0) { s += String.fromCharCode(b[at]); at += 1; }
+    return { text: s, next: at + 1 };
+  }
+
+  /* HEIF/HEIC/AVIF: zero-fill every Exif / XMP item in place. */
+  function gapStripHeif(b) {
+    if (gapSniff(b) !== "heif") return null;
+    var top = gapBoxes(b, 0, b.length);
+    if (!top) return null;
+    var meta = gapFind(top, "meta");
+    if (!meta) return null;
+    var kids = gapBoxes(b, meta.body + 4, meta.end);
+    if (!kids) return null;
+    var iinf = gapFind(kids, "iinf");
+    var iloc = gapFind(kids, "iloc");
+    var idat = gapFind(kids, "idat");
+    if (!iinf || !iloc) return null;
+
+    var targets = {};
+    var targetCount = 0;
+    var iv0 = b[iinf.body];
+    var infeStart = iinf.body + 4 + (iv0 === 0 ? 2 : 4);
+    var infes = gapBoxes(b, infeStart, iinf.end);
+    if (!infes) return null;
+    for (var n = 0; n < infes.length; n += 1) {
+      var infe = infes[n];
+      if (infe.type !== "infe") continue;
+      var iv = b[infe.body];
+      if (iv < 2) return null;
+      var q = infe.body + 4;
+      var id = iv === 2 ? gapU16be(b, q) : gapU32be(b, q);
+      q += (iv === 2 ? 2 : 4) + 2;
+      var itemType = gapAscii(b, q, 4);
+      q += 4;
+      if (itemType === "Exif") {
+        targets[id] = true; targetCount += 1;
+      } else if (itemType === "mime") {
+        var name = gapCString(b, q, infe.end);
+        var contentType = gapCString(b, name.next, infe.end).text.toLowerCase();
+        if (contentType.indexOf("xml") >= 0 || contentType.indexOf("xmp") >= 0) { targets[id] = true; targetCount += 1; }
+      }
+    }
+    if (targetCount === 0) return { bytes: b, removed: false };
+
+    var lv = b[iloc.body];
+    var r = iloc.body + 4;
+    var offSize = b[r] >> 4;
+    var lenSize = b[r] & 15;
+    var baseSize = b[r + 1] >> 4;
+    var idxSize = (lv === 1 || lv === 2) ? (b[r + 1] & 15) : 0;
+    r += 2;
+    var items = lv < 2 ? gapU16be(b, r) : gapU32be(b, r);
+    r += lv < 2 ? 2 : 4;
+    var ranges = [];
+    var located = {};
+    for (var it = 0; it < items; it += 1) {
+      if (r > iloc.end) return null;
+      var itemId = lv < 2 ? gapU16be(b, r) : gapU32be(b, r);
+      r += lv < 2 ? 2 : 4;
+      var method = 0;
+      if (lv === 1 || lv === 2) { method = gapU16be(b, r) & 15; r += 2; }
+      var dref = gapU16be(b, r);
+      r += 2;
+      var base = gapReadN(b, r, baseSize);
+      r += baseSize;
+      var extents = gapU16be(b, r);
+      r += 2;
+      for (var e = 0; e < extents; e += 1) {
+        if (idxSize) r += idxSize;
+        var off = gapReadN(b, r, offSize);
+        r += offSize;
+        var len = gapReadN(b, r, lenSize);
+        r += lenSize;
+        if (!targets[itemId]) continue;
+        if (dref !== 0 || method === 2 || !(len > 0) || isNaN(off) || isNaN(base)) return null;
+        var abs = method === 0 ? base + off : (idat ? idat.body + base + off : -1);
+        var limit = method === 0 ? b.length : (idat ? idat.end : -1);
+        if (abs < 0 || abs + len > limit) return null;
+        ranges.push([abs, len]);
+        located[itemId] = true;
+      }
+    }
+    if (r > iloc.end) return null;
+    for (var key in targets) {
+      if (Object.prototype.hasOwnProperty.call(targets, key) && !located[key]) return null;
+    }
+    var copy = b.slice();
+    for (var z = 0; z < ranges.length; z += 1) copy.fill(0, ranges[z][0], ranges[z][0] + ranges[z][1]);
+    return { bytes: copy, removed: true };
+  }
+
+  /* { kind, metadata: removed|none|unsafe, bytes|null }. Non-images pass. */
+  function gapCleanBytes(b) {
+    var kind = gapSniff(b);
+    if (!kind) return { kind: "file", metadata: "none", bytes: b };
+    var res = null;
+    try {
+      if (kind === "jpeg") res = gapStripJpeg(b);
+      else if (kind === "png") res = gapStripPng(b);
+      else if (kind === "webp") res = gapStripWebp(b);
+      else if (kind === "heif") res = gapStripHeif(b);
+    } catch (err) { res = null; }
+    if (!res) return { kind: kind, metadata: "unsafe", bytes: null };
+    if (!res.removed) return { kind: kind, metadata: "none", bytes: b };
+    return { kind: kind, metadata: "removed", bytes: res.bytes };
+  }
+
+  function gapReadBytes(file) {
+    if (!file) return Promise.reject(new Error("no file"));
+    if (typeof file.arrayBuffer === "function") {
+      return file.arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(new Uint8Array(reader.result)); };
+        reader.onerror = function () { reject(reader.error); };
+        reader.readAsArrayBuffer(file);
+      } catch (err) { reject(err); }
+    });
+  }
+
+  function gapMakeFile(bytes, like, name, type) {
+    var fileName = name || (like && like.name) || "photo";
+    var mime = type || (like && like.type) || "application/octet-stream";
+    try {
+      return new File([bytes], fileName, { type: mime, lastModified: (like && like.lastModified) || Date.now() });
+    } catch (err) {
+      var blob = new Blob([bytes], { type: mime });
+      try { blob.name = fileName; } catch (ignored) { /* read-only */ }
+      return blob;
+    }
+  }
+
+  /* Opt-in Compact copy: a re-encoded JPEG carries no metadata at all.
+     Offered only when the browser can decode it and it is smaller. */
+  function gapCompact(file, kind, bytes) {
+    if (!file || kind === "file" || kind === "tiff") return Promise.resolve(null);
+    if (kind === "webp" && bytes && gapAscii(bytes, 12, 4) === "VP8X" && (bytes[20] & 0x02)) return Promise.resolve(null);
+    if (typeof createImageBitmap !== "function" || typeof document === "undefined") return Promise.resolve(null);
+    return createImageBitmap(file).then(function (bitmap) {
+      var maxEdge = 1600;
+      var scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height, 1));
+      var width = Math.max(1, Math.round(bitmap.width * scale));
+      var height = Math.max(1, Math.round(bitmap.height * scale));
+      var canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      var ctx = canvas.getContext("2d");
+      if (!ctx) { if (bitmap.close) bitmap.close(); return null; }
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      if (bitmap.close) bitmap.close();
+      return new Promise(function (resolve) {
+        try { canvas.toBlob(function (blob) { resolve(blob); }, "image/jpeg", 0.72); } catch (err) { resolve(null); }
+      });
+    }).then(function (blob) {
+      if (!blob || !(blob.size < file.size)) return null;
+      var base = String((file && file.name) || "photo").replace(/\.[^.]+$/, "") || "photo";
+      return gapMakeFile(blob, null, base + ".jpg", "image/jpeg");
+    }).catch(function () { return null; });
+  }
+
+  /* One file's cleaning, as a promise of { kind, metadata, clean, compact }. */
+  function gapPrepareFile(file) {
+    return gapReadBytes(file).then(function (bytes) {
+      var cleaned = gapCleanBytes(bytes);
+      var clean = null;
+      if (cleaned.bytes) clean = cleaned.bytes === bytes ? file : gapMakeFile(cleaned.bytes, file);
+      var result = { kind: cleaned.kind, metadata: cleaned.metadata, clean: clean, compact: null };
+      if (!clean) return result;
+      return gapCompact(clean, cleaned.kind, bytes).then(function (compact) {
+        result.compact = compact;
+        return result;
+      });
+    }).catch(function () {
+      return { kind: "file", metadata: "unsafe", clean: null, compact: null };
+    });
+  }
+
+  function createGapUploads(app) {
+    var prepared = {};
+    var variants = {};
+    function report(key, index, r) {
+      if (!app || !app.ports || !app.ports.gapPhotoPrepared) return;
+      if (r.kind === "file" && r.metadata !== "unsafe") return;
+      try {
+        app.ports.gapPhotoPrepared.send({
+          key: key,
+          index: index,
+          kind: r.kind,
+          metadata: r.metadata,
+          cleanBytes: r.clean ? r.clean.size : null,
+          compactBytes: r.compact ? r.compact.size : null
+        });
+      } catch (err) { /* port gone */ }
+    }
+    return {
+      prepare: function (key, files) {
+        prepared[key] = (files || []).map(function (file, index) {
+          var p = gapPrepareFile(file);
+          p.then(function (r) { report(key, index, r); });
+          return p;
+        });
+      },
+      setVariant: function (key, index, variant) {
+        if (variant === "clean" || variant === "compact" || variant === "original") variants[key + "#" + index] = variant;
+      },
+      /* Resolve to { file } or { refused: true } — the original bytes
+         leave only on the explicit "original" choice. */
+      resolve: function (key, index, file) {
+        if (!file) return Promise.resolve({ file: null });
+        var variant = variants[key + "#" + index] || "clean";
+        if (variant === "original") return Promise.resolve({ file: file });
+        var list = prepared[key];
+        var pending = (list && list[index]) || gapPrepareFile(file);
+        return pending.then(function (r) {
+          if (variant === "compact" && r.compact) return { file: r.compact };
+          if (!r.clean) return { refused: true };
+          return { file: r.clean };
+        });
+      },
+      forget: function (key) { delete prepared[key]; }
+    };
+  }
+
+  /* Paste / drop: files from a clipboard or a drop (items as fallback). */
+  function gapFilesFrom(data) {
+    if (!data) return [];
+    var out = [];
+    var list = data.files || [];
+    for (var i = 0; i < list.length; i += 1) out.push(list[i]);
+    if (out.length > 0) return out;
+    var items = data.items || [];
+    for (var j = 0; j < items.length; j += 1) {
+      var item = items[j];
+      if (item && item.kind === "file" && typeof item.getAsFile === "function") {
+        var f = item.getAsFile();
+        if (f) out.push(f);
+      }
+    }
+    return out;
+  }
+
+  function gapDragHasFiles(event) {
+    var dt = event && event.dataTransfer;
+    if (!dt) return false;
+    var types = dt.types || [];
+    for (var i = 0; i < types.length; i += 1) if (types[i] === "Files") return true;
+    return false;
+  }
+
+  function wireGapComposer(app, doc, held, uploads) {
+    if (!doc || typeof doc.addEventListener !== "function" || !app.ports.uploadPicked) return;
+    var seq = 0;
+    var dropTimer = null;
+    var dropOn = false;
+
+    function composerField() {
+      var field = doc.getElementById ? doc.getElementById("shell-composer-input") : null;
+      return field && !field.disabled ? field : null;
+    }
+    function setDrop(on) {
+      if (on === dropOn) return;
+      dropOn = on;
+      try { if (app.ports.gapDropActive) app.ports.gapDropActive.send(on); } catch (err) { /* port gone */ }
+    }
+    function stage(files) {
+      if (!files.length || !composerField()) return false;
+      seq += 1;
+      var key = "drop-" + seq + "-" + Date.now().toString(36);
+      held[key] = files;
+      uploads.prepare(key, files);
+      try {
+        app.ports.uploadPicked.send({
+          key: key,
+          files: files.map(function (f) { return { name: f.name || "", size: f.size || 0, mime: f.type || "" }; })
+        });
+      } catch (err) { /* port gone */ }
+      return true;
+    }
+
+    doc.addEventListener("paste", function (event) {
+      var field = composerField();
+      if (!field || event.target !== field) return;
+      var files = gapFilesFrom(event.clipboardData);
+      if (files.length === 0) return;
+      event.preventDefault();
+      stage(files);
+    });
+    doc.addEventListener("dragover", function (event) {
+      if (!gapDragHasFiles(event)) return;
+      /* Always claim a file drag so a miss never navigates away. */
+      event.preventDefault();
+      if (event.dataTransfer) {
+        try { event.dataTransfer.dropEffect = composerField() ? "copy" : "none"; } catch (err) { /* read-only */ }
+      }
+      if (composerField()) setDrop(true);
+      if (dropTimer) clearTimeout(dropTimer);
+      dropTimer = setTimeout(function () { setDrop(false); }, 250);
+    });
+    doc.addEventListener("drop", function (event) {
+      if (!gapDragHasFiles(event)) return;
+      event.preventDefault();
+      if (dropTimer) clearTimeout(dropTimer);
+      setDrop(false);
+      stage(gapFilesFrom(event.dataTransfer));
+    });
+    doc.addEventListener("dragend", function () { setDrop(false); });
+  }
+
+  /* Owner-scoped drafts journal (oracle `deviceMemoryStorageKey`). */
+  var GAP_DRAFTS_BASE = "onyx:composer-drafts";
+  var GAP_DRAFTS_MAX = 50;
+  var GAP_DRAFT_MAX_LEN = 8192;
+  var GAP_DRAFTS_MAX_CHARS = 3 * 1024 * 1024;
+
+  function gapDraftsKey(serverUrl, identity) {
+    if (typeof serverUrl !== "string" || !serverUrl || serverUrl.length > 2048 || serverUrl !== serverUrl.trim()) return null;
+    if (typeof identity !== "string" || !identity || identity.length > 256 || identity !== identity.trim()) return null;
+    try {
+      return GAP_DRAFTS_BASE + ":owner:" + encodeURIComponent(JSON.stringify([serverUrl, identity.toLowerCase()]));
+    } catch (err) { return null; }
+  }
+
+  function gapSanitizeDrafts(value) {
+    var out = {};
+    if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+    var count = 0;
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length && count < GAP_DRAFTS_MAX; i += 1) {
+      var key = String(keys[i]).trim().toLowerCase();
+      var draft = value[keys[i]];
+      if (!key || key.length > 256 || /[\s,\u0000-\u001f\u007f]/.test(key)) continue;
+      if (typeof draft !== "string" || draft.length === 0) continue;
+      out[key] = draft.slice(0, GAP_DRAFT_MAX_LEN);
+      count += 1;
+    }
+    return out;
+  }
+
+  function createGapDrafts(storage, sendSaved, schedule) {
+    var pending = null;
+    var timer = null;
+    var later = schedule || function (fn, ms) { return setTimeout(fn, ms); };
+    function write(req) {
+      var key = gapDraftsKey(req.serverUrl, req.identity);
+      if (!key || !storage) { sendSaved("only-in-tab"); return; }
+      var drafts = gapSanitizeDrafts(req.drafts);
+      try {
+        if (Object.keys(drafts).length === 0) {
+          storage.removeItem(key);
+          sendSaved(storage.getItem(key) === null ? "saved" : "only-in-tab");
+          return;
+        }
+        var text = JSON.stringify(drafts);
+        storage.setItem(key, text);
+        sendSaved(storage.getItem(key) === text ? "saved" : "only-in-tab");
+      } catch (err) { sendSaved("only-in-tab"); }
+    }
+    function flush() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (pending) { var req = pending; pending = null; write(req); }
+    }
+    return {
+      save: function (req) {
+        if (!req) return;
+        pending = req;
+        if (timer) clearTimeout(timer);
+        timer = later(flush, 300);
+      },
+      flush: flush,
+      load: function (serverUrl, identity) {
+        var key = gapDraftsKey(serverUrl, identity);
+        var result = { serverUrl: serverUrl, identity: identity, drafts: {}, status: "only-in-tab" };
+        if (!key || !storage) return result;
+        try {
+          var raw = storage.getItem(key);
+          if (!raw) { result.status = "saved"; return result; }
+          if (raw.length > GAP_DRAFTS_MAX_CHARS) { result.status = "malformed"; return result; }
+          result.drafts = gapSanitizeDrafts(JSON.parse(raw));
+          result.status = "saved";
+        } catch (err) { result.status = "malformed"; }
+        return result;
+      }
+    };
+  }
+
+  function gapStorage() {
+    try {
+      return (typeof window !== "undefined" && window.localStorage) ? window.localStorage : null;
+    } catch (err) { return null; }
+  }
+
+  /* Menus and panels keep the keyboard: the message menu focuses its
+     first item and roves with Arrow/Home/End; the reaction picker
+     focuses its search and roves its grid; the search panel focuses its
+     field. Each returns focus to where it came from when it closes and
+     focus would otherwise be lost. */
+  function installGapFocus(doc, Mutation) {
+    if (!doc || typeof doc.querySelector !== "function") return null;
+    var layers = [
+      { sel: ".onyx-msg-menu", first: '[role="menuitem"]:not([disabled])', open: false, back: null },
+      { sel: ".onyx-react-picker", first: ".onyx-react-search", open: false, back: null },
+      { sel: ".onyx-message-search", first: "#onyx-message-search-input", open: false, back: null }
+    ];
+    function focusEl(el) {
+      if (!el) return;
+      try { el.focus({ preventScroll: true }); } catch (err) { try { el.focus(); } catch (ignored) { /* best-effort */ } }
+    }
+    function settle() {
+      for (var i = 0; i < layers.length; i += 1) {
+        var layer = layers[i];
+        var node = doc.querySelector(layer.sel);
+        if (node && !layer.open) {
+          layer.open = true;
+          layer.back = doc.activeElement || null;
+          if (!node.contains(doc.activeElement)) focusEl(node.querySelector(layer.first));
+        } else if (!node && layer.open) {
+          layer.open = false;
+          var back = layer.back;
+          layer.back = null;
+          var active = doc.activeElement;
+          var lost = !active || active === doc.body || (typeof active.isConnected === "boolean" && !active.isConnected);
+          if (back && lost && back.isConnected) focusEl(back);
+        }
+      }
+    }
+    function rove(list, current, key, cols) {
+      var at = list.indexOf(current);
+      if (at < 0) return null;
+      var step = cols || 1;
+      if (key === "ArrowDown") return list[Math.min(list.length - 1, at + step)];
+      if (key === "ArrowUp") return at - step < 0 ? null : list[at - step];
+      if (key === "ArrowRight") return list[Math.min(list.length - 1, at + 1)];
+      if (key === "ArrowLeft") return list[Math.max(0, at - 1)];
+      if (key === "Home") return list[0];
+      if (key === "End") return list[list.length - 1];
+      return null;
+    }
+    function onKey(event) {
+      var key = event.key;
+      if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"].indexOf(key) < 0) return;
+      if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+      var target = event.target;
+      if (!target || typeof target.closest !== "function") return;
+      var menu = target.closest(".onyx-msg-menu");
+      if (menu) {
+        if (key === "ArrowLeft" || key === "ArrowRight") return;
+        var items = Array.prototype.slice.call(menu.querySelectorAll('[role="menuitem"]:not([disabled])'));
+        var next = rove(items, target, key, 1);
+        if (!next && key === "ArrowUp") next = items[items.length - 1];
+        if (!next && items.indexOf(target) < 0 && items.length) next = items[0];
+        if (next) { event.preventDefault(); focusEl(next); }
+        return;
+      }
+      var picker = target.closest(".onyx-react-picker");
+      if (picker) {
+        var choices = Array.prototype.slice.call(picker.querySelectorAll(".onyx-react-choice"));
+        if (!choices.length) return;
+        if (target.classList && target.classList.contains("onyx-react-search")) {
+          if (key === "ArrowDown") { event.preventDefault(); focusEl(choices[0]); }
+          return;
+        }
+        var top0 = choices[0].offsetTop;
+        var cols = 0;
+        for (var c = 0; c < choices.length && choices[c].offsetTop === top0; c += 1) cols += 1;
+        var moved = rove(choices, target, key, key === "ArrowDown" || key === "ArrowUp" ? Math.max(1, cols) : 1);
+        if (!moved && key === "ArrowUp") moved = picker.querySelector(".onyx-react-search");
+        if (moved) { event.preventDefault(); focusEl(moved); }
+      }
+    }
+    doc.addEventListener("keydown", onKey);
+    if (Mutation) {
+      try {
+        new Mutation(function () { settle(); }).observe(doc.body || doc.documentElement, { childList: true, subtree: true });
+      } catch (err) { /* observation unavailable */ }
+    }
+    return { settle: settle, onKey: onKey };
+  }
+
+  function wireGapConvo(app, held) {
+    var doc = typeof document !== "undefined" ? document : null;
+    var uploads = createGapUploads(app);
+    if (app.ports.gapUploadVariant) {
+      app.ports.gapUploadVariant.subscribe(function (req) {
+        if (req && typeof req.key === "string" && typeof req.index === "number") uploads.setVariant(req.key, req.index, req.variant);
+      });
+    }
+    var drafts = createGapDrafts(gapStorage(), function (status) {
+      try { if (app.ports.gapDraftsSaved) app.ports.gapDraftsSaved.send(status); } catch (err) { /* port gone */ }
+    });
+    if (app.ports.gapDraftsSave) {
+      app.ports.gapDraftsSave.subscribe(function (req) { drafts.save(req); });
+    }
+    /* The owner-transition request every owned journal rides. */
+    if (app.ports.topicReadRequest && app.ports.gapDraftsLoaded) {
+      app.ports.topicReadRequest.subscribe(function (req) {
+        if (!req) return;
+        drafts.flush();
+        try { app.ports.gapDraftsLoaded.send(drafts.load(req.serverUrl, req.identity)); } catch (err) { /* port gone */ }
+      });
+    }
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("pagehide", function () { drafts.flush(); });
+      if (doc) {
+        doc.addEventListener("visibilitychange", function () {
+          if (doc.visibilityState === "hidden") drafts.flush();
+        });
+      }
+    }
+    wireGapComposer(app, doc, held, uploads);
+    if (doc) {
+      try { installGapFocus(doc, typeof MutationObserver !== "undefined" ? MutationObserver : null); } catch (err) { /* best-effort */ }
+    }
+    return uploads;
+  }
+
   if (global.document && global.visualViewport) {
     try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
   }
@@ -10156,6 +11011,23 @@ function fetchPublicFeed(url) {
     installVoicePipAssist: installVoicePipAssist,
     installOverlayFocusOnce: installOverlayFocusOnce,
     wireShortcuts: wireShortcuts,
+    /* v3/gap-convo */
+    gapConvo: {
+      sniff: gapSniff,
+      clean: gapCleanBytes,
+      stripJpeg: gapStripJpeg,
+      stripPng: gapStripPng,
+      stripWebp: gapStripWebp,
+      stripHeif: gapStripHeif,
+      exifOrientation: gapExifOrientation,
+      prepareFile: gapPrepareFile,
+      createUploads: createGapUploads,
+      draftsKey: gapDraftsKey,
+      sanitizeDrafts: gapSanitizeDrafts,
+      createDrafts: createGapDrafts,
+      filesFrom: gapFilesFrom,
+      installFocus: installGapFocus
+    },
     /* v3/polish */
     polishFlags: polishFlags,
     wirePolish: wirePolish,

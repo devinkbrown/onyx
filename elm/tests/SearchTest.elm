@@ -778,7 +778,8 @@ suite =
                         [ \_ -> Expect.equal True opened.searchOpen
                         , \_ -> Expect.equal "moon" opened.searchQuery
                         , \_ -> Expect.equal "" opened.composer
-                        , \_ -> Expect.equal [] out
+                        , -- v3/gap-convo: only the quiet scroll to the active match goes out
+                          \_ -> Expect.equal [] (List.filter (\o -> o /= TranscriptScroll { action = "message-quiet", key = "r:2" }) out)
                         ]
                         ()
             , test "multi-word tails join and verbs match case-insensitively" <|
@@ -808,7 +809,8 @@ suite =
                         , \_ -> Expect.equal 0 opened.searchIndex
                         , \_ -> Expect.equal "" opened.composer
                         , \_ -> Expect.equal 2 (List.length (searchResults opened))
-                        , \_ -> Expect.equal [] out
+                        , -- v3/gap-convo: only the quiet scroll to the active match goes out
+                          \_ -> Expect.equal [] (List.filter (\o -> o /= TranscriptScroll { action = "message-quiet", key = "r:3" }) out)
                         ]
                         ()
             ]
