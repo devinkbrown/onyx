@@ -7,8 +7,8 @@
  * removed from the CSSOM, the computed style of the elements it matches is compared with
  * and without it, and the rule is put back. One JSON per page goes to $CSS_INERT_OUT.
  */
+/* global CSS, getComputedStyle */
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 
 import appearance from './screens-appearance.mjs';
 import calls from './screens-calls.mjs';

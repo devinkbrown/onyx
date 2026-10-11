@@ -4,8 +4,6 @@
 export function parseCss(src) {
   let i = 0;
   const n = src.length;
-  const lineOf = (off) => { let l = 1; for (let k = 0; k < off; k += 1) if (src.charCodeAt(k) === 10) l += 1; return l; };
-  // faster line lookup
   const nl = []; for (let k = 0; k < n; k += 1) if (src.charCodeAt(k) === 10) nl.push(k);
   const line = (off) => { let lo = 0; let hi = nl.length; while (lo < hi) { const m = (lo + hi) >> 1; if (nl[m] < off) lo = m + 1; else hi = m; } return lo + 1; };
   function skipComment() { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; }
@@ -36,7 +34,7 @@ export function parseCss(src) {
       const text = src.slice(p, endAt);
       const colon = text.indexOf(':');
       if (colon > 0) {
-        const prop = text.slice(0, colon).trim(); let value = text.slice(colon + 1).trim();
+        const prop = text.slice(0, colon).trim(); const value = text.slice(colon + 1).trim();
         const important = /!\s*important\s*$/i.test(value);
         decls.push({ prop, value, important, start: p, end: stop < bodyEnd ? stop + 1 : endAt, line: line(p) });
       }

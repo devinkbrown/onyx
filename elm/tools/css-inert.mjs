@@ -26,8 +26,8 @@
  * matched it and how many used it; --json writes the inert list as
  * {file, line, prop} for a pruning pass.
  */
-import { spawn, execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, copyFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -108,6 +108,13 @@ if (cmd === 'probe') {
       inert.push({ file: rel, line: decl ? decl.line : rule.line, rule: rule.line, sel: rule.selector.replace(/\s+/g, ' ').slice(0, 80), prop, declProp: decl ? decl.prop : prop, pages: a.pages, overridden: a.ovr, scenarios: a.scen.size });
     }
   }
+  // whole rules: matched on enough pages, never effective for ANY property, overridden for at least one
+  const byRule = new Map();
+  for (const [k, a] of agg) { const i = Number(k.split('|')[0]); const r = byRule.get(i) || { pages: 0, eff: 0, ovr: 0, scen: new Set(), props: 0 }; r.pages = Math.max(r.pages, a.pages); r.eff += a.eff; r.ovr += a.ovr; for (const s of a.scen) r.scen.add(s); r.props += 1; byRule.set(i, r); }
+  const wholeRules = [];
+  for (const [i, r] of byRule) if (r.eff === 0 && r.ovr >= 1 && r.pages >= minPages && r.scen.size >= 2 && rules[i]) wholeRules.push({ file: rel, line: rules[i].line, sel: rules[i].selector.replace(/\s+/g, ' ').slice(0, 90), decls: rules[i].decls.length, pages: r.pages, scenarios: r.scen.size });
+  console.log(`${file}: ${wholeRules.length} whole rules inert (${wholeRules.reduce((n, r) => n + r.decls, 0)} declarations)`);
+  const wj = flag('--whole-json', ''); if (wj) writeFileSync(wj, JSON.stringify(wholeRules, null, 1));
   console.log(`${file}: ${rules.length} rules; ${seenDecls} (rule,property) pairs observed; ${inert.length} inert (>= ${minPages} pages, >= 2 scenarios)`);
   const j = flag('--json', '');
   if (j) writeFileSync(j, JSON.stringify(inert, null, 1));
