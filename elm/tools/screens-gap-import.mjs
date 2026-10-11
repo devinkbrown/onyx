@@ -13,7 +13,7 @@
  * local fake IRC server; structured messages are injected through a
  * Playwright WebSocket route.
  */
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,7 +37,13 @@ async function boot(page, h) {
 }
 
 async function openTransfer(page, h) {
-  await h.tryClick(page, '[data-testid="you-open"]');
+  // Phone rooms hide the top bar: step back to the list, then use the bottom nav.
+  if (await page.isVisible('[data-testid="you-open"]')) {
+    await h.tryClick(page, '[data-testid="you-open"]');
+  } else {
+    await h.tryClick(page, '[data-testid="room-back"]');
+    await h.tryClick(page, '[data-testid="nav-you"]:visible');
+  }
   await h.tryClick(page, '[data-testid="you-settings-open-preferences"]');
   await h.tryClick(page, '#pref-category-tab-transfer');
   await h.settle(page, 300);
@@ -80,6 +86,30 @@ function wideExport() {
   return files;
 }
 
+/** A ~24 MB WeeChat-style log (350k lines) for the "big file" scenarios. */
+function bigLog() {
+  const dir = mkdtempSync(join(tmpdir(), 'onyx-gi-big-'));
+  const file = join(dir, 'irc.synthnet.#biglog.weechatlog');
+  const nicks = ['ana', 'bo', 'cy', 'dee', 'eli'];
+  const parts = [];
+  for (let i = 0; i < 350000; i += 1) {
+    const t = new Date(Date.UTC(2023, 0, 1, 0, 0, 0) + i * 60000).toISOString().replace('T', ' ').slice(0, 19);
+    parts.push(`${t}\t${nicks[i % 5]}\tsynthetic line number ${i} with some padding text to look like chat`);
+  }
+  writeFileSync(file, parts.join('\n') + '\n');
+  return file;
+}
+
+/** Longest gap between animation frames while an import runs (UI freeze probe). */
+async function probeFrames(page) {
+  await page.evaluate(() => {
+    window.__gaps = [];
+    let last = performance.now();
+    const tick = () => { const n = performance.now(); window.__gaps.push(n - last); last = n; requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+}
+
 async function stage(page, h, source, paths) {
   await page.click(`#history-import-source-${source}`);
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-testid="history-import-choose"]')]);
@@ -118,7 +148,7 @@ const DETAILS = {
 const block = (b) => `[onyx:block] ${JSON.stringify(b)}`;
 const lines = () => [
   `@time=${T(3)};msgid=b1 :ash!a@${NET} PRIVMSG ${ROOM} :${block(DEPLOY)}`,
-  `@time=${T(2.5)};msgid=b2 :nova!n@${NET} PRIVMSG ${ROOM} :heads up — ${block(ELSEWHERE)}`,
+  `@time=${T(2.5)};msgid=b2 :nova!n@${NET} PRIVMSG ${ROOM} :${block(ELSEWHERE)}`,
   `@time=${T(2)};msgid=b3 :sol!s@${NET} PRIVMSG ${ROOM} :${block(DETAILS)}`,
   // hostile / invalid: stays plain text
   `@time=${T(1.5)};msgid=b4 :rue!r@${NET} PRIVMSG ${ROOM} :[onyx:block] {"title":"x","buttons":[{"label":"Go","url":"javascript:alert(1)"}]}`,
@@ -184,6 +214,22 @@ export default {
     await page.waitForSelector('[data-testid="history-import-batch"]', { timeout: 8000 });
     await page.click('[data-testid="history-import-batch"] button');
     await h.settle(page, 300);
+  },
+  'gi-big': async (page, h) => {
+    await boot(page, h); await openTransfer(page, h);
+    await page.click('#history-import-source-irc');
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-testid="history-import-choose"]')]);
+    await chooser.setFiles([bigLog()]);
+    await page.waitForSelector('[role="progressbar"]', { timeout: 8000 }).catch(() => {});
+    await h.settle(page, 120);
+  },
+  'gi-big-review': async (page, h) => {
+    await boot(page, h); await openTransfer(page, h);
+    await probeFrames(page);
+    const started = Date.now();
+    await stage(page, h, 'irc', [bigLog()]);
+    const gaps = await page.evaluate(() => window.__gaps);
+    console.log(`BIG-IMPORT ${page.viewportSize().width}px: review in ${Date.now() - started}ms, longest frame gap ${Math.round(Math.max(...gaps))}ms over ${gaps.length} frames`);
   },
   'gi-block': async (page, h) => { await room(page, h); await scrollToCards(page); await h.settle(page, 200); },
   'gi-block-copied': async (page, h) => {

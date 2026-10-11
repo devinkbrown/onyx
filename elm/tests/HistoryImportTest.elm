@@ -68,7 +68,7 @@ sample job =
 
 ctx : HistoryImport.Ctx
 ctx =
-    { nowMs = 1700000000000, owner = Just "srv|ana" }
+    { nowMs = 1700000000000, owner = Just "srv|ana", keepFor = \_ -> 400, maxAgeDays = Nothing }
 
 
 run : List Msg -> HistoryImport.State -> ( HistoryImport.State, List Effect )
@@ -288,12 +288,73 @@ suite =
                         p =
                             case (Tuple.first (run [ SetDest "discord:2" "#general" ] reviewing)).phase of
                                 Reviewing staged ->
-                                    HistoryImport.plan (Tuple.first (run [ SetDest "discord:2" "#general" ] reviewing)) staged
+                                    HistoryImport.plan ctx (Tuple.first (run [ SetDest "discord:2" "#general" ] reviewing)) staged
 
                                 _ ->
-                                    HistoryImport.plan reviewing { job = 0, source = Discord, label = "", files = 0, rejectedFiles = 0, skipped = 0, systemSkipped = 0, duplicatesInFile = 0, droppedOverCap = 0, overBudget = 0, datesEstimated = False, invalid = 0, conversations = [] }
+                                    HistoryImport.plan ctx reviewing { job = 0, source = Discord, label = "", files = 0, rejectedFiles = 0, skipped = 0, systemSkipped = 0, duplicatesInFile = 0, droppedOverCap = 0, overBudget = 0, datesEstimated = False, invalid = 0, conversations = [] }
                     in
                     Expect.equal ( p.targets, List.map (.rows >> List.map .id) p.persists ) ( [ "#general" ], [ [ "d:1", "d:3", "d:4" ] ] )
+            , test "retention keeps the newest rows per destination and counts the rest" <|
+                \_ ->
+                    let
+                        capped =
+                            { ctx | keepFor = \_ -> 2 }
+
+                        staged =
+                            decoded (sample 1)
+
+                        p =
+                            HistoryImport.plan capped (Tuple.first (run [ SetDest "discord:2" "#general" ] reviewing)) staged
+                    in
+                    Expect.equal ( List.map (.rows >> List.map .id) p.persists, p.written, p.trimmed ) ( [ [ "d:3", "d:4" ] ], 2, 1 )
+            , test "retention honours a per-conversation override" <|
+                \_ ->
+                    let
+                        limits =
+                            { ctx | keepFor = \t -> if t == "bo" then 0 else 400 }
+
+                        p =
+                            HistoryImport.plan limits reviewing (decoded (sample 1))
+                    in
+                    Expect.equal ( p.targets, p.written, p.trimmed ) ( [ "#general" ], 2, 1 )
+            , test "an age cutoff drops rows older than it" <|
+                \_ ->
+                    let
+                        day =
+                            86400000
+
+                        old =
+                            payload 1 "discord" [ conversation "a" "#a" False [ row "old" 1000 False, row "fresh" (1700000000000 - 2 * day) False ] ]
+
+                        withAge =
+                            { ctx | maxAgeDays = Just 30 }
+
+                        p =
+                            HistoryImport.plan withAge reviewing (decoded old)
+                    in
+                    Expect.equal ( List.map (.rows >> List.map .id) p.persists, p.trimmed ) ( [ [ "fresh" ] ], 1 )
+            , test "an import that retention would empty says so and writes nothing" <|
+                \_ ->
+                    let
+                        none =
+                            { ctx | keepFor = \_ -> 0 }
+
+                        ( s, effects ) =
+                            HistoryImport.update none Confirm reviewing
+                    in
+                    Expect.equal
+                        ( List.filter isPersist effects, Maybe.map .failure s.status )
+                        ( [], Just False )
+            , test "the confirmed batch counts only what is written" <|
+                \_ ->
+                    let
+                        capped =
+                            { ctx | keepFor = \_ -> 1 }
+
+                        ( s, _ ) =
+                            HistoryImport.update capped Confirm reviewing
+                    in
+                    Expect.equal (Maybe.map .messages s.lastBatch) (Just 2)
             , test "everything already present writes nothing" <|
                 \_ ->
                     let
@@ -311,8 +372,11 @@ suite =
                         many =
                             payload 1 "discord" [ conversation "a" "#a" False (List.map (\i -> row ("r" ++ String.fromInt i) (i + 1) False) (List.range 1 1000)) ]
 
+                        roomy =
+                            { ctx | keepFor = \_ -> 5000 }
+
                         ( _, effects ) =
-                            run [ Choose Discord, GotStaged many, Confirm ] HistoryImport.blank
+                            List.foldl (\m ( s, es ) -> HistoryImport.update roomy m s |> Tuple.mapSecond ((++) es)) ( HistoryImport.blank, [] ) [ Choose Discord, GotStaged many, Confirm ]
                     in
                     Expect.equal
                         (List.filterMap
@@ -388,3 +452,23 @@ suite =
                 \_ -> Expect.equal [ HistoryImport.countLabel 1 "message", HistoryImport.countLabel 1234567 "message", HistoryImport.countLabel 0 "room" ] [ "1 message", "1,234,567 messages", "0 rooms" ]
             ]
         ]
+
+
+decoded : E.Value -> HistoryImport.Staged
+decoded value =
+    case HistoryImport.decodeStaged value of
+        Just staged ->
+            staged
+
+        Nothing ->
+            { job = 0, source = Discord, label = "", files = 0, rejectedFiles = 0, skipped = 0, systemSkipped = 0, duplicatesInFile = 0, droppedOverCap = 0, overBudget = 0, datesEstimated = False, invalid = 0, conversations = [] }
+
+
+isPersist : Effect -> Bool
+isPersist effect =
+    case effect of
+        Persist _ ->
+            True
+
+        _ ->
+            False

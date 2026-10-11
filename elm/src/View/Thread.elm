@@ -2312,7 +2312,7 @@ clippedReplyPreview : String -> String
 clippedReplyPreview text =
     let
         safe =
-            App.sanitizePersistedReplyPreviewText text
+            App.sanitizePersistedReplyPreviewText (BlockKit.summary text)
     in
     if String.length safe > 80 then
         String.left 80 safe ++ "…"

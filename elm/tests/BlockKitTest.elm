@@ -264,4 +264,20 @@ suite =
             , test "a stray clipboard result is ignored" <|
                 \_ -> Expect.equal (Tuple.first (BlockKit.update 0 (BlockKit.CopyResult { tag = "blockkit:zz", ok = True }) BlockKit.blank)) BlockKit.blank
             ]
+        , describe "summary (reply previews, pins)"
+            [ test "plain text is untouched" <|
+                \_ -> Expect.equal "hello [onyx] world" (BlockKit.summary "hello [onyx] world")
+            , test "a valid block reads as its title, never its JSON" <|
+                \_ ->
+                    Expect.equal "Structured message: Deploy"
+                        (BlockKit.summary (line (E.object [ ( "title", E.string "Deploy" ), ( "text", E.string "ok" ) ])))
+            , test "text before the block is kept" <|
+                \_ ->
+                    Expect.equal "see below · Structured message: Deploy"
+                        (BlockKit.summary ("see below\n" ++ line (E.object [ ( "title", E.string "Deploy" ) ])))
+            , test "a clipped (undecodable) payload still hides the JSON fragment" <|
+                \_ -> Expect.equal "Structured message" (BlockKit.summary "[onyx:block] {\"title\":\"Deploy\",\"fields\":[{\"lab")
+            , test "a marker in the middle of a sentence is not a block" <|
+                \_ -> Expect.equal "talking about [onyx:block] syntax" (BlockKit.summary "talking about [onyx:block] syntax")
+            ]
         ]

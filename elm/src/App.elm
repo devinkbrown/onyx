@@ -46286,6 +46286,8 @@ historyImportCtx : Model -> HistoryImport.Ctx
 historyImportCtx model =
     { nowMs = model.nowMs
     , owner = Maybe.map (\o -> o.serverUrl ++ "|" ++ o.identity) (deviceMemoryOwner model)
+    , keepFor = Retention.effectiveKeep model.retentionPolicy
+    , maxAgeDays = model.retentionPolicy.maxAgeDays
     }
 
 

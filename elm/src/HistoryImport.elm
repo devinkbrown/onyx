@@ -825,9 +825,17 @@ reviewTitleId =
     "history-import-review-title"
 
 
+{-| What `update` needs from the outside: the clock, the signed-in
+owner, and the device's history retention (the vault trims every
+conversation to it after each write, so an import larger than it would
+lose its oldest rows at once — the review must say so, and the plan
+never writes rows the vault would drop on the spot).
+-}
 type alias Ctx =
     { nowMs : Float
     , owner : Maybe String
+    , keepFor : String -> Int
+    , maxAgeDays : Maybe Float
     }
 
 
@@ -1139,6 +1147,7 @@ type alias Plan =
     { persists : List { target : String, rows : List Row }
     , written : Int
     , already : Int
+    , trimmed : Int
     , targets : List String
     , errors : List ( String, String )
     }
@@ -1147,9 +1156,14 @@ type alias Plan =
 {-| The writes a review produces: included conversations whose
 destination is valid, new rows only (already-present rows are never
 re-written), grouped by destination in time order, chunked. Any
-invalid included destination is reported and blocks the import. -}
-plan : State -> Staged -> Plan
-plan state staged =
+invalid included destination is reported and blocks the import.
+
+The device's retention applies per destination exactly as the vault's
+trim will (age cutoff, then the newest `keep`): rows beyond it are
+counted in `trimmed` and not written.
+-}
+plan : { a | nowMs : Float, keepFor : String -> Int, maxAgeDays : Maybe Float } -> State -> Staged -> Plan
+plan limits state staged =
     let
         step conversation acc =
             let
@@ -1183,19 +1197,40 @@ plan state staged =
         folded =
             List.foldl step { byTarget = Dict.empty, order = [], already = 0, errors = [] } staged.conversations
 
-        grouped =
+        cutoff =
+            Maybe.map (\days -> limits.nowMs - days * 86400000) limits.maxAgeDays
+
+        retained target rows =
+            let
+                inAge =
+                    case cutoff of
+                        Just c ->
+                            List.filter (\row -> toFloat row.at >= c) rows
+
+                        Nothing ->
+                            rows
+
+                ordered =
+                    List.sortWith (\a b -> compare ( a.at, a.id ) ( b.at, b.id )) inAge
+            in
+            List.drop (List.length ordered - max 0 (limits.keepFor target)) ordered
+
+        kept =
             List.filterMap
                 (\target ->
                     Dict.get target folded.byTarget
-                        |> Maybe.map (\rows -> ( target, List.sortBy .at rows ))
+                        |> Maybe.map (\rows -> ( target, List.length rows, retained target rows ))
                 )
                 folded.order
-                |> List.filter (not << List.isEmpty << Tuple.second)
+
+        grouped =
+            List.filter (\( _, _, rows ) -> not (List.isEmpty rows)) kept
     in
-    { persists = List.concatMap (\( target, rows ) -> List.map (\chunk -> { target = target, rows = chunk }) (chunks 400 rows)) grouped
-    , written = List.sum (List.map (List.length << Tuple.second) grouped)
+    { persists = List.concatMap (\( target, _, rows ) -> List.map (\chunk -> { target = target, rows = chunk }) (chunks 400 rows)) grouped
+    , written = List.sum (List.map (\( _, _, rows ) -> List.length rows) grouped)
     , already = folded.already
-    , targets = List.map Tuple.first grouped
+    , trimmed = List.sum (List.map (\( _, total, rows ) -> total - List.length rows) kept)
+    , targets = List.map (\( target, _, _ ) -> target) grouped
     , errors = folded.errors
     }
 
@@ -1214,7 +1249,7 @@ confirm : Ctx -> State -> Staged -> ( State, List Effect )
 confirm ctx state staged =
     let
         p =
-            plan state staged
+            plan ctx state staged
     in
     case p.errors of
         ( key, message ) :: _ ->
@@ -1227,7 +1262,10 @@ confirm ctx state staged =
                     , dests = Dict.empty
                     , status =
                         Just
-                            (if p.already > 0 then
+                            (if p.trimmed > 0 then
+                                { message = "Nothing imported: " ++ countLabel p.trimmed "message" ++ " fall outside the history this device keeps. Raise it in History & data first.", failure = False }
+
+                             else if p.already > 0 then
                                 { message = "Nothing new to import: " ++ countLabel p.already "message" ++ " already on this device.", failure = False }
 
                              else
@@ -1274,6 +1312,12 @@ confirm ctx state staged =
                                        )
                                     ++ (if p.already > 0 then
                                             " (" ++ countLabel p.already "message" ++ " already here, skipped)"
+
+                                        else
+                                            ""
+                                       )
+                                    ++ (if p.trimmed > 0 then
+                                            " (" ++ countLabel p.trimmed "older message" ++ " left out: beyond what this device keeps)"
 
                                         else
                                             ""

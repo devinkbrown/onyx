@@ -327,9 +327,60 @@ test("the worker source is self-contained and evaluates", () => {
   const src = H.workerSource();
   const posted = [];
   const self = { postMessage: (m) => posted.push(m) };
-  // eslint-disable-next-line no-new-func
   new Function("self", src)(self);
   assert.equal(typeof self.onmessage, "function");
+});
+
+/* Evaluate a stringified worker source in a context that only has what a
+   real worker has (no module closure): any free variable the source still
+   needs throws here, exactly as it would in the browser. */
+async function runWorkerSource(vmModule, source, job) {
+  const messages = [];
+  const self = { postMessage: (m) => messages.push(m) };
+  const context = vmModule.createContext({ self, TextDecoder, Promise, setTimeout, Uint8Array, DecompressionStream: globalThis.DecompressionStream });
+  vmModule.runInContext(source, context);
+  assert.equal(typeof self.onmessage, "function");
+  self.onmessage({ data: job });
+  for (let i = 0; i < 200 && !messages.some((m) => m.type === "done" || m.type === "error"); i += 1) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return messages;
+}
+
+test("the worker runs a job end to end from its own source", async () => {
+  const vm = await import("node:vm");
+  const files = [fileOf("discord-general.json")];
+  const messages = await runWorkerSource(vm, H.workerSource(), { kind: "discord", files, paths: ["discord-general.json"] });
+  const done = messages.find((m) => m.type === "done");
+  assert.ok(done, JSON.stringify(messages.filter((m) => m.type === "error")));
+  assert.equal(done.result.messages, 4);
+  assert.ok(messages.some((m) => m.type === "progress"), "progress is posted");
+});
+
+test("the minified build keeps the worker source self-contained (esbuild, es2017)", async (t) => {
+  let esbuild = null;
+  const store = new URL("../../node_modules/.pnpm/", import.meta.url).pathname;
+  const roots = [store, "/home/kain/onyx/node_modules/.pnpm/"];
+  for (const root of roots) {
+    try {
+      const hit = readdirSync(root).find((n) => n.startsWith("esbuild@"));
+      if (hit) { esbuild = require(join(root, hit, "node_modules/esbuild")); break; }
+    } catch (err) { /* try the next store */ }
+  }
+  if (!esbuild) { t.skip("esbuild not found"); return; }
+  const vm = await import("node:vm");
+  const minified = esbuild.transformSync(readFileSync(new URL("./historyImport.js", import.meta.url), "utf8"), { minify: true, target: "es2017" }).code;
+  const sandbox = { File, Blob, TextDecoder, setTimeout, console };
+  sandbox.globalThis = sandbox;
+  const context = vm.createContext(sandbox);
+  vm.runInContext(minified, context);
+  const Min = context.OnyxHistoryImport;
+  assert.ok(Min && typeof Min.workerSource === "function", "the minified module still exports its API");
+  const files = [fileOf("discord-general.json")];
+  const messages = await runWorkerSource(vm, Min.workerSource(), { kind: "discord", files, paths: ["discord-general.json"] });
+  const done = messages.find((m) => m.type === "done");
+  assert.ok(done, JSON.stringify(messages.filter((m) => m.type === "error")));
+  assert.equal(done.result.messages, 4);
 });
 
 test("main-thread fallback runs a job end to end and honours cancel", async () => {

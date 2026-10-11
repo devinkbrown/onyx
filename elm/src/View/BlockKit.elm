@@ -115,7 +115,12 @@ card model env block =
                     , if interactive then
                         Just
                             (div [ class "bk-foot" ]
-                                [ button
+                                [ if offOrigin env block then
+                                    span [ class "bk-note" ] [ text "Some controls belong to another conversation and can't run here." ]
+
+                                  else
+                                    text ""
+                                , button
                                     [ type_ "button"
                                     , class "bk-inspect"
                                     , id inspectId
@@ -130,6 +135,22 @@ card model env block =
                         Nothing
                     ]
                 )
+
+
+{-| Whether any control in the block targets another conversation. -}
+offOrigin : Env -> BK.Block -> Bool
+offOrigin env block =
+    List.any (\b -> not (BK.originAllows env.target b.action)) block.selects
+        || List.any
+            (\b ->
+                case b.kind of
+                    BK.RunAction action ->
+                        not (BK.originAllows env.target action)
+
+                    _ ->
+                        False
+            )
+            block.buttons
 
 
 fieldsView : List BK.Field -> Maybe (Html Msg)

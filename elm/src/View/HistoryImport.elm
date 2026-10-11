@@ -29,6 +29,7 @@ import Html.Attributes exposing (attribute, autofocus, checked, class, classList
 import Html.Events exposing (onCheck, onClick, onInput, preventDefaultOn)
 import Json.Decode as Decode
 import PrefsPanel
+import Retention
 
 
 transfer : Model -> List (Html Msg)
@@ -264,43 +265,54 @@ sourceButton current source =
 type alias Selection =
     { fresh : Int
     , already : Int
+    , trimmed : Int
     , conversations : Int
     , invalid : Int
     , dms : Int
+    , keep : Int
     }
 
 
-selection : HI.State -> HI.Staged -> Selection
-selection hi staged =
-    List.foldl
-        (\conv acc ->
-            let
-                dest =
-                    HI.destFor hi conv
-            in
-            if not dest.include then
-                acc
+{-| What Import would do right now, from the same plan the confirm uses
+(so the numbers on screen are the numbers written).
+-}
+selection : Model -> HI.State -> HI.Staged -> Selection
+selection model hi staged =
+    let
+        limits =
+            { nowMs = model.nowMs
+            , keepFor = Retention.effectiveKeep model.retentionPolicy
+            , maxAgeDays = model.retentionPolicy.maxAgeDays
+            }
 
-            else
-                case HI.normalizeDestination dest.value of
-                    Ok { dm } ->
-                        { acc
-                            | fresh = acc.fresh + (conv.count - conv.dupCount)
-                            , already = acc.already + conv.dupCount
-                            , conversations = acc.conversations + 1
-                            , dms =
-                                if dm then
-                                    acc.dms + 1
+        p =
+            HI.plan limits hi staged
 
-                                else
-                                    acc.dms
-                        }
+        included =
+            List.filter (\conv -> (HI.destFor hi conv).include) staged.conversations
 
-                    Err _ ->
-                        { acc | invalid = acc.invalid + 1, conversations = acc.conversations + 1 }
-        )
-        { fresh = 0, already = 0, conversations = 0, invalid = 0, dms = 0 }
-        staged.conversations
+        dms =
+            List.length
+                (List.filter
+                    (\conv ->
+                        case HI.normalizeDestination (HI.destFor hi conv).value of
+                            Ok { dm } ->
+                                dm
+
+                            Err _ ->
+                                False
+                    )
+                    included
+                )
+    in
+    { fresh = p.written
+    , already = p.already
+    , trimmed = p.trimmed
+    , conversations = List.length included
+    , invalid = List.length p.errors
+    , dms = dms
+    , keep = model.retentionPolicy.keep
+    }
 
 
 shownLimit : Int
@@ -315,7 +327,7 @@ reviewCard model staged =
             model.historyImport
 
         sel =
-            selection hi staged
+            selection model hi staged
 
         total =
             List.length staged.conversations
@@ -352,7 +364,10 @@ reviewCard model staged =
                     Nothing
 
         importLabel =
-            if sel.fresh == 0 then
+            if sel.invalid > 0 then
+                "Fix the highlighted rooms"
+
+            else if sel.fresh == 0 then
                 "Nothing new to import"
 
             else
@@ -417,6 +432,18 @@ reviewCard model staged =
                 , onClick (msg HI.ShowAll)
                 ]
                 [ text ("Show all " ++ HI.groupThousands total ++ " conversations") ]
+
+          else
+            text ""
+        , if sel.trimmed > 0 then
+            p [ class "pref-desc hi-privacy", attribute "data-testid" "history-import-trimmed" ]
+                [ text
+                    (HI.countLabel sel.trimmed "older message"
+                        ++ " fall outside the history this device keeps ("
+                        ++ HI.groupThousands sel.keep
+                        ++ " per conversation, set in History & data) and will be left out. Imported messages count toward that limit with what a conversation already holds, oldest first."
+                    )
+                ]
 
           else
             text ""

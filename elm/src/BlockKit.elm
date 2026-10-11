@@ -29,6 +29,7 @@ module BlockKit exposing
     , prepare
     , safeText
     , safeUrl
+    , summary
     , update
     )
 
@@ -432,6 +433,51 @@ extract body =
         { text = String.trimRight (String.join "\n" (List.reverse keptLines))
         , blocks = List.reverse found
         }
+
+
+{-| A short plain description of a body for the places that cannot draw
+a card (reply previews, pinned lists): the first valid block's title
+(or `Structured message`) in place of its JSON. A body without the
+marker is returned untouched; a clipped payload that can no longer
+decode still reads `Structured message` rather than a JSON fragment.
+-}
+summary : String -> String
+summary body =
+    if not (hasMarker body) then
+        body
+
+    else
+        let
+            kit =
+                extract body
+
+            label block =
+                "Structured message"
+                    ++ (case block.title of
+                            Just title ->
+                                ": " ++ title
+
+                            Nothing ->
+                                ""
+                       )
+
+            lead =
+                String.trim kit.text
+        in
+        case kit.blocks of
+            block :: _ ->
+                if String.isEmpty lead then
+                    label block
+
+                else
+                    lead ++ " · " ++ label block
+
+            [] ->
+                if String.startsWith marker (String.trim body) then
+                    "Structured message"
+
+                else
+                    body
 
 
 {-| Strict payload decode (see the module doc). -}

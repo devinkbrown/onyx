@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* global DecompressionStream, self, Worker */
 /* historyImport.js — v3/gap-import: third-party history import (roadmap 4.5).
 
    Credential-free, on-device import of history exported from other
