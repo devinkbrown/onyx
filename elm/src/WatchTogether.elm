@@ -550,7 +550,19 @@ checkUrl raw =
                                     Err UrlBadHost
 
                                 else
-                                    case Url.fromString (scheme ++ afterScheme) of
+                                    let
+                                        -- `elm/url` splits host and port at the
+                                        -- last colon, so a bracketed IPv6 literal
+                                        -- is checked with a stand-in host (the
+                                        -- literal itself was validated above).
+                                        probe =
+                                            if String.startsWith "[" host then
+                                                scheme ++ "ipv6.invalid" ++ String.dropLeft (String.length authority) afterScheme
+
+                                            else
+                                                scheme ++ afterScheme
+                                    in
+                                    case Url.fromString probe of
                                         Just _ ->
                                             Ok t
 
