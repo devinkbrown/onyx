@@ -1,0 +1,419 @@
+/* v3/gap-import — history import (Preferences → Import & export) and
+   BlockKit-lite structured messages (inline cards + their dialogs).
+
+   Linked before ui-sheets.css; every selector is namespaced (.hi-* for
+   the import pane, .bk-* for structured messages) so nothing here can
+   reach another surface. Calm, near-black, 1px seams, 6px radii; the
+   one accent marks the primary action, focus and "copied". Touch
+   targets are 44px wherever the pointer is coarse (any width). */
+
+:root {
+  --gi-seam: color-mix(in oklab, var(--onyx-line) 55%, var(--onyx-dim));
+  --gi-field: color-mix(in oklab, var(--onyx-bg) 55%, var(--onyx-panel));
+  --gi-ext: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5'/%3E%3C/svg%3E");
+}
+
+/* ===================================================================
+   1. Shared buttons
+   =================================================================== */
+
+.hi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.hi-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
+.hi-btn:focus-visible,
+.hi-seg:focus-visible,
+.bk-btn:focus-visible,
+.bk-inspect:focus-visible,
+.bk-select-input:focus-visible,
+.hi-dest-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.hi-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; }
+.hi-btn--primary {
+  border-color: var(--onyx-accent);
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+}
+.hi-btn--primary:hover:not(:disabled) { border-color: var(--onyx-accent); filter: brightness(1.08); }
+.hi-btn--primary:disabled { border-color: var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-faint); }
+.hi-btn--primary:focus-visible { outline-color: var(--onyx-text); outline-offset: 2px; }
+.hi-btn--quiet { border-color: transparent; background: transparent; color: var(--onyx-dim); }
+.hi-btn--quiet:hover:not(:disabled) { border-color: var(--onyx-line); color: var(--onyx-text); }
+.hi-btn--danger { border-color: var(--onyx-bad); color: var(--onyx-bad); }
+.hi-btn--quiet.hi-btn--danger { border-color: transparent; }
+.hi-btn--quiet.hi-btn--danger:hover:not(:disabled) { border-color: var(--onyx-bad); color: var(--onyx-bad); }
+
+/* ===================================================================
+   2. Import pane: sources, activity, notes
+   =================================================================== */
+
+.hi-card { min-width: 0; }
+
+.hi-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.25rem), 1fr));
+  gap: var(--space-2);
+}
+.hi-seg {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+}
+.hi-seg:hover { border-color: var(--onyx-dim); }
+.hi-seg[aria-checked="true"] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+.hi-blurb { margin-top: var(--space-3); max-width: 62ch; line-height: var(--leading-body); }
+
+.hi-activity,
+.hi-note {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--gi-field);
+}
+.hi-activity-row { display: flex; align-items: center; gap: var(--space-3); }
+.hi-activity-text { flex: 1; min-width: 0; font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.hi-activity-sub { margin: var(--space-2) 0 0; }
+.hi-bar { height: 4px; margin-top: var(--space-3); overflow: hidden; border-radius: 2px; background: var(--onyx-line); }
+.hi-bar-fill { display: block; height: 100%; background: var(--onyx-accent); transition: width var(--dur-fast) var(--ease); }
+
+.hi-note { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.hi-note[data-tone="bad"] { border-color: color-mix(in oklab, var(--onyx-warn) 60%, var(--onyx-line)); }
+.hi-note-text { flex: 1 1 14rem; min-width: 0; font-size: var(--text-sm); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.hi-note[data-tone="bad"] .hi-note-text { color: var(--onyx-warn); }
+.hi-note-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-inline-start: auto; }
+
+/* ===================================================================
+   3. Review
+   =================================================================== */
+
+.hi-review { container: hi-review / inline-size; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 0; }
+.hi-kicker {
+  margin: 0 0 2px;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-faint);
+}
+.hi-review-title { margin: 0; font-size: var(--text-lg); font-weight: 650; line-height: var(--leading-snug); }
+.hi-review-title:focus { outline: none; }
+.hi-review-title:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.hi-review-sub { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+
+.hi-tally {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--gi-field);
+}
+.hi-tally-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: var(--space-3); }
+.hi-tally-cell + .hi-tally-cell { border-inline-start: 1px solid var(--onyx-line); }
+.hi-tally-label { font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-faint); }
+.hi-tally-value { font-size: var(--text-xl); font-weight: 650; line-height: var(--leading-tight); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hi-tally-note { font-size: var(--text-2xs); color: var(--onyx-dim); }
+
+.hi-left-out { margin-top: var(--space-3); font-size: var(--text-sm); color: var(--onyx-dim); }
+.hi-left-out > summary {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  cursor: pointer;
+  color: var(--onyx-dim);
+  font-weight: 600;
+}
+.hi-left-out > summary:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.hi-left-list { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); line-height: var(--leading-body); }
+.hi-left-list li { margin-block: 2px; }
+
+.hi-review-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--onyx-line);
+}
+.hi-review-bar-title { font-size: var(--text-sm); font-weight: 650; }
+
+.hi-convs { margin: 0; padding: 0; list-style: none; }
+.hi-conv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 15rem);
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--onyx-line);
+}
+.hi-conv--off .hi-conv-text { opacity: 0.55; }
+.hi-conv-main { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; cursor: pointer; }
+.hi-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--onyx-accent);
+  cursor: pointer;
+}
+.hi-check:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.hi-conv-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hi-conv-name { font-size: var(--text-md); font-weight: 600; line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.hi-conv-meta { font-size: var(--text-2xs); color: var(--onyx-dim); line-height: var(--leading-snug); }
+.hi-dest { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hi-dest-label { font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-faint); }
+.hi-dest-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--gi-field);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.hi-dest-input:disabled { opacity: 0.5; }
+.hi-dest-input[aria-invalid="true"] { border-color: var(--onyx-warn); }
+.hi-error { grid-column: 1 / -1; margin: 0; font-size: var(--text-2xs); color: var(--onyx-warn); line-height: var(--leading-snug); }
+.hi-hint { grid-column: 1 / -1; margin: 0; font-size: var(--text-2xs); color: var(--onyx-dim); }
+.hi-review > .hi-error { margin-top: var(--space-3); font-size: var(--text-sm); }
+.hi-more { margin-top: var(--space-2); }
+.hi-privacy { margin: var(--space-3) 0 0; }
+
+.hi-review-foot {
+  position: sticky;
+  bottom: calc(-1 * var(--space-5));
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) 0 var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+  background: var(--onyx-panel);
+}
+
+@container hi-review (max-width: 30rem) {
+  .hi-conv { grid-template-columns: minmax(0, 1fr); }
+  .hi-tally-cell { padding: var(--space-2) var(--space-3); }
+  .hi-tally-value { font-size: var(--text-lg); }
+  .hi-tally-note { display: none; }
+  .hi-review-foot { justify-content: stretch; }
+  .hi-review-foot .hi-btn { flex: 1 1 8rem; }
+}
+
+/* ===================================================================
+   4. Past imports
+   =================================================================== */
+
+.hi-batches { margin: 0; padding: 0; list-style: none; }
+.hi-batch { padding: var(--space-2) 0; border-top: 1px solid var(--onyx-line); }
+.hi-batch-row { display: flex; align-items: center; gap: var(--space-3); }
+.hi-batch-copy { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.hi-batch-name { font-size: var(--text-sm); font-weight: 600; overflow-wrap: anywhere; }
+.hi-batch-meta { font-size: var(--text-2xs); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.hi-confirm { margin-top: var(--space-2); padding: var(--space-3); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--gi-field); }
+.hi-confirm .pref-desc { margin-bottom: 0; }
+
+/* ===================================================================
+   5. BlockKit-lite cards (inline under a message)
+   =================================================================== */
+
+.bk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(480px, 100%);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-left: 2px solid var(--gi-seam);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  color: var(--onyx-text);
+}
+.bk-title { margin: 0; font-size: var(--text-md); font-weight: 650; line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.bk-text { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.bk-text--clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.bk-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.bk-field { min-width: 0; }
+.bk-field dt { font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-faint); }
+.bk-field dd { margin: 1px 0 0; font-size: var(--text-sm); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.bk-unset { color: var(--onyx-faint); }
+
+.bk-selects { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.bk-select { display: flex; flex: 1 1 11rem; flex-direction: column; gap: 4px; min-width: 0; }
+.bk-select-label { font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-faint); }
+.bk-select-wrap { display: block; min-width: 0; }
+.bk-select-input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+}
+.bk-select-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bk-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.bk-copy { display: inline-flex; max-width: 100%; }
+.bk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+.bk-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
+.bk-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; border-style: dashed; }
+.bk-btn-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-host {
+  min-width: 0;
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--onyx-dim);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 400;
+}
+.bk-btn--link::after {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 13px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--gi-ext) center / contain no-repeat;
+  mask: var(--gi-ext) center / contain no-repeat;
+}
+.bk-btn--action { border-color: color-mix(in oklab, var(--onyx-accent) 55%, var(--onyx-line)); }
+.bk-btn--action:hover:not(:disabled) { border-color: var(--onyx-accent); }
+.bk-btn--action:disabled { border-color: var(--onyx-line); }
+.bk-btn[data-copy-state="copied"] { border-color: var(--onyx-accent); color: var(--onyx-accent); }
+.bk-btn[data-copy-state="failed"] { border-color: var(--onyx-warn); color: var(--onyx-warn); }
+
+.bk-foot { display: flex; }
+.bk-inspect {
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-2xs);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.bk-inspect:hover { color: var(--onyx-text); }
+
+.bk-modal-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); }
+.bk-modal-copy { display: flex; flex: 1 1 10rem; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* ===================================================================
+   6. BlockKit dialogs (send review · inspect)
+   =================================================================== */
+
+.onyx-sheet-layer[data-placement="center"] > .bk-dialog { width: min(var(--sheet-w-sm), 100%); }
+.onyx-sheet-layer[data-placement="center"] > .bk-dialog--inspect { width: min(var(--sheet-w-md), 100%); }
+.bk-dialog-body { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.bk-intro { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); }
+.bk-intro:focus { outline: none; }
+.bk-review { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; }
+.bk-review > div { min-width: 0; }
+.bk-review dt { font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; color: var(--onyx-faint); }
+.bk-review dd { margin: 3px 0 0; min-width: 0; }
+.bk-review code { padding: 2px 6px; border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--gi-field); font-family: var(--font-mono); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.bk-review-text {
+  margin: 0;
+  padding: var(--space-3);
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--gi-field);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bk-warning { margin: 0; font-size: var(--text-sm); color: var(--onyx-warn); }
+.bk-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+.bk-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.bk-section-title { margin: 0; font-size: var(--text-sm); font-weight: 650; }
+.bk-detail { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.bk-detail-what { margin: 0; font-size: var(--text-2xs); color: var(--onyx-dim); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.bk-detail-list { margin: 0; padding: 0; list-style: none; }
+.bk-detail-list li { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); padding: var(--space-1) 0; border-top: 1px solid var(--onyx-line); font-size: var(--text-sm); }
+.bk-detail-label { font-weight: 600; }
+
+/* ===================================================================
+   7. Touch: 44px targets at any width
+   =================================================================== */
+
+@media (hover: none), (pointer: coarse) {
+  .hi-btn,
+  .hi-seg,
+  .hi-dest-input,
+  .bk-btn,
+  .bk-select-input { min-height: var(--target-min); }
+  .hi-dest-input,
+  .bk-select-input { font-size: 16px; }
+  .hi-conv-main { min-height: var(--target-min); align-items: center; }
+  .hi-check { width: 22px; height: 22px; margin: 0; }
+  .hi-left-out > summary { min-height: var(--target-min); }
+  .bk-inspect { min-height: var(--target-min); padding-inline: var(--space-2); margin-inline-start: calc(-1 * var(--space-2)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hi-bar-fill { transition: none; }
+}

@@ -60,6 +60,7 @@ import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
 import View.Prefs exposing (prefsSheet)
+import View.BlockKit -- v3/gap-import
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
@@ -339,6 +340,7 @@ overlays model =
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        , View.BlockKit.overlay model -- v3/gap-import
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model
         -- v3/polish: the quiet asks + the update strip

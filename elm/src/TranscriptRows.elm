@@ -237,7 +237,7 @@ needsRichRow { body, menuOpen } =
         lower =
             String.toLower body
     in
-    menuOpen || String.contains "http" lower || String.contains "[file" lower
+    menuOpen || String.contains "http" lower || String.contains "[file" lower || String.contains "[onyx:block]" lower -- v3/gap-import: structured cards read model state
 
 
 {-| Scroll-bridge key for a conversation (lowercased name, mirroring

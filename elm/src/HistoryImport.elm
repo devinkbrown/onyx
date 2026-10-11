@@ -22,6 +22,7 @@ module HistoryImport exposing
     , fingerprint
     , formatDay
     , fromVaultSnapshot
+    , groupThousands
     , isDestinationRoom
     , maxConversations
     , maxRowsPerConversation
