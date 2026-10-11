@@ -1,18 +1,18 @@
-/* v3/rx-shell CSS smoke test — control sizes in css/rx-shell.css must win
-   against the frame's 24px target floor.
+/* v3/rx-shell CSS smoke test — the frame's 24px button floor has ZERO
+   specificity, so a control's own size rule always wins.
 
-   app.css gives every frame button `min-height: var(--target-floor)` at
-   specificity (0,3,0). A size rule for a shell button written with two
-   classes silently lost to it (rail rows, nav buttons, the bell all
-   measured 24px tall on touch). This test pins the floor's specificity
-   and requires every `min-height` rule in rx-shell.css that aims at a
-   control to be at least as specific, so it wins by coming later in the
-   cascade. Run with:
+   app.css gives every frame button `min-height: var(--target-floor)` (24px,
+   WCAG 2.5.8). It used to be `.onyx-frame :where(button):not(…):not(…)` —
+   specificity (0,3,0) — and silently beat every one- or two-class size rule
+   (rail rows, nav buttons, the bell, call buttons all measured 24px on
+   touch), which slices then worked around with `:not(#_)` or a doubled
+   `.onyx-frame` prefix. The whole selector now sits inside :where(). This
+   test pins that, and that no stylesheet reintroduces the hack. Run with:
      node --test elm/rxShellCss.smoke.mjs
    (from the repo root). Zero dependencies beyond node itself. */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -72,41 +72,36 @@ function rules(css) {
   return out;
 }
 
-test("the frame's button floor is (0,3,0)", () => {
+test("the frame's button floor has zero specificity", () => {
   const app = rules(read("app.css"));
   const floor = app.find(
-    (r) => /min-height:\s*var\(--target-floor\)/.test(r.body) && r.selectors.some((s) => s.startsWith(".onyx-frame :where(button)")),
+    (r) => /min-height:\s*var\(--target-floor\)/.test(r.body) && r.selectors.some((s) => /^:where\(\.onyx-frame button/.test(s)),
   );
-  assert.ok(floor, "app.css still carries the frame button floor");
-  assert.deepEqual(specificity(floor.selectors[0]), [0, 3, 0]);
+  assert.ok(floor, "app.css still carries the frame button floor, wrapped in :where()");
+  assert.deepEqual(specificity(floor.selectors[0]), [0, 0, 0]);
+  // And nothing else in app.css brings back a non-zero-specificity floor.
+  const strong = app.filter(
+    (r) => /min-height:\s*var\(--target-floor\)/.test(r.body) && r.selectors.some((s) => /^\.onyx-frame\b/.test(s) && /\bbutton\b/.test(s)),
+  );
+  assert.deepEqual(strong.map((r) => r.selectors[0]), []);
 });
 
-test("rx-shell.css min-height rules on controls are at least as specific as the floor", () => {
-  const floor = [0, 3, 0];
-  // Containers (bars, panes), form fields, disclosure rows and :root variants are not buttons.
-  const skip = [
-    /^:root/,
-    /^\.onyx-frame > /,
-    /\.onyx-room-header$/,
-    /\.onyx-rail-filter-input$/,
-    /\.onyx-roster-filter-input$/,
-    /\.onyx-mlist-group-head$/,
-    /\.onyx-room-header-icon$/,
-  ];
-  const weak = [];
-  for (const rule of rules(read("css/rx-shell.css"))) {
-    if (!/(^|[;\s])min-height\s*:/.test(rule.body)) continue;
-    for (const selector of rule.selectors) {
-      if (skip.some((re) => re.test(selector))) continue;
-      if (cmp(specificity(selector), floor) < 0) weak.push(selector);
-    }
-  }
-  assert.deepEqual(weak, [], `min-height rules weaker than the frame floor: ${weak.join(" | ")}`);
+test("no stylesheet needs :not(#_) to beat the frame floor", () => {
+  const files = ["app.css", ...readdirSync(join(here, "css")).filter((f) => f.endsWith(".css")).map((f) => `css/${f}`)];
+  const hacks = files.filter((f) => stripComments(read(f)).includes(":not(#_)"));
+  assert.deepEqual(hacks, []);
+});
+
+test("a one-class control size rule beats the floor in the cascade", () => {
+  const floor = specificity(":where(.onyx-frame button:not(.onyx-avatar):not(.onyx-facepile-face))");
+  assert.ok(cmp(specificity(".onyx-call-btn"), floor) > 0);
+  assert.ok(cmp(specificity("button"), floor) > 0);
 });
 
 test("the specificity helper agrees with known selectors", () => {
   assert.deepEqual(specificity(".a .b"), [0, 2, 0]);
   assert.deepEqual(specificity(".onyx-frame :where(button):not(.x):not(.y)"), [0, 3, 0]);
+  assert.deepEqual(specificity(":where(.onyx-frame button:not(.x):not(.y))"), [0, 0, 0]);
   assert.deepEqual(specificity("a.b:hover > #c"), [1, 2, 1]);
   assert.deepEqual(specificity(".a :is(.b, .c .d)"), [0, 3, 0]);
 });

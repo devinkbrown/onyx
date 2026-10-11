@@ -3998,8 +3998,11 @@ html, body {
   outline-offset: var(--focus-offset);
 }
 
-/* WCAG 2.5.8: nothing interactive in the shell below 24×24. */
-.onyx-frame :where(button):not(.onyx-avatar):not(.onyx-facepile-face) { min-height: var(--target-floor); }
+/* WCAG 2.5.8: nothing interactive in the shell below 24×24. The whole
+   selector sits in :where(), so the floor has ZERO specificity: any rule
+   that sets its own min-height (or sizes the button) wins by existing, and
+   no size rule ever needs `:not(#_)` or a doubled `.onyx-frame` to beat it. */
+:where(.onyx-frame button:not(.onyx-avatar):not(.onyx-facepile-face)) { min-height: var(--target-floor); }
 
 html { scroll-padding-block: var(--space-6); }
 

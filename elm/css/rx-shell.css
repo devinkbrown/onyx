@@ -652,29 +652,27 @@
 
 /* 10. Touch floor ---------------------------------------------------------- */
 
-/* app.css gives every frame button `min-height: var(--target-floor)` (24px)
-   at specificity (0,3,0). Rules written with two classes (here and in
-   pol-shell.css) lost to it, so on touch the shell's controls measured
-   24px tall. These restate the sizes at the same weight, later in the
-   cascade. Phones and anything touch get 44px; the section toggles in
-   long lists keep a 36px strip (they are not the thing being aimed at). */
+/* Phones and anything touch get 44px controls; the section toggles in
+   long lists keep a 36px strip (they are not the thing being aimed at).
+   (app.css floors frame buttons at 24px with zero specificity, so these
+   plain two-class rules win without restating `.onyx-frame`.) */
 @media (hover: none), (max-width: 599.98px) {
-  .onyx-frame .onyx-topbar .onyx-palette-launcher,
-  .onyx-frame .onyx-topbar .shell-ribbon-bell,
-  .onyx-frame .onyx-topbar .onyx-ident { min-height: 44px; }
-  .onyx-frame .onyx-topbar :is(.shell-ribbon-bell, .onyx-topbar-compose, .onyx-ident) { min-width: 44px; }
-  .onyx-frame .onyx-room-header :is(.onyx-room-back, .onyx-call-join) { min-width: 44px; }
-  .onyx-frame .onyx-room-header .onyx-room-back,
-  .onyx-frame .onyx-room-header .onyx-room-header-btn,
-  .onyx-frame .onyx-room-header .onyx-room-header-icon,
-  .onyx-frame .onyx-room-header .onyx-members-toggle,
-  .onyx-frame .onyx-room-header .onyx-call-join { min-height: 44px; }
-  .onyx-frame .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; }
-  .onyx-frame .onyx-rail .onyx-rail-filter-unread,
-  .onyx-frame .onyx-rail .onyx-rail-filter-clear { min-height: 44px; }
-  .onyx-frame .onyx-rail .onyx-rail-browse { min-height: 44px; }
-  .onyx-frame .onyx-roster .onyx-roster-care { min-height: 44px; }
-  .onyx-frame .onyx-room-more-alerts .room-notify-seg { min-height: 44px; }
+  .onyx-topbar .onyx-palette-launcher,
+  .onyx-topbar .shell-ribbon-bell,
+  .onyx-topbar .onyx-ident { min-height: 44px; }
+  .onyx-topbar :is(.shell-ribbon-bell, .onyx-topbar-compose, .onyx-ident) { min-width: 44px; }
+  .onyx-room-header :is(.onyx-room-back, .onyx-call-join) { min-width: 44px; }
+  .onyx-room-header .onyx-room-back,
+  .onyx-room-header .onyx-room-header-btn,
+  .onyx-room-header .onyx-room-header-icon,
+  .onyx-room-header .onyx-members-toggle,
+  .onyx-room-header .onyx-call-join { min-height: 44px; }
+  .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; }
+  .onyx-rail .onyx-rail-filter-unread,
+  .onyx-rail .onyx-rail-filter-clear { min-height: 44px; }
+  .onyx-rail .onyx-rail-browse { min-height: 44px; }
+  .onyx-roster .onyx-roster-care { min-height: 44px; }
+  .onyx-room-more-alerts .room-notify-seg { min-height: 44px; }
 }
 @media (hover: none) {
   /* The facepile's 30px faces are a mouse affordance; on touch the

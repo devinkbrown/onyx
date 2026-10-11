@@ -172,7 +172,7 @@ export const SET = {
       ...of('gcmd', ['actions']),
       ...of('watch', ['watch-card', 'watch-editor']),
       // appearance / themes (ocean is the baseline everywhere else)
-      ...of('ap', ['ap-room-hc', 'ap-room-pearl-hc', 'ap-room-garnet', 'ap-room-compact', 'ap-prefs-display', 'ap-appearance', 'ap-zoom-200']),
+      ...of('ap', ['ap-room-hc', 'ap-room-pearl-hc', 'ap-room-compact', 'ap-prefs-display', 'ap-appearance', 'ap-zoom-200']),
       // keyboard + hover states of our own (extra PNGs)
       ...of('css', ['focus-tour-room', 'hover-room', 'composer-states']),
     ],

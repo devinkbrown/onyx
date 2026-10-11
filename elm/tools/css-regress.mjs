@@ -30,7 +30,8 @@
  *
  * Determinism (so a non-zero diff always means a CSS change): screens.mjs is
  * run with --freeze (the fake server's timestamps AND the page clock are fixed,
- * TZ=UTC, locale en-US), --stable (animations disabled, caret hidden; it
+ * TZ=UTC, locale en-US, the node-side scenario clock frozen too, a stable
+ * port per job), --stable (animations disabled, caret hidden; it
  * already emulates prefers-reduced-motion). `noise` shoots twice and diffs, so
  * flaky scenarios are visible before they can fool a refactor; flaky shots
  * can be excluded with --skip name,name (matched against file-name prefixes).
@@ -40,7 +41,9 @@
  * `diff` writes report.json + report.html with before | after | diff crops of
  * every changed region to --report, prints a summary, exits 1 if anything
  * differs. Options: --tolerance N (per-channel difference ignored, default 0),
- * --only substr (filter file names).
+ * --only substr (filter file names), --noise A B (two baseline runs of the
+ * same build: pixels where A and B differ, dilated 3px, are ignored, so a
+ * flaky shot only fails on changes OUTSIDE its own flaky regions).
  *
  * Needs: the system Chromium and playwright-core from the repo's pnpm store
  * (same lookup as screens.mjs); the PNG codec is playwright-core's bundled
@@ -84,15 +87,22 @@ function jobsFor(tierNames) {
     const vps = tierVps(t);
     const vpGroups = chunk(vps, name === 'core' ? 3 : 5);
     const scenarios = t.scenarios.map(keyOf);
-    const per = name === 'core' ? 6 : name === 'public' ? 3 : 8;
-    for (const sc of chunk(scenarios, per)) for (const vg of vpGroups) jobs.push({ tier: name, scenarios: sc, vps: vg, full: !!t.full, dpr: t.dpr || 0 });
+    const per = 3; // small jobs balance best: the call / gap scenarios are the slow tail
+    const slow = (k) => /focus-tour|hover-room|composer-states|^call-/.test(k); // multi-shot / call scenarios: one per job, started first
+    const parts = [...scenarios.filter(slow).map((k) => [k]), ...chunk(scenarios.filter((k) => !slow(k)), per)];
+    for (const sc of parts) for (const vg of vpGroups) jobs.push({ tier: name, scenarios: sc, vps: vg, full: !!t.full, dpr: t.dpr || 0, slow: sc.length === 1 && slow(sc[0]) });
   }
+  jobs.sort((a, b) => Number(b.slow) - Number(a.slow));
   return jobs;
 }
 
+// Stable per-job port (a pure function of what the job shoots), so the port
+// that appears in invite links is the same in every run.
+const portFor = (job) => { let h = 2166136261; for (const c of job.scenarios.join(',') + '@' + job.vps.join(',')) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return 21000 + ((h >>> 0) % 20000) + Number(flag('--port-offset', 0)); };
+
 function runJob(job, out, dist, extraArgs) {
   const args = [join(here, 'screens.mjs'), '--dist', dist, '--out', out, '--extra', join(here, 'screens-css-regress.mjs'),
-    '--only', job.scenarios.join(','), '--vp', job.vps.join(','), '--freeze', FREEZE, '--stable', ...(job.full ? ['--full'] : []), ...(job.dpr ? ['--dpr', String(job.dpr)] : []), ...extraArgs];
+    '--only', job.scenarios.join(','), '--vp', job.vps.join(','), '--freeze', FREEZE, '--stable', '--port', String(portFor(job)), ...(job.full ? ['--full'] : []), ...(job.dpr ? ['--dpr', String(job.dpr)] : []), ...extraArgs];
   return new Promise((done) => {
     const p = spawn(process.execPath, args, { cwd: repo, env: { ...process.env, TZ: 'UTC', LANG: 'en_US.UTF-8', CSS_REGRESS_OUT: out } });
     let log = '';
@@ -110,7 +120,7 @@ async function shoot(out) {
   let jobs = jobsFor(tiers);
   if (only) jobs = jobs.filter((j) => j.scenarios.some((s) => s.includes(only)));
   if (only) jobs = jobs.map((j) => ({ ...j, scenarios: j.scenarios.filter((s) => s.includes(only)) }));
-  const nJobs = Number(flag('--jobs', Math.max(4, Math.min(20, cpus().length - 8))));
+  const nJobs = Number(flag('--jobs', Math.max(4, Math.min(14, Math.floor(cpus().length / 3)))));
   if (!has('--keep')) rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const queue = [...jobs];
@@ -174,7 +184,7 @@ function sideBySide(PNG, panels, gap = 8) {
 }
 
 /** Compare two PNG buffers. -> { same, sizeChanged, count, regions[] } */
-function comparePngs(PNG, a, b, tol) {
+function comparePngs(PNG, a, b, tol, ignore) {
   const A = PNG.sync.read(a); const B = PNG.sync.read(b);
   if (A.width !== B.width || A.height !== B.height) return { sizeChanged: [A.width, A.height, B.width, B.height], count: -1, regions: [], A, B };
   const W = A.width; const H = A.height; let count = 0;
@@ -183,7 +193,7 @@ function comparePngs(PNG, a, b, tol) {
   const mask = new PNG({ width: W, height: H });
   for (let i = 0, p = 0; p < W * H; p += 1, i += 4) {
     const d = Math.max(Math.abs(A.data[i] - B.data[i]), Math.abs(A.data[i + 1] - B.data[i + 1]), Math.abs(A.data[i + 2] - B.data[i + 2]), Math.abs(A.data[i + 3] - B.data[i + 3]));
-    if (d > tol) { count += 1; cells[Math.floor(p / W / CELL) * cw + Math.floor((p % W) / CELL)] = 1; mask.data[i] = 255; mask.data[i + 1] = 0; mask.data[i + 2] = 80; mask.data[i + 3] = 255; }
+    if (d > tol && !(ignore && ignore[p])) { count += 1; cells[Math.floor(p / W / CELL) * cw + Math.floor((p % W) / CELL)] = 1; mask.data[i] = 255; mask.data[i + 1] = 0; mask.data[i + 2] = 80; mask.data[i + 3] = 255; }
     else { mask.data[i] = A.data[i] >> 2; mask.data[i + 1] = A.data[i + 1] >> 2; mask.data[i + 2] = A.data[i + 2] >> 2; mask.data[i + 3] = 255; }
   }
   if (!count) return { same: true, count: 0, regions: [] };
@@ -213,13 +223,31 @@ function diff(baseDir, curDir) {
   const only = flag('--only', '');
   const report = flag('--report', '');
   const skip = (flag('--skip', '') || '').split(',').filter(Boolean);
+  // --noise A B: two baseline runs of the SAME build. Pixels where they differ (dilated 3px)
+  // are ignored: a shot only fails on changes outside its own flaky regions.
+  const ni = rest.indexOf('--noise'); const noiseA = ni >= 0 ? resolve(rest[ni + 1]) : ''; const noiseB = ni >= 0 ? resolve(rest[ni + 2]) : '';
+  const noiseMask = (f, W, H) => {
+    if (!noiseA || !existsSync(join(noiseA, f)) || !existsSync(join(noiseB, f))) return null;
+    const NA = PNG.sync.read(readFileSync(join(noiseA, f))); const NB = PNG.sync.read(readFileSync(join(noiseB, f)));
+    if (NA.width !== W || NA.height !== H || NB.width !== W || NB.height !== H) return null;
+    const m = new Uint8Array(W * H);
+    for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
+      const i = (y * W + x) * 4;
+      if (NA.data[i] !== NB.data[i] || NA.data[i + 1] !== NB.data[i + 1] || NA.data[i + 2] !== NB.data[i + 2]) {
+        for (let dy = -3; dy <= 3; dy += 1) for (let dx = -3; dx <= 3; dx += 1) { const yy = y + dy; const xx = x + dx; if (yy >= 0 && xx >= 0 && yy < H && xx < W) m[yy * W + xx] = 1; }
+      }
+    }
+    return m;
+  };
   const list = (d) => new Set(readdirSync(d).filter((f) => f.endsWith('.png') && (!only || f.includes(only)) && !skip.some((s) => f.startsWith(s))));
   const A = list(baseDir); const B = list(curDir);
   const rows = []; let same = 0;
   if (report) { rmSync(report, { recursive: true, force: true }); mkdirSync(report, { recursive: true }); }
   for (const f of [...A].sort()) {
     if (!B.has(f)) { rows.push({ file: f, kind: 'missing-in-current' }); continue; }
-    const r = comparePngs(PNG, readFileSync(join(baseDir, f)), readFileSync(join(curDir, f)), tol);
+    const bufA = readFileSync(join(baseDir, f)); const bufB = readFileSync(join(curDir, f));
+    let r = comparePngs(PNG, bufA, bufB, tol, null);
+    if (!r.same && !r.sizeChanged && noiseA) { const mk = noiseMask(f, r.A.width, r.A.height); if (mk) r = comparePngs(PNG, bufA, bufB, tol, mk); }
     if (r.same) { same += 1; continue; }
     if (r.sizeChanged) { rows.push({ file: f, kind: 'size', size: r.sizeChanged }); continue; }
     const row = { file: f, kind: 'pixels', count: r.count, regions: r.regions.slice(0, 6) };
@@ -259,8 +287,10 @@ if (cmd === 'shoot') {
   const r = await shoot(out);
   process.exit(r.failed.length ? 1 : 0);
 } else if (cmd === 'diff') {
-  const [a, b] = rest.filter((x) => !x.startsWith('--') && !['--report', '--tolerance', '--only', '--skip'].some((k) => rest[rest.indexOf(x) - 1] === k));
-  if (!a || !b) { console.error('usage: css-regress.mjs diff BASE CUR [--report DIR] [--tolerance N] [--only substr] [--skip prefix,prefix]'); process.exit(2); }
+  const valueFlags = ['--report', '--tolerance', '--only', '--skip', '--noise'];
+  const positional = rest.filter((x, i) => !x.startsWith('--') && !valueFlags.includes(rest[i - 1]) && !(rest[i - 2] === '--noise'));
+  const [a, b] = positional;
+  if (!a || !b) { console.error('usage: css-regress.mjs diff BASE CUR [--report DIR] [--tolerance N] [--only substr] [--skip prefix,prefix] [--noise A B]'); process.exit(2); }
   process.exit(diff(resolve(a), resolve(b)) ? 1 : 0);
 } else if (cmd === 'noise') {
   const out = resolve(flag('--out', '/tmp/css-regress-noise'));

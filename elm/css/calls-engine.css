@@ -535,26 +535,23 @@
   .onyx-call-joining, .onyx-call-name { font-size: 0.875rem; }
 }
 
-/* ---------- button sizes (beat the frame floor) ----------
-   app.css floors every button inside `.onyx-frame` at 24px with
-   `.onyx-frame :where(button):not(.onyx-avatar):not(.onyx-facepile-face)`
-   (specificity 0,3,0). That silently outranks every one- or two-class
-   `min-height` on a call button (the ring's Decline / Accept and the
-   banner's Join were 24px tall). `:not(#_)` raises these above it, so
-   the sizes written in the call stylesheets apply again. */
-.onyx-call-btn:not(#_) { min-height: 36px; }
-.onyx-cq-prompt .onyx-call-btn:not(#_) { min-height: 28px; }
-.onyx-call-ring-actions .onyx-call-btn:not(#_) { min-height: var(--target-min); }
-.onyx-call-pip-btn:not(#_) { min-height: 30px; }
-.onyx-vs-btn:not(#_) { min-height: 36px; }
-.onyx-stage-hand-row .onyx-call-btn:not(#_) { min-height: 28px; }
-.onyx-call-captions-copy:not(#_), .onyx-call-caption-translate:not(#_) { min-height: 28px; }
+/* ---------- button sizes ----------
+   app.css floors every button inside `.onyx-frame` at 24px, but the floor
+   is wrapped in :where() (zero specificity), so these one- and two-class
+   `min-height` rules win on their own, by being later in the cascade. */
+.onyx-call-btn { min-height: 36px; }
+.onyx-cq-prompt .onyx-call-btn { min-height: 28px; }
+.onyx-call-ring-actions .onyx-call-btn { min-height: var(--target-min); }
+.onyx-call-pip-btn { min-height: 30px; }
+.onyx-vs-btn { min-height: 36px; }
+.onyx-stage-hand-row .onyx-call-btn { min-height: 28px; }
+.onyx-call-captions-copy, .onyx-call-caption-translate { min-height: 28px; }
 @media (max-width: 767px) {
-  .onyx-call-pip-btn:not(#_) { min-height: 28px; }
-  .onyx-call-ring-actions .onyx-call-btn:not(#_) { min-height: 52px; }
-  .onyx-call-lost .onyx-call-btn:not(#_) { min-height: var(--target-min); }
-  .onyx-stage-actions .onyx-call-btn:not(#_), .onyx-stage-hand-row .onyx-call-btn:not(#_) { min-height: var(--target-min); }
-  .onyx-vs-btn:not(#_) { min-height: var(--target-min); }
+  .onyx-call-pip-btn { min-height: 28px; }
+  .onyx-call-ring-actions .onyx-call-btn { min-height: 52px; }
+  .onyx-call-lost .onyx-call-btn { min-height: var(--target-min); }
+  .onyx-stage-actions .onyx-call-btn, .onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-min); }
+  .onyx-vs-btn { min-height: var(--target-min); }
 }
 
 /* ---------- touch devices: every control is a 44px target ---------- */
@@ -562,17 +559,17 @@
   :is(.onyx-call-btn, .onyx-call-pip-btn, .onyx-call-pip-corner, .onyx-vs-btn, .onyx-call-more-item,
     .onyx-call-react-item, .onyx-call-sheet-close, .onyx-join-banner-hide, .onyx-sec-chip, .onyx-tile-btn,
     .onyx-calls-primary, .onyx-calls-join-voice, .onyx-calls-join-video, .onyx-calls-mute, .onyx-calls-leave,
-    .onyx-calls-room, .onyx-stage-hands-open):not(#_) {
+    .onyx-calls-room, .onyx-stage-hands-open) {
     min-height: var(--target-min); min-width: var(--target-min);
   }
-  .onyx-call-stage .onyx-call-more .onyx-call-more-item:not(#_) { min-height: var(--target-min); }
+  .onyx-call-stage .onyx-call-more .onyx-call-more-item { min-height: var(--target-min); }
   .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); flex: none; }
-  .onyx-vs-select:not(#_) { min-height: var(--target-min); }
-  .onyx-vs-range:not(#_) { height: var(--target-min); }
+  .onyx-vs-select { min-height: var(--target-min); }
+  .onyx-vs-range { height: var(--target-min); }
   .onyx-vs-toggle { min-height: var(--target-min); align-items: center; }
   .onyx-vs-toggle input { margin: 0; }
   /* Small text actions keep a compact look; a halo supplies the 44px. */
-  .onyx-call-captions-copy:not(#_), .onyx-call-caption-translate:not(#_) { min-height: 36px; font-size: var(--text-sm); position: relative; }
+  .onyx-call-captions-copy, .onyx-call-caption-translate { min-height: 36px; font-size: var(--text-sm); position: relative; }
   .onyx-call-captions-copy::after, .onyx-call-caption-translate::after { content: ""; position: absolute; inset: -5px -2px; }
   .onyx-call-react-item { width: var(--target-min); height: var(--target-min); }
 }

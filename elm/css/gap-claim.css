@@ -117,10 +117,8 @@
   text-align: center;
   cursor: pointer;
 }
-/* The shell sets a 24px floor on every button with a (0,3,0) selector
-   (app.css `.onyx-frame :where(button):not(…):not(…)`), so the real
-   heights are stated at a higher specificity: 36px, and 44px for a finger. */
-.gc-card .gc-actions button.gc-btn { min-height: 36px; }
+/* 36px, and 44px for a finger (the 24px frame floor has zero specificity). */
+.gc-btn { min-height: 36px; }
 .gc-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
 .gc-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gc-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; }
@@ -175,7 +173,7 @@
 /* ---------- touch: 44px targets at any width ---------- */
 
 @media (hover: none), (pointer: coarse) {
-  .gc-card .gc-actions button.gc-btn { min-height: var(--target-min); }
+  .gc-btn { min-height: var(--target-min); }
 }
 
 /* Short viewports (phone landscape): tighter card, no kicker. */

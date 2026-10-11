@@ -35,13 +35,27 @@ const only = opt('--only', '') ? opt('--only', '').split(',') : null;
 //   --dpr N        override deviceScaleFactor for every viewport
 //   --full         fullPage screenshots (long public pages)
 //   --stable       animations: 'disabled' on every screenshot
-//   --viewports W×H,...  extra ad-hoc viewports named w<W>x<H> usable in --vp
+//   --port N       pin the fake server's port
+//   --vp wWxH      ad-hoc viewport, e.g. w768x900 (DPR 1, mouse)
 const freezeAt = opt('--freeze', '') ? Date.parse(opt('--freeze', '')) : null;
 if (opt('--freeze', '') && Number.isNaN(freezeAt)) { console.error('--freeze needs an ISO date'); process.exit(2); }
 const dprOverride = opt('--dpr', '') ? Number(opt('--dpr', '')) : null;
 const fullPage = args.includes('--full');
 const stable = args.includes('--stable');
 const clockMs = () => (freezeAt ?? Date.now());
+// Scenario files build their fixtures from Date.now() too (message times,
+// "N minutes ago"): freeze this process's clock as well, or every run bakes
+// the wall-clock minute into the shots.
+if (freezeAt) {
+  const RealDate = Date;
+  globalThis.Date = class FrozenDate extends RealDate {
+    constructor(...a) { if (a.length === 0) super(freezeAt); else super(...a); }
+    static now() { return freezeAt; }
+  };
+}
+// --port N pins the fake server's port (it shows up in invite links, so a
+// random port makes those shots differ run to run).
+const portArg = opt('--port', '') ? Number(opt('--port', '')) : 0;
 mkdirSync(out, { recursive: true });
 if (!existsSync(join(dist, 'index.html'))) {
   console.error(`no build at ${dist} — run: bash elm/tools/build.sh`);
@@ -168,7 +182,10 @@ server.on('upgrade', (req, sock) => {
   sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${wsAccept(req.headers['sec-websocket-key'])}\r\n\r\n`);
   ircSession(sock);
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+await new Promise((r) => {
+  server.once('error', () => server.listen(0, '127.0.0.1', r)); // pinned port busy: fall back to any
+  server.listen(portArg, '127.0.0.1', r);
+});
 const base = `http://127.0.0.1:${server.address().port}`;
 const pin = `ws=${encodeURIComponent(base.replace('http', 'ws') + '/ws')}`;
 
