@@ -226,7 +226,7 @@ reviewTests =
                         [ \q -> q |> Query.has [ testId "history-import-trimmed", Selector.text "1 older message fall outside the history this device keeps (1 per conversation" ]
                         , \q -> q |> Query.has [ Selector.text "Import 2 messages" ]
                         ]
-        , test "an invalid destination turns the primary action into 'Fix the highlighted rooms'" <|
+        , test "an invalid destination turns the primary action into 'Fix destinations'" <|
             \_ ->
                 let
                     bad =
@@ -235,7 +235,7 @@ reviewTests =
                 query bad
                     |> Query.find [ testId "history-import-confirm" ]
                     |> Expect.all
-                        [ Query.has [ Selector.text "Fix the highlighted rooms", Selector.disabled False ]
+                        [ Query.has [ Selector.text "Fix destinations", Selector.disabled False ]
                         , Event.simulate Event.click >> Event.expect (HistoryImportMsg HI.Confirm)
                         ]
         , test "leaving a conversation out updates the count and disables an empty import" <|

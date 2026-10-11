@@ -366,7 +366,7 @@ reviewCard model staged =
 
         importLabel =
             if sel.invalid > 0 then
-                "Fix the highlighted rooms"
+                "Fix destinations"
 
             else if sel.fresh == 0 then
                 "Nothing new to import"
@@ -409,7 +409,7 @@ reviewCard model staged =
                 , ul [ class "hi-left-list" ] (List.map (\n -> li [] [ text n ]) leftOut)
                 ]
         , div [ class "hi-review-bar" ]
-            [ span [ class "hi-review-bar-title" ] [ text "Where each conversation goes" ]
+            [ span [ class "hi-review-bar-title" ] [ text "Where it goes" ]
             , button
                 [ type_ "button"
                 , class "hi-btn hi-btn--quiet"

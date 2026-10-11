@@ -458,6 +458,20 @@
   .bk-inspect { min-height: var(--target-min); padding-inline: var(--space-2); margin-inline-start: calc(-1 * var(--space-2)); }
 }
 
+/* Short viewports (phone landscape): the review gives its height to the
+   conversation list — one-line tally, no kicker or sub-line, a slim bar. */
+@media (max-height: 520px) {
+  .hi-review .hi-kicker,
+  .hi-review .hi-review-sub { display: none; }
+  .hi-tally { margin-top: var(--space-2); }
+  .hi-tally-cell { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); padding: var(--space-1) var(--space-3); }
+  .hi-tally-value { font-size: var(--text-md); }
+  .hi-tally-note { display: none; }
+  .hi-review-bar { margin-top: var(--space-2); }
+  .hi-review-foot { margin-top: var(--space-2); padding: var(--space-2) 0; }
+  .hi-conv { padding: var(--space-2) 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hi-bar-fill,
   .hi-left-out > summary::before { transition: none; }
