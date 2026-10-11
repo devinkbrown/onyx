@@ -73,7 +73,8 @@ disclosure config body =
             attribute "open" ""
 
           else
-            class "oc-more-closed"
+            attribute "data-open" "false"
+
         ]
         (summary []
             [ span [ class "oc-more-title" ] [ text config.title ]

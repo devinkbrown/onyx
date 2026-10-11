@@ -218,7 +218,15 @@ suite =
                             update ComposerSend { live | isOper = True, activeChannel = Just "#c", composer = "/desk bans" }
                     in
                     Expect.equal ( True, OperReply.Bans ) ( m.operDeskOpen, m.operConsole.tab )
+            , test "/desk also learns what the session follows (as opening the desk does)" <|
+                \_ ->
+                    let
+                        ( _, out ) =
+                            update ComposerSend { live | isOper = True, activeChannel = Just "#c", composer = "/desk" }
+                    in
+                    Expect.equal [ "EVENT LIST" ] (sent out)
             , test "a person who is not an operator is refused" <|
+
                 \_ ->
                     let
                         ( m, _ ) =

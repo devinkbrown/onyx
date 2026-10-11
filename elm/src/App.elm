@@ -20381,8 +20381,12 @@ runSlashDesk model target =
                             Nothing ->
                                 console
                 }
+
+            ( learned, lines ) =
+                OperConsole.update (operConsoleCtx opened) OperConsole.Opened opened.operConsole
         in
-        ( opened, [] )
+        ( { opened | operConsole = learned }, List.map SendLine lines )
+
 
 
 {-| What the operator console needs from the model. -}
@@ -20417,8 +20421,21 @@ operConsoleStep consoleMsg model =
                     else
                         []
 
+                OperConsole.Confirm ->
+                    -- The review closes: focus goes back to the tab, not the void.
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                OperConsole.Cancel ->
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
                 _ ->
-                    []
+                    -- A change just staged for review: its confirm button takes focus.
+                    if model.operConsole.pending == Nothing && next.pending /= Nothing then
+                        [ PrefsFocus { id = "oc-review-confirm" } ]
+
+                    else
+                        []
+
     in
     ( { model | operConsole = next }, List.map SendLine lines ++ focus )
 

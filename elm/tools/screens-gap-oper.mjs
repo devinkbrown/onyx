@@ -227,7 +227,30 @@ export default {
     });
     console.log('MEASURE', page.viewportSize().width, JSON.stringify(rects));
   },
+  // 200% browser zoom on a laptop is a 640x360 CSS viewport.
+  'oper-zoom200': async (page, h) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await operSession(page, h);
+    await openDesk(page, h);
+    await tab(page, h, 'bans');
+  },
+  'oper-zoom200-live': async (page, h) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    const s = await operSession(page, h);
+    await openDesk(page, h);
+    s.events();
+    await h.settle(page, 400);
+  },
+  // A large default font size (browser setting): rem tokens scale 150%.
+  'oper-bigtext': async (page, h) => {
+    await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = '150%'; }); });
+    const s = await operSession(page, h);
+    await openDesk(page, h);
+    s.events();
+    await h.settle(page, 400);
+  },
   'oper-bans': async (page, h) => {
+
 
     await operSession(page, h);
     await openDesk(page, h);

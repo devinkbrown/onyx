@@ -684,13 +684,8 @@ factValue topic detail =
             else
                 detail
 
-        ( "reputation", "none" ) ->
-            "No address on record"
-
-        ( "reputation", n ) ->
-            "Score " ++ n ++ " (higher is worse)"
-
         ( "account", "none score=0" ) ->
+
             "Not signed in"
 
         ( "flood", _ ) ->
@@ -701,7 +696,16 @@ factValue topic detail =
                 detail
 
         _ ->
-            detail
+            if topic == "reputation" then
+                if detail == "none" then
+                    "No address on record"
+
+                else
+                    "Score " ++ detail ++ " (higher is worse)"
+
+            else
+                detail
+
 
 
 flagged : ( String, String ) -> Bool
@@ -1103,7 +1107,26 @@ appealCard model ready appeal =
         , p [ class "oc-appeal-text" ] [ text appeal.text ]
         , if answering then
             form [ class "oc-form", attribute "data-testid" "oc-appeal-form", onSubmit (run (AppealAnswer { id = String.fromInt appeal.id, text = console.forms.appealAnswer })) ]
-                [ K.field { id = "oc-appeal-answer", label = "Your answer", hint = "Recorded with your name in the audit log." }
+                [ K.formRow
+                    [ K.button_
+                        { kind = "quiet"
+                        , label = "Accepted"
+                        , testId = "oc-appeal-accept"
+                        , onClick = edit AppealAnswerText "Accepted: the restriction is being lifted."
+                        , disabled = False
+                        , ariaLabel = Just "Start the answer with: accepted"
+                        }
+                    , K.button_
+                        { kind = "quiet"
+                        , label = "Declined"
+                        , testId = "oc-appeal-decline"
+                        , onClick = edit AppealAnswerText "Declined: the restriction stays."
+                        , disabled = False
+                        , ariaLabel = Just "Start the answer with: declined"
+                        }
+                    ]
+                , K.field { id = "oc-appeal-answer", label = "Your answer", hint = "Recorded with your name in the audit log. An answer does not lift anything by itself: lift the ban in Bans or Silence." }
+
                     (textarea
                         [ id "oc-appeal-answer"
                         , class "oc-input oc-textarea"

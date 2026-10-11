@@ -51,6 +51,19 @@ testId id =
     Selector.attribute (Attr.attribute "data-testid" id)
 
 
+sendsOnly : List Outbound -> List Outbound
+sendsOnly =
+    List.filter
+        (\o ->
+            case o of
+                SendLine _ ->
+                    True
+
+                _ ->
+                    False
+        )
+
+
 line : String -> Msg
 line raw =
     WsLineReceived raw
@@ -228,14 +241,16 @@ suite =
                             update (OperConsoleMsg C.Confirm) staged
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [] out1
+                        [ \_ -> Expect.equal [] (sendsOnly out1)
+                        , \_ -> Expect.equal [ PrefsFocus { id = "oc-review-confirm" } ] out1
+
                         , \_ -> query staged |> Query.find [ testId "oc-review-wire" ] |> Query.has [ Selector.text "KLINE ADD *!*@bad.example :spam wave" ]
                         , \_ -> query staged |> Query.find [ testId "oc-review-confirm" ] |> Event.simulate Event.click |> Event.expect (OperConsoleMsg C.Confirm)
                         , \_ -> query staged |> Query.find [ testId "oc-review-cancel" ] |> Event.simulate Event.click |> Event.expect (OperConsoleMsg C.Cancel)
                         , \_ ->
                             Expect.equal
                                 [ SendLine "KLINE ADD *!*@bad.example :spam wave\u{000D}\n", SendLine "WARD LIST\u{000D}\n" ]
-                                out2
+                                (sendsOnly out2)
                         ]
                         ()
             , test "the ward list renders the daemon's rows with a Lift button each" <|
@@ -295,7 +310,26 @@ suite =
                         ]
                         ()
             ]
+        , describe "appeal answers"
+            [ test "Accepted and Declined start the answer text" <|
+                \_ ->
+                    let
+                        opening =
+                            update (OperConsoleMsg (C.AnswerAppeal (Just 4)))
+                                (List.foldl (\raw m -> update (line raw) m |> Tuple.first)
+                                    (onTab Appeals base)
+                                    [ ":onyx.test NOTICE root :APPEAL 4 bob 203.0.113.9 open :please look again" ]
+                                )
+                                |> Tuple.first
+                    in
+                    Expect.all
+                        [ \q -> q |> Query.find [ testId "oc-appeal-accept" ] |> Event.simulate Event.click |> Event.expect (OperConsoleMsg (C.Edit AppealAnswerText "Accepted: the restriction is being lifted."))
+                        , \q -> q |> Query.find [ testId "oc-appeal-decline" ] |> Event.simulate Event.click |> Event.expect (OperConsoleMsg (C.Edit AppealAnswerText "Declined: the restriction stays."))
+                        ]
+                        (query opening)
+            ]
         , describe "silence"
+
             [ test "the gag, shun and quarantine forms are present and disabled when empty" <|
                 \_ ->
                     Expect.all
