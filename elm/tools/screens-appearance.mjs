@@ -139,9 +139,47 @@ async function sceneContrast(page, h, theme, bg, highContrast, surface = 'app') 
   }
 }
 
+/**
+ * Computed-style assertions for Text size and Density in a real browser:
+ * the root follows the scale (sm 15 / md 16 / lg 18 px), body text follows the
+ * root, and touch devices keep 44px targets in every density. Throws on a miss
+ * (screens.mjs reports it as a PROBLEM).
+ */
+async function assertScaleDensity(page, h, fontScale, density) {
+  await room(page, h, { prefs: { fontScale, density } });
+  // On a phone the list pages (rail rows, bottom nav) sit behind the room.
+  if ((page.viewportSize()?.width ?? 1440) < 768) await h.tryClick(page, '[data-testid="room-back"]');
+  const touch = await page.evaluate(() => matchMedia('(hover: none)').matches);
+  const got = await page.evaluate(() => {
+    const px = (el) => (el ? parseFloat(getComputedStyle(el).fontSize) : null);
+    const heights = (sel) => [...document.querySelectorAll(sel)]
+      .filter((e) => e.getClientRects().length)
+      .map((e) => Math.round(e.getBoundingClientRect().height));
+    return {
+      root: px(document.documentElement),
+      body: px(document.querySelector('.onyx-message .onyx-body')),
+      attrs: [document.documentElement.dataset.fontScale, document.documentElement.dataset.density].join('/'),
+      railItems: heights('.onyx-rail .onyx-rail-item'),
+      navButtons: heights('.onyx-mobile-nav .onyx-nav-btn, .onyx-primary-nav .onyx-nav-btn'),
+    };
+  });
+  const root = { sm: 15, md: 16, lg: 18 }[fontScale];
+  const problems = [];
+  if (got.attrs !== `${fontScale}/${density}`) problems.push(`html data attrs ${got.attrs}`);
+  if (Math.abs(got.root - root) > 0.05) problems.push(`root ${got.root}px, want ${root}`);
+  if (got.body === null || Math.abs(got.body - 0.9375 * root) > 0.2) problems.push(`message body ${got.body}px, want ${0.9375 * root}`);
+  if (touch) {
+    const small = [...got.railItems, ...got.navButtons].filter((height) => height < 44);
+    if (small.length) problems.push(`touch targets under 44px: ${small.join(',')}`);
+  }
+  if (process.env.AUDIT_VERBOSE) console.log(`scale ${fontScale}/${density} @${page.viewportSize()?.width}${touch ? ' touch' : ''}: root ${got.root} body ${got.body} rail ${got.railItems.slice(0, 3)} nav ${got.navButtons.slice(0, 3)}`);
+  if (problems.length) throw new Error(`scale ${fontScale}/${density}: ${problems.join('; ')}`);
+}
+
 const SCENE_IDS = ['deep-current', 'bioluminescence', 'caustics', 'aurora', 'pyrite-field', 'gold-veins', 'ember', 'forest', 'resin', 'ink-wash', 'mist', 'frost', 'aurora-ribbons', 'tide-bands', 'obsidian', 'lapis-gradient', 'paper-grain'];
 
 export default {
+  ...Object.fromEntries(['sm', 'md', 'lg'].flatMap((scale) => ['compact', 'cozy', 'roomy'].map((density) => [`ap-assert-${scale}-${density}`, (page, h) => assertScaleDensity(page, h, scale, density)]))),
   'ap-scene-frost-ember': (page, h) => sceneContrast(page, h, 'frost', 'ember', false),
   'ap-scene-frost-mist': (page, h) => sceneContrast(page, h, 'frost', 'mist', false),
   'ap-scene-kohaku-ember': (page, h) => sceneContrast(page, h, 'kohaku', 'ember', false),
