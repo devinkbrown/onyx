@@ -14,6 +14,7 @@ import Dict
 import Html exposing (Html, a, button, div, h2, input, li, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput)
+import View.Chanserv -- v3/gap-chanserv
 import View.Formation exposing (formation)
 import View.Sheet as Sheet
 
@@ -281,4 +282,6 @@ admission model =
 
         message ->
             div [ class "chb-admission", attribute "role" "status", attribute "aria-live" "polite", attribute "aria-atomic" "true" ]
-                [ text message ]
+                [ text message
+                , View.Chanserv.joinPromptActions model -- v3/gap-chanserv
+                ]
