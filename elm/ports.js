@@ -7424,7 +7424,22 @@ function fetchPublicFeed(url) {
             }
             applyAppearanceSeenTokens = Object.keys(seen);
           } catch (err) { /* token commit is best-effort; the browser ignores invalid values */ }
+          /* v3/gap-appearance: shell scheme flag, browser chrome colour,
+             and the no-flash cache of the derived shell palette. */
+          try { applyShellChrome(root, (req && Array.isArray(req.tokens)) ? req.tokens : []); } catch (err) { /* chrome sync is best-effort */ }
         } catch (err) { /* DOM application is best-effort */ }
+      });
+    }
+    /* v3/gap-appearance — the background renderer. Elm sends what to
+       paint; window.OnyxBackdrop (backdrop.js) owns the canvas, policy
+       and lifecycle. Without the bundle nothing paints and <html> never
+       gains data-scene, so the shell keeps its opaque ground. */
+    if (app.ports.backgroundScene) {
+      app.ports.backgroundScene.subscribe(function (req) {
+        try {
+          var backdrop = (typeof window !== "undefined") ? window.OnyxBackdrop : undefined;
+          if (backdrop && typeof backdrop.render === "function") backdrop.render(req);
+        } catch (err) { /* the scene is decoration; never break the app */ }
       });
     }
     /* Theme Studio share link (mirroring handleShare): the Elm fold
@@ -11766,6 +11781,118 @@ function fetchPublicFeed(url) {
     try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
   }
 
+  /* v3/gap-appearance — shell palette chrome. The Elm fold commits the
+     derived shell palette as `--onyx-theme-*` (base) / `--onyx-theme-hc-*`
+     (high contrast) pairs with the theme tokens; css/gap-appearance.css
+     maps them onto `--onyx-*`. Here: the light/dark flag CSS keys light-
+     ground rules on (<html data-shell-scheme>), the browser chrome colour
+     (<meta name="theme-color">), and a cache so the next load paints the
+     chosen look before Elm boots (no dark flash for light looks). Only
+     `--onyx-theme-*` names with `#rrggbb` values are ever cached or
+     restored (fail-closed: anything else is dropped). */
+  var SHELL_PALETTE_KEY = "onyx:shell-palette";
+  var SHELL_TOKEN_RE = /^--onyx-theme-(hc-)?[a-z0-9-]{1,24}$/;
+  var SHELL_HEX_RE = /^#[0-9a-f]{6}$/;
+
+  function shellSchemeOf(hex) {
+    if (typeof hex !== "string" || !SHELL_HEX_RE.test(hex)) return "dark";
+    var lin = function (i) {
+      var c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    var lum = 0.2126 * lin(1) + 0.7152 * lin(3) + 0.0722 * lin(5);
+    return lum > 0.18 ? "light" : "dark";
+  }
+
+  function shellPairs(pairs) {
+    var out = [];
+    for (var i = 0; i < pairs.length && out.length < 64; i++) {
+      var pair = pairs[i];
+      if (!Array.isArray(pair) || typeof pair[0] !== "string" || typeof pair[1] !== "string") continue;
+      if (SHELL_TOKEN_RE.test(pair[0]) && SHELL_HEX_RE.test(pair[1])) out.push([pair[0], pair[1]]);
+    }
+    return out;
+  }
+
+  function shellBgOf(pairs) {
+    for (var i = 0; i < pairs.length; i++) if (pairs[i][0] === "--onyx-theme-bg") return pairs[i][1];
+    return "";
+  }
+
+  function syncShellChrome(root, bg) {
+    if (!bg) return;
+    root.setAttribute("data-shell-scheme", shellSchemeOf(bg));
+    var doc = root.ownerDocument;
+    var meta = doc && doc.querySelector ? doc.querySelector('meta[name="theme-color"]') : null;
+    if (meta) meta.setAttribute("content", bg);
+  }
+
+  function applyShellChrome(root, rawPairs) {
+    var pairs = shellPairs(rawPairs);
+    var bg = shellBgOf(pairs);
+    if (!bg) return;
+    syncShellChrome(root, bg);
+    try {
+      if (global.localStorage) global.localStorage.setItem(SHELL_PALETTE_KEY, JSON.stringify({ v: 1, pairs: pairs }));
+    } catch (err) { /* storage unavailable — next load paints the house look first */ }
+  }
+
+  function restoreShellPalette(win) {
+    var doc = win && win.document;
+    if (!doc || !doc.documentElement) return false;
+    var raw = null;
+    try { raw = win.localStorage ? win.localStorage.getItem(SHELL_PALETTE_KEY) : null; } catch (err) { raw = null; }
+    if (typeof raw !== "string" || raw.length > 8192) return false;
+    var parsed = null;
+    try { parsed = JSON.parse(raw); } catch (err) { return false; }
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.pairs)) return false;
+    var pairs = shellPairs(parsed.pairs);
+    var bg = shellBgOf(pairs);
+    if (!bg) return false;
+    var root = doc.documentElement;
+    for (var i = 0; i < pairs.length; i++) root.style.setProperty(pairs[i][0], pairs[i][1]);
+    syncShellChrome(root, bg);
+    return true;
+  }
+
+  /* v3/gap-appearance — first paint of the device display prefs. Elm
+     stamps these on <html> once its snapshot lands (appearanceApply); until
+     then a Large text size or Roomy density would paint at the defaults and
+     jump. Same fail-closed rule as the palette: only whitelisted values from
+     `onyx:preferences` are ever stamped, and Elm re-applies the validated
+     truth right after boot. */
+  var DEVICE_PREF_ENUMS = {
+    density: ["compact", "cozy", "roomy"],
+    fontScale: ["sm", "md", "lg"],
+    width: ["measured", "full"]
+  };
+  var DEVICE_PREF_FLAGS = ["highContrast", "reduceMotion", "reduceTransparency"];
+
+  function restoreDevicePrefs(win) {
+    var doc = win && win.document;
+    if (!doc || !doc.documentElement || !doc.documentElement.dataset) return false;
+    var raw = null;
+    try { raw = win.localStorage ? win.localStorage.getItem("onyx:preferences") : null; } catch (err) { raw = null; }
+    if (typeof raw !== "string" || raw.length > 8192) return false;
+    var parsed = null;
+    try { parsed = JSON.parse(raw); } catch (err) { return false; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    var data = doc.documentElement.dataset;
+    var applied = false;
+    Object.keys(DEVICE_PREF_ENUMS).forEach(function (key) {
+      if (DEVICE_PREF_ENUMS[key].indexOf(parsed[key]) >= 0) { data[key] = parsed[key]; applied = true; }
+    });
+    DEVICE_PREF_FLAGS.forEach(function (key) {
+      if (typeof parsed[key] === "boolean") { data[key] = String(parsed[key]); applied = true; }
+    });
+    return applied;
+  }
+
+  if (global.document && global.localStorage) {
+    try { restoreShellPalette(global); } catch (err) { /* first paint keeps the house look */ }
+    try { restoreDevicePrefs(global); } catch (err) { /* first paint keeps the default sizes */ }
+  }
+
   /* ── v3/gap-shell: browser connectivity, one device value, roving keys ──
      Mirrors the oracle's OS network listeners (`store.ts` `offline` /
      `online`): each becomes one `shellEvent` for Elm, which owns the
@@ -12385,6 +12512,11 @@ function fetchPublicFeed(url) {
     installVoicePipAssist: installVoicePipAssist,
     installOverlayFocusOnce: installOverlayFocusOnce,
     wireShortcuts: wireShortcuts,
+    /* v3/gap-appearance */
+    shellSchemeOf: shellSchemeOf,
+    applyShellChrome: applyShellChrome,
+    restoreShellPalette: restoreShellPalette,
+    restoreDevicePrefs: restoreDevicePrefs,
     /* v3/polish */
     polishFlags: polishFlags,
     wirePolish: wirePolish,

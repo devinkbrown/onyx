@@ -400,7 +400,7 @@
      shows a dozen names per screen. */
   .onyx-roster:popover-open .onyx-member,
   .onyx-roster:popover-open .onyx-mlist-main { min-height: 48px; }
-  .onyx-roster:popover-open .onyx-mlist-main { gap: var(--space-3); font-size: 16px; }
+  .onyx-roster:popover-open .onyx-mlist-main { gap: var(--space-3); font-size: 1rem; }
   .onyx-roster:popover-open .onyx-avatar--sm { width: 2rem; height: 2rem; font-size: 0.75rem; }
 }
 

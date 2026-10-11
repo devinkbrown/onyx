@@ -37,6 +37,22 @@ isApply outbound =
             False
 
 
+{-| v3/gap-appearance: on the app route the background-renderer
+outbound rides along whenever the scene spec changes; the store/apply
+contract below is checked without it (the scene has its own tests). -}
+withoutScene : List Outbound -> List Outbound
+withoutScene =
+    List.filter
+        (\outbound ->
+            case outbound of
+                BackgroundScene _ ->
+                    False
+
+                _ ->
+                    True
+        )
+
+
 seeded : Model
 seeded =
     Tuple.first
@@ -74,7 +90,7 @@ suite =
                             [ \o -> Expect.equal 1 (List.length o)
                             , \o -> Expect.equal True (List.all isApply o)
                             ]
-                            out
+                            (withoutScene out)
                     ]
                     ( next, outbounds )
         , test "snapshot with unknown theme falls back to the default look" <|
@@ -116,7 +132,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStoreTheme { id = "abyss" } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            outbounds
+                            (withoutScene outbounds)
                     ]
                     ()
         , test "text-size preference stores and re-applies" <|
@@ -132,7 +148,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStorePrefs { json = Prefs.encodePreferences next.prefs } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            outbounds
+                            (withoutScene outbounds)
                     ]
                     ()
         , test "unknown preference keys keep the current value silently" <|
@@ -155,7 +171,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStorePrefs { json = Prefs.encodePreferences off.prefs } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            offOut
+                            (withoutScene offOut)
                     , \_ -> Expect.equal ( seeded, [] ) ( noop, noopOut )
                     ]
                     ()
@@ -176,7 +192,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStorePrefs { json = Prefs.encodePreferences next.prefs } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            outbounds
+                            (withoutScene outbounds)
                     ]
                     ()
         , test "data-saver toggle flips between off and adaptive" <|
@@ -195,14 +211,14 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStoreSceneMotion { value = "adaptive" } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            offOut
+                            (withoutScene offOut)
                     , \_ -> Expect.equal Prefs.SceneOff back.sceneMotion
                     , \_ ->
                         Expect.all
                             [ \o -> Expect.equal [ AppearanceStoreSceneMotion { value = "off" } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            backOut
+                            (withoutScene backOut)
                     ]
                     ()
         , test "staging a known background does not persist" <|
@@ -262,7 +278,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStoreBackground { id = "deep-current" } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            outbounds
+                            (withoutScene outbounds)
                     ]
                     ()
         , test "applying with nothing staged is a silent no-op" <|
@@ -300,7 +316,7 @@ suite =
                             [ \o -> Expect.equal [ AppearanceStoreTheme { id = "abyss" } ] (List.take 1 o)
                             , \o -> Expect.equal True (List.all isApply (List.drop 1 o) && List.length o == 2)
                             ]
-                            outbounds
+                            (withoutScene outbounds)
                     ]
                     ()
         , test "arrow keys wrap around the look list" <|

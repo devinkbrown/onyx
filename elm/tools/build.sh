@@ -6,6 +6,8 @@
 #   + voice engine: elm/media/build-voice.mjs bundles the Cadence media
 #     engine + window.OnyxVoiceEngine adapter (voice.js), its hashed video
 #     worker (voice-worker.<sha>.js) and the opcodec codec files
+#   + background renderer: elm/media/build-backdrop.mjs bundles the canvas
+#     scene engine + window.OnyxBackdrop adapter (backdrop.js)
 #   + content hashes: every local <script src> / <link href> asset that
 #     index.html references (app.js, voice.js, historyImport.js, ports.js,
 #     app.css, css/*.css) is
@@ -16,11 +18,13 @@
 # written by ./deploy.sh alone). Smoke the result with:
 #   ONYX_ELM_DIST=elm/dist-elm node --test elm/bundleBoot.smoke.mjs
 #
-# Usage: elm/tools/build.sh          (ELM=<elm 0.19.1 binary> to override)
+# Usage: elm/tools/build.sh          (ELM=<elm 0.19.1 binary> to override;
+#        ELM_OUT=<dir> builds somewhere other than elm/dist-elm, e.g. a side
+#        build while screenshots read the main one)
 set -euo pipefail
 
 ELM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT="$ELM_DIR/dist-elm"
+OUT="${ELM_OUT:-$ELM_DIR/dist-elm}"
 ELM_BIN="${ELM:-elm}"
 
 case "$OUT" in
@@ -69,6 +73,10 @@ if [ -n "$ESBUILD_BIN" ]; then
   # Calls: the real media engine behind window.OnyxVoiceEngine. Without it
   # every join fails closed, so the bundle is mandatory (fail the build).
   node "$ELM_DIR/media/build-voice.mjs" "$ESBUILD_BIN" "$OUT"
+  # v3/gap-appearance: the background renderer behind window.OnyxBackdrop
+  # (the canvas engine + 17 canvas variants). Mandatory like voice.js: the
+  # build fails if it cannot be bundled or would pull in Solid code.
+  node "$ELM_DIR/media/build-backdrop.mjs" "$ESBUILD_BIN" "$OUT"
 else
   echo "error: esbuild not found — the voice engine cannot be bundled (set ESBUILD=...)" >&2
   exit 1
@@ -99,7 +107,7 @@ html = html.replace(ref, (whole, lead, rel) => {
   return `${lead}="${hashed.get(rel)}"`;
 });
 
-for (const required of ["app.js", "voice.js", "historyImport.js", "ports.js", "app.css"]) {
+for (const required of ["app.js", "voice.js", "backdrop.js", "historyImport.js", "ports.js", "app.css", "css/gap-appearance.css"]) {
   if (!hashed.has(required)) throw new Error(`index.html no longer references ${required}`);
 }
 fs.writeFileSync(indexPath, html);

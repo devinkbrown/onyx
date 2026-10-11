@@ -77,7 +77,7 @@ suite =
         , test "header description follows the active built-in look" <|
             \_ ->
                 query blank
-                    |> Query.has [ Selector.text "The flagship — mineral night, quiet cyan signal, and matte, focused surfaces." ]
+                    |> Query.has [ Selector.text "The flagship — abyssal night, one quiet sea-glass signal, and matte, focused surfaces." ]
         , test "session overrides raise the modified badge" <|
             \_ ->
                 query overridden

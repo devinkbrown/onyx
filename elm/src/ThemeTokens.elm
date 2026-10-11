@@ -5,6 +5,17 @@ module ThemeTokens exposing (themeIds, tokensFor)
 Do not hand-edit: regenerate from the oracle. Each map is the full
 literal token set (`THEMES[id].tokens`); the studio overlays session
 overrides on top via `Studio.diffOverrides` / `Studio.customThemeTokens`.
+
+v3/gap-appearance — Elm-owned divergence (the Solid oracle is
+deprecated): the light looks now paint the whole shell, so Pearl's
+`--shu` / `--warn` / `--ok` and Frost's `--paper-dim` / `--paper-mute` /
+`--warn` / `--shu` / `--ok` were darkened, and Tide's, Kohaku's and
+Frost's `--paper-mute` nudged to clear 3:1 on every surface, Pearl's
+`--lapis` and Frost's `--paper-dim` nudged to clear 4.8:1 (headroom for
+tinted rows and hovers), to the
+values `ShellPalette` derives, so every built-in palette clears AA on
+its own surfaces (`ShellPaletteTest` gates all 18). Keep these on
+regeneration.
 -}
 
 import Dict exposing (Dict)
@@ -90,7 +101,7 @@ tokensFor id =
                 , ( "--shu-bright", "#ffa193" )
                 , ( "--paper", "#d1e1e9" )
                 , ( "--paper-dim", "#8c9ba2" )
-                , ( "--paper-mute", "#536770" )
+                , ( "--paper-mute", "#5b7079" )
                 , ( "--ok", "#5bc78e" )
                 , ( "--warn", "#e6d08c" )
                 , ( "--danger", "var(--shu)" )
@@ -245,19 +256,19 @@ tokensFor id =
                 , ( "--stone-2", "#dbd6cc" )
                 , ( "--stone-3", "#d0cbc1" )
                 , ( "--stone-line", "#c9c2b5" )
-                , ( "--lapis", "#0065b0" )
+                , ( "--lapis", "#005fa7" )
                 , ( "--lapis-bright", "#086fbe" )
                 , ( "--lapis-deep", "#003e70" )
                 , ( "--gold", "#896100" )
                 , ( "--gold-bright", "#ad7c0a" )
                 , ( "--gold-deep", "#5f4200" )
-                , ( "--shu", "#c83319" )
+                , ( "--shu", "#bd270a" )
                 , ( "--shu-bright", "#e5462b" )
                 , ( "--paper", "#251e15" )
                 , ( "--paper-dim", "#494136" )
                 , ( "--paper-mute", "#71675a" )
-                , ( "--ok", "#15915c" )
-                , ( "--warn", "var(--gold)" )
+                , ( "--ok", "#007347" )
+                , ( "--warn", "#825c00" )
                 , ( "--danger", "var(--shu)" )
                 , ( "--seam", "color-mix(in oklab, var(--gold) 55%, transparent)" )
                 , ( "--seam-faint", "color-mix(in oklab, var(--gold) 24%, transparent)" )
@@ -420,7 +431,7 @@ tokensFor id =
                 , ( "--shu-bright", "#ff8066" )
                 , ( "--paper", "#e4ddd0" )
                 , ( "--paper-dim", "#9e988b" )
-                , ( "--paper-mute", "#6a6252" )
+                , ( "--paper-mute", "#6d6555" )
                 , ( "--ok", "#5bc78e" )
                 , ( "--warn", "#e6d08c" )
                 , ( "--danger", "var(--shu)" )
@@ -614,13 +625,13 @@ tokensFor id =
                 , ( "--gold", "#00768a" )
                 , ( "--gold-bright", "#0096af" )
                 , ( "--gold-deep", "#00515f" )
-                , ( "--shu", "#c92f34" )
+                , ( "--shu", "#be222b" )
                 , ( "--shu-bright", "#e64344" )
                 , ( "--paper", "#202b2e" )
-                , ( "--paper-dim", "#546063" )
-                , ( "--paper-mute", "#7a8d92" )
-                , ( "--ok", "#15915c" )
-                , ( "--warn", "#8a6e1f" )
+                , ( "--paper-dim", "#4c575a" )
+                , ( "--paper-mute", "#65787d" )
+                , ( "--ok", "#007347" )
+                , ( "--warn", "#7b5f07" )
                 , ( "--danger", "var(--shu)" )
                 , ( "--seam", "color-mix(in oklab, var(--lapis) 34%, transparent)" )
                 , ( "--seam-faint", "color-mix(in oklab, var(--lapis) 14%, transparent)" )

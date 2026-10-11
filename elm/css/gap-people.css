@@ -57,7 +57,7 @@
 @media (hover: none) {
   .onyx-roster-more { min-height: var(--target-min); }
 }
-.onyx-roster:popover-open .onyx-roster-more { min-height: var(--target-min); font-size: 15px; }
+.onyx-roster:popover-open .onyx-roster-more { min-height: var(--target-min); font-size: 0.9375rem; }
 
 /* ── 2. Member card: moderation ─────────────────────────────────────── */
 

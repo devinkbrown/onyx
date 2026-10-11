@@ -61,7 +61,18 @@ function assetRoot() {
     rmSync(out, { recursive: true, force: true });
     throw new Error(`could not bundle the voice engine (needs the repo's esbuild; set ESBUILD=...): ${err.message}`, { cause: err });
   }
-  return { dir: here, appJs, voiceJs: join(out, "voice.js"), cleanup() { rmSync(out, { recursive: true, force: true }); } };
+  /* v3/gap-appearance: index.html also loads the background renderer
+     (backdrop.js), built by media/build-backdrop.mjs. */
+  try {
+    execFileSync(process.execPath, [join(here, "media/build-backdrop.mjs"), findEsbuild(), out], {
+      cwd: here,
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+  } catch (err) {
+    rmSync(out, { recursive: true, force: true });
+    throw new Error(`could not bundle the background renderer (needs the repo's esbuild; set ESBUILD=...): ${err.message}`, { cause: err });
+  }
+  return { dir: here, appJs, voiceJs: join(out, "voice.js"), backdropJs: join(out, "backdrop.js"), cleanup() { rmSync(out, { recursive: true, force: true }); } };
 }
 
 function findEsbuild() {
@@ -91,6 +102,7 @@ function localResources(root, fetched) {
         fetched.push(rel);
         const file = rel === "app.js" && root.appJs ? root.appJs
           : rel === "voice.js" && root.voiceJs ? root.voiceJs
+          : rel === "backdrop.js" && root.backdropJs ? root.backdropJs
           : join(root.dir, rel);
         try {
           const type = rel.endsWith(".js") ? "application/javascript" : rel.endsWith(".css") ? "text/css" : "application/octet-stream";
@@ -161,6 +173,9 @@ async function boot(path, setup) {
     virtualConsole,
     beforeParse(window) {
       installSocketStub(window, log);
+      /* v3/gap-appearance: jsdom has no 2D canvas; model a browser without
+         one so the background renderer fails closed (no scene). */
+      window.HTMLCanvasElement.prototype.getContext = () => null;
       if (setup) setup(window);
       window.addEventListener("error", (e) => errors.push(`window.error: ${e.message}`));
       if (!window.matchMedia) {
