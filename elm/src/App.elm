@@ -46811,7 +46811,7 @@ gapDraftPersistable model target =
 
 
 {-| The quiet draft line under the composer, if any. -}
-gapDraftStatus : Model -> Maybe String
+gapDraftStatus : Model -> Maybe { text : String, saved : Bool }
 gapDraftStatus model =
     case model.activeChannel of
         Nothing ->

@@ -298,6 +298,7 @@ type DraftStatus
     | DraftSaved
     | DraftTabOnly
     | DraftLimit
+    | DraftFailed
 
 
 draftStatusFromString : String -> DraftStatus
@@ -313,30 +314,35 @@ draftStatusFromString raw =
             DraftTabOnly
 
         "malformed" ->
-            DraftTabOnly
+            DraftFailed
 
         _ ->
             DraftUnknown
 
 
-{-| The quiet line under the composer (mirroring the oracle "Saved
-here" / "Only on this tab" compose state). `persistable` is False for
-encrypted DMs, whose drafts never touch storage. -}
-draftStatusCopy : { persistable : Bool, status : DraftStatus } -> Maybe String
+{-| The quiet line under the composer, in the oracle's own words
+(`Composer.tsx`: "Saved here" / "Only on this tab" / "Saved with
+limits; full text remains here" / "Could not save; full text remains
+here"). `persistable` is False for encrypted DMs, whose drafts never
+touch storage; `saved` says whether the draft is on this device. -}
+draftStatusCopy : { persistable : Bool, status : DraftStatus } -> Maybe { text : String, saved : Bool }
 draftStatusCopy input =
     if not input.persistable then
-        Just "Draft kept in this tab only (encrypted chat)"
+        Just { text = "Only on this tab", saved = False }
 
     else
         case input.status of
             DraftSaved ->
-                Just "Draft saved on this device"
+                Just { text = "Saved here", saved = True }
 
             DraftTabOnly ->
-                Just "Draft kept in this tab only"
+                Just { text = "Only on this tab", saved = False }
 
             DraftLimit ->
-                Just "Draft kept in this tab only (too many saved drafts)"
+                Just { text = "Saved with limits; full text remains here", saved = False }
+
+            DraftFailed ->
+                Just { text = "Could not save; full text remains here", saved = False }
 
             DraftUnknown ->
                 Nothing

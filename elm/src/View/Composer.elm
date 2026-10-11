@@ -840,12 +840,26 @@ emojiButton model ready =
 -- v3/gap-convo
 
 
-{-| "Draft saved on this device" (or why it is not). Quiet, never live. -}
+{-| "Saved here" (or why it is not). Quiet: it appears with the first
+typed character and only changes when the draft's home does. -}
 gapDraftLine : Model -> Html Msg
 gapDraftLine model =
     case App.gapDraftStatus model of
-        Just copy ->
-            p [ class "gap-draft-status", attribute "data-testid" "draft-status" ] [ text copy ]
+        Just status ->
+            p
+                [ class "gap-draft-status"
+                , attribute "role" "status"
+                , attribute "aria-live" "polite"
+                , attribute "data-testid" "draft-status"
+                , attribute "data-kept"
+                    (if status.saved then
+                        "device"
+
+                     else
+                        "tab"
+                    )
+                ]
+                [ text status.text ]
 
         Nothing ->
             text ""

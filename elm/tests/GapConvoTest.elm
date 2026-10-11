@@ -496,7 +496,7 @@ suite =
                         saved =
                             Tuple.first (update (GapConvoMsg (GapConvo.DraftsSaved "saved")) typed)
                     in
-                    Expect.equal (Just "Draft saved on this device") (gapDraftStatus saved)
+                    Expect.equal (Just "Saved here") (Maybe.map .text (gapDraftStatus saved))
             ]
         , describe "landing on a message"
             [ test "a search hit scrolls into view without stealing the field's focus" <|
