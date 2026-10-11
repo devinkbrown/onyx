@@ -1,22 +1,35 @@
-# Onyx Elm rewrite
+# Onyx Elm client (v3)
 
-1:1 parity port of the Onyx SolidJS client with a revamped Elm UI,
-tracked against every onyx-server feature in [COVERAGE.md](COVERAGE.md).
+The Elm client is the Onyx web product: the build `./deploy.sh` ships with
+`ONYX_CLIENT=elm`. The SolidJS client in `src/` is deprecated; it is kept as the
+behavioural oracle that the status docs compare against, and its TypeScript tests are
+the source of many Elm test vectors (`src/lib/**/*.test.ts`,
+`onyx-client-contract.v2.json`).
 
-TypeScript sources are the behavior oracle; Elm tests mirror their
-vectors (`src/lib/**/*.test.ts`, `onyx-client-contract.v2.json`).
+Status docs live in [`design/INDEX.md`](design/INDEX.md): the roadmap
+([V3_ROADMAP.md](V3_ROADMAP.md)), the protocol matrix ([COVERAGE.md](COVERAGE.md)),
+the client parity map, the server feature map, the design direction and the calls design.
 
 ## Layout
 
-- `src/Wire.elm` — IRC framing/parsing/formatting (port of `lib/irc/parser.ts`).
-- `src/Base64Url.elm` — canonical unpadded base64url + UTF-8 bytes.
-- `src/GroupControl.elm` — E2EEGROUP routing codec + OGC1 payload
-  (ports of `lib/e2ee/groupControl.ts`, `groupControlPayload.ts` pure surface).
-- `src/GroupEnvelope.elm` — `ONYXROOM1` envelope parse/pack/AAD/display
-  (port of `lib/e2ee/groupEnvelope.ts` pure surface + keyring validators).
-- `tests/` — oracle-mirrored vectors (`elm-test`).
-- `tools/` — offline/sandbox setup scripts (not part of the app).
-- `COVERAGE.md` — server-feature → oracle → Elm status matrix.
+- `src/Main.elm` — `Browser.application` entry: ports, subscriptions, routing.
+- `src/App.elm` — the model, `Msg` and `update`: protocol folds, composer, store
+  actions. Effects are data (`List Outbound`); `Main` turns them into port calls.
+  New work lives in feature modules (`src/Organize*.elm`, `Chanserv.elm`,
+  `WatchTogether.elm`, `OperConsole.elm`, `GapShell.elm`, …) wired in through blocks
+  tagged `-- v3/<slice>` and the `settleSteps` list.
+- `src/Wire.elm`, `Base64Url.elm`, `GroupControl.elm`, `GroupEnvelope.elm`, `DmCipher.elm`,
+  `Keyring.elm`, … — pure protocol and crypto-adjacent modules (validation, parsing,
+  packing, transcripts, fail-closed display rules).
+- `src/View.elm` and `src/View/*.elm` — every rendered surface.
+- `ports.js` (+ `historyImport.js`, `media/*.ts` for the Cadence voice engine and the
+  background renderer) — the JS side: WebSocket, IndexedDB vault, WebCrypto, WebAuthn,
+  WebRTC, uploads, notifications, service worker registration.
+- `app.css` + `css/*.css` — styles (tokens first, then per-surface sheets in `index.html` link order).
+- `tests/` — elm-test vectors; `*.smoke.mjs` — jsdom smoke suites over the real bundle and
+  `ports.js`; `tools/` — build (`build.sh`), screenshots (`screens*.mjs`), CSS coverage,
+  contrast audit, style map, call end-to-end.
+- `design/` — design and status documents (see `design/INDEX.md`).
 
 Crypto (AES-GCM, Ed25519, ECDH, SCRAM), WebSocket, IndexedDB, WebAuthn,
 WebRTC, and HTTP live behind ports; Elm owns validation, parsing,
@@ -57,8 +70,12 @@ export ELM_HOME=/tmp/elmhome
 ```sh
 export PATH=/tmp:$PATH ELM_HOME=/tmp/elmhome
 cd elm
-/tmp/elm make src/Wire.elm --output /dev/null        # typecheck spot-check
-node /tmp/elmtools/package/bin/elm-test              # full suite
+/tmp/elm make src/Main.elm --output /dev/null                  # typecheck the app
+node /tmp/elmtools/package/bin/elm-test --compiler /tmp/elm    # full suite
+for s in *.smoke.mjs; do node "$s" || echo "FAIL $s"; done     # smoke suites
+node tools/css-coverage.mjs                                    # 0 unstyled, 0 undefined vars
+bash tools/build.sh                                            # → dist-elm/ (never touches out/)
+node tools/screens.mjs --vp all --out <dir>                    # real-Chromium aspect-ratio matrix
 ```
 
 `elm.json` pins must stay complete (direct + indirect + test-indirect):

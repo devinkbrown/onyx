@@ -12,6 +12,14 @@ architecture. It is grounded in the current repo state:
 - The Solid oracle already has the right information architecture:
   `shellNavigationModel.ts`, `ChannelSidebar.tsx` and `HomeBriefingView.tsx`.
 
+> **Status (2026-10-11).** This is the design direction as written on 2026-10-10, and the
+> figures in the opening list (App.elm size, unkeyed transcript, bare rail, no global key
+> subscription) describe the code *then*. The direction has since been built: the shell frame,
+> keyed transcript, sectioned rail, action palette and one `shortcut` port all shipped, and
+> every viewport class is covered by the 15-viewport matrix. Where the build stands is in
+> [`../V3_ROADMAP.md`](../V3_ROADMAP.md); what is still open is in the **Remaining gaps**
+> section of [`CLIENT_PARITY_MAP.md`](CLIENT_PARITY_MAP.md). Index: [`INDEX.md`](INDEX.md).
+
 ## Information architecture: five destinations, two collections, one palette
 
 Port the Solid `shellNavigationModel` as is; do not invent a new IA for
