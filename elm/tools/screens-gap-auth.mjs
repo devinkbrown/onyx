@@ -169,7 +169,8 @@ async function bootAccount(page, h) {
     ws.onMessage((m) => server.send(m));
     server.onMessage((m) => ws.send(m));
   });
-  await h.joinRoom(page, 'kn', '#lounge');
+  // Home (no room): on phones the bottom nav is only there outside a room.
+  await h.joinRoom(page, 'kn', '');
   const inject = async (...lines) => {
     for (const l of lines) if (client) client.send(l);
     await h.settle(page, 400);
