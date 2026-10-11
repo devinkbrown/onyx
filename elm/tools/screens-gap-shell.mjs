@@ -277,7 +277,7 @@ export default {
   'gs-offline': async (page, h) => {
     await mockIrc(page, {});
     await settleIn(page, h);
-    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await page.evaluate(() => window.dispatchEvent(new window.Event('offline')));
     await h.settle(page, 900);
   },
 };

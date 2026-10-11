@@ -10058,6 +10058,14 @@ function fetchPublicFeed(url) {
     } catch (e) { return null; }
   }
 
+  function gapShellLocalStorage(win) {
+    try { return (win && win.localStorage) || null; } catch (e) { return null; }
+  }
+
+  function gapShellOnline(nav) {
+    try { return !(nav && nav.onLine === false); } catch (e) { return true; }
+  }
+
   function gapShellVisible(el) {
     try { return !!(el && el.getClientRects && el.getClientRects().length); } catch (e) { return false; }
   }
@@ -10076,7 +10084,7 @@ function fetchPublicFeed(url) {
       selector = ".onyx-rail-item";
     }
     if (!root || !selector) return null;
-    var list = [];
+    var list;
     try { list = Array.prototype.slice.call(root.querySelectorAll(selector)); } catch (e) { return null; }
     return list.filter(gapShellVisible);
   }
@@ -10136,13 +10144,11 @@ function fetchPublicFeed(url) {
     var win = env.window || (typeof window !== "undefined" ? window : undefined);
     var doc = env.document || (typeof document !== "undefined" ? document : undefined);
     var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
-    var local = null;
-    try { local = (win && win.localStorage) || null; } catch (e) { local = null; }
+    var local = gapShellLocalStorage(win);
     function send(event) {
       try { if (app.ports.shellEvent) app.ports.shellEvent.send(event); } catch (e) { /* port gone */ }
     }
-    var online = true;
-    try { online = !(nav && nav.onLine === false); } catch (e) { online = true; }
+    var online = gapShellOnline(nav);
     send({
       event: "boot",
       online: online,

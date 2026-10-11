@@ -297,7 +297,7 @@ joinField model =
                 ([ id "gs-join-input"
                  , class "gs-join-input"
                  , type_ "text"
-                 , placeholder "Join a room by name"
+                 , placeholder "Join by name"
                  , attribute "autocomplete" "off"
                  , attribute "autocapitalize" "off"
                  , attribute "autocorrect" "off"
