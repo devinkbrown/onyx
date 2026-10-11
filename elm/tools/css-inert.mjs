@@ -18,7 +18,7 @@
  *
  *   node elm/tools/css-inert.mjs probe --out DIR [--dist elm/dist-elm] [--files app,pol-shell]
  *        [--vp phone,fold-open,tablet-land,desktop,laptop-short] [--jobs 6] [--only substr] [--resume]
- *   node elm/tools/css-inert.mjs report DIR [--file app] [--min-pages 4] [--json out.json]
+ *   node elm/tools/css-inert.mjs report DIR [--file app] [--min-pages 4] [--min-ratio 0.8] [--json out.json]
  *
  * `probe` copies the built dist, swaps in the UNMINIFIED sources of the
  * worktree under the same hashed names (rule order = source order), and runs
@@ -95,6 +95,7 @@ if (cmd === 'probe') {
   const dir = resolve(rest.find((x) => !x.startsWith('--')) || '');
   const file = flag('--file', 'app');
   const minPages = Number(flag('--min-pages', 4));
+  const minRatio = Number(flag('--min-ratio', 0.8)); // overridden on at least this share of the pages that match it
   const { parseCss, walk } = await import('./css-inert-scan.mjs');
   const rel = file === 'app' ? 'app.css' : `css/${file}.css`;
   // the sources the probe ran against (its dist copy), not whatever the worktree holds now
@@ -121,9 +122,9 @@ if (cmd === 'probe') {
     const [i, dj] = k.split('|').map(Number); const rule = rules[i]; const decl = rule && rule.decls[dj];
     if (!decl) continue;
     const row = { file: rel, line: decl.line, rule: rule.line, sel: rule.selector.replace(/\s+/g, ' ').slice(0, 80), prop: decl.prop, value: decl.value.slice(0, 40), pages: a.pages, overridden: a.ovr, scenarios: a.scen.size };
-    if (a.eff === 0 && a.ovr >= 1 && a.pages >= minPages && a.scen.size >= 2) inert.push(row); else used.push(row);
+    if (a.eff === 0 && a.ovr >= 1 && a.ovr / a.pages >= minRatio && a.pages >= minPages && a.scen.size >= 2) inert.push(row); else used.push(row);
   }
-  console.log(`${file}: ${rules.length} rules; ${seenDecls} declarations observed; ${inert.length} inert (never used on >= ${minPages} pages in >= 2 scenarios, overridden somewhere)`);
+  console.log(`${file}: ${rules.length} rules; ${seenDecls} declarations observed; ${inert.length} inert (never used on >= ${minPages} pages in >= 2 scenarios, overridden by a different value on >= ${Math.round(minRatio * 100)}% of the pages that match it)`);
   const j = flag('--json', '');
   if (j) writeFileSync(j, JSON.stringify(inert, null, 1));
   for (const r of inert.slice(0, Number(flag('--show', 40)))) console.log(`  ${r.file}:${r.line}  ${r.sel}  { ${r.prop}: ${r.value} }  (${r.overridden}/${r.pages} pages overridden, ${r.scenarios} scenarios)`);
