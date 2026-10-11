@@ -188,7 +188,7 @@ function parseCss(file) {
       if (src[i] === '@') {
         const { pos, ch } = scanUntil(src, i, end, ['{', ';']);
         const prelude = src.slice(i, pos).trim().replace(/\s+/g, ' ');
-        const name = (prelude.match(/^@([\w-]+)/) || [, ''])[1].toLowerCase();
+        const name = (prelude.match(/^@([\w-]+)/) || ['', ''])[1].toLowerCase();
         if (ch !== '{') { atrules.push({ file, line: lineOf(i), name, prelude, ctx: [...ctx], statement: true }); i = pos + 1; continue; }
         const close = matchBrace(src, pos, end);
         atrules.push({ file, line: lineOf(i), name, prelude, ctx: [...ctx] });
