@@ -734,10 +734,10 @@ Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/
 | E98 | Image lightbox (focus trap, Escape, Save, Close) | `MessageText.tsx:145` (UI) | FULL | `View/Thread.elm:2484-2528`, `App.elm:38456` | |
 | E99 | Open Graph link-preview card for the first link | `MessageText.tsx:1063,1176`; `preview/linkPreview.ts` (pref) | PARTIAL | `View/Thread.elm:2535-2658`, `App.elm:35935,36944` | Fetched at fold time; rows restored from the vault never fetch a card |
 | E100 | Preview thumbnail: consent click, hide on error | `MessageText.tsx:1131-1158` (UI) | PARTIAL | `View/Thread.elm:2648` | Consent works; a broken thumbnail is not hidden |
-| E101 | BlockKit-lite message block (title/text/fields/selects/buttons, safety hint) | `MessageText.tsx:535`; `integrations/blockKitLite.ts:64` (auto) | MISSING | — | `[onyx:block]` payload renders as raw text |
-| E102 | BlockKit URL buttons and copy-value buttons (Copied/failed) | `MessageText.tsx:404-503` (UI) | MISSING | — | |
-| E103 | BlockKit actions: origin-scoped review dialog, then send | `MessageText.tsx:619-673`; `BlockKitActionConfirmation.tsx:32` (UI) | MISSING | — | |
-| E104 | BlockKit modal block ("Inspect structured data") | `message/BlockKitModal.tsx:186` (UI) | MISSING | — | |
+| E101 | BlockKit-lite message block (title/text/fields/selects/buttons, safety hint) | `MessageText.tsx:535`; `integrations/blockKitLite.ts:64` (auto) | FULL | `View/BlockKit.elm` (cards), `BlockKit.elm` (strict decoder), `View/Thread.elm` `messageBody` | Strict decoder: payload ≤ 4 KiB, field/option/button caps, no truncation, unsafe/invisible characters refused; invalid blocks stay plain text (v3/gap-import) |
+| E102 | BlockKit URL buttons and copy-value buttons (Copied/failed) | `MessageText.tsx:404-503` (UI) | FULL | `View/BlockKit.elm` `buttonView` | http(s)-only URL buttons show their destination host and open `noopener noreferrer`; copy buttons report Copied / Copy failed (v3/gap-import) |
+| E103 | BlockKit actions: origin-scoped review dialog, then send | `MessageText.tsx:619-673`; `BlockKitActionConfirmation.tsx:32` (UI) | FULL | `BlockKit.elm` `Stage`/`ConfirmSend`, `View/BlockKit.elm` `reviewDialog`, `App.elm` `blockKitSend` | Origin-scoped (target must be the conversation the block is in; others render disabled); review shows exact destination + plaintext; re-validated at confirm; one message out as the user (v3/gap-import) |
+| E104 | BlockKit modal block ("Inspect structured data") | `message/BlockKitModal.tsx:186` (UI) | FULL | `View/BlockKit.elm` `inspectDialog` | "Inspect structured data" dialog lists every field, option and destination, with the exact text each control would send (v3/gap-import) |
 | E105 | Extension client actions (open-url/copy-text manifest, audit) | `extensions/clientActions.ts`; `PreferencesPanel.tsx:2522` (UI) | MISSING | — | Preferences/palette surface; listed for completeness |
 | E106 | Textarea: Enter sends, Shift+Enter newline, auto-grow | `Composer.tsx:697,902,1742` (UI) | FULL | `View/Composer.elm:98,628` | |
 | E107 | Destination and offline state in placeholder and accessible name | `Composer.tsx:368-383` (UI) | PARTIAL | `View/Composer.elm:100-119` | aria-label is just "Message"; DMs don't get the "@" prefix |
@@ -1867,19 +1867,19 @@ Elm checked: `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`
 | V42 | Export compressed vault (.json.gz) | `PreferencesPanel.tsx:1164` (UI) | MISSING | — | — |
 | V43 | Save vault (plain / gzip) to file via File System Access | `PreferencesPanel.tsx:1175`, `:1185` (UI) | MISSING | — | — |
 | V44 | Share vault file (Web Share) | `PreferencesPanel.tsx:1200` (UI) | MISSING | — | — |
-| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | PARTIAL | `View/Prefs.elm:229`, `App.elm:37003`, `ports.js:6882` | Merges immediately; no 64 MiB guard; result only in service log; non-vault sections ignored |
-| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | MISSING | — | Picker accepts `.json` only |
-| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | MISSING | — | — |
-| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | MISSING | — | — |
+| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | FULL | `View/HistoryImport.elm`, `HistoryImport.elm`, `historyImport.js` (portable kind) | 64 MiB file guard before reading; parsed in a worker; staged for review before any write (v3/gap-import) |
+| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | FULL | `historyImport.js` `readText` | `.json.gz` opened through `DecompressionStream`, 64 MiB expanded cap (v3/gap-import) |
+| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | FULL | `View/HistoryImport.elm` `reviewCard` | Counts (new / already here / left out), per-conversation include + destination, Cancel / Import (v3/gap-import) |
+| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | PARTIAL | `App.elm` `settleStepGapImport`, `HistoryImport.ownerChanged` | Owner change aborts a running or staged import (v3/gap-import); the cross-tab import lock is not ported |
 | V49 | Import applies prefs, scene motion, retention handoff | `portableTransfer.ts:228` (UI) | MISSING | — | `preferenceHandoff` ignored |
 | V50 | Saved sign-in targets (account handoffs) transfer | `portableTransfer.ts:167` (UI) | MISSING | — | — |
 | V51 | Export result echo | `PreferencesPanel.tsx:867` (UI) | FULL | `App.elm:36989` | Counts messages/conversations only |
-| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/Prefs.elm:221` | Only Portable vault route |
-| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | MISSING | — | — |
-| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | MISSING | — | — |
+| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/HistoryImport.elm` | Portable vault + four third-party sources (radiogroup with arrow keys) + past imports; the Discord bot-token route (V55) and the other tools are not ported |
+| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | FULL | `historyImport.js` `addDiscordExport`, `View/HistoryImport.elm` | Multi-file / paginated exports merge by message id; replies, attachments (http(s) only); review step; chunked + worker, progress + cancel (v3/gap-import) |
+| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | FULL | `historyImport.js` `discordPackage` | JSON and CSV message files, DMs; review step (v3/gap-import) |
 | V55 | Discord bot-token server import (proxy consent, progress, cancel, pins) | `HistoryImportControls.tsx:635`, `:834` (UI) | MISSING | — | Uses `/discord-import` proxy |
-| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | MISSING | — | — |
-| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | MISSING | — | — |
+| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | FULL | `historyImport.js` `slackExport` | Real per-day export layout and the bundle shapes Solid read; Slack markup decoded; review step (v3/gap-import) |
+| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | FULL | `historyImport.js` `ircLog` | WeeChat, irssi, mIRC, ZNC, HexChat logs; the room is chosen in the review, not before parsing (v3/gap-import) |
 | V58 | Import byte/count limits with copy | `shell/importFileLimits.ts:6` (UI) | MISSING | `VaultImport.elm:22` row ceilings only | No file-size gate before FileReader |
 | V59 | `/export [txt\|json]` local transcript | `store.ts:8400` (slash) | FULL | `App.elm:19339`, `Transcript.elm` | Toast says "Export started" even if download fails |
 | V60 | Room More → Export local transcript | `shell/PresenceRibbon.tsx:1216` (UI) | MISSING | — | — |

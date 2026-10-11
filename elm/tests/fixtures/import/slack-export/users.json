@@ -1,0 +1,4 @@
+[
+  { "id": "U0000001", "name": "ana", "real_name": "Ana Sample", "profile": { "display_name": "ana", "real_name": "Ana Sample" } },
+  { "id": "U0000002", "name": "bo", "profile": { "display_name": "", "real_name": "Bo Test" } }
+]

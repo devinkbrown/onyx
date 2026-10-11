@@ -1,0 +1,11 @@
+{
+  "__proto__": { "polluted": true },
+  "guild": { "name": "‮evil\u0000 guild" },
+  "channel": { "id": "../../etc", "name": "!!!" , "type": 7 },
+  "messages": [
+    { "id": { "x": 1 }, "type": "Default", "timestamp": 12, "content": ["array"], "author": "string" },
+    { "id": "1", "type": "Default", "timestamp": "2024-01-02T10:00:00Z", "content": "ok but author has spaces", "author": { "nickname": "  Mallory  The  Great \n" } },
+    { "id": "2", "type": "Default", "timestamp": "2024-01-02T10:00:01Z", "content": "[onyx:block] {\"title\":\"imported block\"}", "author": { "name": "m" } },
+    { "id": "3", "type": "Default", "timestamp": "2024-01-02T10:00:02Z", "content": "<img src=x onerror=alert(1)>", "author": { "name": "m" } }
+  ]
+}

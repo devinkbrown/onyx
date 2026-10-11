@@ -677,7 +677,7 @@ transferVectors =
                 in
                 Expect.equal ( out, pending.prefsTransferStatus, done.prefsTransferStatus )
                     ( [ VaultExportRequest ], Just "Preparing export…", Just "Exported 1 message from 2 conversations." )
-        , test "import opens the existing validated picker" <|
+        , test "import asks the history importer for a portable vault file (review follows)" <|
             \_ ->
-                Expect.equal (Tuple.second (update PrefsVaultImport opened)) [ VaultImportPick ]
+                Expect.equal (Tuple.second (update PrefsVaultImport opened)) [ HistoryImportPick { job = 1, kind = "portable" } ]
         ]

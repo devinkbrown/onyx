@@ -120,6 +120,7 @@ import Browser.Dom
 import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
+import HistoryImport -- v3/gap-import
 import Media
 import Nodes
 import Organizer -- v3/gap-organize
@@ -280,6 +281,40 @@ port vaultExported : ({ targets : Int, messages : Int } -> msg) -> Sub msg
 port vaultImportPick : () -> Cmd msg
 
 port vaultImportFile : ({ json : String } -> msg) -> Sub msg
+
+
+-- v3/gap-import: third-party history import (historyImport.js). Staged
+-- results and batch lists arrive as raw JSON and are decoded strictly.
+
+
+port historyImportPick : { job : Int, kind : String } -> Cmd msg
+
+
+port historyImportCancel : { job : Int } -> Cmd msg
+
+
+port historyImportRecord : { batch : HistoryImport.Batch, ids : List String, prints : List String } -> Cmd msg
+
+
+port historyImportListRequest : () -> Cmd msg
+
+
+port historyImportRemove : { batch : String } -> Cmd msg
+
+
+port historyImportProgress : ({ job : Int, phase : String, done : Float, total : Float, files : Int } -> msg) -> Sub msg
+
+
+port historyImportStaged : (Decode.Value -> msg) -> Sub msg
+
+
+port historyImportFailed : ({ job : Int, message : String } -> msg) -> Sub msg
+
+
+port historyImportBatches : (Decode.Value -> msg) -> Sub msg
+
+
+port historyImportRemoved : ({ batch : String, removed : Int, ok : Bool, targets : List String, prints : List String } -> msg) -> Sub msg
 
 port outboxQueue : { target : String, text : String } -> Cmd msg
 
@@ -1257,6 +1292,22 @@ perform key outbound =
         App.VaultImportPick ->
             vaultImportPick ()
 
+        -- v3/gap-import
+        App.HistoryImportPick req ->
+            historyImportPick req
+
+        App.HistoryImportCancel req ->
+            historyImportCancel req
+
+        App.HistoryImportRecord req ->
+            historyImportRecord req
+
+        App.HistoryImportListRequest ->
+            historyImportListRequest ()
+
+        App.HistoryImportRemove req ->
+            historyImportRemove req
+
         App.OutboxQueue req ->
             outboxQueue req
 
@@ -1759,6 +1810,12 @@ subscriptions model =
         , vaultExported App.VaultExported
         , deviceHistoryCopyRows App.DeviceHistoryRowsReceived
         , vaultImportFile App.VaultImportFile
+        -- v3/gap-import
+        , historyImportProgress (App.HistoryImportMsg << HistoryImport.Progress)
+        , historyImportStaged (App.HistoryImportMsg << HistoryImport.GotStaged)
+        , historyImportFailed (App.HistoryImportMsg << HistoryImport.Failed)
+        , historyImportBatches (App.HistoryImportMsg << HistoryImport.Batches)
+        , historyImportRemoved (App.HistoryImportMsg << HistoryImport.Removed)
         , vaultStored App.VaultStored
         , outboxQueued App.OutboxQueued
         , outboxQueueFailed App.OutboxQueueFailed

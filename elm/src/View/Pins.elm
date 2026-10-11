@@ -5,6 +5,7 @@ against the loaded buffer, with jump-to-message and op-gated unpin.
 -}
 
 import App exposing (Model, Msg(..))
+import BlockKit -- v3/gap-import
 import Html exposing (Html, a, button, div, li, p, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, href)
 import Html.Events exposing (onClick)
@@ -155,7 +156,7 @@ pinRow model channel id =
         label =
             case row of
                 Just message ->
-                    "Jump to pinned message from " ++ message.from ++ ": " ++ clip (App.displayBody message)
+                    "Jump to pinned message from " ++ message.from ++ ": " ++ clip (BlockKit.summary (App.displayBody message))
 
                 Nothing ->
                     "Load pinned message " ++ id
@@ -187,7 +188,7 @@ pinRow model channel id =
                                 ]
                                 [ text (App.pinnedMessageStateLabel state) ]
                             ]
-                        , span [ class (pinBodyClass state) ] [ text (App.displayBody message) ]
+                        , span [ class (pinBodyClass state) ] [ text (BlockKit.summary (App.displayBody message)) ]
                         ]
             ]
         , if App.isChannelOp model channel then
