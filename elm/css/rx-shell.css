@@ -50,6 +50,15 @@
    ellipsis when the sidebar is narrow instead of being cut mid-word. */
 .onyx-rail .onyx-rail-filter-input { text-overflow: ellipsis; }
 
+/* Room header, any width: the name gives way (ellipsis) before it can
+   run into the buttons, and the facepile steps aside while the column
+   is narrow. `em` follows the reader's own default font size, so a
+   large-text setting drops the facepile sooner. */
+.onyx-frame .onyx-room-header-name { flex: 0 1 auto; min-width: 10ch; white-space: nowrap; }
+@media (max-width: 74em) {
+  .onyx-frame .onyx-room-header-actions .onyx-facepile { display: none; }
+}
+
 /* 1. Sidebar rows -------------------------------------------------------- */
 
 /* Rows are positioned so the hover actions can sit over their end. */
@@ -106,7 +115,7 @@
   .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; color: var(--onyx-dim); }
   .onyx-rail .onyx-rail-more .onyx-shi { width: 20px; height: 20px; }
   /* A long press opens the row menu (Android) — never the iOS callout. */
-  .onyx-rail :is(.onyx-rail-row, .onyx-rail-entry) { -webkit-touch-callout: none; }
+  .onyx-rail :is(.onyx-rail-row, .onyx-rail-entry) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 }
 
 /* Touch rows beside a conversation: the current row's step runs under
@@ -273,8 +282,8 @@
 /* Two-pane widths below the dialog breakpoint (foldables open, small
    tablets): a bottom sheet the width of the list pane, not of the screen. */
 @media (min-width: 600px) and (max-width: 767.98px) {
-  .onyx-sheet-layer.onyx-railmenu-layer { place-items: end center; }
-  .onyx-sheet-layer.onyx-railmenu-layer > .onyx-sheet.onyx-railmenu { width: min(420px, 100%); border-width: 1px 1px 0; }
+  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] { place-items: end center; }
+  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] > .onyx-sheet.onyx-railmenu { width: min(420px, 100%); border-width: 1px 1px 0; }
 }
 
 /* 2. Empty collections ---------------------------------------------------- */

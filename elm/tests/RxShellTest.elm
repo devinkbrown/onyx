@@ -260,6 +260,20 @@ suite =
                         |> Event.simulate Event.click
                         |> Event.expect NewMessageOpen
             ]
+        , describe "home"
+            [ test "the catch-up reads once: the card, no separate summary strip above it" <|
+                \_ ->
+                    let
+                        home =
+                            query { busy | activeChannel = Nothing } |> Query.find [ testId "home" ]
+                    in
+                    Expect.all
+                        [ \_ -> home |> Query.findAll [ Selector.class "onyx-home-signal" ] |> Query.count (Expect.equal 0)
+                        , \_ -> home |> Query.findAll [ Selector.class "onyx-home-inbox" ] |> Query.count (Expect.equal 1)
+                        , \_ -> home |> Query.find [ Selector.class "onyx-home-inbox" ] |> Query.has [ Selector.text "Needs your attention", Selector.text "Mark all caught up" ]
+                        ]
+                        ()
+            ]
         , test "the rail's hover label spells the totals out" <|
             \_ ->
                 query busy
