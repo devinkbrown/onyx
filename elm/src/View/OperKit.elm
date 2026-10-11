@@ -1,7 +1,6 @@
 module View.OperKit exposing
     ( button_
     , card
-    , choice
     , clockHms
     , consoleMsg
     , disclosure
@@ -190,30 +189,6 @@ button_ config =
 formRow : List (Html Msg) -> Html Msg
 formRow children =
     div [ class "oc-row" ] children
-
-
-{-| A two-or-more-way pressed-state chooser (segmented). -}
-choice : { label : String, testId : String, current : String, options : List ( String, String ), onPick : String -> Msg } -> Html Msg
-choice config =
-    div [ class "oc-seg", attribute "role" "group", attribute "aria-label" config.label, attribute "data-testid" config.testId ]
-        (List.map
-            (\( val, name ) ->
-                button
-                    [ type_ "button"
-                    , class "oc-seg-btn"
-                    , attribute "aria-pressed"
-                        (if val == config.current then
-                            "true"
-
-                         else
-                            "false"
-                        )
-                    , onClick (config.onPick val)
-                    ]
-                    [ text name ]
-            )
-            config.options
-        )
 
 
 emptyNote : String -> Html Msg

@@ -276,10 +276,6 @@
 .onyx-moddesk-sheet .oper-desk .oc-chip:disabled { opacity: 0.5; cursor: default; }
 .onyx-moddesk-sheet .oper-desk .oc-chip:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
-.oc-seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-bg); }
-.onyx-moddesk-sheet .oper-desk .oc-seg-btn { min-height: 32px; padding: 0 var(--space-3); border: 0; border-radius: 4px; background: transparent; color: var(--onyx-dim); font: inherit; font-size: var(--oc-fs); cursor: pointer; }
-.onyx-moddesk-sheet .oper-desk .oc-seg-btn[aria-pressed="true"] { background: var(--onyx-panel-2); color: var(--onyx-text); }
-
 .oc-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .oc-filters { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
 .oc-filters .oc-field { flex: 1 1 150px; }
