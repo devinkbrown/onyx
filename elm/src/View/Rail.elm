@@ -24,8 +24,10 @@ v3/rx-shell — every row has an overflow control (`sidebar-row-more`:
 a quiet `…` on hover / focus with a fine pointer, always shown on
 touch) and answers a context menu (right-click, Android long-press)
 with the same row menu (`railMenu`, mounted with the overlays): for a
-room Favorite, Mark as read, Notifications and Leave (which asks
-Stay / Leave before it parts); for a DM Mark as read and Mute. Pointer opens anchor the menu at the
+room Favorite, Mark as read, Notifications and Leave (through the
+shared Leave confirm of `View.GapShell`); the organize entries of
+v3/gap-organize (Move to folder, Hide / Close) sit in the same menu;
+for a DM Mark as read and Mute. Pointer opens anchor the menu at the
 pointer on wide screens; keyboard opens and phones get a centred / bottom sheet. Empty
 Rooms / Messages collections say what they are for and offer the next
 step (Browse rooms / Start a room; New message).
@@ -34,6 +36,7 @@ step (Browse rooms / Start a room; New message).
 import App exposing (Channel, Model, Msg(..))
 import Avatar
 import Dict
+import GapShell
 import Html exposing (Html, button, div, h2, input, label, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, style, tabindex, type_, value)
 import Html.Events exposing (on, onClick, onInput, preventDefaultOn)
@@ -47,6 +50,9 @@ import View.CallPresence
 -- v3/rx-shell
 import View.Notify
 import View.Sheet as Sheet
+-- v3/gap-organize
+import View.Organize
+import View.GapShell -- v3/gap-shell
 
 
 {-| Which collection the sidebar shows. -}
@@ -73,7 +79,8 @@ rail model =
                 , query = model.sidebarFilter
                 , unreadOnly = model.sidebarUnreadOnly
                 }
-                (Dict.values model.channels)
+                -- v3/gap-organize: hidden rooms + closed DMs step out
+                (View.Organize.listed model (Dict.values model.channels))
 
         canStar =
             App.deviceMemoryOwner model /= Nothing
@@ -124,6 +131,8 @@ rail model =
                         ]
                     ]
                )
+            -- v3/gap-organize: room folders sit between Favorites and Rooms
+            ++ View.Organize.folderSections model (roomRow model canStar) derived.rooms
             ++ [ div [ class "onyx-rail-section onyx-rail-section--rooms", attribute "data-testid" "sidebar-channels" ]
                     [ p [ class "onyx-rail-label", id "sidebar-channels-label" ] [ text "Rooms" ]
                     , ul [ attribute "role" "list", attribute "aria-label" "Joined rooms" ]
@@ -131,8 +140,9 @@ rail model =
                             [ li [ class "onyx-rail-zero" ] [ emptyRooms (which == "rooms") ] ]
 
                          else
-                            List.map (roomRow model canStar) derived.rooms
+                            List.map (roomRow model canStar) (View.Organize.unfiledRooms model derived.rooms)
                         )
+                    , View.Organize.hiddenFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-section onyx-rail-section--dms", attribute "data-testid" "sidebar-dms" ]
                     [ div [ class "onyx-rail-section-heading" ]
@@ -150,6 +160,7 @@ rail model =
                       else
                         ul [ attribute "role" "list", attribute "aria-labelledby" "sidebar-dms-label" ]
                             (List.map (dmRow model) derived.dms)
+                    , View.Organize.closedFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-foot", attribute "role" "group", attribute "aria-label" "Find or start a room" ]
                     [ button
@@ -171,6 +182,7 @@ rail model =
                         , text "Start a room"
                         ]
                     ]
+               , View.GapShell.railExtras model -- v3/gap-shell
                ]
         )
 
@@ -568,6 +580,7 @@ dmRow model channel =
                 (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline }
                     -- v3/account2
                     ++ View.Account2.friendPresenceLabel model channel.name
+                    ++ View.Organize.mutedLabel model channel.name -- v3/gap-organize
                 )
             , attribute "aria-current"
                 (if active then
@@ -637,6 +650,7 @@ dmRow model channel =
 
                           else
                             text ""
+                        , View.Organize.mutedMark model channel.name -- v3/gap-organize
                         , badge channel
                         ]
                     ]
@@ -699,7 +713,7 @@ rowContextMenu name =
 view can flip it near the bottom edge). -}
 point : String -> Decode.Decoder App.RailMenu
 point name =
-    Decode.map4 (\x y vw vh -> { name = name, x = x, y = y, vw = vw, vh = vh, leaving = False })
+    Decode.map4 (\x y vw vh -> { name = name, x = x, y = y, vw = vw, vh = vh })
         (Decode.oneOf [ Decode.field "clientX" Decode.float, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.field "clientY" Decode.float, Decode.succeed 0 ])
         (Decode.oneOf [ Decode.at [ "view", "innerWidth" ] Decode.float, Decode.succeed 0 ])
@@ -835,30 +849,6 @@ railMenu model =
                             ]
                         , Sheet.closeButton { label = "Close options", onClose = RailMenuClose, testId = Nothing, extraClass = "onyx-railmenu-close" }
                         ]
-
-                leaveConfirm room =
-                    [ div [ class "onyx-railmenu-confirm", attribute "role" "group", attribute "aria-label" ("Leave " ++ room ++ "?") ]
-                        [ p [ class "onyx-railmenu-confirm-title" ] [ text ("Leave " ++ room ++ "?") ]
-                        , p [ class "onyx-railmenu-confirm-copy" ] [ text "You will stop receiving its messages. You can rejoin later if the room is open to you." ]
-                        , div [ class "onyx-railmenu-confirm-actions" ]
-                            [ button
-                                [ type_ "button"
-                                , class "onyx-railmenu-confirm-cancel"
-                                , attribute "data-testid" "rail-menu-leave-cancel"
-                                , Sheet.autofocus "rail-menu"
-                                , onClick RailLeaveCancel
-                                ]
-                                [ text "Stay" ]
-                            , button
-                                [ type_ "button"
-                                , class "onyx-railmenu-confirm-leave"
-                                , attribute "data-testid" "rail-menu-leave-confirm"
-                                , onClick (RailLeave room)
-                                ]
-                                [ text "Leave room" ]
-                            ]
-                        ]
-                    ]
             in
             Sheet.view
                 { scope = "rail-menu"
@@ -873,11 +863,7 @@ railMenu model =
                 , attrs = attribute "data-testid" "rail-menu" :: anchor
                 }
                 (railMenuHead
-                    :: (if menu.leaving && isRoom then
-                            leaveConfirm channel.name
-
-                        else
-                            ((if isRoom then
+                    :: ((if isRoom then
                             [ item "favorite"
                                 (if starred then
                                     "Remove from Favorites"
@@ -926,9 +912,11 @@ railMenu model =
                                    )
                             )
                        ]
+                    -- v3/gap-organize: Move to folder / Hide room; Close conversation
+                    ++ View.Organize.railMenuEntries model channel
                     ++ (if isRoom then
                             [ div [ class "onyx-railmenu-notify" ] [ View.Notify.roomNotifyStrip model channel.name ]
-                            , item "leave" "Leave room" "leave" RailLeaveAsk [ class "onyx-railmenu-item--danger" ]
+                            , item "leave" "Leave room" "leave" (GapShellMsg (GapShell.LeaveAsk channel.name)) [ class "onyx-railmenu-item--danger" ]
                             ]
 
                         else
@@ -954,5 +942,4 @@ railMenu model =
                                 [ attribute "aria-pressed" (boolAttr muted) ]
                             ]
                        ))
-                       )
                 )

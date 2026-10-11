@@ -50,8 +50,9 @@ Elm. The five destinations are Home / Rooms / Messages / Calls / You.
 - Touch (`hover: none`) keeps 44px targets at every width. Note the frame
   gives every button a 24px floor at specificity (0,3,0): size rules for
   shell buttons need three classes (guarded by `rxShellCss.smoke.mjs`).
-- Rows carry an overflow menu (Favorite, Mark as read, Notifications,
-  Leave — which asks first); a DM's has Mark as read and Mute.
+- Rows carry one overflow menu (Favorite, Mark as read, Move to folder,
+  Hide, Notifications, Leave — which asks first, through the shared
+  confirm); a DM's has Mark as read, Close and Mute.
 
 ### Rules
 

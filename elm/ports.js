@@ -3450,12 +3450,23 @@
         sendPort(batch);
       }
     });
+    /* v3/gap-shell: ONE wsClosed per socket. A failed socket fires
+       `error` and then `close` in the same task, which reached Elm as two
+       closes (two "Disconnected" rows, and a second close could undo a
+       redial). `close` reports (it carries the reason); `error` is only a
+       next-task fallback. */
+    var closeReported = false;
+    function reportClose(payload) {
+      if (closeReported) return;
+      closeReported = true;
+      app.ports.wsClosed.send(payload);
+    }
     socket.addEventListener("close", function (event) {
-      app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
+      reportClose({ clean: event.wasClean, reason: event.reason || "" });
       if (onClose) { try { onClose(); } catch (err) {} }
     });
     socket.addEventListener("error", function () {
-      app.ports.wsClosed.send({ clean: false, reason: "error" });
+      setTimeout(function () { reportClose({ clean: false, reason: "error" }); }, 0);
     });
     return {
       send: function (line) {
@@ -3722,6 +3733,63 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* v3/gap-organize — organize memory + attention prefs. Elm owns every
+     shape, bound and owner-scoped key name (`Organize`, `Attention`,
+     `Organizer`); the bridge only reads and writes whole localStorage
+     values for an allow-listed set of keys:
+       owner-scoped  onyx:{room-folders,hidden-rooms,closed-conversations,
+                     bookmarks,user-notes,smart-mute}:owner:<enc>
+       read-only     onyx:channel-navigation:owner:<enc> (the oracle's
+                     record, read once to bring its folders across)
+       device-wide   onyx:dnd-quiet-{start,end,enabled}, onyx:calm
+     A `null` value removes the key. Reads answer with `null` for a
+     missing key (never "") so Elm can tell "unset" from "empty". */
+  var ORGANIZE_OWNED = /^onyx:(room-folders|hidden-rooms|closed-conversations|bookmarks|user-notes|smart-mute|channel-navigation):owner:[A-Za-z0-9%._~!*'()-]{1,8192}$/;
+  var ORGANIZE_DEVICE = /^onyx:(dnd-quiet-start|dnd-quiet-end|dnd-quiet-enabled|calm)$/;
+  var ORGANIZE_MAX_VALUE = 2 * 1024 * 1024;
+  function organizeReadable(key) {
+    return typeof key === "string" && (ORGANIZE_OWNED.test(key) || ORGANIZE_DEVICE.test(key));
+  }
+  function organizeWritable(key) {
+    return organizeReadable(key) && key.indexOf("onyx:channel-navigation:") !== 0;
+  }
+  function wireOrganize(app, env) {
+    var storage = function () {
+      try {
+        var store = (env && env.storage) || (typeof window !== "undefined" ? window.localStorage : null);
+        return store && typeof store.getItem === "function" ? store : null;
+      } catch (err) { return null; }
+    };
+    if (app.ports.organizeStore) {
+      app.ports.organizeStore.subscribe(function (req) {
+        if (!req || !organizeWritable(req.key)) return;
+        var store = storage();
+        if (!store) return;
+        try {
+          if (req.value === null || req.value === undefined) {
+            store.removeItem(req.key);
+          } else if (typeof req.value === "string" && req.value.length <= ORGANIZE_MAX_VALUE) {
+            store.setItem(req.key, req.value);
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.organizeLoad && app.ports.organizeLoaded) {
+      app.ports.organizeLoad.subscribe(function (req) {
+        if (!req || typeof req.tag !== "string" || !Array.isArray(req.keys)) return;
+        var store = storage();
+        var values = {};
+        req.keys.slice(0, 32).forEach(function (key) {
+          if (!organizeReadable(key)) return;
+          var raw = null;
+          try { raw = store ? store.getItem(key) : null; } catch (err) { raw = null; }
+          values[key] = (typeof raw === "string" && raw.length <= ORGANIZE_MAX_VALUE) ? raw : null;
+        });
+        try { app.ports.organizeLoaded.send({ tag: req.tag, values: values }); } catch (err) { /* app gone */ }
+      });
+    }
+  }
+
   function wireTranscriptScroll(app, env) {
     if (!app.ports.scrollPolicy && !app.ports.scrollState) return null;
     var e = env || {};
@@ -3790,15 +3858,59 @@ function fetchPublicFeed(url) {
     } catch (err) { return false; }
   }
   var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker", c: "captions" /* v3/calls-c8 */ };
+  /* v3/gap-commands — the shell chords of the oracle `shortcutsRegistry`
+     (verified against src/lib/keyboard/shortcutsRegistry.ts and
+     useKeyboardShortcuts.ts). Ctrl/Cmd+Shift letters below are the
+     shell's outside a call; while a call is live the call chords above
+     own M / E / L (and the rest of CALL_CHORDS). */
+  var SHELL_SHIFT_CHORDS = { a: "account", e: "mark-read", d: "dnd", m: "room-mute", u: "attach", l: "schedule" };
+  /* Composer-local chords also fire from the message box itself
+     (oracle COMPOSER_EDITABLE_ALLOWED_IDS). */
+  var COMPOSER_CHORDS = { attach: true, schedule: true };
+  var COMPOSER_INPUT_ID = "shell-composer-input";
+  /* WCAG 2.1.4: the single-character keys (`?`, `/`, J, K, N, U, G…)
+     can be switched off on this device; the switch lives in the `?`
+     overlay and is stored here. */
+  var SINGLE_KEYS_STORAGE_KEY = "onyx:single-key-shortcuts";
+  var G_SEQUENCE_MS = 1200;
+  var shortcutSequence = { gAt: 0 };
   function callKeysLive(doc) {
     if (!doc || !doc.querySelector) return false;
     try { return !!doc.querySelector('[data-call-keys="on"]'); } catch (err) { return false; }
   }
-  function classifyShortcut(e, doc) {
+  function singleKeysEnabled() {
+    try {
+      if (typeof window === "undefined" || !window || !window.localStorage) return true;
+      return window.localStorage.getItem(SINGLE_KEYS_STORAGE_KEY) !== "off";
+    } catch (err) { return true; }
+  }
+  /* Letter of a key press, layout-safe for Alt/Option chords (macOS
+     Option+M types "µ"): `code` (`KeyM`) wins when present. */
+  function shortcutLetter(e) {
+    var code = typeof e.code === "string" ? e.code : "";
+    if (/^Key[A-Z]$/.test(code)) return code.charAt(3).toLowerCase();
+    var key = typeof e.key === "string" ? e.key : "";
+    return key.length === 1 ? key.toLowerCase() : "";
+  }
+  function shortcutComposerTarget(target) {
+    try { return !!target && target.id === COMPOSER_INPUT_ID; } catch (err) { return false; }
+  }
+  /* Controls that own Enter / J / K themselves (oracle isInteractiveTarget). */
+  function shortcutInteractiveTarget(target) {
+    if (!target || typeof target !== "object" || !target.closest) return false;
+    try {
+      return !!target.closest(
+        'button, a[href], summary, select, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="switch"], [aria-controls]'
+      );
+    } catch (err) { return false; }
+  }
+  function classifyShortcut(e, doc, opts) {
     if (!e || e.defaultPrevented) return null;
-    if (e.isComposing || e.keyCode === 229) return null;
+    if (e.isComposing || e.keyCode === 229) { shortcutSequence.gAt = 0; return null; }
     var key = typeof e.key === "string" ? e.key : "";
     var mod = !!(e.ctrlKey || e.metaKey);
+    var now = opts && typeof opts.now === "number" ? opts.now : Date.now();
+    var singleKeys = opts && typeof opts.singleKeys === "boolean" ? opts.singleKeys : singleKeysEnabled();
     if (key === "Escape") {
       if (mod || e.altKey || e.shiftKey) return null;
       return { name: "escape", prevent: false };
@@ -3807,24 +3919,151 @@ function fetchPublicFeed(url) {
       if (shortcutForeignModal(doc)) return null;
       return { name: "palette-toggle", prevent: true };
     }
+    var letter = shortcutLetter(e);
+    /* v3/gap-commands — Ctrl/Cmd+, opens preferences, even while typing
+       (oracle EDITABLE_ALLOWED_IDS). */
+    if (mod && !e.altKey && !e.shiftKey && (key === "," || e.code === "Comma")) {
+      if (shortcutForeignModal(doc)) return null;
+      return { name: "prefs", prevent: true };
+    }
     /* v3/calls-c11 (C12) — call chords: Ctrl/Cmd+Shift+<letter>, only
        while a call is live (the always-mounted announcer carries
        `data-call-keys="on"`), never while typing, never under a
        foreign modal. Push to talk (C9) is the separate user-bound
-       single-key runtime (`createPushToTalk`), on the same scope rules. */
+       single-key runtime (`createPushToTalk`), on the same scope rules.
+       v3/gap-commands: outside a call the same modifier pair carries
+       the shell chords (account, mark read, DND, mute room, attach,
+       schedule). */
     if (mod && e.shiftKey && !e.altKey) {
-      var chord = CALL_CHORDS[key.toLowerCase()];
-      if (!chord) return null;
+      var editable = shortcutEditableTarget(e.target);
+      var chord = CALL_CHORDS[letter];
+      if (chord && callKeysLive(doc)) {
+        if (editable) return null;
+        if (shortcutForeignModal(doc)) return null;
+        return { name: "call-" + chord, prevent: true };
+      }
+      var shell = SHELL_SHIFT_CHORDS[letter];
+      if (!shell) return null;
+      if (editable && !(COMPOSER_CHORDS[shell] && shortcutComposerTarget(e.target))) return null;
+      if (shortcutForeignModal(doc)) return null;
+      return { name: shell, prevent: true };
+    }
+    /* Ctrl/Cmd+B stars the room; Ctrl/Cmd+Alt+E exports the local
+       transcript — never while typing (Ctrl+Alt is AltGr on many
+       layouts, so typed text always wins). */
+    if (mod && !e.shiftKey && (letter === "b" && !e.altKey || letter === "e" && e.altKey)) {
       if (shortcutEditableTarget(e.target)) return null;
       if (shortcutForeignModal(doc)) return null;
-      if (!callKeysLive(doc)) return null;
-      return { name: "call-" + chord, prevent: true };
+      return { name: letter === "b" ? "room-star" : "export", prevent: true };
     }
-    if (mod || e.altKey) return null;
-    if (key !== "?" && key !== "/") return null;
-    if (shortcutEditableTarget(e.target)) return null;
-    if (shortcutForeignModal(doc)) return null;
-    return key === "?" ? { name: "shortcuts", prevent: true } : { name: "palette", prevent: true };
+    if (mod) return null;
+    /* Alt chords: conversation stepping, member list, room list focus,
+       composer focus. Never while typing. */
+    if (e.altKey) {
+      if (shortcutEditableTarget(e.target)) return null;
+      if (shortcutForeignModal(doc)) return null;
+      if (key === "ArrowUp" || key === "ArrowDown") {
+        return { name: (e.shiftKey ? "unread-" : "conv-") + (key === "ArrowUp" ? "prev" : "next"), prevent: true };
+      }
+      if (e.shiftKey) return null;
+      if (letter === "m") return { name: "members", prevent: true, local: true };
+      if (letter === "s") return { name: "sidebar-focus", prevent: true, local: true };
+      if (key === "Enter" && !shortcutInteractiveTarget(e.target)) return { name: "composer-focus", prevent: true, local: true };
+      return null;
+    }
+    if (shortcutEditableTarget(e.target)) { shortcutSequence.gAt = 0; return null; }
+    if (shortcutForeignModal(doc)) { shortcutSequence.gAt = 0; return null; }
+    /* Enter focuses the composer from anywhere that is not a control. */
+    if (key === "Enter") {
+      shortcutSequence.gAt = 0;
+      if (e.shiftKey || shortcutInteractiveTarget(e.target)) return null;
+      return { name: "composer-focus", prevent: true, local: true };
+    }
+    if (!singleKeys) { shortcutSequence.gAt = 0; return null; }
+    var armed = shortcutSequence.gAt && now - shortcutSequence.gAt <= G_SEQUENCE_MS;
+    shortcutSequence.gAt = 0;
+    if (armed && !e.shiftKey) {
+      if (key.toLowerCase() === "h") return { name: "go-home", prevent: true };
+      if (key.toLowerCase() === "d") return { name: "go-date", prevent: true };
+    }
+    if (key === "?") return { name: "shortcuts", prevent: true };
+    if (key === "/") return { name: "palette", prevent: true };
+    if (e.shiftKey || key.length !== 1) return null;
+    var lower = key.toLowerCase();
+    if (lower === "g") { shortcutSequence.gAt = now; return { name: "", prevent: true, local: true }; }
+    if (lower === "j" || lower === "k") {
+      if (shortcutInteractiveTarget(e.target)) return null;
+      return { name: lower === "j" ? "message-next" : "message-prev", prevent: true, local: true };
+    }
+    if (lower === "n") return { name: "next-unread", prevent: true };
+    if (lower === "u") return { name: "follow", prevent: true };
+    return null;
+  }
+  /* v3/gap-commands — the focus-only shortcuts run here (Elm holds no
+     DOM handles): J / K move through the transcript's message rows,
+     Enter / Alt+Enter focus the composer, Alt+S the room list, Alt+M
+     opens the member sheet (narrow) or moves into the member rail
+     (wide). Returns whether anything happened, so a key with nothing
+     to act on keeps its browser default. Never under the palette or
+     the shortcuts overlay (focus must stay inside a modal). */
+  function shortcutFocus(el) {
+    if (!el || !el.focus) return false;
+    try { el.focus({ preventScroll: true }); } catch (err) {
+      try { el.focus(); } catch (ignored) { return false; }
+    }
+    return true;
+  }
+  function shortcutVisible(el) {
+    try { return !!el && !el.hidden && el.getClientRects && el.getClientRects().length > 0; } catch (err) { return false; }
+  }
+  function runLocalShortcut(name, doc) {
+    if (!doc || !doc.querySelector) return false;
+    try {
+      if (doc.querySelector('[data-shortcut-scope="palette"], [data-shortcut-scope="shortcuts"]')) return false;
+    } catch (err) { return false; }
+    if (name === "") return true; /* the armed `g` prefix */
+    if (name === "composer-focus") {
+      var field = doc.getElementById ? doc.getElementById(COMPOSER_INPUT_ID) : null;
+      if (!field || field.disabled || !shortcutVisible(field)) return false;
+      return shortcutFocus(field);
+    }
+    if (name === "message-next" || name === "message-prev") {
+      var rows = [];
+      try {
+        rows = Array.prototype.filter.call(
+          doc.querySelectorAll('[data-transcript-key] li.onyx-message'),
+          shortcutVisible
+        );
+      } catch (err) { return false; }
+      if (rows.length === 0) return false;
+      var active = doc.activeElement;
+      var current = -1;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] === active || (rows[i].contains && active && rows[i].contains(active))) { current = i; break; }
+      }
+      var next = current === -1
+        ? rows.length - 1
+        : Math.max(0, Math.min(rows.length - 1, current + (name === "message-next" ? 1 : -1)));
+      var row = rows[next];
+      if (!shortcutFocus(row)) return false;
+      try { row.scrollIntoView({ block: "nearest" }); } catch (err) { /* best-effort */ }
+      return true;
+    }
+    if (name === "sidebar-focus") {
+      var item = doc.querySelector('.onyx-rail-item[aria-current="location"]') || doc.querySelector(".onyx-rail-item");
+      return shortcutVisible(item) && shortcutFocus(item);
+    }
+    if (name === "members") {
+      var toggle = doc.querySelector('[data-testid="members-toggle"]');
+      if (shortcutVisible(toggle)) {
+        try { toggle.click(); return true; } catch (err) { return false; }
+      }
+      var rail = doc.getElementById ? doc.getElementById("onyx-members") : null;
+      if (!shortcutVisible(rail)) return false;
+      var first = rail.querySelector('button, input, [tabindex]:not([tabindex="-1"])');
+      return shortcutFocus(first || rail);
+    }
+    return false;
   }
   /* v3/frame — the ONE overlay focus mechanism (APG dialog pattern).
      Every overlay the Elm view mounts carries a scope marker:
@@ -4291,11 +4530,70 @@ function fetchPublicFeed(url) {
     window.addEventListener("keydown", function (e) {
       var hit = classifyShortcut(e, doc);
       if (!hit) return;
+      /* v3/gap-commands: focus-only keys act here and only claim the
+         key when they did something. */
+      if (hit.local) {
+        if (runLocalShortcut(hit.name, doc)) {
+          try { e.preventDefault(); } catch (err) { /* best-effort */ }
+        }
+        return;
+      }
       if (hit.prevent) {
         try { e.preventDefault(); } catch (err) { /* best-effort */ }
       }
       try { app.ports.shortcut.send(hit.name); } catch (err) { /* port gone */ }
     });
+    /* v3/gap-commands — palette recents and the single-key switch. */
+    wireGapPrefs(app, window);
+  }
+
+  /* v3/gap-commands — device storage for the palette recents (keyed by
+     device-memory owner, at most 8 owners x 8 ids) and the single-key
+     shortcuts switch; one boot snapshot goes back to Elm. */
+  var PALETTE_RECENTS_STORAGE_KEY = "onyx:palette-recents";
+  function gapReadRecents(storage) {
+    var out = {};
+    try {
+      var raw = storage ? storage.getItem(PALETTE_RECENTS_STORAGE_KEY) : null;
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return out;
+      var owners = Object.keys(parsed).slice(0, 8);
+      owners.forEach(function (owner) {
+        var ids = parsed[owner];
+        if (typeof owner !== "string" || owner.length > 600 || !Array.isArray(ids)) return;
+        out[owner] = ids.filter(function (id) { return typeof id === "string" && id.length > 0 && id.length <= 200; }).slice(0, 8);
+      });
+    } catch (err) { /* corrupt or blocked storage: start empty */ }
+    return out;
+  }
+  function wireGapPrefs(app, win) {
+    var storage = null;
+    try { storage = (win && win.localStorage) || null; } catch (err) { storage = null; }
+    if (app.ports.paletteRecentsSave) {
+      app.ports.paletteRecentsSave.subscribe(function (req) {
+        if (!req || typeof req.owner !== "string" || !req.owner || req.owner.length > 600 || !Array.isArray(req.ids)) return;
+        var all = gapReadRecents(storage);
+        delete all[req.owner];
+        var next = {};
+        next[req.owner] = req.ids.filter(function (id) { return typeof id === "string" && id.length > 0 && id.length <= 200; }).slice(0, 8);
+        Object.keys(all).slice(0, 7).forEach(function (owner) { next[owner] = all[owner]; });
+        try { if (storage) storage.setItem(PALETTE_RECENTS_STORAGE_KEY, JSON.stringify(next)); } catch (err) { /* session-only */ }
+      });
+    }
+    if (app.ports.singleKeysSave) {
+      app.ports.singleKeysSave.subscribe(function (req) {
+        try {
+          if (!storage) return;
+          if (req && req.enabled === false) storage.setItem(SINGLE_KEYS_STORAGE_KEY, "off");
+          else storage.removeItem(SINGLE_KEYS_STORAGE_KEY);
+        } catch (err) { /* session-only */ }
+      });
+    }
+    if (app.ports.gapPrefsLoaded) {
+      var singleKeys = true;
+      try { singleKeys = !storage || storage.getItem(SINGLE_KEYS_STORAGE_KEY) !== "off"; } catch (err) { singleKeys = true; }
+      try { app.ports.gapPrefsLoaded.send({ recents: gapReadRecents(storage), singleKeys: singleKeys }); } catch (err) { /* port gone */ }
+    }
   }
 
   function wire(app) {
@@ -6664,6 +6962,8 @@ function fetchPublicFeed(url) {
        `queueMicrotask`; missing chips (stale emits) no-op. */
     /* v3/transcript — scroll anchoring bridge. */
     wireTranscriptScroll(app);
+    /* v3/gap-organize — organize memory + attention prefs. */
+    wireOrganize(app);
 
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
@@ -7516,6 +7816,7 @@ function fetchPublicFeed(url) {
 
     /* v3/polish */
     wirePolish(app, { registration: swRegistration });
+    wireGapShell(app); /* v3/gap-shell */
 
     /* v3/gap-pwa-safety: a bfcache restore / freeze resume probes the
        socket at once (a dead one closes into the reconnect path) and
@@ -10791,6 +11092,159 @@ function fetchPublicFeed(url) {
     try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
   }
 
+  /* ── v3/gap-shell: browser connectivity, one device value, roving keys ──
+     Mirrors the oracle's OS network listeners (`store.ts` `offline` /
+     `online`): each becomes one `shellEvent` for Elm, which owns the
+     policy (drop the socket while offline so sends queue, reconnect at
+     once when back). Page restore (bfcache / freeze) is v3/gap-pwa-safety's
+     `installPageLifecycle` + `pageRestored`. The boot event also carries
+     `navigator.onLine`, the stored MOTD dismissal and the Start-a-room
+     "next hang" label (next Saturday 4 pm, localized — the oracle
+     `formatHangLabel(nextSaturdayHang())`).
+
+     Roving keys (oracle `ChannelSidebar` / `PresenceRibbon` menus):
+     ArrowUp/ArrowDown/Home/End move focus between the sidebar's rows and
+     between the room More menu's items; a keyboard-opened More menu
+     focuses its first item. Tab order is untouched. */
+  var GAP_SHELL_STORE_KEYS = { "motd-dismissed-at": "onyx:motd-dismissed-at" };
+
+  function gapShellNextSaturdayHang(now) {
+    var c = new Date(now.getTime());
+    c.setDate(c.getDate() + ((6 - c.getDay() + 7) % 7));
+    c.setHours(16, 0, 0, 0);
+    if (c.getTime() <= now.getTime()) c.setDate(c.getDate() + 7);
+    return c;
+  }
+
+  function gapShellHangLabel(now) {
+    try {
+      return gapShellNextSaturdayHang(now || new Date())
+        .toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
+    } catch (e) { return ""; }
+  }
+
+  function gapShellReadMs(storage, key) {
+    try {
+      var n = Number(storage && storage.getItem(key));
+      return isFinite(n) && n > 0 ? n : null;
+    } catch (e) { return null; }
+  }
+
+  function gapShellLocalStorage(win) {
+    try { return (win && win.localStorage) || null; } catch (e) { return null; }
+  }
+
+  function gapShellOnline(nav) {
+    try { return !(nav && nav.onLine === false); } catch (e) { return true; }
+  }
+
+  function gapShellVisible(el) {
+    try { return !!(el && el.getClientRects && el.getClientRects().length); } catch (e) { return false; }
+  }
+
+  var GAP_SHELL_MENU_ITEMS = "#onyx-room-more-menu > button:not([disabled]), #onyx-room-more-menu > a[href]";
+
+  function gapShellRovingItems(target) {
+    if (!target || typeof target.closest !== "function") return null;
+    var root = null;
+    var selector = null;
+    if (target.closest("#onyx-room-more-menu")) {
+      root = target.ownerDocument || null;
+      selector = GAP_SHELL_MENU_ITEMS;
+    } else if (typeof target.matches === "function" && target.matches(".onyx-rail-item")) {
+      root = target.closest(".onyx-rail");
+      selector = ".onyx-rail-item";
+    }
+    if (!root || !selector) return null;
+    var list;
+    try { list = Array.prototype.slice.call(root.querySelectorAll(selector)); } catch (e) { return null; }
+    return list.filter(gapShellVisible);
+  }
+
+  /* Returns the element focused, or null when the key is not ours. */
+  function gapShellRovingKey(e) {
+    if (!e || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+    if (e.isComposing) return null;
+    var key = e.key;
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return null;
+    var target = e.target;
+    /* The More toggle: ArrowDown into an open menu. */
+    if (target && typeof target.closest === "function" && target.closest(".onyx-room-more-toggle")) {
+      if (key !== "ArrowDown" || target.getAttribute("aria-expanded") !== "true") return null;
+      var doc = target.ownerDocument;
+      var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+      if (!first) return null;
+      first.focus();
+      e.preventDefault();
+      return first;
+    }
+    var items = gapShellRovingItems(target);
+    if (!items || items.length === 0) return null;
+    var at = items.indexOf(target);
+    if (at < 0) return null;
+    var n = items.length;
+    var next = key === "Home" ? 0
+      : key === "End" ? n - 1
+      : key === "ArrowDown" ? (at + 1) % n
+      : (at - 1 + n) % n;
+    items[next].focus();
+    e.preventDefault();
+    return items[next];
+  }
+
+  /* A keyboard click (detail 0) on the More toggle that opens the menu
+     focuses its first item once Elm has painted it. */
+  function gapShellMenuOpenFocus(e, win) {
+    var target = e && e.target;
+    if (!target || typeof target.closest !== "function") return;
+    var toggle = target.closest(".onyx-room-more-toggle");
+    if (!toggle || e.detail !== 0) return;
+    var raf = (win && win.requestAnimationFrame) ? win.requestAnimationFrame.bind(win) : function (f) { return setTimeout(f, 16); };
+    raf(function () {
+      raf(function () {
+        if (toggle.getAttribute("aria-expanded") !== "true") return;
+        var doc = toggle.ownerDocument;
+        var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+        if (first) first.focus();
+      });
+    });
+  }
+
+  function wireGapShell(app, env) {
+    env = env || {};
+    if (!app || !app.ports) return null;
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var doc = env.document || (typeof document !== "undefined" ? document : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var local = gapShellLocalStorage(win);
+    function send(event) {
+      try { if (app.ports.shellEvent) app.ports.shellEvent.send(event); } catch (e) { /* port gone */ }
+    }
+    var online = gapShellOnline(nav);
+    send({
+      event: "boot",
+      online: online,
+      hangLabel: gapShellHangLabel(env.now ? new Date(env.now) : new Date()),
+      motdDismissedAt: gapShellReadMs(local, GAP_SHELL_STORE_KEYS["motd-dismissed-at"])
+    });
+    if (app.ports.shellStore) {
+      app.ports.shellStore.subscribe(function (req) {
+        var key = req && GAP_SHELL_STORE_KEYS[req.key];
+        if (!key) return;
+        try { if (local) local.setItem(key, String(req.value).slice(0, 32)); } catch (e) { /* private mode */ }
+      });
+    }
+    if (win && typeof win.addEventListener === "function") {
+      win.addEventListener("offline", function () { send({ event: "offline", online: false }); });
+      win.addEventListener("online", function () { send({ event: "online", online: true }); });
+    }
+    if (doc && typeof doc.addEventListener === "function") {
+      doc.addEventListener("keydown", function (e) { gapShellRovingKey(e); });
+      doc.addEventListener("click", function (e) { gapShellMenuOpenFocus(e, win); });
+    }
+    return { send: send };
+  }
+
   global.OnyxPorts = {
     vaultStore: {
       put: vaultPut,
@@ -10912,6 +11366,7 @@ function fetchPublicFeed(url) {
     installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
+    wireOrganize: wireOrganize, /* v3/gap-organize */
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,
@@ -10935,6 +11390,8 @@ function fetchPublicFeed(url) {
     createGroupWelcome: createGroupWelcome,
     wireGroupWelcome: wireGroupWelcome,
     classifyShortcut: classifyShortcut,
+    runLocalShortcut: runLocalShortcut,
+    wireGapPrefs: wireGapPrefs,
     installShortcutFocus: installShortcutFocus,
     installOverlayFocus: installOverlayFocus,
     /* v3/calls-c6 */
@@ -10949,7 +11406,15 @@ function fetchPublicFeed(url) {
     registerServiceWorker: registerServiceWorker,
     installPageLifecycle: installPageLifecycle,
     swUrl: SW_URL,
-    memKV: memKV
+    memKV: memKV,
+    /* v3/gap-shell */
+    gapShell: {
+      wire: wireGapShell,
+      rovingKey: gapShellRovingKey,
+      hangLabel: gapShellHangLabel,
+      nextSaturdayHang: gapShellNextSaturdayHang,
+      storeKeys: GAP_SHELL_STORE_KEYS
+    }
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports.OnyxPorts = global.OnyxPorts;

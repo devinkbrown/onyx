@@ -10,10 +10,12 @@ topbar New conversation entry.
 import App exposing (..)
 import Dict
 import Expect
+import GapShell
 import Html
 import Html.Attributes as Attr
 import Json.Encode as Encode
 import Nav
+import Organizer
 import Switcher
 import Test exposing (Test, describe, test)
 import Test.Html.Event as Event
@@ -65,12 +67,12 @@ busy =
 
 at : String -> Float -> Float -> RailMenu
 at name x y =
-    { name = name, x = x, y = y, vw = 1440, vh = 900, leaving = False }
+    { name = name, x = x, y = y, vw = 1440, vh = 900 }
 
 
 keyboard : String -> RailMenu
 keyboard name =
-    { name = name, x = 0, y = 0, vw = 1440, vh = 900, leaving = False }
+    { name = name, x = 0, y = 0, vw = 1440, vh = 900 }
 
 
 unreadOf : String -> Model -> Int
@@ -136,7 +138,7 @@ suite =
                         , \_ -> menu |> Query.find [ testId "rail-menu-favorite" ] |> Event.simulate Event.click |> Event.expect (SidebarStarToggle "#b")
                         , \_ -> menu |> Query.find [ testId "rail-menu-read" ] |> Event.simulate Event.click |> Event.expect (RailMarkRead "#b")
                         , \_ -> menu |> Query.find [ testId "room-notify" ] |> Query.has [ attr "role" "radiogroup" ]
-                        , \_ -> menu |> Query.find [ testId "rail-menu-leave" ] |> Event.simulate Event.click |> Event.expect RailLeaveAsk
+                        , \_ -> menu |> Query.find [ testId "rail-menu-leave" ] |> Event.simulate Event.click |> Event.expect (GapShellMsg (GapShell.LeaveAsk "#b"))
                         , \_ -> menu |> Query.hasNot [ testId "rail-menu-mute" ]
                         ]
                         ()
@@ -164,7 +166,7 @@ suite =
                         , \_ -> query (step (RailMenuOpen (at "#b" 300 120)) busy) |> Query.find [ testId "rail-menu" ] |> Query.has [ Selector.style "left" "296px", Selector.style "top" "124px" ]
                         , \_ -> query (step (RailMenuOpen (at "#b" 300 800)) busy) |> Query.find [ testId "rail-menu" ] |> Query.has [ Selector.style "bottom" "104px" ]
                         , \_ -> query (step (RailMenuOpen (keyboard "#b")) busy) |> Query.find [ Selector.class "onyx-railmenu-layer" ] |> Query.has [ attr "data-anchored" "false" ]
-                        , \_ -> query (step (RailMenuOpen { name = "#b", x = 200, y = 300, vw = 390, vh = 844, leaving = False }) busy) |> Query.find [ Selector.class "onyx-railmenu-layer" ] |> Query.has [ attr "data-anchored" "false" ]
+                        , \_ -> query (step (RailMenuOpen { name = "#b", x = 200, y = 300, vw = 390, vh = 844 }) busy) |> Query.find [ Selector.class "onyx-railmenu-layer" ] |> Query.has [ attr "data-anchored" "false" ]
                         ]
                         ()
             , test "Mark as read clears the room and closes the menu" <|
@@ -174,41 +176,30 @@ suite =
                             busy |> step (RailMenuOpen (keyboard "#b")) |> step (RailMarkRead "#b")
                     in
                     Expect.equal ( unreadOf "#b" busy > 0, unreadOf "#b" after, after.railMenu ) ( True, 0, Nothing )
-            , test "Leave parts the room; a DM sends nothing" <|
-                \_ ->
-                    Expect.equal
-                        ( outs (RailLeave "#b") (step (RailMenuOpen (keyboard "#b")) busy)
-                        , outs (RailLeave "carol") busy
-                        , (step (RailLeave "#b") (step (RailMenuOpen (keyboard "#b")) busy)).railMenu
-                        )
-                        ( [ SendLine "PART #b\u{000D}\n" ], [], Nothing )
-            , test "Leave room asks first: the menu swaps to Stay / Leave, Stay returns, Leave parts" <|
+            , test "Leave room asks through the shared confirm and closes the menu" <|
                 \_ ->
                     let
                         asked =
-                            busy |> step (RailMenuOpen (keyboard "#b")) |> step RailLeaveAsk
+                            busy |> step (RailMenuOpen (keyboard "#b")) |> step (GapShellMsg (GapShell.LeaveAsk "#b"))
+                    in
+                    Expect.equal ( asked.railMenu, asked.gapShell.leaveAsk ) ( Nothing, Just "#b" )
+            , test "the organize entries are in the same menu: rooms move or hide, DMs close" <|
+                \_ ->
+                    let
+                        room =
+                            query (step (RailMenuOpen (keyboard "#b")) busy) |> Query.find [ testId "rail-menu" ]
 
-                        confirm =
-                            query asked |> Query.find [ testId "rail-menu" ]
+                        dm =
+                            query (step (RailMenuOpen (keyboard "carol")) busy) |> Query.find [ testId "rail-menu" ]
                     in
                     Expect.all
-                        [ \_ -> Expect.equal (Maybe.map .leaving asked.railMenu) (Just True)
-                        , \_ -> Expect.equal (outs RailLeaveAsk (step (RailMenuOpen (keyboard "#b")) busy)) []
-                        , \_ -> confirm |> Query.has [ Selector.text "Leave #b?" ]
-                        , \_ -> confirm |> Query.hasNot [ testId "rail-menu-favorite" ]
-                        , \_ -> confirm |> Query.hasNot [ testId "rail-menu-leave" ]
-                        , \_ -> confirm |> Query.find [ testId "rail-menu-leave-cancel" ] |> Event.simulate Event.click |> Event.expect RailLeaveCancel
-                        , \_ -> confirm |> Query.find [ testId "rail-menu-leave-confirm" ] |> Event.simulate Event.click |> Event.expect (RailLeave "#b")
-                        , \_ -> Expect.equal (Maybe.map .leaving (step RailLeaveCancel asked).railMenu) (Just False)
+                        [ \_ -> room |> Query.has [ testId "organize-move", testId "organize-hide" ]
+                        , \_ -> dm |> Query.has [ testId "organize-close" ]
+                        , \_ -> dm |> Query.hasNot [ testId "organize-move" ]
+                        , \_ -> room |> Query.find [ testId "organize-hide" ] |> Event.simulate Event.click |> Event.expect (OrganizeMsg (Organizer.Hide "#b"))
+                        , \_ -> Expect.equal (busy |> step (RailMenuOpen (keyboard "#b")) |> step (OrganizeMsg (Organizer.Hide "#b"))).railMenu Nothing
                         ]
                         ()
-            , test "asking to leave needs an open menu on a room (a DM, or none, does nothing)" <|
-                \_ ->
-                    Expect.equal
-                        [ (step RailLeaveAsk busy).railMenu |> Maybe.map .leaving
-                        , (busy |> step (RailMenuOpen (keyboard "carol")) |> step RailLeaveAsk).railMenu |> Maybe.map .leaving
-                        ]
-                        [ Nothing, Just False ]
             , test "Favorite and Mute close the menu; the room going away closes it" <|
                 \_ ->
                     Expect.equal

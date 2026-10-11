@@ -235,25 +235,6 @@
 }
 .onyx-railmenu-notify .room-notify-seg[aria-checked="true"] { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); font-weight: 650; }
 
-/* Leave room asks before it parts: Stay (the default focus) / Leave. */
-.onyx-railmenu-confirm { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-2) var(--space-1); }
-.onyx-railmenu-confirm-title { margin: 0; font-size: var(--text-md); font-weight: 650; overflow-wrap: anywhere; }
-.onyx-railmenu-confirm-copy { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
-.onyx-railmenu-confirm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
-.onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button {
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  font: inherit;
-  font-size: var(--text-md);
-  font-weight: 600;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.onyx-railmenu-confirm-cancel { color: var(--onyx-text); background: transparent; border: 1px solid var(--onyx-line); }
-.onyx-railmenu-confirm-cancel:hover { background: var(--onyx-panel-2); }
-.onyx-railmenu-confirm-leave { color: var(--onyx-bad); background: transparent; border: 1px solid var(--onyx-bad); }
-.onyx-railmenu-confirm-leave:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
-
 /* Anchored at the pointer: no veil, no entrance travel, a close the
    pointer does not need (Escape and a click outside close it). */
 .onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet-backdrop { background: transparent; animation: none; }
@@ -272,7 +253,6 @@
   .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
   .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
   .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
-  .onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
   .onyx-railmenu-head .onyx-railmenu-tile,
   .onyx-railmenu-head .onyx-railmenu-face { width: 44px; height: 44px; }
   .onyx-railmenu-title { font-size: var(--text-lg); }
@@ -479,7 +459,6 @@
 
   .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
   .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; }
-  .onyx-frame .onyx-railmenu .onyx-railmenu-confirm-actions button { min-height: 44px; }
 }
 
 /* 6. Short windows (≤520px tall) ----------------------------------------- */
