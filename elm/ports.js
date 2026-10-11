@@ -1151,10 +1151,12 @@
   /* Session resume credentials — ports-side subset of
      credentials.ts (`onyx:credentials` localStorage). Only the
      server-issued resume Bearer [REDACTED] (local TOKEN + mesh MTOKEN) live
-     here; passwords, remembered identities, and account handoffs need
-     a login UI the Elm client has not built yet. Shape:
-       { v: 1, slots: { "<server>|<nick>": { sessionToken?,
-         meshToken?, meshExpiresAtMs? } } }
+     here, plus (v3/rx-public) the opted-in remembered identities and
+     their saved password; account handoffs are still Solid-only. Shape:
+       { v: 1, active?, slots: { "<server host>|<nick>": { sessionToken?,
+         meshToken?, meshExpiresAtMs?, remembered?, nick?, savedAt?,
+         password? } } }
+     (plus the Solid client's v2 fields, carried through untouched)
      with per-server/nick keying so an account switch never replays a
      stranger's bearer. Bounds mirror the oracle (4 KiB Bearer [REDACTED]
      no whitespace/control). */

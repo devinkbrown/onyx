@@ -117,7 +117,7 @@ export default {
   },
   'zoom-landing': zoom('/'),
   'zoom-connect': zoom('/app?PIN'),
-  'zoom-privacy': zoom('/privacy/'),
+  'zoom-privacy': zoom('/privacy'),
   'zoom-appearance': zoom('/appearance'),
   'bigfont-landing': bigFont('/'),
   'bigfont-connect': bigFont('/app?PIN'),

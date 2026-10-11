@@ -1753,16 +1753,17 @@
 .public-related__list a[aria-current="page"] { color: var(--onyx-text); box-shadow: inset 2px 0 0 var(--onyx-accent); padding-left: var(--space-3); }
 .public-related__list a[aria-current="page"]::after { display: none; }
 @media (min-width: 1100px) {
-  .trust-page,
-  .public-info-page {
+  /* Only pages that carry the rail (Guides shares .public-info-page). */
+  .trust-page:has(> .public-related),
+  .public-info-page:has(> .public-related) {
     display: grid;
     grid-template-columns: minmax(0, 46rem) minmax(12rem, 16rem);
     justify-content: space-between;
     column-gap: 64px;
     align-items: start;
   }
-  .trust-page > section,
-  .public-info-page > section { grid-column: 1; }
+  .trust-page:has(> .public-related) > section,
+  .public-info-page:has(> .public-related) > section { grid-column: 1; }
   .trust-page > .public-related,
   .public-info-page > .public-related {
     grid-column: 2;
@@ -1816,3 +1817,12 @@
    roadmap cards — ports.js focuses them on navigation). */
 .public-frame [id] { scroll-margin-top: calc(var(--pub-header-h) + env(safe-area-inset-top) + var(--space-4)); }
 .public-frame__main:focus-visible { outline: none; }
+
+/* Tablet portrait (721-860px): the landing hero keeps copy and sketch
+   side by side instead of a stretched phone column. */
+@media (min-width: 721px) and (max-width: 860px) {
+  .onyx-land-hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: var(--space-7) 40px; padding-block: 64px 72px; }
+  .onyx-land-copy { max-width: none; }
+  .onyx-land-sketch { max-width: none; }
+  .onyx-land-h1 { font-size: clamp(2.5rem, 1rem + 3.6vw, 3rem); }
+}

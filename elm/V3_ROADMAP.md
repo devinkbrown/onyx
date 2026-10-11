@@ -28,8 +28,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 0.1 | Connect gate: guest / sign in / create account / recovery code, room field, status copy, Cancel | `app/Connect.tsx` | **done** (`c18b9591`) |
 | 0.2 | Leave / disconnect returns to the gate | `ServerRail` disconnect | **done** (`c18b9591`) |
-| 0.3 | Remembered identities + "Stay signed in" (needs a ports listing seam over `onyx:credentials`) | `Connect.tsx`, `lib/credentials.ts` | todo |
-| 0.4 | Invite preview aside when arriving via `?join=` | `Connect.tsx` `conn-context` | todo |
+| 0.3 | Remembered identities + "Stay signed in" (needs a ports listing seam over `onyx:credentials`) | `Connect.tsx`, `lib/credentials.ts` | **done** (v3/rx-public) — `credentialsRequest`/`credentialsListed`/`credentialsReady` ports (metadata only; `use` arms the SASL holder ports-side), `Remembered` + `View.Connect` "Welcome back" panel, Stay signed in on the password sign-in path; Solid v2 store read + carried through writes; `rememberedIdentities.smoke.mjs`, `RememberedTest` |
+| 0.4 | Invite preview aside when arriving via `?join=` | `Connect.tsx` `conn-context` | **done** (v3/rx-public) — `conn-context` aside: room, inviter (`by`), topic, company (`with`), access-rules note |
 | 0.5 | Session-expired "Sign in again" banner | `SessionReclaimBanner` | **done** (v3/account2: four-phase banner in the shell notices strip) |
 
 ## Phase 1 — Shell skeleton that feels like Onyx

@@ -1830,3 +1830,16 @@
   .ap-group { margin-top: var(--space-6); }
   .ts-preview-pane { position: static; max-height: none; overflow: visible; }
 }
+
+/* The live preview adapts to its own width (tablet portrait gives the
+   pane ~20rem): the member column goes first, then the room list, so
+   the conversation never wraps word-by-word. */
+.ts-preview-pane { container: ts-preview / inline-size; }
+@container ts-preview (max-width: 24rem) {
+  .ts-pv-members { display: none; }
+  .ts-preview__chrome { grid-template-columns: auto minmax(0, 1fr); }
+}
+@container ts-preview (max-width: 17rem) {
+  .ts-pv-side { display: none; }
+  .ts-preview__chrome { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+}

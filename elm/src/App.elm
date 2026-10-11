@@ -24285,10 +24285,10 @@ Modes reuse the existing folds rather than new wire paths:
 The optional Room field becomes the pending `?join=` target, fired on
 001 by `firePendingDeepLinkJoin`.
 
-Narrowings: remembered identities and "Stay signed in" are not offered
-(their secrets live in the ports-side credential store, which exposes no
-listing port yet); passkey sign-in is hidden like the oracle's
-`PRESENT_PASSKEY_SIGNIN = false`.
+Remembered identities and "Stay signed in" (v3/rx-public) ride a
+metadata-only port seam over the ports-side credential store — see the
+`mapRemembered` block. Narrowing: passkey sign-in is hidden like the
+oracle's `PRESENT_PASSKEY_SIGNIN = false`.
 -}
 type ConnectMode
     = ConnectGuest
