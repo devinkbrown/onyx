@@ -425,10 +425,12 @@ suite =
                         ()
             , test "no rooms shows the zero-state copy; no DMs shows the messages empty copy" <|
                 \_ ->
+                    -- v3/rx-shell: the empty collections say what they are
+                    -- for and offer the next step.
                     rail blank
                         |> Query.has
                             [ Selector.text "No rooms yet. Browse rooms to join one."
-                            , Selector.text "No messages yet. Open a person to start one."
+                            , Selector.text "No messages yet. Start one with New."
                             ]
             ]
         , describe "New conversation sheet"

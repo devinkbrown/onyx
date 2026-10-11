@@ -86,7 +86,7 @@ html:has(> body .onyx-frame) > body {
   box-shadow: inset 0 var(--safe-top) 0 0 var(--onyx-panel);
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 599.98px) {
   /* Bottom nav: labels and targets clear the home indicator. */
   .onyx-frame > .onyx-mobile-nav {
     padding-bottom: max(8px, calc(var(--safe-bottom) + 4px));
@@ -96,7 +96,7 @@ html:has(> body .onyx-frame) > body {
 
 /* Wide / landscape layouts have no bottom nav: the composer is the last
    thing on screen, so it keeps clear of the home indicator. */
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   .onyx-main > .onyx-composer { padding-bottom: max(var(--space-3), var(--safe-bottom)); }
 }
 
@@ -106,7 +106,7 @@ html:has(> body .onyx-frame) > body {
    edge (--vvh); the bottom nav steps aside so the composer sits right
    on the keyboard, and if Safari pans the visual viewport anyway the
    frame follows it. */
-@media (max-width: 767.98px) {
+@media (max-width: 599.98px) {
   :root[data-kb="open"] .onyx-frame > .onyx-mobile-nav { display: none; }
   :root[data-kb="open"] .onyx-frame { transform: translateY(var(--vv-top, 0px)); }
   :root[data-kb="open"] .onyx-main > .onyx-composer { padding-bottom: var(--space-2); }
