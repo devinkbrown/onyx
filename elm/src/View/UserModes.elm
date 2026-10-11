@@ -947,7 +947,7 @@ selfNameRow model =
                         [ small [ class "um-selfname__label" ] [ text "Name on the network" ]
                         , span [ class "um-selfname__value", attribute "title" shown ] [ text shown ]
                         ]
-                    , button [ type_ "button", class "um-btn um-btn--quiet", testid "um-selfname-edit", onClick (um U.RealnameEdit) ] [ text "Edit" ]
+                    , button [ type_ "button", id "um-selfname-edit", class "um-btn um-btn--quiet", testid "um-selfname-edit", onClick (um U.RealnameEdit) ] [ text "Edit" ]
                     ]
 
             Just draft ->
@@ -958,7 +958,6 @@ selfNameRow model =
                         , id "um-selfname-input"
                         , class "um-input"
                         , attribute "autocomplete" "off"
-                        , attribute "data-onyx-autofocus" "profile"
                         , maxlength U.maxRealnameLength
                         , placeholder (model.ourNick ++ " (webchat)")
                         , value draft

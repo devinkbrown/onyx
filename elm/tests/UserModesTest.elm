@@ -26,7 +26,7 @@ ctx0 =
     , ignored = Set.empty
     , isChannel = \n -> String.startsWith "#" n
     , profileNicks = Set.empty
-    , dmPeers = []
+    , dmPeers = \_ -> []
     , serverPrefix = Nothing
     }
 
@@ -222,6 +222,16 @@ wireBuilderTests =
                     , \_ -> Expect.equal Nothing (U.deferAtLine 1700000000000 "#lounge" "a\nb")
                     , \_ -> Expect.equal Nothing (U.deferAtLine 1700000000000 "#lounge" (String.repeat 401 "x"))
                     , \_ -> Expect.equal Nothing (U.deferAtLine 1700000000000 "#lo unge" "hi")
+                    ]
+                    ()
+        , test "DEFER CRON is a builder only (no control offers a send nobody can cancel)" <|
+            \_ ->
+                Expect.all
+                    [ \_ -> Expect.equal (Just "DEFER CRON 0 9 * * 1 #lounge :stand-up now\r\n") (U.deferCronLine "0 9 * * 1" "#lounge" "stand-up now")
+                    , \_ -> Expect.equal Nothing (U.deferCronLine "0 9 * *" "#lounge" "x")
+                    , \_ -> Expect.equal Nothing (U.deferCronLine "0 9 * * mon" "#lounge" "x")
+                    , \_ -> Expect.equal Nothing (U.deferCronLine "0 9 * * 1" "#lounge" "")
+                    , \_ -> Expect.equal Nothing (U.deferCronLine "0 9 * * 1 2" "#lounge" "x")
                     ]
                     ()
         , test "DEFER counts bytes, not characters" <|
@@ -623,7 +633,7 @@ callerIdTests =
                         List.map (\i -> "peer" ++ String.fromInt i) (List.range 1 40)
 
                     ( state, effects ) =
-                        upd { ctx0 | dmPeers = "alice" :: "#room" :: peers } U.AcceptExistingDms { blank | accepts = [ "Alice" ] }
+                        upd { ctx0 | dmPeers = \_ -> "alice" :: "#room" :: peers } U.AcceptExistingDms { blank | accepts = [ "Alice" ] }
                 in
                 Expect.all
                     [ \_ -> Expect.equal 24 (List.length (List.filter (String.startsWith "ACCEPT +") (sent effects)))
@@ -1296,6 +1306,7 @@ profileTests =
                 Expect.all
                     [ \_ -> Expect.equal [ "SETNAME :Wren Ito\r\n" ] (sent effects)
                     , \_ -> Expect.equal True (List.member U.Persist effects)
+                    , \_ -> Expect.equal True (List.member (U.FocusId "um-selfname-edit") effects)
                     , \_ -> Expect.equal "Wren Ito" saved.realname
                     , \_ -> Expect.equal Nothing saved.realnameDraft
                     , \_ -> Expect.equal "Wren Ito" (U.realnameShown saved "kn")
@@ -1310,7 +1321,7 @@ profileTests =
                 Expect.all
                     [ \_ -> Expect.equal [] (sent effects)
                     , \_ -> Expect.equal "Wren" saved.realname
-                    , \_ -> Expect.equal [ U.Persist ] effects
+                    , \_ -> Expect.equal [ U.Persist, U.FocusId "um-selfname-edit" ] effects
                     ]
                     ()
         , test "a blank draft resets to the default name" <|

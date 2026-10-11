@@ -44287,7 +44287,7 @@ userModesCtx model =
 
             Nothing ->
                 Set.empty
-    , dmPeers = userModesDmPeers model
+    , dmPeers = \_ -> userModesDmPeers model
     , serverPrefix = model.serverPrefix
     }
 
@@ -44462,6 +44462,9 @@ applyUserModesEffect message effect model =
 
         UserModes.ForgetDeviceAutojoin channel ->
             removeAutoJoin model channel
+
+        UserModes.FocusId id ->
+            ( model, [ PrefsFocus { id = id } ] )
 
 
 {-| The server answered a send-later request: success closes the picker and

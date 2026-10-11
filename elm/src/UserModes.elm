@@ -29,6 +29,7 @@ module UserModes exposing
     , blank
     , clearOwned
     , deferAtLine
+    , deferCronLine
     , deferCheck
     , deferCheckCopy
     , deferMaxBytes
@@ -428,8 +429,9 @@ type alias Ctx =
     -- of them means "offline", which is when WHOWAS/SEEN are worth asking.
     , profileNicks : Set String
 
-    -- lower-case nicks of the open DM conversations, newest first.
-    , dmPeers : List String
+    -- the open DM conversations, newest first (a thunk: only the "approve
+    -- people I already message" button needs it, not every inbound line).
+    , dmPeers : () -> List String
 
     -- the prefix 001 named as the server (a dotless server name is only
     -- trusted as a server once it did).
@@ -447,6 +449,7 @@ type Effect
     | OpenDm String
     | OpenPrivacy
     | ForgetDeviceAutojoin String
+    | FocusId String
 
 
 
@@ -751,6 +754,36 @@ deferAtLine sendAt channel text =
 
                 else
                     Just (Wire.formatIrcLine "DEFER" [ "AT", String.fromInt sendAt, c, t ])
+
+            _ ->
+                Nothing
+
+
+{-| `DEFER CRON <min> <hour> <dom> <mon> <dow> <#channel> :<text>`
+(`handleDefer`): the same send, repeating. The wire shape is covered here but
+no control offers it: the server has no way to cancel a job, so a recurring
+send that was a mistake would repeat for good.
+-}
+deferCronLine : String -> String -> String -> Maybe String
+deferCronLine cron channel text =
+    let
+        fields =
+            String.words cron
+
+        fieldOk field =
+            not (String.isEmpty field) && String.all (\c -> Char.isDigit c || c == '*' || c == '/' || c == ',' || c == '-') field
+    in
+    if List.length fields /= 5 || not (List.all fieldOk fields) then
+        Nothing
+
+    else
+        case ( wireToken channel, cleanText 100000 text ) of
+            ( Just c, Just t ) ->
+                if utf8Bytes t > deferMaxBytes then
+                    Nothing
+
+                else
+                    Just (Wire.formatIrcLine "DEFER" ([ "CRON" ] ++ fields ++ [ c, t ]))
 
             _ ->
                 Nothing
@@ -1148,7 +1181,7 @@ update ctx msg state =
                         Set.fromList (List.map String.toLower state.accepts)
 
                     fresh =
-                        ctx.dmPeers
+                        ctx.dmPeers ()
                             |> List.filter (\n -> not (Set.member (String.toLower n) have) && n /= "" && not (ctx.isChannel n))
                             |> List.take maxApproveBatch
                 in
@@ -1420,13 +1453,13 @@ update ctx msg state =
                 ( { state | autojoinStatus = offlineStatus }, [] )
 
         RealnameEdit ->
-            ( { state | realnameDraft = Just state.realname, realnameStatus = Nothing }, [] )
+            ( { state | realnameDraft = Just state.realname, realnameStatus = Nothing }, [ FocusId "um-selfname-input" ] )
 
         RealnameInput value ->
             ( { state | realnameDraft = Just (String.left maxRealnameLength value) }, [] )
 
         RealnameCancel ->
-            ( { state | realnameDraft = Nothing, realnameStatus = Nothing }, [] )
+            ( { state | realnameDraft = Nothing, realnameStatus = Nothing }, [ FocusId "um-selfname-edit" ] )
 
         RealnameSave ->
             case cleanRealname (Maybe.withDefault state.realname state.realnameDraft) of
@@ -1449,11 +1482,11 @@ update ctx msg state =
                             | realnameLive = Just clean
                             , realnameStatus = Just { text = "Saved. People see “" ++ clean ++ "” on your profile.", error = False }
                           }
-                        , Persist :: sends [ setnameLine clean ]
+                        , Persist :: sends [ setnameLine clean ] ++ [ FocusId "um-selfname-edit" ]
                         )
 
                     else
-                        ( { saved | realnameStatus = Just { text = "Saved. It applies the next time you connect.", error = False } }, [ Persist ] )
+                        ( { saved | realnameStatus = Just { text = "Saved. It applies the next time you connect.", error = False } }, [ Persist, FocusId "um-selfname-edit" ] )
 
         RealnameReset ->
             let
@@ -1468,11 +1501,11 @@ update ctx msg state =
                     | realnameLive = Just fallback
                     , realnameStatus = Just { text = "Back to the default name.", error = False }
                   }
-                , Persist :: sends [ setnameLine fallback ]
+                , Persist :: sends [ setnameLine fallback ] ++ [ FocusId "um-selfname-edit" ]
                 )
 
             else
-                ( { saved | realnameStatus = Just { text = "Back to the default name.", error = False } }, [ Persist ] )
+                ( { saved | realnameStatus = Just { text = "Back to the default name.", error = False } }, [ Persist, FocusId "um-selfname-edit" ] )
 
         ProfileLookup lookup ->
             profileLookup ctx lookup.nick lookup.account state
