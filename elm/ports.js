@@ -153,10 +153,14 @@
      `owner` (a string, or null = no scope → reads answer empty, writes
      refuse). Rows written before scoping have no owner and stay
      quarantined: never shown, searched, exported, sent or claimed by
-     whoever opens the app next — only an explicit Clear (or retention
-     age) removes them. A direct call that omits `owner` entirely (the
-     node smokes) addresses only those ownerless rows. */
+     whoever opens the app next, and exempt from retention trimming —
+     only an explicit Clear or the person's own attach / delete decision
+     (v3/gap-claim, below) changes them. A direct call that omits
+     `owner` entirely (the node smokes) addresses only those ownerless
+     rows. */
   var VAULT_OWNER_MAX = 4096;
+  /* The retention bucket of rows with no owner stamp. */
+  var CLAIM_LEGACY_BUCKET = "";
 
   function ownerArg(req) {
     if (!req || typeof req !== "object" || !Object.prototype.hasOwnProperty.call(req, "owner")) return undefined;
@@ -328,8 +332,10 @@
     var index = store.index("by-target");
     var pending = names.length;
     names.forEach(function (target) {
-      // Retention applies per owner scope (legacy ownerless rows are
-      // their own bucket, so their age cutoff still prunes them).
+      // Retention applies per owner scope. Legacy ownerless rows (from
+      // before scoping) are NOT trimmed: they await an explicit
+      // attach / delete decision (v3/gap-claim) and age or count limits
+      // must never silently take them while nobody can see them.
       var seenByOwner = {};
       var cursor = index.openCursor(IDBKeyRange.only(target));
       cursor.onsuccess = function () {
@@ -344,6 +350,7 @@
           var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
           if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
           Object.keys(seenByOwner).forEach(function (bucket) {
+            if (bucket === CLAIM_LEGACY_BUCKET) return; // v3/gap-claim
             var seen = seenByOwner[bucket];
             var prune = selectPruneIds(seen, channelPolicy, now);
             var keyById = {};
@@ -8320,6 +8327,75 @@ function fetchPublicFeed(url) {
         });
       });
     }
+    /* v3/gap-claim — history from before owner scoping: scan, attach to
+       the scope Elm names, delete, or remember "Not now". One request
+       port, one answer port; every answer names the scope it is for so
+       Elm drops stale ones. */
+    if (app.ports.gapClaimRequest && app.ports.gapClaimAnswer) {
+      app.ports.gapClaimRequest.subscribe(function (req) {
+        var op = req && typeof req.op === "string" ? req.op : "";
+        var scope = req && typeof req.scope === "string" ? req.scope : "";
+        var guest = req && typeof req.guest === "string" && req.guest.length <= VAULT_OWNER_MAX ? req.guest : "";
+        function answer(payload) {
+          payload.scope = scope;
+          try { app.ports.gapClaimAnswer.send(payload); } catch (err) { /* port gone */ }
+        }
+        function failed(kind, reason) {
+          answer({ kind: kind, op: op, ok: false, reason: reason, total: 0, attached: 0, merged: 0, deleted: 0, remaining: -1 });
+        }
+        if (!scope || scope.length > VAULT_OWNER_MAX) {
+          if (op === "attach" || op === "delete") failed("done", "scope");
+          else if (op === "scan") answer({ kind: "scan", ok: false });
+          return;
+        }
+        var hooks = {
+          progress: function (done, total) { answer({ kind: "progress", op: op, done: done, total: total }); }
+        };
+        if (op === "scan") {
+          /* Deferred a moment so the sweep stays out of the way of boot. */
+          setTimeout(function () {
+            claimEnqueue(function (release) {
+              claimScan(vault, { scope: scope, guest: guest, quick: true }, function (r) {
+                var store = claimStorage();
+                var st = claimReadState(store);
+                if (r.ok && r.rows === 0 && st.interrupted) claimWriteState(store, { attach: null });
+                answer({
+                  kind: "scan",
+                  ok: r.ok,
+                  rows: r.rows,
+                  conversations: r.conversations,
+                  oldest: r.oldest,
+                  newest: r.newest,
+                  undated: r.undated,
+                  otherOwners: r.otherOwners,
+                  truncated: r.truncated,
+                  dismissed: st.dismissed,
+                  interrupted: st.interrupted && r.rows > 0,
+                  historyOn: localHistoryEnabled()
+                });
+                release();
+              });
+            });
+          }, CLAIM_SCAN_DELAY_MS);
+        } else if (op === "attach") {
+          claimEnqueue(function (release) {
+            claimAttach(vault, scope, hooks, function (res) {
+              answer({ kind: "done", op: "attach", ok: res.ok, reason: res.reason, total: res.total, attached: res.attached, merged: res.merged, deleted: 0, remaining: res.remaining });
+              release();
+            });
+          });
+        } else if (op === "delete") {
+          claimEnqueue(function (release) {
+            claimDelete(vault, hooks, function (res) {
+              answer({ kind: "done", op: "delete", ok: res.ok, reason: res.reason, total: res.total, attached: 0, merged: 0, deleted: res.deleted, remaining: res.remaining });
+              release();
+            });
+          });
+        } else if (op === "dismiss") {
+          claimWriteState(claimStorage(), { dismissed: true, dismissedAt: (typeof Date !== "undefined" && Date.now) ? Date.now() : 0 });
+        }
+      });
+    }
     var badge = createAppBadge(typeof navigator !== "undefined" ? navigator : null);
     /* A stale OS badge from an earlier session never outlives a reload. */
     badge.set(0);
@@ -12289,14 +12365,19 @@ function fetchPublicFeed(url) {
     var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
     /* v3/gap-account: retention is per target AND per owner scope (two
        identities' rows share logical ids and must never evict each
-       other); legacy ownerless rows are their own bucket. */
+       other); legacy ownerless rows are their own bucket, which the
+       sweep skips (v3/gap-claim). */
     var byTarget = {};
     seen.forEach(function (entry) {
       if (!entry.target) return;
       var group = entry.target + "\u0001" + entry.bucket;
       (byTarget[group] = byTarget[group] || []).push(entry);
     });
-    var targets = Object.keys(byTarget);
+    /* v3/gap-claim: legacy ownerless rows await an explicit attach /
+       delete decision and are never trimmed by count or age. */
+    var targets = Object.keys(byTarget).filter(function (group) {
+      return byTarget[group][0].bucket !== CLAIM_LEGACY_BUCKET;
+    });
     if (targets.length === 0) { onDone(0); return; }
     var tx;
     try {
@@ -12327,6 +12408,407 @@ function fetchPublicFeed(url) {
     });
   }
 
+
+  /* ---------------------------------------------------------------------
+     v3/gap-claim — claim (attach or delete) the history that predates
+     owner scoping.
+
+     Rows written before v3/gap-account carry no owner stamp. Every read,
+     search, export and send filters on the stamp, so those rows are
+     quarantined: invisible to every identity, and (since this slice) also
+     exempt from retention trimming, so age or count limits can never take
+     them silently while they await a decision. The user decides, once and
+     explicitly, from Elm (`GapClaim`):
+
+       scan    count + date range + conversation count of the unstamped
+               rows. Reads `target` and `at` only; the message text is
+               never read into the result.
+       attach  re-key ONLY the unstamped rows under the chosen scope
+               (`owner + NUL + id`, `owner` and `rid` set). Batches of
+               CLAIM_BATCH rows, each ONE readwrite transaction (all of the
+               batch or none of it); a row is looked up inside the
+               transaction and skipped unless it is still unstamped, so
+               rows stamped for any identity are never touched and a second
+               run (another tab, a retry after an interruption) simply
+               finds nothing left. When the scope already holds a row with
+               the same logical id, that owned row wins and the legacy
+               duplicate is dropped (`merged`). Counts accumulate only from
+               committed batches; the result is verified by a fresh scan
+               (`remaining` must be 0).
+       delete  the same walk, but erases the unstamped rows. Verified the
+               same way.
+
+     Queued sends (outbox) are not history and are never claimed: an
+     ownerless queued send could otherwise go out under whichever identity
+     is signed in. They expire after 24h on their own flush walk.
+
+     Operations run one at a time (a serial queue) so a re-scan requested
+     after a scope change always sees a finished attach. The device-wide
+     decision (`Not now`, and a marker for an unfinished attach) lives in
+     one small localStorage record. */
+  var CLAIM_STATE_KEY = "onyx:history-claim";
+  var CLAIM_BATCH = 400;
+  var CLAIM_SCAN_CAP = 250000;
+  var CLAIM_TARGETS_CAP = 100000;
+  var CLAIM_OWNERS_CAP = 256;
+  var CLAIM_ROUNDS_MAX = 64;
+  var CLAIM_SCAN_DELAY_MS = 800;
+  /* Pause between batches (ms). 0 = just yield to the event loop; the
+     screenshot harness slows it to catch the progress state. */
+  var claimTuning = { pauseMs: 0 };
+
+  function claimStorage() {
+    try {
+      return (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function claimReadState(store) {
+    var out = { dismissed: false, interrupted: false };
+    try {
+      var raw = store ? store.getItem(CLAIM_STATE_KEY) : null;
+      if (!raw) return out;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return out;
+      out.dismissed = parsed.dismissed === true;
+      out.interrupted = !!(parsed.attach && typeof parsed.attach === "object" && !Array.isArray(parsed.attach));
+    } catch (err) { /* unreadable record = no decision yet */ }
+    return out;
+  }
+
+  /* `patch` keys: dismissed / dismissedAt / attach (null removes). */
+  function claimWriteState(store, patch) {
+    if (!store) return false;
+    try {
+      var current = {};
+      var raw = store.getItem(CLAIM_STATE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) current = parsed;
+      }
+      var next = { v: 1 };
+      if (current.dismissed === true) {
+        next.dismissed = true;
+        if (typeof current.dismissedAt === "number" && isFinite(current.dismissedAt)) next.dismissedAt = current.dismissedAt;
+      }
+      if (current.attach && typeof current.attach === "object" && !Array.isArray(current.attach)) next.attach = current.attach;
+      Object.keys(patch || {}).forEach(function (key) {
+        if (patch[key] === null) delete next[key];
+        else next[key] = patch[key];
+      });
+      store.setItem(CLAIM_STATE_KEY, JSON.stringify(next));
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /* Walk the store once. `scope` (the scope being asked about) only keeps
+     it (and the `guest` scope, which says nothing about who else uses
+     the device) out of the `otherOwners` count; `keys` also collects the primary
+     keys of the unstamped rows. Message text is never read. */
+  function claimScan(db, opts, onDone) {
+    var wantKeys = !!(opts && opts.keys);
+    var scope = (opts && typeof opts.scope === "string") ? opts.scope : null;
+    var spare = (opts && typeof opts.guest === "string" && opts.guest) ? opts.guest : null;
+    var result = { ok: false, rows: 0, conversations: 0, oldest: null, newest: null, undated: 0, otherOwners: 0, truncated: false, keys: [] };
+    var finished = false;
+    function done(ok) {
+      if (finished) return;
+      finished = true;
+      result.ok = ok;
+      if (!wantKeys) delete result.keys;
+      try { onDone(result); } catch (err) { /* caller's problem */ }
+    }
+    if (db === null) {
+      /* No store: nothing persisted on a host without IndexedDB; a host
+         that has IndexedDB but failed to open cannot be scanned. */
+      done(!(typeof global.indexedDB !== "undefined" && global.indexedDB));
+      return;
+    }
+    if (opts && opts.quick) {
+      claimLooksClean(db, function (clean) {
+        if (clean) done(true); else claimWalk();
+      });
+    } else {
+      claimWalk();
+    }
+    function claimWalk() {
+      var tx;
+      var cursor;
+      try {
+        tx = db.transaction(STORE, "readonly");
+        cursor = tx.objectStore(STORE).openCursor();
+      } catch (err) {
+        done(false);
+        return;
+      }
+      var targets = {};
+      var owners = {};
+      var nTargets = 0;
+      var nOwners = 0;
+      var seen = 0;
+      cursor.onsuccess = function () {
+        var c = cursor.result;
+        if (!c) return;
+        if (seen >= CLAIM_SCAN_CAP) { result.truncated = true; return; }
+        seen += 1;
+        var raw = c.value;
+        var stamp = vaultRowOwner(raw);
+        if (stamp === null) {
+          result.rows += 1;
+          if (wantKeys) result.keys.push(c.primaryKey);
+          var tkey = "t" + String((raw && raw.target) || "").toLowerCase();
+          if (!Object.prototype.hasOwnProperty.call(targets, tkey) && nTargets < CLAIM_TARGETS_CAP) {
+            targets[tkey] = true;
+            nTargets += 1;
+          }
+          var at = (raw && typeof raw.at === "number" && isFinite(raw.at) && raw.at > 0) ? Math.floor(raw.at) : 0;
+          if (at === 0) {
+            result.undated += 1;
+          } else {
+            if (result.oldest === null || at < result.oldest) result.oldest = at;
+            if (result.newest === null || at > result.newest) result.newest = at;
+          }
+        } else if (stamp !== scope && stamp !== spare) {
+          var okey = "o" + stamp;
+          if (!Object.prototype.hasOwnProperty.call(owners, okey) && nOwners < CLAIM_OWNERS_CAP) {
+            owners[okey] = true;
+            nOwners += 1;
+          }
+        }
+        c.continue();
+      };
+      cursor.onerror = function () { done(false); };
+      tx.oncomplete = function () {
+        result.conversations = nTargets;
+        result.otherOwners = nOwners;
+        done(true);
+      };
+      tx.onerror = function () { done(false); };
+      tx.onabort = function () { done(false); };
+    }
+  }
+
+  /* A cheap proof that NOTHING is unstamped, so the common steady state
+     (everything already owned) costs two index counts instead of reading
+     every row on every page load. Owned rows are keyed by their scope key,
+     a JSON array, so they all start with `["`; an unstamped row's key is
+     its logical id (`#room:12`, `nick:7`), which can never start with a
+     quote because no channel or nick may. Zero keys outside that prefix
+     proves no unstamped row; ANYTHING else (a count, an error, an
+     unusual key) just means "do the full walk", never "clean". */
+  var CLAIM_OWNED_PREFIX = "[\"";
+  function claimLooksClean(db, onDone) {
+    var settled = false;
+    function settle(clean) {
+      if (settled) return;
+      settled = true;
+      onDone(clean);
+    }
+    try {
+      var tx = db.transaction(STORE, "readonly");
+      var store = tx.objectStore(STORE);
+      var below = store.count(IDBKeyRange.upperBound(CLAIM_OWNED_PREFIX, true));
+      var above = store.count(IDBKeyRange.lowerBound(CLAIM_OWNED_PREFIX + "\uffff", true));
+      var counts = { below: -1, above: -1 };
+      below.onsuccess = function () { counts.below = below.result; };
+      above.onsuccess = function () { counts.above = above.result; };
+      tx.oncomplete = function () { settle(counts.below === 0 && counts.above === 0); };
+      tx.onerror = function () { settle(false); };
+      tx.onabort = function () { settle(false); };
+    } catch (err) {
+      settle(false);
+    }
+  }
+
+  /* One atomic batch. `mode` "attach" re-keys under `owner`, "delete"
+     erases. Every key is re-read INSIDE the transaction and skipped
+     unless it is still unstamped. Counts are reported only when the
+     transaction committed; an abort rolls the whole batch back. */
+  function claimBatch(db, mode, owner, keys, onDone) {
+    var settled = false;
+    function settle(res) {
+      if (settled) return;
+      settled = true;
+      onDone(res);
+    }
+    var tx;
+    var store;
+    try {
+      tx = db.transaction(STORE, "readwrite");
+      store = tx.objectStore(STORE);
+    } catch (err) {
+      settle({ ok: false, attached: 0, merged: 0, deleted: 0, skipped: 0 });
+      return;
+    }
+    var attached = 0;
+    var merged = 0;
+    var deleted = 0;
+    var skipped = 0;
+    try {
+      keys.forEach(function (key) {
+        var getReq = store.get(key);
+        getReq.onsuccess = function () {
+          var raw = getReq.result;
+          if (!raw || typeof raw !== "object" || vaultRowOwner(raw) !== null) { skipped += 1; return; }
+          if (mode === "delete") {
+            store.delete(key);
+            deleted += 1;
+            return;
+          }
+          var rid = (typeof raw.rid === "string" && raw.rid) ? raw.rid : String(raw.id === undefined || raw.id === null ? "" : raw.id);
+          if (!rid) { skipped += 1; return; }
+          var ownedKey = owner + "\u0000" + rid;
+          var ownedReq = store.get(ownedKey);
+          ownedReq.onsuccess = function () {
+            if (ownedReq.result) {
+              /* This scope already holds the row: the owned copy wins. */
+              store.delete(key);
+              merged += 1;
+              return;
+            }
+            var next = Object.assign({}, raw);
+            next.rid = rid;
+            next.owner = owner;
+            next.id = ownedKey;
+            store.put(next);
+            store.delete(key);
+            attached += 1;
+          };
+        };
+      });
+    } catch (err) {
+      try { if (tx.abort) tx.abort(); } catch (abortErr) { /* already dead */ }
+      settle({ ok: false, attached: 0, merged: 0, deleted: 0, skipped: 0 });
+      return;
+    }
+    tx.oncomplete = function () {
+      /* Rows moved or left: every per-target proof is void. */
+      vaultDmPrivacyCache = {};
+      settle({ ok: true, attached: attached, merged: merged, deleted: deleted, skipped: skipped });
+    };
+    tx.onerror = function () { settle({ ok: false, attached: 0, merged: 0, deleted: 0, skipped: 0 }); };
+    tx.onabort = function () { settle({ ok: false, attached: 0, merged: 0, deleted: 0, skipped: 0 }); };
+  }
+
+  /* Walk-and-batch driver shared by attach and delete. Resumable and
+     idempotent: it always starts from a fresh scan of what is still
+     unstamped, and it ends with a verifying scan. */
+  function claimRun(db, mode, owner, hooks, onDone) {
+    var totals = { total: 0, attached: 0, merged: 0, deleted: 0, skipped: 0 };
+    var failed = null;
+    var round = 0;
+    function processed() {
+      return totals.attached + totals.merged + totals.deleted + totals.skipped;
+    }
+    function finish() {
+      claimScan(db, { scope: owner }, function (verify) {
+        var remaining = verify.ok ? verify.rows : -1;
+        onDone({
+          ok: failed === null && verify.ok && remaining === 0,
+          reason: failed || (verify.ok ? (remaining === 0 ? "" : "remaining") : "verify"),
+          total: totals.total,
+          attached: totals.attached,
+          merged: totals.merged,
+          deleted: totals.deleted,
+          remaining: remaining
+        });
+      });
+    }
+    function nextRound() {
+      round += 1;
+      if (round > CLAIM_ROUNDS_MAX) { failed = failed || "rounds"; finish(); return; }
+      claimScan(db, { keys: true, scope: owner }, function (scan) {
+        if (!scan.ok) { failed = "scan"; finish(); return; }
+        if (scan.rows === 0) { finish(); return; }
+        totals.total = Math.max(totals.total, processed() + scan.rows);
+        var keys = scan.keys;
+        var index = 0;
+        var progressed = 0;
+        function nextBatch() {
+          if (index >= keys.length) {
+            if (scan.truncated && progressed > 0) nextRound(); else finish();
+            return;
+          }
+          var slice = keys.slice(index, index + CLAIM_BATCH);
+          index += slice.length;
+          claimBatch(db, mode, owner, slice, function (res) {
+            if (!res.ok) { failed = "write"; finish(); return; }
+            totals.attached += res.attached;
+            totals.merged += res.merged;
+            totals.deleted += res.deleted;
+            totals.skipped += res.skipped;
+            progressed += res.attached + res.merged + res.deleted;
+            if (hooks && typeof hooks.progress === "function") {
+              try { hooks.progress(processed(), totals.total); } catch (err) { /* observer only */ }
+            }
+            setTimeout(nextBatch, claimTuning.pauseMs);
+          });
+        }
+        nextBatch();
+      });
+    }
+    nextRound();
+  }
+
+  function claimAttach(db, owner, hooks, onDone) {
+    function refuse(reason) {
+      onDone({ ok: false, reason: reason, total: 0, attached: 0, merged: 0, deleted: 0, remaining: -1 });
+    }
+    if (typeof owner !== "string" || owner.length === 0 || owner.length > VAULT_OWNER_MAX) { refuse("scope"); return; }
+    /* History opted out: the store should hold nothing, and attaching
+       would re-adopt what the person chose not to keep. Delete only. */
+    if (!localHistoryEnabled()) { refuse("history-off"); return; }
+    if (db === null) { refuse("unavailable"); return; }
+    var store = claimStorage();
+    claimWriteState(store, { attach: { scope: owner, at: (typeof Date !== "undefined" && Date.now) ? Date.now() : 0 } });
+    claimRun(db, "attach", owner, hooks, function (res) {
+      if (res.ok) claimWriteState(store, { attach: null });
+      onDone(res);
+    });
+  }
+
+  function claimDelete(db, hooks, onDone) {
+    if (db === null) {
+      onDone({ ok: false, reason: "unavailable", total: 0, attached: 0, merged: 0, deleted: 0, remaining: -1 });
+      return;
+    }
+    var store = claimStorage();
+    claimRun(db, "delete", null, hooks, function (res) {
+      if (res.ok) claimWriteState(store, { attach: null });
+      onDone(res);
+    });
+  }
+
+  /* Serial queue: one claim operation at a time. */
+  var claimQueue = [];
+  var claimRunning = false;
+  function claimEnqueue(job) {
+    claimQueue.push(job);
+    claimPump();
+  }
+  function claimPump() {
+    if (claimRunning) return;
+    var job = claimQueue.shift();
+    if (!job) return;
+    claimRunning = true;
+    var released = false;
+    try {
+      job(function () {
+        if (released) return;
+        released = true;
+        claimRunning = false;
+        claimPump();
+      });
+    } catch (err) {
+      claimRunning = false;
+      claimPump();
+    }
+  }
+
   global.OnyxPorts = {
     /* v3/gap-account */
     gapAccount: {
@@ -12341,6 +12823,20 @@ function fetchPublicFeed(url) {
       localHistoryEnabled: localHistoryEnabled,
       openVault: openVault,
       pruneAllTargets: pruneAllTargets
+    },
+    /* v3/gap-claim */
+    gapClaim: {
+      scan: claimScan,
+      looksClean: claimLooksClean,
+      attach: claimAttach,
+      remove: claimDelete,
+      enqueue: claimEnqueue,
+      readState: claimReadState,
+      writeState: claimWriteState,
+      stateKey: CLAIM_STATE_KEY,
+      batchSize: CLAIM_BATCH,
+      scanCap: CLAIM_SCAN_CAP,
+      tuning: claimTuning
     },
     vaultStore: {
       put: vaultPut,

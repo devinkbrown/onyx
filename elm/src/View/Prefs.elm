@@ -26,6 +26,7 @@ import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
 import View.GapAccount
+import View.GapClaim -- v3/gap-claim
 import View.HistoryImport -- v3/gap-import
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
@@ -280,6 +281,7 @@ panelBody model category =
 
         History ->
             [ sectionHead "History & data" "How this browser remembers, finds, retains, and erases local conversation data."
+            , View.GapClaim.prefsCard model -- v3/gap-claim
             , segmented
                 { groupId = "pref-vault-mode"
                 , legend = "Default search mode"
