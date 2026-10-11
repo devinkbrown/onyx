@@ -91,9 +91,9 @@ Any other reply hits `( model, [] )` (`src/App.elm:20990-20991`). That covers
 | D4 | **Custom status never reaches the server.** Elm sends `PROP * STATUS <text>`. A user PROP needs the entity to equal your own nick, so `*` gets `913 ERR_NOACCESS`, which lands in the invisible sink. | `propAccess` `src/daemon/server.zig:39768-39782` | `src/App.elm:20128` |
 | D5 | **The oper live Event Spine feed is discarded.** Live oper events arrive as `@onyx_server.io/category=FLOOD;…severity=warn :srv EVENT <oper> FLOOD …`. `Spine.foldEventLine` re-dispatches only the `MEDIA` and `WEBAUTHN` planes. It ignores every category body, `OBSERVE` push, `AUDIT` row and `EVENT BROADCAST`. Only `EVENT REPLAY JSON`, which opers must pull, is shown. | `renderEventTagged` `src/daemon/event_spine.zig:482`; delivery `src/daemon/server.zig:55973-55997` | `src/Spine.elm` `foldEventLine` (ignore arm); `src/App.elm:8484` |
 | D6 | **Disconnect reasons are hidden.** `ERROR :<reason>` goes to the invisible sink. Covered reasons: Excess Flood, K-line/Ward, Killed, Ghosted, raid ban, reputation, too many connections, draining, ping/registration timeout. The `KILL` line has no arm. | ERROR sites `src/daemon/server.zig:9776,9834,11709,11724,11744,17689,22262,25000` | `src/App.elm:5008-5011`; no `"KILL"` arm in `foldLine` (`src/App.elm:4593-5928`) |
-| D7 | **"Delete room" sends `CHANNEL DROP`, but Elm never registers rooms.** The DROP therefore fails with `FAIL CHANNEL CHANNEL_UNKNOWN`/`ACCOUNT_REQUIRED`, which is dropped (§0.2). Only the PART takes effect. | `handleChannel` `src/daemon/server.zig:47370` | `requestStewardDeleteRoom` `src/App.elm:21536-21560` |
+| D7 | **FIXED (v3/gap-chanserv).** **"Delete room" sends `CHANNEL DROP`, but Elm never registers rooms.** The DROP therefore fails with `FAIL CHANNEL CHANNEL_UNKNOWN`/`ACCOUNT_REQUIRED`, which is dropped (§0.2). Only the PART takes effect. | `handleChannel` `src/daemon/server.zig:47370` | `requestStewardDeleteRoom` `src/App.elm:21536-21560` |
 | D8 | **Mesh `SESSION REDIRECT: session lives on <node>; reconnect there to reclaim` is not handled.** It falls into the invisible sink, and the reclaim banner never learns the target node. | `src/daemon/server.zig:49447`, `:49634` | no `REDIRECT` match in `src/App.elm`, `src/Session.elm` or `src/Wire.elm` |
-| D9 | **Error numerics for `+S`/`+O`/`+A` joins are silent.** `489 ERR_SECUREONLYCHAN` and `520 ERR_OPERONLYCHAN` have no arm, so the user sees the join silently fail. | `joinDenied` `src/daemon/server.zig:22401-22418` | no `489`/`520` arms (`src/App.elm:5659-5735`) |
+| D9 | **FIXED (v3/gap-chanserv).** **Error numerics for `+S`/`+O`/`+A` joins are silent.** `489 ERR_SECUREONLYCHAN` and `520 ERR_OPERONLYCHAN` have no arm, so the user sees the join silently fail. | `joinDenied` `src/daemon/server.zig:22401-22418` | no `489`/`520` arms (`src/App.elm:5659-5735`) |
 
 ### 0.5 Scorecard
 
@@ -470,18 +470,18 @@ replies are server NOTICEs.
 
 | Subcommand | Server | Reply shape | Who | Elm |
 |---|---|---|---|---|
-| `REGISTER #c` | `:47391-47397` | `Channel #c registered to <acct>` | acct (op on channel) | **MISSING** |
-| `DROP #c` | `:47400-47405` | `Channel #c dropped` | founder | **PARTIAL**: sent by "delete room" (`src/App.elm:21559`); fails for unregistered rooms (D7) |
-| `INFO #c` | `:47407-47425` | `channel=… founder=… flags=… mlock=… topiclock=… guard=… private=…`, `  desc:`, `  url:` | acct | **MISSING** |
-| `SET #c MLOCK <+modes-modes>` | `:47436-47449` (`mode_lock.LockSpec`) | `Channel #c MLOCK set to …`; enforced on MODE (325 RPL_CHANNELMLOCK) | founder | **MISSING** |
-| `SET #c KEEPTOPIC on\|off` | `:47450-47465` | snapshot restored on recreate | founder | **MISSING** |
-| `SET #c TOPICLOCK\|GUARD\|PRIVATE on\|off` | `:47466-47485` (PRIVATE flips live `+s`) | `Channel #c <field> on\|off` | founder | **MISSING** |
-| `SET #c DESC\|URL <text>` | `:47486-47505` | `DESC set\|cleared`, `URL set to …` | founder | **MISSING** |
-| `ACCESS #c LIST\|ADD\|DEL <acct> <FOUNDER\|OP\|VOICE>` | `:47510-47545` | `ACCESS #c acct LEVEL`, `End of ACCESS list` | founder | **MISSING** (Elm manages **IRCX** `ACCESS`, which is a different, mask-based store) |
-| `AKICK #c LIST\|ADD <mask\|account:x> [reason]\|DEL <mask>` | `:47546-47604` | `AKICK #c mask :reason`, `AKICK added/removed …`; enforced at JOIN (474) | founder/admin | **MISSING** |
-| `TRANSFER #c <acct>` | `:47605-47613` | `Channel #c founder transferred to <acct>` | founder | **MISSING** (Elm "transfer" is the in-room `+q` dance, `src/Stewardship.elm:481-493`) |
-| `SUCCESSOR #c SHOW\|SET\|CLEAR` (top-level) | `handleSuccessor:44761` | NOTICEs; FAIL `ACCOUNT_UNKNOWN NOT_FOUNDER INVALID_VALUE …` | founder/oper | **RAW** |
-| `LISTCHANS` (top-level) | `handleListchans:25648` | `LISTCHANS #c level` … `End of LISTCHANS (n)` | acct | **RAW** |
+| `REGISTER #c` | `:47391-47397` | `Channel #c registered to <acct>` | acct (op on channel) | **FULL** (v3/gap-chanserv: `src/Chanserv.elm`, Registration section in `src/View/RoomSettings.elm` via `src/View/Chanserv.elm`) |
+| `DROP #c` | `:47400-47405` | `Channel #c dropped` | founder | **FULL** ("Delete room" now asks `CHANNEL INFO` first and sends `DROP` only for a registered room; Registration section "Drop registration") |
+| `INFO #c` | `:47407-47425` | `channel=… founder=… flags=… mlock=… topiclock=… guard=… private=…`, `  desc:`, `  url:` | acct | **FULL** (registration status, founder, description, website) |
+| `SET #c MLOCK <+modes-modes>` | `:47436-47449` (`mode_lock.LockSpec`) | `Channel #c MLOCK set to …`; enforced on MODE (325 RPL_CHANNELMLOCK) | founder | **FULL** ("Protection and locked rules") |
+| `SET #c KEEPTOPIC on\|off` | `:47450-47465` | snapshot restored on recreate | founder | **FULL** |
+| `SET #c TOPICLOCK\|GUARD\|PRIVATE on\|off` | `:47466-47485` (PRIVATE flips live `+s`) | `Channel #c <field> on\|off` | founder | **FULL** |
+| `SET #c DESC\|URL <text>` | `:47486-47505` | `DESC set\|cleared`, `URL set to …` | founder | **FULL** (a description can be replaced, not blanked: the server parser refuses empty values) |
+| `ACCESS #c LIST\|ADD\|DEL <acct> <FOUNDER\|OP\|VOICE>` | `:47510-47545` | `ACCESS #c acct LEVEL`, `End of ACCESS list` | founder | **FULL** ("Account access"; distinct from the IRCX mask `ACCESS` in Roles) |
+| `AKICK #c LIST\|ADD <mask\|account:x> [reason]\|DEL <mask>` | `:47546-47604` | `AKICK #c mask :reason`, `AKICK added/removed …`; enforced at JOIN (474) | founder/admin | **FULL** ("Auto-kick") |
+| `TRANSFER #c <acct>` | `:47605-47613` | `Channel #c founder transferred to <acct>` | founder | **HELPER ONLY** (`Chanserv.transferLine` + receipt fold; the confirmation flow is the ownership slice's, v3/gap-people) |
+| `SUCCESSOR #c SHOW\|SET\|CLEAR` (top-level) | `handleSuccessor:44761` | NOTICEs; FAIL `ACCOUNT_UNKNOWN NOT_FOUNDER INVALID_VALUE …` | founder/oper | **FULL** ("Successor") |
+| `LISTCHANS` (top-level) | `handleListchans:25648` | `LISTCHANS #c level` … `End of LISTCHANS (n)` | acct | **FULL** (Account sheet "Your rooms") |
 
 ### 6.2 `SESSION` (multi-device reclaim)
 
@@ -583,39 +583,39 @@ Elm folds every advertised letter through `Modes.applyChannelModeDelta`
 | Letter (MODEX name) | Group / param | Set by | Effect | Elm |
 |---|---|---|---|---|
 | `b` ban | A mask (+extbans) | op | Blocks JOIN (474); `+e` exempts | **FULL** (`src/View/Bans.elm`, `requestBanList:19059`, extban builder) |
-| `e` exempt | A mask | op | Exempts from `+b`/`+Z` | **MISSING** (348/349 unhandled) |
-| `I` invite-exception | A mask | op | Bypass `+i` | **MISSING** (346/347 unhandled) |
-| `Z` quiet | A mask | op | Mutes without blocking JOIN | **MISSING** (728/729 unhandled) |
+| `e` exempt | A mask | op | Exempts from `+b`/`+Z` | **FULL** (Room settings → Mutes and exceptions → Exceptions) |
+| `I` invite-exception | A mask | op | Bypass `+i` | **FULL** (Invite passes) |
+| `Z` quiet | A mask | op | Mutes without blocking JOIN | **FULL** (Muted; Mute / Unmute on the member card) |
 | `k` key | B | op | JOIN key (475) | **FULL** (`src/RoomSettings.elm:1022-1039`) |
 | `l` limit | C int | op | 471, then `+d` clone or `+f` forward | **FULL** (`src/RoomSettings.elm:1043-1068`) |
-| `f` forward | C #target (needs ops on target unless `+F`) | op | Redirect refused joins (470) | Slash |
-| `j` join throttle | C `joins:secs` | op | 480 + one-shot raid alert | Slash |
+| `f` forward | C #target (needs ops on target unless `+F`) | op | Redirect refused joins (470) | **FULL** (More rules: "Send people elsewhere when they can't join") |
+| `j` join throttle | C `joins:secs` | op | 480 + one-shot raid alert | **FULL** (More rules: "Join rate limit") |
 | `i` invite-only | D | op | 473 | **FULL** (RoomSettings + desk) |
 | `m` moderated | D | op | voice+ to speak | **FULL** |
 | `n` no-external | D | op | | **FULL** |
 | `t` topic-ops | D | op | | **FULL** |
 | `s` secret | D | op | hidden from LIST; roster gated | **FULL** (also Stewardship "close room" `+si`, `src/App.elm:21528`) |
-| `C` no-CTCP | D | op | 404 / `FAIL PRIVMSG CTCP_BLOCKED` | Slash |
-| `T` no-notice | D | op | drop non-op NOTICE | Slash |
-| `N` no-nick | D | op | blocks nick changes | Slash |
-| `g` free-invite | D | op | any member may INVITE under `+i` | Slash |
-| `S` TLS-only | D | op | 489 | Slash (and 489 is silent, D9) |
-| `M` moderate-unregistered | D | op | unauth members need voice | Slash |
-| `W` news-wire | D | op | enables `!news`/`!localnews` | Slash |
-| `O` oper-only / `A` admin-only | D | oper | 520 | Slash (520 silent) |
-| `p` PRIVATE | D (ext) | op | roster gated for non-members | Slash |
-| `h` HIDDEN | D (ext) | op | omitted from LIST/NAMES enumeration | Slash |
-| `u` KNOCK | D (ext) | op | enables KNOCK | Slash |
-| `a` AUTHONLY | D (ext) | op | accounts only (477) | Slash |
+| `C` no-CTCP | D | op | 404 / `FAIL PRIVMSG CTCP_BLOCKED` | **FULL** (More rules) |
+| `T` no-notice | D | op | drop non-op NOTICE | **FULL** (More rules) |
+| `N` no-nick | D | op | blocks nick changes | **FULL** (More rules; also a timed rule) |
+| `g` free-invite | D | op | any member may INVITE under `+i` | **FULL** (More rules) |
+| `S` TLS-only | D | op | 489 | **FULL** (More rules; 489 now explained on the join prompt) |
+| `M` moderate-unregistered | D | op | unauth members need voice | **FULL** (More rules; also a timed rule) |
+| `W` news-wire | D | op | enables `!news`/`!localnews` | **FULL** (More rules) |
+| `O` oper-only / `A` admin-only | D | oper | 520 | **FULL** (More rules, network operators only; 520 explained) |
+| `p` PRIVATE | D (ext) | op | roster gated for non-members | **FULL** (More rules) |
+| `h` HIDDEN | D (ext) | op | omitted from LIST/NAMES enumeration | **FULL** (More rules) |
+| `u` KNOCK | D (ext) | op | enables KNOCK | **FULL** (More rules: "Allow join requests"; Ask to join + host Invite) |
+| `a` AUTHONLY | D (ext) | op | accounts only (477) | **FULL** (More rules; 477 explained) |
 | `f` NOFORMAT (MODEX only) | ext | op | strips formatting | `/modex` cannot set it either (query-only) → **MISSING** |
-| `d` CLONEABLE | D (ext) | op | auto-clone `#c1…` when full | Slash |
+| `d` CLONEABLE | D (ext) | op | auto-clone `#c1…` when full | **FULL** (More rules) |
 | `E` CLONE / `r` REGISTERED / `z` SERVICE | D (ext) | **oper** | markers | Slash |
-| `x` AUDITORIUM | D (ext) | op | members hidden from each other | Slash; Elm roster cannot explain an empty NAMES |
-| `w` NOWHISPER | D (ext) | op | 923 | Slash |
-| `V` NOCOMICDATA | D (ext) | op | DATA refused (531) | Slash |
-| `U` OPMODERATE | D (ext) | op | blocked messages routed to ops | Slash; Elm never renders ops-routed held messages specially |
-| `F` FREETARGET / `D` DISFORWARD | D (ext) | op | forward-target policy | Slash |
-| MLOCK (services) | 325 `RPL_CHANNELMLOCK` | founder | Locks modes | **MISSING** (§6.1) |
+| `x` AUDITORIUM | D (ext) | op | members hidden from each other | **FULL** to set (More rules); the roster still cannot explain an empty NAMES |
+| `w` NOWHISPER | D (ext) | op | 923 | **FULL** (More rules) |
+| `V` NOCOMICDATA | D (ext) | op | DATA refused (531) | **FULL** (More rules) |
+| `U` OPMODERATE | D (ext) | op | blocked messages routed to ops | **FULL** to set (More rules); held messages are not rendered specially |
+| `F` FREETARGET / `D` DISFORWARD | D (ext) | op | forward-target policy | **FULL** (More rules, Forwarding) |
+| MLOCK (services) | 325 `RPL_CHANNELMLOCK` | founder | Locks modes | **FULL** ("Locked rules"; a refused change shows "That rule is locked") |
 
 ## 8. Member status prefixes (`PREFIX=(YQqov)*!.@+`, `src/daemon/chanmode.zig:405`)
 
@@ -641,7 +641,7 @@ only type `/mode <ownnick> +R`.
 | `B` bot | user | WHOIS 335, `bot` tag | **MISSING** (bots are external) |
 | `D` deaf | user | no channel messages | **MISSING** |
 | `g` caller-id | user | DMs need ACCEPT (716/717/718) | **MISSING** (no ACCEPT UI either) |
-| `C` no-CTCP | user | blocks direct CTCP | **MISSING** |
+| `C` no-CTCP | user | blocks direct CTCP | **FULL** (More rules) |
 | `R` regonly-PM | user | only logged-in users may DM you | **MISSING** (high-value anti-spam toggle) |
 | `p` hide-chans | user | hides your channels in WHOIS | **MISSING** |
 | `Q` no-forward | user | never forwarded by `+f` | **MISSING** |
@@ -680,7 +680,7 @@ validators: `channelBuiltinGet` `src/daemon/server.zig:39925` and
 | `FOUNDERKEY OWNERKEY HOSTKEY VOICEKEY` | channel | owner/host, **secret per tier** | a keyed JOIN matching `FOUNDERKEY`/`OWNERKEY`/`HOSTKEY` grants Q/q/o (`src/daemon/server.zig:22841-22852`); `VOICEKEY` is stored and read-gated only | **MISSING** ("role keys" UI) |
 | `LANGUAGE` (31) / `SUBJECT` (31) | channel | host | LISTX filters (`S=`, language) | **MISSING** |
 | `TOPIC` (160) | channel | host | IRCX topic mirror | **N/A** |
-| `ONJOIN` / `ONPART` (255) | channel | host | server NOTICE to the joiner/leaver `:srv NOTICE <nick> :[#chan] <text>` (`deliverChannelPropMessage` `src/daemon/server.zig:22965-22970`) | **MISSING**: there is no room welcome-message setting, and the delivered NOTICE lands in the invisible sink (§0.1) |
+| `ONJOIN` / `ONPART` (255) | channel | host | server NOTICE to the joiner/leaver `:srv NOTICE <nick> :[#chan] <text>` (`deliverChannelPropMessage` `src/daemon/server.zig:22965-22970`) | **FULL** (v3/gap-chanserv: the notice is a system row in the room; host settings "Welcome message" / "Goodbye message") |
 | `PICS` (255) | channel | sysop_manager | LISTX 813 | **N/A** |
 | `CLIENT LAG ACCOUNT CLIENTGUID SERVICEPATH` | channel | host/owner/sysop | IRCX legacy | **N/A** |
 | `no-ai` / `local-only` / `server-ai-ok` (`0\|1`) | channel | host | AI consent policy | **PARTIAL**: read (`src/AiPolicy.elm:66-69`); no setter UI |
@@ -689,8 +689,8 @@ validators: `channelBuiltinGet` `src/daemon/server.zig:39925` and
 | `membership-visibility` (`ordinary\|sealed`) | channel | host | sealed rooms refuse NAMES/WHO (`src/proto/sealed_room.zig`) | **MISSING** |
 | `EPHEMERAL` (secs; 0 off) | channel | host | hides older replay | **FULL** (`src/RoomSettings.elm:1088`, retention section `src/View/RoomSettings.elm:380`) |
 | `RETAIN` (secs) | channel | host | **deletes** rows after TTL (`channelRetainTtlMs` `src/daemon/server.zig:27040`) | **MISSING** |
-| `SLOWMODE` (secs ≤ 86400) | channel | host | per-member send gap; 404 "(slowmode)"; set automatically by the raid shield (§17) | **MISSING** (no setting, no countdown) |
-| `SLOWVOICE` (`0\|1`) | channel | host | whether voice/ops wait too | **MISSING** |
+| `SLOWMODE` (secs ≤ 86400) | channel | host | per-member send gap; 404 "(slowmode)"; set automatically by the raid shield (§17) | **FULL** (host setting "Slow mode", composer countdown, honest 404 copy; "0" turns it off because the server refuses an empty value) |
+| `SLOWVOICE` (`0\|1`) | channel | host | whether voice/ops wait too | **FULL** ("Hosts and voiced people wait too"; "1" restores the exemption) |
 | `HOLD` (n) | channel | host | first *n* messages per new member held for oper review (`captureFirstHold` `src/daemon/server.zig:43395`; sender gets NOTICE `HOLD stored`) | **MISSING** (sender sees nothing; message looks sent) |
 | `PINS` (csv msgids) | channel | host | pinned messages | **FULL** (via PROP, `writePins:13561`, `src/View/Pins.elm`) |
 | `onyx_server.topics` (csv) | channel | host (auto-added) | named-conversation registry | **PARTIAL**: topics are used through tags; there is no registry editor |
@@ -1088,10 +1088,10 @@ add or touch.
 7. **[User][P0] Custom status is broken (D4).**
    - Sketch: send `PROP <ownnick> STATUS <text>` instead of `PROP *` (`src/App.elm:20128`), or move status to `METADATA * SET ocean.status`.
    - Fold 913 into an error.
-8. **[Op][P0] "Delete room" silently fails server-side (D7).**
+8. **[Op][P0] "Delete room" silently fails server-side (D7).** **DONE (v3/gap-chanserv).**
    - Sketch: send `CHANNEL DROP` only when the room is registered (`CHANNEL INFO` first).
    - Otherwise do "close" (`+si`, kick, part), and surface `FAIL CHANNEL` (`requestStewardDeleteRoom:21536`).
-9. **[User][P0] `+S`/`+O`/`+A`/forward joins fail or redirect silently (D9).**
+9. **[User][P0] `+S`/`+O`/`+A`/forward joins fail or redirect silently (D9).** **DONE (v3/gap-chanserv).**
    - Sketch: add 489/520/470 arms in `foldErrorNumeric:17116` with join-prompt copy ("TLS required", "operators only", "you were forwarded to #x").
 
 ### P1 — high-value user features
@@ -1099,7 +1099,7 @@ add or touch.
 10. **[User][P1] Server-side scheduled messages.**
     - Sketch: when Live and registered, also submit `DEFER AT <unix-ms> #c :text` (cron via `DEFER CRON`) from `src/Schedule.elm`/`requestScheduleMessage`, so messages send with the tab closed.
     - The server has no cancel, so keep local scheduling for cancellable items and label server-held ones "can't be cancelled".
-11. **[User][P1] KNOCK ("Ask to join") for `+i`/`+k`/`+l` rooms.**
+11. **[User][P1] KNOCK ("Ask to join") for `+i`/`+k`/`+l` rooms.** **DONE (v3/gap-chanserv).**
     - Sketch: add a button on the 471/473/475 join prompt (`setChannelJoinPrompt`) → `KNOCK #c :reason`.
     - Fold 711 as a toast and 713/714 as errors.
     - For ops, fold 710 into an inbox "X asks to join #c" row with an Invite action (`src/App.elm:4673-4690`).
@@ -1125,10 +1125,10 @@ add or touch.
 16. **[User][P1] Show the MOTD and the onboarding WELCOME pack.**
     - Sketch: render `model.motd` (already collected at `src/App.elm:4568`) on Home with a dismiss.
     - Fold `NOTICE WELCOME :…` lines into the same card.
-17. **[User][P1] Room welcome message.**
+17. **[User][P1] Room welcome message.** **DONE (v3/gap-chanserv).**
     - Sketch: fold `NOTICE <me> :[#c] text` (ONJOIN/ONPART) as a pinned system row in that room.
     - Add an op setting "Welcome message" → `PROP #c ONJOIN :text` (`src/RoomSettings.elm` `WriteProp`).
-18. **[User][P1] Slowmode experience.**
+18. **[User][P1] Slowmode experience.** **DONE (v3/gap-chanserv).**
     - Sketch: op setting "Slow mode" → `PROP #c SLOWMODE <secs>` (+ `SLOWVOICE`).
     - In the composer, read `SLOWMODE` from props and show a countdown/disabled state after each send.
     - Special-case 404 "(slowmode)" copy (`foldErrorNumeric` 404 arm).
@@ -1157,7 +1157,7 @@ add or touch.
 
 ### P2 — channel operator power
 
-27. **[Op][P1] Register a room and channel services.**
+27. **[Op][P1] Register a room and channel services.** **DONE (v3/gap-chanserv).**
     - Sketch: add a "Registration" section in `src/View/RoomSettings.elm` using `Services.channelService` (`src/Services.elm:930`, unused):
       - `CHANNEL REGISTER`/`INFO`/`DROP`/`TRANSFER`
       - `SET MLOCK|KEEPTOPIC|TOPICLOCK|GUARD|PRIVATE|DESC|URL`
@@ -1165,14 +1165,14 @@ add or touch.
       - `SUCCESSOR SHOW|SET|CLEAR`
       - `LISTCHANS` in Account
     - Fold the `CHANNEL`/`ACCESS`/`AKICK` NOTICE shapes (§6.1) and `FAIL CHANNEL`.
-28. **[Op][P1] Persistent auto-kick list.**
+28. **[Op][P1] Persistent auto-kick list.** **DONE (v3/gap-chanserv).**
     - Sketch: Bans view tab "Auto-kick (registered rooms)" → `CHANNEL AKICK #c ADD|DEL|LIST`; fold the `AKICK …` NOTICEs.
-29. **[Op][P1] Exceptions, invite exceptions and quiet lists.**
+29. **[Op][P1] Exceptions, invite exceptions and quiet lists.** **DONE (v3/gap-chanserv).**
     - Sketch: add tabs in `src/View/Bans.elm` for `+e`/`+I`/`+Z`; fold 348/349, 346/347, 728/729 like 367/368 (`foldBanListRow:19108`).
     - Add a "Mute" (`+Z`) member action next to Ban in the desk/profile.
-30. **[Op][P1] Server-side timed modes.**
+30. **[Op][P1] Server-side timed modes.** **DONE for flags (v3/gap-chanserv); the server's `TEMPMODE` refuses `b` ("boolean channel flags only"), so the temp-ban stays on the client timer.**
     - Sketch: replace the client temp-ban timer (`requestTempBan:20427`) with `TEMPMODE ADD #c b <mask> <ms>` (and timed `+m`/`+i`/`+N`); `TEMPMODE CANCEL` for undo.
-31. **[Op][P1] Full channel mode toggles.**
+31. **[Op][P1] Full channel mode toggles.** **DONE (v3/gap-chanserv).**
     - Sketch: extend `RoomSettings.flagToggles` (`src/RoomSettings.elm:171-175`) with C T N g S M W u a d x w V U F D p h, each with plain-language copy.
     - Add `+f` forward and `+j joins:secs` param inputs, and owner `+q` grant/revoke.
     - Respect `MODES=` when batching.

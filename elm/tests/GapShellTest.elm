@@ -530,8 +530,8 @@ replies =
     describe "unclaimed replies are never silent"
         [ test "an unknown FAIL becomes an inbox error" <|
             \_ ->
-                Expect.equal [ "CHANNEL failed: Channel is not registered (CHANNEL_UNKNOWN)" ]
-                    (errorTexts (feedM ":s FAIL CHANNEL CHANNEL_UNKNOWN #x :Channel is not registered" settledLive))
+                Expect.equal [ "FROBNICATE failed: Channel is not registered (CHANNEL_UNKNOWN)" ]
+                    (errorTexts (feedM ":s FAIL FROBNICATE CHANNEL_UNKNOWN #x :Channel is not registered" settledLive))
         , test "an unknown NOTE goes to Activity only" <|
             \_ ->
                 let
@@ -550,7 +550,7 @@ replies =
                         feedM line settledLive |> .gapShell |> .activity |> List.head |> Maybe.map .kind
                 in
                 Expect.all
-                    [ \_ -> Expect.equal (Just Problem) (kindOf ":s FAIL CHANNEL CHANNEL_UNKNOWN #x :Channel is not registered")
+                    [ \_ -> Expect.equal (Just Problem) (kindOf ":s FAIL FROBNICATE CHANNEL_UNKNOWN #x :Channel is not registered")
                     , \_ -> Expect.equal (Just Problem) (kindOf ":s WARN SEEN SLOW :seen index is catching up")
                     , \_ -> Expect.equal (Just Notice) (kindOf ":s NOTE SEEN INFO zed :zed was last seen 2h ago")
                     ]

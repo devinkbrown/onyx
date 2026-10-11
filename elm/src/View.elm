@@ -75,6 +75,7 @@ import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
 -- v3/gap-organize
@@ -266,6 +267,7 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
