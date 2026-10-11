@@ -4037,6 +4037,63 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* v3/gap-organize — organize memory + attention prefs. Elm owns every
+     shape, bound and owner-scoped key name (`Organize`, `Attention`,
+     `Organizer`); the bridge only reads and writes whole localStorage
+     values for an allow-listed set of keys:
+       owner-scoped  onyx:{room-folders,hidden-rooms,closed-conversations,
+                     bookmarks,user-notes,smart-mute}:owner:<enc>
+       read-only     onyx:channel-navigation:owner:<enc> (the oracle's
+                     record, read once to bring its folders across)
+       device-wide   onyx:dnd-quiet-{start,end,enabled}, onyx:calm
+     A `null` value removes the key. Reads answer with `null` for a
+     missing key (never "") so Elm can tell "unset" from "empty". */
+  var ORGANIZE_OWNED = /^onyx:(room-folders|hidden-rooms|closed-conversations|bookmarks|user-notes|smart-mute|channel-navigation):owner:[A-Za-z0-9%._~!*'()-]{1,8192}$/;
+  var ORGANIZE_DEVICE = /^onyx:(dnd-quiet-start|dnd-quiet-end|dnd-quiet-enabled|calm)$/;
+  var ORGANIZE_MAX_VALUE = 2 * 1024 * 1024;
+  function organizeReadable(key) {
+    return typeof key === "string" && (ORGANIZE_OWNED.test(key) || ORGANIZE_DEVICE.test(key));
+  }
+  function organizeWritable(key) {
+    return organizeReadable(key) && key.indexOf("onyx:channel-navigation:") !== 0;
+  }
+  function wireOrganize(app, env) {
+    var storage = function () {
+      try {
+        var store = (env && env.storage) || (typeof window !== "undefined" ? window.localStorage : null);
+        return store && typeof store.getItem === "function" ? store : null;
+      } catch (err) { return null; }
+    };
+    if (app.ports.organizeStore) {
+      app.ports.organizeStore.subscribe(function (req) {
+        if (!req || !organizeWritable(req.key)) return;
+        var store = storage();
+        if (!store) return;
+        try {
+          if (req.value === null || req.value === undefined) {
+            store.removeItem(req.key);
+          } else if (typeof req.value === "string" && req.value.length <= ORGANIZE_MAX_VALUE) {
+            store.setItem(req.key, req.value);
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.organizeLoad && app.ports.organizeLoaded) {
+      app.ports.organizeLoad.subscribe(function (req) {
+        if (!req || typeof req.tag !== "string" || !Array.isArray(req.keys)) return;
+        var store = storage();
+        var values = {};
+        req.keys.slice(0, 32).forEach(function (key) {
+          if (!organizeReadable(key)) return;
+          var raw = null;
+          try { raw = store ? store.getItem(key) : null; } catch (err) { raw = null; }
+          values[key] = (typeof raw === "string" && raw.length <= ORGANIZE_MAX_VALUE) ? raw : null;
+        });
+        try { app.ports.organizeLoaded.send({ tag: req.tag, values: values }); } catch (err) { /* app gone */ }
+      });
+    }
+  }
+
   function wireTranscriptScroll(app, env) {
     if (!app.ports.scrollPolicy && !app.ports.scrollState) return null;
     var e = env || {};
@@ -4849,6 +4906,26 @@ function fetchPublicFeed(url) {
     var keepalive = null;
 
     openVault(function (db) { vault = db; });
+
+    /* v3/gap-import: third-party history import (historyImport.js, loaded
+       before this file). The module reads the vault through this accessor
+       so owner scoping, when the vault gains it, changes one place. With
+       the module missing every pick fails closed with a visible reason. */
+    if (app.ports.historyImportPick) {
+      var historyImport = global.OnyxHistoryImport;
+      if (historyImport && typeof historyImport.wire === "function") {
+        historyImport.wire(app, { vault: function () { return vault; } });
+      } else {
+        app.ports.historyImportPick.subscribe(function (req) {
+          try {
+            app.ports.historyImportFailed.send({
+              job: req && typeof req.job === "number" ? req.job : 0,
+              message: "History import is unavailable in this build."
+            });
+          } catch (err) { /* port gone */ }
+        });
+      }
+    }
 
     /* v3/calls-engine: the mounted voice engine shares this socket. */
     var voiceSeam = createVoiceSeam({
@@ -6527,6 +6604,61 @@ function fetchPublicFeed(url) {
         } catch (err) { /* Elm tore down — non-fatal */ }
       });
     }
+    /* v3/gap-usermodes: the owner-scoped `onyx:usermodes:owner:<owner>` slot.
+       Elm owns the shape and validates on load (unknown mode letters, bad
+       rows and oversize text all drop), so the bridge stores the verbatim
+       JSON string Elm hands back and returns the parsed object — capped at
+       64 KiB like the other owner slots. A missing, oversize or unparsable
+       slot resolves to null (Elm keeps its defaults). Only the latest
+       requested owner resolves, so a late load after an account or nick
+       switch can never apply the old owner's wishes. Nothing secret is ever
+       kept here: modes the browser re-applies, a server-ignore opt-in, the
+       real name and the (public) text of sends the server already holds. */
+    var USERMODES_BASE_KEY = "onyx:usermodes";
+    var USERMODES_MAX_CHARS = 64 * 1024;
+    var userModesPendingKey = null;
+    function userModesOwnerKey(serverUrl, identity) {
+      if (typeof serverUrl !== "string" || !serverUrl) return null;
+      if (typeof identity !== "string" || !identity) return null;
+      try {
+        return USERMODES_BASE_KEY + ":owner:" + encodeURIComponent(JSON.stringify([serverUrl, identity]));
+      } catch (err) { return null; }
+    }
+    if (app.ports.userModesRequest) {
+      app.ports.userModesRequest.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || !app.ports.userModesLoaded) return;
+        userModesPendingKey = key;
+        var raw = null;
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            raw = window.localStorage.getItem(key);
+          }
+        } catch (err) { raw = null; }
+        if (userModesPendingKey !== key) return;
+        userModesPendingKey = null;
+        var payload = null;
+        try {
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= USERMODES_MAX_CHARS) {
+            payload = JSON.parse(raw);
+          }
+        } catch (err) { payload = null; }
+        try {
+          app.ports.userModesLoaded.send(payload);
+        } catch (err) { /* Elm tore down — non-fatal */ }
+      });
+    }
+    if (app.ports.userModesSave) {
+      app.ports.userModesSave.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || typeof req.json !== "string") return;
+        try {
+          if (typeof window === "undefined" || !window.localStorage) return;
+          if (req.json.length > USERMODES_MAX_CHARS) return;
+          window.localStorage.setItem(key, req.json);
+        } catch (err) { /* storage unavailable or full — non-fatal */ }
+      });
+    }
     /* CTCP TIME query reply (mirroring the oracle's
        `new Date().toString()` body): the clock lives ports-side, so
        Elm hands over the validated target and the bridge sends the
@@ -7209,6 +7341,8 @@ function fetchPublicFeed(url) {
        `queueMicrotask`; missing chips (stale emits) no-op. */
     /* v3/transcript — scroll anchoring bridge. */
     wireTranscriptScroll(app);
+    /* v3/gap-organize — organize memory + attention prefs. */
+    wireOrganize(app);
 
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
@@ -11643,6 +11777,7 @@ function fetchPublicFeed(url) {
     installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
+    wireOrganize: wireOrganize, /* v3/gap-organize */
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,

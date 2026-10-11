@@ -1,0 +1,8 @@
+{
+  "guild": { "id": "900000000000000001", "name": "Synthetic Guild" },
+  "channel": { "id": "100000000000000001", "type": "GuildTextChat", "name": "General Chat" },
+  "messages": [
+    { "id": "300000000000000008", "type": "Default", "timestamp": "2024-01-02T10:06:00.000+00:00", "content": "tab\tand bell\u0007 and ‮reversed", "author": { "id": "3", "name": "cy" } },
+    { "id": "300000000000000009", "type": "Default", "timestamp": "2024-01-02T10:07:00.000+00:00", "content": "page two starts here", "author": { "id": "2", "name": "bo_test" } }
+  ]
+}

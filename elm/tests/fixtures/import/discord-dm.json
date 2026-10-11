@@ -1,0 +1,8 @@
+{
+  "guild": { "id": "0", "name": "Direct Messages" },
+  "channel": { "id": "100000000000000099", "type": "DirectTextChat", "category": "Private", "name": "bo_test" },
+  "messages": [
+    { "id": "400000000000000001", "type": "Default", "timestamp": "2024-02-01T08:00:00Z", "content": "hey, quick question", "author": { "id": "2", "name": "bo_test" } },
+    { "id": "400000000000000002", "type": "Default", "timestamp": "2024-02-01T08:01:00Z", "content": "sure", "author": { "id": "1", "name": "ana_sample" } }
+  ]
+}

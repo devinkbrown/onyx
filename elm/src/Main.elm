@@ -120,8 +120,10 @@ import Browser.Dom
 import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
+import HistoryImport -- v3/gap-import
 import Media
 import Nodes
+import Organizer -- v3/gap-organize
 import Polish
 import GapShell -- v3/gap-shell
 import Schedule
@@ -280,6 +282,40 @@ port vaultImportPick : () -> Cmd msg
 
 port vaultImportFile : ({ json : String } -> msg) -> Sub msg
 
+
+-- v3/gap-import: third-party history import (historyImport.js). Staged
+-- results and batch lists arrive as raw JSON and are decoded strictly.
+
+
+port historyImportPick : { job : Int, kind : String } -> Cmd msg
+
+
+port historyImportCancel : { job : Int } -> Cmd msg
+
+
+port historyImportRecord : { batch : HistoryImport.Batch, ids : List String, prints : List String } -> Cmd msg
+
+
+port historyImportListRequest : () -> Cmd msg
+
+
+port historyImportRemove : { batch : String } -> Cmd msg
+
+
+port historyImportProgress : ({ job : Int, phase : String, done : Float, total : Float, files : Int } -> msg) -> Sub msg
+
+
+port historyImportStaged : (Decode.Value -> msg) -> Sub msg
+
+
+port historyImportFailed : ({ job : Int, message : String } -> msg) -> Sub msg
+
+
+port historyImportBatches : (Decode.Value -> msg) -> Sub msg
+
+
+port historyImportRemoved : ({ batch : String, removed : Int, ok : Bool, targets : List String, prints : List String } -> msg) -> Sub msg
+
 port outboxQueue : { target : String, text : String } -> Cmd msg
 
 port outboxFlush : { labeled : Bool } -> Cmd msg
@@ -420,6 +456,17 @@ port ctcpConfigLoaded : (Decode.Value -> msg) -> Sub msg
 port ctcpTimeReply : { to : String } -> Cmd msg
 
 
+-- v3/gap-usermodes: the owner-scoped `onyx:usermodes` slot (privacy modes the
+-- browser keeps on, server-ignore opt-in, real name, server-held sends).
+port userModesRequest : { serverUrl : String, identity : String } -> Cmd msg
+
+
+port userModesLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port userModesSave : { serverUrl : String, identity : String, json : String } -> Cmd msg
+
+
 port watchListRequest : { serverUrl : String, identity : String } -> Cmd msg
 
 
@@ -533,6 +580,19 @@ port notifyPermissionChanged : (String -> msg) -> Sub msg
 
 
 port polishFlagSave : { key : String } -> Cmd msg
+
+
+-- v3/gap-organize: one localStorage key per write (`value = Nothing`
+-- removes it) and one batched read answered on `organizeLoaded`.
+
+
+port organizeStore : { key : String, value : Maybe String } -> Cmd msg
+
+
+port organizeLoad : { tag : String, keys : List String } -> Cmd msg
+
+
+port organizeLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port pwaInstallPrompt : () -> Cmd msg
@@ -940,6 +1000,7 @@ type alias Flags =
 type alias Model =
     { app : App.Model
     , navKey : Nav.Key
+    , organizeOwner : Maybe App.DeviceMemoryOwner -- v3/gap-organize: last owner read
     }
 
 
@@ -1111,6 +1172,7 @@ init rawFlags url key =
                     }
             }
       , navKey = key
+      , organizeOwner = Nothing
       }
     , Cmd.batch
         [ case ( bootNick, wsPin ) of
@@ -1139,6 +1201,7 @@ init rawFlags url key =
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
         , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
+        , organizeLoad Organizer.deviceRead -- v3/gap-organize
         , Task.perform (always (App.RouteEntered url)) (Task.succeed ()) -- v3/rx-public
         ]
     )
@@ -1241,6 +1304,22 @@ perform key outbound =
         App.VaultImportPick ->
             vaultImportPick ()
 
+        -- v3/gap-import
+        App.HistoryImportPick req ->
+            historyImportPick req
+
+        App.HistoryImportCancel req ->
+            historyImportCancel req
+
+        App.HistoryImportRecord req ->
+            historyImportRecord req
+
+        App.HistoryImportListRequest ->
+            historyImportListRequest ()
+
+        App.HistoryImportRemove req ->
+            historyImportRemove req
+
         App.OutboxQueue req ->
             outboxQueue req
 
@@ -1326,6 +1405,12 @@ perform key outbound =
         -- v3/gap-auth
         App.AuthGatePort value ->
             authGateOut value
+
+        App.UserModesRequest req ->
+            userModesRequest req
+
+        App.UserModesSave req ->
+            userModesSave req
 
         App.GuestClaimDismissSave req ->
             guestClaimDismissSave req
@@ -1428,6 +1513,10 @@ perform key outbound =
         -- v3/polish
         App.PolishFlagSave req ->
             polishFlagSave req
+
+        -- v3/gap-organize
+        App.OrganizeStore req ->
+            organizeStore req
 
         -- v3/gap-commands
         App.PaletteRecentsSave req ->
@@ -1680,14 +1769,26 @@ update msg model =
     let
         ( app, outbound ) =
             App.update msg model.app
+
+        -- v3/gap-organize: read the owner's organize memory when the
+        -- device-memory owner changes (outside App.update's outbound list)
+        owner =
+            App.deviceMemoryOwner app
+
+        organizeReads =
+            if owner == model.organizeOwner then
+                []
+
+            else
+                List.filterMap identity [ Maybe.andThen Organizer.ownerRead owner ]
     in
-    ( { model | app = app }
+    ( { model | app = app, organizeOwner = owner }
       -- v3/ship: elm/core 1.0.5 gathers a batch's commands per port by
       -- consing (`_Platform_insert`), so commands for ONE port reach
       -- ports.js in reverse batch order. Reversing here keeps the wire in
       -- `App.update` order (CAP LS before NICK/USER, so SASL can run
       -- pre-registration); bundleBoot.smoke.mjs pins this on the real bundle.
-    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound))
+    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound) ++ List.map organizeLoad organizeReads)
     )
 
 
@@ -1709,6 +1810,7 @@ subscriptions model =
         , notifyPermissionChanged App.NotifyPermissionChanged
         -- v3/polish
         , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
+        , organizeLoaded (App.OrganizeMsg << Organizer.Loaded) -- v3/gap-organize
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , shellEvent (App.GapShellMsg << GapShell.ShellEventReceived) -- v3/gap-shell
         , searchHotkey (\_ -> App.SearchHotkey)
@@ -1724,6 +1826,12 @@ subscriptions model =
         , vaultExported App.VaultExported
         , deviceHistoryCopyRows App.DeviceHistoryRowsReceived
         , vaultImportFile App.VaultImportFile
+        -- v3/gap-import
+        , historyImportProgress (App.HistoryImportMsg << HistoryImport.Progress)
+        , historyImportStaged (App.HistoryImportMsg << HistoryImport.GotStaged)
+        , historyImportFailed (App.HistoryImportMsg << HistoryImport.Failed)
+        , historyImportBatches (App.HistoryImportMsg << HistoryImport.Batches)
+        , historyImportRemoved (App.HistoryImportMsg << HistoryImport.Removed)
         , vaultStored App.VaultStored
         , outboxQueued App.OutboxQueued
         , outboxQueueFailed App.OutboxQueueFailed
@@ -1746,6 +1854,7 @@ subscriptions model =
         , friendsLoaded App.FriendsLoaded
         , watchListLoaded App.WatchListLoaded
         , ctcpConfigLoaded App.CtcpConfigLoaded
+        , userModesLoaded App.UserModesLoaded
         , guestClaimDismissLoaded App.GuestClaimDismissLoaded
         , tempBanTimerFired (\res -> App.TempBanElapsed { key = res.key })
         , whoisTimeoutFired (\res -> App.WhoisTimeoutElapsed { nick = res.nick, gen = res.gen })

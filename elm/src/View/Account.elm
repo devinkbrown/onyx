@@ -26,6 +26,7 @@ import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
 import View.Sheet as Sheet
+import View.UserModes
 
 
 accountPanel : Model -> Html Msg
@@ -64,6 +65,8 @@ accountPanel model =
                         div [ class "onyx-account-body" ]
                             [ sectionNav
                             , overviewSection model
+                            , -- v3/gap-usermodes
+                              View.UserModes.autojoinSection model
                             , securitySection model
                             , certSection model
                             , keytransSection model
@@ -88,6 +91,7 @@ sectionNav : Html Msg
 sectionNav =
     nav [ class "onyx-account-nav", attribute "aria-label" "Account sections" ]
         [ a [ class "onyx-account-nav__item", href "#acct-identity" ] [ text "Overview" ]
+        , View.UserModes.autojoinNavItem -- v3/gap-usermodes
         , a [ class "onyx-account-nav__item", href "#acct-two-factor-authentication-title" ] [ text "Security" ]
         , a [ class "onyx-account-nav__item", href "#acct-certificates-title" ] [ text "Certificates" ]
         , a [ class "onyx-account-nav__item", href "#acct-transparency-title" ] [ text "Transparency" ]
