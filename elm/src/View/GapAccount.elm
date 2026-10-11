@@ -93,7 +93,7 @@ switch s =
         , attribute "aria-describedby" descId
         , attribute "aria-busy" (boolString s.busy)
         , attribute "data-testid" ("account-protect-" ++ s.key)
-        , disabled s.busy
+        , disabled (s.busy || s.value == Nothing)
         , onClick (gap (ProtectToggle s.key (not current)))
         ]
         [ span [ class "pref-toggle-text" ]
@@ -345,14 +345,19 @@ namesSection model =
                                             , onClick (gap (GroupPrimary row.nick))
                                             ]
                                             [ text "Make primary" ]
-                                    , button
-                                        [ type_ "button"
-                                        , class "gap-btn gap-btn--quiet"
-                                        , attribute "aria-label" ("Remove " ++ row.nick ++ " from your group")
-                                        , disabled (not live)
-                                        , onClick (gap (GroupRemove row.nick))
-                                        ]
-                                        [ text "Remove" ]
+                                    , if row.primary then
+                                        -- make another name primary first
+                                        text ""
+
+                                      else
+                                        button
+                                            [ type_ "button"
+                                            , class "gap-btn gap-btn--quiet"
+                                            , attribute "aria-label" ("Remove " ++ row.nick ++ " from your group")
+                                            , disabled (not live)
+                                            , onClick (gap (GroupRemove row.nick))
+                                            ]
+                                            [ text "Remove" ]
                                     ]
                                 ]
                         )

@@ -47163,8 +47163,19 @@ settleStepGapAccount msg prior ( m0, outs0 ) =
 
             else
                 m8
+
+        -- Queued sends belong to one scope. A scope that changes on a
+        -- LIVE socket (900 / logout) was not covered by the flush the 001
+        -- fold already issued, so walk the new owner's queue now (a change
+        -- at registration rides that 001 flush; no double walk).
+        sessionFlush =
+            if scopeChanged && prior.connection == Live && m9.connection == Live && m9.gapAccount.scope /= Nothing then
+                [ flushRequest m9 ]
+
+            else
+                []
     in
-    ( m9, scopeOuts ++ outs2 )
+    ( m9, scopeOuts ++ outs2 ++ sessionFlush )
 
 
 {-| Erase the local vault (turning history off, or Clear). Rows already

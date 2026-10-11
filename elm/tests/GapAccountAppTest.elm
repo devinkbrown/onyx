@@ -435,6 +435,28 @@ suite =
                         , \_ -> Expect.equal 1 (List.length (fxOf outs))
                         ]
                         ()
+            , test "the queue is walked once at registration, and again when the scope changes mid-session" <|
+                \_ ->
+                    let
+                        flushes outs =
+                            List.length (List.filter (\o -> case o of
+                                                                OutboxFlush _ ->
+                                                                    True
+
+                                                                _ ->
+                                                                    False
+                                                    ) outs)
+
+                        ( _, registering ) =
+                            welcome "me" fresh
+
+                        ( _, signingIn ) =
+                            login "kai" guest
+
+                        ( _, quiet ) =
+                            send guest [ ":irc.example NOTICE me :hello" ]
+                    in
+                    Expect.equal ( 1, 1, 0 ) ( flushes registering, flushes signingIn, flushes quiet )
             , test "the device-global list writers stay in the intent stream for the port layer to drop" <|
                 \_ ->
                     let

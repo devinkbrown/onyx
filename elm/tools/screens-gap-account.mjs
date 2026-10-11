@@ -27,8 +27,8 @@ async function boot(page, h, opts = {}) {
   const state = {
     secure: false,
     enforce: true,
-    masks: ['kn!*@home.example', '*!kn@*.office.example'],
-    group: [{ nick: 'kn', primary: true }, { nick: 'kn-away', primary: false }],
+    masks: opts.masks || ['kn!*@home.example', '*!kn@*.office.example'],
+    group: opts.group || [{ nick: 'kn', primary: true }, { nick: 'kn-away', primary: false }],
     seen: [],
   };
   let client = null;
@@ -156,6 +156,17 @@ const OWNER_ROWS = `
   });
 })()`;
 
+const LONG_MASKS = [
+  'a-really-long-nickname-for-testing!some-long-username-here@a-very-long-hostname.subdomain.example.org',
+  '*!*@*.dynamic.customer-pool-1234567890.some-isp-with-long-names.example.net',
+  'kn!*@home.example',
+];
+const LONG_GROUP = [
+  { nick: 'kn', primary: true },
+  { nick: 'a-grouped-nick-that-goes-on-and-on-and-on', primary: false },
+  { nick: 'kn-away', primary: false },
+];
+
 export default {
   'ga-protect': async (page, h) => {
     await boot(page, h, { login: true });
@@ -275,5 +286,23 @@ export default {
     await h.settle(page, 1500);
     const rows = await page.evaluate(OWNER_ROWS);
     if (rows && rows.some((r) => r.owner === null)) throw new Error('vault holds ownerless rows');
+  },
+  'ga-names-long': async (page, h) => {
+    await boot(page, h, { login: true, masks: LONG_MASKS, group: LONG_GROUP });
+    await openAccount(page, h);
+    await reveal(page, h, '#acct-names-title');
+  },
+  // Browser zoom 200% on a laptop is a 640x360 viewport.
+  'ga-zoom-protect': async (page, h) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await boot(page, h, { login: true });
+    await openAccount(page, h);
+    await reveal(page, h, '#acct-protection-title');
+  },
+  'ga-zoom-history': async (page, h) => {
+    await page.setViewportSize({ width: 640, height: 360 });
+    await boot(page, h, { login: true });
+    await openPrefs(page, h, 'History');
+    await reveal(page, h, '[data-testid="pref-local-history"]');
   },
 };
