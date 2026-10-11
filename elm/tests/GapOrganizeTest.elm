@@ -21,6 +21,7 @@ import Organizer exposing (Effect(..))
 import Prefs
 import RoomSettings
 import Set
+import Switcher
 import Test exposing (Test, describe, test)
 import Test.Html.Event as Event
 import Test.Html.Query as Query
@@ -284,6 +285,17 @@ lists =
                     |> Query.find [ testid "sidebar-reopen" ]
                     |> Event.simulate Event.click
                     |> Event.expect (OrganizeMsg (Organizer.Reopen "jun"))
+        , test "hidden rooms and closed DMs stay reachable from the palette" <|
+            \_ ->
+                Switcher.entries (isChannelName organized) organized.activeChannel (Dict.values organized.channels)
+                    |> List.map .id
+                    |> (\ids -> ( List.member "channel:#elm" ids, List.member "dm:jun" ids ))
+                    |> Expect.equal ( True, True )
+        , test "opening a hidden room from the palette lands in it" <|
+            \_ ->
+                step (ChannelSelect "#elm") organized
+                    |> (\m -> ( m.activeChannel, Organizer.isHidden "#elm" m.organize ))
+                    |> Expect.equal ( Just "#elm", True )
         , test "nothing hidden or closed draws no footer" <|
             \_ ->
                 view world

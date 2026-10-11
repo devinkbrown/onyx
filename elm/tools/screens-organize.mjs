@@ -227,12 +227,17 @@ export default {
   'org-note': async (page, h) => {
     await setup(page, h, { organize: false });
     await openRoom(page, h, '#lounge');
-    if (!(await clickVisible(page, ['.onyx-roster .onyx-member'], h))) {
+    await snap(page, 'note-room');
+    const card = ['[aria-label="View member card for mara"]'];
+    if (!(await clickVisible(page, card, h))) {
       await clickVisible(page, ['[data-testid="members-toggle"]'], h);
-      await clickVisible(page, ['.onyx-member'], h);
+      await snap(page, 'note-members');
+      await clickVisible(page, card, h);
     }
+    await snap(page, 'note-card');
     if (await clickVisible(page, ['[data-testid="member-note-add"]'], h)) {
-      await page.fill('[data-testid="member-note-input"]', 'Runs the design crit on Thursdays. Prefers async reviews.');
+      await snap(page, 'note-adding');
+      await page.fill('[data-testid="member-note-input"]', 'Runs the design crit on Thursdays. Prefers async reviews.', { timeout: 5000 });
       await clickVisible(page, ['[data-testid="member-note-save"]'], h);
     }
   },
