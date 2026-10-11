@@ -19,6 +19,9 @@
  *   node elm/tools/css-inert.mjs probe --out DIR [--dist elm/dist-elm] [--files app,pol-shell]
  *        [--vp phone,fold-open,tablet-land,desktop,laptop-short] [--jobs 6] [--only substr] [--resume]
  *   node elm/tools/css-inert.mjs report DIR [--file app] [--min-pages 4] [--min-ratio 0.8] [--json out.json]
+ *   node elm/tools/css-inert.mjs verify --a DIST_A --b DIST_B --out DIR [--vp phone,tablet-land,desktop] [--jobs N]
+ *        fingerprints every element's computed style in every scenario for two builds and compares
+ *        (the check that deleting the inert declarations changed nothing the browser computes)
  *
  * `probe` copies the built dist, swaps in the UNMINIFIED sources of the
  * worktree under the same hashed names (rule order = source order), and runs
@@ -128,7 +131,46 @@ if (cmd === 'probe') {
   const j = flag('--json', '');
   if (j) writeFileSync(j, JSON.stringify(inert, null, 1));
   for (const r of inert.slice(0, Number(flag('--show', 40)))) console.log(`  ${r.file}:${r.line}  ${r.sel}  { ${r.prop}: ${r.value} }  (${r.overridden}/${r.pages} pages overridden, ${r.scenarios} scenarios)`);
+} else if (cmd === 'verify') {
+  // verify --a DIST_A --b DIST_B --out DIR: every element's computed style, in every scenario, must
+  // be identical in the two builds (e.g. before / after deleting inert declarations).
+  const out = resolve(flag('--out', ''));
+  if (!flag('--out', '') || !flag('--a', '') || !flag('--b', '')) { console.error('verify needs --a DIST --b DIST --out DIR'); process.exit(2); }
+  const vps = flag('--vp', 'phone,tablet-land,desktop').split(',');
+  const only = flag('--only', '');
+  const jobs = Number(flag('--jobs', Math.max(2, Math.floor(cpus().length / 2))));
+  rmSync(out, { recursive: true, force: true });
+  const { NAMES } = await import(join(here, 'screens-css-dump.mjs'));
+  const names = NAMES.filter((n) => !only || n.includes(only));
+  const queue = [];
+  for (const side of ['a', 'b']) for (let i = 0; i < names.length; i += 4) queue.push({ side, chunk: names.slice(i, i + 4) });
+  let done = 0;
+  const run = ({ side, chunk }) => new Promise((res) => {
+    const dist = resolve(repo, flag(`--${side}`, ''));
+    const args = ['-n', '10', process.execPath, join(here, 'screens.mjs'), '--dist', dist, '--out', `${out}/${side}-shots`, '--extra', join(here, 'screens-css-dump.mjs'),
+      '--only', chunk.join(','), '--vp', vps.join(','), '--freeze', FREEZE, '--stable'];
+    const p = spawn('nice', args, { cwd: repo, env: { ...process.env, TZ: 'UTC', CSS_DUMP_OUT: `${out}/${side}` } });
+    p.stdout.on('data', () => {}); p.stderr.on('data', () => {});
+    p.on('close', () => { done += 1; process.stderr.write(`\r${done}/${queue.length} jobs`); res(); });
+  });
+  const work = [...queue];
+  await Promise.all(Array.from({ length: jobs }, async () => { while (work.length) await run(work.shift()); }));
+  process.stderr.write('\n');
+  rmSync(`${out}/a-shots`, { recursive: true, force: true }); rmSync(`${out}/b-shots`, { recursive: true, force: true });
+  const fa = readdirSync(`${out}/a`).filter((f) => f.endsWith('.json')); const fb = new Set(readdirSync(`${out}/b`).filter((f) => f.endsWith('.json')));
+  let same = 0; const structural = []; const differing = []; let missing = 0;
+  for (const f of fa) {
+    if (!fb.has(f)) { missing += 1; continue; }
+    const A = JSON.parse(readFileSync(`${out}/a/${f}`, 'utf8')); const B = JSON.parse(readFileSync(`${out}/b/${f}`, 'utf8'));
+    if (A.length !== B.length) { structural.push(`${f}: ${A.length} vs ${B.length} elements`); continue; }
+    const bad = []; A.forEach((row, i) => { if (row[1] !== B[i][1] || row[0] !== B[i][0]) bad.push(`#${i} ${row[0]}`); });
+    if (bad.length) differing.push(`${f}: ${bad.length} element(s) differ, e.g. ${bad.slice(0, 4).join(', ')}`); else same += 1;
+  }
+  console.log(`verify: ${fa.length} pages; identical ${same}; computed style differs ${differing.length}; DOM differs (flake?) ${structural.length}; missing in b ${missing}`);
+  for (const l of differing.slice(0, 40)) console.log('  DIFF ' + l);
+  for (const l of structural.slice(0, 20)) console.log('  DOM  ' + l);
+  process.exit(differing.length ? 1 : 0);
 } else {
-  console.error('usage: css-inert.mjs probe|report   (see the README comment at the top of this file)');
+  console.error('usage: css-inert.mjs probe|report|verify   (see the README comment at the top of this file)');
   process.exit(2);
 }

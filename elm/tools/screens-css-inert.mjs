@@ -114,6 +114,7 @@ const wrap = (fn) => async (page, h) => {
   return rows;
 };
 
+export const RAW = {}; // every scenario, unwrapped: inert__<name>__<file> -> fn(page, h)
 const scenarios = {};
 const seenFns = new Set();
 for (const [file, src] of Object.entries(FILES)) {
@@ -122,6 +123,7 @@ for (const [file, src] of Object.entries(FILES)) {
     seenFns.add(fn);
     const key = `inert__${name}__${file}`;
     if (scenarios[key]) continue;
+    RAW[key] = fn;
     scenarios[key] = async (page, h) => {
       const rows = await wrap(fn)(page, h);
       if (outDir) {
