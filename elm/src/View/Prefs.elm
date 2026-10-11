@@ -24,7 +24,9 @@ import Nav
 import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
+import View.UserModes
 
 
 prefsSheet : Model -> Html Msg
@@ -174,6 +176,14 @@ panelBody model category =
                 , current = Prefs.clockToString model.prefs.clock
                 , onSelect = \value -> AppearanceSetPref { key = "clock", value = value }
                 }
+            -- v3/gap-organize
+            , toggle
+                { key = "readerMode"
+                , legend = "Reader mode"
+                , title = "Read without the side panels"
+                , description = "Conversations open as a calm, single column: the lists, member panel and top bar step aside and the words lead. Exit from the bar at the top."
+                , value = model.prefs.readerMode
+                }
             ]
 
         Conversation ->
@@ -184,6 +194,14 @@ panelBody model category =
                 , title = "Hide join, part & quit"
                 , description = "Removes the quiet system lines from the feed."
                 , value = model.prefs.hideEvents
+                }
+            , -- v3/gap-watch
+              toggle
+                { key = "watchTogether"
+                , legend = "Watch together"
+                , title = "Show watch-together activities"
+                , description = "Shows a room's shared watch clock above the conversation. Onyx shares a title, a link and a play/pause clock; it never streams or controls the video."
+                , value = model.prefs.watchTogether
                 }
             , section [ class "pref-group" ]
                 [ h3 [ class "pref-label" ] [ text "Alerts" ]
@@ -200,7 +218,12 @@ panelBody model category =
                 [ h3 [ class "pref-label" ] [ text "Link previews and encrypted DMs" ]
                 , p [ class "pref-desc" ] [ text "Preview, HTTPS-only, and end-to-end encryption switches live in Appearance under Privacy." ]
                 ]
+            , View.Organize.prefsOrganize model -- v3/gap-organize
             ]
+
+        Privacy ->
+            -- v3/gap-usermodes
+            View.UserModes.privacyPanel model
 
         History ->
             [ sectionHead "History & data" "How this browser remembers, finds, retains, and erases local conversation data."

@@ -1,0 +1,408 @@
+/* v3/gap-usermodes — privacy switches, message requests, offline
+   messages, server blocks, account rooms, the self name, an offline
+   person's last-seen, and the send-later "where" choice.
+
+   Loaded before ui-sheets.css (which still wins the sheet chrome). The
+   shared `pref-*` switch/row classes are reused wherever the look is the
+   same; everything new is `um-*`. Tokens come from :root in app.css. */
+
+.um-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ── text ─────────────────────────────────────────────────────────── */
+
+.um-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+}
+.um-hint--inline { margin: var(--space-2) 0 0; }
+
+.um-status {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+}
+.um-status--error { color: var(--onyx-warn); }
+
+.um-label {
+  display: block;
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-2xs);
+  color: var(--onyx-dim);
+}
+
+/* ── controls ─────────────────────────────────────────────────────── */
+
+button.um-btn {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+button.um-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
+.um-btn:focus-visible,
+.um-choice:focus-visible,
+.um-inbox-link:focus-visible,
+.um-requests__settings:focus-visible,
+.um-fold__toggle:focus-visible,
+.um-more__toggle:focus-visible,
+.um-switch:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+button.um-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; }
+button.um-btn.um-btn--primary { border-color: var(--onyx-accent); background: var(--onyx-accent); color: var(--onyx-accent-ink); font-weight: 600; }
+button.um-btn.um-btn--primary:hover:not(:disabled) { border-color: var(--onyx-accent); }
+button.um-btn.um-btn--primary:disabled { border-color: var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-faint); }
+button.um-btn.um-btn--quiet { border-color: transparent; background: transparent; color: var(--onyx-dim); }
+button.um-btn.um-btn--quiet:hover:not(:disabled) { border-color: var(--onyx-line); color: var(--onyx-text); }
+button.um-btn.um-btn--soft { border-color: var(--onyx-line); background: transparent; color: var(--onyx-accent); }
+button.um-btn.um-btn--danger { border-color: var(--onyx-bad); background: transparent; color: var(--onyx-bad); }
+
+.um-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.um-input::placeholder { color: var(--onyx-faint); }
+.um-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-accent); }
+.um-input--area { min-height: 76px; resize: vertical; line-height: var(--leading-snug); }
+
+.um-form {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.um-form > .um-input { flex: 1 1 auto; }
+.um-form > .um-btn { flex: none; }
+
+.um-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Groups sit under the pane head with the same seam as the other cards. */
+.um-group { min-width: 0; }
+.um-group > .pref-desc { margin-bottom: var(--space-2); }
+.um-approved > .um-btn--soft { margin-top: var(--space-1); }
+
+/* The privacy switches reuse .pref-toggle; stacked with air between. */
+.um-stack { display: flex; flex-direction: column; gap: var(--space-2); }
+.um-switch:disabled { opacity: 0.55; cursor: not-allowed; }
+.um-switch[aria-busy="true"] .pref-switch { opacity: 0.6; }
+.um-more > .um-stack { margin-top: var(--space-2); }
+.um-more__toggle,
+.um-fold__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--onyx-text);
+  cursor: pointer;
+  list-style: none;
+}
+.um-more__toggle::-webkit-details-marker,
+.um-fold__toggle::-webkit-details-marker { display: none; }
+.um-more__toggle::after,
+.um-fold__toggle::after {
+  content: "";
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--onyx-i-chevron) center / contain no-repeat;
+  mask: var(--onyx-i-chevron) center / contain no-repeat;
+  transform: rotate(90deg);
+  transition: transform var(--dur-fast) var(--ease);
+}
+details[open] > .um-more__toggle::after,
+details[open] > .um-fold__toggle::after { transform: rotate(-90deg); }
+.um-fold__state { font-size: var(--text-2xs); font-weight: 400; color: var(--onyx-dim); }
+
+/* ── lists ────────────────────────────────────────────────────────── */
+
+.um-list {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.um-list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 2px 0;
+  border-top: 1px solid var(--onyx-line);
+}
+.um-list__name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.um-tag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--onyx-line);
+  border-radius: 999px;
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  color: var(--onyx-dim);
+}
+.um-tag--lock { align-self: flex-start; }
+
+/* ── Inbox: message requests + the mailbox link ───────────────────── */
+
+.um-requests {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+}
+.um-requests__head { display: flex; align-items: baseline; gap: var(--space-2); }
+.um-requests__title { margin: 0; flex: 1; font-size: var(--text-sm); font-weight: 600; }
+.um-requests__count { font-size: var(--text-2xs); color: var(--onyx-accent); }
+.um-requests__list { margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.um-request {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--onyx-line);
+}
+.um-request__who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.um-request__nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.um-request__sub { font-size: var(--text-2xs); color: var(--onyx-dim); }
+.um-request__actions { flex: none; display: flex; gap: var(--space-1); }
+button.um-requests__settings {
+  margin-top: var(--space-1);
+  padding: var(--space-1) 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-2xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+button.um-inbox-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.um-inbox-link:hover { background: var(--onyx-panel-2); }
+.um-inbox-link__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.um-inbox-link__copy strong { font-size: var(--text-sm); font-weight: 600; }
+.um-inbox-link__copy small { font-size: var(--text-2xs); color: var(--onyx-dim); }
+.um-inbox-link__count {
+  flex: none;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--onyx-accent);
+  color: var(--onyx-accent-ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-align: center;
+}
+.um-inbox-link__chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--onyx-i-chevron) center / contain no-repeat;
+  mask: var(--onyx-i-chevron) center / contain no-repeat;
+}
+
+/* ── Offline messages sheet ───────────────────────────────────────── */
+
+.um-memo__guest { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--onyx-dim); }
+.um-memo__body { display: flex; flex-direction: column; gap: var(--space-3); }
+.um-memo__section {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+}
+.um-memo__section:first-child { padding-top: 0; border-top: 0; }
+.um-memo__head { display: flex; align-items: center; gap: var(--space-2); }
+.um-memo__title { margin: 0; flex: 1; font-size: var(--text-sm); font-weight: 600; }
+.um-memo__list { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.um-memo__row {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+}
+.um-memo__who { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); }
+.um-memo__who strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.um-memo__text { margin: var(--space-1) 0 0; font-size: var(--text-sm); line-height: var(--leading-body); overflow-wrap: anywhere; white-space: pre-wrap; }
+.um-memo__when { display: block; margin-top: var(--space-1); font-size: var(--text-2xs); color: var(--onyx-faint); }
+.um-memo__compose { margin-top: var(--space-1); }
+.um-memo__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-2); }
+.um-memo__counter { font-size: var(--text-2xs); color: var(--onyx-faint); }
+.um-confirm {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+}
+.um-fold > .um-hint,
+.um-fold > .um-form,
+.um-fold > .um-list,
+.um-fold > .um-actions { margin-top: var(--space-2); }
+
+/* ── server blocks (in the Notifications sheet) ───────────────────── */
+
+.um-blocks { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-2) 0; }
+.um-blocks__extra { margin-top: var(--space-1); }
+.um-blocks__title { margin: 0; font-size: var(--text-2xs); font-weight: 600; color: var(--onyx-dim); text-transform: none; }
+.um-blocks .um-list { margin-top: var(--space-1); }
+
+/* ── Account: rooms I join automatically ──────────────────────────── */
+
+.um-autojoin .um-form { margin-top: var(--space-2); }
+.um-autojoin .um-list { margin-top: var(--space-3); }
+
+/* ── self name + an offline person's last seen ────────────────────── */
+
+.um-selfname { margin: var(--space-3) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.um-selfname__view { display: flex; align-items: center; gap: var(--space-3); }
+.um-selfname__copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.um-selfname__label { font-size: var(--text-2xs); color: var(--onyx-dim); }
+.um-selfname__value { font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.um-selfname__edit { display: flex; flex-direction: column; }
+.um-selfname .um-actions { margin-top: var(--space-2); }
+
+.um-offline {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--onyx-line);
+}
+.um-offline__line { margin: 0; font-size: var(--text-sm); color: var(--onyx-text); }
+.um-offline__line--none { color: var(--onyx-dim); }
+.um-offline__sub { margin: 2px 0 0; font-size: var(--text-2xs); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.um-lastseen { margin: var(--space-2) 0 0; align-self: flex-start; }
+
+/* ── send-later: where to keep it ─────────────────────────────────── */
+
+.um-where {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+}
+.um-where__signin { margin: 0 0 var(--space-3); }
+button.um-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--onyx-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.um-choice.um-choice--on { border-color: var(--onyx-accent); background: var(--onyx-panel-2); }
+.um-choice:disabled { cursor: not-allowed; }
+.um-choice:disabled .um-choice__title { color: var(--onyx-faint); }
+.um-choice__title { font-size: var(--text-sm); font-weight: 600; }
+.um-choice__hint { font-size: var(--text-2xs); line-height: var(--leading-snug); color: var(--onyx-dim); }
+
+/* The picker is narrow; with the extra choice it must never clip: the
+   custom-time row wraps and the popover may use a little more width. */
+.onyx-schedule-pop { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; }
+.onyx-schedule-pop .onyx-schedule-custom { flex-wrap: wrap; }
+.onyx-schedule-pop .onyx-schedule-when { flex: 1 1 160px; min-width: 0; }
+.onyx-schedule-pop .onyx-schedule-sub { overflow-wrap: anywhere; }
+
+/* ── scheduled sheet: held by the server ──────────────────────────── */
+
+.um-held-wrap:empty { display: none; }
+.um-held { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.um-held__title { margin: 0; font-size: var(--text-sm); font-weight: 600; }
+.um-held .onyx-scheduled-list { margin-top: var(--space-2); }
+.um-held__item { display: flex; flex-direction: column; gap: var(--space-1); }
+
+/* ── narrow + touch ───────────────────────────────────────────────── */
+
+@media (max-width: 420px) {
+  .um-where { grid-template-columns: minmax(0, 1fr); }
+  .um-form { flex-wrap: wrap; }
+  .um-form > .um-input { flex-basis: 100%; }
+  .um-form > .um-btn { flex: 1 1 auto; }
+}
+
+@media (max-width: 359px) {
+  .um-request { flex-wrap: wrap; }
+  .um-request__actions { width: 100%; }
+  .um-request__actions .um-btn { flex: 1 1 0; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .um-btn,
+  .um-choice,
+  .um-input,
+  .um-more__toggle,
+  .um-fold__toggle,
+  .um-list__row { min-height: var(--target-min); }
+  .um-input { font-size: 16px; }
+  .um-requests__settings { min-height: var(--target-min); }
+  .um-list__row { padding: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .um-btn,
+  .um-more__toggle::after,
+  .um-fold__toggle::after { transition: none; }
+}

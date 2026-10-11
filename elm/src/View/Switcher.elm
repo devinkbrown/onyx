@@ -18,12 +18,12 @@ grammar in this client).
 -}
 
 import App exposing (Model, Msg(..))
-import Dict
 import Html exposing (Html, button, div, h2, h3, input, kbd, mark, p, section, span, text)
 import Html.Attributes exposing (attribute, class, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, preventDefaultOn, on)
 import Json.Decode as Decode
 import Switcher
+import View.GapCommands
 import View.Sheet as Sheet
 
 
@@ -71,9 +71,9 @@ paletteDialog model =
         query =
             model.palette.query
 
+        -- v3/gap-commands: recents, People and the full action set
         matched =
-            Switcher.matches query
-                (Switcher.entries (App.isChannelName model) model.activeChannel (Dict.values model.channels))
+            App.paletteMatches model
 
         count =
             List.length matched
@@ -97,7 +97,7 @@ paletteDialog model =
             List.indexedMap Tuple.pair matched
 
         groups =
-            [ Switcher.Rooms, Switcher.DMs, Switcher.Actions ]
+            Switcher.sections
                 |> List.map (\s -> ( s, List.filter (\( _, m ) -> m.entry.section == s) indexed ))
                 |> List.filter (\( _, items ) -> not (List.isEmpty items))
     in
@@ -301,6 +301,7 @@ shortcutsOverlay model =
                     )
                 , div [ class "shortcuts-overlay", attribute "data-testid" "shortcuts-overlay" ]
                     (List.map groupSection Switcher.shortcutGroups)
+                , View.GapCommands.singleKeysSwitch model -- v3/gap-commands
                 ]
 
     else

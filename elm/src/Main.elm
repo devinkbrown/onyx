@@ -122,7 +122,9 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Media
 import Nodes
+import Organizer -- v3/gap-organize
 import Polish
+import GapShell -- v3/gap-shell
 import Schedule
 import Switcher
 import Task
@@ -419,6 +421,17 @@ port ctcpConfigLoaded : (Decode.Value -> msg) -> Sub msg
 port ctcpTimeReply : { to : String } -> Cmd msg
 
 
+-- v3/gap-usermodes: the owner-scoped `onyx:usermodes` slot (privacy modes the
+-- browser keeps on, server-ignore opt-in, real name, server-held sends).
+port userModesRequest : { serverUrl : String, identity : String } -> Cmd msg
+
+
+port userModesLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port userModesSave : { serverUrl : String, identity : String, json : String } -> Cmd msg
+
+
 port watchListRequest : { serverUrl : String, identity : String } -> Cmd msg
 
 
@@ -534,6 +547,19 @@ port notifyPermissionChanged : (String -> msg) -> Sub msg
 port polishFlagSave : { key : String } -> Cmd msg
 
 
+-- v3/gap-organize: one localStorage key per write (`value = Nothing`
+-- removes it) and one batched read answered on `organizeLoaded`.
+
+
+port organizeStore : { key : String, value : Maybe String } -> Cmd msg
+
+
+port organizeLoad : { tag : String, keys : List String } -> Cmd msg
+
+
+port organizeLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port pwaInstallPrompt : () -> Cmd msg
 
 
@@ -546,12 +572,33 @@ port pwaEvent : (Decode.Value -> msg) -> Sub msg
 port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
 
 
+{-| v3/gap-shell — browser lifecycle (`boot`, `offline`, `online`,
+`restored`) from `ports.js` `wireGapShell`, and one whitelisted
+`onyx:*` device value back. -}
+port shellEvent : (Decode.Value -> msg) -> Sub msg
+
+
+port shellStore : { key : String, value : String } -> Cmd msg
+
+
 port searchHotkey : (() -> msg) -> Sub msg
 
 
 {-| v3/switcher — the one global keyboard port: `ports.js` owns the
 scope rules and sends a short shortcut name. -}
 port shortcut : (String -> msg) -> Sub msg
+
+
+{-| v3/gap-commands — the palette recents (per device-memory owner) and
+the single-key shortcuts preference, saved to `localStorage` by
+`ports.js`, which sends the boot snapshot back once at wire time. -}
+port paletteRecentsSave : { owner : String, ids : List String } -> Cmd msg
+
+
+port singleKeysSave : { enabled : Bool } -> Cmd msg
+
+
+port gapPrefsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
@@ -906,6 +953,7 @@ type alias Flags =
 type alias Model =
     { app : App.Model
     , navKey : Nav.Key
+    , organizeOwner : Maybe App.DeviceMemoryOwner -- v3/gap-organize: last owner read
     }
 
 
@@ -1077,6 +1125,7 @@ init rawFlags url key =
                     }
             }
       , navKey = key
+      , organizeOwner = Nothing
       }
     , Cmd.batch
         [ case ( bootNick, wsPin ) of
@@ -1105,6 +1154,7 @@ init rawFlags url key =
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
         , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
+        , organizeLoad Organizer.deviceRead -- v3/gap-organize
         , Task.perform (always (App.RouteEntered url)) (Task.succeed ()) -- v3/rx-public
         ]
     )
@@ -1289,6 +1339,12 @@ perform key outbound =
         App.CtcpTimeReply req ->
             ctcpTimeReply req
 
+        App.UserModesRequest req ->
+            userModesRequest req
+
+        App.UserModesSave req ->
+            userModesSave req
+
         App.GuestClaimDismissSave req ->
             guestClaimDismissSave req
 
@@ -1391,11 +1447,26 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-organize
+        App.OrganizeStore req ->
+            organizeStore req
+
+        -- v3/gap-commands
+        App.PaletteRecentsSave req ->
+            paletteRecentsSave req
+
+        App.SingleKeysSave req ->
+            singleKeysSave req
+
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()
 
         App.PwaUpdateApprove ->
             pwaUpdateApprove ()
+
+        -- v3/gap-shell
+        App.ShellStore req ->
+            shellStore req
 
         App.OfflineMemoNotice req ->
             offlineMemoNotice req
@@ -1631,14 +1702,26 @@ update msg model =
     let
         ( app, outbound ) =
             App.update msg model.app
+
+        -- v3/gap-organize: read the owner's organize memory when the
+        -- device-memory owner changes (outside App.update's outbound list)
+        owner =
+            App.deviceMemoryOwner app
+
+        organizeReads =
+            if owner == model.organizeOwner then
+                []
+
+            else
+                List.filterMap identity [ Maybe.andThen Organizer.ownerRead owner ]
     in
-    ( { model | app = app }
+    ( { model | app = app, organizeOwner = owner }
       -- v3/ship: elm/core 1.0.5 gathers a batch's commands per port by
       -- consing (`_Platform_insert`), so commands for ONE port reach
       -- ports.js in reverse batch order. Reversing here keeps the wire in
       -- `App.update` order (CAP LS before NICK/USER, so SASL can run
       -- pre-registration); bundleBoot.smoke.mjs pins this on the real bundle.
-    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound))
+    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound) ++ List.map organizeLoad organizeReads)
     )
 
 
@@ -1660,9 +1743,13 @@ subscriptions model =
         , notifyPermissionChanged App.NotifyPermissionChanged
         -- v3/polish
         , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
+        , organizeLoaded (App.OrganizeMsg << Organizer.Loaded) -- v3/gap-organize
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
+        , shellEvent (App.GapShellMsg << GapShell.ShellEventReceived) -- v3/gap-shell
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
+        -- v3/gap-commands
+        , gapPrefsLoaded App.GapPrefsLoaded
         , retentionPolicyLoaded App.RetentionPolicyLoaded
         , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived
@@ -1694,6 +1781,7 @@ subscriptions model =
         , friendsLoaded App.FriendsLoaded
         , watchListLoaded App.WatchListLoaded
         , ctcpConfigLoaded App.CtcpConfigLoaded
+        , userModesLoaded App.UserModesLoaded
         , guestClaimDismissLoaded App.GuestClaimDismissLoaded
         , tempBanTimerFired (\res -> App.TempBanElapsed { key = res.key })
         , whoisTimeoutFired (\res -> App.WhoisTimeoutElapsed { nick = res.nick, gen = res.gen })

@@ -1,0 +1,391 @@
+/* v3/gap-shell — Activity, join-by-name, room More additions, Leave
+   confirm, the Home network message and the connect gate's "Sign in as"
+   action (views: src/View/GapShell.elm).
+
+   Same language as the shell: near-black panels, 1px seams, 6px radii,
+   one accent (focus only here), kinds told by a small dot, not colour
+   floods. Linked before ui-sheets.css, so the shared sheet frame (head,
+   phone bottom sheet, swipe) still wins where it should; rules here are
+   scoped to gs-* classes. Icons are CSS masks (never font glyphs). */
+
+:root {
+  --gs-i-activity: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12h4l3-7 4 14 3-7h4'/%3E%3C/svg%3E");
+  --gs-i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+  --gs-i-export: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14'/%3E%3C/svg%3E");
+  --gs-i-ledger: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19V5M4 19h16M8 15v-4M12 15V7M16 15v-6'/%3E%3C/svg%3E");
+  --gs-i-leave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6H5v12h4M14 12H8M16 8l4 4-4 4'/%3E%3C/svg%3E");
+}
+
+/* ---------- 1. Rail: join by name + the Activity row ------------------ */
+
+.gs-rail-extras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  min-width: 0;
+}
+/* Messages (DMs) has neither: rooms are joined, and Activity lives in You. */
+.onyx-rail[data-collection="messages"] .gs-rail-extras { display: none; }
+
+.gs-join { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
+.gs-join-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 2px 0 var(--space-2);
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.gs-join-field:focus-within { border-color: var(--onyx-dim); outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.gs-join-hash { flex: none; font-size: var(--text-sm); color: var(--onyx-faint); }
+.gs-join-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-text);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.gs-join-input::placeholder { color: var(--onyx-faint); }
+.onyx-frame .onyx-rail button.gs-join-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  flex: none;
+  min-height: 26px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+}
+.onyx-frame .onyx-rail button.gs-join-go:hover:not(:disabled) { background: var(--onyx-line); }
+.onyx-frame .onyx-rail button.gs-join-go:disabled,
+.onyx-frame .onyx-rail button.gs-join-go:disabled:hover { color: var(--onyx-faint); background: transparent; border-color: transparent; cursor: default; }
+.onyx-frame .onyx-rail button.gs-join-go:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.gs-join-error { margin: 0; font-size: var(--text-xs); color: var(--onyx-warn); overflow-wrap: anywhere; }
+
+.onyx-frame .onyx-rail button.gs-rail-activity {
+  position: relative;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  text-align: left;
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-frame .onyx-rail button.gs-rail-activity:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-frame .onyx-rail button.gs-rail-activity:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.gs-icon-activity { --shi: var(--gs-i-activity); width: 18px; height: 18px; }
+.gs-door-copy { display: flex; align-items: baseline; gap: var(--space-2); flex: 1 1 auto; min-width: 0; }
+.gs-door-name { font-size: var(--text-sm); font-weight: 600; color: var(--onyx-text); white-space: nowrap; }
+.gs-door-sub { font-size: var(--text-xs); color: var(--onyx-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.gs-door-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--onyx-warn); }
+
+/* ---------- 2. Activity sheet ------------------------------------------ */
+
+.onyx-sheet.gs-activity { display: flex; flex-direction: column; }
+.gs-activity-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.gs-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+.onyx-frame .gs-seg button.gs-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+}
+.onyx-frame .gs-seg button.gs-seg-btn:hover { color: var(--onyx-text); }
+.onyx-frame .gs-seg button.gs-seg-btn[aria-pressed="true"] { color: var(--onyx-text); font-weight: 600; background: var(--onyx-panel-2); }
+.onyx-frame .gs-seg button.gs-seg-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.gs-seg-count { font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 400; color: var(--onyx-faint); font-variant-numeric: tabular-nums; }
+
+.gs-activity-conn { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
+.gs-activity-conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--onyx-faint); }
+.gs-activity-conn[data-state="live"] .gs-activity-conn-dot { background: var(--onyx-accent); }
+.gs-activity-conn[data-state="connecting"] { color: var(--onyx-warn); }
+.gs-activity-conn[data-state="connecting"] .gs-activity-conn-dot { background: var(--onyx-warn); }
+
+.gs-activity-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--onyx-line);
+  border-radius: 0;
+}
+.gs-activity-list:focus { outline: none; }
+.gs-activity-list:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.gs-act-row {
+  display: grid;
+  grid-template-columns: 5.5ch 6px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--space-2);
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--onyx-line) 55%, transparent);
+}
+.gs-act-when {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--onyx-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gs-act-mark { align-self: center; width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.gs-act-row[data-kind="problem"] .gs-act-mark { background: var(--onyx-bad); }
+.gs-act-row[data-kind="connection"] .gs-act-mark { background: var(--onyx-warn); }
+.gs-act-text {
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--onyx-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.gs-act-row[data-kind="notice"] .gs-act-text { color: var(--onyx-dim); }
+.gs-activity-empty,
+.gs-activity-foot { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--onyx-dim); }
+.gs-activity-foot { font-size: var(--text-xs); color: var(--onyx-faint); }
+
+/* ---------- 3. Room More menu additions -------------------------------- */
+
+.onyx-room-more-menu > .gs-more-read { --shi: var(--gs-i-check); }
+.onyx-room-more-menu > .gs-more-export { --shi: var(--gs-i-export); }
+.onyx-room-more-menu > .gs-more-leave { --shi: var(--gs-i-leave); }
+.onyx-room-more-menu > .gs-more-ledger { --shi: var(--gs-i-ledger); }
+
+/* The ledger is a real link: the same row skin as the menu buttons. */
+.onyx-room-more-menu > a.gs-more-ledger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--onyx-text);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--radius);
+  -webkit-tap-highlight-color: transparent;
+}
+.onyx-room-more-menu > a.gs-more-ledger::before {
+  content: "";
+  display: inline-block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--shi) center / contain no-repeat;
+  mask: var(--shi) center / contain no-repeat;
+}
+.onyx-room-more-menu > a.gs-more-ledger:hover { background: var(--onyx-panel-2); }
+.onyx-room-more-menu > a.gs-more-ledger:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* Leave: last, past a hairline, in the warning ink. */
+.onyx-frame .onyx-room-more-menu > button.gs-more-leave {
+  margin-top: var(--space-1);
+  color: var(--onyx-bad);
+  box-shadow: 0 -1px 0 var(--onyx-line);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.onyx-frame .onyx-room-more-menu > button.gs-more-leave::before { color: var(--onyx-bad); }
+
+/* ---------- 4. Leave confirm ------------------------------------------- */
+
+.onyx-sheet-layer > .onyx-sheet.gs-leave { width: min(400px, 100%); padding: var(--space-5); }
+.gs-leave-title { margin: 0; font-size: var(--text-lg); font-weight: 650; line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.gs-leave-body { margin: var(--space-2) 0 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.gs-leave-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-5); }
+.onyx-frame .gs-leave button.gs-btn {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--onyx-text);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-frame .gs-leave button.gs-btn:hover { background: var(--onyx-panel-2); }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--ghost { color: var(--onyx-text); }
+.onyx-frame .gs-leave button.gs-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--danger { color: var(--onyx-bad); border-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
+.onyx-frame .gs-leave button.gs-btn.gs-btn--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+
+/* ---------- 5. Home: the network's message ----------------------------- */
+
+.gs-motd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.gs-motd-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.gs-motd-title {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--onyx-faint);
+}
+.onyx-frame .gs-motd button.gs-motd-dismiss {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -4px -4px -4px 0;
+  padding: 0;
+  color: var(--onyx-faint);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.onyx-frame .gs-motd button.gs-motd-dismiss .onyx-sheet-x { width: 16px; height: 16px; }
+.onyx-frame .gs-motd button.gs-motd-dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-frame .gs-motd button.gs-motd-dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.gs-motd-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gs-motd-line { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); overflow-wrap: anywhere; }
+.gs-motd-line:first-child { font-size: var(--text-md); color: var(--onyx-text); }
+.gs-motd-gap { margin: 0; height: var(--space-2); }
+.onyx-frame .gs-motd button.gs-motd-more {
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--onyx-dim);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--onyx-line);
+}
+.onyx-frame .gs-motd button.gs-motd-more:hover { color: var(--onyx-text); }
+.onyx-frame .gs-motd button.gs-motd-more:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.gs-motd-pack { margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--onyx-line); }
+.gs-motd-pack-title { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 650; color: var(--onyx-text); }
+.gs-motd-pack-list { margin: 0; padding-left: 1.1em; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--onyx-dim); }
+.gs-motd-pack-list li { overflow-wrap: anywhere; }
+
+/* ---------- 6. Connect gate + recovery banner -------------------------- */
+
+/* The recovery strip now carries real reasons (offline, a kill, a ban):
+   let it wrap to two lines instead of cutting the reason at "Spammin…". */
+.onyx-reconnect-msg {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.onyx-reconnect { align-items: center; }
+
+.gs-conn-signin { align-self: flex-start; margin-top: var(--space-1); }
+
+/* ---------- 7. Touch: 44px targets at any width ------------------------- */
+
+@media (hover: none) and (pointer: coarse) {
+  .gs-join-field { min-height: 44px; }
+  .gs-join-input { height: 42px; font-size: 16px; }
+  .onyx-rail .gs-join-field { padding-right: 2px; }
+  .onyx-frame .onyx-rail button.gs-join-go { min-height: 40px; min-width: 56px; padding: 0 var(--space-3); }
+  .onyx-frame .onyx-rail button.gs-rail-activity { min-height: 44px; }
+  .onyx-frame .gs-seg button.gs-seg-btn { min-height: 44px; }
+  /* The More menu rows keep one height: 44px for a finger at any width. */
+  .onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > button,
+  .onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger { min-height: 44px; }
+  .onyx-frame .gs-motd button.gs-motd-dismiss { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
+  .onyx-frame .gs-motd button.gs-motd-more { min-height: 44px; }
+  .onyx-frame .gs-leave button.gs-btn { min-height: 44px; }
+}
+
+/* ---------- 8. Phones ---------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .gs-rail-extras { padding: var(--space-3) var(--space-4) 0; gap: var(--space-3); }
+  .gs-join-input { font-size: 16px; }
+  .onyx-frame .onyx-rail button.gs-rail-activity { min-height: 48px; padding: 0 var(--space-3); background: var(--onyx-panel); border: 1px solid var(--onyx-line); }
+  .gs-door-name { font-size: var(--text-md); }
+  .gs-door-sub { font-size: var(--text-sm); }
+  .gs-act-text { font-size: var(--text-md); }
+
+  .onyx-frame .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger {
+    min-height: 48px;
+    padding: 0 var(--space-4);
+    font-size: var(--text-md);
+  }
+  .onyx-frame .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger::before { width: 20px; height: 20px; }
+
+  .onyx-sheet-layer > .onyx-sheet.gs-leave { width: 100%; padding: var(--space-5) var(--sheet-pad, 16px) calc(var(--space-4) + env(safe-area-inset-bottom, 0px)); }
+  .gs-leave-actions { flex-direction: column-reverse; align-items: stretch; }
+  .onyx-frame .gs-leave button.gs-btn { min-height: 48px; font-size: var(--text-md); }
+}
+
+/* Short landscape phones: keep the rail extras compact. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .gs-rail-extras { padding-top: var(--space-2); gap: var(--space-2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onyx-frame .onyx-rail button.gs-rail-activity,
+  .onyx-frame .gs-seg button.gs-seg-btn,
+  .onyx-frame .gs-leave button.gs-btn { transition: none; }
+}

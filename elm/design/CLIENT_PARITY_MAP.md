@@ -44,7 +44,7 @@ still product bugs, and fixing them is the cheapest way for Elm to beat Solid.
 |---|---:|---:|---:|---:|---:|---:|
 | [D Shell, navigation, Home, banners, PWA](#d--shell-navigation-home-banners-notification-center-pwa) | 186 | 94 | 38 | 4 | 38 | 12 |
 | [E Conversation](#e--conversation--transcript-message-rendering-menus-composer-search-media-threads-topics) | 178 | 114 | 26 | 5 | 26 | 7 |
-| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 61 | 1 | 0 | 44 | 1 |
+| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 88 | 6 | 0 | 12 | 1 |
 | [F Sheets & settings](#f--sheets--settings-preferences-appearance-themes-backgrounds-notification-settings-room-settings) | 125 | 44 | 32 | 10 | 37 | 2 |
 | [J Public website](#j--public-website-routes-pages-route-a11y-static-metadata) | 120 | 80 | 20 | 1 | 9 | 10 |
 | [H Calls](#h--calls--voice-video-screen-share-stage-watch-together) | 112 | 64 | 15 | 3 | 22 | 8 |
@@ -117,7 +117,7 @@ Solid had the same defect.
 | 13 | **Jumps never scroll into view** (pins, media index, vault hits, `?at=`, search, jump-to-date). `historyLanding` has no consumer. | Conversation | E gap 2, A14/A15/A20/A129 | feed `threadAnchorIndex`; scroller "message" action |
 | 14 | **No Activity / server-log view.** ERROR reasons (kills, bans), MOTD, WALLOPS, server NOTICEs, KNOCK 710–714, 477/480 and unhandled numerics are all invisible. | Shell | C113/C112/C86/C127, A175, D18/D33 | Rail "Activity" entry rendering `serviceLog`; ERROR → notification |
 | 15 | **Encrypted-DM toggle only takes effect after a reload.** | Settings / security | F gap 4 | set `model.e2eeDms` in the pref fold; publish/withdraw the key |
-| 16 | **Quiet hours are missing.** Solid silenced 22:00–08:00 by default; Elm alerts overnight. | Settings | B51, F gap 5 | `dndQuietStart/End` in `notifyDndActive` |
+| 16 | **[Closed — v3/gap-organize] Quiet hours** now silence desktop + sound alerts on a daily schedule (Notifications sheet; off by default — Solid's loader read a missing key as hour 0, so its 22–08 default never ran). | Settings | B51, F gap 5 | `dndQuietStart/End` in `notifyDndActive` |
 | 17 | **Delivery and connection feedback gaps.** Labeled DMs to an offline nick vanish on 401. There is no browser offline/online or page-restore handling. `/join` and accepted invites don't open the room. FAIL SESSION has no inbox row. | Shell / conversation | C92, C131, A1, G30, C36, C7 | `notDeliveredToast` in `fold401`; `online`/`offline`/`pageshow` ports; `selectChannel` on self-JOIN |
 | 18 | **Download page is dead on a direct visit.** Skip link, every in-page `#anchor`, and in-app `/app/?join=…` links are broken. No scroll reset or route announcement either. | Public | J55, J22/J16, J19/J91/J95, J15/J17 | route-entry fold in `Main.init`; fragment port; reparse deep links in `UrlChanged` |
 | 19 | **Drafts are lost on reload** (Solid persisted per owner with a "Saved here" status). | Conversation | E gap 4, A112/A113 | `composerDraftsSave` port |
@@ -128,9 +128,9 @@ Solid had the same defect.
 | 24 | **Calls fail silently.** No media-error, decode, "Removed from voice" or codec toasts; no "joining…" state during permission/enrolment. | Calls | H gaps 3–4 | `emitLocal({mediaError})` → `CallDock` toasts; provisional state |
 | 25 | **No app badge or "(n)" title, and clicking a desktop alert only focuses the window.** | Shell / data | D174/D175, V68/V69/V73, A116 | `attentionSet` port; `notifyClicked` → `ChannelSelect` |
 | 26 | **Watch Together is missing**, though the About page advertises it. | Calls | H102–H111 | `WatchTogether` over `PROP ocean.watch` |
-| 27 | **Home catch-up is shallow.** No "Since you left" digest, resume points, recently visited rooms or offline memory; queued rows lack Open/Remove. | Shell / data | D141–D155, V82/V83, V39/V40 | port `catchup/*` + `sinceDigest` |
+| 27 | **Home catch-up is shallower than Solid's.** [v3/gap-organize] "Since you left" digest (who / when / what about, jump to the first unread line), "On this device" offline note and queued-send Open/Remove are in; resume points and recently visited rooms are not. | Shell / data | D141–D155, V82/V83, V39/V40 | port `catchup/*` + `sinceDigest` |
 | 28 | **The palette is about a quarter of Solid's; 17 of 21 shortcuts and J/K and `g` sequences are missing.** | Commands | K46–K102 | People/recents/Preferences/Copy link rows; nav chords |
-| 29 | **Room folders, calm presets and smart mute are missing.** | Settings | B80–B85, F | `Sidebar` folders; `NotifyCenter` tiers |
+| 29 | **[Closed — v3/gap-organize] Room folders, Calm / Regular / Power presets and smart mute** are in (folders also: hidden rooms, closed conversations, saved messages, private notes). | Settings | B80–B85, F | `Sidebar` folders; `NotifyCenter` tiers |
 | 30 | **Small data-loss / privacy bugs in the composer.** Ctrl/Cmd+F wipes the visible draft (`App.elm:39566`). Quoting an E2EE row inserts ciphertext (`View/Thread.elm:1653`). Collapsed senders can't be shown again. | Conversation | E gaps 6–8, A182 | drop `composer = ""`; `loadedActionText`; Show-all banner |
 
 Just outside the 30:
@@ -164,7 +164,7 @@ defect; fixing it makes Elm better than Solid rather than equal to it.
    - `/join` and accepted invites don't switch to the room (C36).
    - Fix: add lifecycle ports, and call `selectChannel` on the self-JOIN outside replay.
 7. **[Med] DM mute, Mark as read, Export transcript and Room ledger are missing from the room More menu** (D115/D119/D123/D126). They reuse the existing folds `MuteDm`, `/read`, `/export` and `statsRoomHref`.
-8. **[Med] Room folders missing** (D36/D37, roadmap 4.2).
+8. **[Closed — v3/gap-organize] Room folders** (D36/D37, roadmap 4.2).
 9. **[Med] Web Push arming is not reachable from the first-run "Turn on" or the Notifications sheet toggle** (D87/D177). Route both through `WebPushToggle`, and register the service worker first.
 10. **[Med] No join-by-name field in the rail** (D45). There is no Solid-style context rail or desktop People toggle (D12/D14).
 11. **[Med] The formation "hang label" toggle is inert** (D163). No port feeds `CreateHangLabelInput`.
@@ -192,10 +192,10 @@ defect; fixing it makes Elm better than Solid rather than equal to it.
 1. **[High] Themes don't recolor the app shell** (F, gap 1). The shell paints from a fixed `--onyx-*` palette (`app.css:5–14`; ~926 uses vs 13 theme-token uses). Light looks leave the shell dark. Derive `--onyx-*` from the theme tokens.
 2. **[High] Text size and Density do nothing** (F, gap 2). `data-font-scale`/`data-density` are written to `<html>` but no Elm CSS reads them.
 3. **[High] The encrypted-DM toggle only takes effect after a reload** (F, gap 4). It writes `prefs.e2eeDms`, but every gate reads `model.e2eeDms`, which is set once at boot.
-4. **[High] Quiet hours missing** (B51, F). Solid silenced 22:00–08:00 by default, so Elm now alerts overnight. Extend `notifyDndActive` with `dndQuietStart/End`.
+4. **[Closed — v3/gap-organize] Quiet hours** (B51, F). Solid silenced 22:00–08:00 by default, so Elm now alerts overnight. Extend `notifyDndActive` with `dndQuietStart/End`.
 5. **[High] Hide room, close/reopen conversation, and DM mute have no UI** (B58–B60). `MuteDm`/`UnmuteDm` are CORE-ONLY. Add to the room-header More menu and the sidebar filter.
-6. **[Med] Calm / Regular / Power notification presets and smart-mute rules are missing.**
-7. **[Med] Room folders are missing** (B80–B85, roadmap 4.2).
+6. **[Closed — v3/gap-organize] Calm / Regular / Power notification presets and smart-mute rules.**
+7. **[Closed — v3/gap-organize] Room folders** (B80–B85, roadmap 4.2).
 8. **[Med] No background renderer at all** (F). The picker, preview and Background-motion settings persist choices that never render.
 9. **[Med] Eight preferences can't be changed:** width, reader mode, experience level, voice/video entry, topic tools, reaction density, blocked hosts, watch-together. Their CSS (width/reader) is not ported either.
 10. **[Med] Room settings sheet lacks** hide, leave-confirm, close-DM, transcript export and topic-draft durability. Keyword and per-room notify storage is not per-account.
@@ -264,15 +264,15 @@ defect; fixing it makes Elm better than Solid rather than equal to it.
 
 ### Command surfaces (slash, palette, keyboard)
 
-1. **[High] Registry slash verbs that need translation are broken** (K1–K19/K34/K35, ⚠ shared).
+1. **[Closed — v3/gap-commands] Registry slash verbs that need translation were broken** (K1–K19/K34/K35, ⚠ shared). Now translated beside `parseSlashLocal` (`planSlash`), with inbound CTCP ACTION as action rows; content verbs ride the composer's seal/hold. Original defect:
    - `/me`, `/msg`, `/query`, `/j`, `/op`, `/deop`, `/voice`, `/devoice`, `/ban`, `/unban`, `/back`, `/unaway`, `/quote`, `/raw`, `/ctcp` and `/stage` hit 421 on Onyx Server.
    - `/kick`, `/topic`, `/invite <nick>` and bare `/part` go out without a channel.
    - `/away <multi-word>` loses all but the first word (B12).
    - Inbound CTCP ACTION is swallowed, so `/me` lines from other IRC clients vanish.
    - Fix: add a translation table beside `parseSlashLocal` and an action row type.
-2. **[High] `/share` (and bare `/invite`) missing in Elm** (K8/K29), yet `/help` advertises `/share`.
-3. **[Med] The palette is about a quarter of Solid's** (K46–K83). Missing: People rows, recents, Preferences, Scheduled, Copy room link, Start voice, Mark all read, theme switching, and the grammar verbs.
-4. **[Med] 17 of 21 Solid shortcuts are missing,** plus J/K and `g h`/`g d` (K89–K102).
+2. **[Closed — v3/gap-commands] `/share` (and bare `/invite`) were missing in Elm** (K8/K29); both work and `/help` lists only working verbs.
+3. **[Mostly closed — v3/gap-commands] The palette was about a quarter of Solid's** (K46–K83); People, recents, Preferences, Theme Studio, Scheduled, Copy room/node link, Start voice, Mark all read, catch-up, theme rows and the `#room` / `mute N` grammar now ship. Still missing: hide/close, translate, reader mode/width/motion, AI-policy and extension rows, time grammar (K63, K65, K69–K71, K74–K76, K79, K82, K83 partly). Original gap: Missing: People rows, recents, Preferences, Scheduled, Copy room link, Start voice, Mark all read, theme switching, and the grammar verbs.
+4. **[Closed — v3/gap-commands] 17 of 21 Solid shortcuts were missing,** plus J/K and `g h`/`g d` (K89–K102); all now go through the one `shortcut` port (reader mode, K94, stays missing: no reader mode in Elm).
 5. **[Low] No swipe-to-reply** (K105).
 
 ## Where Elm is better than Solid
@@ -432,15 +432,15 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D33 | Activity (status) entry row | `ChannelSidebar.tsx:730` (UI) | MISSING | — | see D18 |
 | D34 | Favorites section (starred, alpha) | `ChannelSidebar.tsx:754` (UI) | FULL | `View/Rail.elm:103`; `Sidebar.elm:156` | — |
 | D35 | Star/unstar per room (owner-gated) | `ChannelSidebar.tsx:581` (UI) | FULL | `View/Rail.elm:416`; `App.elm:41787` | — |
-| D36 | Room folders in sidebar + collapse toggle (persisted) | `ChannelSidebar.tsx:781,798` (UI) | MISSING | `Sidebar.elm:36` narrowing | no folder state |
-| D37 | Folder management (create/assign/delete) | `ChannelOrganizationSection.tsx:39-155`; `app/Account.tsx:1110` (UI) | MISSING | `View/Account2.elm:21` | — |
+| D36 | Room folders in sidebar + collapse toggle (persisted) | `ChannelSidebar.tsx:781,798` (UI) | FULL | `View/Organize.elm` `folderSections`; `Organize.elm`; `Organizer.elm` `FolderToggle` | v3/gap-organize: owner-scoped `onyx:room-folders`; a filter in use opens every folder; deleting a folder returns its rooms to Rooms (Solid's `default` bucket was never drawn) |
+| D37 | Folder management (create/assign/delete) | `ChannelOrganizationSection.tsx:39-155`; `app/Account.tsx:1110` (UI) | FULL | `View/Organize.elm` `prefsOrganize` (create / rename / reorder / delete), row menu + folder picker, Room settings "On this device" | v3/gap-organize |
 | D38 | Drag reorder (`setChannelOrder`) | `src/lib/store/store.ts:17831` (DEAD) | N/A | — | no caller |
-| D39 | Hidden rooms filtered from list; auto-reveal on mention / own msg / leave | `ChannelSidebar.tsx:284`; `store.ts:11677,12977` (auto) | MISSING | — | no hiddenRooms state |
+| D39 | Hidden rooms filtered from list; auto-reveal on mention / own msg / leave | `ChannelSidebar.tsx:284`; `store.ts:11677,12977` (auto) | FULL | `Organizer.elm` `revealWhere`; `App.elm` `settleStepOrganize`; `View/Organize.elm` `listed` / `hiddenFooter` | v3/gap-organize: returns on a mention or your own line; still found by the list filter, the palette and Browse |
 | D40 | Room row: name, topic line, activity stamp, unread 99+/mention badge, aria | `ChannelSidebar.tsx:521` (UI) | FULL | `View/Rail.elm:331-415`; `Sidebar.elm:208` | — |
 | D41 | Rooms zero state: Browse / Start a room / Invite friends | `ChannelSidebar.tsx:825,833,841` (UI) | PARTIAL | `View/Rail.elm:117,143-161` | no Invite friends in rail |
 | D42 | Collection heading with counts | `ChannelSidebar.tsx:383` (UI) | PARTIAL | `View/Rail.elm:76` | no counts |
 | D43 | Messages: recency sort, initial, preview, key-change ⚠, offline-memo stamp, badge | `ChannelSidebar.tsx:878-955` (UI) | FULL | `View/Rail.elm:462-568`; `Sidebar.elm:145,355` | Elm adds time + friend dot |
-| D44 | Closed conversations hidden; reopen on open/new inbound | `ChannelSidebar.tsx:365`; `store.ts:8027,13061` (auto) | MISSING | — | no closedConversations state |
+| D44 | Closed conversations hidden; reopen on open/new inbound | `ChannelSidebar.tsx:365`; `store.ts:8027,13061` (auto) | FULL | `Organizer.elm` `reopenWhere`; `View/Organize.elm` `closedFooter` | v3/gap-organize: close from the row menu / DM More menu; reopens on news from that person or when opened |
 | D45 | Join-a-room-by-name form | `ChannelSidebar.tsx:968` (UI) | PARTIAL | `App.elm:12981` `/join` | slash only; no field |
 | D46 | Roving arrow/Home/End focus, single tab stop | `ChannelSidebar.tsx:428` (UI) | MISSING | `View/Rail.elm:11` narrowing | — |
 | D47 | Mobile switcher sheet head ("Switch rooms", Close) | `RoomSwitcherSheet.tsx:28-42` (UI) | FULL | `View/Topbar.elm:58`; `View/Rail.elm:76` | page title + nav back |
@@ -448,7 +448,7 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D49 | You head: nick, guest/signed-in, close | `app/Account.tsx:661`; `app/YouSettings.tsx:53` (UI) | FULL | `View/Nav.elm:265-291` | Elm adds connection + status block |
 | D50 | Guest vs account lede | `YouSettings.tsx:54` (UI) | FULL | `View/Nav.elm:293` | — |
 | D51 | Account group (guest → Keep this name) | `YouSettings.tsx:60` (UI) | FULL | `View/Nav.elm:302`; `App.elm:44019` | — |
-| D52 | Notifications: Calm presets + keywords | `YouSettings.tsx:75-85`; `CalmModeControl.tsx` (UI) | PARTIAL | `View/Nav.elm:323`; `View/Notify.elm:357` | no Calm/Regular/Power |
+| D52 | Notifications: Calm presets + keywords | `YouSettings.tsx:75-85`; `CalmModeControl.tsx` (UI) | FULL | `View/Attention.elm` `presetSection` / `smartMuteSection`; `Attention.elm` `allowsAlert`; `App.elm` `organizePresetKind` | v3/gap-organize: Power is a real tier (Solid's never differed from Regular); unread badges are never gated |
 | D53 | Privacy: Private messages (e2eeDms), Safer link previews (httpsOnly) | `YouSettings.tsx:93,106` (UI) | FULL | `View/Appearance.elm:232,234` | on `/appearance` |
 | D54 | Blocked users on this device | `YouSettings.tsx:122` (UI) | FULL | `View/Notify.elm:422` | in Notifications sheet |
 | D55 | Appearance entry | `YouSettings.tsx:133` (UI) | FULL | `View/Nav.elm:336` | route, not in-shell sheet |
@@ -522,7 +522,7 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D123 | More › Mark as read (when unread) | `PresenceRibbon.tsx:1305` (UI) | PARTIAL | `App.elm:13004` `/read` | slash only |
 | D124 | More › "Do not disturb is on" → Preferences | `PresenceRibbon.tsx:1328` (UI) | MISSING | — | — |
 | D125 | DM More › media + jump to date | `PresenceRibbon.tsx:1365,1378` (UI) | FULL | `View/RoomHeader.elm:276-278` | Elm adds DM call |
-| D126 | DM More › Mute/Unmute DM (+toast) | `PresenceRibbon.tsx:1383` (UI) | CORE-ONLY | `App.elm:31136,31181` no dispatcher | `/mute` is room-only |
+| D126 | DM More › Mute/Unmute DM (+toast) | `PresenceRibbon.tsx:1383` (UI) | FULL | `View/Organize.elm` `roomMoreItems` (DM More menu) + `muteEntry` (row menu); a muted DM row shows a bell-off mark | v3/gap-organize: dispatches the existing `MuteDm` / `UnmuteDm` folds |
 | D127 | DM More › Close conversation → confirm | `PresenceRibbon.tsx:1428`; `HarborConfirmSheet.tsx:69` (UI) | MISSING | — | — |
 | D128 | More › You account chip | `PresenceRibbon.tsx:1475` (UI) | FULL | `View/Topbar.elm:104-160` | identity chip |
 | D129 | More menu roving arrows/Home/End, first-item focus | `PresenceRibbon.tsx:535-552` (UI) | PARTIAL | `View/RoomHeader.elm:234` | group of buttons; Escape/scrim only |
@@ -551,7 +551,7 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D152 | Your rooms: Recently visited (Join) | `HomeBriefingView.tsx:253` (UI) | MISSING | — | joinHistory absent |
 | D153 | Welcome name / home tip / invite / recaps / more activity | `HomeView.tsx:20-32` props unrendered (DEAD) | N/A | `View/Home.elm:74,113,115` | Elm renders greeting/coach/invite |
 | D154 | CatchUpSummary, MarkAllCaughtUp components | `CatchUpSummary.tsx`, `MarkAllCaughtUp.tsx` (DEAD) | N/A | — | — |
-| D155 | Since-you-left digest card in room | `SinceDigestCard.tsx:13`; `MessageView.tsx:2077` (UI) | MISSING | — | — |
+| D155 | Since-you-left digest card in room | `SinceDigestCard.tsx:13`; `MessageView.tsx:2077` (UI) | PARTIAL | `View/Attention.elm` `digest` / `digestHead` / `digestLine` (on Home); `Attention.buildDigest` | v3/gap-organize: lives on Home by design (V3_ROADMAP 1.4a), not above the unread divider; skips your own lines; no "Review unread" divider clear |
 | D156 | "Say hi" coach in composer (guest room landing) | `Composer.tsx:1963`; `lib/firstHour/firstHour.ts:108` (UI) | PARTIAL | `View/Home.elm:375,429` | empty rooms only; any guest |
 | D157 | Coach dismissal persisted | `firstHour.ts:90` (UI) | FULL | `App.elm:39086` | — |
 | D158 | Composer autofocus on first-hour room landing | `firstHour.ts:125`; `Composer.tsx:689` (auto) | MISSING | — | — |
@@ -581,7 +581,7 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D182 | Self-updating relative `<time>` + ISO title | `components/RelativeTime.tsx`; `ScheduledMessagesSheet.tsx:92` (UI) | FULL | `View/Scheduled.elm:114` | — |
 | D183 | Virtual-keyboard inset (mobile) | `lib/mobile/virtualKeyboardOverlay.ts`; `AppShell.tsx:840` (auto) | FULL | `ports.js:9955` | Elm visualViewport works on iOS too |
 | D184 | Mobile breakpoint switch (900px) | `lib/mobile/breakpoints.ts:16`; `AppShell.tsx:839` (auto) | FULL | CSS 768px | layout-only |
-| D185 | Message bookmarks (add/remove) | `store.ts:9984` (DEAD) | N/A | — | no caller |
+| D185 | Message bookmarks (add/remove) | `store.ts:9984` (DEAD) | N/A | `View/Organize.elm` `bookmarkMenuItem` / `bookmarksSheet`; `Organize.addBookmark` | Solid's was dead; v3/gap-organize ships it (message menu "Save message", You hub / room More "Saved messages", Home strip; encrypted rows keep their place, never their words) |
 | D186 | Channel bookmarks / categories libs | `lib/channel/bookmarks.ts`, `categories.ts` (portable identity only) | N/A | — | account mapper |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
@@ -611,12 +611,12 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 - [High] App badge + attention title (D174, D175): add an `attentionSet` port (`setAppBadge`/`clearAppBadge` in `ports.js`) fed from mention totals, and prefix `View.documentTitle` with "(n)".
 - [High] Service worker registration (D168, D169): register `/sw.js` in `ports.js` `wirePolish` (`updateViaCache:'none'`). Today offline shell, update detection and Web Push all depend on a worker the Elm build never installs.
 - [High] Home catch-up depth (D141–D143, D152): add `Home.resumePoints`, an invites tier from INVITE notifications, recently visited rooms (persisted `joinHistory`) and offline vault-backed catch-up in `View/Home.elm`.
-- [Med] Room folders (D36, D37): folder state in `App`, grouping plus collapse in `Sidebar.sections`/`View/Rail.elm`, management in the Account panel.
-- [Med] DM mute UI (D126): dispatch the existing `MuteDm`/`UnmuteDm` from a DM More item in `View/RoomHeader.moreMenu`.
+- [Closed — v3/gap-organize] Room folders (D36, D37): folder state in `App`, grouping plus collapse in `Sidebar.sections`/`View/Rail.elm`, management in the Account panel.
+- [Closed — v3/gap-organize] DM mute UI (D126): dispatch the existing `MuteDm`/`UnmuteDm` from a DM More item in `View/RoomHeader.moreMenu`.
 - [Med] Mark as read / Export transcript / Room ledger in More (D115, D119, D123): buttons that reuse the `/read` and `/export` folds (`App.elm:13004,14597`) plus a ledger link.
-- [Med] Since-you-left digest card (D155): port `sinceDigest` into `View/Thread.elm`, shown above the unread divider.
+- [Closed on Home — v3/gap-organize] Since-you-left digest card (D155): port `sinceDigest` into `View/Thread.elm`, shown above the unread divider.
 - [Med] Web Push arming in the Notifications sheet and first-run Turn on (D87, D177): route `Polish.NotifyEnable` and the sheet toggle through `WebPushToggle`.
-- [Med] Calm presets and quiet hours (D29, D52): `Notify` tiers plus a radiogroup in `View/Notify.elm`.
+- [Closed — v3/gap-organize] Calm presets and quiet hours (D29, D52): `Notify` tiers plus a radiogroup in `View/Notify.elm`.
 - [Med] Join a room by name in the rail (D45): an input in `View/Rail.elm` dispatching the `/join` fold.
 - [Med] Context rail / desktop People toggle (D12, D14): optional column-4 rail and a roster hide toggle with `aria-expanded`.
 - [Med] Formation hang label is inert (D163): feed `CreateHangLabelInput` from `ports.js` (next-Saturday label), or drop the toggle.
@@ -679,7 +679,7 @@ Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/
 | E43 | Scroll and pulse to the active visible search match | `search/MessageSearch.tsx:85,419` (UI) | PARTIAL | `View/Thread.elm:559` | Highlight class only; no row scroll in `ports.js` |
 | E44 | Page older history from the server | none (DEAD) | N/A | `App.elm:39196`, `View/Thread.elm:137` | Elm has the rewind fold, but its button only renders when hiddenBefore>0, so it is unreachable |
 | E45 | Reader-memory strip (device memory, reviewed span, context trail, other rooms, Start/New/Latest/Home/Find text) | `MessageView.tsx:426-561,2081` (pref readerMode) | MISSING | `Prefs.elm:605` | The pref is stored but has no UI |
-| E46 | In-room "Since you left" digest with "Review unread" (records review, clears divider) | `MessageView.tsx:1101,1394,2074` (UI) | MISSING | — | Moved to Home by design (V3_ROADMAP 1.4a); the divider review-clear is also gone |
+| E46 | In-room "Since you left" digest with "Review unread" (records review, clears divider) | `MessageView.tsx:1101,1394,2074` (UI) | PARTIAL | `View/Attention.elm` (Home digest, each row jumps to its first unread line) | v3/gap-organize: moved to Home by design (V3_ROADMAP 1.4a); the divider review-clear is still gone |
 | E47 | Typing indicator line | `TypingIndicator.tsx:39,105` (auto) | FULL | `App.elm:8430`, `View/Thread.elm:161` | 3 typers read "3 people…" instead of three names |
 | E48 | Transcript density | `preferences.ts:49` (pref, CSS only) | FULL | `View/Thread.elm:190,543`, `View/Appearance.elm:167` | Elm Compact is an IRC-style line layout |
 | E49 | Topic filter chips (All plus per-topic, with unread badge) | `MessageView.tsx:1838` (pref topicTools) | FULL | `View/Thread.elm:901-926,1250` | |
@@ -887,25 +887,25 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.elm:12978` registry, raw `App.elm:11164` | ⚠ shared: sends `ME`→421; inbound ACTION swallowed both sides |
-| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: `TOPIC <text>` lacks channel; Room settings topic editor works in Elm |
+| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K3 | `/nick <nick>` | `registry.ts:217` (slash, raw) | FULL | `App.elm:11164` | NICK is a real verb |
-| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `App.elm:11164` | `/j` → `J` → 421 in both (⚠ shared) |
-| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: bare `/part` has no channel; `/leave` → 421 |
-| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `App.elm:11164`; leak guard `App.elm:11171` | ⚠ shared 421; Elm refuses raw content verbs into protected DMs (better) |
+| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K7 | `/whois <nick>` opens profile sheet | `store.ts:8494` (slash) | FULL | `App.elm:14627` / `14634` usage toast | — |
-| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | PARTIAL | raw only `App.elm:11164` | Elm bare `/invite` sends `INVITE` (461) instead of copying the link; `INVITE nick` lacks channel ⚠ shared |
+| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K9 | `/event <when> <title>` / `/event clear` | `store.ts:8122` (slash) | FULL | `App.elm:14990` → `runSlashEvent` 13850 | — |
 | K10 | `/webhook create\|list\|delete` | `registry.ts:224` (slash, raw) | FULL | `App.elm:11164` | server `WEBHOOK` module exists |
 | K11 | `/notice <target> <text>` | `registry.ts:226` (slash, raw) | FULL | `App.elm:11164`, `rawContentVerbs` guard | Elm better: refuses plaintext into designated/unresolved DMs |
 | K12 | `/away [message]` | `registry.ts:227` (slash, raw) | FULL | `App.elm:11164` | — |
-| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should send bare `AWAY`) |
+| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K14 | `/mode <target> [modes]` | `registry.ts:229` (slash, raw) | FULL | `App.elm:11164` | — |
 | K15 | `/modex [#room[,nick]]` (IRCX MODEX) | — | FULL | `App.elm:14648` | Elm-only addition |
-| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: no channel param; member card/desk kick works in Elm |
-| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should be `MODE #room ±b`) |
-| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should be `MODE #room ±o/v nick`) |
-| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: sends literal `QUOTE …` (421) instead of the raw line |
+| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K20 | `/clear` local scrollback | `store.ts:8139` (slash) | FULL | `App.elm:14553` | — |
 | K21 | `/ignore [nick]`, `/unignore <nick>`, bare list | `store.ts:8160` (slash) | FULL | `App.elm:14476/14494/14512` | — |
 | K22 | `/read`, alias `/markread` | `store.ts:8198` (slash) | FULL | `App.elm:14609` | — |
@@ -915,16 +915,16 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K26 | `/highlight`, `/unhighlight` | `store.ts:8280` (slash) | FULL | `App.elm:14655/14673` | — |
 | K27 | `/snooze <min>`, `/dnd [on\|off\|min]` | `store.ts:8307` (slash) | FULL | `App.elm:14697/14700` | — |
 | K28 | `/color`, alias `/colour` | `store.ts:8349` (slash) | FULL | `App.elm:14888` | — |
-| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | MISSING | no arm in `parseSlashLocal` `App.elm:10981`; falls to raw 11164 | sends `SHARE` → 421; still advertised by Elm `/help` (`App.elm:13065`) |
+| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K30 | `/export [txt\|json]` | `store.ts:8401` (slash) | FULL | `App.elm:14597` | — |
 | K31 | `/import` vault snapshot | — (Solid imports via Preferences) | FULL | `App.elm:14603` | Elm-only verb |
 | K32 | `/notify all\|mentions\|mute` | `store.ts:8427` (slash) | FULL | `App.elm:14771` | — |
-| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `App.elm:11164` | server PING/PONG; no latency readout in either |
-| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should wrap `\x01CMD\x01` in PRIVMSG) |
-| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (no STAGE verb; stage rides CTCP) |
+| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K36 | `/history` opens search | `store.ts:8156` (slash) | FULL | `App.elm:14571` | — |
 | K37 | `/search <query>` | `store.ts:8147` (slash) | FULL | `App.elm:14577` | — |
-| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.elm:14944`, list `13065` | Elm list advertises the broken `/share` |
+| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K39 | Oper verbs `/broadcast` (`/wallops`) `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8510` `parseOperSlashCommand` (slash) | FULL | `App.elm:14993-15011` → `runSlashOper` | shared `planOperAction` gate |
 | K40 | Text verbs `/shrug` `/tableflip` `/unflip` `/lenny` `/disapprove` | `registry.ts:255-259` (slash) | FULL | `App.elm:11101` `expandSlashTextCommand` | — |
 | K41 | Unknown verb raw passthrough | `store.ts:8528` (slash) | FULL | `App.elm:11164` | Elm better: `plaintextWouldLeak` refusal for content verbs |
@@ -932,11 +932,11 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K43 | Slash suggestions (prefix, aliases, oper-hidden, Tab/Enter) | `Composer.tsx:401,1524` (UI) | FULL | `ComposerAssist.elm`, `View/Composer.elm` | see E section |
 | K44 | Palette: `Go to #room` rows | `commands.ts:1430` (palette) | FULL | `Switcher.elm:171` | — |
 | K45 | Palette: `Open DM with nick` rows | `commands.ts:1449` (palette) | FULL | `Switcher.elm:180` | — |
-| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | MISSING | `Switcher.elm` has Rooms/DMs/Actions only | no People section |
-| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | MISSING | `Switcher.elm:134` ("so recents can key on it later") | — |
+| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K48 | Palette: Browse rooms | `commands.ts:1195` | FULL | `Switcher.elm:236` | — |
 | K49 | Palette: Start a room | `commands.ts:1203` | FULL | `Switcher.elm:237` | — |
-| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | MISSING | — | Browse rooms covers listing only |
+| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K51 | Palette: New conversation | — | FULL | `Switcher.elm:238` | Elm-only |
 | K52 | Palette: Jump to date… | `commands.ts:1280` | FULL | `Switcher.elm:242` | — |
 | K53 | Palette: Notifications | — | FULL | `Switcher.elm:247` | Elm-only |
@@ -944,51 +944,51 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K55 | Palette: You | — | FULL | `Switcher.elm:249` | Elm-only |
 | K56 | Palette: Open keyboard shortcuts | `commands.ts:1077` | FULL | `Switcher.elm:250` | — |
 | K57 | Palette: Disconnect | `commands.ts:1347` | FULL | `Switcher.elm:251` | — |
-| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | MISSING | — | Prefs sheet exists (You hub) but not in palette |
-| K59 | Palette: Open Theme Studio | `commands.ts:1243` | MISSING | — | Studio lives in `/appearance` Advanced |
-| K60 | Palette: Show/Hide member list | `commands.ts:1251` | MISSING | — | — |
-| K61 | Palette: Focus composer | `commands.ts:1259` | MISSING | — | — |
-| K62 | Palette: Scheduled messages | `commands.ts:1272` | MISSING | — | sheet exists (`View/Scheduled.elm`) |
+| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K59 | Palette: Open Theme Studio | `commands.ts:1243` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K60 | Palette: Show/Hide member list | `commands.ts:1251` | PARTIAL | — | v3/gap-commands: Alt+M shows/hides the member list; no palette row |
+| K61 | Palette: Focus composer | `commands.ts:1259` | PARTIAL | — | v3/gap-commands: Enter / Alt+Enter focus the composer; no palette row |
+| K62 | Palette: Scheduled messages | `commands.ts:1272` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K63 | Palette: AI policy row for active room | `commands.ts:1305` | MISSING | `AiPolicy.elm` (no UI) | — |
-| K64 | Palette: Start voice in current room | `commands.ts:1317` | MISSING | — | Join call exists in room header |
+| K64 | Palette: Start voice in current room | `commands.ts:1317` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K65 | Palette: Start video in current room | `commands.ts:1331` | N/A | video off on live network (`fbe04585`) | revisit when video ships |
-| K66 | Palette: Copy node address | `commands.ts:1355` | MISSING | — | — |
-| K67 | Palette: Copy room link | `commands.ts:1365` | MISSING | — | Invite friends sheet copies |
-| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | MISSING | — | — |
+| K66 | Palette: Copy node address | `commands.ts:1355` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K67 | Palette: Copy room link | `commands.ts:1365` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K69 | Palette: Switch background rows | `commands.ts:1473` | MISSING | — | — |
 | K70 | Palette: extension action rows | `commands.ts:1162` | MISSING | — | extensions not ported (see F) |
 | K71 | Palette time grammar: "jump [#room] <time>" (`timeGrammar.ts`) | `commands.ts:328,354,568` | MISSING | — | — |
-| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | MISSING | — | — |
-| K73 | Palette: Mark all read | `commands.ts:444` | MISSING | Home "Mark all caught up" exists | — |
+| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K73 | Palette: Mark all read | `commands.ts:444` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K74 | Palette: Reopen reviewed anchors | `commands.ts:493` | MISSING | — | no review history in Elm |
 | K75 | Palette: vault search mode toggle / `vault exact\|semantic\|hybrid` | `commands.ts:524,942` | MISSING | mode toggle lives in search panel | — |
-| K76 | Grammar: hide room / close conversation | `commands.ts:594-657` | MISSING | — | Elm has no hidden rooms / closed conversations |
+| K76 | Grammar: hide room / close conversation | `commands.ts:594-657` | PARTIAL | `View/Organize.elm` (row menu, room / DM More menus, Room settings) | v3/gap-organize: hidden rooms and closed conversations exist now; palette verbs for them are not added (hidden rooms and closed DMs do stay reachable from the palette) |
 | K77 | Grammar: leave / PART room | `commands.ts:671-713` | MISSING | — | — |
-| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | MISSING | — | — |
+| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | PARTIAL | — | v3/gap-commands: palette star/unstar/mark-read/DM rows; no typed grammar |
 | K79 | Grammar: schedule message "<text> in 2h" | `commands.ts:801` | MISSING | — | — |
-| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | MISSING | — | — |
-| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | MISSING | — | — |
+| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | PARTIAL | — | v3/gap-commands: `mute N` / DND / away rows; no `away set\|clear` grammar |
+| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | PARTIAL | — | v3/gap-commands: palette search/home rows; no focus-mode or `search X` grammar |
 | K82 | Grammar: translate to X / clear | `commands.ts:976-988` | MISSING | — | — |
-| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | MISSING | — | — |
+| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | PARTIAL | — | v3/gap-commands: density toggle row; reader mode, width and motion stay in Preferences |
 | K84 | Shortcut Ctrl/Cmd+K palette | `shortcutsRegistry.ts` (shortcut) | FULL | `ports.js:3492` | — |
 | K85 | Shortcut `/` palette when not typing | `useSpotlight.ts:32` | FULL | `ports.js:3509` | — |
 | K86 | Shortcut `?` shortcuts overlay | `shortcutsRegistry.ts` | FULL | `ports.js:3512` | — |
 | K87 | Shortcut Escape closes topmost overlay | `useKeyboardShortcuts.ts:670` | FULL | `ports.js:3488` + `App.escapeMsg` | Elm single ordered stack (better) |
 | K88 | Shortcut Ctrl/Cmd+F search | `shortcutsRegistry.ts` | FULL | `ports.js:5770` `isFindHotkey`, `App.elm:39559` | — |
-| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | MISSING | — | — |
-| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | MISSING | — | — |
-| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | MISSING | — | — |
-| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | MISSING | — | — |
-| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | MISSING | — | — |
+| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
 | K94 | Shortcut Ctrl/Cmd+Shift+R reader mode | `shortcutsRegistry.ts` | MISSING | — | no reader mode in Elm |
-| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | MISSING | — | — |
-| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | MISSING | — | — |
-| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | MISSING | — | — |
-| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | MISSING | Elm uses the chord for camera in calls only | — |
-| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | MISSING | Elm `L` = leave call (in-call only) | — |
-| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | MISSING | `Shift+M` = mic in calls (`ports.js:3478`) | spec §7.1 chord clash resolved for calls only |
-| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | MISSING | — | — |
-| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | MISSING | — | — |
+| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
 | K103 | Call chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S | (Solid VoiceBar local keys; see H) | FULL | `ports.js:3478`, `Switcher.elm:637` | Elm-wide, `aria-keyshortcuts` |
 | K104 | Push-to-talk talk key | `useCadenceMedia.ts` (see H) | FULL | `ports.js:3751` `createPushToTalk` | — |
 | K105 | Swipe-to-reply on touch rows | `rowGesture.ts` (gesture) | MISSING | — | — |
@@ -1861,8 +1861,8 @@ Elm checked: `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`
 | V36 | Composer outbox chrome + Retry now | `shell/Composer.tsx:1375`, `:1389` (UI) | PARTIAL | `View/Composer.elm:212` | Queue never read at boot: offline reload shows no chrome until 001/Prefs open |
 | V37 | Queued / delivery-uncertain placeholder rows | `MessageView.tsx:2285` (UI) | FULL | `View/Thread.elm:557`, `:580` | — |
 | V38 | Home queued-sends card + Try sending now | `home/HomeBriefingView.tsx:411` (UI) | PARTIAL | `View/Home.elm:226`, `:254` | No uncertain/admitted row states (prunePending hard-coded 0) |
-| V39 | Open a queued send (re-materialise placeholder + focus) | `HomeBriefingView.tsx:458`, `store.ts:7368` (UI) | MISSING | — | — |
-| V40 | Remove one queued send from Home (two-step confirm) | `HomeBriefingView.tsx:466`, `store.ts:7419` (UI) | PARTIAL | `View/Prefs.elm:490` | Per-row discard exists only in Prefs |
+| V39 | Open a queued send (re-materialise placeholder + focus) | `HomeBriefingView.tsx:458`, `store.ts:7368` (UI) | PARTIAL | `View/Organize.elm` `homeOutboxActions` | v3/gap-organize: Open goes to the conversation the send is queued for; the placeholder row is already in the transcript |
+| V40 | Remove one queued send from Home (two-step confirm) | `HomeBriefingView.tsx:466`, `store.ts:7419` (UI) | FULL | `View/Organize.elm` `homeOutboxActions` (Remove → Confirm remove / Keep) → `PrefsOutboxRemove` | v3/gap-organize |
 | V41 | Export portable vault JSON | `PreferencesPanel.tsx:1151` (UI) | PARTIAL | `View/Prefs.elm:228`, `App.elm:40345`, `ports.js:6821` | Vault rows only; drops drafts, topic drafts, followed, read cursors, saved searches, reviews, sign-in targets, prefs |
 | V42 | Export compressed vault (.json.gz) | `PreferencesPanel.tsx:1164` (UI) | MISSING | — | — |
 | V43 | Save vault (plain / gzip) to file via File System Access | `PreferencesPanel.tsx:1175`, `:1185` (UI) | MISSING | — | — |
@@ -1904,8 +1904,8 @@ Elm checked: `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`
 | V79 | Closed-tab status copy, "What can ping" kinds, host honesty | `closedTabCopy.ts:54`, `YouNotifications.tsx:239` (UI) | MISSING | `View/Account.elm:490` | Elm copy is "Push is on/off." only |
 | V80 | SW push → OS notification (E2EE-redacted) + click opens `/app?join=` | `public/sw.js:377`, `:438` (auto) | PARTIAL | `App.elm` parseDeepLinkJoin | Works only where a legacy Solid SW registration persists |
 | V81 | Away-digest tiers (attention / followed / quiet, calm preset) | `home/homeController.ts:425`, `awayDigest.ts:102` (UI) | PARTIAL | `Home.elm:217` composeInbox | Mentions/unread only; no followed/continue tier or calm preset |
-| V82 | "Since you left" digest card in a room | `MessageView.tsx:2074`, `sinceDigest.ts:80` (auto UI) | MISSING | — | — |
-| V83 | Home "On this device" cold vault rooms while offline | `HomeBriefingView.tsx:486`, `homeController.ts:496` (UI) | MISSING | `View/Home.elm:13` narrowing | — |
+| V82 | "Since you left" digest card in a room | `MessageView.tsx:2074`, `sinceDigest.ts:80` (auto UI) | PARTIAL | `View/Attention.elm` (Home) | v3/gap-organize: on Home by design, per conversation |
+| V83 | Home "On this device" cold vault rooms while offline | `HomeBriefingView.tsx:486`, `homeController.ts:496` (UI) | PARTIAL | `View/Attention.elm` `homeMemoryNote` | v3/gap-organize: while offline Home says what this device is holding (queued sends, drafts); vault-backed cold rooms are not listed |
 | V84 | Reviewed catch-up anchors (record on caught-up, palette recall, reader span) | `homeController.ts:915`, `commands.ts:483`, `MessageView.tsx:1141` (UI/palette) | MISSING | `App.elm:30694` marks read only | — |
 | V85 | Home "more activity" (remembered rooms, quiet activity/boosts, reviews) | `homeController.ts:806` (DEAD) | N/A | — | `HomeBriefingView` types `more` but renders nothing |
 | V86 | Unread read-state core (incoming / viewed / total mentions) | `readState.ts:24` (auto) | FULL | `App.elm:30663`, `App.elm:18662` | — |
@@ -2219,7 +2219,7 @@ Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window e
 | B40 | tempBan (timed +b with auto-lift and retries) | DEAD, store:16415 (no UI in the cockpit) | N/A | `View/Bans.elm:84/102/128` → `App.elm:20427`, lift `App.elm:20570` | Elm is better: a reachable "Add a timed block" |
 | B41 | addHighlightWord / removeHighlightWord | `src/app/KeywordListControl.tsx:31/41` (UI), slash store:8291/8298 | FULL | `View/Notify.elm:362/403`, `App.elm:39317`; `/highlight` `App.elm:14655/14673` | Keyword sort uses codepoint order (COVERAGE narrowing) |
 | B42 | openHighlightModal / closeHighlightModal | DEAD, store:16503 | N/A | — | — |
-| B43 | setUserNote / getUserNote / deleteUserNote | DEAD, store:16509–16532 | N/A | none | Private notes are never surfaced in Solid |
+| B43 | setUserNote / getUserNote / deleteUserNote | DEAD, store:16509–16532 | N/A | `View/Organize.elm` `memberNote`; `Organize.setNote` | Solid never surfaced them; v3/gap-organize shows a private note on the member card (owner-scoped `onyx:user-notes`, 2048 chars, 512 people) |
 | B44 | openInviteModal / closeInviteModal | DEAD, store:16546 | N/A | (Elm `InviteShareOpen` is a different surface) | — |
 | B45 | setNickColorOverride / clearNickColorOverride | DEAD; `nickColorOverrides` has no reader | N/A | `App.elm:42567/42592` folds with no View dispatcher (CORE-ONLY) | — |
 | B46 | setCTCPVersionReply / TimeEnabled / PingEnabled / Enabled | DEAD setters; the persisted config drives auto-replies | N/A | config load `App.elm:37844`, `Main.elm:1646`; replies via `foldCtcpQuery` | Stored config is honoured in both; neither can edit it |
@@ -2227,7 +2227,7 @@ Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window e
 | B48 | open/closeAnnouncementsPanel, markAnnouncementsRead, clearAnnouncements | DEAD, store:16612–16620 | N/A | — | — |
 | B49 | setDndEnabled (manual DND) | `NotificationControls.tsx:347` (UI); palette `commands.ts:875`; Ctrl+Shift+D (`useKeyboardShortcuts.ts:457`); `/dnd` store:8311 | PARTIAL | `View/Notify.elm:294` → `App.elm:39344`; `/dnd` `App.elm:14700` → `14382` | No palette "dnd on/off", no Ctrl+Shift+D |
 | B50 | setDndUntil (timed snooze, auto-clear) | `NotificationControls.tsx:343` (UI); palette `mute 30m` `commands.ts:847`; `/snooze` store:8312 | PARTIAL | `View/Notify.elm:305/330` → `App.elm:39358/39361`; `/snooze` `App.elm:14697`; `App.elm:31607` | No palette "mute for N" grammar |
-| B51 | setDndQuietHours + isDndActive (daily quiet hours; default 22–08 **on**) | `NotificationControls.tsx:306/311` (UI), `src/shell/PortableIdentitySection.tsx:123`; enforced at `src/lib/notifications/NotificationRuntime.tsx:90` | MISSING | `App.elm:31607` checks only `dndEnabled`/`dndUntil` | Elm alerts overnight where Solid stayed silent by default |
+| B51 | setDndQuietHours + isDndActive (daily quiet hours; default 22–08 **on**) | `NotificationControls.tsx:306/311` (UI), `src/shell/PortableIdentitySection.tsx:123`; enforced at `src/lib/notifications/NotificationRuntime.tsx:90` | FULL | `View/Attention.elm` `quietSection`; `Attention.quietActive`; `App.elm` `organizeQuietNow` (ORed into `dnd`) | v3/gap-organize: `onyx:dnd-quiet-{start,end,enabled}`. Default **off**: `_loadDndHour` (`store.ts:5162`) read a missing key as `Number(null)` = 0, so Solid's 22–08 default never ran (0 = 0 is an empty window). Web-push closed-tab alerts do not honour it |
 | B52 | openDndModal / closeDndModal | DEAD, store:16668 | N/A | — | — |
 | B53 | setTimeFormat | DEAD (replaced by prefs `clock`, `src/lib/prefs/preferences.ts:72`) | N/A | `Prefs.elm:110` `Clock` in the Prefs sheet | The live path belongs to the prefs mapper |
 | B54 | setChannelSortOrder | DEAD, store:16683 | N/A | — | — |
@@ -2256,11 +2256,11 @@ Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window e
 | B77 | openServerInfo / closeServerInfo | DEAD, store:16984 | N/A | — | — |
 | B78 | setNickAway | DEAD; `awayNicks` has no non-store reader | N/A | `App.elm:17981` away fold (roster marker) | — |
 | B79 | toggleFocusMode | palette `commands.ts:910`, but `focusMode` has no reader | N/A | — | No-op in Solid |
-| B80 | createFolder | `src/shell/ChannelOrganizationSection.tsx:39` (UI, Account page) | MISSING | none (`View/Rail.elm:11` defers folders) | — |
-| B81 | deleteFolder (orphans → first folder) | `ChannelOrganizationSection.tsx:155` (UI) | MISSING | none | — |
-| B82 | addChannelToFolder | `ChannelOrganizationSection.tsx:51` (UI) | MISSING | none | — |
-| B83 | toggleFolderCollapsed + sidebar folder groups | `ChannelSidebar.tsx:361` (UI) | MISSING | none | — |
-| B84 | renameFolder | DEAD, store:17065 | N/A | — | — |
+| B80 | createFolder | `src/shell/ChannelOrganizationSection.tsx:39` (UI, Account page) | FULL | `Organize.createFolder`; `View/Organize.elm` | v3/gap-organize |
+| B81 | deleteFolder (orphans → first folder) | `ChannelOrganizationSection.tsx:155` (UI) | FULL | `Organize.deleteFolder` | v3/gap-organize: orphans return to the plain Rooms list |
+| B82 | addChannelToFolder | `ChannelOrganizationSection.tsx:51` (UI) | FULL | `Organize.assignRoom`; folder picker | v3/gap-organize: a room lives in one folder |
+| B83 | toggleFolderCollapsed + sidebar folder groups | `ChannelSidebar.tsx:361` (UI) | FULL | `Organize.toggleCollapsed`; `View/Organize.elm` `folderSections` | v3/gap-organize |
+| B84 | renameFolder | DEAD, store:17065 | FULL | `Organize.renameFolder`; `prefsOrganize` | v3/gap-organize: Elm ships it (Solid's was dead) |
 | B85 | setChannelFolders (portable import) | `PortableIdentitySection.tsx:122` (UI) | MISSING | `Account2.elm:466` reports that folders were skipped | Honest refusal copy |
 | B86 | openPollCreate / closePollCreate | DEAD, store:17086 | N/A | — | — |
 | B87 | openReactionStats / closeReactionStats | DEAD, store:17091 | N/A | — | — |
