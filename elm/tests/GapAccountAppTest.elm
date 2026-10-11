@@ -636,6 +636,41 @@ suite =
                             update (AppearanceSetPref { key = "linkPreviews", value = "false" }) guest
                     in
                     Expect.equal ( True, False ) ( m.e2eeDms, List.member DmPublishKey outs )
+            , test "turning it off releases a pending key hold: the draft stays and sending is now the user's choice" <|
+                \_ ->
+                    let
+                        opened =
+                            Tuple.first (update (ChannelSelect "bob") { blank | nowMs = 1000 })
+
+                        ( held, _ ) =
+                            update ComposerSend { opened | composer = "hello" }
+
+                        ( off, offOuts ) =
+                            update (AppearanceSetPref { key = "e2eeDms", value = "false" }) held
+
+                        ( _, sendOuts ) =
+                            update ComposerSend off
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just "bob") held.dmKeyHold
+                        , \_ -> Expect.equal ( Nothing, "hello", Nothing ) ( off.dmKeyHold, off.composer, off.composerError )
+                        , \_ -> Expect.equal [] (List.filter (String.contains "PRIVMSG") (sentLines offOuts))
+                        , \_ -> Expect.equal [ "PRIVMSG bob hello\u{000D}\n" ] (sentLines sendOuts)
+                        ]
+                        ()
+            , test "turning it on while a DM is open asks for that peer's key at once" <|
+                \_ ->
+                    let
+                        opened =
+                            Tuple.first (update (ChannelSelect "bob") { blank | nowMs = 1000 })
+
+                        ( off, _ ) =
+                            update (AppearanceSetPref { key = "e2eeDms", value = "false" }) opened
+
+                        ( _, onOuts ) =
+                            update (AppearanceSetPref { key = "e2eeDms", value = "true" }) off
+                    in
+                    Expect.equal True (List.any (String.startsWith "METADATA bob GET ocean.dm-key") (sentLines onOuts))
             , test "turning it on warns when plaintext DMs are still queued" <|
                 \_ ->
                     let

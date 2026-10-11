@@ -538,7 +538,7 @@ transferCards model =
         [ div [ class "pref-group-head" ]
             [ h3 [ class "pref-label", id "pref-vault-portable-title" ] [ text "Portable vault" ] ]
         , p [ class "pref-desc" ]
-            [ text "Export or merge the local message history of the account you're signed in as. Passwords, session tokens and decrypted DM text are never exported." ]
+            [ text "Export or merge the local message history this browser keeps for your current sign-in. Passwords, session tokens and decrypted DM text are never exported." ]
         , div [ class "pref-actions" ]
             [ button
                 [ type_ "button"
@@ -561,7 +561,7 @@ transferCards model =
             div [ class "pref-confirm gap-review", attribute "role" "group", attribute "aria-label" "Review export", attribute "data-testid" "pref-export-review" ]
                 [ strong [ class "gap-review-title" ] [ text "Before you download" ]
                 , ul [ class "gap-review-facts" ]
-                    [ li [] [ text "Readable message text for every room and DM saved in this browser for this account." ]
+                    [ li [] [ text "Readable message text for every room and DM saved in this browser under your current sign-in." ]
                     , li [] [ text "Encrypted DMs stay encrypted. Passwords and session tokens are never included." ]
                     , li [] [ text "Anyone with the file can read it — keep it private." ]
                     ]
@@ -584,7 +584,7 @@ transferCards model =
 
                           else
                             li [] [ text ("Exported " ++ String.left 10 review.exportedAt) ]
-                        , li [] [ text "Merged into this account's local history in this browser. Messages already here are kept." ]
+                        , li [] [ text "Merged into the local history this browser keeps for your current sign-in. Messages already here are kept." ]
                         ]
                     , div [ class "pref-actions" ]
                         [ button [ type_ "button", class "pref-reset gap-btn--primary", attribute "data-testid" "pref-import-confirm", onClick (gap ImportConfirm) ] [ text "Import" ]
