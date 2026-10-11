@@ -44,6 +44,7 @@ import Set
 import Stats
 import Stewardship
 import Time
+import View.Chanserv -- v3/gap-chanserv
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
@@ -109,13 +110,16 @@ roomSettingsSheet model =
                 , contextLine ctx
                 , topicSection model ctx room
                 , notifySection model room
+                , View.Chanserv.paceSection model ctx room -- v3/gap-chanserv
                 , View.Organize.roomSettingsSection model room.name -- v3/gap-organize
                 , details [ class "rset-advanced" ]
                     [ summary [] [ text "Advanced" ]
-                    , p [ class "rset-hint" ] [ text "Room rules, roles, insights, and integrations. Everyday alerts stay above." ]
+                    , p [ class "rset-hint" ] [ text "Room rules, roles, registration, insights, and integrations. Everyday alerts stay above." ]
                     , rulesSection model ctx room
+                    , View.Chanserv.listsSection model ctx room -- v3/gap-chanserv
                     , retentionSection model ctx room
                     , rolesSection model ctx room
+                    , View.Chanserv.registrationSection model ctx room -- v3/gap-chanserv
                     , encryptionSection model ctx room
                     , historySection model ctx room
                     , sectionWith "insights" "Public insights" [ insightsStrip model room.name ]
@@ -369,6 +373,7 @@ rulesSection model ctx room =
                 , p [ id "chset-limit-hint", class "rset-hint" ] [ text "Maximum people allowed. Leave blank to remove." ]
                 , applyButton "chset-limit-apply" "Apply limit" (not ctx.connected)
                 ]
+            , View.Chanserv.moreRules model ctx room -- v3/gap-chanserv
             ]
 
 

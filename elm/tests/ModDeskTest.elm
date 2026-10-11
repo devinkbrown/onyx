@@ -12,7 +12,9 @@ import EventReplay
 import Expect
 import Html
 import Html.Attributes as Attr
+import OperConsole
 import OperDesk
+import OperReply
 import Prefs
 import Set
 import Test exposing (Test, describe, test)
@@ -25,6 +27,16 @@ import View
 operModel : Model
 operModel =
     { blank | connection = Live, ourNick = "root", isOper = True, operDeskOpen = True }
+
+
+{-| v3/gap-oper: the desk is tabbed; the controls below live in Network. -}
+onTab : OperReply.Section -> Model -> Model
+onTab section model =
+    let
+        console =
+            model.operConsole
+    in
+    { model | operConsole = { console | tab = section } }
 
 
 run : List Msg -> Model -> ( Model, List Outbound )
@@ -381,14 +393,14 @@ suite =
             , test "offline disables the reads and shows the reconnect note" <|
                 \_ ->
                     Expect.all
-                        [ \_ -> query { operModel | connection = Offline } |> Query.find [ testId "oper-desk-privs" ] |> Query.has [ Selector.disabled True ]
+                        [ \_ -> query (onTab OperReply.Network { operModel | connection = Offline }) |> Query.find [ testId "oper-desk-privs" ] |> Query.has [ Selector.disabled True ]
                         , \_ -> query { operModel | connection = Offline } |> Query.findAll [ testId "oper-desk-offline" ] |> Query.count (Expect.equal 1)
                         , \_ -> query operModel |> Query.findAll [ testId "oper-desk-offline" ] |> Query.count (Expect.equal 0)
                         ]
                         ()
             , test "the disconnect submit stays disabled without nick and reason" <|
                 \_ ->
-                    query operModel
+                    query (onTab OperReply.Network operModel)
                         |> Query.find [ testId "oper-desk-kill-submit" ]
                         |> Query.has [ Selector.disabled True ]
             ]

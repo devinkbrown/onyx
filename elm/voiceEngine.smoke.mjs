@@ -291,3 +291,87 @@ test("recovery: capture lost under a live call rejoins with fresh capture", asyn
   await new Promise((r) => setTimeout(r, 500));
   assert.equal(h.log.filter((e) => e[0] === "join").length, joinsBefore + 1);
 });
+
+/* v3/rx-calls — media failures are never silent. */
+async function joinedHarness() {
+  const h = harness();
+  h.adapter.receiveLine(":node.test 001 ana :Welcome");
+  h.adapter.receiveLine(":node.test 900 ana ana!u@h ana :You are now logged in");
+  const p = h.adapter.joinVoice("#c", {});
+  await tick(); await tick();
+  serverConfirmsEnroll(h);
+  await p;
+  return h;
+}
+
+test("media errors: classified words, in-call errors ride the live snapshot", async () => {
+  const { classifyMediaError } = await import(pathToFileURL(outFile).href);
+  assert.equal(classifyMediaError("Codec unavailable — audio capture disabled"), "codec");
+  assert.equal(classifyMediaError("You were removed from voice by mara"), "removed");
+  assert.equal(classifyMediaError("Media request timed out"), "timeout");
+  assert.equal(classifyMediaError("Video encode worker crashed"), "encoder");
+  assert.equal(classifyMediaError("Voice join failed: x"), null, "join failures have the failed banner");
+  assert.equal(classifyMediaError("Screen share failed: x"), null, "share failures have screenError");
+  assert.equal(classifyMediaError("something odd"), "media");
+
+  const h = await joinedHarness();
+  const cb = h.fake.engine._cb();
+  cb.onError("something odd");
+  assert.deepEqual(h.events.filter((e) => e.local && e.local.errorKind).map((e) => e.local.errorKind), ["media"]);
+  /* a removal ends the call: a follow-up idle carries the reason */
+  cb.onCallState("idle", "", null);
+  cb.onError("You were removed from voice by mara");
+  const removed = h.events.find((e) => e.state === "idle" && e.errorKind === "removed");
+  assert.ok(removed, "removed idle snapshot");
+  assert.match(removed.mediaError, /removed from voice by mara/);
+});
+
+test("decode failures are announced once a minute per peer; key changes are announced", async () => {
+  const h = await joinedHarness();
+  const cb = h.fake.engine._cb();
+  cb.onDecodeError("ben", "voice", new Error("bad frame"));
+  cb.onDecodeError("BEN", "voice", new Error("bad frame"));
+  cb.onDecodeError("cy", "video", new Error("bad frame"));
+  const decodes = h.events.filter((e) => e.local && e.local.errorKind === "decode").map((e) => [e.local.errorPeer, e.local.errorMedia]);
+  assert.deepEqual(decodes, [["ben", "voice"], ["cy", "video"]]);
+  h.adapter.peerKeyChanged("ben");
+  assert.ok(h.events.some((e) => e.local && e.local.errorKind === "peer_key" && e.local.errorPeer === "ben"));
+});
+
+test("Leave during the join (capture / enrollment) cancels it: no engine join, AbortError", async () => {
+  const h = harness();
+  h.adapter.receiveLine(":node.test 001 ana :Welcome");
+  h.adapter.receiveLine(":node.test 900 ana ana!u@h ana :You are now logged in");
+  const p = h.adapter.joinVoice("#c", {});
+  await tick(); await tick();
+  h.adapter.leaveRoom("#c");
+  serverConfirmsEnroll(h);
+  await assert.rejects(p, (e) => e.name === "AbortError");
+  assert.ok(!h.log.some((e) => e[0] === "join"), "the engine never joined");
+  /* the next join works normally */
+  const again = h.adapter.joinVoice("#c", {});
+  await again;
+  assert.ok(h.log.some((e) => e[0] === "join"));
+});
+
+test("a key the server already confirmed (the Elm sign-in enrollment) is not re-added; forged notices do not count", async () => {
+  const h = harness();
+  h.adapter.receiveLine(":node.test 001 ana :Welcome");
+  h.adapter.receiveLine(":node.test 900 ana ana!u@h ana :You are now logged in");
+  /* a user-originated NOTICE never counts as the server's confirmation */
+  h.adapter.receiveLine(":mallory!m@h NOTICE ana :IDENTITY ADDED label=onyx-0011223344556677");
+  const first = h.adapter.joinVoice("#c", {});
+  await tick(); await tick();
+  assert.equal(h.lines.filter((l) => l.startsWith("IDENTITY ADD ")).length, 1, "forged notice ignored: the adapter enrolls itself");
+  serverConfirmsEnroll(h);
+  await first;
+
+  const g = harness();
+  g.adapter.receiveLine(":node.test 001 ana :Welcome");
+  g.adapter.receiveLine(":node.test 900 ana ana!u@h ana :You are now logged in");
+  /* Elm enrolled the same device key at the end of the welcome burst */
+  g.adapter.receiveLine(":node.test NOTICE ana :IDENTITY ADDED label=onyx-0011223344556677");
+  await g.adapter.joinVoice("#c", {});
+  assert.equal(g.lines.filter((l) => l.startsWith("IDENTITY ADD ")).length, 0, "no second ADD round trip");
+  assert.ok(g.log.some((e) => e[0] === "join"));
+});

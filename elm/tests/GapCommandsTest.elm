@@ -864,7 +864,9 @@ paletteSuite =
                     , \_ -> Expect.equal True (List.member (PushUrl "/appearance") (outs "Open Theme Studio"))
                     , \_ -> Expect.equal True (model "Scheduled messages").showScheduledMessages
                     , \_ -> Expect.equal True (List.member (ClipboardCopy { text = "https://eshmaki.me/app/?join=%23c", tag = "room-link:#c" }) (outs "Copy room link"))
-                    , \_ -> Expect.equal True (List.member (VoiceJoin { channel = "#c", video = False }) (outs "Start voice call"))
+                    -- v3/rx-calls: calls need an account (a guest is offered one, nothing is sent)
+                    , \_ -> Expect.equal True (List.member (VoiceJoin { channel = "#c", video = False }) (Tuple.second (runTitle "Start voice call" (openPalette { twoRooms | accountName = Just "kai" }))))
+                    , \_ -> Expect.equal False (List.member (VoiceJoin { channel = "#c", video = False }) (outs "Start voice call"))
                     , \_ -> Expect.equal True (Set.member "#c" (model "Star #c").starredChannels)
                     , \_ -> Expect.equal "none" (notifyLevel (model "Mute #c") "#c")
                     , \_ -> Expect.equal True (List.member "PART #c\u{000D}\n" (wire (outs "Leave #c")))

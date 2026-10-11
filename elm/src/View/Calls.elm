@@ -7,16 +7,21 @@ engine bridge, which lands with the engine itself).
 Hard rules, mirroring the oracle:
 
   - Opening this hub never joins, accepts, starts, or otherwise mutates
-    a call. The only controls are "Choose a room" (reveals the rail)
-    and "Return to call" (navigates, voice untouched).
+    a call. "Choose a room" reveals the rail and "Return to call"
+    navigates (voice untouched); an idle hub with an open room offers
+    an explicit "Join call in #room" (and video only while the engine
+    reports a camera).
+  - v3/rx-calls: calls need an account, so a guest gets the "Sign in to
+    join calls" card instead of any join control.
   - Ringing and provisional states are never labeled established.
-  - No join / accept / start control exists for any presentation.
+  - No accept / start control exists for any presentation.
   - The last-call outcome renders only while idle; a live call always
     wins over history, and the hub never invents it.
 
 -}
 
 import App exposing (Model, Msg(..))
+import CallUi -- v3/rx-calls
 import Html exposing (Html, button, div, h1, header, main_, p, span, strong, text)
 import Html.Attributes exposing (attribute, class)
 import Html.Events exposing (onClick)
@@ -156,6 +161,28 @@ actionNote presentation canReturn =
         "Choose a room to see its call controls and live status."
 
 
+{-| v3/rx-calls: "Join with video" only where the engine offers a
+camera (video is switched off on the live network). -}
+joinButtons : Bool -> String -> Html Msg
+joinButtons camera where_ =
+    div [ class "onyx-calls-join" ]
+        [ button
+            [ class "onyx-calls-join-voice"
+            , onClick (CallJoin { channel = where_, video = False })
+            ]
+            [ text ("Join call in " ++ where_) ]
+        , if camera then
+            button
+                [ class "onyx-calls-join-video"
+                , onClick (CallJoin { channel = where_, video = True })
+                ]
+                [ text ("Join with video in " ++ where_) ]
+
+          else
+            text ""
+        ]
+
+
 {-| The hub surface. `canReturn` needs a provisional-or-established
 call plus a target; otherwise the primary button reveals the rooms.
 An idle hub with an open conversation offers voice/video join (the
@@ -242,23 +269,23 @@ callsHub model =
                     ]
                     [ text "Choose a room" ]
         , case ( presentation, activeChannel ) of
-            ( HubIdle, Just where_ ) ->
-                div [ class "onyx-calls-join" ]
-                    [ button
-                        [ class "onyx-calls-join-voice"
-                        , onClick (CallJoin { channel = where_, video = False })
-                        ]
-                        [ text ("Join call in " ++ where_) ]
-                    , if model.callLocal.cameraSupported then
-                        button
-                            [ class "onyx-calls-join-video"
-                            , onClick (CallJoin { channel = where_, video = True })
-                            ]
-                            [ text ("Join with video in " ++ where_) ]
+            -- v3/rx-calls: a guest is offered an account first
+            ( HubIdle, _ ) ->
+                if CallUi.needsAccount model then
+                    View.CallPresence.guestCard model
+                        { title = "Sign in to join calls"
+                        , faces = []
+                        , testid = "calls-hub-guest"
+                        , dismiss = Nothing
+                        }
 
-                      else
-                        text ""
-                    ]
+                else
+                    case activeChannel of
+                        Just where_ ->
+                            joinButtons model.callLocal.cameraSupported where_
+
+                        Nothing ->
+                            text ""
 
             _ ->
                 text ""

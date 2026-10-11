@@ -33,13 +33,16 @@ single IRC line is a refusal with desk-renderable errors, and nothing
 is sent. Summaries mark network-wide or session-ending actions
 `destructive`, mirroring the oracle.
 
-Raw `EVENT` lines only re-dispatch the MEDIA and WEBAUTHN planes;
-category bodies and OBSERVE pushes via raw `EVENT` are ignored exactly
-like the oracle (its §11 checklist box stays unchecked — the oper
-NOTICE stream lives in `EventReplay`).
+Raw `EVENT` lines re-dispatch the MEDIA and WEBAUTHN planes. The oracle
+ignored category bodies and OBSERVE pushes (its §11 checklist box stays
+unchecked); v3/gap-oper folds them into the operator desk's live feed
+(`OperFeed`), which only an operator session keeps. The `EVENT REPLAY
+JSON` NOTICE stream still lives in `EventReplay`.
+
 
 -}
 
+import OperFeed
 import Wire
 
 
@@ -690,6 +693,7 @@ type EventRedispatch
     = EventIgnored
     | EventAsNote { params : List String }
     | EventAsPasskey { params : List String }
+    | EventAsFeed OperFeed.Draft
 
 
 foldEventLine : Wire.IrcMessage -> EventRedispatch
@@ -714,7 +718,15 @@ foldEventLine message =
                 EventAsPasskey { params = List.drop 1 message.params }
 
             _ ->
-                EventIgnored
+                -- v3/gap-oper: the operator planes (category events, OBSERVE
+                -- pushes, announces, AUDIT rows) feed the desk's live feed.
+                case OperFeed.parseEvent message of
+                    Just draft ->
+                        EventAsFeed draft
+
+                    Nothing ->
+                        EventIgnored
+
 
 
 paramAt : Int -> List String -> String

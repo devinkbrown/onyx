@@ -76,7 +76,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | # | Surface | Oracle | Size |
 |---|---|---|---|
 | 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | **done** (v3/frame + v3/roomsettings: privacy glyph, expandable topic, facepile, notify strip + invite / DM safety trigger in the header, Room settings in More; heatline, export, mark read and room care in More still todo) |
-| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | **done** (v3/roomsettings; invite builder, export, hide/leave and topic-draft durability not in the sheet; webhooks linked to Room care) |
+| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | **done** (v3/roomsettings; invite builder, export, hide/leave and topic-draft durability not in the sheet; webhooks linked to Room care; v3/gap-chanserv adds welcome message + slow mode, "More rules" (every channel flag, forward, join throttle, timed rules), mutes/exceptions/invite passes, and registered-room services: register, info, locked rules, account access, auto-kick, successor, "Your rooms") |
 | 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | **done** (`v3/notify`: room All/@/Mute strip in the thread header + Notifications sheet with desktop/sound/DND; quiet-hours schedule + calm presets narrowed out — no `App` state) |
 | 3.4 | Invite friends share sheet | `RoomInviteShare` | S |
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M · **done** (v3/roster: Filter members field + Escape clear, header count, avatar + presence dot, role/away in words, per-row Message + double-click DM; no windowing, loading skeleton, or modal/mobile copy) |
@@ -107,6 +107,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 5.1 | Moderation cockpit: room desk, invite form, current-room header (move bans out of the main column) | `ModerationCockpit` | S · **done** (v3/moddesk) |
 | 5.2 | Oper desk (broadcast / kill / rehash) + event console with filters | `OperDesk`, `OperEventConsole` | M · **done** (v3/moddesk) |
+| 5.3 | Operator console: live Event Spine feed (filter/pause/clear, rate-limited), network bans (WARD/K/D/X-lines + tests), silencing (SHUN/GAG/QUARANTINE), abuse insight (ABUSE/CLONES/SESSIONS), appeals (user + oper side), content controls (FILTER/SPAMTRAP/HOLD/POLICY/CHALLENGE), accounts admin, node controls + read-only mesh reports + audit trail | server `oper_cmd.zig` / `server.zig` (no oracle) | L · **done** (v3/gap-oper); remaining: force actions, integrations, GRANT/REVOKE, AUDIT PROOF, VHOST approvals |
 
 ## Phase 6 — Voice and video
 

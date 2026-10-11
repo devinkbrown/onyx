@@ -3594,8 +3594,10 @@ suite =
                             Query.find [ Selector.class "onyx-toast--danger" ] q
                                 |> Query.has [ Selector.text "Send failed", Selector.text "The wire dropped it." ]
                         , \_ ->
+                            -- v3/rx-shell: the dismiss glyph is a mask icon, never a font character
                             Query.find [ Selector.attribute (Attr.attribute "aria-label" "Dismiss Send failed") ] q
-                                |> Query.has [ Selector.text "×" ]
+                                |> Query.find [ Selector.class "onyx-shi" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "data-icon" "close") ]
                         ]
                         ()
             , test "undo row offers an Undo control" <|
@@ -3782,12 +3784,18 @@ suite =
                 \_ ->
                     let
                         q =
+                            query { blank | callsOpen = True, accountName = Just "me" }
+
+                        -- v3/rx-calls: a guest gets the sign-in card instead
+                        guest =
                             query { blank | callsOpen = True }
                     in
                     Expect.all
                         [ \_ -> Query.has [ Selector.text "Talk where the conversation already lives." ] q
                         , \_ -> Query.has [ Selector.text "Choose a room" ] q
                         , \_ -> Query.find [ Selector.class "onyx-calls" ] q |> Query.findAll [ Selector.tag "button" ] |> Query.count (Expect.equal 1)
+                        , \_ -> guest |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "calls-hub-guest") ] |> Query.has [ Selector.text "Sign in to join calls" ]
+                        , \_ -> guest |> Query.findAll [ Selector.tag "button", Selector.containing [ Selector.text "Join call" ] ] |> Query.count (Expect.equal 0)
                         ]
                         ()
             , test "incoming ringing never claims established" <|
@@ -3860,7 +3868,7 @@ suite =
                             blank.callLocal
 
                         q =
-                            query { blank | callsOpen = True, activeChannel = Just "#room", callLocal = { local | cameraSupported = True } }
+                            query { blank | callsOpen = True, activeChannel = Just "#room", callLocal = { local | cameraSupported = True }, accountName = Just "me" }
                     in
                     Expect.all
                         [ \_ ->

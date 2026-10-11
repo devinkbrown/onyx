@@ -207,24 +207,32 @@ voiceStage model =
         , attribute "data-motion" (motionWord model)
         , attribute "data-testid" "voice-stage"
         , attribute "data-reconnecting" (boolAttr (View.CallDock.reconnectingNow model)) -- v3/calls-c6
+        , attribute "data-count" (String.fromInt count) -- v3/rx-calls
         ]
-        [ p
-            [ class "onyx-call-stage-status"
-            , attribute "role" "status"
-            , attribute "aria-live" "polite"
-            , attribute "data-testid" "voice-stage-state"
-            ]
-            -- v3/calls-c6: derived reconnecting state (spec §2.14)
-            (if View.CallDock.reconnectingNow model then
-                [ span [ class "onyx-call-pip", attribute "data-state" "provisional" ] []
-                , text "Reconnecting…"
+        [ -- v3/rx-calls: one head row — the live status on the left, the
+          -- call facts (where / timer / people) and the security chip on
+          -- the right — so the bar below is controls only.
+          div [ class "onyx-call-stage-head" ]
+            [ headFaces everyone
+            , p
+                [ class "onyx-call-stage-status"
+                , attribute "role" "status"
+                , attribute "aria-live" "polite"
+                , attribute "data-testid" "voice-stage-state"
                 ]
+                -- v3/calls-c6: derived reconnecting state (spec §2.14)
+                (if View.CallDock.reconnectingNow model then
+                    [ span [ class "onyx-call-pip", attribute "data-state" "provisional" ] []
+                    , span [ class "onyx-call-stage-status-text" ] [ text "Reconnecting…" ]
+                    ]
 
-             else
-                [ span [ class "onyx-call-pip", attribute "data-state" (presentationPip presentation) ] []
-                , text statusText
-                ]
-            )
+                 else
+                    [ span [ class "onyx-call-pip", attribute "data-state" (presentationPip presentation) ] []
+                    , span [ class "onyx-call-stage-status-text" ] [ text statusText ]
+                    ]
+                )
+            , callMeta model
+            ]
         , View.CallDock.lostBanner model -- v3/calls-c6
         , if videoMode then
             View.CallVideo.stageBody model
@@ -257,6 +265,13 @@ voiceStage model =
                         )
                     ]
                     (List.map personCell everyone)
+        -- v3/rx-calls: the join is in flight (capture + device key)
+        , if presentation == HubProvisional && not (View.CallDock.reconnectingNow model) then
+            p [ class "onyx-call-joining", attribute "data-testid" "call-joining-hint" ]
+                [ text "Allow the microphone if your browser asks. Setting up encryption can take a few seconds." ]
+
+          else
+            text ""
         , View.StageMode.audienceLine model -- v3/calls-c11
         -- v3/calls-c8: reaction chips + live captions, docked above
         -- the bar (never over a control)
@@ -265,6 +280,37 @@ voiceStage model =
         , View.CallVideo.qualityPrompt model
         , controlBar model
         ]
+
+
+{-| v3/rx-calls — who is here, at a glance, for short screens where
+the people row folds into the head (the full row stays in the
+accessibility tree). Decorative: names ride the cells' labels.
+-}
+headFaces : List CallUi.Person -> Html Msg
+headFaces everyone =
+    let
+        extra =
+            List.length everyone - 5
+    in
+    span [ class "onyx-call-head-faces", attribute "aria-hidden" "true" ]
+        (List.map
+            (\p_ ->
+                span
+                    [ class "onyx-call-avatar onyx-call-avatar-sm"
+                    , attribute "data-speaking" (boolAttr p_.speaking)
+                    , attribute "data-hand" (boolAttr p_.hand)
+                    , title p_.name
+                    ]
+                    [ text (initialOf p_.name) ]
+            )
+            (List.take 5 everyone)
+            ++ (if extra > 0 then
+                    [ span [ class "onyx-call-head-more" ] [ text ("+" ++ String.fromInt extra) ] ]
+
+                else
+                    []
+               )
+        )
 
 
 initialOf : String -> String
@@ -321,11 +367,12 @@ personCell person =
         ]
 
 
-{-| In-call control bar v1 (§2.4). Rendered for ringing and in-call
-lifecycles only.
+{-| v3/rx-calls — the head row's right side: where (hub only; the
+room header already names it), the timer, the people count, the
+push-to-talk hint, the connection pip and the security chip.
 -}
-controlBar : Model -> Html Msg
-controlBar model =
+callMeta : Model -> Html Msg
+callMeta model =
     let
         presentation =
             Media.classifyHubPresentation model.calls.lifecycle model.calls.startedAt
@@ -336,27 +383,55 @@ controlBar model =
         count =
             List.length (people model)
 
+        timer =
+            if View.CallDock.reconnectingNow model then
+                -- v3/calls-c6: the clock is unknown while reconnecting
+                span [ class "onyx-call-timer", attribute "data-testid" "call-timer" ] [ text "—" ]
+
+            else
+                case ( presentation, model.calls.startedAt ) of
+                    ( HubEstablished, Just started ) ->
+                        let
+                            d =
+                                CallUi.formatDuration (round model.nowMs - started)
+                        in
+                        span
+                            [ class "onyx-call-timer"
+                            , attribute "role" "timer"
+                            , attribute "aria-label" d.aria
+                            , attribute "data-testid" "call-timer"
+                            ]
+                            [ text d.text ]
+
+                    _ ->
+                        text ""
+    in
+    if presentation == HubIdle then
+        text ""
+
+    else
+        div [ class "onyx-call-meta", attribute "data-testid" "call-meta" ]
+            [ span [ class "onyx-call-where" ] [ text where_ ]
+            , timer
+            , span [ class "onyx-call-people-count" ] [ text ("· " ++ CallUi.peopleLabel count) ]
+            , View.VoiceSettings.pttHint model -- v3/calls-c8
+            , View.CallVideo.qualityPip model
+            , securityChip model
+            ]
+
+
+{-| In-call control bar v1 (§2.4). Rendered for ringing and in-call
+lifecycles only.
+-}
+controlBar : Model -> Html Msg
+controlBar model =
+    let
+        presentation =
+            Media.classifyHubPresentation model.calls.lifecycle model.calls.startedAt
+
         -- v3/calls-c6: every toggle but Leave waits out a reconnect
         reconnecting =
             View.CallDock.reconnectingNow model
-
-        timer =
-            case ( presentation, model.calls.startedAt ) of
-                ( HubEstablished, Just started ) ->
-                    let
-                        d =
-                            CallUi.formatDuration (round model.nowMs - started)
-                    in
-                    span
-                        [ class "onyx-call-timer"
-                        , attribute "role" "timer"
-                        , attribute "aria-label" d.aria
-                        , attribute "data-testid" "call-timer"
-                        ]
-                        [ text d.text ]
-
-                _ ->
-                    text ""
 
         muted =
             model.callSelfMuted
@@ -383,18 +458,7 @@ controlBar model =
             , attribute "aria-label" "Voice call controls"
             , attribute "data-testid" "voice-bar"
             ]
-            [ div [ class "onyx-call-bar-left" ]
-                [ span [ class "onyx-call-where" ] [ text where_ ]
-                , if reconnecting then
-                    -- v3/calls-c6: the clock is unknown while reconnecting
-                    span [ class "onyx-call-timer", attribute "data-testid" "call-timer" ] [ text "—" ]
-
-                  else
-                    timer
-                , span [ class "onyx-call-people-count" ] [ text ("· " ++ CallUi.peopleLabel count) ]
-                , View.VoiceSettings.pttHint model -- v3/calls-c8
-                ]
-            , div [ class "onyx-call-bar-center", attribute "role" "group", attribute "aria-label" "Call controls" ]
+            [ div [ class "onyx-call-bar-center", attribute "role" "group", attribute "aria-label" "Call controls" ]
               <|
                 -- v3/calls-c11: the stage audience gets Hand / Leave stage
                 Maybe.withDefault
@@ -454,17 +518,30 @@ controlBar model =
                         , onClick CallMoreToggle
                         ]
                         [ callIcon "more", span [ class "onyx-cbtn-cap" ] [ text "More" ] ]
-                    , if model.callMoreOpen then
-                        moreTools model
-
-                      else
-                        text ""
                     ]
                 , View.StageMode.endStageButton model -- v3/calls-c11
                 , leaveButton
                 ]
                 (View.StageMode.audienceBarCenter model leaveButton)
-            , div [ class "onyx-call-bar-right" ] [ securityChip model, View.CallVideo.qualityPip model ]
+            -- v3/rx-calls: More is a row of tools under the controls on
+            -- wide stages and a bottom sheet on phones / short screens;
+            -- tap or click outside closes it (the phone scrim dims).
+            , if model.callMoreOpen then
+                div
+                    [ class "onyx-call-more-scrim"
+                    , attribute "data-testid" "call-more-scrim"
+                    , attribute "aria-hidden" "true"
+                    , onClick CallMoreClose
+                    ]
+                    []
+
+              else
+                text ""
+            , if model.callMoreOpen then
+                moreTools model
+
+              else
+                text ""
             , View.CallOverlays.reactMenu model -- v3/calls-c8
             -- v3/calls-c4
             , span
@@ -608,6 +685,18 @@ moreTools model =
             ]
             "expand"
             (CallMedia.stageSizeLabel model.callStageSize)
+        -- v3/rx-calls: invite with the room link (rooms only)
+        , case model.calls.channel of
+            Just room ->
+                moreItem
+                    [ attribute "data-testid" "call-invite"
+                    , onClick (InviteShareOpen room)
+                    ]
+                    "link"
+                    "Invite people"
+
+            Nothing ->
+                text ""
         -- v3/calls-c8: the live settings entry (was a disabled stub)
         , View.CallOverlays.settingsItem
         ]

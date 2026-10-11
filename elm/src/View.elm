@@ -10,11 +10,15 @@ weight and size only. No gradients, no glow, no glass, no emoji icons.
 
 Layout (v3/frame): one CSS grid — nav rail | collection sidebar |
 conversation column (room header, transcript, composer) | context
-rail — under a global top bar; one column + bottom nav under 768px.
+rail — under a global top bar; one column + bottom nav under 600px
+(v3/rx-shell; was 768px — from 600px the frame keeps the list beside
+the conversation).
 
 -}
 
 import App exposing (Model, Msg, inviteCard)
+import Dict
+import Sidebar
 import Invite exposing (inviteTitle)
 import Browser
 import Html exposing (Html, div, main_, text)
@@ -43,11 +47,12 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
+import View.Appeal
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
 import View.Trust exposing (trustPageForRoute)
-import View.Rail exposing (rail)
+import View.Rail exposing (rail, railMenu)
 import View.NewMessage exposing (newMessageSheet)
 import View.Roadmap
 import View.Roster exposing (roster)
@@ -75,8 +80,10 @@ import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.AuthGate -- v3/gap-auth
 -- v3/gap-organize
 import View.Attention
 import View.Organize
@@ -136,7 +143,13 @@ view model =
                                 View.Roadmap.route model
 
                             _ ->
-                                if App.connectGateVisible model then
+                                -- v3/gap-auth: an auth step (two-step code,
+                                -- challenge question, passkey, password
+                                -- reset) takes over the gate.
+                                if View.AuthGate.takesOver model then
+                                    [ View.AuthGate.gate model ]
+
+                                else if App.connectGateVisible model then
                                     [ connectGate model ]
 
                                 else
@@ -200,12 +213,36 @@ documentTitle model =
                             "Onyx roadmap — rooms, calls, catch-up"
 
                         _ ->
-                            case model.activeChannel of
-                                Just name ->
-                                    name ++ " — Onyx"
+                            waitingPrefix model
+                                ++ (case model.activeChannel of
+                                        Just name ->
+                                            name ++ " — Onyx"
 
-                                Nothing ->
-                                    "Onyx"
+                                        Nothing ->
+                                            "Onyx"
+                                   )
+
+
+{-| v3/rx-shell — the tab says how many other conversations are
+waiting (`(3) #lounge — Onyx`), so the total reads even when the
+window is a background tab. -}
+waitingPrefix : Model -> String
+waitingPrefix model =
+    let
+        active =
+            Maybe.map String.toLower model.activeChannel
+
+        waiting =
+            model.channels
+                |> Dict.values
+                |> List.filter (\c -> Sidebar.hasAttention c && Just (String.toLower c.name) /= active)
+                |> List.length
+    in
+    if waiting > 0 then
+        "(" ++ String.fromInt waiting ++ ") "
+
+    else
+        ""
 
 
 {-| v3/frame — the ONE app frame grid (see `.onyx-frame` in app.css):
@@ -213,10 +250,10 @@ documentTitle model =
     nav rail | topbar (global)                                  |
              | notices (reconnect banner, search, guest chip)   |
              | collection sidebar | conversation | context rail |
-    mobile bottom nav (under 768px only)
+    mobile bottom nav (under 600px only)
 
 The conversation column stacks the room header, the transcript pane
-and the composer. Under 768px the grid collapses to one column: the
+and the composer. Under 600px the grid collapses to one column: the
 sidebar replaces the conversation while the Rooms / Messages drawer is
 open (`data-nav-drawer`), the context rail hides, and the bottom nav
 takes the last row —
@@ -224,6 +261,13 @@ except inside a conversation (`data-convo`), which is a pushed page:
 the global bar and the bottom nav step aside and the room header's
 back control returns to the list. Every overlay (sheets, palette, toasts, the You
 hub) mounts in `.onyx-overlays`, outside the grid flow.
+
+v3/rx-shell — the same grid on every aspect ratio (css/rx-shell.css):
+600–767px is a compact two-pane (foldables open, 200% zoom); windows
+under 520px tall fold the global bar into the sidebar head so it
+shares one row with the room header; wide screens keep the transcript
+at a ~72ch measure and, past 1960px, the frame stops growing inside a
+calm surround.
 -}
 appFrame : Model -> Html Msg
 appFrame model =
@@ -266,6 +310,7 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
@@ -337,6 +382,7 @@ overlays model =
         -- v3/roomsettings
         , View.RoomSettings.roomSettingsSheet model
         , operSheet model
+        , View.Appeal.appealSheet model -- v3/gap-oper
         , personSafetySheet model
         , newMessageSheet model
         , inviteShareSheet model -- v3/dmsafety
@@ -355,7 +401,8 @@ overlays model =
         , View.GapShell.leaveConfirm model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
-        -- v3/gap-organize: row menu, folder picker, saved messages; reader exit
+        , railMenu model -- v3/rx-shell: the sidebar row menu
+        -- v3/gap-organize: folder picker, saved messages; reader exit
         , View.Organize.sheets model
         , View.Attention.readerPill model
         , View.UserModes.memoSheet model -- v3/gap-usermodes

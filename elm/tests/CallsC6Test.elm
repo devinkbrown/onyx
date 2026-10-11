@@ -92,6 +92,7 @@ base =
         , channels = Dict.fromList [ ( "#harbor", room "#harbor" ), ( "#builds", room "#builds" ) ]
         , activeChannel = Just "#harbor"
         , nowMs = 1000
+        , accountName = Just "odalys" -- v3/rx-calls: calls need an account
     }
 
 
@@ -327,16 +328,19 @@ ringTests =
                     |> Query.fromHtml
                     |> Query.findAll [ Selector.containing [ Selector.text "Accept" ], Selector.tag "button" ]
                     |> Query.count (Expect.equal 0)
-        , test "a DM's More menu offers Call; a room's does not" <|
+        -- v3/rx-calls: the server routes MEDIA to channels only, so a DM
+        -- says so plainly instead of offering a ring that cannot connect.
+        , test "a DM's More menu says direct calls aren't available yet; a room's says nothing" <|
             \_ ->
                 let
                     dm =
                         { base | activeChannel = Just "jun", roomMenuOpen = True }
                 in
                 Expect.all
-                    [ \_ -> query dm |> Query.find [ testid "ribbon-dm-call" ] |> Query.has [ aria "Start voice call with jun", Selector.text "Call" ]
-                    , \_ -> query dm |> Query.find [ testid "ribbon-dm-call" ] |> Event.simulate Event.click |> Event.expect (CallStart "jun")
-                    , \_ -> query { base | roomMenuOpen = True } |> Query.findAll [ testid "ribbon-dm-call" ] |> Query.count (Expect.equal 0)
+                    [ \_ -> query dm |> Query.find [ testid "ribbon-dm-call-unavailable" ] |> Query.has [ Selector.text "Direct calls aren\u{2019}t available yet", Selector.attribute (Attr.attribute "role" "note") ]
+                    , \_ -> query dm |> Query.findAll [ testid "ribbon-dm-call" ] |> Query.count (Expect.equal 0)
+                    , \_ -> query dm |> Query.find [ testid "ribbon-dm-call-unavailable" ] |> Query.findAll [ Selector.tag "button" ] |> Query.count (Expect.equal 0)
+                    , \_ -> query { base | roomMenuOpen = True } |> Query.findAll [ testid "ribbon-dm-call-unavailable" ] |> Query.count (Expect.equal 0)
                     ]
                     ()
         ]

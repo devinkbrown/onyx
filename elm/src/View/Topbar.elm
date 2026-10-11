@@ -47,11 +47,29 @@ topbar model =
         , div [ class "onyx-topbar-global" ]
             (View.ModDesk.operToggle model
                 ++ [ connectionPill model
+                   , composeButton
                    , inbox model
                    , identityChip model
                    ]
             )
         ]
+
+
+{-| v3/rx-shell — New conversation from anywhere in the shell (not only
+the Messages page): a compose glyph beside the inbox on two-pane and
+wide layouts. Phones keep New on the Messages page. -}
+composeButton : Html Msg
+composeButton =
+    button
+        [ type_ "button"
+        , class "onyx-topbar-compose"
+        , attribute "data-testid" "topbar-new-conversation"
+        , attribute "aria-label" "New conversation"
+        , attribute "aria-haspopup" "dialog"
+        , attribute "title" "New conversation"
+        , onClick NewMessageOpen
+        ]
+        [ span [ class "onyx-shi", attribute "data-icon" "compose", attribute "aria-hidden" "true" ] [] ]
 
 
 {-| The phone bar names the page it sits on (Home shows the brand). -}
