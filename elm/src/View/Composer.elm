@@ -124,6 +124,11 @@ composer model =
                  , value model.composer
                  , onInput ComposerInput
                  , preventDefaultOn "keydown" (keyDecoder model)
+
+                 -- v3/gap-convo: where the caret is (emoji lands there)
+                 , on "keyup" gapCaretDecoder
+                 , on "click" gapCaretDecoder
+                 , on "select" gapCaretDecoder
                  , disabled (not ready)
                  , attribute "id" "shell-composer-input"
                  , class "onyx-composer-field"
@@ -985,3 +990,11 @@ gapStagedPrivacy model item =
                             []
                        )
                 )
+
+
+{-| The field's selection after a key-up, click or select. -}
+gapCaretDecoder : Decode.Decoder Msg
+gapCaretDecoder =
+    Decode.map2 (\start end -> App.GapConvoMsg (GapConvo.CaretMoved { start = start, end = end }))
+        (Decode.at [ "target", "selectionStart" ] Decode.int)
+        (Decode.at [ "target", "selectionEnd" ] Decode.int)

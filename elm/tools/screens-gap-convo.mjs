@@ -22,6 +22,7 @@
  *   gc-menu-keys      arrow keys rove the message menu
  *   gc-ctrlf          Ctrl+F keeps the draft
  *   gc-loading        history in flight: placeholders, not "say hi"
+ *   gc-caret          an emoji lands at the caret, which stays after it
  */
 
 const T = (minAgo) => new Date(Date.now() - minAgo * 60000).toISOString();
@@ -378,6 +379,27 @@ export default {
     await hop(page, 'design');
     ok(!!(await page.$('[data-testid="history-loading"]')), 'placeholders show while history is in flight');
     await h.settle(page, 200);
+  },
+
+  'gc-caret': async (page, h) => {
+    await room(page, h);
+    await page.fill('#shell-composer-input', 'hello world');
+    await page.focus('#shell-composer-input');
+    await page.keyboard.press('Home');
+    for (let i = 0; i < 5; i += 1) await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(200);
+    await page.click('.shell-composer-tool--emoji');
+    await page.waitForTimeout(400);
+    const choice = await page.$('.shell-emoji-choice');
+    ok(!!choice, 'emoji picker open');
+    const glyph = (await choice.textContent()).trim();
+    await choice.click();
+    await page.waitForTimeout(500);
+    const value = await page.inputValue('#shell-composer-input');
+    ok(value === `hello${glyph} world`, `the emoji landed at the caret (got ${JSON.stringify(value)})`);
+    const pos = await page.evaluate(() => document.getElementById('shell-composer-input').selectionStart);
+    ok(pos === 5 + glyph.length, `the cursor sits right after it (got ${pos})`);
+    ok(await page.evaluate(() => document.activeElement && document.activeElement.id === 'shell-composer-input'), 'the field has the keyboard back');
   },
 
   'gc-menu-keys': async (page, h) => {

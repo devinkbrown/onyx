@@ -1,6 +1,7 @@
 module GapConvo exposing
     ( DraftStatus(..)
     , EditOutcome(..)
+    , Caret
     , Landing
     , Msg(..)
     , Out(..)
@@ -19,6 +20,7 @@ module GapConvo exposing
     , editBody
     , editRefOf
     , encodeDrafts
+    , insertAtCaret
     , landingMatches
     , landingRowId
     , maxDraftLength
@@ -513,6 +515,7 @@ type alias State staged =
     , lastDraftSnapshot : List ( String, String )
     , dropActive : Bool
     , revisionsOpen : Maybe String
+    , composerCaret : Maybe Caret
     }
 
 
@@ -530,6 +533,7 @@ blank =
     , lastDraftSnapshot = []
     , dropActive = False
     , revisionsOpen = Nothing
+    , composerCaret = Nothing
     }
 
 
@@ -544,9 +548,51 @@ type Msg
     | CollapsedShowAll
     | RevisionsToggle String
     | OpenHistoryPrefs
+    | CaretMoved Caret
 
 
 type Out
     = DraftsSave { serverUrl : String, identity : String, drafts : Encode.Value }
     | DraftsRequest { serverUrl : String, identity : String }
     | UploadVariant { key : String, index : Int, variant : String }
+    | CaretSet { pos : Int }
+
+
+
+-- CARET
+
+
+{-| The composer's selection as the field last reported it (UTF-16
+offsets, like Elm strings). Elm never reads the DOM, so the field tells
+us on key-up / click / select. -}
+type alias Caret =
+    { start : Int
+    , end : Int
+    }
+
+
+{-| Insert at the selection (replacing it), mirroring the oracle
+`insertTextAtCaret`; a selection that no longer fits the draft (it was
+rewritten since) falls back to the end. `caret` is where the cursor
+belongs afterwards. -}
+insertAtCaret : Maybe Caret -> String -> String -> { text : String, caret : Int }
+insertAtCaret selection insert current =
+    let
+        len =
+            String.length current
+
+        ( start, end ) =
+            case selection of
+                Just sel ->
+                    if sel.start >= 0 && sel.end >= sel.start && sel.end <= len then
+                        ( sel.start, sel.end )
+
+                    else
+                        ( len, len )
+
+                Nothing ->
+                    ( len, len )
+    in
+    { text = String.left start current ++ insert ++ String.dropLeft end current
+    , caret = start + String.length insert
+    }

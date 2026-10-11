@@ -38369,8 +38369,14 @@ updateCore msg model =
                 let
                     inserted =
                         ComposerAssist.insertEmoji glyph model.composer model.composerAssist
+
+                    -- v3/gap-convo: at the caret, not the end of the draft
+                    atCaret =
+                        GapConvo.insertAtCaret model.gapConvo.composerCaret glyph model.composer
                 in
-                ( setComposerDraft { model | composerAssist = inserted.assist } inserted.draft, [] )
+                ( setComposerDraft { model | composerAssist = inserted.assist } atCaret.text
+                , [ GapConvoOut (GapConvo.CaretSet { pos = atCaret.caret }) ]
+                )
 
         AttachPick ->
             -- Attaching mid-edit refuses with the draft kept
@@ -47226,8 +47232,33 @@ gapSettleRefusal msg next =
 
 
 settleStepGapConvo : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
-settleStepGapConvo msg prior ( next, outs ) =
+settleStepGapConvo msg prior ( next0, outs ) =
     let
+        -- The caret the field reported belongs to the text it reported it
+        -- for: a draft rewritten by anything but typing (send, quote,
+        -- restore, room switch) forgets it.
+        next =
+            case msg of
+                ComposerInput _ ->
+                    next0
+
+                GapConvoMsg _ ->
+                    next0
+
+                ComposerEmojiInsert _ ->
+                    next0
+
+                _ ->
+                    if next0.composer /= prior.composer && next0.gapConvo.composerCaret /= Nothing then
+                        let
+                            gc0 =
+                                next0.gapConvo
+                        in
+                        { next0 | gapConvo = { gc0 | composerCaret = Nothing } }
+
+                    else
+                        next0
+
         swapped =
             gapSwapStaged prior next
                 |> gapSettleRefusal msg
@@ -47354,6 +47385,13 @@ updateGapConvo sub model =
 
         GapConvo.DraftsSaved status ->
             ( { model | gapConvo = { gc | draftStatus = GapConvo.draftStatusFromString status } }, [] )
+
+        GapConvo.CaretMoved caret ->
+            if gc.composerCaret == Just caret then
+                ( model, [] )
+
+            else
+                ( { model | gapConvo = { gc | composerCaret = Just caret } }, [] )
 
         GapConvo.DropActive on ->
             if gc.dropActive == on then

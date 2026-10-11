@@ -15,10 +15,15 @@ import App exposing (..)
 import Dict
 import Expect
 import GapConvo
+import Html.Attributes
 import Json.Encode as Encode
 import Labels
 import Set
 import Test exposing (Test, describe, test)
+import Test.Html.Event as Event
+import Test.Html.Query as Query
+import Test.Html.Selector as Selector
+import View.Thread
 
 
 feed : Model -> String -> ( Model, List Outbound )
@@ -620,5 +625,110 @@ suite =
                         , \_ -> Expect.equal Nothing kept.composerError
                         ]
                         ()
+            ]
+        , describe "caret and small copy"
+            [ test "insertAtCaret lands at the selection, replaces a selection, and falls back to the end" <|
+                \_ ->
+                    Expect.equal
+                        [ { text = "hello\u{1F600} world", caret = 7 }
+                        , { text = "hi \u{1F600}s", caret = 5 }
+                        , { text = "hello\u{1F600}", caret = 7 }
+                        , { text = "hello\u{1F600}", caret = 7 }
+                        , { text = "hello\u{1F600}", caret = 7 }
+                        ]
+                        [ GapConvo.insertAtCaret (Just { start = 5, end = 5 }) "\u{1F600}" "hello world"
+                        , GapConvo.insertAtCaret (Just { start = 3, end = 8 }) "\u{1F600}" "hi worlds"
+                        , GapConvo.insertAtCaret Nothing "\u{1F600}" "hello"
+                        , GapConvo.insertAtCaret (Just { start = 9, end = 12 }) "\u{1F600}" "hello"
+                        , GapConvo.insertAtCaret (Just { start = -1, end = 2 }) "\u{1F600}" "hello"
+                        ]
+            , test "an emoji pick goes where the caret was and asks the field to put the cursor after it" <|
+                \_ ->
+                    let
+                        typed =
+                            { owned | composer = "hello world" }
+
+                        moved =
+                            Tuple.first (update (GapConvoMsg (GapConvo.CaretMoved { start = 5, end = 5 })) typed)
+
+                        ( picked, outs ) =
+                            update (ComposerEmojiInsert "\u{1F600}") moved
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal "hello\u{1F600} world" picked.composer
+                        , \_ -> Expect.equal [ GapConvoOut (GapConvo.CaretSet { pos = 7 }) ] outs
+                        ]
+                        ()
+            , test "a draft rewritten by anything but typing forgets the caret; typing keeps it" <|
+                \_ ->
+                    let
+                        typed =
+                            Tuple.first (update (GapConvoMsg (GapConvo.CaretMoved { start = 2, end = 2 })) { owned | composer = "hi" })
+
+                        stillTyping =
+                            Tuple.first (update (ComposerInput "hiy") typed)
+
+                        quoted =
+                            Tuple.first (update (MessageQuote { target = "#c", from = "alice", body = "hey" }) typed)
+                    in
+                    Expect.equal [ Just { start = 2, end = 2 }, Nothing ]
+                        [ stillTyping.gapConvo.composerCaret, quoted.gapConvo.composerCaret ]
+            , test "the draft line speaks the oracle's words" <|
+                \_ ->
+                    Expect.equal
+                        [ Just ( "Saved here", True )
+                        , Just ( "Only on this tab", False )
+                        , Just ( "Saved with limits; full text remains here", False )
+                        , Just ( "Could not save; full text remains here", False )
+                        , Just ( "Only on this tab", False )
+                        , Nothing
+                        ]
+                        (List.map (Maybe.map (\c -> ( c.text, c.saved )))
+                            [ GapConvo.draftStatusCopy { persistable = True, status = GapConvo.DraftSaved }
+                            , GapConvo.draftStatusCopy { persistable = True, status = GapConvo.DraftTabOnly }
+                            , GapConvo.draftStatusCopy { persistable = True, status = GapConvo.DraftLimit }
+                            , GapConvo.draftStatusCopy { persistable = True, status = GapConvo.DraftFailed }
+                            , GapConvo.draftStatusCopy { persistable = False, status = GapConvo.DraftSaved }
+                            , GapConvo.draftStatusCopy { persistable = True, status = GapConvo.DraftUnknown }
+                            ]
+                        )
+            , test "the bridge's status words map to the right state" <|
+                \_ ->
+                    Expect.equal
+                        [ GapConvo.DraftSaved, GapConvo.DraftTabOnly, GapConvo.DraftLimit, GapConvo.DraftFailed, GapConvo.DraftUnknown ]
+                        (List.map GapConvo.draftStatusFromString [ "saved", "only-in-tab", "limit-reached", "malformed", "???" ])
+            , test "only an empty conversation whose history is in flight shows placeholders" <|
+                \_ ->
+                    case Dict.get "#c" live.channels of
+                        Just ch ->
+                            Expect.equal [ False, True ]
+                                [ gapHistoryLoadingEmpty { live | historyLoading = Set.empty } ch
+                                , gapHistoryLoadingEmpty { live | historyLoading = Set.fromList [ "#c" ] } ch
+                                ]
+
+                        Nothing ->
+                            Expect.fail "the fixture joined #c"
+            , test "quote carries the readable text of an opened encrypted row, never the envelope" <|
+                \_ ->
+                    let
+                        withRow =
+                            feedAll { live | activeChannel = Just "#c" } [ "@msgid=x1 :alice!u@h PRIVMSG #c :placeholder" ]
+
+                        sealed =
+                            { withRow
+                                | channels =
+                                    Dict.update "#c"
+                                        (Maybe.map (\ch -> { ch | messages = List.map (\m -> { m | body = envelope, plaintext = Just "the opened secret" }) ch.messages }))
+                                        withRow.channels
+                            }
+
+                        opened =
+                            Tuple.first (update (MessageMenuOpen { target = "#c", msgid = "x1" }) sealed)
+                    in
+                    View.Thread.thread opened
+                        |> Query.fromHtml
+                        |> Query.find [ Selector.attribute (Html.Attributes.attribute "role" "menuitem"), Selector.containing [ Selector.text "Quote in composer" ] ]
+                        |> Event.simulate Event.click
+                        |> Event.expect (MessageQuote { target = "#c", from = "alice", body = "the opened secret" })
             ]
         ]

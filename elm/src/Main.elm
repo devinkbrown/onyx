@@ -375,6 +375,9 @@ port gapDraftsRequest : { serverUrl : String, identity : String } -> Cmd msg
 port gapUploadVariant : { key : String, index : Int, variant : String } -> Cmd msg
 
 
+port gapCaretSet : { id : String, pos : Int } -> Cmd msg
+
+
 port gapDraftsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
@@ -1391,6 +1394,9 @@ perform key outbound =
 
                 GapConvo.UploadVariant req ->
                     gapUploadVariant req
+
+                GapConvo.CaretSet req ->
+                    gapCaretSet { id = "shell-composer-input", pos = req.pos }
 
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()

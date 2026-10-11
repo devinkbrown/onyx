@@ -10874,6 +10874,22 @@ function fetchPublicFeed(url) {
         if (req && typeof req.key === "string" && typeof req.index === "number") uploads.setVariant(req.key, req.index, req.variant);
       });
     }
+    /* Emoji (and friends) insert at the caret: once Elm has re-rendered
+       the new text, put the cursor right after it and hand the field the
+       keyboard. */
+    if (app.ports.gapCaretSet && doc) {
+      app.ports.gapCaretSet.subscribe(function (req) {
+        if (!req || typeof req.id !== "string" || typeof req.pos !== "number") return;
+        var later = typeof requestAnimationFrame === "function" ? requestAnimationFrame : function (fn) { return setTimeout(fn, 16); };
+        later(function () {
+          var field = doc.getElementById(req.id);
+          if (!field || field.disabled) return;
+          var pos = Math.max(0, Math.min(req.pos, (field.value || "").length));
+          try { field.focus({ preventScroll: true }); } catch (err) { /* best-effort */ }
+          try { field.setSelectionRange(pos, pos); } catch (err) { /* not a text field */ }
+        });
+      });
+    }
     var drafts = createGapDrafts(gapStorage(), function (status) {
       try { if (app.ports.gapDraftsSaved) app.ports.gapDraftsSaved.send(status); } catch (err) { /* port gone */ }
     });
