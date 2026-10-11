@@ -1,0 +1,6 @@
+[
+  { "type": "message", "subtype": "channel_join", "user": "U0000002", "text": "<@U0000002> has joined the channel", "ts": "1704189600.000100" },
+  { "type": "message", "user": "U0000001", "text": "Hi <@U0000002>, see <https://example.test/doc|the doc> &amp; <#C0000001|general>", "ts": "1704189660.000200" },
+  { "type": "message", "user": "U0000002", "text": "thread reply", "ts": "1704189720.000300", "thread_ts": "1704189660.000200" },
+  { "type": "message", "subtype": "me_message", "user": "U0000002", "text": "waves", "ts": "1704189780.000400" }
+]

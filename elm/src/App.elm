@@ -117,6 +117,9 @@ import VaultImport
 -- v3/gap-watch
 import WatchTogether
 import Webhook
+-- v3/gap-import
+import BlockKit
+import HistoryImport
 import Wire
 
 
@@ -957,6 +960,10 @@ type alias Model =
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
 
+    -- v3/gap-import
+    , historyImport : HistoryImport.State
+    , blockKit : BlockKit.State
+
     -- v3/gap-organize
     , organize : Organizer.State
 
@@ -1063,6 +1070,12 @@ type Outbound
     | VoicePrefsSave { json : String }
     | VaultExportRequest
     | VaultImportPick
+    -- v3/gap-import: third-party history import + the staged vault review
+    | HistoryImportPick { job : Int, kind : String }
+    | HistoryImportCancel { job : Int }
+    | HistoryImportRecord { batch : HistoryImport.Batch, ids : List String, prints : List String }
+    | HistoryImportListRequest
+    | HistoryImportRemove { batch : String }
     | RetentionPolicyRequest
     | RetentionPolicySave { json : String }
     | OutboxQueue { target : String, text : String }
@@ -3294,6 +3307,9 @@ type Msg
     | GapShellMsg GapShell.Msg
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
+    -- v3/gap-import
+    | HistoryImportMsg HistoryImport.Msg
+    | BlockKitMsg BlockKit.Msg
     -- v3/gap-organize
     | OrganizeMsg Organizer.Msg
     -- v3/switcher
@@ -4025,6 +4041,9 @@ init nick url =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-import
+    , historyImport = HistoryImport.blank
+    , blockKit = BlockKit.blank
     -- v3/gap-organize
     , organize = Organizer.init
 
@@ -4625,6 +4644,9 @@ blank =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-import
+    , historyImport = HistoryImport.blank
+    , blockKit = BlockKit.blank
     -- v3/gap-organize
     , organize = Organizer.init
 
@@ -17224,10 +17246,10 @@ runSlashLocal model target verb nickArg =
             runSlashExport model (Maybe.withDefault "txt" formatArg)
 
         ( "import", _ ) ->
-            -- Snapshot import trigger (new surface: the `VaultImportPick`
-            -- port has had no UI until now — the validated merge path
-            -- behind it mirrors `importVault`).
-            ( { model | composer = "" }, [ VaultImportPick ] )
+            -- Snapshot import trigger. v3/gap-import: the file is read
+            -- and staged for review in Preferences → Import & export,
+            -- which opens so the progress and review are visible.
+            historyImportOpen { model | composer = "" }
 
         ( "read", _ ) ->
             let
@@ -39336,6 +39358,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepGapImport -- v3/gap-import
     , settleStepOrganize -- v3/gap-organize
     , settleStepGapCommands -- v3/gap-commands
 
@@ -40365,35 +40388,30 @@ updateCore msg model =
                                 ( logService model "Vault import file held no valid vault snapshot.", [] )
 
                             Just snap ->
-                                let
-                                    persists =
-                                        List.filterMap
-                                            (\importedTarget ->
-                                                case List.map importVaultRow importedTarget.messages of
-                                                    [] ->
-                                                        Nothing
+                                -- v3/gap-import: validated rows are staged for
+                                -- review (V47) instead of merging at once; the
+                                -- confirm writes through `historyImportPersist`.
+                                case HistoryImport.fromVaultSnapshot 0 snap of
+                                    Nothing ->
+                                        ( logService model "Vault import file held no importable messages.", [] )
 
-                                                    rows ->
-                                                        Just (VaultPersist { target = importedTarget.target, rows = rows })
+                                    Just staged ->
+                                        let
+                                            ( opened, openOut ) =
+                                                historyImportShowTransfer model
+
+                                            ( reviewed, reviewOut ) =
+                                                historyImportUpdate (HistoryImport.GotSnapshot staged) opened
+                                        in
+                                        ( logService reviewed
+                                            ("Vault import file staged for review ("
+                                                ++ String.fromInt (List.sum (List.map .count staged.conversations))
+                                                ++ " messages, "
+                                                ++ String.fromInt (List.length staged.conversations)
+                                                ++ " conversations)."
                                             )
-                                            snap.targets
-
-                                    messageCount =
-                                        List.sum (List.map (List.length << .messages) snap.targets)
-                                in
-                                if List.isEmpty persists then
-                                    ( logService model "Vault import file held no importable messages.", [] )
-
-                                else
-                                    ( logService model
-                                        ("Importing "
-                                            ++ String.fromInt messageCount
-                                            ++ " messages into "
-                                            ++ String.fromInt (List.length persists)
-                                            ++ " conversations."
+                                        , openOut ++ reviewOut
                                         )
-                                    , persists
-                                    )
 
         OutboxQueued entry ->
             if List.any (\row -> row.id == entry.id) model.outbox then
@@ -43726,7 +43744,8 @@ updateCore msg model =
             ( { model | prefsTransferStatus = Just "Preparing export…" }, [ VaultExportRequest ] )
 
         PrefsVaultImport ->
-            ( model, [ VaultImportPick ] )
+            -- v3/gap-import: read, review, then merge (V45-V47)
+            historyImportUpdate (HistoryImport.Choose HistoryImport.Portable) model
 
         PrefsOutboxRemove id ->
             if model.prefsOutboxBusy || not (List.any (\row -> row.id == id) model.outbox) then
@@ -45384,6 +45403,12 @@ updateCore msg model =
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
 
+        -- v3/gap-import
+        HistoryImportMsg sub ->
+            historyImportUpdate sub model
+
+        BlockKitMsg sub ->
+            blockKitUpdate sub model
         -- v3/gap-organize
         OrganizeMsg sub ->
             organizeUpdate sub model
@@ -48795,6 +48820,7 @@ overlayStack model =
           ( "call-ring-in", model.calls.lifecycle == Media.RingingIn, CallDecline )
         , ( "call-ring-out", model.calls.lifecycle == Media.RingingOut, CallCancel )
         , ( "media-lightbox", model.mediaLightbox /= Nothing, MediaLightboxClose )
+        , ( "blockkit", BlockKit.isOpen model.blockKit, BlockKitMsg BlockKit.Escape ) -- v3/gap-import
         , ( "shortcuts", model.shortcutsOpen, ShortcutsClose )
         -- v3/gap-commands
         , ( "commands-help", model.commandsHelpOpen, CommandsHelpClose )
@@ -50831,6 +50857,278 @@ rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
 
+
+
+-- v3/gap-import
+
+
+historyImportCtx : Model -> HistoryImport.Ctx
+historyImportCtx model =
+    { nowMs = model.nowMs
+    , owner = Maybe.map (\o -> o.serverUrl ++ "|" ++ o.identity) (deviceMemoryOwner model)
+    , keepFor = Retention.effectiveKeep model.retentionPolicy
+    , maxAgeDays = model.retentionPolicy.maxAgeDays
+    }
+
+
+{-| Run one history-import message and interpret its effects. A
+confirmed removal also drops the removed rows from open buffers (rows
+hydrated from the vault carry no msgid, so they match by fingerprint).
+-}
+historyImportUpdate : HistoryImport.Msg -> Model -> ( Model, List Outbound )
+historyImportUpdate sub model =
+    let
+        ( next, effects ) =
+            HistoryImport.update (historyImportCtx model) sub model.historyImport
+
+        pruned =
+            case sub of
+                HistoryImport.Removed r ->
+                    if r.ok && model.historyImport.removing == Just r.batch then
+                        dropImportedRows r.targets (Set.fromList r.prints) model
+
+                    else
+                        model
+
+                _ ->
+                    model
+    in
+    List.foldl historyImportEffect ( { pruned | historyImport = next }, [] ) effects
+
+
+historyImportEffect : HistoryImport.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+historyImportEffect effect ( model, outs ) =
+    case effect of
+        HistoryImport.Pick req ->
+            ( model, outs ++ [ HistoryImportPick req ] )
+
+        HistoryImport.CancelJob req ->
+            ( model, outs ++ [ HistoryImportCancel req ] )
+
+        HistoryImport.Persist req ->
+            ( model, outs ++ [ historyImportPersist req.target req.rows ] )
+
+        HistoryImport.Record req ->
+            ( model, outs ++ [ HistoryImportRecord req ] )
+
+        HistoryImport.ListBatches ->
+            ( model, outs ++ [ HistoryImportListRequest ] )
+
+        HistoryImport.RemoveBatch req ->
+            ( model, outs ++ [ HistoryImportRemove req ] )
+
+        HistoryImport.Touched { targets } ->
+            let
+                ( touched, fetches ) =
+                    historyImportTouched targets model
+            in
+            ( touched, outs ++ fetches )
+
+        HistoryImport.Focus id ->
+            ( model, outs ++ [ PrefsFocus { id = id } ] )
+
+
+{-| THE vault write for imported history: every imported row reaches
+the vault through the normal `VaultPersist` port (whose trim applies
+the destination's retention policy). Vault owner scoping lands here. -}
+historyImportPersist : String -> List HistoryImport.Row -> Outbound
+historyImportPersist target rows =
+    VaultPersist
+        { target = target
+        , rows =
+            List.map
+                (\row ->
+                    { id = row.id
+                    , target = target
+                    , from = row.from
+                    , body = row.body
+                    , at = row.at
+                    , rowType = row.rowType
+                    , deleted = False
+                    , redacted = False
+                    , replyTo = Maybe.map sanitizeReplyRef row.replyTo
+                    }
+                )
+                rows
+        }
+
+
+{-| Conversations an import or removal touched: their DM privacy proof
+is void (like any vault write), and an open, still-empty buffer
+hydrates so the history shows without a reload. -}
+historyImportTouched : List String -> Model -> ( Model, List Outbound )
+historyImportTouched targets model =
+    let
+        keys =
+            List.map String.toLower targets
+    in
+    ( { model | vaultDmPrivacy = List.foldl Dict.remove model.vaultDmPrivacy keys }
+    , List.filterMap
+        (\key ->
+            case Dict.get key model.channels of
+                Just channel ->
+                    if List.isEmpty channel.messages then
+                        Just (VaultFetch { target = key, limit = keepMessages })
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+        )
+        keys
+    )
+
+
+dropImportedRows : List String -> Set String -> Model -> Model
+dropImportedRows targets prints model =
+    if Set.isEmpty prints then
+        model
+
+    else
+        List.foldl
+            (\key m ->
+                if Dict.member key m.channels then
+                    updateChannel m
+                        key
+                        (\c ->
+                            { c
+                                | messages =
+                                    List.filter
+                                        (\row -> row.msgid /= Nothing || not (Set.member (HistoryImport.fingerprint row.at row.from row.body) prints))
+                                        c.messages
+                            }
+                        )
+
+                else
+                    m
+            )
+            model
+            (List.map String.toLower targets)
+
+
+{-| Preferences, on Import & export (the review lives there). -}
+historyImportShowTransfer : Model -> ( Model, List Outbound )
+historyImportShowTransfer model =
+    let
+        ( opened, out ) =
+            if model.prefsOpen then
+                ( model, [] )
+
+            else
+                prefsOpen model
+    in
+    ( { opened | prefsCategory = PrefsPanel.Transfer }, out )
+
+
+historyImportOpen : Model -> ( Model, List Outbound )
+historyImportOpen model =
+    let
+        ( opened, openOut ) =
+            historyImportShowTransfer model
+
+        ( chosen, chooseOut ) =
+            historyImportUpdate (HistoryImport.Choose HistoryImport.Portable) opened
+    in
+    ( chosen, openOut ++ chooseOut )
+
+
+blockKitUpdate : BlockKit.Msg -> Model -> ( Model, List Outbound )
+blockKitUpdate sub model =
+    let
+        ( next, effects ) =
+            BlockKit.update model.nowMs sub model.blockKit
+    in
+    List.foldl blockKitEffect ( { model | blockKit = next }, [] ) effects
+
+
+blockKitEffect : BlockKit.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+blockKitEffect effect ( model, outs ) =
+    case effect of
+        BlockKit.CopyText req ->
+            ( model, outs ++ [ ClipboardCopy req ] )
+
+        BlockKit.SendText prepared ->
+            let
+                ( sent, out ) =
+                    blockKitSend model prepared
+            in
+            ( sent, outs ++ out )
+
+        BlockKit.FocusId id ->
+            ( model, outs ++ [ PrefsFocus { id = id } ] )
+
+
+{-| Send one reviewed structured-control message as the user, through
+the normal composer send (labels, echo, E2EE sealing, offline queue)
+without touching the visible composer, its draft, reply or audience.
+-}
+blockKitSend : Model -> BlockKit.Prepared -> ( Model, List Outbound )
+blockKitSend model prepared =
+    let
+        ( sent, out ) =
+            sendComposerText { model | composer = prepared.text, composerAudience = Nothing, replyingTo = Nothing } prepared.target
+    in
+    ( { sent
+        | composer = model.composer
+        , composerAudience = model.composerAudience
+        , replyingTo = model.replyingTo
+        , composerDrafts = model.composerDrafts
+      }
+    , out
+    )
+
+
+{-| Post-update: BlockKit copy results and their expiry; an owner change
+aborts a running or staged import (V48); entering Import & export
+refreshes the imported-batch list. -}
+settleStepGapImport : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapImport msg prior ( m, outs ) =
+    let
+        ( copied, copyOut ) =
+            case msg of
+                ClipboardResult r ->
+                    if String.startsWith BlockKit.copyTagPrefix r.tag then
+                        blockKitUpdate (BlockKit.CopyResult r) m
+
+                    else
+                        ( m, [] )
+
+                Tick _ ->
+                    if Dict.isEmpty m.blockKit.copies then
+                        ( m, [] )
+
+                    else
+                        blockKitUpdate (BlockKit.Tick m.nowMs) m
+
+                _ ->
+                    ( m, [] )
+
+        priorOwner =
+            (historyImportCtx prior).owner
+
+        ( guarded, ownerOut ) =
+            if priorOwner /= Nothing && priorOwner /= (historyImportCtx copied).owner then
+                let
+                    ( state, effects ) =
+                        HistoryImport.ownerChanged copied.historyImport
+                in
+                List.foldl historyImportEffect ( { copied | historyImport = state }, [] ) effects
+
+            else
+                ( copied, [] )
+
+        onTransfer model =
+            model.prefsOpen && model.prefsCategory == PrefsPanel.Transfer
+
+        listOut =
+            if onTransfer guarded && not (onTransfer prior) then
+                [ HistoryImportListRequest ]
+
+            else
+                []
+    in
+    ( guarded, outs ++ copyOut ++ ownerOut ++ listOut )
 
 
 -- v3/gap-organize

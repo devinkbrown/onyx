@@ -1,0 +1,4 @@
+[
+  { "type": "message", "user": "U0000001", "text": "next day <!here>", "ts": "1704276000.000100", "files": [ { "permalink": "https://synthetic.slack.example/files/F1" } ] },
+  { "type": "message", "user": "U0000009", "text": "unknown user", "ts": "bad" }
+]

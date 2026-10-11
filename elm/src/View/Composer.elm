@@ -15,6 +15,7 @@ a nested form, so Enter in the composer still sends.
 -}
 
 import App exposing (Model, Msg(..))
+import BlockKit -- v3/gap-import
 import ComposerAssist
 import Dict
 import Emoji
@@ -317,7 +318,7 @@ replyBar model =
                     in
                     div [ class "shell-composer-context", attribute "role" "status", attribute "aria-live" "polite" ]
                         [ span [ class "shell-composer-context-label" ] [ text ("Replying to " ++ shown.from) ]
-                        , span [ class "shell-composer-context-text" ] [ text (clippedText shown.preview) ]
+                        , span [ class "shell-composer-context-text" ] [ text (clippedText (BlockKit.summary shown.preview)) ]
                         , button
                             [ type_ "button"
                             , class "shell-composer-context-close"
