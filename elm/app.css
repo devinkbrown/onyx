@@ -76,7 +76,10 @@
   --dur-micro: 100ms;
   --dur-fast: 160ms;
   --dur-base: 220ms;
-  --dur: var(--dur-base);
+  /* v3/gap-appearance: --dur is the THEME's base step (Theme Studio sets it);
+     css/gap-appearance.css derives --dur-base/-fast/-micro from it. It used to
+     alias --dur-base here, which formed a cycle with that derivation and left
+     every duration invalid until the first theme commit. */
 
   /* Surfaces separate by the 1px seam; sheets alone get the short,
      cool shadow (--elev-3). */

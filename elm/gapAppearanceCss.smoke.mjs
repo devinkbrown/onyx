@@ -89,6 +89,13 @@ test("Conversation width: the measure reaches the log and composer (display: con
   assert.match(wide, /padding-inline:\s*max\(var\(--space-4\),\s*calc\(\(100% - var\(--shell-measure\)\) \/ 2\)\)/);
 });
 
+test("the duration ladder derives from the theme's --dur without a cycle", () => {
+  // `--dur: var(--dur-base)` next to `--dur-base: var(--dur, 220ms)` is a cycle:
+  // both compute invalid and every transition is dropped until a theme commits.
+  assert.doesNotMatch(read("app.css"), /--dur:\s*var\(--dur-base\)/);
+  assert.match(gap, /--dur-base:\s*var\(--dur,\s*220ms\)/);
+});
+
 test("no shell font-size is left in px (Text size reaches everything)", () => {
   const files = ["app.css", ...readdirSync(join(here, "css")).filter((f) => f.endsWith(".css") && f !== "gap-appearance.css").map((f) => `css/${f}`)];
   const offenders = [];
