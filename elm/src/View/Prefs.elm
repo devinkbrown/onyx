@@ -312,7 +312,7 @@ panelBody model category =
                 { key = "highContrast"
                 , legend = "Contrast"
                 , title = "Raise interface contrast"
-                , description = "Strengthens text, borders, focus outlines, and panel separation across the active theme."
+                , description = "Strengthens text, borders, focus outlines, and panel separation across the active theme. Your device's own contrast setting does the same automatically."
                 , value = model.prefs.highContrast
                 }
             ]

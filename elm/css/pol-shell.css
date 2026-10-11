@@ -644,7 +644,7 @@
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  font-size: 10px;
+  font-size: 0.625rem;
   line-height: 16px;
   color: var(--onyx-accent-ink);
   background: var(--onyx-accent);
@@ -704,7 +704,7 @@
   height: 16px;
   padding: 0 4px;
   box-sizing: border-box;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
@@ -837,7 +837,7 @@
   height: 18px;
   padding: 0 5px;
   box-sizing: border-box;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 18px;
   font-variant-numeric: tabular-nums;
   color: var(--onyx-text);
@@ -1026,7 +1026,7 @@
   box-sizing: border-box;
   width: 28px;
   height: 28px;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   color: var(--onyx-dim);
@@ -1035,7 +1035,7 @@
   border-radius: 50%;
 }
 .onyx-topbar .onyx-ident-avatar { width: 26px; height: 26px; }
-.onyx-you-avatar { width: 52px; height: 52px; font-size: 16px; color: var(--onyx-text); }
+.onyx-you-avatar { width: 52px; height: 52px; font-size: 1rem; color: var(--onyx-text); }
 
 /* You hub (the sheet family styles the list): the face beside the
    identity, and the connection line the phone bar no longer shows. */
@@ -1235,7 +1235,7 @@
     height: 16px;
     padding: 0 4px;
     box-sizing: border-box;
-    font-size: 10px;
+    font-size: 0.625rem;
     font-weight: 700;
     line-height: 16px;
     text-align: center;
@@ -1253,7 +1253,7 @@
   .onyx-frame .onyx-room-topic-toggle { display: none; }
   .onyx-room-header-safety .onyx-dmsafe-chip { padding-block: 0; font-size: var(--text-2xs); }
   .onyx-room-header-safety .onyx-dmsafe-trigger { min-height: 24px; padding-block: 0; font-size: var(--text-2xs); }
-  .onyx-frame .onyx-room-header-avatar { width: 34px; height: 34px; font-size: 11px; }
+  .onyx-frame .onyx-room-header-avatar { width: 34px; height: 34px; font-size: 0.6875rem; }
   .onyx-frame .onyx-room-header-actions { gap: 0; }
   .onyx-frame .onyx-room-header .onyx-search-toggle { display: none; }
   .onyx-room-header-icon { min-width: 44px; min-height: 44px; padding: 0; }
@@ -1386,7 +1386,7 @@
   .onyx-rail .onyx-rail-time { font-size: var(--text-xs); }
   .onyx-rail .onyx-rail-has-unread .onyx-rail-time { color: var(--onyx-text); }
   .onyx-rail .onyx-rail-unread { min-width: 22px; height: 22px; line-height: 20px; padding: 0 7px; font-size: var(--text-xs); }
-  .onyx-rail .onyx-rail-avatar { width: 48px; height: 48px; font-size: 15px; }
+  .onyx-rail .onyx-rail-avatar { width: 48px; height: 48px; font-size: 0.9375rem; }
   .onyx-rail .onyx-rail-row { gap: 0; }
   .onyx-rail .onyx-rail-star { display: none; }
 
@@ -1418,7 +1418,7 @@
     color: var(--onyx-dim);
     background: transparent;
     border: 0;
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 600;
   }
   .onyx-mobile-nav .onyx-nav-btn:hover { background: transparent; }

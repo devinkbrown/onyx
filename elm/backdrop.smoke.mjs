@@ -243,3 +243,23 @@ test("ports.js: shell palette chrome + no-flash cache are fail-closed", () => {
   store.set("onyx:shell-palette", "{nope");
   assert.equal(restoreShellPalette({ document: doc, localStorage: globalThis.localStorage }), false);
 });
+
+test("ports.js: device display prefs restore only whitelisted values on first paint", () => {
+  const require = createRequire(import.meta.url);
+  require("./ports.js");
+  const { restoreDevicePrefs } = globalThis.OnyxPorts;
+  const dataset = {};
+  const doc = { documentElement: { dataset } };
+  const win = (json) => ({ document: doc, localStorage: { getItem: () => json } });
+
+  assert.equal(restoreDevicePrefs(win(JSON.stringify({ fontScale: "lg", density: "roomy", width: "full", highContrast: true, reduceMotion: false }))), true);
+  assert.deepEqual({ ...dataset }, { fontScale: "lg", density: "roomy", width: "full", highContrast: "true", reduceMotion: "false" });
+
+  for (const key of Object.keys(dataset)) delete dataset[key];
+  assert.equal(restoreDevicePrefs(win(JSON.stringify({ fontScale: "xxl", density: "<script>", width: 3, highContrast: "yes" }))), false);
+  assert.deepEqual({ ...dataset }, {}, "unknown values are never stamped");
+  assert.equal(restoreDevicePrefs(win("{nope")), false);
+  assert.equal(restoreDevicePrefs(win("[1,2]")), false);
+  assert.equal(restoreDevicePrefs(win(null)), false);
+  assert.equal(restoreDevicePrefs(win("x".repeat(9000))), false);
+});

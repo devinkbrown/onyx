@@ -10097,8 +10097,42 @@ function fetchPublicFeed(url) {
     return true;
   }
 
+  /* v3/gap-appearance — first paint of the device display prefs. Elm
+     stamps these on <html> once its snapshot lands (appearanceApply); until
+     then a Large text size or Roomy density would paint at the defaults and
+     jump. Same fail-closed rule as the palette: only whitelisted values from
+     `onyx:preferences` are ever stamped, and Elm re-applies the validated
+     truth right after boot. */
+  var DEVICE_PREF_ENUMS = {
+    density: ["compact", "cozy", "roomy"],
+    fontScale: ["sm", "md", "lg"],
+    width: ["measured", "full"]
+  };
+  var DEVICE_PREF_FLAGS = ["highContrast", "reduceMotion", "reduceTransparency"];
+
+  function restoreDevicePrefs(win) {
+    var doc = win && win.document;
+    if (!doc || !doc.documentElement || !doc.documentElement.dataset) return false;
+    var raw = null;
+    try { raw = win.localStorage ? win.localStorage.getItem("onyx:preferences") : null; } catch (err) { raw = null; }
+    if (typeof raw !== "string" || raw.length > 8192) return false;
+    var parsed = null;
+    try { parsed = JSON.parse(raw); } catch (err) { return false; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+    var data = doc.documentElement.dataset;
+    var applied = false;
+    Object.keys(DEVICE_PREF_ENUMS).forEach(function (key) {
+      if (DEVICE_PREF_ENUMS[key].indexOf(parsed[key]) >= 0) { data[key] = parsed[key]; applied = true; }
+    });
+    DEVICE_PREF_FLAGS.forEach(function (key) {
+      if (typeof parsed[key] === "boolean") { data[key] = String(parsed[key]); applied = true; }
+    });
+    return applied;
+  }
+
   if (global.document && global.localStorage) {
     try { restoreShellPalette(global); } catch (err) { /* first paint keeps the house look */ }
+    try { restoreDevicePrefs(global); } catch (err) { /* first paint keeps the default sizes */ }
   }
 
   global.OnyxPorts = {
@@ -10253,6 +10287,7 @@ function fetchPublicFeed(url) {
     shellSchemeOf: shellSchemeOf,
     applyShellChrome: applyShellChrome,
     restoreShellPalette: restoreShellPalette,
+    restoreDevicePrefs: restoreDevicePrefs,
     /* v3/polish */
     polishFlags: polishFlags,
     wirePolish: wirePolish,

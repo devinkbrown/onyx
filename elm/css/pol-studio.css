@@ -1260,7 +1260,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: 15rem;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.4;
 }
 

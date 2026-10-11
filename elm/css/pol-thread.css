@@ -143,7 +143,7 @@
   top: 5px;
   width: var(--pt-gutter);
   text-align: center;
-  font-size: 10.5px;
+  font-size: 0.65625rem;
   opacity: 0;
   transition: opacity var(--dur-micro) var(--ease);
 }
@@ -324,7 +324,7 @@
   aspect-ratio: 1;
   min-height: 32px;
   padding: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
 }
 .onyx-react-pop .onyx-react-choice:hover,
@@ -386,7 +386,7 @@
   .onyx-frame .onyx-msg-menu .onyx-msg-menu-item { min-height: var(--target-min); font-size: var(--text-md); }
   .onyx-react-pop .onyx-react-search { min-height: var(--target-min); font-size: 16px; }
   .onyx-react-pop .onyx-react-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); max-height: 40dvh; }
-  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 24px; }
+  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 1.5rem; }
 }
 
 /* Boosts: quiet pills under the body; ours reads heavier (never the
@@ -403,7 +403,7 @@
   font-size: var(--text-sm);
   line-height: 1;
 }
-.onyx-message .boost-emoji { font-size: 15px; }
+.onyx-message .boost-emoji { font-size: 0.9375rem; }
 .onyx-message .boost-count { color: var(--onyx-dim); font-size: var(--text-2xs); font-weight: 650; font-variant-numeric: tabular-nums; }
 .onyx-message button.boost-pill:hover { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
 .onyx-message .boost-pill.you {
@@ -1307,7 +1307,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-composer .shell-command-desc { font-size: var(--text-sm); }
   .onyx-composer .shell-emoji-search { min-height: 40px; font-size: 16px; }
   .onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); max-height: 36dvh; }
-  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 24px; }
+  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 1.5rem; }
 }
 
 /* ── 8. Message search ───────────────────────────────────────────────── */

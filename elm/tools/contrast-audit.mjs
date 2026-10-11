@@ -168,3 +168,103 @@ export function assertContrast(label, result, { max = 0 } = {}) {
     .join('; ');
   throw new Error(`${label}: ${result.failures.length}/${result.checked} text nodes below target — ${worst}`);
 }
+
+/** Runs in the page: the transcript's text boxes and their painted colours. */
+function pageTextBoxes({ scope }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  const flat = (css) => {
+    g.globalCompositeOperation = 'copy';
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, 1, 1);
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = css;
+    g.fillRect(0, 0, 1, 1);
+    const d = g.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3]];
+  };
+  const top = document.querySelector(scope) || document.body;
+  const boxes = [];
+  const walker = document.createTreeWalker(top, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.nodeValue.replace(/\s+/g, ' ').trim();
+    const el = node.parentElement;
+    if (!text || !el || /^(SCRIPT|STYLE|CANVAS)$/.test(el.tagName)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const r of range.getClientRects()) {
+      if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+      const color = flat(cs.color);
+      if (color[3] < 26) continue;
+      let k = 1;
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const m = /brightness\(([0-9.]+)\)/.exec(getComputedStyle(n).filter || '');
+        if (m) k *= Number(m[1]);
+      }
+      boxes.push({
+        x: r.left, y: r.top, w: r.width, h: r.height,
+        fg: color.slice(0, 3).map((v) => Math.min(255, Math.round(v * k))),
+        text: text.slice(0, 30),
+        tag: el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className ? `.${el.className.split(/\s+/)[0]}` : ''),
+      });
+    }
+  }
+  return boxes;
+}
+
+/** Runs in the page: score each box against the bare screenshot behind it. */
+async function pageScoreBoxes({ b64, boxes, dpr }) {
+  const img = new Image();
+  img.src = `data:image/png;base64,${b64}`;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0);
+  const lin = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = (r, gg, b) => 0.2126 * lin(r) + 0.7152 * lin(gg) + 0.0722 * lin(b);
+  const out = [];
+  for (const box of boxes) {
+    const x = Math.max(0, Math.floor(box.x * dpr));
+    const y = Math.max(0, Math.floor(box.y * dpr));
+    const w = Math.max(1, Math.min(img.width - x, Math.ceil(box.w * dpr)));
+    const h = Math.max(1, Math.min(img.height - y, Math.ceil(box.h * dpr)));
+    if (x >= img.width || y >= img.height) continue;
+    const data = g.getImageData(x, y, w, h).data;
+    const lums = [];
+    for (let i = 0; i < data.length; i += 4) lums.push(lum(data[i], data[i + 1], data[i + 2]));
+    lums.sort((a, b) => a - b);
+    const fgLum = lum(box.fg[0], box.fg[1], box.fg[2]);
+    // Worst ground for this text: the pixels closest to its own luminance
+    // (5th / 95th percentile, so a lone star does not decide it).
+    const near = fgLum >= 0.18 ? lums[Math.floor(lums.length * 0.95)] : lums[Math.floor(lums.length * 0.05)];
+    const ratio = (Math.max(fgLum, near) + 0.05) / (Math.min(fgLum, near) + 0.05);
+    out.push({ text: box.text, tag: box.tag, ratio: Math.round(ratio * 100) / 100 });
+  }
+  return out;
+}
+
+/**
+ * Contrast of the transcript text against what is ACTUALLY painted behind it
+ * (the background scene included): collect the text boxes, hide the text,
+ * screenshot the bare surface, score each box against its worst pixels.
+ * @returns {Promise<{ checked: number, worst: Array<{text:string,tag:string,ratio:number}>, failures: Array<{text:string,tag:string,ratio:number}> }>}
+ */
+export async function auditSceneContrast(page, { scope = '.onyx-thread-pane', min = 4.5 } = {}) {
+  const boxes = await page.evaluate(pageTextBoxes, { scope });
+  const hide = await page.addStyleTag({ content: '*, *::before, *::after { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; } ::placeholder { color: transparent !important; }' });
+  const dpr = await page.evaluate(() => window.devicePixelRatio || 1);
+  const shot = (await page.screenshot({ type: 'png' })).toString('base64');
+  await hide.evaluate((node) => node.remove());
+  const scored = await page.evaluate(pageScoreBoxes, { b64: shot, boxes, dpr });
+  scored.sort((a, b) => a.ratio - b.ratio);
+  return { checked: scored.length, worst: scored.slice(0, 5), failures: scored.filter((s) => s.ratio + 0.005 < min) };
+}

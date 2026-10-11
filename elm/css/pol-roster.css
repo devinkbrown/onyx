@@ -398,7 +398,7 @@
   .onyx-roster:popover-open .onyx-mlist-group-head > .pt-ico { opacity: 1; }
   .onyx-roster:popover-open .onyx-member,
   .onyx-roster:popover-open .onyx-mlist-main { min-height: 52px; }
-  .onyx-roster:popover-open .onyx-mlist-main { gap: var(--space-3); font-size: 16px; }
+  .onyx-roster:popover-open .onyx-mlist-main { gap: var(--space-3); font-size: 1rem; }
   .onyx-roster:popover-open .onyx-avatar--sm { width: 2.25rem; height: 2.25rem; font-size: 0.78rem; }
 }
 

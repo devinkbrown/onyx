@@ -136,12 +136,11 @@ html { font-size: 100%; }
 :root[data-font-scale='sm'] { font-size: 93.75%; }
 :root[data-font-scale='lg'] { font-size: 112.5%; }
 
-/* Transcript text still set in px elsewhere: rem twins (identical at the
-   default size) so Text size reaches it. */
-.onyx-system { font-size: 0.75rem; }
-.onyx-day-divider { font-size: 0.75rem; }
-.onyx-continuation:not(.onyx-message--compact) > .onyx-ts { font-size: 0.65625rem; }
-.onyx-message--compact .onyx-ts { font-size: 0.75rem; }
+/* Every font-size in app.css and css/*.css is rem (the px values were
+   converted at 1/16, identical at the default size), so Text size reaches
+   all of it. Only the 16px inputs keep px on purpose: iOS zooms a focused
+   field under 16px, whatever the Text size. The Theme Studio preview
+   (.ts-pv-*) stays a fixed miniature of the look. */
 
 /* ── 6. Density ───────────────────────────────────────────────────────
    Cozy is the house rhythm (no overrides). Compact tightens the

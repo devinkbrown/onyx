@@ -8,10 +8,12 @@ Fold ownership: prefs/theme/background slots, staging, preview, and
 the DOM application live in `App` (ports-side reads/writes); this
 module renders the oracle's chrome and hooks.
 
-Documented narrowings: the animated/scene background canvas engine
-lands with the backgrounds slice (the stage resolves the same
-`resolveBackgroundId` id and previews through the same 160ms
-ports-side delay); arrow-key radio travel selects without moving DOM
+The background stage resolves the same `resolveBackgroundId` id and
+previews through the same 160ms ports-side delay; the scene itself is
+painted by `window.OnyxBackdrop` (v3/gap-appearance, `BackgroundScene`
+outbound, `settleStepScene`), full-viewport behind this page.
+
+Documented narrowing: arrow-key radio travel selects without moving DOM
 focus (as on the OnyxOS tabs).
 -}
 

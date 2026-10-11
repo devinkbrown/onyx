@@ -14,7 +14,7 @@
  * same keys the app writes), so every shot is a cold load of that state.
  */
 import shell from './screens-shell.mjs';
-import { auditContrast, assertContrast } from './contrast-audit.mjs';
+import { auditContrast, assertContrast, auditSceneContrast } from './contrast-audit.mjs';
 
 const THEME_IDS = ['ocean', 'tide', 'abyss', 'reef', 'onyx', 'obsidian', 'pearl', 'ink', 'shu', 'hisui', 'pine', 'kohaku', 'terracotta', 'vermillion', 'sapphire', 'teal', 'slate', 'frost'];
 
@@ -47,9 +47,7 @@ async function room(page, h, state) {
 
 async function prefsSheet(page, h, state, category) {
   await room(page, h, state);
-  const phone = (page.viewportSize()?.width ?? 1440) < 768;
-  if (phone) await h.tryClick(page, '.onyx-mobile-nav [data-testid="nav-you"]');
-  else await h.tryClick(page, '[data-testid="you-open"]');
+  await openYou(page, h);
   await h.tryClick(page, '[data-testid="you-settings-open-preferences"]');
   if (category) await h.tryClick(page, `#pref-category-tab-${category}`);
   await h.settle(page, 300);
@@ -59,8 +57,11 @@ async function prefsSheet(page, h, state, category) {
 /** Open the You hub (phone: the bottom nav; else the rail). */
 async function openYou(page, h) {
   const phone = (page.viewportSize()?.width ?? 1440) < 768;
-  if (phone) await h.tryClick(page, '.onyx-mobile-nav [data-testid="nav-you"]');
-  else await h.tryClick(page, '[data-testid="you-open"]');
+  if (phone) {
+    // Inside a conversation the bottom nav is away: back to the list first.
+    await h.tryClick(page, '[data-testid="room-back"]');
+    await h.tryClick(page, '.onyx-mobile-nav [data-testid="nav-you"]');
+  } else await h.tryClick(page, '[data-testid="you-open"]');
 }
 
 /**
@@ -100,7 +101,46 @@ async function auditTheme(page, h, theme, highContrast) {
   if (process.env.AUDIT_VERBOSE) console.log(`audit ${theme}${highContrast ? '+hc' : ''} @${page.viewportSize()?.width}: ${seen.join(' ')}`);
 }
 
+const PUBLIC_PATHS = ['/', '/about', '/status', '/guides', '/roadmap', '/privacy', '/stats', '/community', '/accessibility', '/download', '/onyxos', '/guidelines', '/invite', '/contact'];
+
+/** The public pages follow the look too: audit each under one theme. */
+async function auditPublic(page, h, theme) {
+  await seed(page, { theme });
+  const seen = [];
+  for (const path of PUBLIC_PATHS) {
+    await page.goto(`${h.base}${path}`);
+    await h.settle(page, 500);
+    const result = await auditContrast(page, { min: 3 });
+    seen.push(`${path}:${result.checked}`);
+    assertContrast(`${theme} ${path}`, result);
+  }
+  await page.goto(`${h.base}/app?${h.pin}`);
+  await h.settle(page, 600);
+  const gate = await auditContrast(page, { min: 3 });
+  seen.push(`connect:${gate.checked}`);
+  assertContrast(`${theme} connect gate`, gate);
+  if (process.env.AUDIT_VERBOSE) console.log(`audit public ${theme} @${page.viewportSize()?.width}: ${seen.join(' ')}`);
+}
+
+/** Transcript text against the pixels the scene actually paints behind it. */
+async function sceneContrast(page, h, theme, bg, highContrast) {
+  await room(page, h, { theme, bg, prefs: highContrast ? { highContrast: true } : {} });
+  await page.waitForFunction(() => document.documentElement.dataset.scene === 'app', null, { timeout: 5000 });
+  const result = await auditSceneContrast(page, { min: highContrast ? 7 : 4.5 });
+  if (process.env.AUDIT_VERBOSE) console.log(`scene ${theme}/${bg}${highContrast ? '+hc' : ''} @${page.viewportSize()?.width}: ${result.checked} boxes, worst ${result.worst.map((w) => `${w.tag}"${w.text}"=${w.ratio}`).join(' ')}`);
+  if (result.failures.length) {
+    throw new Error(`scene ${theme}/${bg}: ${result.failures.length}/${result.checked} text boxes below target — ${result.failures.slice(0, 5).map((f) => `${f.tag} "${f.text}" ${f.ratio}:1`).join('; ')}`);
+  }
+}
+
+const SCENE_IDS = ['deep-current', 'bioluminescence', 'caustics', 'aurora', 'pyrite-field', 'gold-veins', 'ember', 'forest', 'resin', 'ink-wash', 'mist', 'frost', 'aurora-ribbons', 'tide-bands', 'obsidian', 'lapis-gradient', 'paper-grain'];
+
 export default {
+  ...Object.fromEntries(SCENE_IDS.flatMap((bg) => [
+    [`ap-scene-dark-${bg}`, (page, h) => sceneContrast(page, h, 'ocean', bg, false)],
+    [`ap-scene-light-${bg}`, (page, h) => sceneContrast(page, h, 'pearl', bg, false)],
+  ])),
+  ...Object.fromEntries(['ocean', 'pearl', 'frost', 'kohaku', 'slate'].map((id) => [`ap-audit-public-${id}`, (page, h) => auditPublic(page, h, id)])),
   ...Object.fromEntries(THEME_IDS.map((id) => [`ap-audit-${id}`, (page, h) => auditTheme(page, h, id, false)])),
   ...Object.fromEntries(['ocean', 'pearl', 'frost', 'kohaku'].map((id) => [`ap-audit-hc-${id}`, (page, h) => auditTheme(page, h, id, true)])),
   ...shell,
