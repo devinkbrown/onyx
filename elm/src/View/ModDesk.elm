@@ -336,7 +336,7 @@ tabBody model tab =
 
 liveTab : Model -> Html Msg
 liveTab model =
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-live" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-live" ]
         [ OperKit.lede "What the network reports to operators, as it happens. The feed keeps the latest 400 rows and never sends a command when you filter it."
         , OperFeedPanel.followPanel model
         , OperFeedPanel.feedPanel model
@@ -379,7 +379,7 @@ announceForm model =
                 , onInput (OperDeskField OperDesk.Broadcast)
                 ]
                 []
-            , button [ type_ "submit", disabled (not live || String.trim desk.broadcast == "") ]
+            , button [ type_ "submit", class "oc-btn oc-btn-primary", disabled (not live || String.trim desk.broadcast == "") ]
                 [ text "Review announcement" ]
             ]
         , p [ class "onyx-moddesk-hint" ]
@@ -406,9 +406,9 @@ networkTab model =
         submitOn intent =
             onSubmit (OperDeskSubmit intent)
     in
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-network" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-network" ]
         [ OperKit.lede "Actions on a person or on this node, and read-only reports about the mesh."
-        , OperKit.card { id = "watch", title = "Watch someone", hint = "Their activity appears in the Live feed with their real host." }
+        , OperKit.disclosure { id = "watch", title = "Watch someone", hint = "Their activity appears in the Live feed", open = False }
             [ Html.form
                 [ class "onyx-moddesk-form oc-form"
                 , attribute "data-testid" "oper-desk-observe-form"
@@ -425,13 +425,14 @@ networkTab model =
                         , onInput (OperDeskField OperDesk.Mask)
                         ]
                         []
-                    , button [ type_ "submit", disabled (not live || String.trim desk.mask == "") ] [ text "Observe" ]
+                    , button [ type_ "submit", class "oc-btn oc-btn-primary", disabled (not live || String.trim desk.mask == "") ] [ text "Observe" ]
                     ]
                 , p [ class "onyx-moddesk-hint" ]
                     [ text "OBSERVE reveals the subject’s real, uncloaked host to you. Use the narrowest mask that answers the question." ]
                 , div [ class "onyx-moddesk-actions" ]
                     [ button
                         [ type_ "button"
+                        , class "oc-btn oc-btn-quiet"
                         , attribute "data-testid" "oper-desk-observe-list"
                         , disabled (not live)
                         , onClick (OperDeskSubmit OperObserveList)
@@ -439,6 +440,7 @@ networkTab model =
                         [ text "List watches" ]
                     , button
                         [ type_ "button"
+                        , class "oc-btn oc-btn-quiet"
                         , attribute "data-testid" "oper-desk-observe-off"
                         , disabled (not live)
                         , onClick (OperDeskSubmit OperObserveOff)
@@ -447,9 +449,9 @@ networkTab model =
                     ]
                 ]
             ]
-        , OperKit.card { id = "disconnect", title = "Disconnect someone", hint = "Ends their session on the whole network. They can reconnect; use a ban to stop that." }
+        , OperKit.disclosure { id = "disconnect", title = "Disconnect someone", hint = "Ends their session network-wide", open = False }
             [ Html.form
-                [ class "onyx-moddesk-form oc-form onyx-moddesk-form--danger"
+                [ class "onyx-moddesk-form oc-form"
                 , attribute "data-testid" "oper-desk-kill-form"
                 , submitOn (OperKill { target = desk.killNick, reason = desk.killReason })
                 ]
@@ -476,7 +478,7 @@ networkTab model =
                         []
                     , button
                         [ type_ "submit"
-                        , class "onyx-moddesk-danger"
+                        , class "oc-btn oc-btn-danger"
                         , attribute "data-testid" "oper-desk-kill-submit"
                         , disabled (not live || String.trim desk.killNick == "" || String.trim desk.killReason == "")
                         ]
@@ -488,6 +490,7 @@ networkTab model =
             [ div [ class "onyx-moddesk-actions" ]
                 [ button
                     [ type_ "button"
+                    , class "oc-btn oc-btn-quiet"
                     , attribute "data-testid" "oper-desk-privs"
                     , disabled (not live)
                     , onClick (OperDeskSubmit OperPrivs)
@@ -495,7 +498,7 @@ networkTab model =
                     [ text "Show my privileges" ]
                 , button
                     [ type_ "button"
-                    , class "onyx-moddesk-danger"
+                    , class "oc-btn oc-btn-danger"
                     , attribute "data-testid" "oper-desk-rehash"
                     , disabled (not live)
                     , onClick (OperDeskSubmit OperRehash)
@@ -513,7 +516,9 @@ networkTab model =
                 Nothing ->
                     text ""
             ]
+        , accountsCard model
         , reportsCard model
+        , auditCard model
         , OperKit.repliesLog model Network
         , case desk.lastSent of
             Just sent ->
@@ -527,6 +532,169 @@ networkTab model =
             , p [] [ text "This network grants operator status from the signed-in account — there is no OPER command, and a broadcast rides the Event Spine rather than a user-mode WALLOPS." ]
             , code [] [ text "EVENT BROADCAST · EVENT ADD/DEL/LIST · EVENT OBSERVE · REHASH · PRIVS · KILL" ]
             ]
+        ]
+
+
+{-| Account administration: look an account up, then suspend, forbid or
+pin it. Every change is reviewed before it is sent, and the daemon's
+one-line report refreshes the card. -}
+accountsCard : Model -> Html Msg
+accountsCard model =
+    let
+        console =
+            model.operConsole
+
+        name =
+            console.forms.accountName
+
+        ready =
+            model.connection == Live && String.trim name /= ""
+
+        act action on =
+            OperConsoleMsg (OperConsole.Run (OperPlan.AccountAdmin { action = action, account = name, on = on }))
+
+        known =
+            case console.account of
+                Just status ->
+                    String.toLower status.name == String.toLower (String.trim name)
+
+                Nothing ->
+                    False
+    in
+    OperKit.disclosure { id = "accounts", title = "Accounts", hint = "Look up, suspend, forbid or pin an account", open = False }
+        [ Html.form
+            [ class "oc-form"
+            , attribute "data-testid" "oc-account-form"
+            , onSubmit (act "INFO" True)
+            ]
+            [ OperKit.formRow
+                [ OperKit.field { id = "oc-account-name", label = "Account name", hint = "" }
+                    (OperKit.textInput
+                        { id = "oc-account-name"
+                        , value = name
+                        , placeholder = "bobby"
+                        , onChange = \v -> OperConsoleMsg (OperConsole.Edit AccountName v)
+                        , testId = "oc-account-name"
+                        , mono = False
+                        , max = 64
+                        }
+                    )
+                , Html.button
+                    [ type_ "submit"
+                    , class "oc-btn oc-btn-primary oc-btn-align"
+                    , disabled (not ready)
+                    , attribute "data-testid" "oc-account-look"
+                    ]
+                    [ text "Look up" ]
+                ]
+            ]
+        , case console.account of
+            Just status ->
+                div [ class "oc-result", attribute "data-testid" "oc-account-result" ]
+                    [ p [ class "oc-result-head" ] [ text (status.name ++ ": " ++ OperReply.accountSummary status ++ ".") ]
+                    , if known && model.connection == Live then
+                        div [ class "oc-row" ]
+                            [ OperKit.button_
+                                { kind =
+                                    if status.suspended then
+                                        "quiet"
+
+                                    else
+                                        "danger"
+                                , label =
+                                    if status.suspended then
+                                        "Unsuspend"
+
+                                    else
+                                        "Suspend"
+                                , testId = "oc-account-suspend"
+                                , onClick =
+                                    act
+                                        (if status.suspended then
+                                            "UNSUSPEND"
+
+                                         else
+                                            "SUSPEND"
+                                        )
+                                        True
+                                , disabled = not status.registered
+                                , ariaLabel = Nothing
+                                }
+                            , OperKit.button_
+                                { kind =
+                                    if status.forbidden then
+                                        "quiet"
+
+                                    else
+                                        "danger"
+                                , label =
+                                    if status.forbidden then
+                                        "Allow name again"
+
+                                    else
+                                        "Forbid name"
+                                , testId = "oc-account-forbid"
+                                , onClick =
+                                    act
+                                        (if status.forbidden then
+                                            "UNFORBID"
+
+                                         else
+                                            "FORBID"
+                                        )
+                                        True
+                                , disabled = False
+                                , ariaLabel = Nothing
+                                }
+                            , OperKit.button_
+                                { kind = "quiet"
+                                , label =
+                                    if status.noexpire then
+                                        "Let it expire"
+
+                                    else
+                                        "Never expire"
+                                , testId = "oc-account-noexpire"
+                                , onClick = act "NOEXPIRE" (not status.noexpire)
+                                , disabled = not status.registered
+                                , ariaLabel = Nothing
+                                }
+                            ]
+
+                      else
+                        text ""
+                    ]
+
+            Nothing ->
+                text ""
+        ]
+
+
+{-| The last operator actions the node recorded (`AUDIT`): who did what
+to whom, with the proof id the daemon signed it with. -}
+auditCard : Model -> Html Msg
+auditCard model =
+    let
+        rows =
+            model.operConsole.audit
+    in
+    OperKit.card { id = "audit", title = "Recent operator actions", hint = "The node's audit trail: who did what, with the proof id it signed." }
+        [ OperKit.formRow
+            [ OperKit.button_
+                { kind = "quiet"
+                , label = "Load the last 20"
+                , testId = "oc-audit-load"
+                , onClick = OperConsoleMsg (OperConsole.Run (OperPlan.ServerQuery { verb = "AUDIT", arg = "20" }))
+                , disabled = model.connection /= Live
+                , ariaLabel = Nothing
+                }
+            ]
+        , if List.isEmpty rows then
+            OperKit.emptyNote "Nothing loaded yet."
+
+          else
+            ul [ class "oc-report", attribute "data-testid" "oc-audit-rows", attribute "aria-label" "Audit trail" ]
+                (List.map (\row -> li [] [ text row.text ]) rows)
         ]
 
 

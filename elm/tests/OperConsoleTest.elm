@@ -341,7 +341,52 @@ suite =
                     in
                     Expect.equal [ "APPEAL ANSWER 3 :Lifted, sorry", "APPEAL LIST" ] (lines (send oper Confirm staged))
             ]
+        , describe "lists with no terminator"
+            [ test "appeal rows show as they arrive, before the load ends" <|
+                \_ ->
+                    let
+                        state =
+                            send oper (Refresh Appeals) C.blank
+                                |> stateOf
+                                |> feedAll oper [ notice "APPEAL 1 bob 203.0.113.9 open :please review", notice "APPEAL 2 ann h.example open :sorry" ]
+                    in
+                    Expect.equal ( [ 1, 2 ], True ) ( List.map .id state.appeals.listing.rows, state.appeals.listing.loading )
+            , test "the load ends once the daemon has been quiet for the reply window" <|
+                \_ ->
+                    let
+                        state =
+                            send oper (Refresh Appeals) C.blank
+                                |> stateOf
+                                |> feedLine oper (notice "APPEAL 1 bob 203.0.113.9 open :please review")
+
+                        early =
+                            send (later 1000 oper) Settle state |> stateOf
+
+                        quiet =
+                            send (later (C.claimWindowMs + 10000) oper) Settle state |> stateOf
+                    in
+                    Expect.equal ( True, False, 1 ) ( early.appeals.listing.loading, quiet.appeals.listing.loading, List.length quiet.appeals.listing.rows )
+            , test "anyLoading is the cheap guard the host checks" <|
+                \_ ->
+                    Expect.equal ( False, True ) ( C.anyLoading C.blank, C.anyLoading (send oper (Refresh Bans) C.blank |> stateOf) )
+            , test "clone members attach to the group they follow" <|
+                \_ ->
+                    let
+                        state =
+                            send oper (Run ClonesScan) C.blank
+                                |> stateOf
+                                |> feedAll oper
+                                    [ notice "CLONES ip 203.0.113.9 (2 clients)"
+                                    , notice "  alice 203.0.113.9 *"
+                                    , notice "CLONES net 198.51.100.0/24 (1 clients)"
+                                    , notice "  dave 198.51.100.4 dave"
+                                    ]
+                    in
+                    Expect.equal [ ( "203.0.113.9", [ "alice" ] ), ( "198.51.100.0/24", [ "dave" ] ) ]
+                        (List.map (\g -> ( g.header.key, List.map .nick g.members )) state.clones.groups)
+            ]
         , describe "appeals (the person's own)"
+
             [ test "filing sends APPEAL :text and waits" <|
                 \_ ->
                     let
@@ -538,7 +583,43 @@ suite =
                     in
                     Expect.equal ( [ "a" ], 1 ) ( List.map .text (OperFeed.visible state.feed), OperFeed.heldCount state.feed )
             ]
+        , describe "staff and accounts"
+            [ test "an account report fills the account card and the Network log" <|
+                \_ ->
+                    let
+                        state =
+                            send oper (Run (AccountAdmin { action = "INFO", account = "bob", on = True })) C.blank
+                                |> stateOf
+                                |> feedLine oper (notice "ACCOUNT INFO bob registered=true flags=1 suspended=true forbidden=false noexpire=false")
+                    in
+                    Expect.equal ( Just True, [ Network ] ) ( Maybe.map .suspended state.account, List.map .section state.log )
+            , test "suspending is staged, then sent without a second query" <|
+                \_ ->
+                    let
+                        staged =
+                            send oper (Run (AccountAdmin { action = "SUSPEND", account = "bob", on = True })) C.blank |> stateOf
+                    in
+                    Expect.equal [ "ACCOUNT SUSPEND bob" ] (lines (send oper Confirm staged))
+            , test "audit rows from the Event Spine fill the audit trail" <|
+                \_ ->
+                    let
+                        draft =
+                            { category = "AUDIT", severity = "notice", origin = "n1.test", text = "#41 ops SHUN *!*@x (proof ab12) — spam", kind = OperFeed.AuditEvent, eventId = Nothing }
+
+                        state =
+                            C.observeEvent oper draft C.blank
+                    in
+                    Expect.equal ( [ "#41 ops SHUN *!*@x (proof ab12) — spam" ], 1 ) ( List.map .text state.audit, List.length (OperFeed.visible state.feed) )
+            , test "a person who is not an operator keeps no audit trail" <|
+                \_ ->
+                    let
+                        draft =
+                            { category = "AUDIT", severity = "notice", origin = "n1.test", text = "x", kind = OperFeed.AuditEvent, eventId = Nothing }
+                    in
+                    Expect.equal [] (C.observeEvent guest draft C.blank).audit
+            ]
         , describe "reply log"
+
             [ test "is bounded" <|
                 \_ ->
                     let

@@ -227,7 +227,35 @@ suite =
                         [ Just (Said { section = Content, text = "CHALLENGE method set" }), Just (Said { section = Content, text = "CHALLENGE question set" }) ]
                         [ read (notice "CHALLENGE method set"), read (notice "CHALLENGE question set") ]
             ]
+        , describe "account administration"
+            [ test "the one-line account report, for every action" <|
+                \_ ->
+                    Expect.equal
+                        [ Just (AccountReport { action = "SUSPEND", name = "bob", registered = True, suspended = True, forbidden = False, noexpire = False })
+                        , Just (AccountReport { action = "INFO", name = "ann", registered = True, suspended = False, forbidden = False, noexpire = True })
+                        , Just (AccountReport { action = "NOEXPIRE on", name = "ann", registered = True, suspended = False, forbidden = False, noexpire = True })
+                        , Just (AccountReport { action = "FORBID", name = "reserved", registered = False, suspended = False, forbidden = True, noexpire = False })
+                        ]
+                        [ read (notice "ACCOUNT SUSPEND bob registered=true flags=1 suspended=true forbidden=false noexpire=false")
+                        , read (notice "ACCOUNT INFO ann registered=true flags=4 suspended=false forbidden=false noexpire=true")
+                        , read (notice "ACCOUNT NOEXPIRE on ann registered=true flags=4 suspended=false forbidden=false noexpire=true")
+                        , read (notice "ACCOUNT FORBID reserved registered=false flags=2 suspended=false forbidden=true noexpire=false")
+                        ]
+            , test "an ACCOUNT line without a status report is not claimed" <|
+                \_ -> Expect.equal Nothing (read (notice "ACCOUNT bob logged in"))
+            , test "a status reads as a sentence" <|
+                \_ ->
+                    Expect.equal "bob: registered, suspended"
+                        (OperReply.accountSummary { action = "INFO", name = "bob", registered = True, suspended = True, forbidden = False, noexpire = False }
+                            |> (\summary -> "bob: " ++ summary)
+                        )
+            , test "FAIL ACCOUNT codes reach the desk" <|
+                \_ ->
+                    Expect.equal (Just (Failed { command = "ACCOUNT", code = "ACCOUNT_UNKNOWN", text = "No such account" }))
+                        (read ":onyx.test FAIL ACCOUNT ACCOUNT_UNKNOWN :No such account")
+            ]
         , describe "two-person rule"
+
             [ test "a mesh ward waits for a second operator" <|
                 \_ -> expectReply SecondOperator (notice "waiting for a second operator")
             ]

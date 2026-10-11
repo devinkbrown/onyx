@@ -220,7 +220,36 @@ suite =
             , test "an unknown challenge method is refused" <|
                 \_ -> Expect.equal True (isErr (OperPlan.plan (ChallengeMethod "captcha")))
             ]
+        , describe "account administration"
+            [ test "info, suspend, forbid and the NOEXPIRE switch" <|
+                \_ ->
+                    Expect.equal
+                        [ Ok "ACCOUNT INFO bobby", Ok "ACCOUNT SUSPEND bobby", Ok "ACCOUNT UNSUSPEND bobby", Ok "ACCOUNT FORBID bobby", Ok "ACCOUNT UNFORBID bobby", Ok "ACCOUNT NOEXPIRE bobby on", Ok "ACCOUNT NOEXPIRE bobby off" ]
+                        [ line (AccountAdmin { action = "INFO", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "SUSPEND", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "UNSUSPEND", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "FORBID", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "UNFORBID", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "NOEXPIRE", account = "bobby", on = True })
+                        , line (AccountAdmin { action = "NOEXPIRE", account = "bobby", on = False })
+                        ]
+            , test "a lookup sends at once; suspending and forbidding are staged and destructive" <|
+                \_ ->
+                    Expect.equal
+                        [ Ok ( False, False ), Ok ( True, True ), Ok ( True, True ), Ok ( True, False ) ]
+                        (List.map
+                            (\a -> OperPlan.plan (AccountAdmin { action = a, account = "bobby", on = True }) |> Result.map (\c -> ( c.mutates, c.destructive )))
+                            [ "INFO", "SUSPEND", "FORBID", "UNSUSPEND" ]
+                        )
+            , test "an unknown action or a spaced name is refused" <|
+                \_ ->
+                    Expect.equal [ True, True ]
+                        [ isErr (OperPlan.plan (AccountAdmin { action = "DROP", account = "bobby", on = True }))
+                        , isErr (OperPlan.plan (AccountAdmin { action = "INFO", account = "bob by", on = True }))
+                        ]
+            ]
         , describe "event spine"
+
             [ test "follow, unfollow, floor, list and stats" <|
                 \_ ->
                     Expect.equal [ Ok "EVENT ADD FLOOD", Ok "EVENT DEL FLOOD", Ok "EVENT SEVERITY warn", Ok "EVENT LIST", Ok "EVENT STATS JSON" ]

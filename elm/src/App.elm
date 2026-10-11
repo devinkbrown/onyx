@@ -79,6 +79,7 @@ import EventReplay
 import OperDesk
 import OperConsole -- v3/gap-oper
 import OperFeed -- v3/gap-oper
+import OperReply -- v3/gap-oper
 import NotifyCenter
 import Outbox
 import Passkey
@@ -13087,6 +13088,8 @@ slashCommands =
     , { name = "history", usage = "/history", description = "Open message search / history tools.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "search", usage = "/search <query>", description = "Open message search with a query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "help", usage = "/help [command]", description = "List local slash commands or describe one command.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "appeal", usage = "/appeal [what happened]", description = "Ask the operators for a second look at a ban or mute.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "desk", usage = "/desk [live|bans|silence|abuse|appeals|content|network]", description = "Open the operator desk on a tab (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "broadcast", usage = "/broadcast <text>", description = "Announce to operators subscribed to ANNOUNCE (opers).", kind = SlashIrc, aliases = [ "wallops" ], insertText = Nothing, oper = True }
     , { name = "kill", usage = "/kill <nick> <reason>", description = "Disconnect someone from the network; the reason is recorded (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "rehash", usage = "/rehash", description = "Ask this node to reload its configuration (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
@@ -15053,6 +15056,13 @@ runSlashLocal model target verb nickArg =
 
         ( "event", _ ) ->
             runSlashEvent model target
+
+        -- v3/gap-oper
+        ( "appeal", _ ) ->
+            runSlashAppeal model
+
+        ( "desk", _ ) ->
+            runSlashDesk model target
 
         ( "broadcast", _ ) ->
             runSlashOper model "broadcast"
@@ -17764,6 +17774,70 @@ requestOperEventReplay model =
 -- v3/gap-oper
 
 
+{-| `/appeal [text]`: open the appeal sheet, prefilled with whatever
+followed the verb. -}
+runSlashAppeal : Model -> ( Model, List Outbound )
+runSlashAppeal model =
+    let
+        text =
+            String.trim (String.dropLeft 7 (String.trim model.composer))
+
+        ( next, _ ) =
+            OperConsole.update (operConsoleCtx model) OperConsole.OpenUserAppeal model.operConsole
+
+        console =
+            if text == "" then
+                next
+
+            else
+                { next | forms = OperConsole.setField OperConsole.AppealText text next.forms }
+    in
+    ( { model | operConsole = console, composer = "" }, [] )
+
+
+{-| `/desk [tab]`: open the operator desk (opers only). -}
+runSlashDesk : Model -> String -> ( Model, List Outbound )
+runSlashDesk model target =
+    if not model.isOper then
+        ( addToast
+            { variant = ToastError
+            , title = "Operator access required"
+            , description = Just "This network grants operator status from the signed-in account."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            { model | composer = "" }
+        , []
+        )
+
+    else
+        let
+            wanted =
+                OperReply.sections
+                    |> List.filter (\s -> String.toLower (OperReply.sectionLabel s) == String.toLower (String.trim target))
+                    |> List.head
+
+            console =
+                model.operConsole
+
+            opened =
+                { model
+                    | operDeskOpen = True
+                    , composer = ""
+                    , operConsole =
+                        case wanted of
+                            Just section ->
+                                { console | tab = section }
+
+                            Nothing ->
+                                console
+                }
+        in
+        ( opened, [] )
+
+
 {-| What the operator console needs from the model. -}
 operConsoleCtx : Model -> OperConsole.Ctx
 operConsoleCtx model =
@@ -17826,11 +17900,33 @@ settleStepOper msg prior ( m, outs ) =
             in
             ( { m | operConsole = next }, outs )
 
+        WsOpened _ ->
+            -- A queued appeal is the one command the daemon takes before
+            -- registration: it goes out ahead of the handshake lines.
+            let
+                ( next, lines ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Connected m.operConsole
+            in
+            ( { m | operConsole = next }, List.map SendLine lines ++ outs )
+
+        Tick _ ->
+
+            if OperConsole.anyLoading m.operConsole then
+                let
+                    ( next, _ ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Settle m.operConsole
+                in
+                ( { m | operConsole = next }, outs )
+
+            else
+                ( m, outs )
+
         _ ->
             ( m, outs )
 
 
-observeOperLines : List String -> Model -> Model
+observeOperLines
+ : List String -> Model -> Model
 observeOperLines lines m =
     let
         asking =
@@ -45230,6 +45326,7 @@ overlayStack model =
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
+        , ( "appeal-sheet", model.operConsole.userAppealOpen, OperConsoleMsg OperConsole.CloseUserAppeal ) -- v3/gap-oper
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
         , ( "member-card", model.userProfileCard /= Nothing, UserProfileClosed )
         -- v3/roomsettings

@@ -12,7 +12,9 @@ module OperConsole exposing
     , State
     , UserAppeal(..)
     , abuseHeadline
+    , anyLoading
     , blank
+
     , claimWindowMs
     , maxLog
     , observeEvent
@@ -139,6 +141,7 @@ type alias AppealsState =
 {-| The person's own appeal (the user-side form). -}
 type UserAppeal
     = AppealIdle
+    | AppealQueued
     | AppealSending
     | AppealFiledAs Int
     | AppealRefused String
@@ -175,6 +178,7 @@ type alias Forms =
     , challengeQuestion : String
     , challengeAnswer : String
     , reportPick : String
+    , accountName : String
     }
 
 
@@ -210,6 +214,7 @@ blankForms =
     , challengeQuestion = ""
     , challengeAnswer = ""
     , reportPick = "MESH|"
+    , accountName = ""
     }
 
 
@@ -229,6 +234,8 @@ type alias State =
     , spamtrap : Maybe { nicks : Int, channels : Int, offenders : Int, trips : Int }
     , policy : Maybe { ward : Int, filter : Int, class : Int, ban : Int }
     , privileges : Maybe { class : String, privileges : List String }
+    , account : Maybe OperReply.AccountStatus
+    , audit : List { atMs : Float, text : String }
     , forms : Forms
     , pending : Maybe OperPlan.Command
     , errors : List String
@@ -236,6 +243,7 @@ type alias State =
     , claimUntilMs : Float
     , claimSection : Section
     , userAppeal : UserAppeal
+    , userAppealOpen : Bool
     }
 
 
@@ -256,6 +264,8 @@ blank =
     , spamtrap = Nothing
     , policy = Nothing
     , privileges = Nothing
+    , account = Nothing
+    , audit = []
     , forms = blankForms
     , pending = Nothing
     , errors = []
@@ -263,6 +273,7 @@ blank =
     , claimUntilMs = 0
     , claimSection = Feed
     , userAppeal = AppealIdle
+    , userAppealOpen = False
     }
 
 
@@ -308,6 +319,7 @@ type Field
     | ChallengeQuestionText
     | ChallengeAnswerText
     | ReportPick
+    | AccountName
     | FeedFilterText
 
 
@@ -435,6 +447,9 @@ setField field value forms =
         ReportPick ->
             { forms | reportPick = value }
 
+        AccountName ->
+            { forms | accountName = value }
+
         FeedFilterText ->
             forms
 
@@ -497,6 +512,10 @@ type Msg
     | ClearLog Section
     | AnswerAppeal (Maybe Int)
     | SendUserAppeal
+    | OpenUserAppeal
+    | CloseUserAppeal
+    | Connected
+    | Settle
 
 
 {-| Apply one message. Returns the new state and the CRLF-terminated
@@ -672,6 +691,29 @@ update ctx msg state =
             , []
             )
 
+        Settle ->
+            ( settleLoading ctx state, [] )
+
+        OpenUserAppeal ->
+            ( { state
+                | userAppealOpen = True
+                , userAppeal =
+                    case state.userAppeal of
+                        AppealRefused _ ->
+                            AppealIdle
+
+                        AppealFiledAs _ ->
+                            AppealIdle
+
+                        other ->
+                            other
+              }
+            , []
+            )
+
+        CloseUserAppeal ->
+            ( { state | userAppealOpen = False }, [] )
+
         SendUserAppeal ->
             case OperPlan.plan (AppealSubmit state.forms.appealText) of
                 Err errors ->
@@ -679,10 +721,28 @@ update ctx msg state =
 
                 Ok cmd ->
                     if not ctx.live then
-                        ( { state | userAppeal = AppealRefused "Connect first — an appeal is filed over a live connection." }, [] )
+                        -- A banned person has no live session. The appeal is
+                        -- the one command the daemon accepts before
+                        -- registration, so it is sent first thing on the next
+                        -- socket (`Connected`).
+                        ( { state | userAppeal = AppealQueued }, [] )
 
                     else
                         ( { state | userAppeal = AppealSending }, [ OperPlan.toLine cmd ] )
+
+        Connected ->
+            case state.userAppeal of
+                AppealQueued ->
+                    case OperPlan.plan (AppealSubmit state.forms.appealText) of
+                        Ok cmd ->
+                            ( { state | userAppeal = AppealSending }, [ OperPlan.toLine cmd ] )
+
+                        Err errors ->
+                            ( { state | userAppeal = AppealRefused (String.join " " errors) }, [] )
+
+                _ ->
+                    ( state, [] )
+
 
 
 {-| Arrow / Home / End over the tab list, wrapping. -}
@@ -727,6 +787,61 @@ rovingTab key current =
 
         _ ->
             current
+
+
+{-| Replies that never got a terminator (APPEAL LIST, a lost line) end
+when the daemon has been quiet for the rest of the reply window: the
+loading flags drop and any rows that did arrive are kept. -}
+settleLoading : Ctx -> State -> State
+settleLoading ctx state =
+    if not (anyLoading state) || ctx.nowMs <= state.claimUntilMs then
+        state
+
+    else
+        let
+            done listing =
+                if listing.loading then
+                    { listing
+                        | loading = False
+                        , rows =
+                            if List.isEmpty listing.incoming then
+                                listing.rows
+
+                            else
+                                List.reverse listing.incoming
+                        , incoming = []
+                        , loadedAtMs = Just ctx.nowMs
+                    }
+
+                else
+                    listing
+
+            appeals =
+                state.appeals
+
+            clones =
+                state.clones
+        in
+        { state
+            | wards = done state.wards
+            , shuns = done state.shuns
+            , filters = done state.filters
+            , sessions = done state.sessions
+            , appeals = { appeals | listing = done appeals.listing }
+            , clones = { clones | loading = False }
+        }
+
+
+{-| Whether any list is still waiting for its reply (a cheap check the
+host makes before it bothers settling). -}
+anyLoading : State -> Bool
+anyLoading state =
+    state.wards.loading
+        || state.shuns.loading
+        || state.filters.loading
+        || state.sessions.loading
+        || state.appeals.listing.loading
+        || state.clones.loading
 
 
 canSend : Ctx -> Bool
@@ -942,6 +1057,8 @@ followUp cmd state =
                 ( "POLICY", [ "ROLLBACK" ] ) ->
                     list PolicyShow
 
+
+
                 _ ->
                     Nothing
     in
@@ -1104,7 +1221,10 @@ observeEvent ctx draft state =
             pushed =
                 { state | feed = OperFeed.push ctx.nowMs draft state.feed }
         in
-        if draft.category == "OPER_ACTION" && ctx.nowMs <= pushed.claimUntilMs then
+        if draft.kind == OperFeed.AuditEvent then
+            { pushed | audit = List.take 40 ({ atMs = ctx.nowMs, text = draft.text } :: pushed.audit) }
+
+        else if draft.category == "OPER_ACTION" && ctx.nowMs <= pushed.claimUntilMs then
             -- The daemon confirms WARD / SHUN / SPAMTRAP changes only on
             -- the Event Spine: surface it in the tab that asked.
             extendClaim ctx (pushLog ctx.nowMs pushed.claimSection Good ("Confirmed: " ++ draft.text) pushed)
@@ -1242,9 +1362,9 @@ finishClaimed _ state =
 
 addCloneMember : OperReply.CloneMember -> Clones -> Clones
 addCloneMember member clones =
-    case clones.groups of
-        group :: rest ->
-            { clones | groups = { group | members = group.members ++ [ member ] } :: rest }
+    case List.reverse clones.groups of
+        group :: earlier ->
+            { clones | groups = List.reverse ({ group | members = group.members ++ [ member ] } :: earlier) }
 
         [] ->
             clones
@@ -1292,7 +1412,13 @@ applyReply ctx reply state =
                 { state | sessions = finishListing now state.sessions }
 
             AppealRow row ->
-                { state | appeals = { appeals | listing = addRow row appeals.listing } }
+                -- APPEAL LIST has no terminator line: rows show as they
+                -- arrive and `settle` ends the load once the daemon is quiet.
+                let
+                    listing =
+                        addRow row appeals.listing
+                in
+                { state | appeals = { appeals | listing = { listing | rows = List.reverse listing.incoming, loadedAtMs = Just now } } }
 
             AppealNone ->
                 logIt Appeals { state | appeals = { appeals | listing = finishListing now (startLoading appeals.listing) } }
@@ -1342,6 +1468,9 @@ applyReply ctx reply state =
 
             PrivilegeList list ->
                 { state | privileges = Just list }
+
+            AccountReport status ->
+                logIt Network { state | account = Just status }
 
             EventCategories e ->
                 { state

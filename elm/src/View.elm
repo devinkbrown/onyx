@@ -43,6 +43,7 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
+import View.Appeal
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
@@ -323,6 +324,7 @@ overlays model =
         -- v3/roomsettings
         , View.RoomSettings.roomSettingsSheet model
         , operSheet model
+        , View.Appeal.appealSheet model -- v3/gap-oper
         , personSafetySheet model
         , newMessageSheet model
         , inviteShareSheet model -- v3/dmsafety

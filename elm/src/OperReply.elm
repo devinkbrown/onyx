@@ -1,5 +1,6 @@
 module OperReply exposing
-    ( Appeal
+    ( AccountStatus
+    , Appeal
     , CloneCluster
     , CloneMember
     , Reply(..)
@@ -8,8 +9,10 @@ module OperReply exposing
     , Shun
     , Tone(..)
     , Ward
+    , accountSummary
     , classify
     , describe
+
     , isErrorNumeric
     , parseCloneMember
     , sectionLabel
@@ -111,6 +114,18 @@ type alias Appeal =
     }
 
 
+{-| `ACCOUNT <action> <name> registered=… flags=… suspended=… forbidden=…
+noexpire=…` (the `ACCOUNT` admin command's one-line report). -}
+type alias AccountStatus =
+    { action : String
+    , name : String
+    , registered : Bool
+    , suspended : Bool
+    , forbidden : Bool
+    , noexpire : Bool
+    }
+
+
 type alias Session =
     { oper : Bool
     , nick : String
@@ -166,6 +181,7 @@ type Reply
     | PolicyGenerations { ward : Int, filter : Int, class : Int, ban : Int }
     | PolicyRolled String
     | SecondOperator
+    | AccountReport AccountStatus
     | EventCategories { subscribed : List String, minSeverity : String }
     | EventSeverityIs String
     | EventStatsText String
@@ -345,6 +361,9 @@ classifyNotice text =
     else if String.startsWith "OBSERVE:" text then
         Just (Said { section = Feed, text = text })
 
+    else if String.startsWith "ACCOUNT " text && String.contains " registered=" text then
+        classifyAccount text
+
     else if String.startsWith "KILL:" text then
         Just (Said { section = Network, text = text })
 
@@ -353,6 +372,50 @@ classifyNotice text =
 
     else
         Nothing
+
+
+
+-- ACCOUNTS
+
+
+classifyAccount : String -> Maybe Reply
+classifyAccount text =
+    let
+        words =
+            String.words text
+
+        flag key =
+            words
+                |> List.filter (String.startsWith (key ++ "="))
+                |> List.head
+                |> Maybe.map (\w -> String.dropLeft (String.length key + 1) w == "true")
+    in
+    case words of
+        "ACCOUNT" :: action :: rest ->
+            -- NOEXPIRE reports as `NOEXPIRE on <name> …`.
+            let
+                ( shown, name ) =
+                    case rest of
+                        word :: more ->
+                            if action == "NOEXPIRE" && (word == "on" || word == "off") then
+                                ( "NOEXPIRE " ++ word, Maybe.withDefault "" (List.head more) )
+
+                            else
+                                ( action, word )
+
+                        [] ->
+                            ( action, "" )
+            in
+            Maybe.map2
+                (\( registered, suspended ) ( forbidden, noexpire ) ->
+                    AccountReport { action = shown, name = name, registered = registered, suspended = suspended, forbidden = forbidden, noexpire = noexpire }
+                )
+                (Maybe.map2 Tuple.pair (flag "registered") (flag "suspended"))
+                (Maybe.map2 Tuple.pair (flag "forbidden") (flag "noexpire"))
+
+
+        _ ->
+            Nothing
 
 
 
@@ -686,7 +749,7 @@ classifyFail : List String -> Maybe Reply
 classifyFail params =
     case params of
         command :: code :: rest ->
-            if List.member command [ "FILTER", "UNREJECT", "APPEAL", "WARD", "SHUN", "SPAMTRAP", "HOLD", "POLICY", "CHALLENGE", "QUARANTINE" ] then
+            if List.member command [ "ACCOUNT", "FILTER", "UNREJECT", "APPEAL", "WARD", "SHUN", "SPAMTRAP", "HOLD", "POLICY", "CHALLENGE", "QUARANTINE" ] then
                 Just (Failed { command = command, code = code, text = lastParam rest })
 
             else
@@ -809,6 +872,9 @@ sectionOf reply =
         SecondOperator ->
             Network
 
+        AccountReport _ ->
+            Network
+
         EventCategories _ ->
             Feed
 
@@ -918,6 +984,9 @@ toneOf reply =
 
         SecondOperator ->
             Warn
+
+        AccountReport _ ->
+            Plain
 
         RehashDone _ ->
             Good
@@ -1073,6 +1142,9 @@ describe reply =
         SecondOperator ->
             "Waiting for a second operator to repeat this command."
 
+        AccountReport a ->
+            a.name ++ ": " ++ accountSummary a
+
 
         EventCategories e ->
             if List.isEmpty e.subscribed then
@@ -1107,6 +1179,34 @@ describe reply =
 
         Said s ->
             s.text
+
+
+accountSummary : AccountStatus -> String
+accountSummary a =
+    if not a.registered then
+        "not registered"
+
+    else
+        String.join ", "
+            (List.filterMap identity
+                [ Just "registered"
+                , if a.suspended then
+                    Just "suspended"
+
+                  else
+                    Nothing
+                , if a.forbidden then
+                    Just "forbidden"
+
+                  else
+                    Nothing
+                , if a.noexpire then
+                    Just "never expires"
+
+                  else
+                    Nothing
+                ]
+            )
 
 
 reasonSuffix : String -> String

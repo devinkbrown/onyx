@@ -188,7 +188,21 @@ export default {
     s.events(3);
     await h.settle(page, 400);
   },
+  'oper-scrolled': async (page, h) => {
+    const s = await operSession(page, h);
+    await openDesk(page, h);
+    s.events();
+    await h.settle(page, 400);
+    await page.evaluate(() => { const el = document.querySelector('[data-testid="oper-sheet"]'); if (el) el.scrollTop = 400; });
+    await h.settle(page, 300);
+    const rects = await page.evaluate(() => {
+      const r = (sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.bottom), Math.round(b.left), Math.round(b.right)]; };
+      return { sheet: r('[data-testid="oper-sheet"]'), tabs: r('[data-testid="oc-tabs"]'), close: r('[data-testid="oper-sheet"] .onyx-sheet-close'), vp: [innerWidth, innerHeight] };
+    });
+    console.log('MEASURE', page.viewportSize().width, JSON.stringify(rects));
+  },
   'oper-bans': async (page, h) => {
+
     await operSession(page, h);
     await openDesk(page, h);
     await tab(page, h, 'bans');

@@ -289,6 +289,7 @@ type Intent
     | EventsReport
     | EventStats
     | ServerQuery { verb : String, arg : String }
+    | AccountAdmin { action : String, account : String, on : Bool }
 
 
 {-| Read-only server queries the Network tab offers, each with the
@@ -639,7 +640,56 @@ plan intent =
         EventStats ->
             Ok (mk Feed "EVENT" [ "STATS", "JSON" ] Nothing "Count the events the node has published since it started." False False)
 
+        AccountAdmin { action, account, on } ->
+            case token 64 "account name" account of
+                Err message ->
+                    Err [ message ]
+
+                Ok name ->
+                    case action of
+                        "INFO" ->
+                            Ok (mk Network "ACCOUNT" [ "INFO", name ] Nothing ("Show the status of the account " ++ name ++ ".") False False)
+
+                        "SUSPEND" ->
+                            Ok (mk Network "ACCOUNT" [ "SUSPEND", name ] Nothing ("Suspend the account " ++ name ++ ": it can no longer sign in.") True True)
+
+                        "UNSUSPEND" ->
+                            Ok (mk Network "ACCOUNT" [ "UNSUSPEND", name ] Nothing ("Let the account " ++ name ++ " sign in again.") True False)
+
+                        "FORBID" ->
+                            Ok (mk Network "ACCOUNT" [ "FORBID", name ] Nothing ("Forbid the account name " ++ name ++ ": nobody can register it, and it cannot sign in.") True True)
+
+                        "UNFORBID" ->
+                            Ok (mk Network "ACCOUNT" [ "UNFORBID", name ] Nothing ("Allow the account name " ++ name ++ " again.") True False)
+
+                        "NOEXPIRE" ->
+                            Ok
+                                (mk Network
+                                    "ACCOUNT"
+                                    [ "NOEXPIRE"
+                                    , name
+                                    , if on then
+                                        "on"
+
+                                      else
+                                        "off"
+                                    ]
+                                    Nothing
+                                    (if on then
+                                        "Keep the account " ++ name ++ " from expiring for inactivity."
+
+                                     else
+                                        "Let the account " ++ name ++ " expire for inactivity again."
+                                    )
+                                    True
+                                    False
+                                )
+
+                        _ ->
+                            Err [ "That account action is not one the desk offers." ]
+
         ServerQuery { verb, arg } ->
+
             if List.any (\q -> q.verb == verb && q.arg == arg) serverQueries then
                 Ok
                     (mk Network

@@ -249,7 +249,7 @@ bansTab model =
                 _ ->
                     "Use * for any run of characters. Masks that match almost everyone are refused."
     in
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-bans" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-bans" ]
         (K.lede "Bans stop people at the door. Say who it covers, for how long, and why — the reason is recorded."
             :: pendingFor model Bans
             ++ [ K.card { id = "ban-add", title = "Add a ban", hint = "" }
@@ -453,7 +453,7 @@ silenceTab model =
         ready =
             live model
     in
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-silence" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-silence" ]
         (K.lede "Quieter than a ban: the person stays connected, and what they say goes nowhere. Use the narrowest tool that works."
             :: pendingFor model Silence
             ++ [ K.card { id = "shun", title = "Shun", hint = "Everything they send is dropped, and they are not told." }
@@ -731,7 +731,7 @@ abuseTab model =
         ready =
             live model
     in
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-abuse" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-abuse" ]
         (K.lede "Look before you act: why someone is throttled, who shares an address, and who is connected right now."
             :: pendingFor model Abuse
             ++ [ K.card { id = "abuse-check", title = "Check a person", hint = "" }
@@ -1031,7 +1031,7 @@ appealsTab model =
         answered =
             List.filter .answered listing.rows
     in
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-appeals" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-appeals" ]
         (K.lede "People who were banned or silenced can ask for a second look, once an hour. Your answer is recorded and audited; the server does not message them."
             :: pendingFor model Appeals
             ++ [ K.card { id = "appeals", title = "Appeals", hint = "" }
@@ -1163,7 +1163,7 @@ boolText flag =
 
 contentTab : Model -> Html Msg
 contentTab model =
-    div [ class "oc-panel", attribute "data-testid" "oc-tab-content" ]
+    div [ class "oc-panel", attribute "data-testid" "oc-panel-content" ]
         (K.lede "Network-wide controls for what people can say and how new connections are tested. These apply to everyone who is not an operator."
             :: pendingFor model Content
             ++ [ filtersCard model
