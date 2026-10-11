@@ -177,7 +177,10 @@ newLogEntries cap prior after =
             else
                 search (k + 1)
     in
-    if la < cap && la >= lp then
+    if after == prior then
+        []
+
+    else if la < cap && la >= lp then
         List.take (la - lp) after
 
     else

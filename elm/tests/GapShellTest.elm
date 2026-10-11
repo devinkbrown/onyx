@@ -23,6 +23,7 @@ import Test exposing (Test, describe, test)
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import View
+import Wire
 
 
 feed : Model -> String -> ( Model, List Outbound )
@@ -153,7 +154,7 @@ signIn =
             \_ ->
                 let
                     pending =
-                        { gate | connection = Registering, capNegotiating = True, sasl = SaslPending Plain, saslAccount = Just "kai", autoReconnect = True }
+                        { gate | connection = Registering, capNegotiating = True, sasl = SaslPending Wire.Plain, saslAccount = Just "kai", autoReconnect = True }
 
                     ( failed, out ) =
                         feed pending ":s 904 kai :SASL authentication failed"
@@ -176,7 +177,7 @@ signIn =
             \_ ->
                 let
                     pending =
-                        { gate | connection = Registering, sasl = SaslPending Plain }
+                        { gate | connection = Registering, sasl = SaslPending Wire.Plain }
 
                     ( failed, _ ) =
                         feed pending ":s 904 kai :Two-factor authentication required: log in with IDENTIFY <account> <password> <code>"
@@ -185,7 +186,7 @@ signIn =
         , test "a sign-in timeout says so" <|
             \_ ->
                 Expect.equal (Just FailSaslTimeout)
-                    (step SaslTimeout { gate | connection = Registering, sasl = SaslPending Plain }).gapShell.connectFailure
+                    (step SaslTimeout { gate | connection = Registering, sasl = SaslPending Wire.Plain }).gapShell.connectFailure
         , test "a stray 904 (no exchange) neither disarms nor blames the password" <|
             \_ ->
                 let
@@ -461,7 +462,7 @@ activity =
                 let
                     m =
                         { settledLive | nowMs = 7000 }
-                            |> feedM ":s NOTICE kai :mesh: 2 nodes linked"
+                            |> feedM ":irc.onyx.test NOTICE kai :mesh: 2 nodes linked"
                             |> feedM ":s ERROR :Ping timeout"
                 in
                 Expect.equal
@@ -498,11 +499,11 @@ activity =
                 let
                     m =
                         settledLive
-                            |> feedM ":s NOTICE kai :WELCOME :Say hi in #lounge"
-                            |> feedM ":s NOTICE kai :WELCOME :Read the house rules"
-                            |> feedM ":s NOTICE kai :WELCOME: end of pack"
-                            |> feedM ":s NOTICE kai :WELCOME :Say hi in #lounge"
-                            |> feedM ":s NOTICE kai :[Welcome] Glad you're here"
+                            |> feedM ":irc.onyx.test NOTICE kai :WELCOME :Say hi in #lounge"
+                            |> feedM ":irc.onyx.test NOTICE kai :WELCOME :Read the house rules"
+                            |> feedM ":irc.onyx.test NOTICE kai :WELCOME: end of pack"
+                            |> feedM ":irc.onyx.test NOTICE kai :WELCOME :Say hi in #lounge"
+                            |> feedM ":irc.onyx.test NOTICE kai :[Welcome] Glad you're here"
                 in
                 Expect.equal [ "Say hi in #lounge", "Read the house rules", "Glad you're here" ] m.gapShell.welcomePack
         , test "dismissing the MOTD hides it for the day and stores the time" <|
@@ -803,7 +804,7 @@ roomActions =
             \_ ->
                 let
                     offline =
-                        { withRoom "#lounge" settledLive | connection = Offline }
+                        (\r -> { r | connection = Offline }) (withRoom "#lounge" settledLive)
 
                     ( left, out ) =
                         offline
@@ -889,7 +890,7 @@ views =
         , test "the Activity sheet renders the log" <|
             \_ ->
                 settledLive
-                    |> feedM ":s NOTICE kai :mesh: 2 nodes linked"
+                    |> feedM ":irc.onyx.test NOTICE kai :mesh: 2 nodes linked"
                     |> step (GapShellMsg GapShell.ActivityOpen)
                     |> query
                     |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "activity-list") ]
@@ -913,7 +914,7 @@ pure =
                     , \_ -> Expect.equal [ "d" ] (GapShell.newLogEntries 3 [ "c", "b", "a" ] [ "d", "c", "b" ])
                     , \_ -> Expect.equal [ "e", "d" ] (GapShell.newLogEntries 3 [ "c", "b", "a" ] [ "e", "d", "c" ])
                     , \_ -> Expect.equal [] (GapShell.newLogEntries 3 [ "c", "b", "a" ] [ "c", "b", "a" ])
-                    , \_ -> Expect.equal [ "x" ] (GapShell.newLogEntries 3 [ "x", "x", "x" ] [ "x", "x", "x" ] |> List.take 1)
+                    , \_ -> Expect.equal [ "x" ] (GapShell.newLogEntries 3 [ "x", "x", "y" ] [ "x", "x", "x" ])
                     ]
                     ()
         , test "close reasons: fatal vs transient" <|
