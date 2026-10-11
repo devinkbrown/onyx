@@ -50,7 +50,9 @@ import Sidebar
 import View.CallDock -- v3/calls-c6
 import View.CallPresence
 import View.DmSafety
+import View.GapShell -- v3/gap-shell
 import View.ModDesk
+import View.Organize -- v3/gap-organize
 import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
@@ -282,6 +284,8 @@ moreMenu model name isRoom channel =
                                , View.WatchTogether.menuItem model -- v3/gap-watch
                                ]
                             ++ View.ModDesk.moderationToggle model
+                            ++ View.Organize.roomMoreItems model name isRoom -- v3/gap-organize
+                            ++ View.GapShell.roomMoreItems model name isRoom -- v3/gap-shell
                         )
                     ]
 

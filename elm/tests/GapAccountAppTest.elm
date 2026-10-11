@@ -11,6 +11,7 @@ import App exposing (..)
 import Dict
 import Expect
 import GapAccount
+import HistoryImport
 import Json.Encode as Encode
 import Notify
 import Set
@@ -1366,13 +1367,34 @@ dataTests =
                     , \_ -> Expect.equal (Just "Imported 3 saved searches.") done.gapAccount.searchStatus
                     ]
                     ()
-        , test "an oversized import file is refused with a message and nothing staged" <|
+        , test "a confirmed history import is held back while local history is off; the review stays" <|
             \_ ->
                 let
-                    ( m, outs ) =
-                        update (GapAccountMsg (GapAccount.ImportRefused { reason = "too big" })) guest
+                    json =
+                        "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#c\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000}]}]}"
+
+                    ( staged, _ ) =
+                        update (VaultImportFile { json = json }) guest
+
+                    prefs =
+                        staged.prefs
+
+                    off =
+                        { staged | prefs = { prefs | localHistory = False } }
+
+                    ( _, okOuts ) =
+                        update (HistoryImportMsg HistoryImport.Confirm) staged
+
+                    ( offModel, offOuts ) =
+                        update (HistoryImportMsg HistoryImport.Confirm) off
                 in
-                Expect.equal ( Just "too big", Nothing, [] ) ( m.gapAccount.importStatus, m.gapAccount.importReview, persistTargets outs )
+                Expect.all
+                    [ \_ -> Expect.equal [ "#c" ] (persistTargets okOuts)
+                    , \_ -> Expect.equal [] (persistTargets offOuts)
+                    , \_ -> Expect.equal (Just True) (Maybe.map .failure offModel.historyImport.status)
+                    , \_ -> Expect.notEqual HistoryImport.Idle offModel.historyImport.phase
+                    ]
+                    ()
         , test "export asks for review first and only then downloads" <|
             \_ ->
                 let

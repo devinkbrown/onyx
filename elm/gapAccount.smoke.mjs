@@ -22,9 +22,11 @@ function memoryStorage(seed) {
   };
 }
 globalThis.localStorage = memoryStorage();
-globalThis.IDBKeyRange = { only: (v) => ({ only: v }) };
+globalThis.IDBKeyRange = { only: (v) => ({ only: v }), bound: (lower, upper) => ({ lower, upper }) };
 require("./ports.js");
+require("./historyImport.js");
 const { gapAccount, vaultStore, outboxStore } = globalThis.OnyxPorts;
+const HI = globalThis.OnyxHistoryImport;
 
 const GUEST = '["onyx","guest"]';
 const KAI = '["onyx","account","kai"]';
@@ -160,8 +162,6 @@ function fakeIdb(opts) {
     data,
     options,
     transaction(names) {
-      const name = Array.isArray(names) ? names[0] : names;
-      const map = data[name];
       const tx = { pending: 0, done: false, aborted: false, oncomplete: null, onerror: null, onabort: null };
       const settle = () => {
         if (tx.done || tx.pending !== 0) return;
@@ -183,54 +183,63 @@ function fakeIdb(opts) {
         }, 0);
         return req;
       };
-      const cursor = (entries) => {
-        const req = {};
-        let i = 0;
-        const step = () => {
-          tx.pending += 1;
-          setTimeout(() => {
-            if (i < entries.length) {
-              const [key, value] = entries[i];
-              req.result = {
-                value,
-                primaryKey: key,
-                continue() { i += 1; step(); },
-                delete() { map.delete(key); },
-              };
-            } else {
-              req.result = null;
-            }
-            if (req.onsuccess) req.onsuccess({ target: req });
-            tx.pending -= 1;
-            settle();
-          }, 0);
+      const makeStore = (name) => {
+        const map = data[name];
+        const cursor = (entries) => {
+          const req = {};
+          let i = 0;
+          const step = () => {
+            tx.pending += 1;
+            setTimeout(() => {
+              if (i < entries.length) {
+                const [key, value] = entries[i];
+                req.result = {
+                  value,
+                  primaryKey: key,
+                  continue() { i += 1; step(); },
+                  delete() { map.delete(key); },
+                };
+              } else {
+                req.result = null;
+              }
+              if (req.onsuccess) req.onsuccess({ target: req });
+              tx.pending -= 1;
+              settle();
+            }, 0);
+          };
+          step();
+          return req;
         };
-        step();
-        return req;
+        const inRange = (key, range) => {
+          if (!range) return true;
+          if (range.only !== undefined) return key === range.only;
+          return key >= range.lower && key <= range.upper;
+        };
+        const sortedEntries = (filter, dir) => {
+          const list = [...map.entries()].filter(([k, v]) => filter(k, v)).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+          return dir === "prev" ? list.reverse() : list;
+        };
+        return {
+          put(row) { map.set(row.id, JSON.parse(JSON.stringify(row))); },
+          add(row) {
+            if (map.has(row.id)) throw new Error("ConstraintError");
+            return request(() => { map.set(row.id, JSON.parse(JSON.stringify(row))); return row.id; });
+          },
+          get(key) { return request(() => { const v = map.get(key); return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }); },
+          delete(key) { map.delete(key); },
+          clear() {
+            if (options.failClear) { tx.aborted = true; settle(); return; }
+            map.clear();
+          },
+          count() { return request(() => (options.stuckRows ? options.stuckRows : map.size)); },
+          getAll() { return request(() => [...map.values()].map((v) => JSON.parse(JSON.stringify(v)))); },
+          openCursor(range, dir) { return cursor(sortedEntries((k) => inRange(k, range), dir)); },
+          index() {
+            return { openCursor(range, dir) { return cursor(sortedEntries((k, v) => !range || v.target === range.only, dir)); } };
+          },
+        };
       };
-      const sortedEntries = (filter, dir) => {
-        const list = [...map.entries()].filter(([, v]) => filter(v)).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-        return dir === "prev" ? list.reverse() : list;
-      };
-      const store = {
-        put(row) { map.set(row.id, JSON.parse(JSON.stringify(row))); },
-        add(row) {
-          if (map.has(row.id)) throw new Error("ConstraintError");
-          return request(() => { map.set(row.id, JSON.parse(JSON.stringify(row))); return row.id; });
-        },
-        delete(key) { map.delete(key); },
-        clear() {
-          if (options.failClear) { tx.aborted = true; settle(); return; }
-          map.clear();
-        },
-        count() { return request(() => (options.stuckRows ? options.stuckRows : map.size)); },
-        getAll() { return request(() => [...map.values()].map((v) => JSON.parse(JSON.stringify(v)))); },
-        openCursor(range, dir) { return cursor(sortedEntries(() => true, dir)); },
-        index() {
-          return { openCursor(range, dir) { return cursor(sortedEntries((v) => !range || v.target === range.only, dir)); } };
-        },
-      };
-      tx.objectStore = () => store;
+      tx.objectStore = (name) => makeStore(name || (Array.isArray(names) ? names[0] : names));
       settle();
       return tx;
     },
@@ -435,10 +444,6 @@ test("ownerArg: missing is undefined, a string is the scope, anything else is nu
   assert.equal(gapAccount.ownerArg(null), undefined);
 });
 
-test("import size guard is the oracle's 64 MiB", () => {
-  assert.equal(gapAccount.importMaxBytes, 64 * 1024 * 1024);
-});
-
 /* ---------- app badge ---------- */
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -551,4 +556,65 @@ test("a healthy open uses the primary database", async () => {
     assert.equal(db.name, "onyx-vault");
     assert.equal(fake.opened.length, 1);
   } finally { fake.restore(); }
+});
+
+/* ---------- history import: duplicates, ledger and undo per owner ---------- */
+
+const printOf = (at, from, body) => HI.parsers.fingerprint(at, from, body);
+
+test("duplicate detection only sees the signed-in scope's rows", async () => {
+  const db = fakeIdb();
+  await put(db, [row("d:1", "#c", "hello there", 1000)], KAI);
+  const sees = (owner) => new Promise((resolve) => HI.existingIndex(db, owner, (ids, prints) => resolve({ ids: [...ids], prints: [...prints] })));
+  const kai = await sees(KAI);
+  const lee = await sees(LEE);
+  const none = await sees(null);
+  assert.deepEqual(kai.ids, ["d:1"], "the logical id, not the owner-prefixed key");
+  assert.deepEqual(kai.prints, [printOf(1000, "alice", "hello there")]);
+  assert.deepEqual(lee, { ids: [], prints: [] });
+  assert.deepEqual(none, { ids: [], prints: [] });
+});
+
+test("the batch ledger is per owner and an undo deletes only that owner's rows", async () => {
+  const db = fakeIdb();
+  // the same imported id lands in both identities' history
+  await put(db, [row("imp:1", "#c", "imported hello", 1000)], KAI);
+  await put(db, [row("imp:1", "#c", "imported hello", 1000)], LEE);
+  const batch = { id: "imp-1", kind: "discord", label: "Guild", at: 5, messages: 1, targets: ["#c"] };
+  const record = (owner) => ({ id: HI.ledgerKey("imp-1", owner), kind: "import-batch", batch, ids: ["imp:1"], prints: [printOf(1000, "alice", "imported hello")] });
+  await new Promise((resolve) => HI.ledgerPut(db, record(KAI), resolve));
+  const list = (owner) => new Promise((resolve) => HI.ledgerList(db, owner, resolve));
+  assert.deepEqual(await list(KAI), [batch]);
+  assert.deepEqual(await list(LEE), [], "another identity does not see the batch");
+  assert.deepEqual(await list(null), []);
+
+  // Lee cannot undo Kai's batch (no ledger entry under Lee), nothing is touched
+  const leeTry = await new Promise((resolve) => HI.removeBatch(db, "imp-1", LEE, (...args) => resolve(args)));
+  assert.deepEqual(leeTry.slice(0, 2), [0, true]);
+  assert.equal(db.data.messages.size, 2);
+
+  const [removed, ok] = await new Promise((resolve) => HI.removeBatch(db, "imp-1", KAI, (...args) => resolve(args)));
+  assert.deepEqual([removed, ok], [1, true]);
+  const kaiRows = await get(db, "#c", KAI);
+  const leeRows = await get(db, "#c", LEE);
+  assert.deepEqual(kaiRows.rows, []);
+  assert.deepEqual(leeRows.rows.map((r) => r.body), ["imported hello"], "Lee's copy is untouched");
+  assert.deepEqual(await list(KAI), [], "the ledger entry goes with it");
+});
+
+test("no scope: nothing is indexed, listed or removed", async () => {
+  const db = fakeIdb();
+  await put(db, [row("imp:1", "#c", "x", 1)], KAI);
+  const removed = await new Promise((resolve) => HI.removeBatch(db, "imp-1", null, (...args) => resolve(args)));
+  assert.deepEqual(removed, [0, false, [], []]);
+  assert.equal(db.data.messages.size, 1);
+});
+
+test("the pre-scope call shape the importer smokes use still works", async () => {
+  const db = fakeIdb();
+  db.data.messages.set("legacy:1", { id: "legacy:1", target: "#c", from: "a", body: "old", at: 7 });
+  const [ids] = await new Promise((resolve) => HI.existingIndex(db, (i, p) => resolve([[...i], [...p]])));
+  assert.deepEqual(ids, ["legacy:1"]);
+  assert.equal(HI.ledgerKey("b1"), "import-batch:b1");
+  assert.equal(HI.ledgerKey("b1", KAI), "import-batch:" + KAI + "\u0000b1");
 });

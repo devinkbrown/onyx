@@ -61,10 +61,12 @@ import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
 import View.Prefs exposing (prefsSheet)
+import View.BlockKit -- v3/gap-import
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Account2
+import View.UserModes -- v3/gap-usermodes
 import View.Toast exposing (toaster)
 import View.Nav
 import View.Inbox
@@ -76,7 +78,11 @@ import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
 import View.Polish -- v3/polish
+-- v3/gap-organize
+import View.Attention
+import View.Organize
 import View.WatchTogether -- v3/gap-watch
+import View.GapShell -- v3/gap-shell
 
 
 view : Model -> Browser.Document Msg
@@ -242,6 +248,7 @@ appFrame model =
              else
                 "false"
             )
+        , View.Attention.readerAttr model -- v3/gap-organize: reader mode
         , -- v3/ui-mobile-shell: a conversation is showing (phones push it
           -- as its own page: no global bar, no bottom nav, a back control)
           attribute "data-convo"
@@ -342,11 +349,19 @@ overlays model =
         -- v3/gap-watch
         , View.WatchTogether.startSheet model
         , reclaimDialog model
+        -- v3/gap-shell
+        , View.GapShell.activitySheet model
+        , View.GapShell.leaveConfirm model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
+        -- v3/gap-organize: row menu, folder picker, saved messages; reader exit
+        , View.Organize.sheets model
+        , View.Attention.readerPill model
+        , View.UserModes.memoSheet model -- v3/gap-usermodes
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        , View.BlockKit.overlay model -- v3/gap-import
         , View.GapCommands.commandsHelp model -- v3/gap-commands
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model

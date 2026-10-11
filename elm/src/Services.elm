@@ -976,11 +976,16 @@ memo sub args =
                         "DEL" ->
                             buildSub "MEMO" "IGNORE" [ Just "DEL", wireToken account ]
 
-                        "LIST" ->
-                            buildSub "MEMO" "IGNORE" [ Just "LIST", wireToken account ]
-
                         _ ->
                             Nothing
+
+                -- v3/gap-usermodes: `MEMO IGNORE LIST` takes no account.
+                [ op ] ->
+                    if String.toUpper op == "LIST" then
+                        Just (Wire.formatIrcLine "MEMO" [ "IGNORE", "LIST" ])
+
+                    else
+                        Nothing
 
                 _ ->
                     Nothing
@@ -1008,8 +1013,10 @@ memo sub args =
                     Nothing
 
         "OFF" ->
+            -- v3/gap-usermodes: the server has no `MEMO OFF`; forwarding
+            -- stops with `MEMO FORWARD OFF` (`handleMemo`).
             if List.isEmpty args then
-                Just (Wire.formatIrcLine "MEMO" [ "OFF" ])
+                Just (Wire.formatIrcLine "MEMO" [ "FORWARD", "OFF" ])
 
             else
                 Nothing
@@ -1424,27 +1431,34 @@ guardEmpty args line =
         Nothing
 
 
+{-| `SILENCE +mask` / `SILENCE -mask` — v3/gap-usermodes: the sign is
+glued to the mask (`silence.zig` `parseOperationWith`); the old
+`SILENCE + mask` form was a 461 on the Onyx Server.
+-}
 silenceEntry : String -> String -> Maybe String
 silenceEntry op mask =
-    case String.toUpper op of
-        "+" ->
-            build "SILENCE" [ Just "+", wireText mask ]
+    case ( op, wireToken mask ) of
+        ( "+", Just m ) ->
+            Just (Wire.formatIrcLine "SILENCE" [ "+" ++ m ])
 
-        "-" ->
-            build "SILENCE" [ Just "-", wireText mask ]
+        ( "-", Just m ) ->
+            Just (Wire.formatIrcLine "SILENCE" [ "-" ++ m ])
 
         _ ->
             Nothing
 
 
+{-| `ACCEPT +nick` / `ACCEPT -nick` — v3/gap-usermodes: the sign is glued
+to the nick (`accept_list.zig` `parseOne`).
+-}
 acceptEntry : String -> String -> Maybe String
 acceptEntry op nick =
-    case String.toUpper op of
-        "+" ->
-            build "ACCEPT" [ Just "+", normalizeNick nick ]
+    case ( op, normalizeNick nick ) of
+        ( "+", Just n ) ->
+            Just (Wire.formatIrcLine "ACCEPT" [ "+" ++ n ])
 
-        "-" ->
-            build "ACCEPT" [ Just "-", normalizeNick nick ]
+        ( "-", Just n ) ->
+            Just (Wire.formatIrcLine "ACCEPT" [ "-" ++ n ])
 
         _ ->
             Nothing

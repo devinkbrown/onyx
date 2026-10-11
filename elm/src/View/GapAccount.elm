@@ -1,5 +1,7 @@
 module View.GapAccount exposing
     ( accountNavLinks
+    , exportButton
+    , exportReview
     , historyCards
     , namesSection
     , protectionSection
@@ -9,8 +11,7 @@ module View.GapAccount exposing
 {-| v3/gap-account — Account protection (secure / enforce, recover and
 release a name, recognised addresses, grouped names) and the
 Preferences data controls (local history on/off + verified clear, saved
-searches clear / export / import, portable-vault export review and
-import review).
+searches clear / export / import, portable-vault export review).
 
 Every control routes through `GapAccountMsg`; the folds live in `App`
 (`updateGapAccount`). Secrets: the protection password field is cleared
@@ -19,6 +20,7 @@ on every send and whenever the Account sheet closes.
 
 import App exposing (ConnectionState(..), Model)
 import GapAccount exposing (Erase(..), Msg(..))
+import HistoryImport
 import Html exposing (Html, a, button, div, form, h3, input, label, li, p, section, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxlength, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -531,97 +533,62 @@ searchStatusLine model =
             text ""
 
 
-{-| Import & export: the portable vault with an export review and an
-import review (nothing merges before Import), plus saved searches. -}
+{-| The Export vault button inside v3/gap-import's portable-vault card:
+it asks for the export review first (`exportReview`) instead of
+downloading at once. -}
+exportButton : String -> Model -> Html App.Msg
+exportButton cls model =
+    button
+        [ type_ "button"
+        , class cls
+        , attribute "data-testid" "pref-vault-export"
+        , disabled model.gapAccount.exportConfirm
+        , onClick (gap ExportAsk)
+        ]
+        [ text "Export vault" ]
+
+
+{-| What a portable export contains, shown before anything downloads. -}
+exportReview : Model -> Html App.Msg
+exportReview model =
+    if model.gapAccount.exportConfirm then
+        div [ class "pref-confirm gap-review", attribute "role" "group", attribute "aria-label" "Review export", attribute "data-testid" "pref-export-review" ]
+            [ strong [ class "gap-review-title" ] [ text "Before you download" ]
+            , ul [ class "gap-review-facts" ]
+                [ li [] [ text "Readable message text for every room and DM saved in this browser under your current sign-in." ]
+                , li [] [ text "Encrypted DMs stay encrypted. Passwords and session tokens are never included." ]
+                , li [] [ text "Anyone with the file can read it \u{2014} keep it private." ]
+                ]
+            , div [ class "pref-actions" ]
+                [ button [ type_ "button", class "pref-reset gap-btn--primary", attribute "data-testid" "pref-export-confirm", onClick (gap ExportConfirm) ] [ text "Download export" ]
+                , button [ type_ "button", class "pref-reset", onClick (gap ExportCancel) ] [ text "Cancel" ]
+                ]
+            ]
+
+    else
+        text ""
+
+
+{-| Import & export: saved searches (the portable vault, its import
+review and past imports are v3/gap-import's). Hidden while a review is
+open so its sticky bar stays the last thing on the page. -}
 transferCards : Model -> List (Html App.Msg)
 transferCards model =
-    let
-        ga =
-            model.gapAccount
-    in
-    [ section [ class "pref-group pref-vault-portable", attribute "aria-labelledby" "pref-vault-portable-title", attribute "data-testid" "pref-vault-portable" ]
-        [ div [ class "pref-group-head" ]
-            [ h3 [ class "pref-label", id "pref-vault-portable-title" ] [ text "Portable vault" ] ]
-        , p [ class "pref-desc" ]
-            [ text "Export or merge the local message history this browser keeps for your current sign-in. Passwords, session tokens and decrypted DM text are never exported." ]
-        , div [ class "pref-actions" ]
-            [ button
-                [ type_ "button"
-                , class "pref-reset"
-                , attribute "data-testid" "pref-vault-export"
-                , disabled (ga.exportConfirm || ga.importReview /= Nothing)
-                , onClick (gap ExportAsk)
-                ]
-                [ text "Export vault" ]
-            , button
-                [ type_ "button"
-                , class "pref-reset"
-                , attribute "data-testid" "pref-vault-import"
-                , disabled (ga.exportConfirm || ga.importReview /= Nothing)
-                , onClick App.PrefsVaultImport
-                ]
-                [ text "Import portable JSON" ]
-            ]
-        , if ga.exportConfirm then
-            div [ class "pref-confirm gap-review", attribute "role" "group", attribute "aria-label" "Review export", attribute "data-testid" "pref-export-review" ]
-                [ strong [ class "gap-review-title" ] [ text "Before you download" ]
-                , ul [ class "gap-review-facts" ]
-                    [ li [] [ text "Readable message text for every room and DM saved in this browser under your current sign-in." ]
-                    , li [] [ text "Encrypted DMs stay encrypted. Passwords and session tokens are never included." ]
-                    , li [] [ text "Anyone with the file can read it — keep it private." ]
+    case model.historyImport.phase of
+        HistoryImport.Reviewing _ ->
+            []
+
+        _ ->
+            [ section [ class "pref-group", attribute "aria-labelledby" "pref-saved-transfer-title", attribute "data-testid" "pref-saved-searches-transfer" ]
+                [ div [ class "pref-group-head" ]
+                    [ h3 [ class "pref-label", id "pref-saved-transfer-title" ] [ text "Saved searches" ]
+                    , span [ class "pref-count" ] [ text (GapAccount.savedSearchLabel (List.length model.savedSearches)) ]
                     ]
+                , p [ class "pref-desc" ] [ text "Move your saved searches between browsers as a JSON file. Importing merges with the ones already here." ]
                 , div [ class "pref-actions" ]
-                    [ button [ type_ "button", class "pref-reset gap-btn--primary", attribute "data-testid" "pref-export-confirm", onClick (gap ExportConfirm) ] [ text "Download export" ]
-                    , button [ type_ "button", class "pref-reset", onClick (gap ExportCancel) ] [ text "Cancel" ]
+                    [ button [ type_ "button", class "pref-reset", attribute "data-testid" "pref-saved-searches-export", onClick (gap SearchExport) ] [ text "Export saved searches" ]
+                    , button [ type_ "button", class "pref-reset", attribute "data-testid" "pref-saved-searches-import", onClick (gap SearchImport) ] [ text "Import saved searches" ]
                     ]
+                , searchStatusLine model
                 ]
-
-          else
-            text ""
-        , case ga.importReview of
-            Just review ->
-                div [ class "pref-confirm gap-review", attribute "role" "group", attribute "aria-label" "Review import", attribute "data-testid" "pref-import-review" ]
-                    [ strong [ class "gap-review-title" ] [ text "Ready to import" ]
-                    , ul [ class "gap-review-facts" ]
-                        [ li [] [ text (PrefsPanel.countLabel review.messages "message" ++ " in " ++ PrefsPanel.countLabel review.conversations "conversation") ]
-                        , if String.isEmpty review.exportedAt then
-                            text ""
-
-                          else
-                            li [] [ text ("Exported " ++ String.left 10 review.exportedAt) ]
-                        , li [] [ text "Merged into the local history this browser keeps for your current sign-in. Messages already here are kept." ]
-                        ]
-                    , div [ class "pref-actions" ]
-                        [ button [ type_ "button", class "pref-reset gap-btn--primary", attribute "data-testid" "pref-import-confirm", onClick (gap ImportConfirm) ] [ text "Import" ]
-                        , button [ type_ "button", class "pref-reset", attribute "data-testid" "pref-import-cancel", onClick (gap ImportCancel) ] [ text "Cancel" ]
-                        ]
-                    ]
-
-            Nothing ->
-                text ""
-        , case model.prefsTransferStatus of
-            Just status ->
-                p [ class "pref-status", attribute "role" "status" ] [ text status ]
-
-            Nothing ->
-                text ""
-        , case ga.importStatus of
-            Just status ->
-                p [ class "pref-status", attribute "role" "status", attribute "data-testid" "pref-import-status" ] [ text status ]
-
-            Nothing ->
-                text ""
-        ]
-    , section [ class "pref-group", attribute "aria-labelledby" "pref-saved-transfer-title", attribute "data-testid" "pref-saved-searches-transfer" ]
-        [ div [ class "pref-group-head" ]
-            [ h3 [ class "pref-label", id "pref-saved-transfer-title" ] [ text "Saved searches" ]
-            , span [ class "pref-count" ] [ text (GapAccount.savedSearchLabel (List.length model.savedSearches)) ]
             ]
-        , p [ class "pref-desc" ] [ text "Move your saved searches between browsers as a JSON file. Importing merges with the ones already here." ]
-        , div [ class "pref-actions" ]
-            [ button [ type_ "button", class "pref-reset", attribute "data-testid" "pref-saved-searches-export", onClick (gap SearchExport) ] [ text "Export saved searches" ]
-            , button [ type_ "button", class "pref-reset", attribute "data-testid" "pref-saved-searches-import", onClick (gap SearchImport) ] [ text "Import saved searches" ]
-            ]
-        , searchStatusLine model
-        ]
-    ]

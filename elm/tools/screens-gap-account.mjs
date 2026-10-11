@@ -261,7 +261,7 @@ export default {
     });
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser', { timeout: 4000 }),
-      h.tryClick(page, '[data-testid="pref-vault-import"]'),
+      h.tryClick(page, '[data-testid="history-import-vault"]'),
     ]);
     await chooser.setFiles({ name: 'vault.json', mimeType: 'application/json', buffer: Buffer.from(exportJson) });
     await h.settle(page, 600);

@@ -19,6 +19,7 @@ import GroupControl
 import GroupDirectory
 import GroupEnvelope
 import GroupPublisher
+import HistoryImport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Labels
@@ -27,6 +28,7 @@ import Schedule
 import Services
 import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
+import PrefsPanel
 import RoomMedia exposing (RoomMediaFilter(..))
 import Moderation
 import Session
@@ -6562,38 +6564,32 @@ suite =
                 Expect.equal
                     "Vault exported (40 messages, 2 targets)."
                     (Maybe.withDefault "" (List.head m.serviceLog))
-        , test "VaultImportFile stages for review; Import merges validated rows through VaultPersist" <|
-            -- v3/gap-account: nothing reaches the vault before the user confirms.
+        , test "VaultImportFile stages a review first; Import then merges the validated rows through VaultPersist" <|
             \_ ->
                 let
                     json =
                         "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#C\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000},{\"id\":\"m2\",\"from\":\"b\",\"text\":\"yo\",\"type\":\"notice\",\"time\":2000}]}]}"
 
-                    ( staged, stageOut ) =
+                    ( staged, stagedOut ) =
                         update (VaultImportFile { json = json }) blank
 
-                    scoped =
-                        let
-                            ga =
-                                staged.gapAccount
-                        in
-                        { staged | gapAccount = { ga | scope = Just "[\"onyx\",\"guest\"]" } }
+                    ( _, confirmOut ) =
+                        update (HistoryImportMsg HistoryImport.Confirm) staged
 
-                    ( merged, outbound ) =
-                        update (GapAccountMsg GapAccount.ImportConfirm) scoped
+                    persists out =
+                        List.filter
+                            (\o ->
+                                case o of
+                                    VaultPersist _ ->
+                                        True
 
-                    ( unscopedTry, unscopedOut ) =
-                        update (GapAccountMsg GapAccount.ImportConfirm) staged
-
-                    ( canceled, cancelOut ) =
-                        update (GapAccountMsg GapAccount.ImportCancel) scoped
+                                    _ ->
+                                        False
+                            )
+                            out
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] (List.filter isPersist stageOut)
-                    , \_ ->
-                        Expect.equal (Just { conversations = 1, messages = 2 })
-                            (Maybe.map (\r -> { conversations = r.conversations, messages = r.messages }) staged.gapAccount.importReview)
-                    , \_ -> Expect.equal True staged.prefsOpen
+                    [ \_ -> Expect.equal [] (persists stagedOut)
                     , \_ ->
                         Expect.equal
                             [ VaultPersist
@@ -6604,29 +6600,39 @@ suite =
                                     ]
                                 }
                             ]
-                            outbound
-                    , \_ -> Expect.equal Nothing merged.gapAccount.importReview
-                    , \_ -> Expect.equal (Just "Imported 2 messages into 1 conversation.") merged.gapAccount.importStatus
-                    , \_ -> Expect.equal [] (List.filter isPersist unscopedOut)
-                    , \_ -> Expect.notEqual Nothing unscopedTry.gapAccount.importReview
-                    , \_ -> Expect.equal ( [], Nothing ) ( List.filter isPersist cancelOut, canceled.gapAccount.importReview )
+                            (persists confirmOut)
+                    , \_ ->
+                        Expect.equal "Vault import file staged for review (2 messages, 1 conversations)."
+                            (Maybe.withDefault "" (List.head staged.serviceLog))
                     ]
                     ()
         , test "VaultImportFile refuses blank, broken, and empty snapshots" <|
             \_ ->
                 let
-                    statusOf json =
-                        let
-                            ( m, out ) =
-                                update (VaultImportFile { json = json }) blank
-                        in
-                        ( m.gapAccount.importStatus, m.gapAccount.importReview == Nothing, List.filter isPersist out )
+                    ( blanked, blankedOut ) =
+                        update (VaultImportFile { json = "   " }) blank
+
+                    ( broken, _ ) =
+                        update (VaultImportFile { json = "{oops" }) blank
+
+                    ( wrong, _ ) =
+                        update (VaultImportFile { json = "{\"kind\":\"other\",\"version\":1,\"targets\":[]}" }) blank
+
+                    ( empty, _ ) =
+                        update (VaultImportFile { json = "{\"kind\":\"onyx-vault\",\"version\":1,\"targets\":[]}" }) blank
                 in
                 Expect.all
-                    [ \_ -> Expect.equal ( Just "That file is empty.", True, [] ) (statusOf "   ")
-                    , \_ -> Expect.equal ( Just "That file isn't valid JSON.", True, [] ) (statusOf "{oops")
-                    , \_ -> Expect.equal ( Just "That file isn't an Onyx vault export.", True, [] ) (statusOf "{\"kind\":\"other\",\"version\":1,\"targets\":[]}")
-                    , \_ -> Expect.equal ( Just "That export holds no messages to import.", True, [] ) (statusOf "{\"kind\":\"onyx-vault\",\"version\":1,\"targets\":[]}")
+                    [ \_ -> Expect.equal [] blankedOut
+                    , \_ -> Expect.equal [] blanked.serviceLog
+                    , \_ ->
+                        Expect.equal "Vault import file could not be read as JSON."
+                            (Maybe.withDefault "" (List.head broken.serviceLog))
+                    , \_ ->
+                        Expect.equal "Vault import file held no valid vault snapshot."
+                            (Maybe.withDefault "" (List.head wrong.serviceLog))
+                    , \_ ->
+                        Expect.equal "Vault import file held no importable messages."
+                            (Maybe.withDefault "" (List.head empty.serviceLog))
                     ]
                     ()
         , test "WsBatchReceived folds every line in order" <|
@@ -7307,7 +7313,7 @@ suite =
                     , \_ -> Expect.equal 3 m3.nickAliasTryIdx
                     ]
                     ()
-        , test "433 with no aliases left errors and resets the index" <|
+        , test "433 with no aliases left retries nick_ on the same socket (v3/gap-shell)" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -7320,12 +7326,11 @@ suite =
                         feed { m1 | nickAliases = [ "kai" ], nickAliasTryIdx = 1 } ":s 433 me me :Nickname is already in use"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m2.notifications)
-                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m3.notifications)
-                    , \_ -> Expect.equal 0 m3.nickAliasTryIdx
-                    , \_ -> Expect.equal [] outbound3
+                    [ \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound
+                    , \_ -> Expect.equal "me_" m2.ourNick
+                    , \_ -> Expect.equal [] m2.notifications
+                    , \_ -> Expect.equal 1 m2.gapShell.nickRetries
+                    , \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound3
                     ]
                     ()
         , test "433 after registration rotates, then logs when exhausted" <|
@@ -7334,17 +7339,19 @@ suite =
                     live =
                         { blank | nickAliases = [ "kai" ] }
 
+                    -- A NICK change refused after registration names the
+                    -- wanted nick, not the one we hold.
                     ( rotated, outbound ) =
-                        feed live ":s 433 me me :Nickname is already in use"
+                        feed live ":s 433 me taken :Nickname is already in use"
 
                     ( bare, bareOut ) =
-                        feed blank ":s 433 me me :Nickname is already in use"
+                        feed blank ":s 433 me taken :Nickname is already in use"
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
                     , \_ -> Expect.equal "kai" rotated.ourNick
                     , \_ -> Expect.equal [] bareOut
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text bare.notifications)
                     ]
                     ()
         , test "error numerics record verbatim inbox rows" <|
@@ -10593,7 +10600,8 @@ suite =
                     ( _, outbound ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                -- v3/gap-usermodes: a fresh registration also asks for the user modes.
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
@@ -10611,7 +10619,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -12471,6 +12479,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12509,6 +12518,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12674,7 +12684,9 @@ suite =
                         , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
                         , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
                         , \_ -> Expect.equal 2 m.whoisTimerGen
-                        , \_ -> Expect.equal [] outs
+                        -- v3/gap-usermodes: an open profile that is offline asks
+                        -- WHOWAS (the only line this fold sends).
+                        , \_ -> Expect.equal [ SendLine "WHOWAS ghost 1\r\n" ] outs
                         ]
                         ()
             , test "401 off the active sheet lands nothing" <|
@@ -15767,9 +15779,13 @@ suite =
                             feed { blank | connection = Live } ":s 433 me taken :In use"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "Erroneous nickname: bad!nick" ] (List.map .text bad.notifications)
-                        , \_ -> Expect.equal [ "Nick/channel temporarily unavailable" ] (List.map .text unavailable.notifications)
-                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text exhausted.notifications)
+                        -- v3/gap-shell: a refused name while registering fails
+                        -- with the reason; 433/437 retry `nick_` instead of erroring.
+                        [ \_ -> Expect.equal [ "“bad!nick” can’t be used here (Erroneous). Pick another name." ] (List.map .text bad.notifications)
+                        , \_ -> Expect.equal [] unavailable.notifications
+                        , \_ -> Expect.equal "me_" unavailable.ourNick
+                        , \_ -> Expect.equal [] exhausted.notifications
+                        , \_ -> Expect.equal "me_" exhausted.ourNick
                         , \_ -> Expect.equal [] retrying.notifications
                         , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] retryOut
                         , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text live.notifications)
@@ -24017,13 +24033,17 @@ suite =
                         , \_ -> Expect.equal [ "Export scrollback" ] (List.map .title exported.toasts)
                         ]
                         ()
-            , test "slash import fires the vault file picker" <|
+            , test "slash import opens Import & export and asks for the vault file picker" <|
                 \_ ->
                     let
-                        ( _, out ) =
+                        ( m, out ) =
                             update ComposerSend { blank | activeChannel = Just "#c", composer = "/import" }
                     in
-                    Expect.equal [ VaultImportPick ] out
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (HistoryImportPick { job = 1, kind = "portable" }) out)
+                        , \_ -> Expect.equal True (m.prefsOpen && m.prefsCategory == PrefsPanel.Transfer)
+                        ]
+                        ()
         , describe "retention policy"
             [ test "keep selection saves and parks the applying status" <|
                 \_ ->

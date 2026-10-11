@@ -269,37 +269,32 @@ suite =
                         ()
             ]
         , describe "Import & export"
-            [ test "Export asks for a review first" <|
+            [ test "Export asks for a review first, then downloads" <|
                 \_ ->
                     let
                         idle =
-                            many (View.GapAccount.transferCards account)
+                            one (View.GapAccount.exportButton "hi-btn" account)
 
                         reviewing =
-                            many (View.GapAccount.transferCards (withGap (\g -> { g | exportConfirm = True }) account))
+                            withGap (\g -> { g | exportConfirm = True }) account
                     in
                     Expect.all
                         [ \_ -> idle |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-vault-export") ] |> Event.simulate Event.click |> Event.expect (GapAccountMsg GapAccount.ExportAsk)
-                        , \_ -> idle |> Query.findAll [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-review") ] |> Query.count (Expect.equal 0)
-                        , \_ -> reviewing |> Query.has [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-review") ]
-                        , \_ -> reviewing |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-vault-export") ] |> Query.has [ Selector.disabled True ]
-                        , \_ -> reviewing |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-confirm") ] |> Event.simulate Event.click |> Event.expect (GapAccountMsg GapAccount.ExportConfirm)
+                        , \_ -> one (View.GapAccount.exportButton "hi-btn" reviewing) |> Query.has [ Selector.disabled True ]
+                        , \_ -> one (View.GapAccount.exportReview reviewing) |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-confirm") ] |> Event.simulate Event.click |> Event.expect (GapAccountMsg GapAccount.ExportConfirm)
+                        , \_ -> one (View.GapAccount.exportReview reviewing) |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-review") ] |> Query.has [ Selector.attribute (Html.Attributes.attribute "role" "group") ]
                         ]
                         ()
-            , test "a staged import shows its counts and offers Import / Cancel; the pickers lock meanwhile" <|
+            , test "the portable-vault card's Export button is ours (asks for a review) and the review sits under it" <|
                 \_ ->
                     let
-                        staged =
-                            many
-                                (View.GapAccount.transferCards
-                                    (withGap (\g -> { g | importReview = Just { json = "{}", conversations = 2, messages = 31, exportedAt = "2026-05-01T10:00:00.000Z" } }) account)
-                                )
+                        reviewing =
+                            withGap (\g -> { g | exportConfirm = True }) account
                     in
                     Expect.all
-                        [ \_ -> staged |> Query.has [ Selector.text "31 messages in 2 conversations", Selector.text "Exported 2026-05-01" ]
-                        , \_ -> staged |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-import-confirm") ] |> Event.simulate Event.click |> Event.expect (GapAccountMsg GapAccount.ImportConfirm)
-                        , \_ -> staged |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-import-cancel") ] |> Event.simulate Event.click |> Event.expect (GapAccountMsg GapAccount.ImportCancel)
-                        , \_ -> staged |> Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-vault-import") ] |> Query.has [ Selector.disabled True ]
+                        [ \_ -> one (View.GapAccount.exportButton "hi-btn" account) |> Query.has [ Selector.text "Export vault" ]
+                        , \_ -> one (View.GapAccount.exportReview account) |> Query.hasNot [ Selector.attribute (Html.Attributes.attribute "data-testid" "pref-export-review") ]
+                        , \_ -> one (View.GapAccount.exportReview reviewing) |> Query.has [ Selector.text "Before you download" ]
                         ]
                         ()
             , test "saved searches have export and import buttons" <|

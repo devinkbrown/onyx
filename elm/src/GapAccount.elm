@@ -2,7 +2,6 @@ module GapAccount exposing
     ( Effect(..)
     , Erase(..)
     , GroupNick
-    , ImportReview
     , LoadedLists
     , Msg(..)
     , QueuedAlert
@@ -70,17 +69,6 @@ type Erase
     | EraseFailed
 
 
-{-| A picked portable-vault file waiting for the user's review. The
-JSON is kept as text and re-validated on Import, so nothing reaches the
-vault until the user confirms. -}
-type alias ImportReview =
-    { json : String
-    , conversations : Int
-    , messages : Int
-    , exportedAt : String
-    }
-
-
 {-| A desktop alert held back by the per-conversation throttle. It is
 re-decided against the CURRENT policy when the window opens, then
 shown once as "N new alerts in <conversation>". -}
@@ -121,10 +109,8 @@ type alias State =
     , searchClearConfirm : Bool
     , searchStatus : Maybe String
 
-    -- portable vault transfer
+    -- portable vault export review (the import review is v3/gap-import's)
     , exportConfirm : Bool
-    , importReview : Maybe ImportReview
-    , importStatus : Maybe String
 
     -- account protection
     , protectPassword : String
@@ -166,8 +152,6 @@ blank =
     , searchClearConfirm = False
     , searchStatus = Nothing
     , exportConfirm = False
-    , importReview = Nothing
-    , importStatus = Nothing
     , protectPassword = ""
     , protectPending = Nothing
     , protectError = Nothing
@@ -203,13 +187,10 @@ type Msg
     | SearchClearConfirm
     | SearchExport
     | SearchImport
-      -- portable vault (Preferences → Import & export)
+      -- portable vault export (Preferences → Import & export)
     | ExportAsk
     | ExportCancel
     | ExportConfirm
-    | ImportConfirm
-    | ImportCancel
-    | ImportRefused { reason : String }
       -- account protection (Account → Protection)
     | ProtectPassword String
     | ProtectToggle String Bool

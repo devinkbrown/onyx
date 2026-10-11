@@ -41,6 +41,7 @@ the Elm client yet).
 type Category
     = Display
     | Conversation
+    | Privacy
     | History
     | Transfer
     | Accessibility
@@ -67,6 +68,7 @@ categories : List CategoryInfo
 categories =
     [ { category = Display, id = "display", label = "Display", summary = "Reading and rhythm" }
     , { category = Conversation, id = "conversation", label = "Conversation", summary = "Room surfaces" }
+    , { category = Privacy, id = "privacy", label = "Privacy", summary = "Who can reach you" }
     , { category = History, id = "history", label = "History & data", summary = "Local vault" }
     , { category = Transfer, id = "transfer", label = "Import & export", summary = "Move conversation data" }
     , { category = Accessibility, id = "accessibility", label = "Accessibility", summary = "Motion and access" }
