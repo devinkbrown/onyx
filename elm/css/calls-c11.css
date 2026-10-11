@@ -148,6 +148,7 @@
 :where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-pip-card, .onyx-call-sheet,
   .onyx-join-banner, .onyx-calls, .onyx-header-voice, .onyx-stage-panel, .onyx-sheet.onyx-call-ring) :where(button) {
   min-width: var(--target-floor);
+  min-height: var(--target-floor);
 }
 
 /* Visible focus on every call control (spec §3.2). */

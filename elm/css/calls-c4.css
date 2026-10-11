@@ -99,10 +99,10 @@
 .onyx-tile-bottom { bottom: var(--space-1); }
 .onyx-tile-spacer { flex: 1 1 auto; }
 .onyx-tile-tag, .onyx-tile-nick {
-  display: inline-flex; align-items: center; gap: var(--space-1); height: 24px;
+  display: inline-flex; align-items: center; gap: var(--space-1); height: 24px; padding: 0 var(--space-2);
   border: 1px solid var(--onyx-line); border-radius: var(--radius);
   background: color-mix(in srgb, var(--onyx-bg) 78%, transparent);
-  font-size: var(--text-2xs); font-weight: 650; white-space: nowrap;
+  font-size: var(--text-2xs); font-weight: 650; color: var(--onyx-text); white-space: nowrap;
 }
 .onyx-tile-tag .onyx-ci { width: 14px; height: 14px; }
 .onyx-tile-tag[data-tone="off"] { color: var(--onyx-dim); }

@@ -181,6 +181,7 @@
 
 .onyx-message-search-current,
 .onyx-message-search-current:hover {
+  background: var(--onyx-panel-2);
   box-shadow: inset 2px 0 0 var(--onyx-accent);
 }
 
@@ -250,7 +251,7 @@
    where the browser reports it (Thread.longPressMenu); links and images
    keep their native callout. */
 @media (hover: none) {
-  .onyx-row-actions { right: var(--space-1); gap: 0; }
+  .onyx-row-actions { top: -22px; right: var(--space-1); gap: 0; }
   .onyx-row-action,
   .onyx-message .onyx-msg-menu-trigger { width: 44px; height: 40px; }
   .onyx-row-action .pt-ico,
@@ -263,7 +264,7 @@
 
 /* Reaction picker light-dismiss layer (mirrors .onyx-msg-menu-backdrop). */
 .onyx-react-backdrop { position: fixed; inset: 0; z-index: var(--z-popover); }
-.onyx-react-pop .onyx-react-picker { z-index: calc(var(--z-popover) + 1); }
+.onyx-react-pop .onyx-react-picker { position: relative; z-index: calc(var(--z-popover) + 1); }
 
 /* Not a class: the Keyed-node key "unread" in Thread.rowEntries. */
 .unread { /* state hook: keyed entry id, styled via .onyx-unread-divider */ }
@@ -338,6 +339,7 @@
 @media (min-width: 768px) {
   .onyx-msg-menu-pop,
   .onyx-react-pop {
+    position: absolute;
     top: 20px;
     right: var(--space-3);
     z-index: calc(var(--z-popover) + 1);
@@ -364,6 +366,7 @@
     padding: var(--space-2) var(--space-2) calc(var(--space-3) + var(--safe-bottom));
     border-width: 1px 0 0;
     border-radius: 12px 12px 0 0;
+    animation: ui-sheet-pop var(--dur-base) var(--ease);
   }
   .onyx-msg-menu-pop .onyx-msg-menu::before,
   .onyx-react-pop .onyx-react-picker::before {
@@ -401,12 +404,13 @@
   padding: 0 var(--space-2);
   gap: 6px;
   background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
   font-size: var(--text-sm);
   line-height: 1;
 }
 .onyx-message .boost-emoji { font-size: 0.9375rem; }
-.onyx-message .boost-count { font-size: var(--text-2xs); font-weight: 650; font-variant-numeric: tabular-nums; }
+.onyx-message .boost-count { color: var(--onyx-dim); font-size: var(--text-2xs); font-weight: 650; font-variant-numeric: tabular-nums; }
 .onyx-message button.boost-pill:hover { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
 .onyx-message .boost-pill.you {
   background: color-mix(in oklab, var(--onyx-text) 9%, var(--onyx-panel));
@@ -623,7 +627,7 @@
 
 /* ── 3. Topic chips ──────────────────────────────────────────────────── */
 
-.topic-chip { font-size: var(--text-sm); cursor: pointer; }
+.topic-chip { font: inherit; font-size: var(--text-sm); min-height: var(--target-floor); cursor: pointer; }
 .topic-chip:hover { color: var(--onyx-text); }
 .topic-chip--all { font-weight: 600; }
 .topic-chip__label { max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -840,6 +844,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   z-index: var(--z-raised);
   min-width: 0;
   min-height: 0;
+  animation: ui-sheet-pop var(--dur-fast) var(--ease);
 }
 .shell-msg-lightbox-dialog:focus { outline: none; }
 .shell-msg-lightbox-stage {
@@ -1006,7 +1011,9 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   grid-template-columns: 2rem minmax(0, 1fr);
   column-gap: var(--space-3);
   row-gap: 2px;
+  margin: 0;
   padding: var(--space-2) var(--space-4);
+  background: transparent;
   border: 0;
   border-radius: 0;
 }
@@ -1054,8 +1061,10 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
+  min-height: 36px;
   padding: 0 var(--space-3);
   font: inherit;
+  font-size: var(--text-sm);
   font-weight: 650;
   color: var(--onyx-accent-ink);
   background: var(--onyx-accent);
@@ -1292,6 +1301,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .onyx-attach-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: 600; }
 .onyx-attach-status { color: var(--onyx-dim); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .onyx-composer .onyx-attach-remove {
+  grid-column: 3;
   grid-row: 1;
   min-height: var(--target-floor);
   padding: 2px var(--space-2);
@@ -1559,6 +1569,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
+  cursor: pointer;
   overflow-wrap: anywhere;
   text-align: left;
 }
@@ -1815,6 +1826,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   text-decoration: none;
   cursor: pointer;
 }
+.room-media-index-row:hover { background: var(--onyx-panel-2); border-color: var(--onyx-line); }
 .room-media-index-row--picture { grid-template-columns: minmax(0, 1fr) auto; align-content: start; align-items: center; gap: var(--space-2); padding: 0; cursor: default; }
 /* v3/rx-convo: the picture spans the tile; name + author sit under it
    with Jump at their right, so a tile reads as one unit. */
@@ -2143,6 +2155,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   padding: 2px 3px;
   margin: -2px -3px;
   border-radius: 3px;
+  color: var(--onyx-dim);
   font-size: var(--text-xs);
   text-decoration: underline dotted;
   text-decoration-color: var(--onyx-faint);
@@ -2325,9 +2338,10 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-frame .onyx-message > .onyx-thread-indicator { min-height: 36px; padding-inline: var(--space-2); }
   .onyx-frame .onyx-message .boost-pill { min-height: 32px; }
   .onyx-frame .onyx-message .boost-add { width: 40px; }
-  .onyx-frame .onyx-jump-latest { padding: 0 var(--space-4); }
+  .onyx-frame .onyx-jump-latest { min-height: 40px; padding: 0 var(--space-4); }
   .onyx-earlier-button,
   .onyx-latest-button { min-height: var(--target-min); padding-inline: var(--space-4); }
+  .onyx-topic-tools-toggle { min-height: 36px; }
   /* Compact keeps its one-line rhythm: the in-line thread link and
      boosts stay short, their hit areas pad out sideways instead. */
   .onyx-frame .onyx-message--compact > .onyx-thread-indicator { min-height: 28px; }
@@ -2337,7 +2351,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 /* Short screens (landscape phones, short laptops): the menu and picker
    never run off the bottom of the screen; they scroll inside. */
 @media (min-width: 768px) {
-  .onyx-msg-menu-pop .onyx-msg-menu { overflow-y: auto; overscroll-behavior: contain; }
+  .onyx-msg-menu-pop .onyx-msg-menu { max-height: min(70dvh, 28rem); overflow-y: auto; overscroll-behavior: contain; }
   .onyx-react-pop .onyx-react-grid { max-height: min(216px, 36dvh); }
 }
 

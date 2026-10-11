@@ -55,8 +55,10 @@
   border-radius: var(--radius);
 }
 .notif-center .notif-center__filter {
+  min-height: 28px;
   border-color: transparent;
   color: var(--onyx-dim);
+  font-size: var(--text-2xs);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -81,8 +83,10 @@
   align-items: start;
   gap: var(--space-1);
   min-width: 0;
+  border-left: 2px solid transparent;
   border-radius: var(--radius);
 }
+.notif-center__row[data-unread="true"] { border-left-color: var(--onyx-dim); background: color-mix(in oklab, var(--onyx-panel-2) 55%, transparent); }
 
 .notif-center .notif-center__open {
   display: grid;
@@ -100,10 +104,13 @@
 .notif-center__glyph {
   display: inline-grid;
   place-items: center;
+  width: 28px;
+  height: 28px;
   font: 600 var(--text-2xs) / 1 var(--font-mono);
   color: var(--onyx-dim);
   background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
 }
 .notif-center__row[data-type="mention"] .notif-center__glyph { color: var(--onyx-accent); }
 .notif-center__row[data-type="dm"] .notif-center__glyph { color: var(--gold-bright); }
@@ -142,6 +149,7 @@
   margin-top: var(--space-1);
   font-size: var(--text-lg);
   line-height: 1;
+  border-color: transparent;
 }
 .notif-center .notif-center__dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
 
@@ -258,6 +266,8 @@
 /* ---------- Room browser + formation ---------------------------------- */
 
 .chb-row { list-style: none; }
+.chb-row--joined .chb-card { background: var(--onyx-panel-2); }
+.chb-row--live .chb-card { border-color: var(--onyx-dim); }
 .chb-room-copy { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .chb-pill--in { color: var(--onyx-dim); border-color: var(--onyx-line); }
 .chb-refresh { flex: none; }
@@ -266,6 +276,9 @@
 .chb .chb-ghost { background: transparent; }
 .chb .chb-submit {
   font-weight: 650;
+  color: var(--onyx-accent-ink);
+  background: var(--onyx-accent);
+  border-color: var(--onyx-accent);
 }
 .chb .chb-submit:hover { border-color: var(--onyx-text); }
 
@@ -329,6 +342,7 @@
 
 /* ---------- Home / Nav / You ------------------------------------------ */
 
+.onyx-home-empty.is-first-room { border-style: dashed; }
 .onyx-home-outbox-offline { border-color: var(--onyx-dim); }
 .onyx-nav-btn--selected:not(.onyx-nav-btn--active) { background: var(--onyx-panel-2); color: var(--onyx-text); }
 .onyx-you-settings { display: flex; flex-direction: column; min-width: 0; }
@@ -383,6 +397,7 @@
 .onyx-profile-backdrop:not(.onyx-sheet-backdrop) {
   position: absolute;
   inset: 0;
+  background: color-mix(in srgb, #000 55%, transparent);
 }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card {
   position: relative;
@@ -395,7 +410,7 @@
 
 /* ---------- Rail -------------------------------------------------------- */
 
-.onyx-rail-zero { list-style: none; }
+.onyx-rail-zero { list-style: none; padding: var(--space-1) var(--space-2); }
 .onyx-rail-filter-on .onyx-rail-filter-input { border-color: var(--onyx-dim); }
 .onyx-rail-dm .onyx-rail-avatar { border-radius: 50%; position: relative; }
 .onyx-rail-preview { max-width: 100%; }
@@ -417,9 +432,13 @@
 .onyx-ident {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   max-width: 220px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
   font-size: var(--text-sm);
   background: transparent;
+  border: 1px solid var(--onyx-line);
   border-radius: var(--r-pill);
 }
 .onyx-ident:hover { background: var(--onyx-panel-2); }
@@ -642,6 +661,7 @@
 }
 .onyx-primary-nav .onyx-nav-btn--selected:not(.onyx-nav-btn--active) { background: transparent; color: var(--onyx-faint); }
 .onyx-nav-glyph { position: relative; display: inline-grid; place-items: center; }
+.onyx-nav-btn .onyx-nav-icon { background: currentColor; }
 .onyx-nav-btn--active .onyx-nav-icon { background: var(--onyx-accent); }
 .onyx-nav-badge {
   position: absolute;
@@ -655,6 +675,8 @@
   font-weight: 700;
   line-height: 16px;
   text-align: center;
+  color: var(--onyx-bg);
+  background: var(--onyx-text);
   border-radius: var(--r-pill);
   box-shadow: 0 0 0 2px var(--onyx-panel);
   font-variant-numeric: tabular-nums;
@@ -785,6 +807,8 @@
   font-size: 0.6875rem;
   line-height: 18px;
   font-variant-numeric: tabular-nums;
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
   border: 1px solid var(--onyx-line);
   border-radius: var(--r-pill);
 }
@@ -804,6 +828,7 @@
   border: 0;
   color: var(--onyx-faint);
   opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 .onyx-rail .onyx-rail-star .onyx-shi { width: 15px; height: 15px; }
 .onyx-rail-row:hover .onyx-rail-star,
@@ -950,6 +975,7 @@
   font-size: var(--text-sm);
   color: var(--onyx-dim);
   background: var(--onyx-bg);
+  border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
 }
 .onyx-room-more-alerts .room-notify-seg[aria-checked="true"] { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); font-weight: 650; }
@@ -980,6 +1006,7 @@
 
 /* You hub (the sheet family styles the list): the face beside the
    identity, and the connection line the phone bar no longer shows. */
+.onyx-sheet.onyx-you > .onyx-you-head { padding-right: calc(var(--sheet-pad, 16px) + 36px); }
 .onyx-you-conn { display: flex; align-items: center; gap: 6px; margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--onyx-dim); }
 .onyx-you-conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--onyx-dim); }
 .onyx-you-conn[data-state="connecting"] { color: var(--onyx-warn); }
@@ -997,7 +1024,7 @@
   border: 0;
 }
 .onyx-home .onyx-home-empty.is-first-room { border: 0; }
-.onyx-home .onyx-home-empty-copy { color: var(--onyx-dim); }
+.onyx-home .onyx-home-empty-copy { font-size: var(--text-md); color: var(--onyx-dim); }
 .onyx-home .onyx-home-action { min-height: 40px; padding: 0 var(--space-4); font-weight: 600; }
 .onyx-home .onyx-home-action--primary { color: var(--onyx-accent-ink); background: var(--onyx-accent); border-color: var(--onyx-accent); }
 .onyx-home .onyx-home-action--primary:hover { filter: brightness(1.06); }
@@ -1161,6 +1188,7 @@
     justify-content: center;
     gap: 1px;
     flex: none;
+    min-width: 40px;
     min-height: 44px;
     padding: 0 var(--space-1) 0 0;
     color: var(--onyx-text);
@@ -1230,6 +1258,7 @@
     border-width: 1px 0 0;
     border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
     box-shadow: var(--elev-3);
+    animation: ui-sheet-pop var(--dur-fast) var(--ease);
   }
   .onyx-room-more-head {
     display: flex;
@@ -1241,7 +1270,7 @@
   .onyx-room-more-grip { width: 36px; height: 4px; border-radius: 2px; background: var(--onyx-line); }
   .onyx-room-more-title { align-self: stretch; padding: 0 var(--space-2); font-size: var(--text-md); font-weight: 700; color: var(--onyx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .onyx-room-more-menu > .onyx-room-more-search { display: flex; }
-  .onyx-frame .onyx-room-more-menu > button { font-size: var(--text-md); }
+  .onyx-frame .onyx-room-more-menu > button { min-height: 48px; padding: 0 var(--space-3); font-size: var(--text-md); }
   .onyx-frame .onyx-room-more-menu > button::before { width: 20px; height: 20px; }
   .onyx-room-more-alerts .room-notify-seg { min-height: 40px; font-size: var(--text-md); }
 
@@ -1354,6 +1383,7 @@
     gap: 3px;
     min-height: var(--mobile-nav-h);
     padding: var(--space-1) 0;
+    color: var(--onyx-dim);
     background: transparent;
     border: 0;
     font-size: 0.6875rem;

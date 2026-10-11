@@ -9,12 +9,16 @@
 
 .onyx-composer .shell-composer-tool--more {
   flex: none;
+  min-height: var(--target-floor);
   background: transparent;
+  border: 1px solid var(--onyx-line);
   color: var(--onyx-dim);
   font-weight: 400;
+  padding: var(--space-2) var(--space-3);
 }
 
 .onyx-composer .shell-composer-tool--more[aria-expanded="true"] {
+  border-color: var(--onyx-dim);
   background: var(--onyx-panel-2);
   color: var(--onyx-text);
 }
@@ -41,6 +45,7 @@
   border: 1px solid var(--onyx-line);
   border-radius: 6px;
   box-shadow: var(--elev-3);
+  animation: polish-rise var(--dur-fast) var(--ease);
 }
 
 .onyx-composer .shell-composer-tools-item {
@@ -60,6 +65,7 @@
   font-weight: 400;
   text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
 
 /* A leading icon per tool (mask glyphs from css/pol-thread.css). */
@@ -129,6 +135,7 @@
 }
 
 .onyx-composer .shell-composer-tools-action {
+  align-self: flex-start;
   min-height: var(--target-floor);
   padding: var(--space-1) var(--space-3);
   background: transparent;
