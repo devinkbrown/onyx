@@ -20,6 +20,7 @@ module GapCommandsTest exposing (suite)
 import App exposing (..)
 import Base64Url
 import Dict
+import DmSafety
 import Expect
 import Html
 import Html.Attributes
@@ -288,6 +289,32 @@ securitySuite =
                         send "/notice bob psst" designated
                 in
                 Expect.equal ( [ { target = "bob", plaintext = "psst" } ], False ) ( seals outs, carries "psst" outs )
+        , test "a pending key change holds /me and /msg: nothing seals, nothing goes out" <|
+            \_ ->
+                let
+                    changed =
+                        { designated | peerKeyChanges = Set.singleton "bob" }
+
+                    ( meHeld, meOut ) =
+                        send "/me waves" (step (ChannelSelect "bob") changed)
+
+                    ( msgHeld, msgOut ) =
+                        send "/msg bob secret plans" changed
+
+                    ( _, noticeOut ) =
+                        send "/notice bob psst" changed
+
+                    ( quoted, quoteOut ) =
+                        send "/quote PRIVMSG bob :secret" changed
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (seals (meOut ++ msgOut ++ noticeOut))
+                    , \_ -> Expect.equal [] (List.filter (\l -> String.contains "PRIVMSG" l || String.contains "NOTICE" l) (wire (meOut ++ msgOut ++ noticeOut ++ quoteOut)))
+                    , \_ -> Expect.equal (Just (DmSafety.keyChangeHoldCopy "bob")) meHeld.composerError
+                    , \_ -> Expect.equal (Just (DmSafety.keyChangeHoldCopy "bob")) msgHeld.composerError
+                    , \_ -> Expect.equal (Just (rawSlashLeakCopy "bob")) quoted.composerError
+                    ]
+                    ()
         , test "/notice to an unresolved peer holds" <|
             \_ ->
                 let
