@@ -7,7 +7,7 @@ Top to bottom, only what applies right now:
 
   - **Activity**: file-picker wait / progress with Cancel, or the last
     result with Undo.
-  - **Review** (replaces the source picker while it is open): what the
+  - **Review** (replaces everything else while it is open): what the
     files hold, per-conversation include + destination, the exact
     count that will be written, Cancel / Import. Nothing is written
     until Import.
@@ -36,10 +36,9 @@ transfer : Model -> List (Html Msg)
 transfer model =
     case model.historyImport.phase of
         Reviewing staged ->
-            [ reviewCard model staged
-            , vaultCard model
-            , batchesCard model
-            ]
+            -- Mid-review the pane is just the review: nothing below it, so
+            -- its sticky Cancel / Import bar is the last thing on the page.
+            [ reviewCard model staged ]
 
         _ ->
             [ activity model

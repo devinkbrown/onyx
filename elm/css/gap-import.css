@@ -110,6 +110,7 @@
    =================================================================== */
 
 .hi-review { container: hi-review / inline-size; margin-top: var(--space-2); padding-top: var(--space-2); border-top: 0; }
+.hi-review-head { min-width: 0; }
 .hi-kicker {
   margin: 0 0 2px;
   font-size: var(--text-xs);
@@ -389,6 +390,7 @@
 }
 .bk-inspect:hover { color: var(--onyx-text); }
 
+.bk-card--modal { gap: 0; }
 .bk-modal-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); }
 .bk-modal-copy { display: flex; flex: 1 1 10rem; flex-direction: column; gap: 2px; min-width: 0; }
 
