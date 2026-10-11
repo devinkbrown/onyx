@@ -23,6 +23,11 @@
  *        fingerprints every element's computed style in every scenario for two builds and compares
  *        (the check that deleting the inert declarations changed nothing the browser computes)
  *
+ * Two declarations that say the same thing in two files (a v1 rule and its
+ * re-cut) are each "inert" next to the other, so deleting both is a bug the
+ * probe cannot see. Therefore: delete from ONE probe run at a time, rebuild,
+ * and run `verify` (below) before trusting the result or probing another file.
+ *
  * `probe` copies the built dist, swaps in the UNMINIFIED sources of the
  * worktree under the same hashed names (rule order = source order), and runs
  * `nice`d screens.mjs jobs. `report` lists, per declaration, how many pages

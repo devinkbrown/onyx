@@ -997,6 +997,7 @@ html, body {
   width: 100%;
 }
 .onyx-composer .onyx-schedule-confirm {
+  border: 0;
   border-radius: 6px;
   font: inherit;
   font-weight: 650;
