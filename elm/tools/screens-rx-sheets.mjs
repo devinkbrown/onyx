@@ -29,10 +29,10 @@
  * Re-exports the shell scenarios (screens-shell.mjs) so one --extra run
  * covers the frame and the overlays.
  */
+/* global getComputedStyle, matchMedia -- used inside page.evaluate (browser context) */
 import shell from './screens-shell.mjs';
 
 const NET = 'onyx.test';
-const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
 const isPhone = (page) => (page.viewportSize()?.width ?? 1440) < 768;
 
@@ -495,7 +495,8 @@ const sheets = {
   },
   // The room desk's member action → the review-first confirm (a ban).
   'rx-mod-review': async (page, h) => {
-    await boot(page, h, { op: true });
+    // The desk's member actions are an Advanced-mode surface (oracle parity).
+    await boot(page, h, { op: true, prefs: { experienceMode: 'advanced' } });
     await clickVisible(page, ['[data-testid="room-more"]'], h);
     await clickVisible(page, ['[data-testid="moderation-open"]'], h);
     await page.selectOption('[data-testid="desk-member-select"]', 'sol', { timeout: 2000 }).catch(() => {});

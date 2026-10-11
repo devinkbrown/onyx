@@ -43204,32 +43204,40 @@ updateCore msg model =
                 Nothing ->
                     ( model, [] )
 
+                -- v3/rx-sheets: the oracle's submit guard — an action the
+                -- experience mode does not offer never stages (the form is
+                -- not shown then either).
                 Just kind ->
-                    ( { model
-                        | userProfileCard = Nothing
-                        , moderationDraft =
-                            Just
-                                { kind = kind
-                                , channel = channel
-                                , target =
-                                    case String.trim model.moderationDesk.member of
-                                        "" ->
-                                            Nothing
+                    if not (List.member kind (Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode))) then
+                        ( model, [] )
 
-                                        nick ->
-                                            Just nick
-                                , mask = Nothing
-                                , reason =
-                                    case String.trim model.moderationDesk.reason of
-                                        "" ->
-                                            Nothing
+                    else
 
-                                        reason ->
-                                            Just reason
-                                }
-                      }
-                    , []
-                    )
+                        ( { model
+                            | userProfileCard = Nothing
+                            , moderationDraft =
+                                Just
+                                    { kind = kind
+                                    , channel = channel
+                                    , target =
+                                        case String.trim model.moderationDesk.member of
+                                            "" ->
+                                                Nothing
+
+                                            nick ->
+                                                Just nick
+                                    , mask = Nothing
+                                    , reason =
+                                        case String.trim model.moderationDesk.reason of
+                                            "" ->
+                                                Nothing
+
+                                            reason ->
+                                                Just reason
+                                    }
+                          }
+                        , []
+                        )
 
         ModerationDeskSubmitBan channel ->
             -- The desk ban-mask form stages a mask draft into the

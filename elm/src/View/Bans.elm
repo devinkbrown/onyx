@@ -525,6 +525,18 @@ deskBanForm model channel live =
 
 deskMemberForm : Model -> String -> Bool -> List (Html Msg)
 deskMemberForm model channel live =
+    -- v3/rx-sheets: oracle parity (`<Show when={memberActions().length > 0}>`):
+    -- the standard experience mode offers no member actions on the desk, so
+    -- the form (and its empty action list) is not shown at all.
+    if List.isEmpty (Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)) then
+        []
+
+    else
+        deskMemberFormBody model channel live
+
+
+deskMemberFormBody : Model -> String -> Bool -> List (Html Msg)
+deskMemberFormBody model channel live =
     let
         desk =
             model.moderationDesk

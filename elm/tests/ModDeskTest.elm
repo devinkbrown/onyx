@@ -13,6 +13,7 @@ import Expect
 import Html
 import Html.Attributes as Attr
 import OperDesk
+import Prefs
 import Set
 import Test exposing (Test, describe, test)
 import Test.Html.Event as Event
@@ -429,12 +430,47 @@ suite =
                           \_ -> q |> Query.find [ Selector.class "onyx-moddesk-head" ] |> Query.find [ Selector.class "onyx-sheet-sub" ] |> Query.has [ Selector.text "#c" ]
                         , \_ -> q |> Query.findAll [ testId "ban-list-panel" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.findAll [ testId "desk-invite-form" ] |> Query.count (Expect.equal 1)
-                        , \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 1)
+                        , -- v3/rx-sheets: the standard experience mode offers no member
+                          -- actions on the desk (oracle parity): no form, no empty dropdown
+                          \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 0)
                         , \_ -> q |> Query.findAll [ testId "ban-add-form" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.has [ Selector.text "Server activity" ]
                         , \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Close room desk") ] |> Event.simulate Event.click |> Event.expect ModerationSheetClose
                         ]
                         ()
+            , test "the member-action form appears for Advanced and every action it offers is listed" <|
+                \_ ->
+                    let
+                        base =
+                            roomModel (Set.singleton 'o')
+
+                        prefs =
+                            base.prefs
+
+                        advanced =
+                            Tuple.first (update ModerationSheetOpen { base | prefs = { prefs | experienceMode = Prefs.ExperienceAdvanced } })
+
+                        q =
+                            query advanced |> Query.find [ testId "desk-member-form" ]
+                    in
+                    Expect.all
+                        [ \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Member action") ] |> Query.findAll [ Selector.tag "option" ] |> Query.count (Expect.equal 2)
+                        , \_ -> q |> Query.find [ testId "desk-member-submit" ] |> Query.has [ Selector.text "Review action" ]
+                        ]
+                        ()
+            , test "a member action the mode does not offer never stages a review" <|
+                \_ ->
+                    let
+                        base =
+                            roomModel (Set.singleton 'o')
+
+                        desk =
+                            base.moderationDesk
+
+                        staged =
+                            Tuple.first (update (ModerationDeskSubmitMember "#c") { base | moderationDesk = { desk | member = "alice", action = "kick" } })
+                    in
+                    Expect.equal Nothing staged.moderationDraft
             , test "closing hides the sheet" <|
                 \_ ->
                     Expect.equal False (Tuple.first (run [ ModerationSheetOpen, ModerationSheetClose ] (roomModel (Set.singleton 'o')))).moderationOpen

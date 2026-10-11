@@ -52,6 +52,10 @@
   --onyx-i-mail: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 6.5h15v11h-15z'/><path d='M5 7l7 6 7-6'/></svg>");
 }
 
+/* Native checkboxes / radios take the one accent, not the browser blue. */
+.onyx-sheet input[type="checkbox"],
+.onyx-sheet input[type="radio"] { accent-color: var(--onyx-accent); }
+
 /* A long placeholder or value ends in an ellipsis, never a hard cut. */
 .onyx-sheet input:not([type="checkbox"]):not([type="radio"]),
 .onyx-sheet select { text-overflow: ellipsis; }
@@ -1590,3 +1594,12 @@ html:has(.onyx-overlays [data-shortcut-scope]) .onyx-roster:popover-open { visib
   :root[data-kb="open"] .onyx-frame :is(.onyx-sheet-layer, .onyx-spotlight, .onyx-profile-pop, .onyx-room-more-menu) { bottom: 0; }
   :root[data-kb="open"] .onyx-frame .onyx-toaster { bottom: calc(var(--composer-h) + var(--space-3)); }
 }
+
+/* ===================================================================
+   22. The DM safety panel is an inline card in the thread, not an
+   overlay, but it speaks the same language: it keeps a reading width
+   on wide screens (its label / value rows never drift to the far edge
+   of an ultrawide window).
+   =================================================================== */
+
+.onyx-dmsafe-panel { max-width: min(100%, 760px); }
