@@ -69,6 +69,7 @@ import View.Toast exposing (toaster)
 import View.Nav
 import View.Inbox
 import View.Switcher
+import View.GapCommands
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
@@ -341,6 +342,7 @@ overlays model =
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
         , View.BlockKit.overlay model -- v3/gap-import
+        , View.GapCommands.commandsHelp model -- v3/gap-commands
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model
         -- v3/polish: the quiet asks + the update strip

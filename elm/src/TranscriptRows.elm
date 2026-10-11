@@ -101,11 +101,18 @@ isSystemType msgType =
 
 
 {-| Continuation grouping (mirroring `sameAuthorGroup`: same author,
-neither row systemic, within five minutes).
+neither row systemic, within five minutes). v3/gap-commands: an action
+(`/me`) row carries its own `* nick` lead, so it never joins a group
+and the row after it starts a fresh one.
 -}
 isContinuation : RowMessage a -> RowMessage a -> Bool
 isContinuation prev m =
-    prev.from == m.from && not (isSystemType prev.msgType) && not (isSystemType m.msgType) && abs (m.at - prev.at) < 5 * 60 * 1000
+    prev.from == m.from
+        && not (isSystemType prev.msgType)
+        && not (isSystemType m.msgType)
+        && prev.msgType /= "action"
+        && m.msgType /= "action"
+        && abs (m.at - prev.at) < 5 * 60 * 1000
 
 
 {-| Stable key for `Html.Keyed`: the server msgid when present,

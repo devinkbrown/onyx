@@ -125,7 +125,7 @@ tray model =
             , descId = "shell-composer-tools-attach-desc"
             , enabled = model.activeChannel /= Nothing && not protected
             , msg = Polish.ToolsAttach
-            , extra = []
+            , extra = [ attribute "aria-keyshortcuts" "Control+Shift+U Meta+Shift+U" ] -- v3/gap-commands
             }
          , item
             { testId = "composer-schedule"
@@ -138,6 +138,7 @@ tray model =
             , extra =
                 [ attribute "aria-haspopup" "dialog"
                 , attribute "aria-expanded" (boolAttr model.scheduleOpen)
+                , attribute "aria-keyshortcuts" "Control+Shift+L Meta+Shift+L" -- v3/gap-commands
                 ]
             }
          , item

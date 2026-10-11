@@ -27,6 +27,7 @@ import TranscriptRows
 import Upload
 import View.BlockKit as BlockKitView -- v3/gap-import
 import View.DmSafety
+import View.GapCommands
 import View.Home
 import View.Icon exposing (icon)
 import View.MessageText exposing (messageText)
@@ -492,6 +493,11 @@ rowShell ctx body menuButton panels m =
         withdrawn =
             m.deleted || m.redacted
 
+        -- v3/gap-commands: an action (`/me`) row reads `* nick waves`
+        -- on one line, with no avatar or name header of its own.
+        isAction =
+            App.messageAction m /= Nothing
+
         clock =
             if m.at <= 0 then
                 text ""
@@ -501,14 +507,14 @@ rowShell ctx body menuButton panels m =
                     [ text (App.formatRowClock ctx.zone ctx.prefs.clock m.at) ]
 
         sender =
-            if cont then
+            if cont || isAction then
                 text ""
 
             else
                 strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
 
         audience =
-            if cont then
+            if cont || isAction then
                 text ""
 
             else
@@ -524,7 +530,7 @@ rowShell ctx body menuButton panels m =
                             [ text (App.audienceLabel m.audience) ]
 
         avatar =
-            if cont || flags.compact then
+            if cont || flags.compact || isAction then
                 text ""
 
             else
@@ -553,7 +559,8 @@ rowShell ctx body menuButton panels m =
         ([ classList
             [ ( "onyx-message", True )
             , ( "onyx-message--compact", flags.compact )
-            , ( "onyx-continuation", cont )
+            , ( "onyx-continuation", cont || isAction )
+            , ( "onyx-message--action", isAction ) -- v3/gap-commands
             , ( "onyx-whisper", m.whisper )
             , ( "onyx-locked", App.messageLocked m )
             , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
@@ -574,7 +581,12 @@ rowShell ctx body menuButton panels m =
         )
         (lead
             ++ [ span [ class "onyx-body" ]
-                    (body
+                    ((if isAction then
+                        View.GapCommands.actionLead m.from :: body
+
+                      else
+                        body
+                     )
                         ++ [ if m.outboxId == Nothing && not m.pending then
                                 text ""
 

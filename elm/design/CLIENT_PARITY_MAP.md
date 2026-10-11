@@ -44,7 +44,7 @@ still product bugs, and fixing them is the cheapest way for Elm to beat Solid.
 |---|---:|---:|---:|---:|---:|---:|
 | [D Shell, navigation, Home, banners, PWA](#d--shell-navigation-home-banners-notification-center-pwa) | 186 | 94 | 38 | 4 | 38 | 12 |
 | [E Conversation](#e--conversation--transcript-message-rendering-menus-composer-search-media-threads-topics) | 178 | 114 | 26 | 5 | 26 | 7 |
-| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 61 | 1 | 0 | 44 | 1 |
+| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 88 | 6 | 0 | 12 | 1 |
 | [F Sheets & settings](#f--sheets--settings-preferences-appearance-themes-backgrounds-notification-settings-room-settings) | 125 | 44 | 32 | 10 | 37 | 2 |
 | [J Public website](#j--public-website-routes-pages-route-a11y-static-metadata) | 120 | 80 | 20 | 1 | 9 | 10 |
 | [H Calls](#h--calls--voice-video-screen-share-stage-watch-together) | 112 | 64 | 15 | 3 | 22 | 8 |
@@ -264,15 +264,15 @@ defect; fixing it makes Elm better than Solid rather than equal to it.
 
 ### Command surfaces (slash, palette, keyboard)
 
-1. **[High] Registry slash verbs that need translation are broken** (K1–K19/K34/K35, ⚠ shared).
+1. **[Closed — v3/gap-commands] Registry slash verbs that need translation were broken** (K1–K19/K34/K35, ⚠ shared). Now translated beside `parseSlashLocal` (`planSlash`), with inbound CTCP ACTION as action rows; content verbs ride the composer's seal/hold. Original defect:
    - `/me`, `/msg`, `/query`, `/j`, `/op`, `/deop`, `/voice`, `/devoice`, `/ban`, `/unban`, `/back`, `/unaway`, `/quote`, `/raw`, `/ctcp` and `/stage` hit 421 on Onyx Server.
    - `/kick`, `/topic`, `/invite <nick>` and bare `/part` go out without a channel.
    - `/away <multi-word>` loses all but the first word (B12).
    - Inbound CTCP ACTION is swallowed, so `/me` lines from other IRC clients vanish.
    - Fix: add a translation table beside `parseSlashLocal` and an action row type.
-2. **[High] `/share` (and bare `/invite`) missing in Elm** (K8/K29), yet `/help` advertises `/share`.
-3. **[Med] The palette is about a quarter of Solid's** (K46–K83). Missing: People rows, recents, Preferences, Scheduled, Copy room link, Start voice, Mark all read, theme switching, and the grammar verbs.
-4. **[Med] 17 of 21 Solid shortcuts are missing,** plus J/K and `g h`/`g d` (K89–K102).
+2. **[Closed — v3/gap-commands] `/share` (and bare `/invite`) were missing in Elm** (K8/K29); both work and `/help` lists only working verbs.
+3. **[Mostly closed — v3/gap-commands] The palette was about a quarter of Solid's** (K46–K83); People, recents, Preferences, Theme Studio, Scheduled, Copy room/node link, Start voice, Mark all read, catch-up, theme rows and the `#room` / `mute N` grammar now ship. Still missing: hide/close, translate, reader mode/width/motion, AI-policy and extension rows, time grammar (K63, K65, K69–K71, K74–K76, K79, K82, K83 partly). Original gap: Missing: People rows, recents, Preferences, Scheduled, Copy room link, Start voice, Mark all read, theme switching, and the grammar verbs.
+4. **[Closed — v3/gap-commands] 17 of 21 Solid shortcuts were missing,** plus J/K and `g h`/`g d` (K89–K102); all now go through the one `shortcut` port (reader mode, K94, stays missing: no reader mode in Elm).
 5. **[Low] No swipe-to-reply** (K105).
 
 ## Where Elm is better than Solid
@@ -887,25 +887,25 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.elm:12978` registry, raw `App.elm:11164` | ⚠ shared: sends `ME`→421; inbound ACTION swallowed both sides |
-| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: `TOPIC <text>` lacks channel; Room settings topic editor works in Elm |
+| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K3 | `/nick <nick>` | `registry.ts:217` (slash, raw) | FULL | `App.elm:11164` | NICK is a real verb |
-| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `App.elm:11164` | `/j` → `J` → 421 in both (⚠ shared) |
-| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: bare `/part` has no channel; `/leave` → 421 |
-| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `App.elm:11164`; leak guard `App.elm:11171` | ⚠ shared 421; Elm refuses raw content verbs into protected DMs (better) |
+| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K7 | `/whois <nick>` opens profile sheet | `store.ts:8494` (slash) | FULL | `App.elm:14627` / `14634` usage toast | — |
-| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | PARTIAL | raw only `App.elm:11164` | Elm bare `/invite` sends `INVITE` (461) instead of copying the link; `INVITE nick` lacks channel ⚠ shared |
+| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K9 | `/event <when> <title>` / `/event clear` | `store.ts:8122` (slash) | FULL | `App.elm:14990` → `runSlashEvent` 13850 | — |
 | K10 | `/webhook create\|list\|delete` | `registry.ts:224` (slash, raw) | FULL | `App.elm:11164` | server `WEBHOOK` module exists |
 | K11 | `/notice <target> <text>` | `registry.ts:226` (slash, raw) | FULL | `App.elm:11164`, `rawContentVerbs` guard | Elm better: refuses plaintext into designated/unresolved DMs |
 | K12 | `/away [message]` | `registry.ts:227` (slash, raw) | FULL | `App.elm:11164` | — |
-| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should send bare `AWAY`) |
+| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K14 | `/mode <target> [modes]` | `registry.ts:229` (slash, raw) | FULL | `App.elm:11164` | — |
 | K15 | `/modex [#room[,nick]]` (IRCX MODEX) | — | FULL | `App.elm:14648` | Elm-only addition |
-| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: no channel param; member card/desk kick works in Elm |
-| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should be `MODE #room ±b`) |
-| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should be `MODE #room ±o/v nick`) |
-| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared: sends literal `QUOTE …` (421) instead of the raw line |
+| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K20 | `/clear` local scrollback | `store.ts:8139` (slash) | FULL | `App.elm:14553` | — |
 | K21 | `/ignore [nick]`, `/unignore <nick>`, bare list | `store.ts:8160` (slash) | FULL | `App.elm:14476/14494/14512` | — |
 | K22 | `/read`, alias `/markread` | `store.ts:8198` (slash) | FULL | `App.elm:14609` | — |
@@ -915,16 +915,16 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K26 | `/highlight`, `/unhighlight` | `store.ts:8280` (slash) | FULL | `App.elm:14655/14673` | — |
 | K27 | `/snooze <min>`, `/dnd [on\|off\|min]` | `store.ts:8307` (slash) | FULL | `App.elm:14697/14700` | — |
 | K28 | `/color`, alias `/colour` | `store.ts:8349` (slash) | FULL | `App.elm:14888` | — |
-| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | MISSING | no arm in `parseSlashLocal` `App.elm:10981`; falls to raw 11164 | sends `SHARE` → 421; still advertised by Elm `/help` (`App.elm:13065`) |
+| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K30 | `/export [txt\|json]` | `store.ts:8401` (slash) | FULL | `App.elm:14597` | — |
 | K31 | `/import` vault snapshot | — (Solid imports via Preferences) | FULL | `App.elm:14603` | Elm-only verb |
 | K32 | `/notify all\|mentions\|mute` | `store.ts:8427` (slash) | FULL | `App.elm:14771` | — |
-| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `App.elm:11164` | server PING/PONG; no latency readout in either |
-| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (should wrap `\x01CMD\x01` in PRIVMSG) |
-| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `App.elm:11164` | ⚠ shared 421 (no STAGE verb; stage rides CTCP) |
+| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
+| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K36 | `/history` opens search | `store.ts:8156` (slash) | FULL | `App.elm:14571` | — |
 | K37 | `/search <query>` | `store.ts:8147` (slash) | FULL | `App.elm:14577` | — |
-| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.elm:14944`, list `13065` | Elm list advertises the broken `/share` |
+| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
 | K39 | Oper verbs `/broadcast` (`/wallops`) `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8510` `parseOperSlashCommand` (slash) | FULL | `App.elm:14993-15011` → `runSlashOper` | shared `planOperAction` gate |
 | K40 | Text verbs `/shrug` `/tableflip` `/unflip` `/lenny` `/disapprove` | `registry.ts:255-259` (slash) | FULL | `App.elm:11101` `expandSlashTextCommand` | — |
 | K41 | Unknown verb raw passthrough | `store.ts:8528` (slash) | FULL | `App.elm:11164` | Elm better: `plaintextWouldLeak` refusal for content verbs |
@@ -932,11 +932,11 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K43 | Slash suggestions (prefix, aliases, oper-hidden, Tab/Enter) | `Composer.tsx:401,1524` (UI) | FULL | `ComposerAssist.elm`, `View/Composer.elm` | see E section |
 | K44 | Palette: `Go to #room` rows | `commands.ts:1430` (palette) | FULL | `Switcher.elm:171` | — |
 | K45 | Palette: `Open DM with nick` rows | `commands.ts:1449` (palette) | FULL | `Switcher.elm:180` | — |
-| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | MISSING | `Switcher.elm` has Rooms/DMs/Actions only | no People section |
-| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | MISSING | `Switcher.elm:134` ("so recents can key on it later") | — |
+| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K48 | Palette: Browse rooms | `commands.ts:1195` | FULL | `Switcher.elm:236` | — |
 | K49 | Palette: Start a room | `commands.ts:1203` | FULL | `Switcher.elm:237` | — |
-| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | MISSING | — | Browse rooms covers listing only |
+| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K51 | Palette: New conversation | — | FULL | `Switcher.elm:238` | Elm-only |
 | K52 | Palette: Jump to date… | `commands.ts:1280` | FULL | `Switcher.elm:242` | — |
 | K53 | Palette: Notifications | — | FULL | `Switcher.elm:247` | Elm-only |
@@ -944,51 +944,51 @@ not against Solid, and they are where Elm can cheaply beat Solid.
 | K55 | Palette: You | — | FULL | `Switcher.elm:249` | Elm-only |
 | K56 | Palette: Open keyboard shortcuts | `commands.ts:1077` | FULL | `Switcher.elm:250` | — |
 | K57 | Palette: Disconnect | `commands.ts:1347` | FULL | `Switcher.elm:251` | — |
-| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | MISSING | — | Prefs sheet exists (You hub) but not in palette |
-| K59 | Palette: Open Theme Studio | `commands.ts:1243` | MISSING | — | Studio lives in `/appearance` Advanced |
-| K60 | Palette: Show/Hide member list | `commands.ts:1251` | MISSING | — | — |
-| K61 | Palette: Focus composer | `commands.ts:1259` | MISSING | — | — |
-| K62 | Palette: Scheduled messages | `commands.ts:1272` | MISSING | — | sheet exists (`View/Scheduled.elm`) |
+| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K59 | Palette: Open Theme Studio | `commands.ts:1243` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K60 | Palette: Show/Hide member list | `commands.ts:1251` | PARTIAL | — | v3/gap-commands: Alt+M shows/hides the member list; no palette row |
+| K61 | Palette: Focus composer | `commands.ts:1259` | PARTIAL | — | v3/gap-commands: Enter / Alt+Enter focus the composer; no palette row |
+| K62 | Palette: Scheduled messages | `commands.ts:1272` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K63 | Palette: AI policy row for active room | `commands.ts:1305` | MISSING | `AiPolicy.elm` (no UI) | — |
-| K64 | Palette: Start voice in current room | `commands.ts:1317` | MISSING | — | Join call exists in room header |
+| K64 | Palette: Start voice in current room | `commands.ts:1317` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K65 | Palette: Start video in current room | `commands.ts:1331` | N/A | video off on live network (`fbe04585`) | revisit when video ships |
-| K66 | Palette: Copy node address | `commands.ts:1355` | MISSING | — | — |
-| K67 | Palette: Copy room link | `commands.ts:1365` | MISSING | — | Invite friends sheet copies |
-| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | MISSING | — | — |
+| K66 | Palette: Copy node address | `commands.ts:1355` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K67 | Palette: Copy room link | `commands.ts:1365` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K69 | Palette: Switch background rows | `commands.ts:1473` | MISSING | — | — |
 | K70 | Palette: extension action rows | `commands.ts:1162` | MISSING | — | extensions not ported (see F) |
 | K71 | Palette time grammar: "jump [#room] <time>" (`timeGrammar.ts`) | `commands.ts:328,354,568` | MISSING | — | — |
-| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | MISSING | — | — |
-| K73 | Palette: Mark all read | `commands.ts:444` | MISSING | Home "Mark all caught up" exists | — |
+| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K73 | Palette: Mark all read | `commands.ts:444` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
 | K74 | Palette: Reopen reviewed anchors | `commands.ts:493` | MISSING | — | no review history in Elm |
 | K75 | Palette: vault search mode toggle / `vault exact\|semantic\|hybrid` | `commands.ts:524,942` | MISSING | mode toggle lives in search panel | — |
 | K76 | Grammar: hide room / close conversation | `commands.ts:594-657` | MISSING | — | Elm has no hidden rooms / closed conversations |
 | K77 | Grammar: leave / PART room | `commands.ts:671-713` | MISSING | — | — |
-| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | MISSING | — | — |
+| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | PARTIAL | — | v3/gap-commands: palette star/unstar/mark-read/DM rows; no typed grammar |
 | K79 | Grammar: schedule message "<text> in 2h" | `commands.ts:801` | MISSING | — | — |
-| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | MISSING | — | — |
-| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | MISSING | — | — |
+| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | PARTIAL | — | v3/gap-commands: `mute N` / DND / away rows; no `away set\|clear` grammar |
+| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | PARTIAL | — | v3/gap-commands: palette search/home rows; no focus-mode or `search X` grammar |
 | K82 | Grammar: translate to X / clear | `commands.ts:976-988` | MISSING | — | — |
-| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | MISSING | — | — |
+| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | PARTIAL | — | v3/gap-commands: density toggle row; reader mode, width and motion stay in Preferences |
 | K84 | Shortcut Ctrl/Cmd+K palette | `shortcutsRegistry.ts` (shortcut) | FULL | `ports.js:3492` | — |
 | K85 | Shortcut `/` palette when not typing | `useSpotlight.ts:32` | FULL | `ports.js:3509` | — |
 | K86 | Shortcut `?` shortcuts overlay | `shortcutsRegistry.ts` | FULL | `ports.js:3512` | — |
 | K87 | Shortcut Escape closes topmost overlay | `useKeyboardShortcuts.ts:670` | FULL | `ports.js:3488` + `App.escapeMsg` | Elm single ordered stack (better) |
 | K88 | Shortcut Ctrl/Cmd+F search | `shortcutsRegistry.ts` | FULL | `ports.js:5770` `isFindHotkey`, `App.elm:39559` | — |
-| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | MISSING | — | — |
-| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | MISSING | — | — |
-| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | MISSING | — | — |
-| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | MISSING | — | — |
-| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | MISSING | — | — |
+| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
 | K94 | Shortcut Ctrl/Cmd+Shift+R reader mode | `shortcutsRegistry.ts` | MISSING | — | no reader mode in Elm |
-| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | MISSING | — | — |
-| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | MISSING | — | — |
-| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | MISSING | — | — |
-| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | MISSING | Elm uses the chord for camera in calls only | — |
-| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | MISSING | Elm `L` = leave call (in-call only) | — |
-| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | MISSING | `Shift+M` = mic in calls (`ports.js:3478`) | spec §7.1 chord clash resolved for calls only |
-| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | MISSING | — | — |
-| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | MISSING | — | — |
+| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
+| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
 | K103 | Call chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S | (Solid VoiceBar local keys; see H) | FULL | `ports.js:3478`, `Switcher.elm:637` | Elm-wide, `aria-keyshortcuts` |
 | K104 | Push-to-talk talk key | `useCadenceMedia.ts` (see H) | FULL | `ports.js:3751` `createPushToTalk` | — |
 | K105 | Swipe-to-reply on touch rows | `rowGesture.ts` (gesture) | MISSING | — | — |
