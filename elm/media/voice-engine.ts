@@ -74,7 +74,13 @@ declare const __ONYX_VIDEO_WORKER__: string;
     async verifyPeerMediaKey(owner, nick, _publicKeyB64url, _attachmentId, trustBinding) {
       const subject = `${nick.toLowerCase()}#media-device#${trustBinding}`;
       const verdict = await peerKeyStatus(subject, trustBinding, owner);
-      if (verdict === 'changed' || verdict === 'unreadable') return false;
+      // v3/rx-calls: a changed key is refused AND announced (the call UI
+      // warns in the DM key-change language); never silently.
+      if (verdict === 'changed') {
+        try { adapter.peerKeyChanged(nick); } catch { /* announce is best-effort */ }
+        return false;
+      }
+      if (verdict === 'unreadable') return false;
       if (verdict === 'first-use') return pinPeerTrustBinding(subject, trustBinding, owner);
       return true;
     },

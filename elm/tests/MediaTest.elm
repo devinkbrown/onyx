@@ -517,7 +517,7 @@ suite =
                 \_ ->
                     let
                         ( joined, outs ) =
-                            update (CallJoin { channel = "#reef", video = True }) blank
+                            update (CallJoin { channel = "#reef", video = True }) { blank | accountName = Just "kai" }
 
                         ( _, offlineOuts ) =
                             update (CallJoin { channel = "#reef", video = False }) { blank | connection = Offline }
@@ -540,7 +540,7 @@ suite =
                 \_ ->
                     let
                         busy =
-                            { blank | calls = { blankCallHub | lifecycle = InCall, channel = Just "#a" } }
+                            { blank | calls = { blankCallHub | lifecycle = InCall, channel = Just "#a" }, accountName = Just "kai" }
 
                         ( joined, outs ) =
                             update (CallJoin { channel = "#b", video = False }) busy

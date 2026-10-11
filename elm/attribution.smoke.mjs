@@ -160,6 +160,24 @@ test("enroll round trip signs the transcript and confirms the marker", async () 
   assert.equal(markers.get(`onyx:attribution-enrolled:${ACCOUNT}`) ?? null, null);
 });
 
+test("node-less enrollment (no ACCOUNTRESIDENCE) signs the same transcript, never a residence", async () => {
+  const deps = memDeps();
+  const attr = OnyxPorts.createAttributionIdentity(deps);
+  const reply = await attr.enroll({ serverUrl: SERVER, account: ACCOUNT, nodeHex: "", gen: 2 });
+  assert.ok(reply, "node-less enroll must succeed");
+  assert.equal(reply.nodeHex, "");
+  assert.equal(reply.gen, 2);
+  assert.equal(reply.alreadyEnrolled, false);
+  const stored = await deps.keyStore.get("sign-v1");
+  const transcript = expectedIdentityTranscript(ACCOUNT, reply.label, Buffer.from(reply.publicHex, "hex"));
+  const ok = await globalThis.crypto.subtle.verify("Ed25519", stored.publicKey, Buffer.from(reply.sig, "hex"), transcript);
+  assert.equal(ok, true);
+  // A residence proof always needs a real node.
+  assert.equal(await attr.residence({ serverUrl: SERVER, account: ACCOUNT, nodeHex: "", epoch: 2000, expiryMs: 3000, gen: 2 }), null);
+  // A missing nodeHex is still malformed (only the explicit "" opts in).
+  assert.equal(await attr.enroll({ serverUrl: SERVER, account: ACCOUNT, gen: 2 }), null);
+});
+
 test("residence round trip signs the residence message", async () => {
   const deps = memDeps();
   const attr = OnyxPorts.createAttributionIdentity(deps);

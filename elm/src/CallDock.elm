@@ -11,6 +11,7 @@ module CallDock exposing
     , acceptingStatus
     , cancelAria
     , codecToast
+    , mediaToast -- v3/rx-calls
     , cornerFromWord
     , cornerWord
     , declineAria
@@ -64,6 +65,7 @@ DOM-free; `App` folds it through `settle` after every update.
 
 -}
 
+import DmSafety -- v3/rx-calls
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Media exposing (CallHub, CallLifecycle(..), CallOutcome(..))
@@ -549,6 +551,7 @@ type JoinError
     | NoDevice
     | AccountRequired
     | EncryptionUnavailable
+    | CaptureLost -- v3/rx-calls: the microphone went away mid-call
     | JoinOther
 
 
@@ -597,6 +600,10 @@ joinErrorFromKind kind =
         "encryption" ->
             Just EncryptionUnavailable
 
+        -- v3/rx-calls
+        "capture" ->
+            Just CaptureLost
+
         "other" ->
             Just JoinOther
 
@@ -619,6 +626,9 @@ failedSub error room =
 
         Just EncryptionUnavailable ->
             "This browser couldn't set up call encryption. Make sure site storage isn't blocked, then try again."
+
+        Just CaptureLost ->
+            "Your microphone stopped, so the call ended. Check it's connected, then join again."
 
         _ ->
             "Your place in " ++ room ++ " is kept."
@@ -650,6 +660,99 @@ codecToast kind =
 
         _ ->
             Nothing
+
+
+{-| v3/rx-calls — every media failure gets calm copy (never the raw
+engine text): the C6 codec / encoder / unsupported words, plus a
+generic media problem, a timed-out request, a peer whose media does
+not decode, a peer whose media key changed (the DM key-change
+language), a removal, and a microphone that went away. `warn` picks
+the quieter toast; `group` dedupes repeats (per peer where it matters).
+-}
+mediaToast : Decode.Value -> Maybe { title : String, description : String, warn : Bool, group : String }
+mediaToast raw =
+    let
+        field name =
+            Decode.decodeValue (Decode.field name Decode.string) raw
+                |> Result.toMaybe
+
+        peer =
+            field "errorPeer"
+                |> Maybe.map String.trim
+                |> Maybe.andThen
+                    (\nick ->
+                        if Media.validEngineNick nick then
+                            Just nick
+
+                        else
+                            Nothing
+                    )
+
+        detail =
+            field "mediaError"
+                |> Maybe.map String.trim
+                |> Maybe.andThen
+                    (\text ->
+                        if String.isEmpty text || String.length text > 200 || String.any (\c -> Char.toCode c < 32 || Char.toCode c == 127) text then
+                            Nothing
+
+                        else
+                            Just text
+                    )
+
+        what =
+            case field "errorMedia" of
+                Just "video" ->
+                    "video"
+
+                Just "screen" ->
+                    "screen share"
+
+                _ ->
+                    "audio"
+
+        make warn group title description =
+            Just { title = title, description = description, warn = warn, group = group }
+    in
+    case field "errorKind" of
+        Nothing ->
+            Nothing
+
+        Just kind ->
+            case codecToast kind of
+                Just toast ->
+                    make False ("voice-" ++ kind) toast.title toast.description
+
+                Nothing ->
+                    case kind of
+                        "media" ->
+                            make False "voice-media" "Call media problem" "Audio or video stumbled on this device. If people can't hear you, leave the call and join again."
+
+                        "timeout" ->
+                            make False "voice-timeout" "The call didn't connect" "The media request timed out. Try joining again in a moment."
+
+                        "removed" ->
+                            make True "voice-removed" "You were removed from the call" (Maybe.withDefault "A moderator removed you from voice." detail)
+
+                        "capture" ->
+                            make False "voice-capture" "Your microphone stopped" "The call ended because the microphone went away. Check it's connected, then join again."
+
+                        "decode" ->
+                            peer
+                                |> Maybe.andThen
+                                    (\nick ->
+                                        make True ("voice-decode-" ++ String.toLower nick) ("Can't play " ++ nick ++ "'s " ++ what) "It isn't decoding on this device right now. It usually recovers on its own."
+                                    )
+
+                        "peer_key" ->
+                            peer
+                                |> Maybe.andThen
+                                    (\nick ->
+                                        make True ("voice-key-" ++ String.toLower nick) (DmSafety.dmKeyChangeTitle nick) "Onyx didn't connect their call media. This usually means they reinstalled Onyx or added a device \u{2014} compare safety numbers in a DM before you trust it."
+                                    )
+
+                        _ ->
+                            Nothing
 
 
 {-| The recovery note after one step of the derived reconnecting

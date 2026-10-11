@@ -149,6 +149,26 @@ function toBytes(data: unknown): Uint8Array | null {
   return null;
 }
 
+/**
+ * v3/rx-calls — an engine `onError` line → the call UI's error word, so
+ * media failures are never silent. Join / ring / share failures have
+ * their own paths (the failed banner, the ring dialog, `screenError`):
+ * null here. The UI shows calm copy per word, never the raw engine text.
+ */
+export function classifyMediaError(message: string): string | null {
+  const m = String(message || '').trim();
+  if (!m) return null;
+  if (/^(Voice|Video) join failed|^Call start failed|^Accept failed|^Already in a session|^No active room for|^Screen share failed|^Stream start failed/i.test(m)) return null;
+  if (/^Codec unavailable/i.test(m)) return 'codec';
+  if (/^You were removed from/i.test(m)) return 'removed';
+  if (/^Media request timed out/i.test(m)) return 'timeout';
+  if (/video encod|encoder|encode worker/i.test(m)) return 'encoder';
+  return 'media';
+}
+
+/** Per-peer decode notices are rate-limited to one a minute. */
+const DECODE_NOTICE_MS = 60_000;
+
 function errorFrom(reason: unknown, fallback: string): Error {
   if (reason instanceof Error) return reason;
   return new Error(typeof reason === 'string' && reason ? reason : fallback);
@@ -208,6 +228,9 @@ export interface OnyxVoiceAdapter {
   /** Re-establish audio after backgrounding / a route change / an ended track
    *  (`gesture`: called synchronously inside a tap, so capture may restart). */
   recover(reason?: string, gesture?: boolean): void;
+  /** v3/rx-calls: a peer's pinned media key changed — the handshake was
+   *  refused; tell the call UI (voice-engine.ts verifyPeerMediaKey). */
+  peerKeyChanged(nick: string): void;
   /** Diagnostics for tests and the e2e harness (no key material). */
   stats(): Record<string, unknown>;
 }
@@ -260,6 +283,17 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
   /** Account whose device key the server confirmed on this connection. */
   let enrolledFor = '';
   let enrollWait: { label: string; resolve: () => void; reject: (err: Error) => void } | null = null;
+  /** v3/rx-calls: the join in flight (capture / enrollment), and whether
+   *  Leave cancelled it before the engine joined. */
+  let pendingJoin: { channel: string; seq: number } | null = null;
+  let joinSeq = 0;
+  let cancelledSeq = 0;
+  /** v3/rx-calls: device-key labels the SERVER confirmed on this
+   *  connection (`IDENTITY ADDED`, e.g. from the Elm client's own
+   *  enrollment at sign-in) → the account they were confirmed for. */
+  const confirmedLabels = new Map<string, string>();
+  /** v3/rx-calls: last decode notice per peer (lowercase nick → ms). */
+  const decodeNoticed: Record<string, number> = {};
   let recovering = false;
   let recoverTimer: ReturnType<typeof setTimeout> | null = null;
   /** Speaking state we last told the server (MEDIA SPEAKING), and the
@@ -410,9 +444,25 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
     onError(message) {
       counters.lastError = String(message).slice(0, 300);
       log(`voice: ${counters.lastError}`);
+      // v3/rx-calls: never silent. A removal ended the call already (the
+      // engine went idle first), so it rides a second idle snapshot; any
+      // other in-call failure rides the live snapshot.
+      const kind = classifyMediaError(counters.lastError);
+      if (!kind) return;
+      if (kind === 'removed') {
+        emit({ state: 'idle', nick: '', channel: null, errorKind: kind, mediaError: counters.lastError.slice(0, 160) });
+      } else if (lastState !== 'idle') {
+        emitLocal({ errorKind: kind });
+      }
     },
     onDecodeError(peer, type, err) {
       log(`voice: decode ${type} from ${peer}: ${err instanceof Error ? err.message : String(err)}`);
+      if (lastState === 'idle' || typeof peer !== 'string' || !peer) return;
+      const key = peer.toLowerCase();
+      const now = Date.now();
+      if (decodeNoticed[key] !== undefined && now - decodeNoticed[key] < DECODE_NOTICE_MS) return;
+      decodeNoticed[key] = now;
+      emitLocal({ errorKind: 'decode', errorPeer: peer, errorMedia: type === 'video' || type === 'screen' ? type : 'voice' });
     },
     onNetworkQuality(tier) {
       if (lastState !== 'idle') emitLocal({ qualityTier: tier });
@@ -585,6 +635,8 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
     } else if (msg.command === 'NOTICE' && /^IDENTITY ADDED\b/.test(msg.params[1] ?? '')) {
       counters.identityEnrolled = true;
       const label = (msg.params[1] ?? '').slice('IDENTITY ADDED label='.length).trim();
+      // Server-originated only (a user NOTICE carries nick!user@host).
+      if (msg.nick === null && label && account && confirmedLabels.size < 16) confirmedLabels.set(label, account.toLowerCase());
       if (enrollWait && label === enrollWait.label) {
         const wait = enrollWait;
         enrollWait = null;
@@ -666,6 +718,13 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
     if (enrolledFor === account.toLowerCase()) return;
     const claim = await options.enrollIdentity(account);
     if (!claim) throw named('This browser could not create the call encryption key.', 'EncryptionKeyError');
+    // v3/rx-calls: the Elm client enrolls this same device key at sign-in;
+    // when the server already confirmed it on this connection, skip the
+    // round trip (this path stays as the belt-and-braces fallback).
+    if (confirmedLabels.get(claim.label) === account.toLowerCase()) {
+      enrolledFor = account.toLowerCase();
+      return;
+    }
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         if (enrollWait && enrollWait.label === claim.label) {
@@ -690,18 +749,35 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
       throw new Error('Not connected');
     }
     joinSentFor = null;
+    counters.lastError = ''; // v3/rx-calls: errors are per attempt
+    joinSeq += 1;
+    const seq = joinSeq;
+    pendingJoin = { channel, seq };
+    const cancelled = () => {
+      if (cancelledSeq !== seq) return;
+      throw named('The join was cancelled', 'AbortError');
+    };
     let stream: MediaStream | null = null;
     try {
       stream = await media;
+      cancelled();
       await ensureEnrolled();
+      cancelled();
       if (video) await engine.joinVideo(channel, stream);
       else await engine.joinVoice(channel, stream);
     } catch (err) {
+      if (pendingJoin && pendingJoin.seq === seq) pendingJoin = null;
       if (stream && engine.getLocalStream() !== stream) stopStream(stream);
       abandonJoin(channel);
       if (lastState === 'idle') options.audio?.setCallSession(false);
+      // v3/rx-calls: the engine reports a missing codec through onError and
+      // then rethrows; name it so the bridge classifies it (`codec`).
+      if (classifyMediaError(counters.lastError) === 'codec' && !(err instanceof Error && err.name !== 'Error')) {
+        throw named(counters.lastError || 'Codec unavailable', 'CodecError');
+      }
       throw errorFrom(err, 'Voice join failed');
     }
+    if (pendingJoin && pendingJoin.seq === seq) pendingJoin = null;
     if (engine.getCallState().callState !== 'in_call' || !engine.getLocalStream()) {
       abandonJoin(channel);
       throw new Error(counters.lastError || 'Voice join failed');
@@ -749,6 +825,8 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
       // Outside a gesture WebKit may refuse capture; the next tap retries
       // (voice-engine.ts routes taps to recover(…, true)).
       log(`voice: recovery deferred: ${err instanceof Error ? err.message : String(err)}`);
+      // v3/rx-calls: a failed rejoin left the room — say why, once.
+      if (lastState === 'idle') emit({ state: 'idle', nick: '', channel: null, errorKind: 'capture' });
     } finally {
       recovering = false;
     }
@@ -770,6 +848,7 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
       ourNick = '';
       account = '';
       enrolledFor = '';
+      confirmedLabels.clear();
       if (enrollWait) {
         const wait = enrollWait;
         enrollWait = null;
@@ -804,6 +883,11 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
       return startJoin(channel, !!(opts && opts.video));
     },
     leaveRoom(channel) {
+      // v3/rx-calls: Leave while capture / enrollment is still running
+      // cancels the join (it would otherwise land after the user left).
+      if (pendingJoin && !joinedRoom && typeof channel === 'string' && pendingJoin.channel.toLowerCase() === channel.toLowerCase()) {
+        cancelledSeq = pendingJoin.seq;
+      }
       joinedRoom = null;
       engine.leaveRoom(channel);
     },
@@ -906,6 +990,10 @@ export function createVoiceAdapter(options: VoiceAdapterOptions): OnyxVoiceAdapt
       // Inside a tap: capture synchronously so WebKit honours the gesture.
       if (gesture) void recoverNow(why, capture(false));
       else scheduleRecover(why);
+    },
+    peerKeyChanged(nick) {
+      if (typeof nick !== 'string' || !nick || nick.length > 256 || lastState === 'idle') return;
+      emitLocal({ errorKind: 'peer_key', errorPeer: nick });
     },
     stats() {
       let net: Record<string, number>;

@@ -1,0 +1,102 @@
+/* v3/gap-auth — the sign-in steps the connect gate was missing:
+   two-step code entry, the pre-001 CHALLENGE question and its stop
+   screens, passkey sign-in, forgot password, and the small links the
+   sign-in form carries. They reuse the connect card's own classes
+   (`.conn-*`, app.css / pol-public.css); only what those do not cover
+   is here. Linked before ui-sheets.css. */
+
+/* A step panel opens with its heading focused (focus moves with the
+   panel); a focus ring around a heading would read as a control. */
+.ga .conn-title:focus { outline: none; }
+
+/* The heading wraps rather than clipping at 320px and long account
+   names break instead of widening the card. */
+.ga .conn-body strong { overflow-wrap: anywhere; color: var(--onyx-text); }
+
+/* One-time codes: monospaced and tabular so digits line up, with a
+   wide tracking only for the short authenticator code. */
+.ga-code {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+/* The 32-character reset code is pasted, not typed: keep it on one line
+   in the narrowest cards (the field scrolls if a font still can't). */
+@media (max-width: 359px) {
+  .ga-code:not(.ga-otp) { font-size: 0.875rem; padding-inline: 10px; }
+}
+.ga-otp {
+  font-size: 1.5rem;
+  min-height: 56px;
+  text-align: center;
+  letter-spacing: 0.32em;
+  padding-left: calc(14px + 0.32em);
+}
+.ga-otp::placeholder { letter-spacing: 0.32em; }
+
+/* Challenge question: the server's own words, set apart from the
+   page copy so it never reads as part of the lede. */
+.ga-question {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--onyx-panel-2);
+  border: 1px solid var(--onyx-line);
+  border-left: 3px solid var(--onyx-accent);
+  border-radius: var(--radius);
+}
+.ga-question-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--onyx-faint);
+}
+.ga-question-text {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  color: var(--onyx-text);
+  overflow-wrap: anywhere;
+}
+
+/* Stop screens and the passkey wait: the actions sit a little apart
+   from the copy above. */
+.ga-actions { margin-top: var(--space-4); }
+.ga-problem { margin: 0 0 var(--space-2); }
+
+/* "Other ways" under a step: quiet text links, never a second row of
+   competing buttons. */
+.ga-alt { margin-top: var(--space-5); padding-top: var(--space-4); }
+.ga-alt-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
+.ga-alt .conn-link,
+.ga-signin-links .conn-link { margin-top: 0; }
+
+/* Sign-in form extras: Forgot password / passkey, on one wrapping row
+   so neither is clipped at 320px. */
+.ga-signin-links { display: flex; flex-direction: column; gap: var(--space-1); margin-top: calc(-1 * var(--space-3)); }
+.ga-signin-row { display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
+
+/* "Quick automatic check" note while the proof of work runs. */
+.ga-note { margin-top: var(--space-1); }
+
+/* Touch targets stay 44px wherever the pointer is a finger, at any width. */
+@media (hover: none) {
+  .ga .conn-link,
+  .ga-signin-links .conn-link { min-height: var(--target-min); }
+}
+
+/* Short and wide (a phone on its side): the connect stage already lays
+   the words and the card out as two compact columns (app.css); only the
+   code field and the question need to follow that tightening. */
+@media (max-height: 520px) and (min-width: 521px) {
+  .ga .conn-context .ga-question { margin-top: var(--space-3); margin-bottom: 0; }
+  .ga-otp { min-height: 48px; font-size: 1.25rem; }
+  .ga .conn-card .conn-actions { margin-top: 0; }
+  .ga-alt { margin-top: var(--space-3); padding-top: var(--space-2); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ga-otp { transition: border-color var(--dur-fast) var(--ease); }
+}
