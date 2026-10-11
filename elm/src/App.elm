@@ -27156,8 +27156,9 @@ requestAccountSetEmail model =
                         )
 
 
-{-| `ACCOUNTSET <account> <current> password <new>` (mirrors the
-oracle's password-change submit; all three fields clear on send).
+{-| Change password: `SETPASS <current> :<new>` (the oracle's submit
+sent `ACCOUNTSET … password`, which the Onyx Server refuses; all three
+fields clear on send, and the reply folds through `foldAuthGateLine`).
 -}
 requestAccountSetPassword : Model -> ( Model, List Outbound )
 requestAccountSetPassword model =

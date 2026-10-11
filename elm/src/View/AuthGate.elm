@@ -38,7 +38,7 @@ gate model =
             model.authGate
     in
     main_ [ class "conn ga", attribute "data-testid" "auth-gate" ]
-        [ div [ class "conn-card ga-card" ]
+        [ div [ class "conn-card" ]
             (a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
                 [ brandMark "conn-brand-mark"
                 , span [ class "conn-brand-name" ] [ text "Onyx" ]
@@ -242,7 +242,7 @@ questionPanel state asked =
             , placeholder_ = "type your answer"
             , value_ = state.answer
             , error = asked.error
-            , hint = Just "Answer within 30 seconds."
+            , hint = Just "Answer soon — the connection times out if you wait too long."
             , busy = asked.sent
             , extra = [ maxlength 64 ]
             , onInput_ = AuthGate.AnswerInput
@@ -282,7 +282,7 @@ stoppedPanel stop =
 
                 StopTimedOut ->
                     ( "That took too long"
-                    , "The question has to be answered within 30 seconds of connecting. Try again for a fresh one."
+                    , "The question has to be answered soon after connecting, and the connection timed out first. Try again for a fresh one."
                     )
     in
     [ title heading

@@ -154,25 +154,49 @@ async function signIn(page, h, nick = 'kai', password = TFA_PASSWORD) {
   await page.fill('#conn-password', password);
   await h.settle(page, 150);
 }
-const guestJoin = async (page, h) => {
+const guestJoin = async (page) => {
   await page.fill('#conn-nick', 'kai');
   await page.click('[data-testid="conn-submit"]');
 };
+
+/** Join #lounge on the stock fake server with the socket proxied so the
+    scenario can inject server lines (the sheet-account recipe). */
+async function bootAccount(page, h) {
+  let client = null;
+  await page.routeWebSocket(/\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    client = ws;
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => ws.send(m));
+  });
+  await h.joinRoom(page, 'kn', '#lounge');
+  const inject = async (...lines) => {
+    for (const l of lines) if (client) client.send(l);
+    await h.settle(page, 400);
+  };
+  await inject(`:${NET} 900 kn kn!u@${NET} kn :You are now logged in as kn`);
+  for (let i = 0; i < 3 && (await page.$('[role="dialog"]')); i += 1) {
+    await page.keyboard.press('Escape');
+    await h.settle(page, 250);
+  }
+  await h.tryClick(page, '[data-testid="you-open"]');
+  await h.tryClick(page, '[data-testid="you-open-account"]');
+  await h.settle(page, 400);
+  return inject;
+}
+
+async function typePasswords(page, h, current, next) {
+  const section = '#acct-password-title';
+  await page.locator(section).scrollIntoViewIfNeeded().catch(() => {});
+  await page.fill('[data-testid="account-new-password"]', next);
+  await page.fill('[data-testid="account-confirm-password"]', next);
+  await page.fill('[data-testid="account-current-password"]', current);
+  await h.settle(page, 200);
+}
+
 const waitFor = (page, sel, ms = 8000) => page.waitForSelector(sel, { state: 'visible', timeout: ms });
 
 export default {
-  'ga-debug': async (page, h) => {
-    page.on('websocket', (ws) => {
-      ws.on('framesent', (f) => console.log('>>', String(f.payload).slice(0, 160).replace(/\r?\n/g, ' | ')));
-      ws.on('framereceived', (f) => console.log('<<', String(f.payload).slice(0, 160)));
-      ws.on('close', () => console.log('ws closed'));
-    });
-    await open(page, h, '2fa');
-    await signIn(page, h);
-    await page.click('[data-testid="conn-submit"]');
-    await h.settle(page, 3000);
-    console.log('TEXT', (await page.innerText('body')).slice(0, 400).replace(/\n/g, ' / '));
-  },
   // The sign-in form with its new Forgot password / passkey links.
   'ga-signin-links': async (page, h) => {
     await open(page, h, 'reset');
@@ -182,20 +206,20 @@ export default {
   // Proof of work: solved silently; the form shows a short note meanwhile.
   'ga-pow-note': async (page, h) => {
     await open(page, h, 'pow', { welcomeDelay: 6000 });
-    await guestJoin(page, h);
+    await guestJoin(page);
     await h.settle(page, 1500);
   },
 
   // The question gate.
   'ga-question': async (page, h) => {
     await open(page, h, 'question');
-    await guestJoin(page, h);
+    await guestJoin(page);
     await waitFor(page, '[data-testid="auth-challenge-question"]');
     await h.settle(page, 250);
   },
   'ga-question-wrong': async (page, h) => {
     await open(page, h, 'question');
-    await guestJoin(page, h);
+    await guestJoin(page);
     await waitFor(page, '#auth-answer');
     await page.fill('#auth-answer', 'lyon');
     await page.click('[data-testid="auth-answer-submit"]');
@@ -203,7 +227,7 @@ export default {
   },
   'ga-question-timeout': async (page, h) => {
     await open(page, h, 'question', { closeAfterMs: 1200 });
-    await guestJoin(page, h);
+    await guestJoin(page);
     await waitFor(page, '#auth-retry', 9000);
     await h.settle(page, 250);
   },
@@ -305,5 +329,30 @@ export default {
     await page.fill('#conn-nick', 'kai');
     await page.click('[data-testid="conn-passkey"]');
     await h.settle(page, 2500);
+  },
+
+  // Change password (SETPASS) from the Account panel.
+  'ga-account-password': async (page, h) => {
+    await bootAccount(page, h);
+    await page.locator('#acct-password-title').scrollIntoViewIfNeeded().catch(() => {});
+    await h.settle(page, 300);
+  },
+  'ga-account-password-changed': async (page, h) => {
+    const inject = await bootAccount(page, h);
+    await typePasswords(page, h, 'old-pass-word', 'a brand new secret');
+    await page.click('[data-testid="account-password-save"]');
+    await h.settle(page, 300);
+    await inject(`:${NET} NOTICE kn :SETPASS: your password has been changed`);
+    await page.locator('[data-testid="account-password-changed"]').scrollIntoViewIfNeeded().catch(() => {});
+    await h.settle(page, 300);
+  },
+  'ga-account-password-wrong': async (page, h) => {
+    const inject = await bootAccount(page, h);
+    await typePasswords(page, h, 'not-my-password', 'a brand new secret');
+    await page.click('[data-testid="account-password-save"]');
+    await h.settle(page, 300);
+    await inject(`:${NET} FAIL SETPASS WRONG_PASSWORD :Current password is incorrect`);
+    await page.locator('#acct-password-title').scrollIntoViewIfNeeded().catch(() => {});
+    await h.settle(page, 300);
   },
 };
