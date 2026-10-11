@@ -51,7 +51,15 @@ scheduledSheet model =
             }
                 [ Sheet.headerWith
                     (Sheet.head { scope = "scheduled", title = "Scheduled messages", closeLabel = "Close scheduled messages", onClose = SetShowScheduledMessages False }
-                        |> (\h -> { h | closeClass = "onyx-scheduled-close", subtitle = Just "Kept on this device. Each one sends when its time arrives and you are connected." })
+                        |> (\h -> { h | closeClass = "onyx-scheduled-close", subtitle =
+                                    Just
+                                        (if List.isEmpty (View.UserModes.heldRows model) then
+                                            "Kept on this device. Each one sends when its time arrives and you are connected."
+
+                                         else
+                                            "Some are kept on this device, some are held by the server."
+                                        )
+                            })
                     )
                 , if List.isEmpty rows && List.isEmpty (View.UserModes.heldRows model) then
                     p [ class "onyx-scheduled-empty" ]
