@@ -39,6 +39,8 @@ import ThemeTokens
 import Attribution
 import GroupControl
 import Polish
+-- v3/gap-shell
+import GapShell
 import Push
 import Stewardship
 import GroupDirectory
@@ -900,6 +902,9 @@ type alias Model =
     -- v3/frame
     , roomMenuOpen : Bool
 
+    -- v3/gap-shell
+    , gapShell : GapShell.Model
+
     -- v3/account2
     , peopleOpen : Bool
     , peopleFriendDraft : String
@@ -1137,6 +1142,8 @@ type Outbound
     | PolishFlagSave { key : String }
     | PwaInstallPrompt
     | PwaUpdateApprove
+      -- v3/gap-shell: one `onyx:*` device value (the MOTD dismissal)
+    | ShellStore { key : String, value : String }
     | OfflineMemoNotice { channel : String, count : Int, firstMsgId : Int }
     | TempBanTimerStart { key : String, delayMs : Int }
     | WhoisTimeoutStart { nick : String, gen : Int, delayMs : Int }
@@ -3213,6 +3220,8 @@ type Msg
     -- v3/frame
     | RoomMenuToggle
     | RoomMenuClose
+    -- v3/gap-shell
+    | GapShellMsg GapShell.Msg
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
     -- v3/switcher
@@ -3887,6 +3896,9 @@ init nick url =
     -- v3/frame
     , roomMenuOpen = False
 
+    -- v3/gap-shell
+    , gapShell = GapShell.init
+
     -- v3/account2
     , peopleOpen = False
     , peopleFriendDraft = ""
@@ -4467,6 +4479,9 @@ blank =
     -- v3/frame
     , roomMenuOpen = False
 
+    -- v3/gap-shell
+    , gapShell = GapShell.init
+
     -- v3/account2
     , peopleOpen = False
     , peopleFriendDraft = ""
@@ -5008,7 +5023,13 @@ foldLine model message =
         "ERROR" ->
             -- The oracle surfaces these as connection errors, never
             -- silently. The trailing param carries the reason.
-            ( logService model ("Server error: " ++ trailingParam message.params), [] )
+            -- v3/gap-shell: inbox row, banner/gate reason, and kills or
+            -- bans stop auto-reconnect.
+            ( foldServerError model (trailingParam message.params), [] )
+
+        "KILL" ->
+            -- v3/gap-shell: `:<oper> KILL <you> :<reason>`.
+            ( foldKill model message, [] )
 
         "001" ->
             -- Registration enters IRCX mode first (before any
@@ -5492,15 +5513,16 @@ foldLine model message =
         "904" ->
             -- ERR_SASLFAIL (and its 905 sibling) only while an
             -- exchange is in flight; otherwise ordinary numerics.
+            -- v3/gap-shell: the server's reason (two-step, storage) is kept.
             if model.sasl /= SaslIdle then
-                failSasl model "SASL authentication failed"
+                failSasl model (saslFailReason message)
 
             else
                 ( logNumeric model message, [] )
 
         "905" ->
             if model.sasl /= SaslIdle then
-                failSasl model "SASL authentication failed"
+                failSasl model (saslFailReason message)
 
             else
                 ( logNumeric model message, [] )
@@ -5719,14 +5741,22 @@ foldLine model message =
 
         "477" ->
             -- Registered/account-only room (`+a`/`+R`): the oracle
-            -- has no 477 path either (generic numeric log), so
-            -- this stays on it rather than inventing a prompt.
-            foldErrorNumeric model message
+            -- has no 477 path either (generic numeric log).
+            -- v3/gap-shell: a room denial now answers the join prompt.
+            foldJoinDenied model message
 
         "480" ->
-            -- Join throttle (`+j`, contract §11): no oracle path;
-            -- the generic numeric log carries the retry-after text.
-            foldErrorNumeric model message
+            -- Join throttle (`+j`, contract §11): no oracle path.
+            -- v3/gap-shell: a room denial now answers the join prompt.
+            foldJoinDenied model message
+
+        "489" ->
+            -- v3/gap-shell: `+S` TLS-only room.
+            foldJoinDenied model message
+
+        "520" ->
+            -- v3/gap-shell: `+O`/`+A` operator-only room.
+            foldJoinDenied model message
 
         "482" ->
             foldErrorNumeric model message
@@ -9641,6 +9671,13 @@ isServerNumeric command =
 
 logNumeric : Model -> Wire.IrcMessage -> Model
 logNumeric model message =
+    -- v3/gap-shell: an error-class numeric no fold claims is also an
+    -- inbox error row (it used to land only in the unrendered log).
+    routeErrorNumeric (logNumericQuiet model message) message
+
+
+logNumericQuiet : Model -> Wire.IrcMessage -> Model
+logNumericQuiet model message =
     let
         text =
             boundSystemEventText (String.trim (String.join " " (List.drop 1 message.params)))
@@ -9764,7 +9801,11 @@ failSasl model reason =
         ( logService model reason, [] )
 
     else
-        ( logService { model | sasl = SaslIdle } reason
+        -- v3/gap-shell: the refusal reaches the inbox and the connect
+        -- gate, and auto-reconnect disarms (retrying the same rejected
+        -- credential only burns the backoff, mirroring the oracle's
+        -- `authFatal` close).
+        ( failSignIn { model | sasl = SaslIdle } reason
         , [ SaslTimerCleared, WsDisconnect ]
         )
 
@@ -10118,6 +10159,18 @@ inbox only once the list is exhausted — pre- and post-registration
 alike. Post-registration numerics otherwise only log. -}
 foldNickError : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldNickError model message =
+    -- v3/gap-shell: a nick error while registering (or in onyx-server's
+    -- post-001 registration tail) retries, or fails with a clear reason.
+    case foldRegistrationNickError model message of
+        Just handled ->
+            handled
+
+        Nothing ->
+            foldNickErrorLive model message
+
+
+foldNickErrorLive : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldNickErrorLive model message =
     let
         -- Nick-error surfaces land in the inbox like the oracle's
         -- `addNotification` call sites, which are not
@@ -10129,7 +10182,13 @@ foldNickError model message =
                 "432" ->
                     addNotification model
                         { kind = NotifError
-                        , text = "Erroneous nickname: " ++ Maybe.withDefault "" (secondParam message.params)
+                        , text =
+                            -- v3/gap-shell: say a registered name is registered
+                            if isRegisteredNickText (trailingParam message.params) then
+                                "“" ++ Maybe.withDefault "" (secondParam message.params) ++ "” belongs to an account. Sign in as it to use that name."
+
+                            else
+                                "Erroneous nickname: " ++ Maybe.withDefault "" (secondParam message.params)
                         , from = Nothing
                         , channel = Nothing
                         , topic = Nothing
@@ -10178,7 +10237,7 @@ foldNickError model message =
                         }
                 in
                 if model.connection /= Registering then
-                    ( logNumeric rotated message
+                    ( logNumericQuiet rotated message
                     , [ SendLine (Wire.formatIrcLine "NICK" [ alias ]) ]
                     )
 
@@ -10188,10 +10247,10 @@ foldNickError model message =
                     )
 
             Nothing ->
-                ( logNumeric { withNotice | nickAliasTryIdx = 0 } message, [] )
+                ( logNumericQuiet { withNotice | nickAliasTryIdx = 0 } message, [] )
 
     else if model.connection /= Registering then
-        ( logNumeric withNotice message, [] )
+        ( logNumericQuiet withNotice message, [] )
 
     else if message.command == "432" && isRegisteredNickText (trailingParam message.params) then
         ( logService withNotice "That nickname is registered. Sign in as its account before using it."
@@ -10199,7 +10258,1171 @@ foldNickError model message =
         )
 
     else
-        ( logNumeric withNotice message, [] )
+        ( logNumericQuiet withNotice message, [] )
+
+
+-- v3/gap-shell ---------------------------------------------------------
+--
+-- Sign-in failures, the Activity log, connection lifecycle and the room
+-- actions of `elm/design/CLIENT_PARITY_MAP.md` (Shell and navigation,
+-- Account and security item 1). State lives in `GapShell`; the Activity,
+-- leave-confirm, More items, join field and MOTD card in
+-- `View.GapShell`. Post-update logic runs in `settleStepGapShell`.
+
+
+setGapShell : (GapShell.Model -> GapShell.Model) -> Model -> Model
+setGapShell f model =
+    { model | gapShell = f model.gapShell }
+
+
+{-| The 904/905 reason the server gave, else the generic refusal. -}
+saslFailReason : Wire.IrcMessage -> String
+saslFailReason message =
+    let
+        trailing =
+            String.trim (trailingParam (List.drop 1 message.params))
+    in
+    if String.isEmpty trailing then
+        "SASL authentication failed"
+
+    else
+        trailing
+
+
+{-| An explicit sign-in was refused: log it, put the reason in the inbox
+and on the connect gate, and disarm auto-reconnect (mirroring the
+oracle's `onError` inbox row plus its `authFatal` close). -}
+failSignIn : Model -> String -> Model
+failSignIn model reason =
+    let
+        failure =
+            GapShell.classifySasl reason
+    in
+    addNotification
+        (logService
+            ({ model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+                |> setGapShell (\g -> { g | connectFailure = Just failure, redialOnClose = False })
+            )
+            reason
+        )
+        { kind = NotifError
+        , text = "Sign-in failed. " ++ GapShell.failureCopy failure
+        , from = Nothing
+        , channel = Nothing
+        , topic = Nothing
+        }
+
+
+{-| End with a full stop unless the text already ends a sentence. -}
+gapSentence : String -> String
+gapSentence text =
+    if List.any (\p -> String.endsWith p text) [ ".", "!", "?", "…" ] then
+        text
+
+    else
+        text ++ "."
+
+
+{-| `ERROR :<reason>`: the reason reaches the inbox, the reconnect
+banner and the connect gate; kills, bans and denials stop
+auto-reconnect (the shell stays with the reason when a session had
+been live). The `Server error:` log line stays the last write. -}
+foldServerError : Model -> String -> Model
+foldServerError model raw =
+    let
+        gs =
+            model.gapShell
+
+        reason =
+            GapShell.closeReason raw
+
+        stopped =
+            if reason.fatal then
+                { model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+
+            else
+                model
+
+        noticed =
+            if gs.killed then
+                -- The KILL line already said so.
+                stopped
+
+            else
+                addNotification stopped
+                    { kind = NotifError
+                    , text = gapSentence reason.text
+                    , from = Nothing
+                    , channel = Nothing
+                    , topic = Nothing
+                    }
+
+        toasted =
+            if reason.fatal && gs.everLive && not gs.killed then
+                addToast
+                    { variant = ToastError
+                    , title = "Disconnected by the server"
+                    , description = Just (gapSentence reason.text)
+                    , duration = Just 0
+                    , groupKey = Just "gap-shell-close"
+                    , undo = Nothing
+                    }
+                    noticed.nowMs
+                    noticed
+
+            else
+                noticed
+    in
+    logService
+        (setGapShell
+            (\g ->
+                { g
+                    | closeReason = Just (gapSentence reason.text)
+                    , connectFailure = Just (GapShell.FailServer (gapSentence reason.text))
+                    , halt =
+                        if reason.fatal && g.everLive then
+                            Just (gapSentence reason.text)
+
+                        else
+                            g.halt
+                    , redialOnClose = g.redialOnClose && not reason.fatal
+                }
+            )
+            toasted
+        )
+        ("Server error: " ++ raw)
+
+
+{-| `:<oper> KILL <you> :<reason>` — onyx-server delivers it before the
+`ERROR :Closing Link` close. A KILL naming anyone else is ignored. -}
+foldKill : Model -> Wire.IrcMessage -> Model
+foldKill model message =
+    case message.params of
+        victim :: rest ->
+            if String.isEmpty victim || String.toLower victim /= String.toLower model.ourNick then
+                model
+
+            else
+                let
+                    killer =
+                        Maybe.withDefault (Maybe.withDefault "the server" message.prefix) message.nick
+
+                    why =
+                        String.trim (Maybe.withDefault "" (List.head (List.reverse rest)))
+
+                    reason =
+                        GapShell.closeReason ("Killed (" ++ killer ++ " (" ++ why ++ "))")
+
+                    copy =
+                        gapSentence reason.text
+
+                    logged =
+                        logService { model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+                            ("Removed from Onyx by "
+                                ++ killer
+                                ++ (if String.isEmpty why then
+                                        ""
+
+                                    else
+                                        ": " ++ why
+                                   )
+                            )
+
+                    noticed =
+                        addNotification logged
+                            { kind = NotifError
+                            , text = copy
+                            , from = Nothing
+                            , channel = Nothing
+                            , topic = Nothing
+                            }
+
+                    toasted =
+                        if model.gapShell.everLive then
+                            addToast
+                                { variant = ToastError
+                                , title = "Disconnected by an operator"
+                                , description = Just copy
+                                , duration = Just 0
+                                , groupKey = Just "gap-shell-close"
+                                , undo = Nothing
+                                }
+                                noticed.nowMs
+                                noticed
+
+                        else
+                            noticed
+                in
+                setGapShell
+                    (\g ->
+                        { g
+                            | killed = True
+                            , closeReason = Just copy
+                            , connectFailure = Just (GapShell.FailServer copy)
+                            , halt =
+                                if g.everLive then
+                                    Just copy
+
+                                else
+                                    g.halt
+                            , redialOnClose = False
+                        }
+                    )
+                    toasted
+
+        [] ->
+            model
+
+
+{-| The connect gate's error line for this attempt, if this slice knows
+it: the attempt's own failure, else an offline browser. -}
+gapShellConnectCopy : Model -> Maybe String
+gapShellConnectCopy model =
+    case model.gapShell.connectFailure of
+        Just failure ->
+            Just (GapShell.failureCopy failure)
+
+        Nothing ->
+            if model.gapShell.browserOffline then
+                Just "You’re offline. Connect to the internet, then try again."
+
+            else
+                Nothing
+
+
+{-| Nick errors while registering — or, on onyx-server, in the
+registration tail: the server sends 001…005 first and only then checks
+the name (`completeLiveRegistration` → `registerConnNick`), answering a
+taken name with `433 <nick> <nick>` and closing the socket. A 433/437
+for the name we hold, before the welcome settles, is therefore a
+registration collision, never a NICK change.
+
+  - a registered name (432 `Nickname is registered…`) fails with
+    "sign in" guidance and stops auto-reconnect;
+  - 433/437 rotate the nick aliases, then retry `nick_` up to four
+    times (on the same socket while registering; by redialing after a
+    tail collision), then fail;
+  - any other 432 fails with the server's reason.
+
+`Nothing` hands the line to the post-registration fold. -}
+foldRegistrationNickError : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldRegistrationNickError model message =
+    let
+        rejected =
+            String.trim (Maybe.withDefault "" (secondParam message.params))
+
+        target =
+            String.trim (Maybe.withDefault "" (List.head message.params))
+
+        same a b =
+            String.toLower a == String.toLower b
+
+        tail =
+            model.connection
+                == Live
+                && not (String.isEmpty rejected)
+                && same target rejected
+                && same rejected model.ourNick
+
+        named =
+            if String.isEmpty rejected then
+                model.ourNick
+
+            else
+                rejected
+
+        base =
+            Maybe.withDefault named model.gapShell.nickRetryBase
+    in
+    if model.connection /= Registering && not tail then
+        Nothing
+
+    else if message.command == "432" && isRegisteredNickText (trailingParam message.params) then
+        Just
+            (failRegistrationNick model
+                (GapShell.FailRegisteredNick named)
+                "That nickname is registered. Sign in as its account before using it."
+            )
+
+    else if GapShell.isRetryableNickError message.command then
+        Just (retryRegistrationNick model tail named base)
+
+    else
+        let
+            failure =
+                if model.gapShell.nickRetries > 0 then
+                    GapShell.FailNickTaken base
+
+                else
+                    GapShell.FailNickRefused named
+                        (let
+                            why =
+                                String.trim (trailingParam (List.drop 2 message.params))
+                         in
+                         if String.isEmpty why then
+                            "not allowed"
+
+                         else
+                            why
+                        )
+        in
+        Just (failRegistrationNick model failure (GapShell.failureCopy failure))
+
+
+failRegistrationNick : Model -> GapShell.ConnectFailure -> String -> ( Model, List Outbound )
+failRegistrationNick model failure text =
+    ( addNotification
+        (logService
+            ({ model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0, nickAliasTryIdx = 0 }
+                |> setGapShell
+                    (\g ->
+                        { g
+                            | connectFailure = Just failure
+                            , nickRetries = 0
+                            , nickRetryBase = Nothing
+                            , redialOnClose = False
+                        }
+                    )
+            )
+            text
+        )
+        { kind = NotifError
+        , text = text
+        , from = Nothing
+        , channel = Nothing
+        , topic = Nothing
+        }
+    , [ WsDisconnect ]
+    )
+
+
+retryRegistrationNick : Model -> Bool -> String -> String -> ( Model, List Outbound )
+retryRegistrationNick model tail named base =
+    let
+        gs =
+            model.gapShell
+
+        budget =
+            GapShell.maxNickRetries + List.length model.nickAliases
+
+        counted m =
+            setGapShell
+                (\g ->
+                    { g
+                        | nickRetries = g.nickRetries + 1
+                        , nickRetryBase = Just (Maybe.withDefault named g.nickRetryBase)
+                    }
+                )
+                m
+
+        go next m =
+            if tail then
+                -- The server is closing this socket: redial as `next`.
+                -- A first connect keeps the connect gate up meanwhile.
+                ( setGapShell (\g -> { g | redialOnClose = True })
+                    { m
+                        | ourNick = next
+                        , autoReconnect =
+                            if gs.everLive then
+                                m.autoReconnect
+
+                            else
+                                False
+                    }
+                , [ WsDisconnect ]
+                )
+
+            else
+                ( { m | ourNick = next }
+                , [ SendLine (Wire.formatIrcLine "NICK" [ next ]) ]
+                )
+    in
+    if gs.nickRetries >= budget then
+        failRegistrationNick model (GapShell.FailNickTaken base) (GapShell.failureCopy (GapShell.FailNickTaken base))
+
+    else
+        case nextNickAlias model.nickAliases model.nickAliasTryIdx model.ourNick named of
+            Just ( alias, idx ) ->
+                go alias
+                    (counted
+                        { model
+                            | nickAliasTryIdx = idx
+                            , currentNickIsAlias =
+                                if String.isEmpty model.ourNick then
+                                    model.currentNickIsAlias
+
+                                else
+                                    True
+                        }
+                    )
+
+            Nothing ->
+                let
+                    underscores =
+                        String.length (String.filter (\c -> c == '_') model.ourNick)
+                            - String.length (String.filter (\c -> c == '_') base)
+                in
+                if underscores >= GapShell.maxNickRetries then
+                    failRegistrationNick model (GapShell.FailNickTaken base) (GapShell.failureCopy (GapShell.FailNickTaken base))
+
+                else
+                    let
+                        next =
+                            GapShell.retryNick model.ourNick
+                    in
+                    go next
+                        (counted
+                            (logService model
+                                ("“" ++ model.ourNick ++ "” is taken right now; trying “" ++ next ++ "”.")
+                            )
+                        )
+
+
+{-| Error-class numerics (4xx, 5xx, and the IRCX 9xx errors — not the
+SASL/IRCX replies 900/901/903/908) that no fold claims. -}
+isErrorNumeric : String -> Bool
+isErrorNumeric command =
+    case String.toInt command of
+        Just n ->
+            String.length command
+                == 3
+                && ((n >= 400 && n < 600)
+                        || (n >= 900 && n < 1000 && not (List.member n [ 900, 901, 903, 908 ]))
+                   )
+
+        Nothing ->
+            False
+
+
+routeErrorNumeric : Model -> Wire.IrcMessage -> Model
+routeErrorNumeric model message =
+    if isErrorNumeric message.command then
+        addNotification model
+            { kind = NotifError
+            , text = boundSystemEventText (String.trim (String.join " " (List.drop 1 message.params)))
+            , from = Nothing
+            , channel = Nothing
+            , topic = Nothing
+            }
+
+    else
+        model
+
+
+{-| A standard reply no fold claims: FAIL/WARN become inbox errors,
+NOTE goes to Activity — never silently dropped. -}
+foldUnknownStandardReply : Model -> Wire.IrcMessage -> Wire.StandardReply -> Model
+foldUnknownStandardReply model _ reply =
+    let
+        description =
+            String.trim reply.description
+
+        line =
+            boundSystemEventText
+                (reply.command
+                    ++ ": "
+                    ++ (if String.isEmpty description then
+                            reply.code
+
+                        else if String.isEmpty reply.code || reply.code == "*" then
+                            description
+
+                        else
+                            description ++ " (" ++ reply.code ++ ")"
+                       )
+                )
+    in
+    case reply.kind of
+        Wire.Note ->
+            logService model line
+
+        _ ->
+            addNotification (logService model line)
+                { kind = NotifError
+                , text = line
+                , from = Nothing
+                , channel = Nothing
+                , topic = Nothing
+                }
+
+
+{-| 477 (`+a` sign-in only), 480 (`+j` join throttle), 489 (`+S`
+TLS-only) and 520 (`+O`/`+A` operators only) naming a room answer the
+join prompt (no 8 s browser wait) with plain copy. 477 also refuses
+DMs to `+R` people; that one stays a plain inbox error. -}
+foldJoinDenied : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldJoinDenied model message =
+    let
+        room =
+            Maybe.withDefault "" (secondParam message.params)
+
+        prompt =
+            case message.command of
+                "477" ->
+                    "Sign in to an account to join this room."
+
+                "480" ->
+                    "This room is letting people in slowly right now. Try again in a moment."
+
+                "489" ->
+                    "This room only allows secure connections."
+
+                _ ->
+                    "Only network operators can join this room."
+    in
+    if isChannelName model room then
+        ( setChannelJoinPrompt
+            (addNotification (logNumericQuiet model message)
+                { kind = NotifError
+                , text = room ++ ": " ++ prompt
+                , from = Nothing
+                , channel = Just room
+                , topic = Nothing
+                }
+            )
+            room
+            prompt
+        , []
+        )
+
+    else
+        foldErrorNumeric model message
+
+
+{-| Offline, a server halt, and a known close reason speak first. -}
+gapShellBanner : Model -> Maybe ReconnectBanner
+gapShellBanner model =
+    let
+        gs =
+            model.gapShell
+    in
+    if model.connection == Live then
+        Nothing
+
+    else if gs.browserOffline then
+        Just
+            { title = "You’re offline"
+            , detail = "You’re offline. Messages you send wait on this device and go out when you’re back."
+            , online = False
+            }
+
+    else
+        case ( gs.halt, model.connection ) of
+            ( Just reason, Offline ) ->
+                Just
+                    { title = "Disconnected by the server"
+                    , detail = reason ++ " Onyx won’t reconnect on its own."
+                    , online = False
+                    }
+
+            _ ->
+                case gs.closeReason of
+                    Just reason ->
+                        if model.connection == Offline && (model.reconnectDueMs > 0 || model.reconnectIn > 0) then
+                            Just
+                                { title = "Reconnecting…"
+                                , detail =
+                                    reason
+                                        ++ (if model.reconnectIn > 0 then
+                                                " Retrying in " ++ String.fromInt model.reconnectIn ++ "s."
+
+                                            else
+                                                " Trying to restore your session."
+                                           )
+                                , online = False
+                                }
+
+                        else
+                            Nothing
+
+                    Nothing ->
+                        Nothing
+
+
+{-| A self-PART line for a room (the offline Leave path). -}
+selfPartLine : Model -> String -> Wire.IrcMessage
+selfPartLine model room =
+    { tags = Dict.empty
+    , prefix = Just (model.ourNick ++ "!local@local")
+    , nick = Just model.ourNick
+    , host = Nothing
+    , command = "PART"
+    , params = [ room ]
+    , raw = ""
+    }
+
+
+updateGapShell : GapShell.Msg -> Model -> ( Model, List Outbound )
+updateGapShell msg model =
+    let
+        gs =
+            model.gapShell
+
+        set g =
+            { model | gapShell = g }
+    in
+    case msg of
+        GapShell.ActivityOpen ->
+            ( { model
+                | youHubOpen = False
+                , roomMenuOpen = False
+                , gapShell = { gs | activityOpen = True, activitySeenAt = model.nowMs }
+              }
+            , []
+            )
+
+        GapShell.ActivityClose ->
+            ( set { gs | activityOpen = False, activitySeenAt = model.nowMs }, [] )
+
+        GapShell.ActivityFilterSet filter ->
+            ( set { gs | activityFilter = filter }, [] )
+
+        GapShell.LeaveAsk room ->
+            if isChannelName model room then
+                ( { model | roomMenuOpen = False, gapShell = { gs | leaveAsk = Just room } }, [] )
+
+            else
+                ( model, [] )
+
+        GapShell.LeaveCancel ->
+            ( set { gs | leaveAsk = Nothing }, [] )
+
+        GapShell.LeaveConfirm ->
+            case gs.leaveAsk of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    let
+                        cleared =
+                            set { gs | leaveAsk = Nothing }
+
+                        toasted m =
+                            addToast
+                                { variant = ToastInfo
+                                , title = "Left " ++ room
+                                , description = Just "History stays on this device."
+                                , duration = Nothing
+                                , groupKey = Nothing
+                                , undo = Nothing
+                                }
+                                m.nowMs
+                                m
+                    in
+                    if model.connection == Live then
+                        -- The server's PART echo drops the room
+                        -- (mirroring the oracle `partChannel`).
+                        ( toasted cleared, [ SendLine (Wire.formatIrcLine "PART" [ room, "Goodbye" ]) ] )
+
+                    else
+                        -- Offline: drop it here, so the reconnect
+                        -- rejoin storm never brings it back.
+                        ( toasted (Tuple.first (foldPart cleared (selfPartLine cleared room))), [] )
+
+        GapShell.MarkRead room ->
+            let
+                ( marked, out ) =
+                    recordLocalReadMarker model room
+            in
+            ( addToast
+                { variant = ToastInfo
+                , title = "Marked read"
+                , description = Just ("Unread badges for " ++ room ++ " were cleared on this device.")
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                { marked | roomMenuOpen = False }
+            , out
+            )
+
+        GapShell.ExportTranscript room ->
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower room) then
+                let
+                    ( exported, out ) =
+                        runSlashExport model "txt"
+                in
+                -- `/export` clears the composer it was typed into; the
+                -- menu path keeps the draft.
+                ( { exported | composer = model.composer, roomMenuOpen = False }, out )
+
+            else
+                ( model, [] )
+
+        GapShell.JoinNameInput value ->
+            ( set { gs | joinName = String.left 80 value, joinError = Nothing }, [] )
+
+        GapShell.JoinNameSubmit ->
+            case GapShell.normalizeJoinName gs.joinName of
+                Err why ->
+                    ( set { gs | joinError = Just why }, [] )
+
+                Ok room ->
+                    let
+                        cleared =
+                            set { gs | joinName = "", joinError = Nothing }
+                    in
+                    case Dict.get (String.toLower room) model.channels of
+                        Just channel ->
+                            updateCore (ChannelSelect channel.name) cleared
+
+                        Nothing ->
+                            if model.connection /= Live then
+                                ( set { gs | joinError = Just "You’re offline. Join when you’re back online." }, [] )
+
+                            else
+                                ( setGapShell (\g -> { g | focusJoins = String.toLower room :: List.filter (\k -> k /= String.toLower room) g.focusJoins }) cleared
+                                , [ SendLine (Wire.formatIrcLine "JOIN" [ room ]) ]
+                                )
+
+        GapShell.MotdDismiss ->
+            ( closeMotd (set { gs | motdDismissedAt = model.nowMs, motdExpanded = False, welcomePack = [] })
+            , [ ShellStore { key = "motd-dismissed-at", value = String.fromInt (round model.nowMs) } ]
+            )
+
+        GapShell.MotdToggle ->
+            ( set { gs | motdExpanded = not gs.motdExpanded }, [] )
+
+        GapShell.ConnectSignInAs nick ->
+            let
+                switched =
+                    Tuple.first (updateCore (ConnectModeSet ConnectSignIn) (set { gs | connectFailure = Nothing }))
+            in
+            ( setConnectForm (\f -> { f | nick = String.left 64 nick, attempted = False, password = "" }) switched, [] )
+
+        GapShell.ShellEventReceived value ->
+            case GapShell.decodeShellEvent value of
+                Nothing ->
+                    ( model, [] )
+
+                Just event ->
+                    foldShellEvent model event
+
+
+{-| Browser lifecycle from `ports.js` `wireGapShell` (mirroring the
+oracle's `online`/`offline` listeners and `connectPageLifecycle`). -}
+foldShellEvent : Model -> GapShell.ShellEvent -> ( Model, List Outbound )
+foldShellEvent model event =
+    let
+        gs =
+            model.gapShell
+
+        canRedial =
+            model.autoReconnect && gs.halt == Nothing
+    in
+    case event.event of
+        "boot" ->
+            ( { model
+                | gapShell =
+                    { gs
+                        | browserOffline = event.online == Just False
+                        , motdDismissedAt = Maybe.withDefault gs.motdDismissedAt event.motdDismissedAt
+                    }
+                , createHangLabel =
+                    case ( String.isEmpty (String.trim model.createHangLabel), event.hangLabel ) of
+                        ( True, Just label ) ->
+                            String.left 64 (String.trim label)
+
+                        _ ->
+                            model.createHangLabel
+              }
+            , []
+            )
+
+        "offline" ->
+            -- The OS knows at once; the keepalive would take ~40 s. Drop
+            -- the socket so sends queue to the outbox instead of
+            -- vanishing (the reconnect countdown waits for `online`).
+            ( logService { model | gapShell = { gs | browserOffline = True } } "This device went offline."
+            , if model.connection /= Offline then
+                [ WsDisconnect ]
+
+              else
+                []
+            )
+
+        "online" ->
+            let
+                back =
+                    logService { model | gapShell = { gs | browserOffline = False } } "This device is back online."
+            in
+            if gs.browserOffline && model.connection == Offline && canRedial then
+                reconnectNow back
+
+            else
+                ( back, [] )
+
+        "restored" ->
+            -- bfcache restore / resume after freeze: the socket may be
+            -- dead without a close; reconnect now (session resume
+            -- reattaches), or wait for `online`.
+            if not canRedial then
+                ( model, [] )
+
+            else if gs.browserOffline then
+                ( model
+                , if model.connection /= Offline then
+                    [ WsDisconnect ]
+
+                  else
+                    []
+                )
+
+            else
+                case model.connection of
+                    Live ->
+                        ( { model | gapShell = { gs | redialOnClose = True } }, [ WsDisconnect ] )
+
+                    Offline ->
+                        reconnectNow model
+
+                    Registering ->
+                        ( model, [] )
+
+        _ ->
+            ( model, [] )
+
+
+{-| v3/gap-shell post-update: stamp new log lines into Activity (and the
+welcome pack), follow the connection lifecycle (registration settled,
+redial after a nick collision or page restore, reset per attempt), and
+focus rooms the person asked to join once their JOIN echo lands. -}
+settleStepGapShell : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapShell msg prior ( next, outs ) =
+    let
+        stamped =
+            stampActivity prior next
+
+        ( lived, lifeOut ) =
+            settleGapLifecycle msg prior stamped
+
+        ( focused, focusOut ) =
+            settleJoinFocus msg prior lived outs
+    in
+    ( focused, outs ++ lifeOut ++ focusOut )
+
+
+stampActivity : Model -> Model -> Model
+stampActivity prior next =
+    if next.serviceLog == prior.serviceLog then
+        next
+
+    else
+        let
+            fresh =
+                GapShell.newLogEntries maxServiceLog prior.serviceLog next.serviceLog
+
+            welcome =
+                List.filterMap GapShell.takeWelcomeLine (List.reverse fresh)
+
+            gs =
+                next.gapShell
+        in
+        { next
+            | gapShell =
+                { gs
+                    | activity = GapShell.recordEntries next.nowMs fresh gs.activity
+                    , welcomePack =
+                        List.take 40
+                            (List.foldl
+                                (\line acc ->
+                                    if List.member line acc then
+                                        acc
+
+                                    else
+                                        acc ++ [ line ]
+                                )
+                                gs.welcomePack
+                                welcome
+                            )
+                }
+        }
+
+
+{-| Whether an inbound message carries an end-of-welcome numeric (376
+end of MOTD, 422 no MOTD): onyx-server sends LUSERS + MOTD only after
+the name check, so either one means registration really settled. -}
+welcomeSettled : Msg -> Bool
+welcomeSettled msg =
+    let
+        isEnd line =
+            (String.contains " 376 " line || String.contains " 422 " line)
+                && List.member (Wire.parseIrcMessage line).command [ "376", "422" ]
+    in
+    case msg of
+        WsLineReceived line ->
+            isEnd line
+
+        WsBatchReceived batch ->
+            List.any isEnd batch.lines
+
+        _ ->
+            False
+
+
+settleGapLifecycle : Msg -> Model -> Model -> ( Model, List Outbound )
+settleGapLifecycle msg prior m =
+    let
+        gs =
+            m.gapShell
+
+        wentLive =
+            prior.connection /= Live && m.connection == Live
+
+        -- Registration that survived its tail: the welcome settled, or
+        -- the session has been live a while (a server with no MOTD).
+        settled =
+            m.connection
+                == Live
+                && (welcomeSettled msg || (gs.liveSinceMs > 0 && m.nowMs - gs.liveSinceMs >= 5000))
+
+        base =
+            if wentLive then
+                { gs
+                    | liveSinceMs = m.nowMs
+                    , halt = Nothing
+                    , killed = False
+                    , closeReason = Nothing
+                    , connectFailure = Nothing
+                    , redialing = False
+                }
+
+            else if m.connection /= Live then
+                { gs | liveSinceMs = 0 }
+
+            else
+                gs
+
+        retried =
+            -- A taken name settled on a suffix: say so once.
+            case ( settled, base.nickRetryBase ) of
+                ( True, Just original ) ->
+                    if String.toLower original /= String.toLower m.ourNick then
+                        addToast
+                            { variant = ToastInfo
+                            , title = "“" ++ original ++ "” is taken right now"
+                            , description =
+                                Just
+                                    ("You joined as “"
+                                        ++ m.ourNick
+                                        ++ "”. "
+                                        ++ (if m.accountName == Nothing then
+                                                "Try the name again later, or pick another from You."
+
+                                            else
+                                                "Onyx will take your name back when it frees up."
+                                           )
+                                    )
+                            , duration = Nothing
+                            , groupKey = Just "gap-shell-nick"
+                            , undo = Nothing
+                            }
+                            m.nowMs
+                            m
+
+                    else
+                        m
+
+                _ ->
+                    m
+
+        withBase =
+            { retried
+                | gapShell =
+                    if settled then
+                        { base | everLive = True, nickRetries = 0, nickRetryBase = Nothing }
+
+                    else
+                        base
+            }
+    in
+    case msg of
+        WsOpened _ ->
+            ( setGapShell (\g -> { g | redialing = False }) withBase, [] )
+
+        WsClosed _ ->
+            let
+                g0 =
+                    withBase.gapShell
+
+                closed =
+                    { g0 | focusJoins = [], redialing = False }
+            in
+            if g0.redialOnClose then
+                case withBase.endpoint of
+                    Just url ->
+                        if String.isEmpty (String.trim url) then
+                            ( { withBase | gapShell = { closed | redialOnClose = False } }, [] )
+
+                        else
+                            ( { withBase
+                                | reconnectIn = 0
+                                , reconnectDueMs = 0
+                                , gapShell = { closed | redialOnClose = False, redialing = True }
+                              }
+                            , [ WsConnect { url = url } ]
+                            )
+
+                    Nothing ->
+                        ( { withBase | gapShell = { closed | redialOnClose = False } }, [] )
+
+            else
+                ( { withBase | gapShell = closed }, [] )
+
+        ConnectSubmit ->
+            -- A fresh attempt owns its own failure.
+            ( setGapShell
+                (\g ->
+                    { g
+                        | connectFailure = Nothing
+                        , nickRetries = 0
+                        , nickRetryBase = Nothing
+                        , halt = Nothing
+                        , killed = False
+                        , closeReason = Nothing
+                        , redialOnClose = False
+                        , redialing = False
+                    }
+                )
+                withBase
+            , []
+            )
+
+        ConnectCancel ->
+            ( setGapShell (\g -> { g | redialOnClose = False, redialing = False }) withBase, [] )
+
+        SessionDisconnect ->
+            ( setGapShell (\g -> { g | halt = Nothing, killed = False, closeReason = Nothing, redialOnClose = False, redialing = False }) withBase, [] )
+
+        ReconnectNow ->
+            ( setGapShell (\g -> { g | halt = Nothing }) withBase, [] )
+
+        _ ->
+            ( withBase, [] )
+
+
+{-| The first channel each JOIN line in `outs` names. -}
+joinTargets : List Outbound -> List String
+joinTargets outs =
+    List.filterMap
+        (\out ->
+            case out of
+                SendLine line ->
+                    let
+                        parsed =
+                            Wire.parseIrcMessage line
+                    in
+                    if parsed.command == "JOIN" then
+                        List.head parsed.params
+                            |> Maybe.andThen (String.split "," >> List.head)
+                            |> Maybe.map String.trim
+                            |> Maybe.andThen
+                                (\c ->
+                                    if String.isEmpty c then
+                                        Nothing
+
+                                    else
+                                        Just c
+                                )
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+        )
+        outs
+
+
+{-| Rooms the person asked for open once their JOIN echo lands
+(`/join`, accepting an invite, the rail's join field) — mirroring the
+oracle's self-JOIN `activeView` switch, but never for reconnect
+rejoins, server-forced joins or history replay. A room already joined
+opens at once. -}
+settleJoinFocus : Msg -> Model -> Model -> List Outbound -> ( Model, List Outbound )
+settleJoinFocus msg prior m outs =
+    let
+        ( asked, askOut ) =
+            case msg of
+                ComposerSend ->
+                    ( List.take 1 (joinTargets outs), [] )
+
+                NotificationActivated id ->
+                    case List.filter (\n -> n.id == id) prior.notifications of
+                        note :: _ ->
+                            case note.channel of
+                                Just room ->
+                                    if note.kind == NotifSystem && String.contains " invited you to " note.text && isChannelName m room then
+                                        if Dict.member (String.toLower room) m.channels || m.connection /= Live then
+                                            ( [ room ], [] )
+
+                                        else
+                                            ( [ room ], [ SendLine (Wire.formatIrcLine "JOIN" [ room ]) ] )
+
+                                    else
+                                        ( [], [] )
+
+                                Nothing ->
+                                    ( [], [] )
+
+                        [] ->
+                            ( [], [] )
+
+                _ ->
+                    ( [], [] )
+
+        ( known, pending ) =
+            List.partition (\room -> Dict.member (String.toLower room) prior.channels) asked
+
+        queued =
+            setGapShell
+                (\g ->
+                    { g
+                        | focusJoins =
+                            List.take 8
+                                (List.map String.toLower pending
+                                    ++ List.filter (\k -> not (List.member k (List.map String.toLower pending))) g.focusJoins
+                                )
+                    }
+                )
+                m
+
+        arrived =
+            List.filter
+                (\key -> Dict.member key queued.channels && not (Dict.member key prior.channels))
+                queued.gapShell.focusJoins
+
+        target =
+            case ( known, arrived ) of
+                ( room :: _, _ ) ->
+                    Just room
+
+                ( [], key :: _ ) ->
+                    Just key
+
+                _ ->
+                    Nothing
+
+        dropped =
+            setGapShell (\g -> { g | focusJoins = List.filter (\k -> not (List.member k arrived)) g.focusJoins }) queued
+    in
+    case target of
+        Just room ->
+            let
+                name =
+                    Dict.get (String.toLower room) dropped.channels
+                        |> Maybe.map .name
+                        |> Maybe.withDefault room
+
+                ( selected, selectOut ) =
+                    updateCore (ChannelSelect name) dropped
+            in
+            ( selected, askOut ++ selectOut )
+
+        Nothing ->
+            ( dropped, askOut )
+
 
 
 {-| Record a channel join rejection for the join surface (mirroring
@@ -10312,6 +11535,11 @@ fireReconnect model =
 
     else if model.connection /= Offline || not model.autoReconnect then
         ( { model | reconnectIn = 0, reconnectDueMs = 0 }, [] )
+
+    else if model.gapShell.browserOffline then
+        -- v3/gap-shell: no attempts burn while the browser is offline;
+        -- `online` reconnects at once.
+        ( model, [] )
 
     else if model.nowMs < model.reconnectDueMs then
         ( { model | reconnectIn = max 0 (ceiling ((model.reconnectDueMs - model.nowMs) / 1000)) }, [] )
@@ -16871,6 +18099,18 @@ type alias ReconnectBanner =
 
 reconnectBanner : Model -> Maybe ReconnectBanner
 reconnectBanner model =
+    -- v3/gap-shell: offline, a server halt and a known close reason
+    -- speak first.
+    case gapShellBanner model of
+        Just banner ->
+            Just banner
+
+        Nothing ->
+            reconnectBannerBase model
+
+
+reconnectBannerBase : Model -> Maybe ReconnectBanner
+reconnectBannerBase model =
     case model.connection of
         Live ->
             if model.backOnlineAt > 0 && model.nowMs - model.backOnlineAt < backOnlineNoticeMs then
@@ -20993,7 +22233,9 @@ foldStandardReply model message =
                         )
 
                     else if reply.command /= "WEBAUTHN" then
-                        ( model, [] )
+                        -- v3/gap-shell: never silent (inbox for FAIL/WARN,
+                        -- Activity for NOTE).
+                        ( foldUnknownStandardReply model message reply, [] )
 
                     else
                         foldPasskeyReply model reply
@@ -24311,6 +25553,9 @@ connectGateVisible model =
         && model.connection
         /= Live
         && not model.autoReconnect
+        -- v3/gap-shell: a kill/ban keeps the shell with its reason
+        && model.gapShell.halt
+        == Nothing
 
 
 {-| Mirrors the oracle `formPhase`: a dial in flight (probe or
@@ -24318,7 +25563,7 @@ handshake) is connecting; a closed socket after an attempt is an error.
 -}
 connectPhase : Model -> ConnectPhase
 connectPhase model =
-    if model.connectForm.dialing || model.connection == Registering then
+    if model.connectForm.dialing || model.connection == Registering || model.gapShell.redialing then
         ConnectConnecting
 
     else if model.connection == Offline && model.connectForm.attempted then
@@ -24399,17 +25644,24 @@ connectStatusMessage model =
             "Connecting to Onyx."
 
         ConnectError ->
-            if matches "nickname is registered|registered nickname requires authentication" then
-                "That name belongs to an account. Sign in to use it."
+            -- v3/gap-shell: this attempt's own failure first, then an
+            -- offline browser, then the oracle's text heuristics.
+            case gapShellConnectCopy model of
+                Just copy ->
+                    copy
 
-            else if nickInUse model then
-                "That name is already in use. Reclaim it, or pick another."
+                Nothing ->
+                    if matches "nickname is registered|registered nickname requires authentication" then
+                        "That name belongs to an account. Sign in to use it."
 
-            else if model.saslAccount /= Nothing && matches "password|auth|login|incorrect|credential|464|sasl" then
-                "That password was not accepted. Check it and sign in again."
+                    else if nickInUse model then
+                        "That name is already in use. Reclaim it, or pick another."
 
-            else
-                "Couldn’t reach Onyx just now. Try again in a moment."
+                    else if model.saslAccount /= Nothing && matches "password|auth|login|incorrect|credential|464|sasl" then
+                        "That password was not accepted. Check it and sign in again."
+
+                    else
+                        "Couldn’t reach Onyx just now. Try again in a moment."
 
         ConnectIdle ->
             case model.connectForm.mode of
@@ -36153,7 +37405,8 @@ parallel slices then merge as adjacent one-line additions.
 -}
 settleSteps : List (Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound ))
 settleSteps =
-    [ settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
+    [ settleStepGapShell -- v3/gap-shell (first: nav/menu steps see its room focus)
+    , settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
     , settleStepNav -- v3/nav
     , settleStepDmSafety -- v3/dmsafety
     , settleStepCalls -- v3/calls-c1
@@ -41961,6 +43214,10 @@ updateCore msg model =
         RoomMenuClose ->
             ( { model | roomMenuOpen = False }, [] )
 
+        -- v3/gap-shell
+        GapShellMsg sub ->
+            updateGapShell sub model
+
         -- v3/roomsettings
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
@@ -44308,6 +45565,9 @@ overlayStack model =
         , ( "call-leave-confirm", model.callLeaveConfirm && model.calls.lifecycle /= Media.Idle, CallLeaveConfirmClose )
         , ( "stage-hands", stageHandsSheetOpen model, StageHandsClose )
         , ( "reclaim", model.reclaimOpen, ReclaimClose )
+        -- v3/gap-shell
+        , ( "leave-room", model.gapShell.leaveAsk /= Nothing, GapShellMsg GapShell.LeaveCancel )
+        , ( "activity", model.gapShell.activityOpen, GapShellMsg GapShell.ActivityClose )
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )

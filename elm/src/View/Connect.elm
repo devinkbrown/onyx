@@ -19,6 +19,7 @@ import Html exposing (Html, a, button, div, form, h1, h2, input, label, main_, n
 import Html.Attributes exposing (attribute, autocomplete, class, classList, disabled, for, href, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import View.PublicFrame exposing (brandMark)
+import View.GapShell -- v3/gap-shell
 
 
 connectGate : Model -> Html Msg
@@ -103,6 +104,7 @@ connectGate model =
                             , attribute "data-testid" "conn-status"
                             ]
                             [ text (App.connectStatusMessage model) ]
+                       , View.GapShell.connectAction model -- v3/gap-shell
                        ]
                 )
             , modeNav form_.mode busy

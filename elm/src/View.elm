@@ -74,6 +74,7 @@ import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.GapShell -- v3/gap-shell
 
 
 view : Model -> Browser.Document Msg
@@ -334,6 +335,9 @@ overlays model =
         , View.StageMode.handsSheet model
         , View.StageMode.leaveConfirm model
         , reclaimDialog model
+        -- v3/gap-shell
+        , View.GapShell.activitySheet model
+        , View.GapShell.leaveConfirm model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
         -- v3/switcher
