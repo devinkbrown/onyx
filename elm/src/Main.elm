@@ -369,9 +369,6 @@ drop-target feeds. -}
 port gapDraftsSave : { serverUrl : String, identity : String, drafts : Encode.Value } -> Cmd msg
 
 
-port gapDraftsRequest : { serverUrl : String, identity : String } -> Cmd msg
-
-
 port gapUploadVariant : { key : String, index : Int, variant : String } -> Cmd msg
 
 
@@ -1428,9 +1425,6 @@ perform key outbound =
             case out of
                 GapConvo.DraftsSave req ->
                     gapDraftsSave req
-
-                GapConvo.DraftsRequest req ->
-                    gapDraftsRequest req
 
                 GapConvo.UploadVariant req ->
                     gapUploadVariant req

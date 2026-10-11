@@ -553,7 +553,6 @@ type Msg
 
 type Out
     = DraftsSave { serverUrl : String, identity : String, drafts : Encode.Value }
-    | DraftsRequest { serverUrl : String, identity : String }
     | UploadVariant { key : String, index : Int, variant : String }
     | CaretSet { pos : Int }
 

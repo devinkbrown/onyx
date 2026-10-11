@@ -7459,6 +7459,7 @@ function fetchPublicFeed(url) {
           return { ok: false, status: 0, body: "", contentType: null };
         });
         sender.then(function (outcome) {
+          if (outcome && outcome.ok) gapUploads.release(key, index); /* v3/gap-convo */
           try {
             app.ports.uploadDone.send({
               key: (req && req.key) || "",
@@ -10999,6 +11000,9 @@ function fetchPublicFeed(url) {
           orientation = gapExifOrientation(b, start + 10, end);
         }
         drop = true;
+      } else if (marker === 0xE0) {
+        /* JFIF is geometry only; a JFXX extension carries a thumbnail. */
+        drop = gapAscii(b, start + 4, 5) !== "JFIF\u0000";
       } else if (marker === 0xE2) {
         drop = gapAscii(b, start + 4, 12) !== "ICC_PROFILE\u0000";
       } else if (marker >= 0xE3 && marker <= 0xEF && marker !== 0xEE) {
@@ -11283,24 +11287,48 @@ function fetchPublicFeed(url) {
 
   /* One file's cleaning, as a promise of { kind, metadata, clean, compact }. */
   function gapPrepareFile(file) {
-    return gapReadBytes(file).then(function (bytes) {
-      var cleaned = gapCleanBytes(bytes);
-      var clean = null;
-      if (cleaned.bytes) clean = cleaned.bytes === bytes ? file : gapMakeFile(cleaned.bytes, file);
-      var result = { kind: cleaned.kind, metadata: cleaned.metadata, clean: clean, compact: null };
-      if (!clean) return result;
-      return gapCompact(clean, cleaned.kind, bytes).then(function (compact) {
-        result.compact = compact;
-        return result;
-      });
+    /* Look at the first bytes only: a movie or archive is never read into
+       memory just to learn it is not a photo. */
+    var head = file && typeof file.slice === "function" ? file.slice(0, 32) : file;
+    return gapReadBytes(head).then(function (first) {
+      if (!gapSniff(first)) return { kind: "file", metadata: "none", clean: file, compact: null, skipped: true };
+      return gapReadBytes(file).then(gapPrepareBytes.bind(null, file));
     }).catch(function () {
       return { kind: "file", metadata: "unsafe", clean: null, compact: null };
+    });
+  }
+
+  function gapPrepareBytes(file, bytes) {
+    var cleaned = gapCleanBytes(bytes);
+    var clean = null;
+    if (cleaned.bytes) clean = cleaned.bytes === bytes ? file : gapMakeFile(cleaned.bytes, file);
+    var result = { kind: cleaned.kind, metadata: cleaned.metadata, clean: clean, compact: null };
+    if (!clean) return Promise.resolve(result);
+    return gapCompact(clean, cleaned.kind, bytes).then(function (compact) {
+      result.compact = compact;
+      return result;
     });
   }
 
   function createGapUploads(app) {
     var prepared = {};
     var variants = {};
+    var order = [];
+    /* Cleaned / compact copies are held only for the few most recent
+       staging batches (and let go as each file finishes uploading). */
+    var MAX_KEYS = 16;
+    function remember(key) {
+      var at = order.indexOf(key);
+      if (at >= 0) order.splice(at, 1);
+      order.push(key);
+      while (order.length > MAX_KEYS) {
+        var old = order.shift();
+        delete prepared[old];
+        for (var v in variants) {
+          if (Object.prototype.hasOwnProperty.call(variants, v) && v.indexOf(old + "#") === 0) delete variants[v];
+        }
+      }
+    }
     function report(key, index, r) {
       if (!app || !app.ports || !app.ports.gapPhotoPrepared) return;
       if (r.kind === "file" && r.metadata !== "unsafe") return;
@@ -11317,6 +11345,7 @@ function fetchPublicFeed(url) {
     }
     return {
       prepare: function (key, files) {
+        remember(key);
         prepared[key] = (files || []).map(function (file, index) {
           var p = gapPrepareFile(file);
           p.then(function (r) { report(key, index, r); });
@@ -11339,6 +11368,13 @@ function fetchPublicFeed(url) {
           if (!r.clean) return { refused: true };
           return { file: r.clean };
         });
+      },
+      /* One file is done (sent or abandoned): drop its copies. A retry
+         simply re-cleans from the original. */
+      release: function (key, index) {
+        var list = prepared[key];
+        if (list) list[index] = null;
+        delete variants[key + "#" + index];
       },
       forget: function (key) { delete prepared[key]; }
     };

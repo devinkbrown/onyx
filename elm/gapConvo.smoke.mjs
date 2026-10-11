@@ -76,6 +76,21 @@ test("JPEG: EXIF/GPS, maker notes, comments, MPF and trailing bytes are dropped;
   assert.equal(buf.length < Buffer.from(src).length, true);
 });
 
+test("JPEG: a JFXX thumbnail extension is dropped (it can carry its own EXIF); JFIF stays", () => {
+  const src = B(
+    [0xff, 0xd8],
+    seg(0xe0, B("JFIF\0", [1, 1, 0, 0, 1, 0, 1, 0, 0])),
+    seg(0xe0, B("JFXX\0", [0x10], "thumbnail-with-GPS-inside")),
+    seg(0xda, Buffer.alloc(10, 3)),
+    [1, 2, 3],
+    [0xff, 0xd9],
+  );
+  const out = gap.stripJpeg(bytes(src));
+  assert.ok(out.removed);
+  assert.equal(has(out.bytes, "thumbnail-with-GPS-inside"), false);
+  assert.ok(has(out.bytes, "JFIF"));
+});
+
 test("JPEG: an upright photo keeps no EXIF at all; a clean one is reported untouched", () => {
   const upright = gap.stripJpeg(bytes(jpeg({ orientation: 1 })));
   assert.equal(has(upright.bytes, "Exif"), false);
@@ -234,6 +249,29 @@ test("uploads: the CLEANED bytes are what leaves; the original only on explicit 
   assert.equal(typeof report.cleanBytes, "number");
   assert.equal(app.sent.find((m) => m.index === 1).metadata, "unsafe");
   assert.equal(app.sent.some((m) => m.index === 2), false, "plain files report nothing");
+});
+
+test("uploads: a non-image is sniffed from its first bytes only, never read whole", async () => {
+  const up = gap.createUploads(fakeApp());
+  const movie = fileOf("not an image, imagine 4 GB of this", "clip.mov", "video/quicktime");
+  let whole = 0;
+  const arrayBuffer = movie.arrayBuffer.bind(movie);
+  movie.arrayBuffer = () => { whole += 1; return arrayBuffer(); };
+  up.prepare("big", [movie]);
+  const got = await up.resolve("big", 0, movie);
+  assert.equal(got.file, movie);
+  assert.equal(whole, 0, "the whole file was never loaded into memory");
+});
+
+test("uploads: release drops a finished file's copies; a retry re-cleans from the original", async () => {
+  const up = gap.createUploads(fakeApp());
+  const photo = fileOf(jpeg(), "me.jpg", "image/jpeg");
+  up.prepare("r", [photo]);
+  const first = await up.resolve("r", 0, photo);
+  up.release("r", 0);
+  const again = await up.resolve("r", 0, photo);
+  assert.equal(has(new Uint8Array(await again.file.arrayBuffer()), "GPSLatitude"), false);
+  assert.notEqual(again.file, first.file, "a fresh clean copy, not the released one");
 });
 
 test("uploads: a file nobody prepared is still cleaned (never posted raw by default)", async () => {
