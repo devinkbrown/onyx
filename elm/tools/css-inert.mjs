@@ -17,7 +17,7 @@
  * that state, so "never observed" is not "inert".
  *
  *   node elm/tools/css-inert.mjs probe --out DIR [--dist elm/dist-elm] [--files app,pol-shell]
- *        [--vp phone,fold-open,tablet-land,desktop,laptop-short] [--jobs 6] [--only substr]
+ *        [--vp phone,fold-open,tablet-land,desktop,laptop-short] [--jobs 6] [--only substr] [--resume]
  *   node elm/tools/css-inert.mjs report DIR [--file app] [--min-pages 4] [--json out.json]
  *
  * `probe` copies the built dist, swaps in the UNMINIFIED sources of the
@@ -45,7 +45,8 @@ if (cmd === 'probe') {
   const vps = flag('--vp', 'phone,fold-open,tablet-land,desktop,laptop-short').split(',');
   const only = flag('--only', '');
   const jobs = Number(flag('--jobs', Math.max(2, Math.floor(cpus().length / 5))));
-  rmSync(out, { recursive: true, force: true });
+  const resume = rest.includes('--resume'); // keep the pages already probed; skip the scenarios that have all theirs
+  if (!resume) rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   // dist copy with raw css under the hashed names
   const probeDist = `${out}-dist`;
@@ -70,8 +71,12 @@ if (cmd === 'probe') {
   writeFileSync(`${out}-src.json`, JSON.stringify(srcMap));
   const { NAMES } = await import(join(here, 'screens-css-inert.mjs'));
   const names = NAMES.filter((n) => !only || n.includes(only));
+  const VP = { se: '320x568', phone: '390x844', promax: '430x932', 'phone-land': '844x390', fold: '344x882', 'fold-open': '673x841', tablet: '820x1180', 'tablet-land': '1180x820', 'ipad-pro-land': '1366x1024', laptop: '1280x720', 'laptop-short': '1366x600', desktop: '1440x900', fhd: '1920x1080', ultrawide: '2560x1080', 'ultrawide-qhd': '3440x1440' };
+  const have = new Set(readdirSync(out));
+  const doneName = (n) => vps.every((v) => have.has(`${n.replace(/^inert__/, '')}--${VP[v]}.json`));
+  const todo = resume ? names.filter((n) => !doneName(n)) : names;
   const chunks = [];
-  for (let i = 0; i < names.length; i += 4) chunks.push(names.slice(i, i + 4));
+  for (let i = 0; i < todo.length; i += 4) chunks.push(todo.slice(i, i + 4));
   const queue = chunks.map((c) => c);
   let done = 0; const problems = [];
   const run = (chunk) => new Promise((res) => {
