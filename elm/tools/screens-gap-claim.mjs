@@ -150,6 +150,20 @@ async function expectNoSecret(page) {
   if (text.includes('LEGACY-SECRET')) throw new Error('legacy message text leaked into the page');
 }
 
+/** Every button in the card meets its target size: 44px where the pointer
+    is coarse (any width), 36px otherwise, and none is narrower than 44px. */
+async function expectTargets(page, cardSelector) {
+  const bad = await page.evaluate((sel) => {
+    const touch = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    const min = touch ? 44 : 36;
+    return [...document.querySelectorAll(`${sel} button`)]
+      .filter((b) => b.offsetParent !== null)
+      .map((b) => ({ label: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width), min }))
+      .filter((b) => b.h < b.min - 0.5 || b.w < 44);
+  }, cardSelector);
+  if (bad.length) throw new Error(`targets too small: ${JSON.stringify(bad)}`);
+}
+
 async function reveal(page, h, selector) {
   await page.evaluate((sel) => {
     const el = document.querySelector(sel);
@@ -176,6 +190,7 @@ export default {
   'gc-home-account': async (page, h) => {
     await boot(page, h, { rows: 1284, targets: 17, login: true });
     await page.waitForSelector(HOME_CARD, { timeout: 6000 });
+    await expectTargets(page, HOME_CARD);
     await reveal(page, h, HOME_CARD);
     await expectNoSecret(page);
   },
@@ -190,6 +205,7 @@ export default {
     await page.waitForSelector(HOME_CARD, { timeout: 6000 });
     await page.click(`${HOME_CARD} [data-testid="claim-delete"]`);
     await h.settle(page, 400);
+    await expectTargets(page, HOME_CARD);
     await reveal(page, h, HOME_CARD);
   },
   'gc-home-working': async (page, h) => {
@@ -305,6 +321,7 @@ export default {
     await boot(page, h, { rows: 1284, targets: 17, login: true, room: '#lounge' });
     await openPrefsHistory(page, h);
     await page.waitForSelector(PREFS_CARD, { timeout: 6000 });
+    await expectTargets(page, PREFS_CARD);
     await reveal(page, h, PREFS_CARD);
     await expectNoSecret(page);
   },
