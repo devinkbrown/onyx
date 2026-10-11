@@ -144,7 +144,7 @@
 
 /* 375px: share moves into More, 2-column 3:4 grid with at most four
    live video tiles (later tiles show the avatar), 96×54 filmstrip. */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-cbtn-share { display: none; }
   .onyx-call-more-share { display: block; }
   .onyx-call-grid[data-columns="1"] > .onyx-tile { aspect-ratio: 16 / 9; }

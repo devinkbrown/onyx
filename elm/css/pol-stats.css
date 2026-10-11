@@ -248,7 +248,7 @@
 
 /* Short landscape phones: the hero scrolls inside itself. */
 .status-scroll-surface { min-width: 0; }
-@media (max-width: 767px) and (max-height: 480px) {
+@media (max-width: 767.98px) and (max-height: 480px) {
   .status-scroll-surface {
     max-height: calc(100svh - 1rem);
     overflow-x: hidden;
@@ -989,7 +989,7 @@
   .stats-page .data-room-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .status-hero,
   .roadmap-hero,
   .stats-page .data-hero.stats-hero { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
@@ -1051,7 +1051,7 @@
 :is(.stats-page, .status-route, .roadmap-page) :where(a, button, input, label) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .stats-page :is(.stats-refresh, .data-action, .public-room-comparison__share, .public-room-comparison__clear, .public-room-comparison__chip,
   .stats-view-nav a, .stats-window-options button, .stats-control-group button):active:not(:disabled) { background: var(--onyx-panel-2); }
-@media (max-width: 768px), (pointer: coarse) {
+@media (max-width: 767.98px), (pointer: coarse) {
   /* 16px: iOS Safari never zooms on focus. */
   .stats-page .stats-room-search input { font-size: max(1rem, 16px); scroll-margin-bottom: calc(120px + var(--kb-inset, 0px)); }
 }

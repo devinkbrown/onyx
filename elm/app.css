@@ -1,6 +1,25 @@
 /* Onyx Elm shell — abyssal monochrome + single sea-glass accent.
    System stack, 6px radii, hierarchy via weight/size. No gradients. */
 
+/* Breakpoints. CSS cannot put variables in media queries, so the vocabulary
+   is written here and enforced by elm/cssGuard.smoke.mjs.
+
+     The seam      <768px = phone layout   max-width: 767.98px
+                   >=768px = desktop       min-width: 768px
+                   (one seam for the app AND the public site; exactly 768px,
+                   an iPad mini in portrait, is desktop. Never `767px`,
+                   `768px` or `769px`.)
+     Shell steps   600px  list-beside-conversation / bottom nav   599.98 | 600
+                   960px  sidebar column                          959.98 | 960
+                   1100px context rail in-flow                    1099.98 | 1100
+     Small phones  480 / 400 / 360px inclusive caps (max-width: Npx)
+     Short         max-height 520px (phone landscape, zoomed laptops)
+     Containers    @container (call stage, banner, tiles, claim card) size to their own box, not the viewport
+
+   Write a below-threshold as the threshold minus 0.02px (767.98) and an
+   at-or-above as the threshold itself, so no fractional viewport (browser
+   zoom, DPR scaling) falls in a gap. */
+
 :root {
   --onyx-bg: #0b0e12;
   --onyx-panel: #12161c;
@@ -2001,7 +2020,7 @@ html, body {
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 520.98px) {
   .conn { justify-content: flex-start; gap: var(--space-6); padding: max(var(--space-3), env(safe-area-inset-top)) 0 calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px)); }
   .conn-input { scroll-margin-bottom: calc(168px + var(--kb-inset, 0px)); }
   .conn-link { min-height: var(--target-min); }
@@ -2011,7 +2030,7 @@ html, body {
   .conn-foot { margin-top: auto; padding: 0 var(--space-5); }
   .conn-identities-actions { flex-wrap: wrap; }
 }
-@media (max-width: 520px) and (max-height: 600px) {
+@media (max-width: 520.98px) and (max-height: 600px) {
   .conn-brand { margin-bottom: var(--space-3); }
   .conn-title { font-size: 1.5rem; }
   .conn-body { margin-bottom: var(--space-4); }
@@ -3053,7 +3072,7 @@ html, body {
 .pref-action-card__icon { font-size: var(--text-lg); color: var(--onyx-dim); }
 .pref-action-card__body { display: flex; flex-direction: column; }
 .pref-action-card__title { font-size: var(--text-sm); }
-@media (max-width: 640px) {
+@media (max-width: 640.98px) {
   .onyx-prefs { width: 100vw; max-height: none; height: 100%; border-radius: 0; }
   .onyx-prefs-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .pref-category-nav { border-right: 0; border-bottom: 1px solid var(--onyx-line); }
@@ -3299,7 +3318,7 @@ html, body {
 
 /* 375px: chip collapses to pip + count + faces, banner stacks with
    44px buttons, cells shrink to 96px, the bar goes icon-only 48px. */
-@media (max-width: 640px) {
+@media (max-width: 640.98px) {
   .onyx-voice-chip-status, .onyx-call-join-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .onyx-join-banner-actions { flex-direction: column; }
   .onyx-join-banner-actions .onyx-call-btn { width: 100%; min-height: 44px; }

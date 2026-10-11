@@ -253,7 +253,7 @@
 }
 .public-frame__footer-links a:hover { color: var(--onyx-text); text-decoration: underline; }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .public-frame { --pub-gutter: var(--space-5); --pub-header-h: 56px; }
   .public-frame__header-inner { gap: var(--space-2); }
   .public-frame__nav-cluster { gap: var(--space-2); }
@@ -974,7 +974,7 @@
 .a11y-list { margin: var(--space-2) 0 0; padding-left: 1.15em; color: var(--onyx-dim); font-size: var(--text-sm); }
 .a11y-list li + li { margin-top: var(--space-1); }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .ab-cta .r-btn { flex: 1 1 auto; }
   .ab-hero { grid-template-columns: minmax(0, 1fr); padding-block: var(--space-7) var(--space-7); }
   .ab-section { grid-template-columns: minmax(0, 1fr); padding-block: var(--space-8); }
@@ -1160,7 +1160,7 @@
   .dl-cta,
   .ab-cta:not(.ab-cta--section) { flex-direction: column; align-items: stretch; }
 }
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .dl-browser-grid { grid-template-columns: minmax(0, 1fr); }
   .dl-browser,
   .dl-honesty,
@@ -1292,7 +1292,7 @@
 .guides-card-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
 .guides-card-actions .guides-action { min-height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .guides-body { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
   /* Phone: the task index becomes one swipeable row of jump links. */
   .guides-index { position: static; }
@@ -1415,7 +1415,7 @@
 .invite-copy-status { margin: 0; color: var(--onyx-dim); font-size: var(--text-sm); }
 .invite-copy-status:empty { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .invite-page { padding-block: var(--space-7) var(--space-4); }
   .invite-door { gap: var(--space-5); }
   .invite-room-mark { width: 48px; height: 48px; font-size: 1.25rem; }
@@ -1557,7 +1557,7 @@
 .onyxos-close h2 { font-size: clamp(1.75rem, 1.3rem + 2vw, 2.5rem); font-weight: 750; letter-spacing: -0.02em; }
 .onyxos-close .onyxos-button { margin-top: var(--space-6); }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .onyxos-hero { padding-block: var(--space-8); }
   .onyxos-native,
   .onyxos-method,
@@ -1607,7 +1607,7 @@
 .trust-rules li:last-child { border-bottom: 1px solid var(--onyx-line); }
 .trust-rules li::before { content: counter(trust-rule, decimal-leading-zero); color: var(--onyx-faint); font-family: var(--font-mono); font-size: var(--text-2xs); line-height: 1.9; }
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .public-info-article { padding-block: var(--space-8) var(--space-4); }
   .public-info-statement,
   .data-card { padding: var(--space-4); }
@@ -1654,7 +1654,7 @@
   color: var(--onyx-text);
 }
 
-@media (max-width: 768px), (pointer: coarse) {
+@media (max-width: 767.98px), (pointer: coarse) {
   .public-frame :is(.dl-copy, .dl-actions .r-btn, .guides-copy, .guides-download, .guides-reset, .guides-step-toggle,
     .guides-card-actions .guides-action, .guides-index__link, .public-frame__footer-open) {
     min-height: var(--target-min);

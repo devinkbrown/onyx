@@ -62,7 +62,7 @@
 
 /* Counts, then the date range: one line when there is room, two when not. */
 .gc-facts-range::before { content: " \00B7  "; white-space: pre; }
-@container gc (max-width: 520px) {
+@container gc (max-width: 520.98px) {
   .gc-facts-counts,
   .gc-facts-range { display: block; }
   .gc-facts-range::before { content: none; }

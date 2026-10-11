@@ -873,7 +873,7 @@
 /* Preferences: on phones, narrow dialogs (≤ 640px, where app.css turns
    the tabs into a row) and short windows the category rail becomes a
    scrolling chip row under the head. */
-@media (max-width: 640px), (max-height: 520px) {
+@media (max-width: 640.98px), (max-height: 520px) {
   .onyx-sheet-layer > .onyx-prefs,
   .onyx-sheet-layer > .onyx-prefs:has(> .onyx-sheet-head) { height: var(--sheet-max-h); padding-bottom: 0; }
   .onyx-prefs .onyx-prefs-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
@@ -903,7 +903,7 @@
   }
 }
 .pref-reset-all__short { display: none; }
-@media (max-width: 640px) {
+@media (max-width: 640.98px) {
   .pref-reset-all__full { display: none; }
   .pref-reset-all__short { display: inline; }
 }

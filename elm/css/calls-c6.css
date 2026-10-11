@@ -187,7 +187,7 @@
 /* 375px: a 160px card docked top-right under the header — the bottom
    is the composer's (spec §2.8 / §2.18). Corner cycling is a desktop
    affordance; the card's buttons drop to 28px. */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-call-pip-card,
   .onyx-call-pip-card[data-corner] {
     bottom: auto;
@@ -252,7 +252,7 @@
 .onyx-call-stage[data-reconnecting="true"] .onyx-call-people { opacity: 0.55; }
 .onyx-call-stage[data-reconnecting="true"] .onyx-cbtn:disabled { opacity: 0.45; cursor: default; }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-call-lost .onyx-call-btn { width: 100%; }
 }
 

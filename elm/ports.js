@@ -4932,7 +4932,7 @@ function fetchPublicFeed(url) {
     if (win && win.addEventListener) {
       win.addEventListener("resize", function () {
         var p = parts();
-        if (isOpen(p.toggle) && (win.innerWidth || 0) > 768) {
+        if (isOpen(p.toggle) && (win.innerWidth || 0) >= 768) {
           try { p.toggle.click(); } catch (err) { /* gone */ }
         }
       });
