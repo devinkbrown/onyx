@@ -1,11 +1,18 @@
 # Client parity map — SolidJS (deprecated) → Elm (the product)
 
-Branch `v3/map-oracle` at `7e03d47f` (2026-10-10). Read-only cartography: no code changed.
+Written 2026-10-10 against `7e03d47f` (branch `v3/map-oracle`) as read-only cartography. **Refreshed
+2026-10-11 against `609cb240`** (every gap and polish slice merged): each row was re-verified in the code
+at that commit and its status, evidence and note rewritten. Where this file says "then" it means the
+map as first written; "now" means `609cb240`. Index of all design docs: [`INDEX.md`](INDEX.md).
 
 **Question answered:** for every user-facing capability the deprecated SolidJS client
 (`src/`) offered, does the Elm client (`elm/`) have it, and how completely? The two
 status docs, `elm/COVERAGE.md` and `elm/V3_ROADMAP.md`, are cross-checked rather than
-trusted; where they are stale or overstate, the row says so.
+trusted; where they were stale or overstated, the row says so. Both were rewritten in the same refresh.
+
+**Where to look first:** [Summary](#summary) (counts) · [Top 30 gaps, and where each stands now](#top-30-gaps-then-and-now) ·
+[**Remaining gaps**](#remaining-gaps-at-609cb240) (what is still missing, ranked) ·
+[Where Elm is better](#where-elm-is-better-than-solid).
 
 ## How this map was built
 
@@ -14,6 +21,7 @@ trusted; where they are stale or overstate, the row says so.
   (10432–15569), every slash verb, palette row and keyboard chord, and every component
   under `src/shell/**`, `src/app/**`, `src/routes/**`, `src/chat/**`, `src/pwa/**`,
   `src/theme/**`, `src/backgrounds/**` plus the feature modules in `src/lib/**`.
+  `src/` has not changed since the map was written, so Solid citations are stable.
 - **Reachability.** A Solid capability counts only if a user can reach it. Each row is
   tagged `UI`, `slash`, `palette`, `shortcut`, `auto` (runs without user action) or
   `DEAD` (store/lib code with no non-test caller). A lot of `store.ts` is DEAD legacy
@@ -21,9 +29,16 @@ trusted; where they are stale or overstate, the row says so.
   `N/A` and are not gaps.
 - **Elm lookup.** For each capability: the `Msg` and its fold in `elm/src/App.elm`, the
   `View` that dispatches it, and any port in `elm/src/Main.elm` / `elm/ports.js`.
-  Evidence is `file:line` from grep at `7e03d47f`; Elm paths are relative to `elm/src/`.
+  Evidence is `file:line`; Elm paths are relative to `elm/src/` (`ports.js`, `app.css` and
+  `css/…` relative to `elm/`). **Line numbers in the Elm evidence are at `609cb240`** (the refresh
+  re-resolved every citation; a symbol name is given beside most so later drift is recoverable).
 - **Server cross-check** where it decides the answer (for example, which raw slash verbs
   the Onyx Server actually implements): `/home/kain/onyx-server/src/daemon`.
+- **Refresh method.** Every status that changed was verified in the code: the `Msg` and its
+  fold, the view or slash verb or shortcut that reaches it, the port, and a test where one
+  exists. Builder reports and `COVERAGE.md` were treated as leads only; several builder claims
+  were corrected (see the notes tagged "over-called"). Nothing was run in a browser for the
+  refresh; behaviour that can only be seen in one is listed under *Not verified* in the notes.
 
 ### Status vocabulary
 
@@ -33,284 +48,274 @@ trusted; where they are stale or overstate, the row says so.
 | **PARTIAL** | Reachable, but something specific is missing; the note names it. |
 | **CORE-ONLY** | Elm has the fold, state or port, but no UI, slash verb or shortcut reaches it. |
 | **MISSING** | Nothing in Elm. |
-| **N/A** | Solid's version was DEAD code, or the feature is absent by design (no OPER/491, STARTTLS, WEBIRC, DCC, pseudo-clients, `+w`, `ocean/*` caps). |
+| **N/A** | Solid's version was DEAD code, or the feature is absent by design (no OPER/491, STARTTLS, WEBIRC, DCC, pseudo-clients, `+w`, `ocean/*` caps), or Elm gates it differently on purpose (for example moderation by server role, not by a local "experience level"). |
 
 "⚠ shared" marks a defect both clients have. Those rows count as parity, but they are
 still product bugs, and fixing them is the cheapest way for Elm to beat Solid.
 
 ## Summary
 
+Now (`609cb240`):
+
 | Section | Rows | FULL | PARTIAL | CORE-ONLY | MISSING | N/A |
 |---|---:|---:|---:|---:|---:|---:|
-| [D Shell, navigation, Home, banners, PWA](#d--shell-navigation-home-banners-notification-center-pwa) | 186 | 94 | 38 | 4 | 38 | 12 |
-| [E Conversation](#e--conversation--transcript-message-rendering-menus-composer-search-media-threads-topics) | 178 | 114 | 26 | 5 | 26 | 7 |
-| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 88 | 6 | 0 | 12 | 1 |
-| [F Sheets & settings](#f--sheets--settings-preferences-appearance-themes-backgrounds-notification-settings-room-settings) | 125 | 44 | 32 | 10 | 37 | 2 |
-| [J Public website](#j--public-website-routes-pages-route-a11y-static-metadata) | 120 | 80 | 20 | 1 | 9 | 10 |
-| [H Calls](#h--calls--voice-video-screen-share-stage-watch-together) | 112 | 64 | 15 | 3 | 22 | 8 |
-| [I Moderation, operators, people](#i--moderation-operators-people-stewardship) | 99 | 72 | 9 | 1 | 6 | 11 |
-| [G Connect, account, security](#g--connect-account-security-identity-e2ee-ux) | 98 | 67 | 11 | 1 | 13 | 6 |
-| [V Data & vault](#v--data--vault--history-vault-outbox-saved-searches-importexport-notification--pwa-runtime) | 97 | 34 | 20 | 2 | 38 | 3 |
-| [A Store actions I](#a--store-actions-i--connection-messaging-accounts-channels-panels) | 182 | 128 | 12 | 2 | 9 | 31 |
-| [B Store actions II](#b--store-actions-ii--stage-away-oper-scheduling-prefs-folders-identity-e2ee-keys-calls-legacy) | 149 | 49 | 12 | 1 | 10 | 77 |
-| [C Inbound protocol](#c--inbound-protocol--every-server-line-the-solid-client-handles) | 143 | 101 | 27 | 1 | 6 | 8 |
-| **All rows** | **1596** | **908** | **223** | **31** | **258** | **176** |
+| [D Shell, navigation, Home, banners, PWA](#d--shell-navigation-home-banners-notification-center-pwa) | 186 | 122 | 29 | 1 | 22 | 12 |
+| [E Conversation](#e--conversation--transcript-message-rendering-menus-composer-search-media-threads-topics) | 178 | 140 | 20 | 1 | 10 | 7 |
+| [K Command surfaces](#k--command-surfaces--slash-verbs-command-palette-keyboard-shortcuts-gestures) | 107 | 86 | 10 | 0 | 10 | 1 |
+| [F Sheets & settings](#f--sheets--settings-preferences-appearance-themes-backgrounds-notification-settings-room-settings) | 125 | 76 | 26 | 1 | 19 | 3 |
+| [J Public website](#j--public-website-routes-pages-route-a11y-static-metadata) | 120 | 95 | 12 | 1 | 2 | 10 |
+| [H Calls](#h--calls--voice-video-screen-share-stage-watch-together) | 112 | 84 | 15 | 1 | 4 | 8 |
+| [I Moderation, operators, people](#i--moderation-operators-people-stewardship) | 99 | 82 | 3 | 0 | 2 | 12 |
+| [G Connect, account, security](#g--connect-account-security-identity-e2ee-ux) | 98 | 80 | 8 | 0 | 4 | 6 |
+| [V Data & vault](#v--data--vault--history-vault-outbox-saved-searches-importexport-notification--pwa-runtime) | 97 | 58 | 20 | 0 | 16 | 3 |
+| [A Store actions I](#a--store-actions-i--connection-messaging-accounts-channels-panels) | 182 | 142 | 7 | 0 | 2 | 31 |
+| [B Store actions II](#b--store-actions-ii--stage-away-oper-scheduling-prefs-folders-identity-e2ee-keys-calls-legacy) | 149 | 65 | 5 | 0 | 3 | 76 |
+| [C Inbound protocol](#c--inbound-protocol--every-server-line-the-solid-client-handles) | 143 | 124 | 11 | 0 | 0 | 8 |
+| **All rows** | **1596** | **1154** | **166** | **5** | **94** | **177** |
+
+Then → now:
+
+| Section | FULL then → now | PARTIAL | CORE-ONLY | MISSING |
+|---|---:|---:|---:|---:|
+| D Shell, navigation, Home, banners, PWA | 94 → 122 | 38 → 29 | 4 → 1 | 38 → 22 |
+| E Conversation | 114 → 140 | 26 → 20 | 5 → 1 | 26 → 10 |
+| K Command surfaces | 88 → 86 | 6 → 10 | 0 → 0 | 12 → 10 |
+| F Sheets & settings | 44 → 76 | 32 → 26 | 10 → 1 | 37 → 19 |
+| J Public website | 80 → 95 | 20 → 12 | 1 → 1 | 9 → 2 |
+| H Calls | 64 → 84 | 15 → 15 | 3 → 1 | 22 → 4 |
+| I Moderation, operators, people | 72 → 82 | 9 → 3 | 1 → 0 | 6 → 2 |
+| G Connect, account, security | 67 → 80 | 11 → 8 | 1 → 0 | 13 → 4 |
+| V Data & vault | 34 → 58 | 20 → 20 | 2 → 0 | 38 → 16 |
+| A Store actions I | 128 → 142 | 12 → 7 | 2 → 0 | 9 → 2 |
+| B Store actions II | 49 → 65 | 12 → 5 | 1 → 0 | 10 → 3 |
+| C Inbound protocol | 101 → 124 | 27 → 11 | 1 → 0 | 6 → 0 |
+| **All rows** | **935 → 1154** | **228 → 166** | **31 → 5** | **226 → 94** |
 
 **How to read the totals.**
 - Sections A–C walk the Solid store and protocol layer. D–K and V walk what users see. The two views overlap: one capability can appear as a store action in A/B and as a control in D–K, so 1596 is a row count, not a count of distinct features.
-- Leaving out N/A, 1420 rows describe something a Solid user could actually reach. Of those, 64% are FULL, 16% PARTIAL, 2% CORE-ONLY and 18% MISSING.
-- The protocol and store layers are close to parity (A and C are about 80% FULL). The gaps sit in what users see: settings (F, 35% FULL), data/vault (V, 36%) and command surfaces (K, 58%).
+- Leaving out N/A, 1,419 rows describe something a Solid user could actually reach. Of those 81% are FULL, 12% PARTIAL, under 1% CORE-ONLY and 7% MISSING. At map time it was 66% FULL, 16% PARTIAL, 2% CORE-ONLY and 16% MISSING of 1420. (The published total row at map time, 908 / 223 / 31 / 258 / 176, did not equal the sum of its own section rows, 935 / 228 / 31 / 226 / 176; the per-section rows are the ones used here.)
+- 224 rows changed status. 6 FULL rows were over-called and are now PARTIAL (D138, E5, E155, I33, K90, K97), 1 became N/A (F13: moderation is gated by server role, not a local level), and the other 217 moved toward parity: FULL 935 → 1154, MISSING 226 → 94, CORE-ONLY 31 → 5.
+- The sections that are still furthest from parity are settings and data (F and V are each 62% FULL of their reachable rows): what is left there is mostly the "App & tools" tab, portable export depth, storage controls and owner scoping of two small lists.
 - N/A is large in B because most of that half of `store.ts` is dead legacy code (streams, raids, polls, spatial pad, breakout sidebar, focus mode, forum posts, announcements).
-- [Section N](#n--every-narrowing-recorded-in-elmcoveragemd-classified) classifies all 146 narrowings recorded in `elm/COVERAGE.md`: FIX 72 · STALE 45 · KEEP 17 · ORACLE-GAP 3 · BOUND 9.
+- [Appendix N](#n--every-narrowing-recorded-in-elmcoveragemd-classified) re-classifies every narrowing recorded in `elm/COVERAGE.md`: 149 narrowings (146 recorded at map time plus 3 found while verifying) → FIX 62 · RESOLVED 58 · KEEP 18 · ORACLE-GAP 4 · BOUND 7 (at map time: FIX 72 · STALE 45 · KEEP 17 · ORACLE-GAP 3 · BOUND 9).
 
-### Headline findings
+### Headline findings, then and now
 
-1. **What users see is behind; the core is close to parity.** `COVERAGE.md` measures parity at the protocol level ("fold + vectors"), and at that level it is mostly right. It never measures whether a user can reach the feature. That gap is what this map adds: 31 CORE-ONLY rows, and many PARTIAL ones, are features whose fold exists but whose control does not.
-2. **Some settings do nothing, or do the wrong thing, today.**
-   - Theme looks don't recolor the app shell (`app.css:5–14` hard-codes the `--onyx-*` palette).
-   - Text size and Density write `data-*` attributes that no Elm CSS reads.
-   - Opting out of local history is ignored.
-   - The encrypted-DM toggle needs a reload.
-   - Backgrounds persist but never render.
-   - Moderation controls are gated on an "Experience level" users cannot set.
-3. **Privacy and isolation regressions against Solid.**
-   - Photos upload with EXIF/GPS intact.
-   - The vault, blocklists, keywords and per-room notify settings are device-global, not per account.
-   - Elm writes the `onyx:credentials` store in a different schema and wipes a migrating user's saved Solid identities.
-   - Staged attachments follow you into the next room.
-4. **Protocol behaviour that is wrong on the live server.**
-   - Server-native edits (`PRIVMSG +draft/edit=…`, the only shape onyx-server sends) are not recognised, so every edit shows as a duplicate message.
-   - Pre-registration 433 has no `nick_` retry, so a taken name hangs on "Connecting".
-   - A wrong password reads "Couldn't reach Onyx".
-   - Labeled DMs to an offline nick vanish on 401.
-   - Elm never renders its server log, so ERROR reasons, MOTD, WALLOPS, KNOCK and every unhandled numeric are invisible.
-5. **Shared defects (⚠).** Both clients send unhandled registry slash verbs raw. On onyx-server that makes these return 421: `/me`, `/msg`, `/query`, `/j`, `/op`, `/deop`, `/voice`, `/devoice`, `/ban`, `/unban`, `/back`, `/unaway`, `/quote`, `/raw`, `/ctcp`, `/stage`. Both clients also swallow inbound CTCP ACTION. Fixing these makes Elm better than Solid, not just equal.
-6. **Things that run only on the old Solid deployment.**
-   - The Elm build registers no service worker, so Web Push hangs on `serviceWorker.ready` and update detection is inert.
-   - On the public site, direct visits to `/download/` never load the catalog, and the skip link and every in-page anchor do nothing.
-7. **The live video-off switch leaks** (`fbe04585`). "Join with video" bypasses `VIDEO_ENABLED`, and the Camera button still shows. This is the one gap that can hurt other people in a call.
-8. **Solid was weaker than its code suggests.**
-   - Its `<Toaster>` was never mounted, so none of its ~48 toasts ever showed.
-   - Mini PiP, `startDmCall`, friends and watch list, custom status, `reclaimNick`, `tempBan` and the Add-a-boost opener had no reachable UI.
-   - Several Home briefing props were computed but never rendered.
-   Elm has working versions of all of these. They count as Elm-better rows, not parity.
+The eight findings of the first version, with where each stands:
 
-## Top 30 gaps (user impact first)
+1. **What users see is behind; the core is close to parity.** *Then:* 31 CORE-ONLY rows and many PARTIAL ones were features whose fold existed but whose control did not. *Now:* 5 CORE-ONLY rows are left: the AI-policy badge in three places (D109, E176, F119: `AiPolicy.elm` is imported by no view), the invite card's OG meta (J8: no head-metadata port) and the SFU topology readout (H36: the adapter never emits `sfu`). The gap between "fold + vectors" and "a user can reach it" is the thing `COVERAGE.md` now records per row.
+2. **Settings that did nothing, or the wrong thing.** *Closed:* themes recolor the shell (`ShellPalette`), Text size, Density and Conversation width reach all of the CSS, opting out of local history is enforced and has a verified erase, the encrypted-DM toggle is live, backgrounds render (17 canvas variants; the 7 DOM/SVG scenes show their closest canvas preset), moderation is gated by server role instead of an unsettable "Experience level".
+3. **Privacy and isolation regressions against Solid.** *Closed:* photos are cleaned of EXIF/GPS (and refused if cleaning fails), the vault, outbox, search, export, blocklists, keywords and per-room alert settings are owner-scoped (`gap-account`), saved identities survive (`rx-public` reads and carries Solid's v2 store), staged attachments stay with their conversation. *Still open:* saved searches and the auto-join memory are device-wide (V21, V92).
+4. **Protocol behaviour that was wrong on the live server.** *Closed:* `PRIVMSG +draft/edit` edits the row in place; a taken name retries `nick_` ×4 and a wrong password says so and stops redialling; a labeled DM to an offline nick hands the text back with a toast; ERROR/KILL reasons, MOTD, WALLOPS, KNOCK and unhandled numerics are visible in the Activity sheet. *Still open:* being kicked is silent (⚠ shared, C40); `FAIL E2EEKEY` from Account key actions only reaches the Activity sheet (C12).
+5. **Shared defects (⚠).** *Closed in Elm* (and still broken in Solid): the registry slash verbs (`/me /msg /query /j /op /deop /voice /devoice /ban /unban /back /unaway /quote /raw /ctcp /stage`) are translated before they are sent, and inbound CTCP ACTION renders as `* nick text`.
+6. **Things that ran only on the old Solid deployment.** *Closed:* `/sw.js` is registered (update strip, Web Push with a bounded wait, push reconciled at login, page-restore reconnect); the public site's direct visits, skip link, in-page anchors and deep links work (`rx-public`). *Still open:* fragment-only URL changes on `/stats/` and `/download/` re-run route entry and refetch (J67).
+7. **The live video-off switch leaked** (`fbe04585`). *Closed* by `a96afd2e`: the Camera button and "Join with video" are hidden and the adapter forces audio-only joins. Video staying off on the live network (SendQ) is a product decision, recorded as BOUND.
+8. **Solid was weaker than its code suggests.** Unchanged and still true: its `<Toaster>` was never mounted, and mini PiP, `startDmCall`, friends and watch list, custom status, `reclaimNick`, `tempBan` and the Add-a-boost opener had no reachable UI. Elm has working versions of all of these except `startDmCall`, which cannot work (the server has no 1:1 media target), so the DM More menu now says "Direct calls aren't available yet".
 
-Each gap lists the rows that hold its evidence and the shape of the fix. "⚠ shared" means
-Solid had the same defect.
+## Top 30 gaps, then and now
 
-| # | Gap | Surface | Rows | Sketch |
+The 30 gaps as ranked when the map was written (user impact first), each with where it stands at
+`609cb240`. **Closed** = shipped and verified in code; the slice is named. Rows are the evidence rows
+in the sections below.
+
+| # | Gap (as first written) | Surface | Rows | Now |
 |---|---|---|---|---|
-| 1 | **Video-off switch leaks.** `cameraSupported` never reaches Elm, so Camera still shows. "Join with video" calls `engine.joinVideo`, which bypasses `VIDEO_ENABLED`, so it can publish the ~2 Mbit/s camera that `fbe04585` blocked to protect the node's SendQ. | Calls | H gap 1, B128 | back-fill `cameraSupported` in `ports.js`; force `video=false` in `voice-engine.ts joinVoice`; gate `View/Calls.elm:254` |
-| 2 | **Every edit shows as a duplicate message.** onyx-server sends edits only as `PRIVMSG +draft/edit=<msgid>` (`server.zig:42417`). Elm has no `draft/edit` handling and folds only an `EDIT` command the server never sends. | Conversation | C57 | in `foldChat` detect the tag and route to `foldEdit` (live + history merge) |
-| 3 | **Photos upload with EXIF/GPS intact.** `Upload.stripJpegExif`/`stripPngExif` exist, but `ports.js` posts the raw File. Solid stripped. | Conversation | E gap 1 | strip in the `uploadSend` bridge; Original/Compact picker |
-| 4 | **Registry slash verbs are broken** (⚠ shared). `/me /msg /query /j /op /deop /voice /devoice /ban /unban /back /unaway /quote /raw /ctcp /stage` → 421. `/kick /topic /invite nick /part` lack a channel; `/away` keeps one word. Inbound CTCP ACTION is swallowed. `/share` and bare `/invite` are missing in Elm, though `/help` lists `/share`. | Commands | K1–K19, K29, K34, K35, B12/B13, C55 | translation table beside `parseSlashLocal`; ACTION row type; `/share` via `InviteShare` + `ClipboardCopy` |
-| 5 | **No service worker is ever registered.** Web Push hangs on `serviceWorker.ready`, there is no update detection and no offline shell. Push is also never reconciled after a reload. | Data / public | V76/V77/V80, J9, D168/D169, N141 | register `/sw.js` in `ports.js`; time-limit `swReady()`; drop the `webPushOn` gate on the boot check |
-| 6 | **Sign-in failures mislead or hang.** A wrong password reads "Couldn't reach Onyx" and keeps reconnecting. A taken nick hangs registration (no `nick_` retry). A registered-nick guest join gets "Erroneous nickname". | Account | C122–C124 | `failSasl` notification + `autoReconnect = False`; ×4 underscore retry while `Registering`; registered copy |
-| 7 | **Themes don't recolor the app shell.** It is painted from a fixed `--onyx-*` palette (`app.css:5–14`), so light looks stay dark. | Settings | F gap 1 | derive `--onyx-*` from the theme tokens |
-| 8 | **Text size and Density do nothing.** No Elm CSS reads `data-font-scale`/`data-density`. | Settings | F gap 2 | port the scale/density rules |
-| 9 | **The local-history opt-out is ignored**, and there is no clear-history control. | Settings / data | F gap 3, V26/V27 | gate `flushVaultBuffer` on `prefs.localHistory`; `VaultClear` port |
-| 10 | **Per-account isolation is missing.** The vault, blocklists, keywords and per-room notify are device-global; Solid scoped them by owner. | Data / security | V4, I gap 2, F | owner key on vault rows and every journal key |
-| 11 | **Saved identities are wiped, and there is no "Welcome back" / "Stay signed in".** Elm writes `onyx:credentials` as `{v:1,slots}` over Solid's `{version:2,…}`; `Credentials.elm` is test-only. | Account | G34, G15–G19 | read/merge v2; list/select/forget ports + Connect block |
-| 12 | **Staged attachments follow you to another room** and send there. | Conversation | E gap 3 | clear or key `attachments` per target on `selectChannel` |
-| 13 | **Jumps never scroll into view** (pins, media index, vault hits, `?at=`, search, jump-to-date). `historyLanding` has no consumer. | Conversation | E gap 2, A14/A15/A20/A129 | feed `threadAnchorIndex`; scroller "message" action |
-| 14 | **No Activity / server-log view.** ERROR reasons (kills, bans), MOTD, WALLOPS, server NOTICEs, KNOCK 710–714, 477/480 and unhandled numerics are all invisible. | Shell | C113/C112/C86/C127, A175, D18/D33 | Rail "Activity" entry rendering `serviceLog`; ERROR → notification |
-| 15 | **Encrypted-DM toggle only takes effect after a reload.** | Settings / security | F gap 4 | set `model.e2eeDms` in the pref fold; publish/withdraw the key |
-| 16 | **[Closed — v3/gap-organize] Quiet hours** now silence desktop + sound alerts on a daily schedule (Notifications sheet; off by default — Solid's loader read a missing key as hour 0, so its 22–08 default never ran). | Settings | B51, F gap 5 | `dndQuietStart/End` in `notifyDndActive` |
-| 17 | **Delivery and connection feedback gaps.** Labeled DMs to an offline nick vanish on 401. There is no browser offline/online or page-restore handling. `/join` and accepted invites don't open the room. FAIL SESSION has no inbox row. | Shell / conversation | C92, C131, A1, G30, C36, C7 | `notDeliveredToast` in `fold401`; `online`/`offline`/`pageshow` ports; `selectChannel` on self-JOIN |
-| 18 | **Download page is dead on a direct visit.** Skip link, every in-page `#anchor`, and in-app `/app/?join=…` links are broken. No scroll reset or route announcement either. | Public | J55, J22/J16, J19/J91/J95, J15/J17 | route-entry fold in `Main.init`; fragment port; reparse deep links in `UrlChanged` |
-| 19 | **Drafts are lost on reload** (Solid persisted per owner with a "Saved here" status). | Conversation | E gap 4, A112/A113 | `composerDraftsSave` port |
-| 20 | **Hide room, close/reopen conversation, DM mute and Leave-with-confirm have no UI.** Every DM ever opened stays listed. | Shell | B58–B60, D39/D44/D117/D118/D126, A22 | owner-keyed sets + room-header More items + confirm sheet |
-| 21 | **Moderation controls are hidden behind an "Experience level" users cannot set.** | Moderation | I gap 1 | segmented control, or gate on `isChannelOp` |
-| 22 | **DM key-change handling** (security). Accept re-pins the whole device set; a change is detected only on seal/open; the alert goes only to the service log. A media peer key change is also unannounced. | Security | N104/N105, G89, B119, C117, H gap 5 | pin the single key; diff on the 761 fold; toast + inbox row |
-| 23 | **No paste or drag-and-drop attachments.** | Conversation | E gap 5 | `ports.js` paste/drop → `uploadPicked` |
-| 24 | **Calls fail silently.** No media-error, decode, "Removed from voice" or codec toasts; no "joining…" state during permission/enrolment. | Calls | H gaps 3–4 | `emitLocal({mediaError})` → `CallDock` toasts; provisional state |
-| 25 | **No app badge or "(n)" title, and clicking a desktop alert only focuses the window.** | Shell / data | D174/D175, V68/V69/V73, A116 | `attentionSet` port; `notifyClicked` → `ChannelSelect` |
-| 26 | **Watch Together is missing**, though the About page advertises it. | Calls | H102–H111 | `WatchTogether` over `PROP ocean.watch` |
-| 27 | **Home catch-up is shallower than Solid's.** [v3/gap-organize] "Since you left" digest (who / when / what about, jump to the first unread line), "On this device" offline note and queued-send Open/Remove are in; resume points and recently visited rooms are not. | Shell / data | D141–D155, V82/V83, V39/V40 | port `catchup/*` + `sinceDigest` |
-| 28 | **The palette is about a quarter of Solid's; 17 of 21 shortcuts and J/K and `g` sequences are missing.** | Commands | K46–K102 | People/recents/Preferences/Copy link rows; nav chords |
-| 29 | **[Closed — v3/gap-organize] Room folders, Calm / Regular / Power presets and smart mute** are in (folders also: hidden rooms, closed conversations, saved messages, private notes). | Settings | B80–B85, F | `Sidebar` folders; `NotifyCenter` tiers |
-| 30 | **Small data-loss / privacy bugs in the composer.** Ctrl/Cmd+F wipes the visible draft (`App.elm:39566`). Quoting an E2EE row inserts ciphertext (`View/Thread.elm:1653`). Collapsed senders can't be shown again. | Conversation | E gaps 6–8, A182 | drop `composer = ""`; `loadedActionText`; Show-all banner |
+| 1 | **Video-off switch leaks.** | Calls | H12b, H21, B128 | **Closed** (`a96afd2e`): Camera and "Join with video" hidden, adapter forces audio-only. Video stays off by design (BOUND: node SendQ). Latent until video ships: `cameraSupported` is back-filled on non-idle snapshots only (H21), and the Ctrl+Shift+E chord is ungated. |
+| 2 | **Every edit shows as a duplicate message** (`PRIVMSG +draft/edit`). | Conversation | C57 | **Closed** (v3/gap-convo): `gapFoldTaggedEdit` edits the row in place, with author and sealed checks and replay refresh. An edit to an encrypted row is ignored (the original stays) and Elm offers no edit in protected conversations, so editing a sealed message is not supported. |
+| 3 | **Photos upload with EXIF/GPS intact.** | Conversation | E127, E128 | **Closed** (v3/gap-convo): a bytes-sniffed cleaner in `ports.js` for JPEG, PNG, WebP, HEIC/AVIF; refuses the upload if cleaning fails; "Send with location data" is explicit. |
+| 4 | **Registry slash verbs broken** (⚠ shared) and inbound ACTION swallowed. | Commands | K1–K19, K29, K34, K35, B12, B13, C55 | **Closed** (v3/gap-commands): `planSlash` translation, ACTION rows, `/share`, bare `/invite`, sealed/held content verbs. |
+| 5 | **No service worker is registered.** | Data / public | V66, V76–V78, J9, D168, D169 | **Closed** (v3/gap-pwa-safety): registration with a HEAD probe, update strip, bounded `ready` for push, push reconciled at login. Left: no auto-reload after a takeover (deliberate), update strip only inside the app frame (J14). |
+| 6 | **Sign-in failures mislead or hang.** | Account | C122–C124, C127 | **Closed** (v3/gap-shell, v3/gap-auth): honest failure copy, reconnect disarmed on refusal, `nick_` ×4 retry including onyx-server's post-001 collision. |
+| 7 | **Themes don't recolor the app shell.** | Settings | F gap 1 | **Closed** (v3/gap-appearance): `ShellPalette` derives the shell palette from the active theme (AA-checked for all 18 themes, high-contrast set). |
+| 8 | **Text size and Density do nothing.** | Settings | F gap 2 | **Closed** (v3/gap-appearance): rem sizing everywhere, density rules, Conversation width. |
+| 9 | **Local-history opt-out ignored; no clear control.** | Settings / data | F25, F27, V26, V27 | **Closed** (v3/gap-account): enforced in Elm and again in the ports bridge; erase is a verified whole-store clear. |
+| 10 | **Per-account isolation missing.** | Data / security | V4, I72, F | **Mostly closed** (v3/gap-account): vault, outbox, search, export, blocklists, keywords, per-room alerts are owner-scoped. Left: saved searches and the auto-join memory (V21, V92, Med). |
+| 11 | **Saved identities wiped; no "Welcome back".** | Account | G15–G19, G34 | **Closed** (v3/rx-public): Solid's v2 store is read and carried through; remembered identities and "Stay signed in" ship. |
+| 12 | **Staged attachments follow you to another room.** | Conversation | E132 | **Closed** (v3/gap-convo). |
+| 13 | **Jumps never scroll into view.** | Conversation | E42, E43, E159, E168, E175, A14–A16 | **Mostly closed** (v3/gap-convo): pins, media, vault hits in loaded rooms, `?at=` and search land, pulse and focus the row. Left: an archived (server) search result only selects the conversation (E155, Med); a vault hit in a room you left or a DM outside the working set opens nothing (A20, Med). |
+| 14 | **No Activity / server-log view.** | Shell | C112, C113, C86, A175, D18, D33 | **Closed** (v3/gap-shell): Activity sheet with an All/Problems filter, unseen-problem dot, MOTD card on Home. |
+| 15 | **Encrypted-DM toggle needs a reload.** | Settings / security | F36 | **Closed** (v3/gap-account): live, publishes the device key at once. |
+| 16 | **Quiet hours.** | Settings | B51, F15 | **Closed** (v3/gap-organize). Left: closed-tab Web Push ignores quiet hours (the service worker has no schedule; F90, V74). |
+| 17 | **Delivery and connection feedback gaps.** | Shell / conversation | C92, C131, C36, C7, G30 | **Closed** (v3/gap-shell, v3/gap-convo, v3/gap-pwa-safety). Left (Low): after a bfcache restore with a dead socket Elm waits for the 15 s pong timeout (A1). |
+| 18 | **Download page dead on a direct visit; skip link and anchors inert.** | Public | J55, J22, J16, J19, J91, J95, J15, J17 | **Closed** (v3/rx-public). Left: fragment-only URL changes re-run route entry and refetch (J67, Med); route announcer partial (J17). |
+| 19 | **Drafts lost on reload.** | Conversation | E110, A112, A113 | **Closed** (v3/gap-convo): per-owner persisted drafts with a "Saved here" line; encrypted-DM plaintext and half-typed commands are never persisted. |
+| 20 | **Hide room, close/reopen conversation, DM mute, Leave-with-confirm have no UI.** | Shell | B58–B60, D39, D44, D117, D118, D126, A22 | **Closed** (v3/gap-organize, v3/gap-shell). Left: the palette Leave row and `/part` skip the confirm sheet (K77, A22); Close conversation has no confirm (B60). |
+| 21 | **Moderation controls hidden behind an unsettable "Experience level".** | Moderation | I gap 1, F13 | **Closed** (v3/gap-people): moderation is gated by server role (`ModAuthority`); the level is N/A. |
+| 22 | **DM key-change handling** (security). | Security | G89, B119, C117, N104, N105 | **Closed** (v3/gap-pwa-safety): acceptance pins only reviewed keys, directory updates raise the review, sends are held, toast + inbox row. Left: a changed *media* peer key is announced by a toast only and does not raise the DM key review (H96, Med). |
+| 23 | **No paste or drag-and-drop attachments.** | Conversation | E125, E126 | **Closed** (v3/gap-convo). |
+| 24 | **Calls fail silently.** | Calls | H90–H94, H96 | **Mostly closed** (v3/rx-calls): calm toasts for media, timeout, removed, lost mic, per-peer decode, peer key change; provisional "joining" state. Left: room-near-capacity toast (H93), no inbox row (H90). |
+| 25 | **No app badge or "(n)" title; alert click only focuses.** | Shell / data | D174, D175, V68, V69, V73, B112 | **Closed** (v3/gap-account). Left (Low): a followed-topic alert opens the room, not the topic (V73, A116). |
+| 26 | **Watch Together is missing.** | Calls | H102–H111, D26 | **Built** (v3/gap-watch): operators start, play, pause, seek, hand off, claim and end an activity; everyone follows and opens the link. **Needs a server change** for ordinary members to join: Onyx Server accepts a channel `PROP` write only from op/owner/founder (913), so members cannot join, leave or accept hosting (H108, H106; ⚠ shared, Solid fails the same way silently). |
+| 27 | **Home catch-up shallower than Solid's.** | Shell / data | D141–D155, V82, V83, V39, V40 | **Partly closed** (v3/gap-organize, v3/gap-claim, v3/gap-shell): "Since you left" digest with first-unread landing, offline note, queued Open/Remove, MOTD card, claim card. Left (Med): resume points, recently visited rooms, Invites tier, formation strip, vault-backed offline catch-up (D141–D143, D148, D149, D152). |
+| 28 | **Palette a quarter of Solid's; shortcuts and J/K/`g` missing.** | Commands | K46–K102 | **Mostly closed** (v3/gap-commands). Left (Low): palette time grammar (K71), hide/close/leave `#other`/schedule/translate/reader/width/motion rows (K76–K83), Ctrl/Cmd+H and Ctrl/Cmd+Shift+R (K90, K94), Alt+M cannot hide the rail (K97). |
+| 29 | **Room folders, presets, smart mute.** | Settings | B80–B85, F | **Closed** (v3/gap-organize). Left: the portable residence file still writes empty folders and the default quiet window and ignores them on import (G80, B85; Med). |
+| 30 | **Small data-loss / privacy bugs in the composer.** | Conversation | E162, E65, E27, A182 | **Closed** (v3/gap-convo): Ctrl/Cmd+F keeps the draft, quoting an E2EE row quotes the plaintext, hidden senders can be shown again. |
 
-Just outside the 30:
-- no third-party history importers, and portable export/import is vault-rows only (V53–V57)
-- no background renderer (F)
-- BlockKit-lite missing (E)
-- Protection toggles and Recover a name (G68/G78, A79/A80)
-- `?signin=1` ignored (G10)
-- webhooks limited to owners of rooms with 3–30 members (I)
-- member list not windowed (I)
-- room ownership transfer cannot complete (⚠ shared, I)
-- peer accounts from extended-join ignored, so the Guest badge is wrong (I)
-- context rail (D12)
+Just outside the 30 (then): importers and portable export, background renderer, BlockKit-lite, Protection
+toggles and Recover a name, `?signin=1`, webhooks, member-list windowing, ownership transfer, peer accounts,
+context rail. Now: history import (Discord, Slack, IRC logs, portable vault) shipped in v3/gap-import
+(**left:** the Discord bot-token server import, V55, needs the `/discord-import` proxy; the cross-tab import
+lock, V48); the background renderer shipped in v3/gap-appearance (7 of 24 scenes are canvas stand-ins, no
+scene reactivity); BlockKit-lite cards, send review and the inspect dialog shipped in v3/gap-import;
+Protection toggles and Recover a name shipped in v3/gap-account; `?signin=1` and "Sign in as X" shipped in
+v3/rx-public; webhooks work for any room host, the roster is windowed and peer accounts are read from
+extended-join and account lines (v3/gap-people); room handover offers now reach the recipient (both people
+must be online, I80, Low); the context rail (D12, D14, D15) is still not built.
 
-## Prioritised gap list, by surface
+## Remaining gaps at `609cb240`
 
-Order is user impact first: things that are broken or that every user hits, then things a
-group of users relies on, then polish. Each line points at the section row(s) with the
-evidence and gives a one-line implementation sketch. "⚠ shared" means Solid had the same
-defect; fixing it makes Elm better than Solid rather than equal to it.
+What is still missing or wrong in Elm, derived from the code during the refresh (each item cites the
+rows that hold the evidence). Rank: **High** = broken, loses data, a privacy or safety hole, or every
+user hits it · **Med** = a group of users hits it, or a promise in the UI is not kept · **Low** = polish
+or a rare path. **No High gap is open in any section.** Items marked *(new)* were found during the
+refresh, not in the first map. Items marked ⚠ are shared with Solid.
 
-### Shell and navigation
+### Needs a server change or a product decision (not client work)
 
-1. **[High] No Activity / server-log view** (C113/C112/C86, A175, D18/D33). `serviceLog` is kept but never rendered, so ERROR reasons (kill/ban/shutdown, C127), MOTD, WALLOPS, server NOTICEs, KNOCK 710–714, 477/480 (the browser then waits 8 s, C101) and every unhandled numeric are invisible. Fix: add a Rail "Activity — Network updates" entry rendering `serviceLog`, and make ERROR a notification.
-2. **[High] Hide room and close/reopen conversation are missing** (D39/D44/D117/D127, B59/B60). Every DM ever opened stays listed. Add owner-keyed `hiddenRooms`/`closedConversations` sets, filter them in `Sidebar.sections`, add items to the room-header More menu, and auto-reopen on inbound traffic.
-3. **[High] No Leave-room action with a confirm step in the room header** (D118). Only `/part` exists. Add `RoomLeaveAsk`/`RoomLeaveConfirm` with a `View.Sheet` confirm.
-4. **[High] No app badge and no "(n)" attention title** (D174/D175, V68/V69, B112). Add an `attentionSet` port fed by `unreadAttentionCount`.
-5. **[High] Home catch-up is shallow** (D141–D143/D152, roadmap 1.4a/2.7). Missing: resume points, invites tier, recently visited rooms, offline vault-backed catch-up, and the "Since you left" digest (D155).
-6. **[Med] Connection lifecycle.**
-   - There is no browser `offline`/`online` handling (C131) and no `pageshow`/`resume` reconnect (A1/G30).
-   - `/join` and accepted invites don't switch to the room (C36).
-   - Fix: add lifecycle ports, and call `selectChannel` on the self-JOIN outside replay.
-7. **[Med] DM mute, Mark as read, Export transcript and Room ledger are missing from the room More menu** (D115/D119/D123/D126). They reuse the existing folds `MuteDm`, `/read`, `/export` and `statsRoomHref`.
-8. **[Closed — v3/gap-organize] Room folders** (D36/D37, roadmap 4.2).
-9. **[Med] Web Push arming is not reachable from the first-run "Turn on" or the Notifications sheet toggle** (D87/D177). Route both through `WebPushToggle`, and register the service worker first.
-10. **[Med] No join-by-name field in the rail** (D45). There is no Solid-style context rail or desktop People toggle (D12/D14).
-11. **[Med] The formation "hang label" toggle is inert** (D163). No port feeds `CreateHangLabelInput`.
-12. **[Low]** In-app route announcer and skip link (D179/D180). Roving arrow keys in the sidebar and More menu (D46/D129). Inbox summary region, ledger links and follow-topic jump (D73–D83). Header copy-name button, DND indicator and AI-policy badge (D93/D124/D109). Formation friend chips and native share. PWA readiness panel.
+- **Watch Together: ordinary members cannot join, leave or accept hosting** (H108, H106, D26). Onyx Server lets only op/owner/founder (or an IRC oper) set a channel property (`daemon/server.zig:39768`, error 913), so only operators can write `ocean.watch`. The activity itself works for everyone to follow. Needs a member-writable key or a `WATCH` verb; then drop the `canWrite` gate in `WatchTogether.guard` and `View/WatchTogether.actions`. ⚠ Solid sends the same `PROP` and never handles the 913. The property is also capped at 512 bytes by the server (Elm budgets 512; Solid 4096).
+- **DM calls.** The server's `MEDIA` plane takes channel targets only and has no ring/accept verb (`daemon/media_cmd.zig:36`); `startCall` fails closed, the ring dialogs cannot be reached, and the DM More menu says "Direct calls aren't available yet" (H60, H61, B140–B143). *New:* the Calls hub still offers "Join call in <nick>" when a DM is active (H4, Low; `MEDIA JOIN <nick>` is refused).
+- **Video is switched off on the live network** (`VIDEO_ENABLED = false`, `media/voice-engine.ts:107`: the Cadence video stream is about 2 Mbit/s against the production node's stock 1 MiB SendQ). Rows H12b, H21, H38, H58 and the encoder side of H91 follow it. Revisit when the codec is lighter or the SendQ is raised.
+- **Calls need an account** with an enrolled device key (`media_cmd.zig:341`, `:362`); guests get the sign-in card. **Stage is a client convention** (no server stage verb: `MODE +m/+v`, `PROP STAGE`, client-to-client CTCP; the speaker role is not server-enforced; H79–H87).
+- **Room handover offers are not held by the server** (I80, Low): the offer lives in the two clients' memory, so both people must be online. Needs a server-held offer/accept step.
+- **Discord bot-token server import** (V55, F41, Low) needs the `/discord-import` proxy; the cross-tab import lock (V48) is not ported.
+- **Reactions and typing stay plaintext metadata in E2EE DMs** (accepted; needs a sealed TAGMSG design on the server).
 
 ### Conversation
 
-1. **[High] Every edit shows as a duplicate message** (C57). onyx-server sends edits only as `PRIVMSG +draft/edit=<msgid>` (`onyx-server/src/daemon/server.zig:42417`). Elm has zero `draft/edit` handling, so the edit is delivered as a new row. Fix: detect the tag in `foldChat` (`App.elm:34673`) and in the history merge, and route to `foldEdit`.
-2. **[High] Labeled DMs to an offline nick vanish on 401 with no "not delivered" toast** (C92). Fix: call `notDeliveredToast` in the `fold401` label branch.
-3. **[High] Photos upload with EXIF/GPS intact** (E, privacy). Solid strips EXIF before upload, and Elm has the pure strip code (`Upload.stripJpegExif`/`stripPngExif`). But `ports.js uploadSend` posts the original File; there is no `exif` anywhere in `ports.js`. Strip in the bridge before the POST, and add the Original/Compact picker.
-4. **[High] Jump targets never scroll into view.** This covers pins, the media index, vault hits, `?at=` and search hits. `historyLanding` is not fed into `threadAnchorIndex`, and the scroller has no "message" landing action.
-5. **[High] Staged attachments follow you to another room.** `attachments` is not cleared or keyed by target on `selectChannel`/`swapComposerDraft` (`App.elm:7758`).
-6. **[High] Drafts are lost on reload.** Per-target drafts live only in memory; Solid persisted them per owner (`onyx:composer-drafts`) with a "Saved here" status.
-7. **[High] No paste or drag-and-drop attachments.** Only the picker exists.
-8. **[Med] Ctrl/Cmd+F wipes the visible draft.** `SearchHotkey` sets `composer = ""` (`App.elm:39566`).
-9. **[Med] Hidden (collapsed) senders cannot be shown again.** The "Hiding messages from … Show all" banner is missing.
-10. **[Med] Quote inserts ciphertext for E2EE rows** (`View/Thread.elm:1653` should use `loadedActionText`).
-11. **[Med] Focus does not move to the composer** on reply, edit or quote. The message menu and reaction picker have no arrow-key roving.
-12. **[Med] BlockKit-lite structured messages missing** (roadmap 2.8). Swipe-to-reply is missing, and long-press is unreliable on iOS.
-13. **[Med] Search panel lacks focus-on-open/restore and the "no matches", history-off and ledger blocks.**
-14. **[Low]** Caret-aware insertion. The full `:shortcode:` map (274 entries) for inline rendering. Edit-history disclosure (roadmap 2.9; `revisionsFor` exists, no UI). Reader-memory strip. History-loading skeleton. Topic-chip unread from the ledger. Reaction-density and topic-tools controls. Link previews for vault-restored rows.
+- **Med — archived (server) search results do not jump** (E155, N30). `ServerOpenResult` only selects the conversation; carry the time and msgid, then `requestTravelTo` and the landing, as Solid's `openServerResult` does. **Med — a vault hit in a room you left or a DM outside the working set opens nothing** (A20): materialise the shell or JOIN first, then fetch around the hit.
+- **Med — no swipe-to-reply and no 450 ms long-press** (E21–E24, K105, A111). Touch has tap-to-reveal and a More button; right-click keeps the native menu; iOS Safari does not fire `contextmenu` on long-press (unverified on a device). Fix: a pointer-gesture helper dispatching `ReplyArm` / `MessageMenuOpen`.
+- **Med — the row's accessible label drops "at <time>"** (E5): screen-reader users never hear a line's time (`App.elm:8775`).
+- **Low — caret-aware completion:** nick Tab-completion and "Insert /" ignore the caret now tracked in `GapConvo.composerCaret` (E119, E141); Reply from the thread panel and Mention from the member card do not focus the composer (E114, E20).
+- **Low — edits in encrypted conversations:** Elm offers no edit in a protected conversation (EDIT would carry the text in the clear) and ignores an inbound edit of a sealed row ("the original stays"). Editing a sealed message is not supported in either direction (no Solid counterpart either).
+- **Low — search panel leftovers** (E146, E149, E151, E153, E158, E161, E162): no room-ledger link, query not selected on open, recall-mode control only with vault hits, no key help or `aria-keyshortcuts`, no saved-search status copy; **Low:** `Search-this-text` seeds the whole message (E68, `suggestSearchQuery` unused).
+- **Low — reader-memory strip and in-room "Since you left" card** (E45, E46, A155): Home has the digest; the room does not, and nothing clears the divider after a review.
+- **Low — accessibility details:** conversation brief and aria-live muting while the window grows (E32, E34, N34), composer destination name and DM `@` placeholder (E107, E108, E139), Delete confirm focus (E79).
+- **Low — other:** `:shortcode:` renders 28 curated codes, Solid 274 (E92); topic-chip unread ignores the per-topic ledger (E50); no device/server provenance badges on translations and pins (E71, E171, N31, N47); vault-restored rows get no link-preview card (E99); staged photos have no thumbnail and an upload in flight is not aborted on an account switch (E129, E132); extension client actions not ported (E105).
+
+### Shell and navigation
+
+- **Med — Home catch-up depth** (D141–D143, D148, D149, D152, V81–V83, B94): no resume points / "continue reading", no recently visited rooms (needs a persisted join history), no Invites tier, no formation strip, no vault-backed offline catch-up; Home queued-send *Open* only navigates and does not re-create a placeholder (V39).
+- **Med — no context rail and no combined mobile Room control desk** (D12, D14, D15, D105, D113): at 1100 px and wider the People column cannot be hidden, and the narrow-only People toggle has no `aria-expanded`. The pieces are all reachable separately (Room settings › Insights, More › Room ledger / Moderation / Room safety, topbar Operator).
+- **Med — no route/section announcer and no "Skip to content" on the app document** (D179, D180, J17): the public pages have them; the app frame has no label for `/app` and swaps mount a fresh node.
+- **Med — leaving without confirm:** the palette *Leave* row and `/part` send `PART` at once (K77, A22, F105); *Close conversation* has no confirm (B60, D127, F106; reversible: toast, Closed footer, reopens on news).
+- **Low:** rail rows are arrow-navigable but all stay Tab stops (D46); Inbox has no unread summary live region, no ledger links, a follow notification opens the room without its topic, dismiss does not hand focus on (D73–D83, A116, V73, V88); no copy-name button, AI-policy badge or "Do not disturb is on" row in the room More menu (D93, D109, D124, F98); `voiceEntry = off` hides Join call and leaves no More-menu fallback (D103, H8); the Notifications sheet lacks the three-layer lede, host-honesty notice and "This room" policy copy (D86, D90, D91, F93, F96); update strip does not hold for a non-empty draft and a worker takeover never reloads automatically (D21, D169, J9); Home details (D137–D139, D145, D155, D156, D48, D71, D158: live/"saved on device" label, relative times, outbox *admitted/uncertain* states, Mark all caught up does not move focus); Formation friend quick-add chips and native share (D165, D166, I90: a friends store exists, `App.elm:790`, but the sheet does not use it); PWA readiness panel (D171); no YouHubNav lateral rail (D62); no network-wide unread total, live-region connection label or collection counts (D7, D28, D41, D42); header sr-only label lacks unread/mention detail (D19); the advanced-mode capability matrix beside Activity (D18); the "Activity · #room" link, header heatline and a scheduled-event chip that travels (D32, D96, D99).
 
 ### Sheets and settings
 
-1. **[High] Themes don't recolor the app shell** (F, gap 1). The shell paints from a fixed `--onyx-*` palette (`app.css:5–14`; ~926 uses vs 13 theme-token uses). Light looks leave the shell dark. Derive `--onyx-*` from the theme tokens.
-2. **[High] Text size and Density do nothing** (F, gap 2). `data-font-scale`/`data-density` are written to `<html>` but no Elm CSS reads them.
-3. **[High] The encrypted-DM toggle only takes effect after a reload** (F, gap 4). It writes `prefs.e2eeDms`, but every gate reads `model.e2eeDms`, which is set once at boot.
-4. **[Closed — v3/gap-organize] Quiet hours** (B51, F). Solid silenced 22:00–08:00 by default, so Elm now alerts overnight. Extend `notifyDndActive` with `dndQuietStart/End`.
-5. **[High] Hide room, close/reopen conversation, and DM mute have no UI** (B58–B60). `MuteDm`/`UnmuteDm` are CORE-ONLY. Add to the room-header More menu and the sidebar filter.
-6. **[Closed — v3/gap-organize] Calm / Regular / Power notification presets and smart-mute rules.**
-7. **[Closed — v3/gap-organize] Room folders** (B80–B85, roadmap 4.2).
-8. **[Med] No background renderer at all** (F). The picker, preview and Background-motion settings persist choices that never render.
-9. **[Med] Eight preferences can't be changed:** width, reader mode, experience level, voice/video entry, topic tools, reaction density, blocked hosts, watch-together. Their CSS (width/reader) is not ported either.
-10. **[Med] Room settings sheet lacks** hide, leave-confirm, close-DM, transcript export and topic-draft durability. Keyword and per-room notify storage is not per-account.
-11. **[Low]** "App & tools" tab (PWA readiness, refresh shell, storage persist/estimate, extensions); high contrast does not follow `prefers-contrast: more`; AI-policy badge; native share; app badge / "(n)" title.
+- **Med — portable residence file and vault export depth** (F37–F40, V41–V50, V23, G80, B85, B51, N134; *new:* the residence export hard-codes quiet hours 22→8 and an empty folder list, import ignores folders and quiet hours, and the import report says "Room folders aren't available in this client yet" — `Account2.elm:252-290`, `:458-466`). The vault export carries message rows only (no drafts, follows, topic cursors, saved searches, preferences or sign-in targets), has no `.json.gz` export, file-save or share, and import has no cross-tab lock.
+- **Med — storage controls and clear cards** (F28, F32, F34, F44, F45, V28–V31, V63, V64): no `navigator.storage.persist()`/`estimate()` (the browser may evict the vault and users cannot see usage), and no clear cards for reviewed catch-up anchors, followed conversations or topic read positions.
+- **Med — closed-tab Web Push ignores quiet hours, preset and smart mute** (F90, F92, V74): the service worker has no schedule, and the held-alert flush (`gapFlushOne`) skips those gates.
+- **Low — "App & tools" tab** (F7, F42, F43, F46, F47, F53, V65, N109): PWA readiness, manual refresh of the app shell, extension manifest and audit, access-audit ledger, storage status line.
+- **Low:** no Ctrl/Cmd+Shift+R reader chord and `Prefs.timeScrubber` is never read (F12, F17, K94); "Hide join, part & quit" hides only those three (F16, KEEP); Discard local drafts covers room drafts only (F31, V31); 7 of 24 background scenes are canvas stand-ins, no scene reactivity (voice RMS, time of day), no scene on Connect/public pages (F81, F85, F86); another tab's active-theme change is not adopted (F66); no in-shell Appearance sheet (F63, N4); no "Switch background" palette rows (F68, K69); no "Effective alerts" explanation, keyword save status or arrow keys on the room notify strip (F93–F95); invite builder is not inside Room settings and there is no native share (F102, F120, D166); insights strip has no error state (F114); group-control indicator never says "active" (F117, G97); `onyx:custom-css` is never purged (F123).
 
 ### Public site
 
-1. **[High] Download catalog never loads on a direct visit** (J55; Status/Stats also wait for the first Tick, J52/J63). Run the `UrlChanged` route-entry fold from `Main.init` when `Route.fromUrl` matches.
-2. **[High] Skip link and every in-page `#anchor` are inert** (J22/J16; WCAG 2.4.1). In `LinkClicked`, handle fragment-only changes with a `scrollToFragment` port (scroll, focus, `replaceUrl`).
-3. **[High] In-app links into `/app/?join=&at=&topic=&as=&signin=` lose their params** (J19/J20/J91/J95). Reparse with `parseDeepLinkQuery` in the `UrlChanged` fold when the route becomes `App`.
-4. **[Med] No scroll reset on page change** (J15). Call `Browser.Dom.setViewport 0 0` on path changes.
-5. **[Med] No route-change announcement for screen readers** (J17). Add a persistent `role=status` node fed from a Route→label table.
-6. **[Med] Stats share links ignore `?room`/`?compare`/`?window` on hard load** (J79). Seed them in `App.init`.
-7. **[Med] Static-file links render the 404 page** (J21, ⚠ shared). Treat paths with a file extension or under `/downloads/` and `/source/` as `LoadUrl`.
-8. **[Med] Public menu and tab widgets lack focus management** (J27/J37/J83/J86/J93). Add one `focusAfterRender` port, plus roving tabindex on the landing board.
-9. **[Low] Head metadata not updated on in-app navigation; landing preview reduced to a static sketch; partial `ocean-*` migration** (J4/J5/J8/J34/J11).
+- **Med — fragment-only URL changes re-run route entry** (J67, J54, J55; *new*): a click on a section link on `/stats/` blanks the index and refetches; `#keep-here` on `/download/` resets the catalog. Fix: run `routeEntry` only when the route or the query changed.
+- **Med — the accessibility statement overclaims** (J42): `View/About.elm:52` says `prefers-reduced-transparency` is honoured; Elm only applies the in-app switch. Add the media query or drop the sentence.
+- **Low:** no runtime head metadata on SPA navigation (J4, J5, J8: the invite card's OG list is never written; no metadata port exists); the palette and the update strip are absent on public routes (J13, J14); no `ocean-*` → `onyx:*` localStorage copy (J11, G33); landing preview is a static sketch (J34); invite preview drops the title (J89); board tabs lack the panel `tabindex` and live note (J37); the phone menu's Tab ring skips the "Open Onyx" link (J27); back/forward between public pages resets scroll (J15).
 
 ### Calls
 
-1. **[High] The video-off switch leaks** (H, gap 1). `cameraSupported` never reaches Elm, so Camera still shows, and "Join with video" (banner + hub) calls `engine.joinVideo`, which bypasses `VIDEO_ENABLED`. Back-fill `cameraSupported` in `ports.js`, force `video=false` in `voice-engine.ts joinVoice`, and gate `View/Calls.elm:254`.
-2. **[High] Watch Together is missing entirely** (H102–H111). `View/About.elm` and `CALLS_DESIGN.md` still advertise it. Add a `WatchTogether` module over `PROP ocean.watch`, plus a room card and a prefs toggle.
-3. **[High] Media failures are silent** (errors, decode failures, "Removed from voice", codec/encoder). Emit `{mediaError, errorKind}` from `voice-core.ts`; turn them into toasts in `CallDock`.
-4. **[Med] No provisional "joining…" state** during the permission prompt / IDENTITY ADD wait (up to 20 s).
-5. **[Med] Media peer key change goes unannounced** (`voice-engine.ts:74`). Reuse the DM key-change toast/banner.
-6. **[Med] Missing in-call features:** local recording (WebM), screen wake lock, OS Media Session controls, in-call "Invite with room link", and real SFU topology/bitrate (STATS is never folded).
-7. **[Low] Smaller call gaps:** spatial-audio pad; stage-size buttons; tile role badges; "local media unavailable"; palette "Start voice"; the DM "Call" item always fails because the adapter has no DM path, so hide it.
+- **Med — a changed peer media key is announced by a toast only** (H96): it does not raise the DM key review/accept flow as Solid does.
+- **Med — no local recording** (H26, H40): the adapter exposes no `startRecording`/`stopRecording`. **Med — no SFU topology or network stats readout** (H36, H37; CORE-ONLY): the adapter never emits `sfu` nor wires `onRoomStats` although the server answers `MEDIA STATS`; the pip shows the tier only.
+- **Low:** no room-near-capacity toast (H93); media errors leave no inbox row (H90); Calls-hub status lacks `aria-live` (H1); bar shows faces + count, not names (H16); no active-speaker chip (H19); no spatial-audio pad (H30); away from the call's room the dock is the mini view (H44); no "local media unavailable — you can stay and listen" status (H45); no Compact/Expand/Fullscreen buttons (H51); video tiles draw no role badge (H56); native-PiP label has no active state (H57); caption lines lack provenance (H65, H66); `voice.js` loads at boot, not lazily (H89); *latent until video ships:* `cameraSupported` back-fill and the ungated Ctrl+Shift+E chord (H21, H12b).
 
-### Moderation and operators
+### Moderation, operators and people
 
-1. **[High] No "Experience level" control** (I, gap 1). The card's Kick/Ban/Op/Voice controls and the desk action list are gated on a mode the user cannot change (`Prefs.elm:449`, `View/Profile.elm:765`). Add the segmented control in `View/Prefs.elm`, or gate on `isChannelOp` alone.
-2. **[Med] Webhooks only for owners of rooms with 3–30 members** (via Room care); Solid let any op manage them. Render the forms in `View/RoomSettings.elm` for ops.
-3. **[Med] Member list renders every row** in rooms of up to 4096. Window it, or use CSS `content-visibility`.
-4. **[Med] Guest badge / account row wrong for registered peers.** Elm ignores the account from extended-join and `ACCOUNT` lines.
-5. **[Med] Room ownership transfer can never complete** (⚠ shared). The offer lives only in the offerer's memory, so the recipient never sees it.
-6. **[Low]** Desk form stages a kick even when no kinds are allowed; the timed block skips review and the self-mask/everyone guards; no prose spine notices; network name hard-coded "Onyx"; members cannot open the read-only desk; Room care lacks Invite/Leave.
+- **Med — the timed block's auto-lift is a tab-lifetime `setTimeout`** (I20; *new*): a reload, closed tab or endpoint hop leaves the block in place while the review says "It lifts on its own when the time is up." The server cannot time a ban. Persist `(room, mask, due, owner)` and replay due lifts, or say the tab must stay open.
+- **Med — the member card's Block confirm skips the opt-in server `SILENCE` mirror** (I65; *new*): only `/ignore`, the message menu and undo go through `userModesMirrorIgnore`.
+- **Low:** a staged moderation draft keeps no account snapshot and survives a room switch (I10); the "Sent …" receipt shows only on the Network tab (I33); no spine prose list (I40); the oper desk shows the literal network name "Onyx" although `isupport.network` is parsed (I25, C135); no roster loading skeleton (I47); Room care helper add is free text (I77) and has no "no owner yet" fallback (I76); override setters (display name, nick colour, soft-ignore) and `auditLog` have folds but no UI in either client (I22, I92–I98).
 
 ### Account and security
 
-1. **[High] Sign-in failures mislead or hang** (C122–C124).
-   - A wrong password reads "Couldn't reach Onyx just now" and keeps reconnecting (`failSasl` only logs).
-   - A taken nick hangs registration: there is no `nick_` ×4 retry when there are no aliases (`foldNickError`, `App.elm:10119`).
-   - A registered-nick guest join shows "Erroneous nickname".
-   - FAIL SESSION has no inbox row (C7).
-2. **[High] Remembered identities / "Stay signed in" missing** (G15–G19, roadmap 0.3). `Credentials.elm` is imported only by tests. Add list/select/save/forget ports and a "Welcome back" block in `View/Connect.elm`.
-3. **[High] The credential store schema clashes with Solid** (G34). Elm writes `onyx:credentials` as `{v:1,slots}` over Solid's `{version:2,activeKey,entries}`, wiping a migrating user's saved identities. Read and merge the v2 shape.
-4. **[High] Blocklists are not per-account** (I, gap 2). Elm uses plain `onyx:ignored-users`/`onyx:muted-dms`; Solid used owner-scoped keys. Blocks are lost on migration and shared across accounts.
-5. **[Med] DM key-change handling (security).**
-   - Accept re-pins the whole live device set instead of the single pending key (N104).
-   - A change is detected only on seal/open, not when the directory updates (N105).
-   - The alert goes only to the service log (G89, B119); it needs a toast and an inbox row.
-6. **[Med] No Protection toggles** ("Require sign-in" / "Hold this name", G68). No "Recover a name" (G78; `Services.recover` has no caller). No connect-time reclaim (G13). `?signin=1` is ignored (G10), although Elm's own invite page builds it.
-7. **[Low]** "Sign in as X" button, invite preview aside, page-restore reconnect, session age/sign-on time, clear secrets when Account closes, show/hide password, `?reader=1`, `ocean-*` migration, group-room "active" indicator.
+- **Med — closing the Account panel leaves the typed passwords in the model** (G82; *new*): email password, current/new/confirm, delete confirm and the recovery-code password reappear when the panel reopens; only logout clears them.
+- **Med — `FAIL E2EEKEY` from Account key actions** only reaches the Activity sheet (C12): no `accountActionError`, no inbox row.
+- **Med — saved searches and the auto-join memory are device-wide** (V21, V92): one `onyx-vault-searches` database and a plain `onyx:autojoin-channels` key shared by every identity on the browser; Solid keeps both per owner. *Related:* `onyx:followed` is a plain device-wide key (N26); a guest's auto-join list is never read, yet the guest toast promises a rejoin (B30).
+- **Low:** no show/hide password toggle anywhere (G14); `?reader=1` is parsed only for share cards (G23); no Elm device-transfer bundle, so saved sign-in targets have nowhere to go (G35); the Account error banner has no `role=alert` and the section nav has no active state or "Your rooms" link (G43, G44); session rows read "Session N" with no age (G51); no GHOST-with-password form at the gate (G13); resume with no saved password does not start a passkey prompt (G17); no gate phase label (G11); the typed password is cleared after a failed submit (G4); no first-hour suppression of the Keep-name chip (G38). "Stay signed in" keeps the account password in localStorage, as Solid does (explicit opt-in; G15).
 
 ### Data and vault
 
-1. **[High] No service worker is ever registered** (J9/V76/V80, N141). Web Push hangs on `serviceWorker.ready` forever, there is no update detection, and there is no offline shell. Register `/sw.js` in `ports.js` and time-limit `swReady()`.
-2. **[High] Push is never reconciled after a reload** (V77). `requestWebPushCheck` only runs when `webPushOn`, which boots False.
-3. **[High] The vault is not owner-scoped** (V4). A second identity on the device sees the first one's history and search recall. Stamp an owner key in the ports vault store.
-4. **[High] The local-history opt-out is ignored, and there is no clear-history control** (V26/V27, F). Gate `flushVaultBuffer` on `prefs.localHistory` and add a `VaultClear` port.
-5. **[High] No third-party history importers** (V53–V57, roadmap 4.5): Discord JSON, package and bot, Slack, IRC logs.
-6. **[Med] Portable export/import is vault-rows only** (V41/V45–V50). There is no review/cancel step and no gzip.
-7. **[Med] Clicking a desktop alert only focuses the window** (V73). Throttled alerts are dropped instead of coalesced (V74).
-8. **[Med] No `(N)` tab title and no app badge** (V68/V69, B112).
-9. **[Med] Saved-search clear/export/import are CORE-ONLY** (V22/V23).
-10. **[Med] No "Since you left" digest, no offline Home memory card, no cold paint of the last room from the vault** (V82/V83/V2/V3). Home queued rows lack Open/Remove (V39/V40).
+- **Med — cold paint and offline reload** (V2, V3, V36, V83): only an empty buffer hydrates on select, there is no resume-target memory, and the outbox is read only on the 001 flush or when Preferences opens. The owner scope exists only after first registration (`gapSettleScope`), so a read before connecting answers empty; cold paint and an offline reload showing queued sends need a remembered scope key.
+- **Low:** palette vault commands (V17); inbox ledger links (V90); boot-time retention prune (V25); always-visible search-mode switch (V12); the "Export started" toast shows even if the download fails (V59, N75); no live notification-permission monitor (V75); closed-tab alert copy parity (V79); update reload holds for calls only, not composer drafts or theme edits (V67, D21, F62); no native-host bridge in client-surface detection (V96).
 
-### Command surfaces (slash, palette, keyboard)
+### Command surfaces
 
-1. **[Closed — v3/gap-commands] Registry slash verbs that need translation were broken** (K1–K19/K34/K35, ⚠ shared). Now translated beside `parseSlashLocal` (`planSlash`), with inbound CTCP ACTION as action rows; content verbs ride the composer's seal/hold. Original defect:
-   - `/me`, `/msg`, `/query`, `/j`, `/op`, `/deop`, `/voice`, `/devoice`, `/ban`, `/unban`, `/back`, `/unaway`, `/quote`, `/raw`, `/ctcp` and `/stage` hit 421 on Onyx Server.
-   - `/kick`, `/topic`, `/invite <nick>` and bare `/part` go out without a channel.
-   - `/away <multi-word>` loses all but the first word (B12).
-   - Inbound CTCP ACTION is swallowed, so `/me` lines from other IRC clients vanish.
-   - Fix: add a translation table beside `parseSlashLocal` and an action row type.
-2. **[Closed — v3/gap-commands] `/share` (and bare `/invite`) were missing in Elm** (K8/K29); both work and `/help` lists only working verbs.
-3. **[Mostly closed — v3/gap-commands] The palette was about a quarter of Solid's** (K46–K83); People, recents, Preferences, Theme Studio, Scheduled, Copy room/node link, Start voice, Mark all read, catch-up, theme rows and the `#room` / `mute N` grammar now ship. Still missing: hide/close, translate, reader mode/width/motion, AI-policy and extension rows, time grammar (K63, K65, K69–K71, K74–K76, K79, K82, K83 partly). Original gap: Missing: People rows, recents, Preferences, Scheduled, Copy room link, Start voice, Mark all read, theme switching, and the grammar verbs.
-4. **[Closed — v3/gap-commands] 17 of 21 Solid shortcuts were missing,** plus J/K and `g h`/`g d` (K89–K102); all now go through the one `shortcut` port (reader mode, K94, stays missing: no reader mode in Elm).
-5. **[Low] No swipe-to-reply** (K105).
+- **Low (all):** palette time grammar (`at <time>`, `@<time>`, `goto #room at <time>`; K71); no `hide room` / `close conversation` palette verbs (K76, B59, B60); no typed `leave #other` / `star #other` / `unread #room` / `dm <anyone>` grammar (K77, K78, B31); no `schedule <text> at <time>` grammar (K79, B21); `mute|snooze|dnd|pause N` takes plain minutes 1–1440 (no `30m`/`2h`/`1d`, no `mute off`; K80, B50); the Search row opens an empty panel (K81); no `translate to X` grammar (K82); no palette rows for reader mode, width, motion, AI policy, backgrounds, vault mode, Show/Hide member list, Focus composer, reviewed anchors or extension actions (K60, K61, K63, K69, K70, K74, K75, K83); Ctrl/Cmd+H and Ctrl/Cmd+Shift+R are unbound and Alt+M only focuses the always-visible rail, while the `?` overlay says "Show / hide member list" (K90, K94, K97); no swipe-to-reply (K105).
+
+### Protocol and engine
+
+- **Med — E2EEGROUP is receive-only** (COVERAGE N54b): no outbound E2EEGROUP, so a `recovery-required` encrypted room cannot ask peers to re-issue its epoch key.
+- **Med — being kicked is silent** (C40, ⚠ shared with Solid): `foldKick` (`App.elm:32489`) drops the room and clears the active view with no row, toast or inbox entry. Fix: in the self branch add an error toast and an inbox row naming the actor and reason.
+- **Med — keyword and nick mention matching is ASCII-only** (COVERAGE N19): non-English keywords and nicks never highlight; changing highlight words does not re-classify retained rows (N20).
+- **Low:** MONITOR 730/731 skip the DM away write (C79); join rows have no `(user@host)` mask (C37); the close row reads "Disconnected: " when the close frame carries no reason (C128); no text-form logout/drop/ACCOUNTSET confirmation fold (C49, C11); no 1 MiB text-frame bound in `ports.js` (C132); an envelope from a peer with no known key stays locked until the DM is opened (C60); `?topic=` slice is stored and never read (C32); "Connected to …" / "Reconnected." Activity lines are never written (C31); after a bfcache restore with a dead socket Elm waits up to the 15 s pong timeout (A1); no composer focus after "Start a room" without a first line (A12); Home queued-send Remove has no toast (A18, A19); no "Device memory …" toast when vault rows paint an empty room (A21); settled server search results return on reopen (A54); guest auto-join list is never read (B30); idle auto-away is missing in both clients (B14); a call-handshake key change shows only a call alert (B119, H96); self-identity is nick-only for resumed sessions (N15); MODEX named modes are not displayed (`modexModes` is read by no view; N10); `MEDIA STATS` room-health readout (N54c); `AiPolicy` is never read or shown (D109, E176, F119, N54a).
+- **Dead code left in the tree** (not a user gap, noted so nobody counts it as shipped): `Upload.stripJpegExif`/`stripPngExif`, `App.suggestSearchQuery`, write-only `historyLanding` (`App.elm:597`), `App.ghostNick` and `Services.ghost`, `Moderation.kindsForMode`, `localSlashCommandList`, the `blocklistsSave` subscriber, `Wire.splitWireFrame` outside tests.
+
 
 ## Where Elm is better than Solid
 
-Consolidated from the per-section "Elm better" lists, which carry the evidence.
+Consolidated from the per-section "Elm better" lists, which carry the evidence. Items marked *(new)* were
+added by the gap and polish slices; everything here was checked in the code.
 
 **Security and privacy**
 - **DM key-lookup hold.** A DM to a peer whose `ocean.dm-key` lookup hasn't answered is held. It never goes out in plaintext, and sending unencrypted needs explicit per-peer consent (`App.dmKeyUnresolved`, `DmKeyHoldTest`). Solid had an open-then-send race. Scheduled DMs wait for the lookup too.
-- **Raw content verbs can't leak plaintext.** `/msg`, `/notice`, `/privmsg`, `/me`, `/query`, `/whisper` and `/edit` refuse to send plaintext into designated or unresolved DMs and required-encryption rooms (`App.elm:11171`). Solid's raw fallthrough had no guard.
+- **Raw content verbs can't leak plaintext.** `/msg`, `/notice`, `/privmsg`, `/me`, `/query`, `/whisper` and `/edit` refuse to send plaintext into designated or unresolved DMs and required-encryption rooms (`plaintextWouldLeak`, `rawContentVerbs`); the translated verbs (`planSlash`) and peers with a pending key change are covered too. Solid's raw fallthrough had no guard.
 - **More fail-closed gates.**
-  - No plaintext EDIT in protected conversations.
+  - No plaintext EDIT in protected conversations; an inbound edit of a sealed row is ignored.
   - Attachments are held before upload.
   - Stage `ACCEPT_SPEAK` voices only people the host invited (the voice-hijack fix).
   - The oper event replay feed is gated.
   - The `mediaSave` sink accepts only http(s) and blob links.
   - Server-time parsing fails closed, so a bad tag can't produce `Invalid Date` ordering.
 - **"Not encrypted" chip** on plaintext DMs. Solid showed nothing.
+- *(new)* **Photo privacy goes further than Solid:** a bytes-sniffed cleaner for JPEG, PNG, WebP and HEIC/AVIF (Solid strips only JPEG APP1 and PNG eXIf), refusal if cleaning fails, a per-photo privacy line, and an explicit "Send with location data" (`ports.js` cleaner, `View/Composer.elm`).
+- *(new)* **Key-change handling:** acceptance pins only the keys the user reviewed (a later device is never trusted by that click), directory updates raise the review without any send or open, sends are held and the text returns to the draft, one toast + inbox row per change (`v3/gap-pwa-safety`).
+- *(new)* **Drafts never persist encrypted-DM plaintext or half-typed `/commands`**; staged files belong to their conversation and late uploads settle into their own room.
+- *(new)* **Legacy history claim:** pre-owner-scoping history is detected without reading text, protected from retention, and offered an explicit Attach / Not now / Delete on Home and in Preferences (`v3/gap-claim`).
 
 **Feedback that actually shows**
 - **Toasts render, with Undo and auto-expiry.** Solid's `<Toaster>` was only ever mounted in tests, so none of its ~48 `addToast` calls were visible (A, D).
 - **The offline-memo toast fires.** Solid's listener read `detail.from` while the store sent `channel`.
-- **Join failures are explained by cause:** permission, no device, account required, encryption. There is a reconnecting state with "Connection lost." and "Reconnected" announcements.
+- **Join failures are explained by cause:** permission, no device, account required, encryption; 477/480/489/520 answer the join prompt in plain words. There is a reconnecting state with "Connection lost." and "Reconnected" announcements.
 - **More inbound responses are visible.** 775/776 access notes show as room rows, and FAIL ACCOUNTINFO clears its loader (in Solid it stayed stuck). STATUSMSG (`@#chan`) messages file under the room with an audience badge.
+- *(new)* **Activity sheet** for server notices, MOTD, WALLOPS, ERROR/KILL reasons, KNOCK and unknown replies, with a Problems filter and an unseen-problem dot (Solid keeps a log it never shows); MOTD and welcome pack as a dismissible Home card.
+- *(new)* **Sign-in failures have their own words** (refused password, taken name, registered name, two-factor, challenge, ban) and stop the redial when retrying cannot help.
+- *(new)* **Throttled desktop alerts coalesce** into "N new alerts", and the tab title and app badge carry the attention count.
 
 **Features Solid had in code but no one could reach**
 - Mini call PiP renders. Solid's `VoicePip` never mounted.
 - Friends and watch list, with rail presence. Away and custom status with expiry.
 - Mid-session nick reclaim (GHOST+NICK with retry), plus a Cancel button while connecting.
-- Timed bans with auto-lift and an extban builder with live preview.
+- Timed bans with auto-lift and an extban builder with live preview (the auto-lift lives only as long as the tab; see I20).
 - "Add a boost" and "Reply in thread" on any message.
 - Room colour labels render, and `/color clear` works.
+- *(new)* Folders, hidden rooms, closed conversations, DM mute, saved messages and private notes on people are reachable (Solid's bookmarks and drag order were dead).
+
+**Accounts and sign-in** *(new)*
+- Two-step sign-in at the gate (904 two-factor → code step), forgot password (`RESETPASS`), pre-registration `CHALLENGE` with a BLAKE3 proof of work solved in `ports.js`, and passkey sign-in on the Connect form (Solid hides it). Solid has no connect-time TOTP, no reset flow and no challenge.
+- Change password through `SETPASS` (Solid's `ACCOUNTSET … password` is refused by the server).
+- Account → Protection ("Require sign-in", "Hold this name"), Recover a name (also sends `NICK` and offers Release hold), Recognised addresses and Grouped names, "Rooms I join automatically" (`AUTOJOIN`; Solid's list never rejoins anything) and "Your rooms".
+- A Privacy pane with real `MODE ±i/p/P/R/g/C/Q` switches, server-side blocks beside the device list, an opt-in `SILENCE` mirror, and per-account (owner-scoped) lists that seed once from the plain key and Solid's `:owner:` slots without deleting.
+
+**Conversation and data** *(new)*
+- Inbound `/me` renders as a `* nick text` action row (Solid swallows it); `/help` is a grouped sheet of working verbs.
+- Edits fold in place from onyx-server's real `+draft/edit` fan-out, with author and sealed checks and replay refresh.
+- Landing on a message is accessible: it un-collapses a hidden sender, keeps a static marker under reduced motion and drops cleanly if the conversation was left.
+- Slow-mode countdown that disables Send, Send later held by the server with a held-sends list, "Device history is off" with a button to the setting, Save message in the message menu.
+- History import in a Web Worker (Discord, Slack, IRC logs, portable vault) with a staged per-conversation review, retention-aware counts, per-batch Undo; an export review before download; standalone saved-search export/import/clear with counts.
+
+**Moderation and operators** *(new)*
+- Moderation gated by server role and rank (`ModAuthority`) instead of a local level; a read-only "Room safety" desk for members; webhooks for any room host.
+- A seven-tab operator console (Live feed with follow chips and a severity floor, Bans, Silence, Abuse, Appeals, Content, Network with accounts admin, node controls, reports and an audit trail), every change reviewed; user-side appeals (`/appeal`, "Ask for a second look" on the connect screen) and `/desk [tab]`.
+- Timed block with a review step and match-everyone / match-you guards; room handover offers reach the recipient (`TAGMSG +onyx/room-transfer`); registration-aware Delete room and Leave with consequences.
 
 **Calls**
 - Call chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S, with `aria-keyshortcuts` and a leave-confirm when more than two people are in the call. A user-bound push-to-talk key.
 - Per-peer media fingerprints in the privacy sheet.
 - Pages of 16 participants with dominant-speaker reordering, and a screenshare layout with a grid escape.
 - iOS/WebKit hardening: audio unlock, capture recovery, and Share hidden where there is no picker.
-- Video kept off on the live network to protect SendQ. This is a product decision; see top gap 1 for where it leaks.
+- Video fails closed on every path while it is switched off on the live network (a product decision for SendQ; `a96afd2e`).
+- *(new)* Provisional join at once with a microphone hint (Leave cancels an in-flight join), a guest "Sign in to join calls" card instead of a join that fails, calm per-word toasts instead of raw engine text, screen wake lock and OS media-session controls, node-less device-key enrollment, a docked stage with a head row and a controls-only bar, palette "Start voice call" / "Return to call" rows, and an honest "Direct calls aren't available yet" in place of a Call item that always failed.
+- *(new)* **Watch Together** within the server's real 512-byte property cap, with an `at=` anchor so late joiners compute the same clock (Solid drifted by the age of the last publish), claim-hosting for an abandoned activity, strict link validation (credentials, spaces, IDN, IPv6 literals) and delete applied on the setter's `819`. 178 test blocks.
 
 **Shell and conversation**
 - **One ordered Escape stack and one overlay-focus mechanism.** Phones get sheets with swipe-down dismiss.
@@ -322,1107 +327,1184 @@ Consolidated from the per-section "Elm better" lists, which carry the evidence.
   - An "uncertain delivery" row state.
   - A composer audience toggle (ops/voiced only).
   - The time scrubber is reachable from the room More menu.
-- **New verbs.** `/modex` and `/import`.
+- **New verbs.** `/modex`, `/import`, `/appeal`, `/desk`.
 - **Per-row discard.** Queued sends and drafts can be discarded one by one, and the Notifications sheet has a snooze-for-minutes field.
 - **Moderation reach.**
-  - The room and oper desks open in every experience mode.
   - The member list has an Away section and per-row Message.
   - Room settings › Roles names who holds each role.
+- *(new)* **Appearance engine:** `ShellPalette` derives an AA-checked shell palette (and a high-contrast set one rung up) from any of the 18 themes or a custom/Studio theme, restored before first paint; Text size, Density and Conversation width reach all of the CSS; `prefers-contrast: more` is honoured.
+- *(new)* **Attention:** Calm / Regular / Power presets with a real Power tier (Solid's never differed from Regular), whole-word smart mute (Solid matched substrings, so "art" silenced "party"), quiet hours with an on/off switch that keeps its hours, a "Since you left" digest that skips your own lines, reader mode with an Exit bar.
+- *(new)* A sidebar row menu on every room and DM, and a compose glyph in the topbar from any view.
 
 **Public site**
 - One bundle, so there are no lazy-chunk failures.
-- More footer destinations and a richer 404 page.
+- More footer destinations and a richer 404 page; an "Also on Onyx" related-pages rail on reading pages.
 - Same-route `?room=` links re-seed the stats inspector.
+- *(new)* In-page `#fragment` links scroll *and* focus their target (Solid's router only scrolls); same-origin static files (download notice, sha, OnyxOS source) load as documents instead of the 404 page; service-worker registration is gated (secure origin, after `load`, HEAD-probed as JavaScript, 30-minute visible recheck) and updates are approval-only, so typed text is never reloaded away.
 
-## Where `COVERAGE.md` and `V3_ROADMAP.md` are stale or overstate
+## Doc drift: `COVERAGE.md` and `V3_ROADMAP.md` at map time, and what the refresh did
 
-Each section has its own drift list with evidence, and [section N](#n--every-narrowing-recorded-in-elmcoveragemd-classified) classifies
-every narrowing. The items that change decisions:
+The first version of this map listed the places where the two status docs were stale or overstated. Both
+docs were rewritten in the same refresh, against the same commit. What happened to each kind of drift:
 
-**Overstated: marked done, but broken or unreachable**
-- **COVERAGE:88 REDACT/EDIT "done".** Onyx Server's only edit shape, `PRIVMSG +draft/edit`, is unhandled, so edits duplicate (C57).
-- **COVERAGE:32 nick errors "underscored retry ×4".** No `_` retry exists. "904/905 … 4003-equivalent" is also wrong: there is no close code and reconnect stays armed (C122/C124).
-- **"Generic numeric log, like the oracle" (many rows).** Solid's log was visible in its Activity view; Elm's `serviceLog` has no view (C113).
-- **COVERAGE:88 / :108 landing.** "`?at=` … + landing" and "`jumpToPinned` focuses loaded rows via `historyLanding`": nothing reads `historyLanding` (A14, E gap 2).
-- **COVERAGE:201 uploads.** "EXIF file ops stay ports-side": `ports.js` strips nothing (E gap 1).
-- **COVERAGE:189 E2EE toggle "done".** It only applies after a reload (F gap 4).
-- **COVERAGE:213 / V3_ROADMAP 4.1 Preferences "done".** About half the panel is missing. Text size and Density are inert, and the local-history opt-out is ignored (F).
-- **COVERAGE:195 themes.** Themes recolor the Appearance page and Theme Studio, not the shell (F gap 1).
-- **COVERAGE:202 / V3_ROADMAP 3.3 notifications "done".** Quiet hours and calm modes are missing, and quiet hours changes default alert behaviour (B51).
-- **COVERAGE:91 Ignore/mute "done".** `MuteDm`/`UnmuteDm` are CORE-ONLY, and the storage is not per-account (B58, I gap 2).
-- **COVERAGE:184 / :188 vault and saved searches.** Vault export/import "done" ignores the portable bundle, owner scoping, cold paint and clear controls. Saved-search clear/export/import outbounds have no emitter (V22/V23).
-- **COVERAGE:63 / :137 GHOST/RECOVER/RELEASE "done".** Only builders exist; `Services.recover`/`release` have no caller (G78, A80).
-- **COVERAGE:122 MEDIA STATS/LAYER/BREAKOUT/POS "done".** `Media.elm` folds none of them. SFU cascade and codec toasts have copy but no feed (H).
-- **COVERAGE:218 C4 camera "done".** Since `fbe04585` the camera is supposed to be off, and the gating leaks (H gap 1).
-- **COVERAGE:76 MODEX "done".** `modexModes` has no view, so `/modex` output is invisible (C).
-- **COVERAGE:198 PublicFrame skip link, Download catalog, Stats query helpers "done".** None work on a hard load (J22/J55/J79).
-- **V3_ROADMAP:8 "all public routes at parity".** Overstated (J).
-- **COVERAGE:206 / :209 moderation.** The card moderation controls are hidden behind an unsettable experience level. The desk opens from the room-header More menu, not the topbar (I).
-- **COVERAGE:224 Web Push arming "stays in the Notifications sheet".** It is only in the Account panel (D).
-- **COVERAGE:19 transport.** Cites `Wire.splitWireFrame`, which only tests use; framing happens in `ports.js` (C).
+**Overstated — marked done, but broken or unreachable.** Every item is now either fixed in code or relabelled.
+- Fixed by a slice, so "done" is now true: server-native edits (`PRIVMSG +draft/edit`, v3/gap-convo); nick errors and the `nick_` ×4 retry, sign-in failure copy (v3/gap-shell, v3/gap-auth); the invisible server log (Activity sheet, v3/gap-shell); `?at=` and pin landing (v3/gap-convo, consumed through `gapConvo.landing`); the live E2EE-DM toggle (v3/gap-account); uploads' EXIF handling (a cleaner in `ports.js`, v3/gap-convo); themes recolouring the shell (v3/gap-appearance); GHOST / RECOVER / RELEASE reachability (reclaim dialog, Account → Recover a name); quiet hours and calm modes (v3/gap-organize); Ignore / mute storage per account (v3/gap-account); the camera gating (`a96afd2e`); Web Push arming in the Notifications sheet (v3/gap-pwa-safety); the public-site skip link, download catalog and stats query helpers on a hard load (v3/rx-public).
+- Relabelled in `COVERAGE.md` (`partial` or `core` plus a **Narrowed:** clause) because the code still does not reach the user: MODEX (`modexModes` is read by no view), `MEDIA STATS` / `LAYER` / `BREAKOUT` / `POS` (the builders have no caller; `onRoomStats` is unwired), the `ai-policy` projection (imported by no view), `MODES` per line (parsed, read by nothing), E2EEGROUP (receive-only), the WHOX / ISON / USERHOST / HELP / WELCOME / SETNAME builders (raw pass-through only), Preferences (no "App & tools" tab or storage controls), vault export / import (message rows only; the residence file ignores folders and quiet hours), Calls C4–C5 (video is off in the shipped engine) and the DM ring overlays (core: no server 1:1 media target).
+- Corrected facts: the transport row cites `ports.js` for the frame split (`Wire.splitWireFrame` is used only by tests); 904 / 905 close the socket with a plain `close()` (no 4003 code); "All 13 routes" is 19 routes plus the `/install` alias and a 404; Solid's quiet-hours default of 22–08 never ran (its loader read a missing key as hour 0), so Elm's off-by-default is parity.
 
-**Understated: marked missing or ahead, but already done**
-- COVERAGE narrowings that later slices resolved: 45 of 146 (section N), including the following.
-  - Password entry, TimeScrubber, local clock, menu pin, per-target drafts.
-  - Escape-to-cancel, textarea composer, More tools tray, member-card Message/Report.
-  - Focus trap, sectioned rail and collection pages.
-  - `stopScreenShare` in the engine, media-panel CSS, minification, real-browser screenshots.
-- COVERAGE:197 "All 13 routes": there are 20 Route constructors plus `/install`.
-- V3_ROADMAP 2.1–2.3 (rich text) and 7.5 (deploy path via `deploy.sh ONYX_CLIENT=elm` + `tools/elm-overlay.mjs`, esbuild minify) have landed. Only CSP is still pending.
+**Understated — marked missing or ahead, but already done.** Narrowing text that later slices had already resolved was removed from `COVERAGE.md` (58 narrowings are classed RESOLVED in Appendix N, against 45 STALE in the first map); the ones that remain were rewritten as precise **Narrowed:** clauses. Appendix N below carries the full classification: 149 narrowings (146 recorded at map time plus 3 found while verifying) → FIX 62 · RESOLVED 58 · KEEP 18 · ORACLE-GAP 4 · BOUND 7 (at map time: FIX 72 · STALE 45 · KEEP 17 · ORACLE-GAP 3 · BOUND 9). Rows for slices that had none now exist: gap-shell, gap-chanserv, gap-usermodes, gap-account, gap-convo, Watch Together, scheduled sends, rx-calls and rx-public.
 
-**Structural**
-- **COVERAGE:198.** The "App core" row is one ~25 KB cell that contradicts itself.
-- **COVERAGE:246–247.** These rows render outside any table.
-- **No COVERAGE row** covers Web Push, the desktop-alert runtime, app badge, attention title, service-worker registration, backgrounds, Protection toggles or Recover a name.
-- **V3_ROADMAP duplicate rows.**
-  - Phase 1 (1.1–1.7), Phase 2 (2.4–2.6), Phase 3 (3.4–3.7) and the C1–C12 summary each appear twice, with contradictory statuses.
-  - Row 6.7 lumps Stage (done) with Watch Together (not started).
-- **Stale code comments.**
-  - `View/About.elm:100` advertises Watch Together, and `View/About.elm:51` claims `prefers-contrast` handling; neither exists.
-  - `View/Formation.elm:10` says "no friends store".
-  - `ports.js:1151` says the login UI is unbuilt.
-  - `View/Topbar.elm:163` says there is "no pre-connect form".
-  - Module docs in `View/NotFound`, `View/Invite` and `View/Guides` cite metadata ports that don't exist.
+**Structural.**
+- `COVERAGE.md`: the 25 KB "App core" cell was split into topic rows; the rows that sat after blank lines or after the "Known Elm-representation divergences" list (which did not render) are in proper tables under per-area headings; duplicate slice rows were merged; the legend now says **done** means a user can reach it and adds **core** (fold and vectors, nothing reaches it) — final word counts: done 123 · partial 34 · core 3 · oracle-gap 2 across 162 rows in 27 tables.
+- `V3_ROADMAP.md`: one table per phase (Phase 1–3 had each row twice with contradictory statuses), one C1–C12 table, row 6.7 split (Stage **done**, Watch Together **done with server limits**), 7.5 deploy path **done** with only CSP pending, a "Where we are" header with measured numbers, and a progress log that includes every slice since the baseline.
+- Stale in-code comments (the ones the first map named — `View/Formation.elm`, `View/Topbar.elm`, `View/NotFound.elm`, `View/Invite.elm`, `View/Guides.elm` — and about 60 more the refresh found, such as the "ACTION is swallowed" notes, the `slashCommands` doc, the `ghostNick` doc, `ports.js`'s idle `blocklistsSave` subscriber and the "no folders / quiet hours" notes in `Account2.elm` and `Sidebar.elm`) were corrected, about 70 comments in 38 files. Comments only: the `--optimize` build is byte-identical before and after, and `ports.js` and `css/pol-studio.css` minify to identical output. `View/About.elm:51` (`prefers-contrast`) and `:100` (Watch Together) were not stale after all: both are true now. Comments about dead code, and user-visible copy that overclaims (for example the `prefers-reduced-transparency` sentence in `View/About.elm:52`), were left and are listed under *Remaining gaps*.
 
 ## Detailed map
 
-One table per surface. Row ids (D1, E12, …) are what the summary, top-30 and gap lists cite. Each section ends with its own stale-doc notes, Elm-better notes and ranked gaps with implementation sketches.
+One table per surface. Row ids (D1, E12, …) are what the summary, top-30 and gap lists cite. Each section ends with its own stale-doc notes, Elm-better notes and ranked gaps with implementation sketches. Rows carry provenance tags (`v3/gap-*`, `v3/rx-*`) where a slice changed them since the map was first written; a note ending "over-called" marks a status the first map or a builder had set too high.
+
+The "Stale or overstated claims" list at the end of each section describes `COVERAGE.md` and `V3_ROADMAP.md` as they were before the refresh (`COVERAGE:NNN` and `V3_ROADMAP:NNN` mean the old line numbers); both files were rewritten afterwards, so those lists are history, with each item marked fixed or still true.
 
 ### D — Shell, navigation, Home, banners, notification center, PWA
 
 Solid walked: `src/shell/AppShell.tsx` (all mounts/effects/drawers), `ChannelSidebar.tsx`, `PrimaryNavigation.tsx` + `navigation/shellNavigationModel.ts`, `ServerRail.tsx`, `YouHubNav.tsx`, `app/YouSettings.tsx`, `HomeView.tsx` + `home/*`, `CatchUpSummary`/`SinceDigestCard`/`MarkAllCaughtUp`/`FirstHourCoach`/`FirstRunNotifyPrompt`, `ContextRail.tsx`, `PresenceRibbon.tsx` (every chip + More item), `PresenceHeatline`, `Facepile`+`facepile.ts`, `TopicChip`, `RoomSwitcherSheet`, `ChannelBrowser`, `CreateRoomFormation`, `startRoom`, `ReconnectStatusBanner`, `session/*`, `OfflineMemoToast`, `NotificationCenter`, `YouNotifications`, `GuestClaimPrompt`+state, `roomIdentity`, `themeBackground`, `lib/{channel,catchup,firstHour,formation,mobile}/*`, `closedConversations`/`hiddenRooms`/`channelNavigationMemory`/`channelColorMemory`/`bookmarks`, `src/pwa/*`, `src/ui/a11y/*`, `primitives/Toast.tsx`, `components/RelativeTime.tsx`.
-Elm checked: `Nav.elm`, `Sidebar.elm`, `Home.elm`, `NotifyCenter.elm`, `Polish.elm`, `View.elm`, `View/{Nav,Rail,Home,Topbar,RoomHeader,Browser,Formation,Inbox,Polish,GuestClaim,Toast,CallPresence,Notify,Roster,RoomSettings,Thread,Appearance,Account}.elm`, `Facepile.elm`, `AiPolicy.elm`, `App.elm` folds (grep), `ports.js` (polish/PWA/viewport), `index.html`.
+Elm checked: `Nav.elm`, `Sidebar.elm`, `Home.elm`, `NotifyCenter.elm`, `Polish.elm`, `View.elm`, `View/{Nav,Rail,Home,Topbar,RoomHeader,Browser,Formation,Inbox,Polish,GuestClaim,Toast,CallPresence,Notify,Roster,RoomSettings,Thread,Appearance,Account}.elm`, `Facepile.elm`, `AiPolicy.elm`, `App.elm` folds (grep), `ports.js` (polish/PWA/viewport), `index.html`, plus (HEAD 609cb240) `GapShell.elm` + `View/GapShell.elm`, `View/Organize.elm`, `View/Attention.elm`, `Organizer.elm`, `View/GapClaim.elm`, `AccountScope.elm` (attention title / badge), `View/WatchTogether.elm`, `ShellPalette.elm` / `media/backdrop*.ts`, `View/Chanserv.elm` (knock rows), `ports.js` (`wireGapShell`, `registerServiceWorker`, `createAppBadge`, `restoreShellPalette`).
 Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whois, voice cluster, DmSafety, Stage, Shortcuts, palette, slash verbs) are not re-mapped here.
 **Key Solid finding:** `primitives/Toast.tsx` `<Toaster>` is never mounted and nothing reads store `toasts` (`src/lib/store/store.ts:9052`), so every Solid `addToast` (copy, hide room, offline memo, undo, A2HS…) is invisible — Solid toasts are DEAD; Elm renders them.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| D1 | Primary nav Home/Rooms/Messages/Calls/You, desktop rail + mobile bottom bar, aria-current/pressed/expanded/haspopup | `src/shell/PrimaryNavigation.tsx:85`, `AppShell.tsx:1566` (UI) | FULL | `Nav.elm` items; `View/Nav.elm:65,78,141`; `App.elm:39383`→`43970` | Elm adds collection unread badges |
-| D2 | Home destination clears conversation + closes drawers | `AppShell.tsx:989` (UI) | FULL | `App.elm:43976` | also closes search/pins/media |
-| D3 | Rooms/Messages collection select (sidebar mode) + mobile drawer open | `AppShell.tsx:995,1000` (UI) | FULL | `App.elm:43995`; `View/Rail.elm:40` data-collection | Elm phone = full-screen page, not modal drawer |
-| D4 | Calls primary surface (hub, Open rooms, Return to call) | `AppShell.tsx:1022,1515` (UI) | FULL | `App.elm:39379,41145`; `View.elm:273` | calls mapper owns hub depth |
-| D5 | You = transient dialog, never a location | `AppShell.tsx:1027` (UI) | FULL | `App.elm:43973`; `View/Nav.elm:232`; `View/Topbar.elm:157` | Elm You hub sheet; identity chip opens it |
-| D6 | Active section follows conversation / calls | `AppShell.tsx:1285` (auto) | FULL | `Nav.elm` `reconcile` | — |
-| D7 | Server rail brand + active-server entry with network unread/mention badge + aria count | `ServerRail.tsx:53-80` (UI) | PARTIAL | `View/Topbar.elm:36`; `View/Nav.elm:103` | No network-wide total; Elm badges per collection instead |
-| D8 | Rail Appearance link | `ServerRail.tsx:95` (UI) | FULL | `View/Nav.elm:336`; `App.elm:44014` PushUrl | via You hub → `/appearance` route |
-| D9 | Rail Disconnect | `ServerRail.tsx:105` (UI) | FULL | `View/Nav.elm:381`; `App.elm:37596` | "Leave Onyx" in You hub (+palette) |
-| D10 | Mobile drawer a11y: background inert, Tab trap, Escape, focus restore | `AppShell.tsx:766-878` (UI) | FULL | `View/Sheet.elm` scope; `App.elm:44279` overlayStack | Elm uses pushed pages + one Sheet focus mechanism |
-| D11 | Close stale drawers/desk when view changes globally | `AppShell.tsx:956-987,1123` (auto) | FULL | `Nav.elm` reconcile; `App.elm:44349` settleRoomMenu | — |
-| D12 | Desktop People column: closed until asked, header toggle, single occupant vs Context | `AppShell.tsx:913,1249,1266` (UI) | PARTIAL | `View/Roster.elm:124`; `css/pol-roster.css:327` | ≥1100px roster always shown; no hide toggle, no aria-expanded |
-| D13 | Mobile People drawer from header (closes on room change) | `AppShell.tsx:913-929,966` (UI) | FULL | `View/Roster.elm:136` popovertarget | popover sheet |
-| D14 | Context rail (toggle + rail: ledger, Room insights, Room tools, Oper desk/events, Escape) | `ContextRail.tsx:48-149`; `PresenceRibbon.tsx:1506` (UI) | PARTIAL | `View/RoomSettings.elm:1090`; `View/RoomHeader.elm:281`; `View/Topbar.elm:48` | No rail; pieces reached via Room settings › Insights, More › Moderation, topbar Operator |
-| D15 | Mobile Room control desk (advanced modes): ledger, insights, moderation, oper, Back/Close | `AppShell.tsx:1040,1594` (UI) | PARTIAL | same as D14 | No combined desk; no "tools appear after grant" note |
-| D16 | New conversation sheet from Messages "+ New"; start → DM, composer focus | `ChannelSidebar.tsx:867`; `AppShell.tsx:1212` (UI) | FULL | `View/Rail.elm:167`; `App.elm:41999,42008` | Elm inserts empty DM shell |
-| D17 | Ctrl/Cmd+F opens message search (not under a modal) | `AppShell.tsx:224` (shortcut) | FULL | `App.elm:39559` | keyboard mapper owns |
-| D18 | Activity/status view (server log buffer; capability matrix in advanced modes) | `AppShell.tsx:1498-1500` (UI) | CORE-ONLY | `App.elm:738` serviceLog folded (`8656`), no view | log only feeds Account notice filters |
-| D19 | Room-current sr-only orientation (label + unread/mention detail) | `AppShell.tsx:1296`; `PresenceRibbon.tsx:616` (UI) | PARTIAL | `View/RoomHeader.elm:80` | header label lacks unread/mention detail |
+| D1 | Primary nav Home/Rooms/Messages/Calls/You, desktop rail + mobile bottom bar, aria-current/pressed/expanded/haspopup | `src/shell/PrimaryNavigation.tsx:85`, `AppShell.tsx:1566` (UI) | FULL | `Nav.elm` items; `View/Nav.elm:67,80,143`; `App.elm:43572`→`48788` | Elm adds collection unread badges |
+| D2 | Home destination clears conversation + closes drawers | `AppShell.tsx:989` (UI) | FULL | `App.elm:48794` | also closes search/pins/media |
+| D3 | Rooms/Messages collection select (sidebar mode) + mobile drawer open | `AppShell.tsx:995,1000` (UI) | FULL | `App.elm:48788` `navSelect` (collection branch `:48813`); `View/Rail.elm:59` data-collection | Elm phone = full-screen page, not modal drawer |
+| D4 | Calls primary surface (hub, Open rooms, Return to call) | `AppShell.tsx:1022,1515` (UI) | FULL | `App.elm:43568,45350`; `View.elm:301` | calls mapper owns hub depth |
+| D5 | You = transient dialog, never a location | `AppShell.tsx:1027` (UI) | FULL | `App.elm:48791`; `View/Nav.elm:236`; `View/Topbar.elm:175` | Elm You hub sheet; identity chip opens it |
+| D6 | Active section follows conversation / calls | `AppShell.tsx:1285` (auto) | FULL | `Nav.elm:171` `reconcile` | — |
+| D7 | Server rail brand + active-server entry with network unread/mention badge + aria count | `ServerRail.tsx:53-80` (UI) | PARTIAL | `View/Topbar.elm:36`; `View/Nav.elm:105` `attention`; `View/GapShell.elm:216` `activityButton` | No network-wide total; Elm badges per collection (9+ cap) and puts an unseen-problem dot on the Activity door (v3/gap-shell) |
+| D8 | Rail Appearance link | `ServerRail.tsx:95` (UI) | FULL | `View/Nav.elm:340`; `App.elm:48832` PushUrl | via You hub → `/appearance` route |
+| D9 | Rail Disconnect | `ServerRail.tsx:105` (UI) | FULL | `View/Nav.elm:388`; `App.elm:41769` | "Leave Onyx" in You hub (+palette) |
+| D10 | Mobile drawer a11y: background inert, Tab trap, Escape, focus restore | `AppShell.tsx:766-878` (UI) | FULL | `View/Sheet.elm` scope; `App.elm:49754` `overlayStack` | Elm uses pushed pages + one Sheet focus mechanism; v3/rx-sheets: Escape closes only the topmost layer |
+| D11 | Close stale drawers/desk when view changes globally | `AppShell.tsx:956-987,1123` (auto) | FULL | `Nav.elm:171` `reconcile`; `App.elm:40025` `settleStepNav`, `:49845` `settleRoomMenu` | — |
+| D12 | Desktop People column: closed until asked, header toggle, single occupant vs Context | `AppShell.tsx:913,1249,1266` (UI) | PARTIAL | `View/Roster.elm:151` `membersToggle`; `css/pol-roster.css:328` | ≥1100px roster always shown; no hide toggle, no aria-expanded |
+| D13 | Mobile People drawer from header (closes on room change) | `AppShell.tsx:913-929,966` (UI) | FULL | `View/Roster.elm:163` popovertarget | popover sheet |
+| D14 | Context rail (toggle + rail: ledger, Room insights, Room tools, Oper desk/events, Escape) | `ContextRail.tsx:48-149`; `PresenceRibbon.tsx:1506` (UI) | PARTIAL | `View/RoomSettings.elm:1085` (Insights); `View/RoomHeader.elm:291-293`; `View/Topbar.elm:48` `operToggle` | No rail; pieces reached via Room settings › Insights, More › Room ledger (v3/gap-shell), More › Moderation / Room safety (v3/gap-people) and topbar Operator (tabbed desk, v3/gap-oper) |
+| D15 | Mobile Room control desk (advanced modes): ledger, insights, moderation, oper, Back/Close | `AppShell.tsx:1040,1594` (UI) | PARTIAL | same as D14 | No combined desk; Moderation / Room safety, Room ledger and Room settings are separate More items; no "tools appear after grant" note |
+| D16 | New conversation sheet from Messages "+ New"; start → DM, composer focus | `ChannelSidebar.tsx:867`; `AppShell.tsx:1212` (UI) | FULL | `View/Rail.elm:249`; `App.elm:46342,46351` | Elm inserts empty DM shell |
+| D17 | Ctrl/Cmd+F opens message search (not under a modal) | `AppShell.tsx:224` (shortcut) | FULL | `App.elm:43748` | keyboard mapper owns |
+| D18 | Activity/status view (server log buffer; capability matrix in advanced modes) | `AppShell.tsx:1498-1500` (UI) | FULL | `View/GapShell.elm:57` `activitySheet`; `GapShell.elm:191` `recordEntries`; `App.elm:11255` `ActivityOpen`; `View/Rail.elm:185`; `View/Nav.elm:364`; `tests/GapShellTest.elm` | v3/gap-shell: "Activity" side sheet (bottom sheet on phones): server notices, MOTD, WALLOPS, ERROR / kill / ban reasons, KNOCK and join denials, unknown FAIL / WARN / NOTE, newest first with time; All / Problems filter, connection line, session-only. No advanced-mode capability matrix |
+| D19 | Room-current sr-only orientation (label + unread/mention detail) | `AppShell.tsx:1296`; `PresenceRibbon.tsx:616` (UI) | PARTIAL | `View/RoomHeader.elm:83` | header label lacks unread/mention detail |
 | D20 | Lazy-surface failure: Retry ×2 / Reload app / Close | `AppShell.tsx:174` (UI) | N/A | — | Elm ships one bundle |
-| D21 | Update hold while any composer draft is non-empty | `AppShell.tsx:418` (auto) | MISSING | `App.elm:45572` polishWorkActive (calls only) | update can reload over drafts |
-| D22 | Update hold during voice call | `AppShell.tsx:399` (auto) | FULL | `App.elm:45572,45821` | — |
-| D23 | Header voice join (gUM first, provisional stage, fail toast, join/rejoin banner) | `AppShell.tsx:486`, `1466` (UI) | FULL | `App.elm:41150`; `CallUi.elm:389`; `View/CallPresence.elm:254` | calls mapper owns depth |
-| D24 | Animated theme background behind shell (`auto` = theme signature) | `AppShell.tsx:1367`; `themeBackground.ts:22` (auto) | MISSING | `ThemeLook.elm` resolveBackgroundId; `View/Appearance.elm:71` empty host | nothing paints a scene anywhere |
-| D25 | Time scrubber surface | `AppShell.tsx:1481` (UI, pref) | FULL | `View/RoomHeader.elm:279`; `View/Polish.elm:246,276` | Elm: More toggle, not pref-gated |
-| D26 | Watch Together activity | `AppShell.tsx:1484` (UI, pref) | CORE-ONLY | `Prefs.elm:421` flag only | no surface |
-| D27 | Session reclaim banner in conversation column | `AppShell.tsx:1415` (auto) | FULL | `View.elm:259` | account mapper owns depth |
-| D28 | Sidebar network header: name (IRCXNet→Onyx, custom label), status dot, polite "Connection X" | `ChannelSidebar.tsx:73,598` (UI) | PARTIAL | `View/Topbar.elm:36,72`; `View/Nav.elm:396` | static "Onyx"; pill not a live region |
-| D29 | Advanced-mode notification chips (desktop/calm/sound/push/DND/quiet hours) | `ChannelSidebar.tsx:610`; `NotificationControls.tsx:375-468` (UI) | PARTIAL | `View/Notify.elm:100`; `View/Account.elm:476` | no calm preset, no quiet hours |
-| D30 | Filter: query, Unread-only, Clear, Escape clears, auto-open, "on" marker | `ChannelSidebar.tsx:625-690` (UI) | FULL | `View/Rail.elm:182-272`; `App.elm:41778-41786` | Elm field always visible |
-| D31 | Filter-empty copy | `ChannelSidebar.tsx:745` (UI) | FULL | `View/Rail.elm:91`; `Sidebar.elm:186` | — |
-| D32 | "Activity · #room" ledger link for active room | `ChannelSidebar.tsx:696` (UI) | PARTIAL | `View/RoomSettings.elm:1097`; `View/Pins.elm:66` | only inside Room settings/Pins |
-| D33 | Activity (status) entry row | `ChannelSidebar.tsx:730` (UI) | MISSING | — | see D18 |
-| D34 | Favorites section (starred, alpha) | `ChannelSidebar.tsx:754` (UI) | FULL | `View/Rail.elm:103`; `Sidebar.elm:156` | — |
-| D35 | Star/unstar per room (owner-gated) | `ChannelSidebar.tsx:581` (UI) | FULL | `View/Rail.elm:416`; `App.elm:41787` | — |
+| D21 | Update hold while any composer draft is non-empty | `AppShell.tsx:418` (auto) | MISSING | `App.elm:51412` polishWorkActive (calls only) | update can reload over drafts (hold is calls only); composer drafts now persist per owner (v3/gap-convo, `GapConvo.elm:219`) so a reload loses less |
+| D22 | Update hold during voice call | `AppShell.tsx:399` (auto) | FULL | `App.elm:51412,51661` | — |
+| D23 | Header voice join (gUM first, provisional stage, fail toast, join/rejoin banner) | `AppShell.tsx:486`, `1466` (UI) | FULL | `App.elm:45355`; `CallUi.elm:397`; `View/CallPresence.elm:255` | calls mapper owns depth |
+| D24 | Animated theme background behind shell (`auto` = theme signature) | `AppShell.tsx:1367`; `themeBackground.ts:22` (auto) | FULL | `App.elm:40300` `sceneSpecFor`, `:40337` `settleStepScene`; `Main.elm:699` `backgroundScene`; `ports.js:7489`; `media/backdrop.ts`; `ThemeLook.elm:398` `resolveBackgroundId`; `backdrop.smoke.mjs` | v3/gap-appearance: one canvas behind the shell (`auto` = theme signature); Off / reduced data paint nothing, reduced motion paints a still, Adaptive is still on narrow or coarse-pointer screens; only on the app and Appearance routes |
+| D25 | Time scrubber surface | `AppShell.tsx:1481` (UI, pref) | FULL | `View/RoomHeader.elm:288`; `View/Polish.elm:247,277` | Elm: More toggle, not pref-gated |
+| D26 | Watch Together activity | `AppShell.tsx:1484` (UI, pref) | FULL | `View/WatchTogether.elm` `card` / `menuItem` / `startSheet`; `View/Thread.elm:63`; `View/RoomHeader.elm:289`; `View/Prefs.elm:253`; `WatchTogether.elm`; `tests/WatchTogetherTest.elm`, `tests/WatchTogetherAppTest.elm` | v3/gap-watch: pref-gated sticky card over the transcript (state, title, clock, link host, Open, roster, handoff, end). Shared clock + link over IRCX PROP `ocean.watch`, never a stream; only room operators can start / join / pause (server 913 otherwise) |
+| D27 | Session reclaim banner in conversation column | `AppShell.tsx:1415` (auto) | FULL | `View.elm:292` | account mapper owns depth |
+| D28 | Sidebar network header: name (IRCXNet→Onyx, custom label), status dot, polite "Connection X" | `ChannelSidebar.tsx:73,598` (UI) | PARTIAL | `View/Topbar.elm:36,90`; `View/Nav.elm:428` | static "Onyx"; pill not a live region |
+| D29 | Advanced-mode notification chips (desktop/calm/sound/push/DND/quiet hours) | `ChannelSidebar.tsx:610`; `NotificationControls.tsx:375-468` (UI) | FULL | `View/Notify.elm:102` `notifySheet`, `:196` `desktopSection`, `:140` `closedTabRow`, `:322` `dndSection`; `View/Attention.elm:62` `quietSection`, `:136` `presetSection`, `:208` `smartMuteSection`; `View/Nav.elm:330` | v3/gap-organize + v3/gap-pwa-safety: one Notifications sheet (You hub) holds desktop, closed-tab, sound, DND / snooze, quiet hours, Calm / Regular / Power and smart mute; no per-chip strip in the sidebar (relocated) |
+| D30 | Filter: query, Unread-only, Clear, Escape clears, auto-open, "on" marker | `ChannelSidebar.tsx:625-690` (UI) | FULL | `View/Rail.elm:264-354`; `App.elm:46052-46060` | Elm field always visible |
+| D31 | Filter-empty copy | `ChannelSidebar.tsx:745` (UI) | FULL | `View/Rail.elm:111`; `Sidebar.elm:186` | — |
+| D32 | "Activity · #room" ledger link for active room | `ChannelSidebar.tsx:696` (UI) | PARTIAL | `View/RoomSettings.elm:1092`; `View/Pins.elm:68`; `View/GapShell.elm:373` `roomMoreItems` | no sidebar link; the room ledger is one tap from the header More menu (D115, v3/gap-shell), Room settings and Pins |
+| D33 | Activity (status) entry row | `ChannelSidebar.tsx:730` (UI) | FULL | `View/GapShell.elm:262` `railExtras` (`gs-rail-activity`); `View/Rail.elm:185`; `View/GapShell.elm:341` `youEntry` | v3/gap-shell: Activity row below Browse / Start a room (Home and Rooms views, hidden on the Messages page) with an unseen-problem dot; also You hub › Help |
+| D34 | Favorites section (starred, alpha) | `ChannelSidebar.tsx:754` (UI) | FULL | `View/Rail.elm:123`; `Sidebar.elm:156` | — |
+| D35 | Star/unstar per room (owner-gated) | `ChannelSidebar.tsx:581` (UI) | FULL | `View/Rail.elm:499`; `App.elm:46061` | — |
 | D36 | Room folders in sidebar + collapse toggle (persisted) | `ChannelSidebar.tsx:781,798` (UI) | FULL | `View/Organize.elm` `folderSections`; `Organize.elm`; `Organizer.elm` `FolderToggle` | v3/gap-organize: owner-scoped `onyx:room-folders`; a filter in use opens every folder; deleting a folder returns its rooms to Rooms (Solid's `default` bucket was never drawn) |
 | D37 | Folder management (create/assign/delete) | `ChannelOrganizationSection.tsx:39-155`; `app/Account.tsx:1110` (UI) | FULL | `View/Organize.elm` `prefsOrganize` (create / rename / reorder / delete), row menu + folder picker, Room settings "On this device" | v3/gap-organize |
 | D38 | Drag reorder (`setChannelOrder`) | `src/lib/store/store.ts:17831` (DEAD) | N/A | — | no caller |
 | D39 | Hidden rooms filtered from list; auto-reveal on mention / own msg / leave | `ChannelSidebar.tsx:284`; `store.ts:11677,12977` (auto) | FULL | `Organizer.elm` `revealWhere`; `App.elm` `settleStepOrganize`; `View/Organize.elm` `listed` / `hiddenFooter` | v3/gap-organize: returns on a mention or your own line; still found by the list filter, the palette and Browse |
-| D40 | Room row: name, topic line, activity stamp, unread 99+/mention badge, aria | `ChannelSidebar.tsx:521` (UI) | FULL | `View/Rail.elm:331-415`; `Sidebar.elm:208` | — |
-| D41 | Rooms zero state: Browse / Start a room / Invite friends | `ChannelSidebar.tsx:825,833,841` (UI) | PARTIAL | `View/Rail.elm:117,143-161` | no Invite friends in rail |
-| D42 | Collection heading with counts | `ChannelSidebar.tsx:383` (UI) | PARTIAL | `View/Rail.elm:76` | no counts |
-| D43 | Messages: recency sort, initial, preview, key-change ⚠, offline-memo stamp, badge | `ChannelSidebar.tsx:878-955` (UI) | FULL | `View/Rail.elm:462-568`; `Sidebar.elm:145,355` | Elm adds time + friend dot |
+| D40 | Room row: name, topic line, activity stamp, unread 99+/mention badge, aria | `ChannelSidebar.tsx:521` (UI) | FULL | `View/Rail.elm:413-498`; `Sidebar.elm:208` | — |
+| D41 | Rooms zero state: Browse / Start a room / Invite friends | `ChannelSidebar.tsx:825,833,841` (UI) | PARTIAL | `View/Rail.elm:139,165-183` | no Invite friends in rail |
+| D42 | Collection heading with counts | `ChannelSidebar.tsx:383` (UI) | PARTIAL | `View/Rail.elm:96` | no counts |
+| D43 | Messages: recency sort, initial, preview, key-change ⚠, offline-memo stamp, badge | `ChannelSidebar.tsx:878-955` (UI) | FULL | `View/Rail.elm:546-661`; `Sidebar.elm:145,355` | Elm adds time + friend dot |
 | D44 | Closed conversations hidden; reopen on open/new inbound | `ChannelSidebar.tsx:365`; `store.ts:8027,13061` (auto) | FULL | `Organizer.elm` `reopenWhere`; `View/Organize.elm` `closedFooter` | v3/gap-organize: close from the row menu / DM More menu; reopens on news from that person or when opened |
-| D45 | Join-a-room-by-name form | `ChannelSidebar.tsx:968` (UI) | PARTIAL | `App.elm:12981` `/join` | slash only; no field |
-| D46 | Roving arrow/Home/End focus, single tab stop | `ChannelSidebar.tsx:428` (UI) | MISSING | `View/Rail.elm:11` narrowing | — |
-| D47 | Mobile switcher sheet head ("Switch rooms", Close) | `RoomSwitcherSheet.tsx:28-42` (UI) | FULL | `View/Topbar.elm:58`; `View/Rail.elm:76` | page title + nav back |
-| D48 | Home "Start a room" (first hour) focuses sidebar join field | `startRoom.ts:20`; `AppShell.tsx:1010` (UI) | PARTIAL | `View/Home.elm:305` | Elm always opens formation |
-| D49 | You head: nick, guest/signed-in, close | `app/Account.tsx:661`; `app/YouSettings.tsx:53` (UI) | FULL | `View/Nav.elm:265-291` | Elm adds connection + status block |
-| D50 | Guest vs account lede | `YouSettings.tsx:54` (UI) | FULL | `View/Nav.elm:293` | — |
-| D51 | Account group (guest → Keep this name) | `YouSettings.tsx:60` (UI) | FULL | `View/Nav.elm:302`; `App.elm:44019` | — |
+| D45 | Join-a-room-by-name form | `ChannelSidebar.tsx:968` (UI) | FULL | `View/GapShell.elm:270` `joinField`; `App.elm:11346` `JoinNameSubmit`; `GapShell.elm:572` `normalizeJoinName`; `tests/GapShellTest.elm` | v3/gap-shell: "# Join by name" field in the rail (Home and Rooms views); a known room just opens, offline says so, a new room is JOINed and opens when the server accepts; bad names explain themselves |
+| D46 | Roving arrow/Home/End focus, single tab stop | `ChannelSidebar.tsx:428` (UI) | PARTIAL | `ports.js:13003` `gapShellRovingKey`; `View/Rail.elm:439,574` (`.onyx-rail-item`); `gapShell.smoke.mjs` | v3/gap-shell: ArrowUp / ArrowDown / Home / End move between visible rows (wraps); every row stays a Tab stop (no single-tab-stop roving tabindex) |
+| D47 | Mobile switcher sheet head ("Switch rooms", Close) | `RoomSwitcherSheet.tsx:28-42` (UI) | FULL | `View/Topbar.elm:76`; `View/Rail.elm:96` | page title + nav back |
+| D48 | Home "Start a room" (first hour) focuses sidebar join field | `startRoom.ts:20`; `AppShell.tsx:1010` (UI) | PARTIAL | `View/Home.elm:309` | Elm always opens formation (the rail join field now exists but Home does not focus it) |
+| D49 | You head: nick, guest/signed-in, close | `app/Account.tsx:661`; `app/YouSettings.tsx:53` (UI) | FULL | `View/Nav.elm:276-293` | Elm adds connection + status block |
+| D50 | Guest vs account lede | `YouSettings.tsx:54` (UI) | FULL | `View/Nav.elm:295` | — |
+| D51 | Account group (guest → Keep this name) | `YouSettings.tsx:60` (UI) | FULL | `View/Nav.elm:304`; `App.elm:48837` | — |
 | D52 | Notifications: Calm presets + keywords | `YouSettings.tsx:75-85`; `CalmModeControl.tsx` (UI) | FULL | `View/Attention.elm` `presetSection` / `smartMuteSection`; `Attention.elm` `allowsAlert`; `App.elm` `organizePresetKind` | v3/gap-organize: Power is a real tier (Solid's never differed from Regular); unread badges are never gated |
-| D53 | Privacy: Private messages (e2eeDms), Safer link previews (httpsOnly) | `YouSettings.tsx:93,106` (UI) | FULL | `View/Appearance.elm:232,234` | on `/appearance` |
-| D54 | Blocked users on this device | `YouSettings.tsx:122` (UI) | FULL | `View/Notify.elm:422` | in Notifications sheet |
-| D55 | Appearance entry | `YouSettings.tsx:133` (UI) | FULL | `View/Nav.elm:336` | route, not in-shell sheet |
-| D56 | Text size + density radiogroups | `YouSettings.tsx:147-190` (UI) | FULL | `View/Appearance.elm:124,157` | — |
-| D57 | Reduce motion / reduce background motion | `YouSettings.tsx:198,211` (UI) | FULL | `View/Appearance.elm:246,256` | — |
-| D58 | Voice devices entry | `YouSettings.tsx:227` (UI) | FULL | `View/Nav.elm:352` | — |
-| D59 | Language tools (translation target) | `YouSettings.tsx:240` (UI) | FULL | `View/Appearance.elm:372` | — |
-| D60 | Help: About, Network status | `YouSettings.tsx:261` (UI) | FULL | `View/Nav.elm:357-379` | Elm adds Guides |
-| D61 | Advanced: All preferences, Theme Studio | `YouSettings.tsx:283,295` (UI) | FULL | `View/Nav.elm:343`; `View/Appearance.elm:266` | account advanced tools → account mapper |
+| D53 | Privacy: Private messages (e2eeDms), Safer link previews (httpsOnly) | `YouSettings.tsx:93,106` (UI) | FULL | `View/Appearance.elm:234,236` | on `/appearance` |
+| D54 | Blocked users on this device | `YouSettings.tsx:122` (UI) | FULL | `View/Notify.elm:489` | in Notifications sheet |
+| D55 | Appearance entry | `YouSettings.tsx:133` (UI) | FULL | `View/Nav.elm:340` | route, not in-shell sheet |
+| D56 | Text size + density radiogroups | `YouSettings.tsx:147-190` (UI) | FULL | `View/Appearance.elm:126,159` | — |
+| D57 | Reduce motion / reduce background motion | `YouSettings.tsx:198,211` (UI) | FULL | `View/Appearance.elm:248,258` | — |
+| D58 | Voice devices entry | `YouSettings.tsx:227` (UI) | FULL | `View/Nav.elm:356` | — |
+| D59 | Language tools (translation target) | `YouSettings.tsx:240` (UI) | FULL | `View/Appearance.elm:374` | — |
+| D60 | Help: About, Network status | `YouSettings.tsx:261` (UI) | FULL | `View/Nav.elm:363-386` | Elm adds Guides and Network activity (v3/gap-shell) |
+| D61 | Advanced: All preferences, Theme Studio | `YouSettings.tsx:283,295` (UI) | FULL | `View/Nav.elm:347`; `View/Appearance.elm:268` | account advanced tools → account mapper |
 | D62 | YouHubNav lateral rail across You sheets (current marker) | `YouHubNav.tsx:50`; `YouNotifications.tsx:199` (UI) | MISSING | — | no cross-sheet hub nav |
-| D63 | Reconnect banner phases + countdown + Back online 3s, calm live region | `ReconnectStatusBanner.tsx:39-142` (auto) | FULL | `View/Topbar.elm:248`; `App.elm:16872` | — |
-| D64 | "Try again now" | `ReconnectStatusBanner.tsx:128` (UI) | FULL | `View/Topbar.elm:277`; `App.elm:39392` | hidden while connecting (deliberate) |
+| D63 | Reconnect banner phases + countdown + Back online 3s, calm live region | `ReconnectStatusBanner.tsx:39-142` (auto) | FULL | `View/Topbar.elm:266`; `App.elm:19720` `reconnectBanner`, `:11183` `gapShellBanner`, `:11389` `foldShellEvent` | v3/gap-shell: offline / server-halt / known close-reason copy speaks first; the browser `offline` event drops the socket so sends queue, `online` redials |
+| D64 | "Try again now" | `ReconnectStatusBanner.tsx:128` (UI) | FULL | `View/Topbar.elm:295`; `App.elm:43581` | hidden while connecting (deliberate) |
 | D65 | Session truth bar | `session/SessionTruthBar.tsx` (DEAD) | N/A | — | never mounted |
-| D66 | Offline memo toast | `OfflineMemoToast.tsx:17` (DEAD: reads `detail.from`, store sends `channel` `store.ts:10937`) | N/A | `App.elm:20717-20745` | Elm fires it — better |
-| D67 | Toast region (render, auto-dismiss, grouping) | `primitives/Toast.tsx:58` never mounted (DEAD) | N/A | `View/Toast.elm:22`; `App.elm:10468,10526` | Elm better |
-| D68 | Undo toasts (block/unblock) | `IgnoredUsersControl.tsx:63,78` (DEAD render) | N/A | `View/Toast.elm:58`; `App.elm:31103,31126` | Elm better |
-| D69 | Guest claim chip: Keep / dismiss (per-owner persisted) | `GuestClaimPrompt.tsx:341-372` (UI) | FULL | `View/GuestClaim.elm:54-90`; `App.elm:39418`; `ports.js:5590` | Elm chip on Home only |
-| D70 | Guest claim sheet REGISTER→VERIFY→IDENTIFY, busy-guarded close | `GuestClaimPrompt.tsx:377-528` (UI) | FULL | `View/GuestClaim.elm:168-278`; `App.elm:39434` | — |
+| D66 | Offline memo toast | `OfflineMemoToast.tsx:17` (DEAD: reads `detail.from`, store sends `channel` `store.ts:10937`) | N/A | `App.elm:23921-23949` | Elm fires it — better |
+| D67 | Toast region (render, auto-dismiss, grouping) | `primitives/Toast.tsx:58` never mounted (DEAD) | N/A | `View/Toast.elm:22`; `App.elm:12053,12111` | Elm better |
+| D68 | Undo toasts (block/unblock) | `IgnoredUsersControl.tsx:63,78` (DEAD render) | N/A | `View/Toast.elm:58`; `App.elm:34829,34853` | Elm better |
+| D69 | Guest claim chip: Keep / dismiss (per-owner persisted) | `GuestClaimPrompt.tsx:341-372` (UI) | FULL | `View/GuestClaim.elm:54-90`; `App.elm:43607`; `ports.js:7016` | Elm chip on Home only |
+| D70 | Guest claim sheet REGISTER→VERIFY→IDENTIFY, busy-guarded close | `GuestClaimPrompt.tsx:377-528` (UI) | FULL | `View/GuestClaim.elm:168-278`; `App.elm:43623` | — |
 | D71 | Suppress guest chip during first-hour guest handoff | `GuestClaimPrompt.tsx:132` (auto) | MISSING | `View/GuestClaim.elm:8` narrowing | — |
-| D72 | Bell + attention-only unread badge (9+) | `NotificationCenter.tsx:258-279` (UI) | FULL | `View/Inbox.elm:27-64` | topbar; no 9+ cap |
+| D72 | Bell + attention-only unread badge (9+) | `NotificationCenter.tsx:258-279` (UI) | FULL | `View/Inbox.elm:29-67` | topbar; no 9+ cap; message-request count rides the badge (v3/gap-usermodes) |
 | D73 | Inbox unread summary (polite) | `NotificationCenter.tsx:286` (UI) | MISSING | — | — |
-| D74 | Mark notifications read | `NotificationCenter.tsx:293` (UI) | FULL | `View/Inbox.elm:109`; `App.elm:37779` | — |
+| D74 | Mark notifications read | `NotificationCenter.tsx:293` (UI) | FULL | `View/Inbox.elm:112`; `App.elm:41959` | — |
 | D75 | Header Room ledger link + "history only" explanation | `NotificationCenter.tsx:297,310` (UI) | MISSING | — | — |
-| D76 | Filters All / Needs you / Other + counts | `NotificationCenter.tsx:314` (UI) | FULL | `View/Inbox.elm:117`; `App.elm:37770` | — |
-| D77 | Per-filter empty copy | `NotificationCenter.tsx:114` (UI) | FULL | `View/Inbox.elm:122-138` | — |
-| D78 | Row: glyph, category, from, channel, rel. time, preview, unread state | `NotificationCenter.tsx:344-366` (UI) | FULL | `View/Inbox.elm:174-231` | Elm adds "Read" label |
-| D79 | Activate row: mark read, open room/DM, close | `NotificationCenter.tsx:171` (UI) | FULL | `App.elm:37776,18628` | — |
-| D80 | Follow notification opens its named topic | `NotificationCenter.tsx:180` (UI) | PARTIAL | `App.elm:18622` | opens room without topic |
-| D81 | Non-jumpable rows disabled | `NotificationCenter.tsx:353` (UI) | PARTIAL | `View/Inbox.elm:201` | always enabled |
+| D76 | Filters All / Needs you / Other + counts | `NotificationCenter.tsx:314` (UI) | FULL | `View/Inbox.elm:122`; `App.elm:41950` | — |
+| D77 | Per-filter empty copy | `NotificationCenter.tsx:114` (UI) | FULL | `View/Inbox.elm:127-143` | — |
+| D78 | Row: glyph, category, from, channel, rel. time, preview, unread state | `NotificationCenter.tsx:344-366` (UI) | FULL | `View/Inbox.elm:181-238` | Elm adds "Read" label; v3/gap-shell files a FAIL SESSION (LIST / DROP refused) as an error row (`App.elm:20323`), v3/gap-chanserv adds KNOCK actions |
+| D79 | Activate row: mark read, open room/DM, close | `NotificationCenter.tsx:171` (UI) | FULL | `App.elm:41956,21755` | — |
+| D80 | Follow notification opens its named topic | `NotificationCenter.tsx:180` (UI) | PARTIAL | `App.elm:21749` | opens room without topic |
+| D81 | Non-jumpable rows disabled | `NotificationCenter.tsx:353` (UI) | PARTIAL | `View/Inbox.elm:208` | always enabled |
 | D82 | Per-row Room ledger link | `NotificationCenter.tsx:369` (UI) | MISSING | — | — |
-| D83 | Dismiss row; focus moves to next/prev dismiss | `NotificationCenter.tsx:202,378` (UI) | PARTIAL | `View/Inbox.elm:233`; `App.elm:37773` | no focus hand-off |
-| D84 | Inbox focus entry/trap/Escape → bell | `NotificationCenter.tsx:154,225` (UI) | FULL | `View/Sheet.elm`; `App.elm:44336` | — |
-| D85 | You → Notifications sheet | `YouNotifications.tsx:191` (UI) | FULL | `View/Nav.elm:323`; `App.elm:39305`; `View/Notify.elm:100` | — |
-| D86 | Three-layer explanation + status (permission/push/host honesty) | `YouNotifications.tsx:200,205` (UI) | PARTIAL | `View/Notify.elm:118,160` | desktop on/off only |
-| D87 | Turn on alerts = permission + closed-tab push + toast | `YouNotifications.tsx:137,219` (UI) | PARTIAL | `View/Notify.elm:189`; `View/Account.elm:476` | push only in Account panel |
-| D88 | Turn off closed-tab alerts | `YouNotifications.tsx:160,231` (UI) | PARTIAL | `View/Account.elm:476`; `App.elm:43380` | Account panel only |
-| D89 | Auto web-push recovery when connected | `YouNotifications.tsx:108` (auto) | FULL | `App.elm:43389` | — |
+| D83 | Dismiss row; focus moves to next/prev dismiss | `NotificationCenter.tsx:202,378` (UI) | PARTIAL | `View/Inbox.elm:240`; `App.elm:41953` | no focus hand-off |
+| D84 | Inbox focus entry/trap/Escape → bell | `NotificationCenter.tsx:154,225` (UI) | FULL | `View/Sheet.elm`; `App.elm:49820` | — |
+| D85 | You → Notifications sheet | `YouNotifications.tsx:191` (UI) | FULL | `View/Nav.elm:327`; `App.elm:43494`; `View/Notify.elm:103` | — |
+| D86 | Three-layer explanation + status (permission/push/host honesty) | `YouNotifications.tsx:200,205` (UI) | PARTIAL | `View/Notify.elm:140` `closedTabRow`, `:196` `desktopSection` | per-toggle status only (desktop on / off / blocked / unsupported; closed-tab Push on / off / busy / error); no three-layer lede, no host-honesty notice |
+| D87 | Turn on alerts = permission + closed-tab push + toast | `YouNotifications.tsx:137,219` (UI) | FULL | `View/Notify.elm:140` `closedTabRow`; `App.elm:24906` `toggleWebPush`, `:24938` `foldWebPushProbed`, `:24984` `foldWebPushEnabled`; `ports.js:10101` `register`; `tests/GapPwaSafetyTest.elm` | v3/gap-pwa-safety: "Alerts when the tab is closed" toggle in the Notifications sheet asks permission, subscribes, toasts "Push on" or the typed reason; guests see why it is unavailable. Desktop alerts is a separate toggle |
+| D88 | Turn off closed-tab alerts | `YouNotifications.tsx:160,231` (UI) | FULL | `View/Notify.elm:140` `closedTabRow`; `View/Account.elm:492`; `App.elm:25006` `foldWebPushDisabled` | v3/gap-pwa-safety: same toggle turns it off with a "Push off" toast; the Account panel keeps its copy |
+| D89 | Auto web-push recovery when connected | `YouNotifications.tsx:108` (auto) | FULL | `App.elm:47744` | — |
 | D90 | "What can ping" kinds list | `YouNotifications.tsx:238` (UI) | MISSING | — | copy-only |
-| D91 | "This room" policy copy + All/@/Mute in sheet | `YouNotifications.tsx:254-259` (UI) | PARTIAL | `View/Notify.elm:50` (header More) | not in sheet; no policy copy |
-| D92 | Live permission monitor | `YouNotifications.tsx:121` (auto) | FULL | `App.elm:31218` | — |
-| D93 | Name button copies room/DM name + toast | `PresenceRibbon.tsx:637` (UI) | MISSING | `View/RoomHeader.elm:99` plain h2 | — |
-| D94 | DM "Private" chip | `PresenceRibbon.tsx:678` (UI) | FULL | `View/RoomHeader.elm:106` | dm mapper |
-| D95 | Topic in header | `PresenceRibbon.tsx:711` (UI) | FULL | `View/RoomHeader.elm:412-470` | Elm: More/Less + "No topic set" |
-| D96 | 24h heatline + present + ledger (advanced modes) | `PresenceRibbon.tsx:699`; `PresenceHeatline.tsx:44` (UI) | PARTIAL | `View/RoomSettings.elm:1096` Room pulse | not in header |
-| D97 | Facepile (cap+overflow) → people card + moderation review | `PresenceRibbon.tsx:705`; `Facepile.tsx:72` (UI) | FULL | `View/RoomHeader.elm:488-561`; `App.elm:42058` | — |
-| D98 | DM Verify safety number | `PresenceRibbon.tsx:721` (UI) | FULL | `View/RoomHeader.elm:106` | dm mapper |
-| D99 | Scheduled event chip: countdown, live, click → travel to moment | `PresenceRibbon.tsx:741`, `510` (UI) | PARTIAL | `View/RoomHeader.elm:476`; `View/RoomSettings.elm:912-975` | no travel click; Elm adds Join/Clear |
-| D100 | Voice occupancy chip (speaking/raised/muted/local health) | `PresenceRibbon.tsx:761` (UI) | FULL | `View/CallPresence.elm:145-190` | Elm better (faces, return-to-call) |
-| D101 | Call lifecycle pills | `PresenceRibbon.tsx:775-805` (UI) | FULL | `View/CallPresence.elm:195-222` | — |
-| D102 | Join call (voiceEntry pref) | `PresenceRibbon.tsx:820` (UI) | FULL | `View/CallPresence.elm:225-245` | — |
-| D103 | Join call in More when header join is pref-hidden | `PresenceRibbon.tsx:985` (UI) | MISSING | — | voiceEntry off = no room join |
-| D104 | Group-control indicator | `PresenceRibbon.tsx:835` (UI) | FULL | `View/RoomHeader.elm:481` | — |
-| D105 | People toggle with count + aria-expanded | `PresenceRibbon.tsx:851` (UI) | PARTIAL | `View/Roster.elm:124-152` | narrow only; no aria-expanded |
-| D106 | Search button (aria-pressed) | `PresenceRibbon.tsx:875` (UI) | FULL | `View/RoomHeader.elm:200`; `App.elm:39553` | — |
-| D107 | Inbox in header | `PresenceRibbon.tsx:895` (UI) | FULL | `View/Topbar.elm:50` | relocated |
-| D108 | More › Alerts All/@/Mute | `PresenceRibbon.tsx:953` (UI) | FULL | `View/RoomHeader.elm:248`; `App.elm:39311` | no roving keys |
+| D91 | "This room" policy copy + All/@/Mute in sheet | `YouNotifications.tsx:254-259` (UI) | PARTIAL | `View/Notify.elm:53` (header More) | not in sheet; no policy copy |
+| D92 | Live permission monitor | `YouNotifications.tsx:121` (auto) | FULL | `App.elm:34945` | — |
+| D93 | Name button copies room/DM name + toast | `PresenceRibbon.tsx:637` (UI) | MISSING | `View/RoomHeader.elm:102` plain h2 | — |
+| D94 | DM "Private" chip | `PresenceRibbon.tsx:678` (UI) | FULL | `View/RoomHeader.elm:109` | dm mapper |
+| D95 | Topic in header | `PresenceRibbon.tsx:711` (UI) | FULL | `View/RoomHeader.elm:434-492` | Elm: More/Less + "No topic set" |
+| D96 | 24h heatline + present + ledger (advanced modes) | `PresenceRibbon.tsx:699`; `PresenceHeatline.tsx:44` (UI) | PARTIAL | `View/RoomSettings.elm:1091` Room pulse | not in header |
+| D97 | Facepile (cap+overflow) → people card + moderation review | `PresenceRibbon.tsx:705`; `Facepile.tsx:72` (UI) | FULL | `View/RoomHeader.elm:510-583`; `App.elm:46401` | — |
+| D98 | DM Verify safety number | `PresenceRibbon.tsx:721` (UI) | FULL | `View/RoomHeader.elm:109` | dm mapper |
+| D99 | Scheduled event chip: countdown, live, click → travel to moment | `PresenceRibbon.tsx:741`, `510` (UI) | PARTIAL | `View/RoomHeader.elm:498`; `View/RoomSettings.elm:907-970` | no travel click; Elm adds Join/Clear |
+| D100 | Voice occupancy chip (speaking/raised/muted/local health) | `PresenceRibbon.tsx:761` (UI) | FULL | `View/CallPresence.elm:146-191` | Elm better (faces, return-to-call) |
+| D101 | Call lifecycle pills | `PresenceRibbon.tsx:775-805` (UI) | FULL | `View/CallPresence.elm:196-223` | — |
+| D102 | Join call (voiceEntry pref) | `PresenceRibbon.tsx:820` (UI) | FULL | `View/CallPresence.elm:226-246` | — |
+| D103 | Join call in More when header join is pref-hidden | `PresenceRibbon.tsx:985` (UI) | MISSING | — | voiceEntry off = no room join anywhere; Elm now has a More menu but no Join call item (the `View/CallPresence.elm:20` comment saying it has none is stale) |
+| D104 | Group-control indicator | `PresenceRibbon.tsx:835` (UI) | FULL | `View/RoomHeader.elm:503` | — |
+| D105 | People toggle with count + aria-expanded | `PresenceRibbon.tsx:851` (UI) | PARTIAL | `View/Roster.elm:151-180` | narrow only; no aria-expanded |
+| D106 | Search button (aria-pressed) | `PresenceRibbon.tsx:875` (UI) | FULL | `View/RoomHeader.elm:203`; `App.elm:43742` | — |
+| D107 | Inbox in header | `PresenceRibbon.tsx:895` (UI) | FULL | `View/Topbar.elm:51` | relocated |
+| D108 | More › Alerts All/@/Mute | `PresenceRibbon.tsx:953` (UI) | FULL | `View/RoomHeader.elm:257`; `App.elm:43500` | no roving keys |
 | D109 | More › AI policy badge | `PresenceRibbon.tsx:956` (UI) | CORE-ONLY | `AiPolicy.elm` (never imported) | prop never read |
-| D110 | More › Search messages (phones) | `PresenceRibbon.tsx:576` (UI) | FULL | `View/RoomHeader.elm:253` | — |
-| D111 | More › Invite friends | `PresenceRibbon.tsx:1008` (UI) | FULL | `View/RoomHeader.elm:261`; `App.elm:41757` | — |
-| D112 | More › Room settings | `PresenceRibbon.tsx:1030` (UI) | FULL | `View/RoomSettings.elm:61` | — |
+| D110 | More › Search messages (phones) | `PresenceRibbon.tsx:576` (UI) | FULL | `View/RoomHeader.elm:262` | — |
+| D111 | More › Invite friends | `PresenceRibbon.tsx:1008` (UI) | FULL | `View/RoomHeader.elm:270`; `App.elm:46030` | — |
+| D112 | More › Room settings | `PresenceRibbon.tsx:1030` (UI) | FULL | `View/RoomSettings.elm:64` | — |
 | D113 | More › Room control desk | `PresenceRibbon.tsx:1048` (UI) | PARTIAL | see D15 | — |
-| D114 | More › Room care (3–30) | `PresenceRibbon.tsx:1071` (UI) | FULL | `View/Stewardship.elm:24`; `View/RoomSettings.elm:755` | relocated |
-| D115 | More › Room ledger | `PresenceRibbon.tsx:1093` (UI) | PARTIAL | `View/RoomSettings.elm:1097` | not in More |
-| D116 | More › Mute/Unmute room | `PresenceRibbon.tsx:1111` (UI) | FULL | `View/Notify.elm:72`; `App.elm:14703` | via Alerts "Mute" |
-| D117 | More › Hide/Show room (+toast) | `PresenceRibbon.tsx:1147` (UI) | MISSING | — | — |
-| D118 | More › Leave room → confirm sheet | `PresenceRibbon.tsx:1192`; `HarborConfirmSheet.tsx` (UI) | PARTIAL | `App.elm:12982` `/part` | slash only, no confirm |
-| D119 | More › Export transcript (txt) | `PresenceRibbon.tsx:1215` (UI) | PARTIAL | `App.elm:13017,14597` `/export` | slash only |
-| D120 | More › Pictures, files, links | `PresenceRibbon.tsx:1263` (UI) | FULL | `View/RoomHeader.elm:332`; `App.elm:38409` | — |
-| D121 | More › Pinned messages (count) | `PresenceRibbon.tsx:1285` (UI) | FULL | `View/RoomHeader.elm:293` | — |
-| D122 | More › Jump to date | `PresenceRibbon.tsx:594` (UI) | FULL | `View/RoomHeader.elm:358`; `App.elm:38652` | — |
-| D123 | More › Mark as read (when unread) | `PresenceRibbon.tsx:1305` (UI) | PARTIAL | `App.elm:13004` `/read` | slash only |
-| D124 | More › "Do not disturb is on" → Preferences | `PresenceRibbon.tsx:1328` (UI) | MISSING | — | — |
-| D125 | DM More › media + jump to date | `PresenceRibbon.tsx:1365,1378` (UI) | FULL | `View/RoomHeader.elm:276-278` | Elm adds DM call |
+| D114 | More › Room care (3–30) | `PresenceRibbon.tsx:1071` (UI) | FULL | `View/Stewardship.elm:27` `roomCareButton`; `View/Roster.elm:94`; `View/RoomTools.elm` `webhookManager` | relocated: Room care opens from the roster footer; incoming webhooks now live in Room settings for any host (v3/gap-people) |
+| D115 | More › Room ledger | `PresenceRibbon.tsx:1093` (UI) | FULL | `View/GapShell.elm:373` `roomMoreItems` (`gs-more-ledger`); `View/RoomHeader.elm:293`; `View/RoomSettings.elm:1092` | v3/gap-shell: rooms only; opens the room ledger (stats) page |
+| D116 | More › Mute/Unmute room | `PresenceRibbon.tsx:1111` (UI) | FULL | `View/Notify.elm:75`; `App.elm:17553` | via Alerts "Mute" |
+| D117 | More › Hide/Show room (+toast) | `PresenceRibbon.tsx:1147` (UI) | FULL | `View/Organize.elm:963` `roomMoreItems` (`room-more-hide`); `Organizer.elm:621` `Hide`, `:642` `Unhide`; `View/Organize.elm` `roomSettingsSection` | v3/gap-organize: "Hide room from list" / "Show room in list" with "Hid #room" toast; disabled until the device owner is known; also in Room settings and the row menu |
+| D118 | More › Leave room → confirm sheet | `PresenceRibbon.tsx:1192`; `HarborConfirmSheet.tsx` (UI) | FULL | `View/GapShell.elm:373,435` `roomMoreItems` / `leaveConfirm`; `App.elm:11270` `LeaveAsk`, `:11280` `LeaveConfirm`; `tests/GapShellTest.elm` | v3/gap-shell + v3/rx-shell: confirm sheet "Leave #room?" (Stay / Leave room), also from the sidebar row menu; PART when live, local drop when offline; "Left #room" toast. `/part` stays |
+| D119 | More › Export transcript (txt) | `PresenceRibbon.tsx:1215` (UI) | FULL | `View/GapShell.elm:373`; `App.elm:11330` `ExportTranscript` → `runSlashExport` (`:22466`); `View/RoomSettings.elm:116`; `View/RoomTools.elm:104` | v3/gap-shell: More › Export transcript downloads the local scrollback as txt without clearing the draft; JSON via `/export json` or Room settings (v3/gap-people) |
+| D120 | More › Pictures, files, links | `PresenceRibbon.tsx:1263` (UI) | FULL | `View/RoomHeader.elm:354`; `App.elm:42607` | — |
+| D121 | More › Pinned messages (count) | `PresenceRibbon.tsx:1285` (UI) | FULL | `View/RoomHeader.elm:315` | — |
+| D122 | More › Jump to date | `PresenceRibbon.tsx:594` (UI) | FULL | `View/RoomHeader.elm:380`; `App.elm:42850` | — |
+| D123 | More › Mark as read (when unread) | `PresenceRibbon.tsx:1305` (UI) | FULL | `View/GapShell.elm:373` (`gs-more-read`, only when unread); `App.elm:11312` `MarkRead` → `recordLocalReadMarker` (`:34647`) | v3/gap-shell: clears badges on this device and toasts; the row menu has it too |
+| D124 | More › "Do not disturb is on" → Preferences | `PresenceRibbon.tsx:1328` (UI) | PARTIAL | `View/Account2.elm:410` `youStatusBlock` (`you-dnd`); `View/Notify.elm:322` `dndSection` | the You hub shows "Do not disturb" / "Notifications paused"; the room More menu has no "Do not disturb is on → Preferences" row |
+| D125 | DM More › media + jump to date | `PresenceRibbon.tsx:1365,1378` (UI) | FULL | `View/RoomHeader.elm:285-287` | Elm: the DM call entry is an honest "Direct calls aren’t available yet" note (`View/CallDock.elm:187`, v3/rx-calls: no DM media target on the server) |
 | D126 | DM More › Mute/Unmute DM (+toast) | `PresenceRibbon.tsx:1383` (UI) | FULL | `View/Organize.elm` `roomMoreItems` (DM More menu) + `muteEntry` (row menu); a muted DM row shows a bell-off mark | v3/gap-organize: dispatches the existing `MuteDm` / `UnmuteDm` folds |
-| D127 | DM More › Close conversation → confirm | `PresenceRibbon.tsx:1428`; `HarborConfirmSheet.tsx:69` (UI) | MISSING | — | — |
-| D128 | More › You account chip | `PresenceRibbon.tsx:1475` (UI) | FULL | `View/Topbar.elm:104-160` | identity chip |
-| D129 | More menu roving arrows/Home/End, first-item focus | `PresenceRibbon.tsx:535-552` (UI) | PARTIAL | `View/RoomHeader.elm:234` | group of buttons; Escape/scrim only |
-| D130 | Header connection indicator (live) | `PresenceRibbon.tsx:1528` (UI) | FULL | `View/Topbar.elm:72` | relocated |
-| D131 | Topic filter bar (All / #topic + unread) | `TopicChip.tsx:124`; `MessageView.tsx:1838` (UI, pref) | FULL | `View/Thread.elm:917` | transcript mapper |
+| D127 | DM More › Close conversation → confirm | `PresenceRibbon.tsx:1428`; `HarborConfirmSheet.tsx:69` (UI) | PARTIAL | `View/Organize.elm:1038` (`dm-more-close`); `Organizer.elm:656` `CloseConversation` | v3/gap-organize: closes at once with a "Conversation closed" toast (nothing deleted; reopens on news or from the Messages "Closed" footer); no confirm step |
+| D128 | More › You account chip | `PresenceRibbon.tsx:1475` (UI) | FULL | `View/Topbar.elm:122-178` | identity chip |
+| D129 | More menu roving arrows/Home/End, first-item focus | `PresenceRibbon.tsx:535-552` (UI) | FULL | `ports.js:13003` `gapShellRovingKey`, `:13051` `wireGapShell` (keyboard click focuses the first item); `View/RoomHeader.elm:238` menu; `gapShell.smoke.mjs` | v3/gap-shell: ArrowUp / ArrowDown / Home / End wrap through the menu’s buttons and links, ArrowDown from the toggle enters an open menu, a keyboard-opened menu focuses its first item; Tab stays inside, Escape closes (v3/rx-sheets). Left / Right unbound; the menu is a `group`, not `role=menu` |
+| D130 | Header connection indicator (live) | `PresenceRibbon.tsx:1528` (UI) | FULL | `View/Topbar.elm:90` | relocated |
+| D131 | Topic filter bar (All / #topic + unread) | `TopicChip.tsx:124`; `MessageView.tsx:1838` (UI, pref) | FULL | `View/Thread.elm:982` | transcript mapper |
 | D132 | Topic chip "Split" | `TopicChip.tsx:96` (DEAD: onSplit never passed) | N/A | — | — |
-| D133 | Home title (What did you miss? / quiet) | `home/HomeBriefingView.tsx:289` (UI) | FULL | `View/Home.elm:75`; `Home.elm:327` | — |
-| D134 | Offline local-memory note (queued sends/drafts/topic drafts) | `HomeBriefingView.tsx:291`; `homeController.ts:361` (UI) | MISSING | — | — |
-| D135 | Catch-up signal strip | `HomeBriefingView.tsx:192,296` (UI) | FULL | `View/Home.elm:76,125` | — |
-| D136 | Caught-up note | `HomeBriefingView.tsx:299` (UI) | FULL | `View/Home.elm:81` | — |
-| D137 | Inbox totals + source label (live / saved on device) | `HomeBriefingView.tsx:320` (UI) | PARTIAL | `View/Home.elm:146` | no source label |
-| D138 | Mark all caught up + polite announce + focus | `home/HomeMarkCaughtUp.tsx:20-57` (UI) | FULL | `View/Home.elm:148,86`; `App.elm:39083,30694` | no focus move |
-| D139 | Mentions / Unread tiers (avatar, meta, rel. time, count) | `HomeBriefingView.tsx:334,356,99` (UI) | PARTIAL | `View/Home.elm:163-223` | no relative time |
-| D140 | Row resumes at first-unread boundary (focusMessage) | `homeController.ts:878,899` (UI) | PARTIAL | `App.elm:39108`; `Home.elm:285` | aria promises boundary; select marks read first |
+| D133 | Home title (What did you miss? / quiet) | `home/HomeBriefingView.tsx:289` (UI) | FULL | `View/Home.elm:81`; `Home.elm:327` | — |
+| D134 | Offline local-memory note (queued sends/drafts/topic drafts) | `HomeBriefingView.tsx:291`; `homeController.ts:361` (UI) | FULL | `View/Attention.elm:384` `homeMemoryNote`; `View/Home.elm:90` | v3/gap-organize: offline-only line "On this device: N queued sends and N drafts waiting…"; counts queued sends and room drafts (no topic-draft count) |
+| D135 | Catch-up signal strip | `HomeBriefingView.tsx:192,296` (UI) | FULL | `View/Home.elm:144` `catchUpSummary`, `:155` count chip | v3/rx-shell: one catch-up card says heading, counts and Mark all caught up (no separate strip) |
+| D136 | Caught-up note | `HomeBriefingView.tsx:299` (UI) | FULL | `View/Home.elm:86` | — |
+| D137 | Inbox totals + source label (live / saved on device) | `HomeBriefingView.tsx:320` (UI) | PARTIAL | `View/Home.elm:144` | no live / "saved on device" source label (offline gets the memory note, D134, instead) |
+| D138 | Mark all caught up + polite announce + focus | `home/HomeMarkCaughtUp.tsx:20-57` (UI) | PARTIAL | `View/Home.elm:147,91`; `App.elm:43268` `HomeMarkAllCaughtUp`, `homeMarkAllCaughtUp` | per-room read markers + polite announcement work; focus is not moved to the announcement (the button unmounts) |
+| D139 | Mentions / Unread tiers (avatar, meta, rel. time, count) | `HomeBriefingView.tsx:334,356,99` (UI) | PARTIAL | `View/Home.elm:167-225` `tier` / `inboxRow`; `View/Attention.elm:360` `digestLine` | avatar, name, mention note and unread count; v3/gap-organize adds a who / clock-window / topic line from the digest; no relative last-activity time |
+| D140 | Row resumes at first-unread boundary (focusMessage) | `homeController.ts:878,899` (UI) | FULL | `View/Home.elm:189` `inboxRow` (`DigestJump`); `Organizer.elm:834`; `App.elm:53036` `JumpFirstUnread` | v3/gap-organize: the row opens the room and lands on the first unread line (`focusMessage` on the msgid captured before the open marked it read); falls back to just opening when that row has no msgid |
 | D141 | Invites tier (INVITE → Join) | `HomeBriefingView.tsx:378`; `lib/catchup/homeInbox.ts:49` (UI) | MISSING | — | — |
 | D142 | Continue reading (resume points) | `HomeBriefingView.tsx:396`; `lib/catchup/resumePoints.ts` (UI) | MISSING | — | — |
 | D143 | Offline catch-up from device memory | `homeController.ts:376-424,860` (auto) | MISSING | — | catchUpMemory absent |
-| D144 | Outbox journal + Try sending now | `HomeBriefingView.tsx:427` (UI) | FULL | `View/Home.elm:226-258` | — |
-| D145 | Outbox row states (admitted/uncertain/expiring) | `HomeBriefingView.tsx:440-448` (UI) | PARTIAL | `View/Home.elm:259-273` | age label only |
-| D146 | Outbox row Open | `HomeBriefingView.tsx:457` (UI) | MISSING | — | — |
-| D147 | Outbox row Remove (confirm) | `HomeBriefingView.tsx:465` (UI) | PARTIAL | `App.elm:40351` PrefsOutboxRemove (Preferences) | not on Home |
+| D144 | Outbox journal + Try sending now | `HomeBriefingView.tsx:427` (UI) | FULL | `View/Home.elm:227-259` | — |
+| D145 | Outbox row states (admitted/uncertain/expiring) | `HomeBriefingView.tsx:440-448` (UI) | PARTIAL | `View/Home.elm:260-275` | per row: queued / expires soon / expired (`Outbox.entryStatusLabel`); admitted and uncertain are only counted in the header |
+| D146 | Outbox row Open | `HomeBriefingView.tsx:457` (UI) | FULL | `View/Organize.elm:1364` `homeOutboxActions` (`home-outbox-open`); `Organizer.elm:837` `OutboxOpen` | v3/gap-organize: Open goes to the destination conversation |
+| D147 | Outbox row Remove (confirm) | `HomeBriefingView.tsx:465` (UI) | FULL | `View/Organize.elm:1364` `homeOutboxActions` (`home-outbox-remove`); `Organizer.elm:840` `OutboxRemoveAsk`; `App.elm:44542` `PrefsOutboxRemove` | v3/gap-organize: Remove asks "Confirm remove / Keep" and deletes only this device’s queued copy |
 | D148 | "On this device" cold-memory cards | `HomeBriefingView.tsx:486` (UI) | MISSING | — | — |
 | D149 | Formation strip (founder/joiner: Open, Reshare) | `HomeBriefingView.tsx:514`; `home/HomeFormationStrip.tsx`; `lib/formation/*` (UI) | MISSING | — | — |
-| D150 | Quiet state + Browse / Start a room | `HomeBriefingView.tsx:525` (UI) | FULL | `View/Home.elm:294-307` | — |
-| D151 | Your rooms: Joined (≤12, Open) | `HomeBriefingView.tsx:221,552` (UI) | FULL | `View/Home.elm:325-371` | Elm adds DM cards |
+| D150 | Quiet state + Browse / Start a room | `HomeBriefingView.tsx:525` (UI) | FULL | `View/Home.elm:298-311` | — |
+| D151 | Your rooms: Joined (≤12, Open) | `HomeBriefingView.tsx:221,552` (UI) | FULL | `View/Home.elm:329-375` | Elm adds DM cards |
 | D152 | Your rooms: Recently visited (Join) | `HomeBriefingView.tsx:253` (UI) | MISSING | — | joinHistory absent |
-| D153 | Welcome name / home tip / invite / recaps / more activity | `HomeView.tsx:20-32` props unrendered (DEAD) | N/A | `View/Home.elm:74,113,115` | Elm renders greeting/coach/invite |
+| D153 | Welcome name / home tip / invite / recaps / more activity | `HomeView.tsx:20-32` props unrendered (DEAD) | N/A | `View/Home.elm:80,120,123` | Elm renders greeting/coach/invite |
 | D154 | CatchUpSummary, MarkAllCaughtUp components | `CatchUpSummary.tsx`, `MarkAllCaughtUp.tsx` (DEAD) | N/A | — | — |
 | D155 | Since-you-left digest card in room | `SinceDigestCard.tsx:13`; `MessageView.tsx:2077` (UI) | PARTIAL | `View/Attention.elm` `digest` / `digestHead` / `digestLine` (on Home); `Attention.buildDigest` | v3/gap-organize: lives on Home by design (V3_ROADMAP 1.4a), not above the unread divider; skips your own lines; no "Review unread" divider clear |
-| D156 | "Say hi" coach in composer (guest room landing) | `Composer.tsx:1963`; `lib/firstHour/firstHour.ts:108` (UI) | PARTIAL | `View/Home.elm:375,429` | empty rooms only; any guest |
-| D157 | Coach dismissal persisted | `firstHour.ts:90` (UI) | FULL | `App.elm:39086` | — |
+| D156 | "Say hi" coach in composer (guest room landing) | `Composer.tsx:1963`; `lib/firstHour/firstHour.ts:108` (UI) | PARTIAL | `View/Home.elm:379,433` | empty rooms only; any guest |
+| D157 | Coach dismissal persisted | `firstHour.ts:90` (UI) | FULL | `App.elm:43271` | — |
 | D158 | Composer autofocus on first-hour room landing | `firstHour.ts:125`; `Composer.tsx:689` (auto) | MISSING | — | — |
-| D159 | Empty-room intro | `MessageView.tsx:2060` (UI) | FULL | `View/Home.elm:408`; `View/Thread.elm:100` | — |
-| D160 | Browse rooms: search, Live/A–Z, refresh, status, pills, ledger, Join/Open/Retry, admission, offline | `ChannelBrowser.tsx:20-330` (UI) | FULL | `View/Browser.elm:21-284`; `App.elm:39444-39518` | — |
+| D159 | Empty-room intro | `MessageView.tsx:2060` (UI) | FULL | `View/Home.elm:412`; `View/Thread.elm:120` | — |
+| D160 | Browse rooms: search, Live/A–Z, refresh, status, pills, ledger, Join/Open/Retry, admission, offline | `ChannelBrowser.tsx:20-330` (UI) | FULL | `View/Browser.elm:22-287`; `App.elm:43633-43707` | — |
 | D161 | Start a room from browse toolbar / empty state | `ChannelBrowser.tsx:205,240` (UI) | MISSING | — | rail/Home have it |
 | D162 | Formation: name, skins, first line, offline, error | `CreateRoomFormation.tsx:208-285` (UI) | FULL | `View/Formation.elm:53-125` | — |
-| D163 | Formation: Suggest next hang | `CreateRoomFormation.tsx:257` (UI) | PARTIAL | `View/Formation.elm:94`; `App.elm:39482` | `CreateHangLabelInput` never dispatched → toggle inert |
+| D163 | Formation: Suggest next hang | `CreateRoomFormation.tsx:257` (UI) | FULL | `View/Formation.elm:94`; `App.elm:11406` (boot event feeds `createHangLabel`), `:18797`; `ports.js:12957` `gapShellHangLabel`; `gapShell.smoke.mjs` | v3/gap-shell: boot supplies the localized next-Saturday-4pm label, the toggle appends it to the new room’s topic. `CreateHangLabelInput` is still never dispatched (label not editable) |
 | D164 | Formation: invitees (3 target, progress) | `CreateRoomFormation.tsx:286-356` (UI) | FULL | `View/Formation.elm:130-175` | — |
-| D165 | Formation: friend quick-add chips | `CreateRoomFormation.tsx:295` (UI) | MISSING | `App.elm:721` friends exist | — |
+| D165 | Formation: friend quick-add chips | `CreateRoomFormation.tsx:295` (UI) | MISSING | `App.elm:790` friends exist | — |
 | D166 | Formation: native share | `CreateRoomFormation.tsx:366` (UI) | MISSING | — | no share port |
-| D167 | Formation: copy invite receipt + create gate | `CreateRoomFormation.tsx:162,186` (UI) | FULL | `View/Formation.elm:190,220`; `App.elm:39494,39497` | — |
-| D168 | Service worker registration (`/sw.js`) | `pwa/serviceWorkerRuntime.ts:35`; `index.tsx:13` (auto) | MISSING | `ports.js:9747` (comment) | registers none |
-| D169 | Controller-change reload (once, coordinator-gated) | `serviceWorkerRuntime.ts:36` (auto) | PARTIAL | `ports.js:9914-9933` | only after approve |
-| D170 | Update-available strip (deferred copy) | `pwa/UpdateAvailable.tsx:7` (UI) | FULL | `View/Polish.elm:589`; `App.elm:45813` | needs existing SW |
+| D167 | Formation: copy invite receipt + create gate | `CreateRoomFormation.tsx:162,186` (UI) | FULL | `View/Formation.elm:190,220`; `App.elm:43683,43686` | — |
+| D168 | Service worker registration (`/sw.js`) | `pwa/serviceWorkerRuntime.ts:35`; `index.tsx:13` (auto) | FULL | `ports.js:11478` `registerServiceWorker` (called `:8591`); `public/sw.js`; `pwaSafety.smoke.mjs` | v3/gap-pwa-safety: registers `/sw.js` (`updateViaCache:none`) after `load`, only on https or loopback, only when a HEAD probe says it is JavaScript (an SPA fallback or 404 stays silent); re-checks for a newer worker while visible and online (30 min) |
+| D169 | Controller-change reload (once, coordinator-gated) | `serviceWorkerRuntime.ts:36` (auto) | PARTIAL | `ports.js:11825` `pwaUpdateApprove` | SW now registered (v3/gap-pwa-safety); a worker takeover reloads only after the user approves the update strip, not automatically on `controllerchange` |
+| D170 | Update-available strip (deferred copy) | `pwa/UpdateAvailable.tsx:7` (UI) | FULL | `View/Polish.elm:590`; `App.elm:51653` | v3/gap-pwa-safety: shown only when a worker already controls the page and a NEWER one installs (the page’s own boot install is ignored); Approve waits while a call is live |
 | D171 | PWA readiness / refresh shell / persist storage panel | `PreferencesPanel.tsx:2670,3714` (UI) | MISSING | — | — |
-| D172 | A2HS visit memory + prompt capture | `pwa/AddToHomeScreenRuntime.tsx:13` (auto) | FULL | `ports.js:9793,9851` | — |
-| D173 | A2HS sheet (gate, iOS copy, Add, Not now) | `pwa/AddToHomeScreenSheet.tsx:34` (UI) | FULL | `View/Polish.elm:501`; `App.elm:45599,45753` | — |
-| D174 | OS app badge = unread mentions | `pwa/AppBadgeRuntime.tsx:42`; `routes/AppRoute.tsx:45` (auto) | MISSING | — | — |
-| D175 | Attention title "(n) Onyx" | `pwa/AttentionTitleRuntime.tsx:20` (auto) | MISSING | `View.elm:145` | title = room name |
-| D176 | First-run notify offer gate | `FirstRunNotifyPrompt.tsx:44` (auto) | FULL | `App.elm:45581`; `View/Polish.elm:449` | — |
-| D177 | First-run Turn on (permission + push + toast) | `FirstRunNotifyPrompt.tsx:77,109` (UI) | PARTIAL | `App.elm:45743` | desktop permission only |
-| D178 | First-run Not now persisted | `FirstRunNotifyPrompt.tsx:115` (UI) | FULL | `App.elm:45750` | — |
+| D172 | A2HS visit memory + prompt capture | `pwa/AddToHomeScreenRuntime.tsx:13` (auto) | FULL | `ports.js:11677,11735` | — |
+| D173 | A2HS sheet (gate, iOS copy, Add, Not now) | `pwa/AddToHomeScreenSheet.tsx:34` (UI) | FULL | `View/Polish.elm:502`; `App.elm:51439,51593` | — |
+| D174 | OS app badge = unread mentions | `pwa/AppBadgeRuntime.tsx:42`; `routes/AppRoute.tsx:45` (auto) | FULL | `Main.elm:1028` `gapAppBadge`, `:1969`; `ports.js:8446`, `:13266` `createAppBadge`; `App.elm:54887`; `AccountScope.elm` `attentionCount`; `gapAccount.smoke.mjs` | v3/gap-account: installed-app badge = unmuted room mentions + unread DMs (oracle `totalUnreadMentions`); writes serialized, cleared at zero, silent where `navigator.setAppBadge` is absent |
+| D175 | Attention title "(n) Onyx" | `pwa/AttentionTitleRuntime.tsx:20` (auto) | FULL | `View.elm:218` `documentTitle`; `AccountScope.elm:371` `attentionTitle`; `tests/GapAccountAppTest.elm` | v3/gap-account: "(n) #room — Onyx" while mentions / DMs wait (capped 999); same count as the app badge |
+| D176 | First-run notify offer gate | `FirstRunNotifyPrompt.tsx:44` (auto) | FULL | `App.elm:51421`; `View/Polish.elm:450` | — |
+| D177 | First-run Turn on (permission + push + toast) | `FirstRunNotifyPrompt.tsx:77,109` (UI) | FULL | `App.elm:51583` `Polish.NotifyEnable`, `:51955` `polishNotifyAnswered`, `:52003` `firstRunArmsPush`; `tests/GapPwaSafetyTest.elm` | v3/gap-pwa-safety: Turn on asks permission, then arms closed-tab push through the one `toggleWebPush` machine when granted + signed in + live + VAPID advertised; otherwise the plain "allowed" toast |
+| D178 | First-run Not now persisted | `FirstRunNotifyPrompt.tsx:115` (UI) | FULL | `App.elm:51590` | — |
 | D179 | Route announcer (polite route label) | `ui/a11y/RouteLifecycle.tsx:126`; `index.tsx:124` (auto) | MISSING | — | — |
-| D180 | Skip-to-content on app document | `index.html:70` (UI) | MISSING | `View/PublicFrame.elm:148` | public pages only |
+| D180 | Skip-to-content on app document | `index.html:108` (UI) | MISSING | `View/PublicFrame.elm:184` | public pages only |
 | D181 | SkipLinkSet primitive | `ui/a11y/SkipLinkSet.tsx:67` (DEAD) | N/A | — | — |
-| D182 | Self-updating relative `<time>` + ISO title | `components/RelativeTime.tsx`; `ScheduledMessagesSheet.tsx:92` (UI) | FULL | `View/Scheduled.elm:114` | — |
-| D183 | Virtual-keyboard inset (mobile) | `lib/mobile/virtualKeyboardOverlay.ts`; `AppShell.tsx:840` (auto) | FULL | `ports.js:9955` | Elm visualViewport works on iOS too |
-| D184 | Mobile breakpoint switch (900px) | `lib/mobile/breakpoints.ts:16`; `AppShell.tsx:839` (auto) | FULL | CSS 768px | layout-only |
+| D182 | Self-updating relative `<time>` + ISO title | `components/RelativeTime.tsx`; `ScheduledMessagesSheet.tsx:92` (UI) | FULL | `View/Scheduled.elm:128` | — |
+| D183 | Virtual-keyboard inset (mobile) | `lib/mobile/virtualKeyboardOverlay.ts`; `AppShell.tsx:840` (auto) | FULL | `ports.js:11866` | Elm visualViewport works on iOS too |
+| D184 | Mobile breakpoint switch (900px) | `lib/mobile/breakpoints.ts:16`; `AppShell.tsx:839` (auto) | FULL | `css/rx-shell.css:122,268,379` (600px) | layout-only; v3/rx-shell moved the phone cut to 600px (compact two-pane 600-767px) |
 | D185 | Message bookmarks (add/remove) | `store.ts:9984` (DEAD) | N/A | `View/Organize.elm` `bookmarkMenuItem` / `bookmarksSheet`; `Organize.addBookmark` | Solid's was dead; v3/gap-organize ships it (message menu "Save message", You hub / room More "Saved messages", Home strip; encrypted rows keep their place, never their words) |
 | D186 | Channel bookmarks / categories libs | `lib/channel/bookmarks.ts`, `categories.ts` (portable identity only) | N/A | — | account mapper |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- `COVERAGE.md:30` "You hub omits … the Notifications/Preferences hub links" — stale: `View/Nav.elm:323` (Notifications), `:343` (Preferences). "device toggles / language … later slices" — reachable via Appearance (`View/Appearance.elm:232-372`). "no focus trap/Escape" — stale (`View/Sheet.elm`, `App.elm:44335` "you"). "Rooms/Messages drawer reuses the unsectioned rail" — stale (`View/Rail.elm:40-114`).
-- `COVERAGE.md:199` "no … `Rooms`·`Messages` collection modes (Elm carries none of … the primary nav yet)" — stale: `View/Rail.elm:40` data-collection + `Nav.elm`.
-- `COVERAGE.md:196` "dismissal not persisted (`onyx:first-hour-seen`)" and "first-run notifications prompt not ported" — stale (`App.elm:39086`, `View/Polish.elm:449`). "Invite friends copy" — Home now opens the share sheet; `HomeInviteCopy` (`App.elm:39105`) is CORE-ONLY.
-- `COVERAGE.md:224` "Web Push arming stays in the Notifications sheet" — wrong: `WebPushToggle` is dispatched only from the Account panel (`View/Account.elm:476`).
-- `View/Formation.elm:10` "friend quick-add row has no Elm friends store yet" — stale (`App.elm:721` friends); "hang label renders once fed" — nothing ever dispatches `CreateHangLabelInput` (`App.elm:39482`), so the visible hang toggle never sends anything (`App.elm:15949`).
-- `V3_ROADMAP.md:78` (3.1) lists room care and heatline as todo — understated: Room care via roster header (`View/Stewardship.elm:24`) and Room settings (`View/RoomSettings.elm:755`); hourly pulse in Room settings › Insights (`View/RoomSettings.elm:1096`). Export / mark read are still slash-only (accurate).
-- `V3_ROADMAP.md:42-49` / `COVERAGE.md:196` treat welcome, recaps and invite friends as oracle Home features. The oracle never renders them: `HomeBriefingView.tsx:23-35` props are unused. Elm's greeting, coach and invite are additions. Duplicate status-less rows for 1.1–1.6 at `V3_ROADMAP.md:43-49`.
-- `View/Toast.elm:3` "mirroring `primitives/Toast.tsx`": the oracle never mounts that toaster, so parity tests are against a surface no Solid user saw.
+- `COVERAGE.md:30` (shell navigation row): "You hub omits … the Notifications/Preferences hub links", "no focus trap/Escape", "Rooms/Messages drawer reuses the unsectioned rail", "<720px bottom bar" — still in the doc, all stale in code: `View/Nav.elm:327` (Notifications), `:348` (Preferences), `View/Sheet.elm` + `App.elm:49754` `overlayStack` (focus scope, Escape closes the topmost sheet, v3/rx-sheets), `View/Rail.elm:59` collections, the phone cut is 600px (v3/rx-shell, `css/rx-shell.css`). "device toggles / language … later slices" — reachable on `/appearance` (`View/Appearance.elm:234-374`).
+- `COVERAGE.md:200` (sidebar row; was `:199`) "no folders / hidden rooms / closed conversations / Activity entry / roving arrow-key focus / `Rooms`·`Messages` collection modes" — all fixed and the sentence is still in the doc: collection modes `View/Rail.elm:59` (v3/nav); folders, hidden rooms, closed conversations `View/Organize.elm` (v3/gap-organize); Activity row, join-by-name field and rail arrow keys `View/GapShell.elm:262`, `ports.js:13003` (v3/gap-shell).
+- `COVERAGE.md:197` (Home row; was `:196`) "dismissal not persisted (`onyx:first-hour-seen`)" and "first-run notifications prompt not ported" — stale (`App.elm:43271`, `View/Polish.elm:450`); "queued rows lack per-row Open/Remove" — stale since v3/gap-organize (`View/Organize.elm:1364`); "Invite friends copy" — Home opens the share sheet and `HomeInviteCopy` (`App.elm:43294`) is still CORE-ONLY (nothing dispatches it). Still true: no vault catch-up, resume points, recaps, formation strip, recently visited rooms or invite tier; "inbox rows omit relative time" (D139).
+- Was: `COVERAGE.md` "Web Push arming stays in the Notifications sheet" (wrong at map time — `WebPushToggle` was dispatched only from the Account panel). Fixed by v3/gap-pwa-safety, which really moved arming into the sheet (`View/Notify.elm:140` `closedTabRow`) and the first-run Turn on (`App.elm:52003` `firstRunArmsPush`); `COVERAGE.md:228` now says so and the old sentence is gone.
+- `View/Formation.elm:10-11` "friend quick-add row has no Elm friends store yet" — still stale (`App.elm:790` friends exist; the chips are simply not built, D165). "hang label renders once fed" — v3/gap-shell now feeds `createHangLabel` from the boot event (`App.elm:11406`, `ports.js:12957`), but the comment still reads as pending and `CreateHangLabelInput` (`App.elm:43671`) is still never dispatched (D163).
+- `V3_ROADMAP.md:78` (3.1) "heatline, export, mark read and room care in More still todo" — still stale/understated: export, mark read, room ledger and leave are in More (v3/gap-shell, `View/GapShell.elm:373`), Room care opens from the roster footer (`View/Stewardship.elm:27`), the hourly pulse is Room settings › Insights (`View/RoomSettings.elm:1091`) and the time scrubber.
+- `V3_ROADMAP.md:42-49` / `COVERAGE.md:197` treat welcome, recaps and invite friends as oracle Home features. Still true that the oracle never renders them (`HomeBriefingView.tsx:23-35` props are unused); Elm’s greeting, coach and invite are additions. Duplicate status-less rows for 1.1–1.6 at `V3_ROADMAP.md:43-49` remain.
+- `View/Toast.elm:3` "mirroring `primitives/Toast.tsx`" — still true: the oracle never mounts that toaster, so parity tests are against a surface no Solid user saw.
+- In-code comments that are stale at HEAD: `View/Rail.elm:11-12` "Roving arrow-key focus, folders and the Activity entry stay with later slices"; `View/Home.elm:13-17` "queued-send rows … not the per-row Open / Remove controls"; `View/CallPresence.elm:20-22` "has no Elm More menu yet" (the menu exists; only the voiceEntry-off Join item is missing, D103); `View/Nav.elm:15-17` "Narrowed: the device toggles, language tools and Advanced group live in later slices" and its claim of "`YouHubNav` workspace links" (D62: there is no hub nav); `View/Inbox.elm:10` "Focus-trap/Escape handling stays with the ports layer" (the panel is a `View.Sheet` scope since v3/ui-sheets); `View/GuestClaim.elm:13-14` same Focus-trap/Escape remark; `View/RoomHeader.elm:26-31` More-menu inventory predates Mark as read / Export / Ledger / Leave / Hide / Close / Saved messages / Reader mode / Watch together.
 
 #### Elm better than Solid
-- Toasts actually render, with Undo and Tick-driven expiry (`View/Toast.elm:22`, `App.elm:10526`). Solid never mounts a toaster.
-- The offline-memo toast fires (`App.elm:20717`). The Solid listener reads `detail.from` while the store sends `channel` (`store.ts:10937`).
-- Unread/mention badges on the Rooms/Messages nav items (`View/Nav.elm:103,205`).
-- On phones a conversation opens as a pushed page with a back button showing how many others are waiting (`View/RoomHeader.elm:137`).
-- Rail extras: room colour labels (`View/Rail.elm:376`; Solid never renders `channelColors`), call presence count (`:409`), friend presence dot on DMs (`:507`), DM time stamp.
-- Home: greeting, quick-start coach, Invite friends and DM cards (`View/Home.elm:74,113,115,334`). Solid computes these but drops them.
-- Room header: topic More/Less expander (`View/RoomHeader.elm:441`); the voice chip shows faces and returns to an active call (`View/CallPresence.elm:160`); the event line adds Join call and op Clear (`View/RoomSettings.elm:954,970`).
-- Time scrubber is always reachable from More (`View/Polish.elm:246`), not hidden behind a pref.
-- The keyboard inset uses visualViewport (`ports.js:9955`), so it also works on iOS Safari. Solid's VirtualKeyboard API is Chromium-only.
+- Toasts actually render, with Undo and Tick-driven expiry (`View/Toast.elm:22`, `App.elm:12111`). Solid never mounts a toaster.
+- The offline-memo toast fires (`App.elm:23921`). The Solid listener reads `detail.from` while the store sends `channel` (`store.ts:10937`).
+- Unread/mention badges on the Rooms/Messages nav items (`View/Nav.elm:105,207`), 9+ capped.
+- On phones a conversation opens as a pushed page with a back button showing how many others are waiting (`View/RoomHeader.elm:140`).
+- Rail extras: room colour labels (`View/Rail.elm:459`; Solid never renders `channelColors`), call presence count (`:492`), friend presence dot on DMs (`:597`), DM time stamp.
+- Sidebar row menu on every room and DM row: `…` overflow, right-click, long-press; Favorite, Mark as read, Notifications, Leave (through the confirm), folder / hide / close, DM mute (`View/Rail.elm` `railMenu`, v3/rx-shell). Solid has only the star toggle.
+- Topbar "New conversation" glyph reachable from anywhere on two-pane and wide layouts (`View/Topbar.elm:61`, v3/rx-shell).
+- Home: greeting, quick-start coach, Invite friends and DM cards (`View/Home.elm:80,120,123,338`) — Solid computes these but drops them. v3/gap-shell adds a dismissible-for-the-day "From the network" card with the server’s MOTD and welcome pack (`View/GapShell.elm:543`); Solid keeps the MOTD in the store and never renders it.
+- Home catch-up rows carry a "Since you left" digest line (who, clock window, topics) and land on the first unread line (`View/Attention.elm:360`, `App.elm:53036`); Home also lists Saved messages and the offline "On this device" note (v3/gap-organize).
+- The Activity door shows an unseen-problem dot and a Problems filter (`View/GapShell.elm:216,57`, v3/gap-shell).
+- Calm / Regular / Power presets with a real third tier, smart mute and quiet hours in one Notifications sheet (`View/Attention.elm:62,136,208`); Solid’s Power never differed from Regular.
+- Folders, hidden rooms, closed conversations, DM mute, saved messages, private notes and reader mode (v3/gap-organize); Solid’s bookmarks and order-drag were dead code (D38, D185).
+- History from before owner scoping gets an explicit attach / not now / delete card on Home and a Preferences row (`View/GapClaim.elm:38`, v3/gap-claim); no Solid equivalent.
+- Room header: topic More/Less expander (`View/RoomHeader.elm:465`); the voice chip shows faces and returns to an active call (`View/CallPresence.elm:184`); the event line adds Join call and op Clear (`View/RoomSettings.elm:949,965`).
+- Time scrubber is always reachable from More (`View/Polish.elm:247`), not hidden behind a pref.
+- The keyboard inset uses visualViewport (`ports.js:11866` `installViewportInsets`), so it also works on iOS Safari. Solid’s VirtualKeyboard API is Chromium-only.
+- Service worker registration never logs a console error on an SPA fallback or 404 (HEAD probe first), re-checks for a newer worker while a tab is visible and online, and the update strip ignores the page’s own boot-time install (`ports.js:11478`, v3/gap-pwa-safety).
+- Watch Together publishes within the server’s real 512-byte property cap and an `at=` anchor so late joiners compute the same clock (`WatchTogether.elm` header, v3/gap-watch); the oracle budgets 4096 and anchors at receipt.
+- First paint restores the theme’s shell palette and the device display prefs before Elm boots, and themes recolour the whole shell (`ports.js:12877,12908`, `ShellPalette.elm`, v3/gap-appearance).
 
 #### Gaps (ranked by user impact)
-- [High] Hide room / Close DM conversation (D39, D44, D117, D127): add owner-keyed `hiddenRooms`/`closedConversations` sets to `App` (save port like starred), filter them in `Sidebar.sections`, add More items in `View/RoomHeader.moreMenu`, and auto-reveal/reopen in the PRIVMSG fold.
-- [High] Leave room from the header with a confirm step (D118): add `RoomLeaveAsk`/`RoomLeaveConfirm` Msgs reusing the `/part` fold, a `View.Sheet` confirm, and a More item.
-- [High] App badge + attention title (D174, D175): add an `attentionSet` port (`setAppBadge`/`clearAppBadge` in `ports.js`) fed from mention totals, and prefix `View.documentTitle` with "(n)".
-- [High] Service worker registration (D168, D169): register `/sw.js` in `ports.js` `wirePolish` (`updateViaCache:'none'`). Today offline shell, update detection and Web Push all depend on a worker the Elm build never installs.
-- [High] Home catch-up depth (D141–D143, D152): add `Home.resumePoints`, an invites tier from INVITE notifications, recently visited rooms (persisted `joinHistory`) and offline vault-backed catch-up in `View/Home.elm`.
-- [Closed — v3/gap-organize] Room folders (D36, D37): folder state in `App`, grouping plus collapse in `Sidebar.sections`/`View/Rail.elm`, management in the Account panel.
-- [Closed — v3/gap-organize] DM mute UI (D126): dispatch the existing `MuteDm`/`UnmuteDm` from a DM More item in `View/RoomHeader.moreMenu`.
-- [Med] Mark as read / Export transcript / Room ledger in More (D115, D119, D123): buttons that reuse the `/read` and `/export` folds (`App.elm:13004,14597`) plus a ledger link.
-- [Closed on Home — v3/gap-organize] Since-you-left digest card (D155): port `sinceDigest` into `View/Thread.elm`, shown above the unread divider.
-- [Med] Web Push arming in the Notifications sheet and first-run Turn on (D87, D177): route `Polish.NotifyEnable` and the sheet toggle through `WebPushToggle`.
-- [Closed — v3/gap-organize] Calm presets and quiet hours (D29, D52): `Notify` tiers plus a radiogroup in `View/Notify.elm`.
-- [Med] Join a room by name in the rail (D45): an input in `View/Rail.elm` dispatching the `/join` fold.
-- [Med] Context rail / desktop People toggle (D12, D14): optional column-4 rail and a roster hide toggle with `aria-expanded`.
-- [Med] Formation hang label is inert (D163): feed `CreateHangLabelInput` from `ports.js` (next-Saturday label), or drop the toggle.
-- [Med] Activity / server-log view (D18, D33): render `serviceLog` as a read-only "Activity" rail entry and view.
-- [Low] Route announcer and app skip link (D179, D180): live region in `View.elm` keyed on route, and a skip link in `appFrame`.
-- [Low] Roving keys in the sidebar and More menu (D46, D129): `ports.js` roving handler on `[data-sidebar-item]` / menu items.
-- [Low] Inbox extras (D73, D75, D80, D82, D83): summary live region, ledger links, follow-topic jump through `ChannelTopicSelect`, dismiss focus hand-off.
-- [Low] Header copy-name button, DND indicator, AI-policy badge (D93, D124, D109): wire `AiPolicy.parseAiPolicyProp` into the room props, show it in More, and add a `ClipboardCopy` on the h2.
-- [Low] Formation friend chips and native share (D165, D166); browse-sheet Start button (D161); outbox Open/Remove on Home (D146, D147); PWA readiness panel (D171); animated background (D24); YouHubNav (D62); collection counts and network label (D28, D42).
+- **[Closed — v3/gap-organize]** [High] Hide room / Close DM conversation (D39, D44, D117): owner-keyed hidden / closed sets, More items, auto-reveal on a mention or your own line, reopen on news (`Organizer.elm:621,656`). Close has no confirm step (see D127 below).
+- **[Closed — v3/gap-shell]** [High] Leave room from the header with a confirm step (D118): `View/GapShell.elm:435`, `App.elm:11270-11310`.
+- **[Closed — v3/gap-account]** [High] App badge + attention title (D174, D175): `gapAppBadge` port fed from mentions + unread DMs, "(n)" prefix in `View.documentTitle`.
+- **[Closed — v3/gap-pwa-safety]** [High] Service worker registration (D168): `ports.js:11478`. The offline shell, update detection and Web Push now have a worker to talk to. D169 (automatic `controllerchange` reload) stays open as Low below.
+- [Med] Home catch-up depth (D141–D143, D148, D149, D152; was High): still no Invites tier from INVITE notifications, Continue reading / resume points, recently visited rooms (`joinHistory`), offline vault-backed catch-up, "On this device" cold-memory cards or the formation strip in `View/Home.elm`. Needs `Home.resumePoints`, a persisted visit history and a vault read on the offline path.
+- **[Closed — v3/gap-organize]** Room folders (D36, D37): `View/Organize.elm` `folderSections`, management in Preferences.
+- **[Closed — v3/gap-organize]** DM mute UI (D126): DM More item and row menu entry.
+- **[Closed — v3/gap-shell]** [Med] Mark as read / Export transcript / Room ledger in More (D115, D119, D123): `View/GapShell.elm:373`.
+- **[Closed on Home — v3/gap-organize]** Since-you-left digest (D155): lives on Home by design; the in-room card above the unread divider is still absent (Low, D155).
+- **[Closed — v3/gap-pwa-safety]** [Med] Web Push arming in the Notifications sheet and first-run Turn on (D87, D88, D177): `View/Notify.elm:140`, `App.elm:52003`.
+- **[Closed — v3/gap-organize]** Calm presets and quiet hours (D29, D52).
+- **[Closed — v3/gap-shell]** [Med] Join a room by name in the rail (D45): `View/GapShell.elm:270`.
+- [Med] Context rail / desktop People column (D12, D14, D105): no optional fourth-column rail (ledger, insights, tools, Operator in one place) and no roster hide toggle with `aria-expanded` at ≥1100px; the toggle that exists is narrow-only and a `popovertarget` button.
+- **[Closed — v3/gap-shell]** [Med] Formation hang label is inert (D163): the boot event feeds the next-Saturday label. The label is still not editable.
+- **[Closed — v3/gap-shell]** [Med] Activity / server-log view (D18, D33): `View/GapShell.elm:57`. The advanced-mode capability matrix Solid shows beside it (`CapabilityMatrixSection`) is not ported (Low).
+- [Med] Route announcer and app skip link (D179, D180; was Low): no polite live region on route / section changes and no "Skip to content" on the app document (only `View/PublicFrame.elm:184`). A bypass-blocks / orientation gap for keyboard and screen-reader users every session; fix with a live region in `View.elm` keyed on `navSection` / route and a skip link in `appFrame`.
+- [Low] Roving keys (D46): arrows now rove the rail and the More menu (v3/gap-shell); rail rows still are all Tab stops (Solid has a single tab stop), More has no Left / Right.
+- [Low] Inbox extras (D73, D75, D80, D82, D83): summary live region, ledger links, follow-topic jump through `ChannelTopicSelect`, disabled non-jumpable rows (D81), dismiss focus hand-off.
+- [Low] Header copy-name button, "Do not disturb is on" More row, AI-policy badge (D93, D124, D109): wire `AiPolicy.parseAiPolicyProp` (still imported by no view) into the room props and More, add a `ClipboardCopy` on the h2. The You hub already shows the DND state.
+- [Low] Join call in More when `voiceEntry` is off (D103): the idle header join just hides.
+- [Low] Notifications sheet explanation (D86, D90, D91): the three-layer lede, host-honesty notice, "What can ping" kinds list and the "This room" policy copy are absent; the controls themselves are all there.
+- [Low] Close conversation has no confirm sheet (D127); it is reversible (toast, Closed footer, reopens on news).
+- [Low] Update strip ignores composer drafts (D21) and a takeover does not reload an idle tab by itself (D169); drafts now persist (v3/gap-convo), so the loss is small.
+- [Low] Home details: relative last-activity time on catch-up rows and a live / "saved on device" source label (D137, D139), per-row admitted / uncertain outbox states (D145), guest-chip suppression during the first-hour handoff (D71), first-hour composer autofocus (D158), Start-a-room focusing the rail join field (D48), "Mark all caught up" focus hand-off (D138), the in-room digest card (D155), the "Say hi" coach limited to empty rooms (D156).
+- [Low] Formation friend chips and native share (D165, D166); browse-sheet Start button (D161); PWA readiness / refresh-shell / persist-storage panel (D171); YouHubNav lateral rail (D62); collection counts, rail Invite friends and network label (D28, D41, D42); server-rail network total (D7); room-current unread detail for screen readers (D19).
+- **[Closed — v3/gap-organize]** Outbox Open / Remove on Home (D146, D147): `View/Organize.elm:1364`.
+- **[Closed — v3/gap-appearance]** Animated theme background (D24): `App.elm:40300`, `ports.js:7489`, `media/backdrop.ts`.
+- **[Closed — v3/gap-watch]** Watch Together surface (D26): `View/WatchTogether.elm`; needs an operator to start (server 913 for everyone else).
 
 ### E — Conversation — transcript, message rendering, menus, composer, search, media, threads, topics
 
 Solid walked: `src/shell/MessageView.tsx` (whole file), `messageWindow.ts`, `threadIndex.ts`, `message/{MessageText,MessageMenu,BlockKitModal,BlockKitActionConfirmation}.tsx`, `message/rowGesture.ts`, `Composer.tsx` (whole file), `TypingIndicator`, `BoostBar`, `PinnedMessages`, `JumpToDateSheet`, `TimeScrubber`, `ScheduledMessagesSheet`, `search/MessageSearch.tsx` + `useMessageSearch.ts`, `RoomMediaIndex`, `ProvenanceBadge`, `AiPolicyBadge`, and the listed `src/lib/*` modules (import-graph checked for dead code).
 Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/MessageText.elm`, `MessageText.elm`, `ComposerAssist.elm`, `Emoji.elm`, `Upload.elm`, `View/Polish.elm`, `View/Search.elm`, `View/Pins.elm`, `View/Media.elm`, `View/Scheduled.elm`, `View/Boost.elm`, `TranscriptRows.elm`, `TopicRead.elm`, `AiPolicy.elm`, the relevant `App.elm` folds and the `ports.js` scroll/upload/translate bridges. Elm paths drop the `elm/src/` prefix. Slash verbs, palette entries and global chords are left to other mappers.
+Refreshed against HEAD `609cb240` (v3/gap-convo, rx-convo, gap-import, gap-organize, gap-appearance, gap-commands and gap-usermodes landed since the map): also read `GapConvo.elm`, `BlockKit.elm`, `View/BlockKit.elm`, the gap-convo bridge in `ports.js` (`installGapFocus`, `wireGapComposer`, `createGapUploads`, `createGapDrafts`, the `landOn` scroller arm), `View/Prefs.elm`, `View/Attention.elm`, `tests/GapConvoTest.elm` and `gapConvo.smoke.mjs`. Cites with `file:line` were re-opened at HEAD; "not re-run" marks real-browser scenarios (`tools/screens-gap-convo.mjs`) that were read but not executed.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| E1 | Chronological render, with a stable re-sort when a replay arrives out of order | `src/shell/MessageView.tsx:283` (auto) | FULL | `View/Thread.elm:114` | Elm buffer is newest-first and gets reversed at render time |
-| E2 | Consecutive-author grouping (same nick, under 5 min, non-system) | `MessageView.tsx:253` (auto) | FULL | `TranscriptRows.elm:108` | Compact density never groups (Elm-only layout) |
-| E3 | Group head: avatar, nick tint, author name | `MessageView.tsx:2267` (UI) | FULL | `View/Thread.elm:501-541` | |
-| E4 | Row clock in the local zone with the 12h/24h pref | `MessageView.tsx:168` (pref) | FULL | `App.elm:1934`, `View/Thread.elm:498` | 12h is a fixed English `h:MM AM/PM` |
-| E5 | Row accessible label (queued/edited/mention flags, never ciphertext) | `MessageView.tsx:190` (auto) | FULL | `App.elm:8389`, `View/Thread.elm:565` | |
-| E6 | Day dividers: Today / Yesterday / long date | `MessageView.tsx:219,2152` (auto) | FULL | `View/Thread.elm:249,1483` | Fixed English, not locale-rendered |
-| E7 | "New messages" divider above the captured unread boundary | `MessageView.tsx:2160` (auto) | FULL | `View/Thread.elm:259`, `App.elm:30663` | |
-| E8 | System event rows (join/part/quit/kick/mode/topic/nick), hidden by the hide-events pref | `MessageView.tsx:2173` (auto/pref) | FULL | `View/Thread.elm:299-309` | |
-| E9 | Deleted/redacted placeholder "[message deleted]" | `MessageView.tsx:624` (auto) | FULL | `App.elm:291` | |
-| E10 | Locked E2EE placeholder (ciphertext never painted) | `MessageView.tsx:612,626` (auto) | FULL | `App.elm:291-322`, `View/Thread.elm:556` | |
-| E11 | Inbound `/me` action rows `* nick text` | `MessageView.tsx:627` (DEAD for inbound) | N/A | `src/lib/store/store.ts:12684` `break`; `App.elm:34737` | Both clients swallow inbound CTCP ACTION |
-| E12 | Webhook JSON NOTICE flattened to IRC-safe text | `MessageView.tsx:630` (auto) | FULL | `App.elm:34789` | Done at fold time instead of render time |
-| E13 | Queued/pending marker | `MessageView.tsx:2285` (auto) | FULL | `View/Thread.elm:576-583` | Elm adds "delivery uncertain" |
-| E14 | Mention/keyword row highlight | `MessageView.tsx:2238` (auto) | FULL | `View/Thread.elm:560` | |
-| E15 | Edited marker | `MessageView.tsx:2288` (auto) | FULL | `View/Thread.elm:584` | |
-| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | FULL | `View/Thread.elm` `editedMarker` / `revisionItem` | v3/rx-convo: "· edited" on a row we edited on this device is a native `details` disclosure (keyboard operable, announced expanded / collapsed) listing the earlier bodies oldest first with the time each was replaced, "kept on this device only"; without local history it stays a quiet label with the revision-count title |
-| E17 | Reply-context line (sanitized, clipped to 80 chars) | `MessageView.tsx:2292` (auto) | FULL | `View/Thread.elm:2279` | |
-| E18 | Thread indicator opens the thread panel | `MessageView.tsx:576,2306`; `threadIndex.ts` (UI) | FULL | `View/Thread.elm:699`, `App.elm:42666` | |
-| E19 | Thread panel: parent, replies log, missing-parent and empty states | `MessageView.tsx:735-807` (UI) | FULL | `View/Thread.elm:722-860` | Elm adds a reply count |
-| E20 | Reply from the thread panel (closes the sheet, arms the reply) | `MessageView.tsx:1567` (UI) | FULL | `View/Thread.elm:870`, `App.elm:42674` | |
-| E21 | Tap-to-reveal action bar; Enter/Space on a focused row | `MessageView.tsx:1637,1648` (UI) | PARTIAL | `View/Thread.elm:569` | Rows are not tab stops and Enter/Space do not reveal; `:focus-within` covers touch |
-| E22 | Right-click on a row opens the ⋯ menu | `MessageView.tsx:2209` (UI) | PARTIAL | `View/Thread.elm:454` | Only a touch `contextmenu` opens it; mouse right-click keeps the native menu |
+| E1 | Chronological render, with a stable re-sort when a replay arrives out of order | `src/shell/MessageView.tsx:283` (auto) | FULL | `View/Thread.elm:134` | Elm buffer is newest-first and gets reversed at render time |
+| E2 | Consecutive-author grouping (same nick, under 5 min, non-system) | `MessageView.tsx:253` (auto) | FULL | `TranscriptRows.elm:108` `isContinuation` | Compact density never groups (Elm-only layout); an action (`/me`) row never joins a group (v3/gap-commands) |
+| E3 | Group head: avatar, nick tint, author name | `MessageView.tsx:2267` (UI) | FULL | `View/Thread.elm:536-576` | |
+| E4 | Row clock in the local zone with the 12h/24h pref | `MessageView.tsx:168` (pref) | FULL | `App.elm:2107`, `View/Thread.elm:533` | 12h is a fixed English `h:MM AM/PM` |
+| E5 | Row accessible label (queued/edited/mention flags, never ciphertext) | `MessageView.tsx:190` (auto) | PARTIAL | `App.elm:8775` `messageAccessibleLabel`, `View/Thread.elm:601`; `AppTest.elm:14807` | Flags and body are there and a sealed body never reads out, but the label drops Solid's "at <time>" (the row clock is `aria-hidden`, so a screen reader never hears when a line was sent). A BlockKit row's label carries the raw `[onyx:block] {…` head (Solid's does too; other Elm surfaces use `BlockKit.summary`) |
+| E6 | Day dividers: Today / Yesterday / long date | `MessageView.tsx:219,2152` (auto) | FULL | `View/Thread.elm:270,1548` | Fixed English, not locale-rendered |
+| E7 | "New messages" divider above the captured unread boundary | `MessageView.tsx:2160` (auto) | FULL | `View/Thread.elm:280`, `App.elm:34369` | |
+| E8 | System event rows (join/part/quit/kick/mode/topic/nick), hidden by the hide-events pref | `MessageView.tsx:2173` (auto/pref) | FULL | `View/Thread.elm:328-338` | |
+| E9 | Deleted/redacted placeholder "[message deleted]" | `MessageView.tsx:624` (auto) | FULL | `App.elm:329` | |
+| E10 | Locked E2EE placeholder (ciphertext never painted) | `MessageView.tsx:612,626` (auto) | FULL | `App.elm:329-374`, `View/Thread.elm:592` | |
+| E11 | Inbound `/me` action rows `* nick text` | `MessageView.tsx:627` (DEAD for inbound) | N/A | `src/lib/store/store.ts:12683-12704` (CTCP `break`); `App.elm:7900` `isCtcpQueryBody`, `App.elm:12844` `messageAction`, `View/Thread.elm:526` | Solid swallowed inbound CTCP ACTION, so its render branch was dead. Elm now exempts ACTION from the swallow and files a `* nick text` row (live, DM, replay, opened E2EE), Elm-only (v3/gap-commands, `GapCommandsTest.elm:590`) |
+| E12 | Webhook JSON NOTICE flattened to IRC-safe text | `MessageView.tsx:630` (auto) | FULL | `App.elm:38558` `Webhook.formatNoticeBody` | Done at fold time instead of render time |
+| E13 | Queued/pending marker | `MessageView.tsx:2285` (auto) | FULL | `View/Thread.elm:620-627` | Elm adds "delivery uncertain" |
+| E14 | Mention/keyword row highlight | `MessageView.tsx:2238` (auto) | FULL | `View/Thread.elm:596` | |
+| E15 | Edited marker | `MessageView.tsx:2288` (auto) | FULL | `View/Thread.elm:628` | Server-native `+draft/edit` lines set it too (v3/gap-convo, `App.elm:55364`) |
+| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | FULL | `View/Thread.elm:2253` `editedMarker`, `:2297` `revisionItem`, `:315` (eager row when a trail exists) | v3/rx-convo: "· edited" on a row we edited on this device is a native `details` disclosure (keyboard operable, announced expanded / collapsed) listing the earlier bodies oldest first with the time each was replaced, "kept on this device only"; without local history it stays a quiet label with the revision-count title. Bodies replaced by a server-native edit we receive file into the same trail (`App.elm:55350`, v3/gap-convo) |
+| E17 | Reply-context line (sanitized, clipped to 80 chars) | `MessageView.tsx:2292` (auto) | FULL | `View/Thread.elm:2445` | |
+| E18 | Thread indicator opens the thread panel | `MessageView.tsx:576,2306`; `threadIndex.ts` (UI) | FULL | `View/Thread.elm:743`, `App.elm:47022` | |
+| E19 | Thread panel: parent, replies log, missing-parent and empty states | `MessageView.tsx:735-807` (UI) | FULL | `View/Thread.elm:766-909` | Elm adds a reply count |
+| E20 | Reply from the thread panel (closes the sheet, arms the reply) | `MessageView.tsx:1567` (UI) | FULL | `View/Thread.elm:919`, `App.elm:47030` | Arming does not move focus to the composer (`ThreadReplyParent` is not in `gapSettleComposerFocus`; see E114) |
+| E21 | Tap-to-reveal action bar; Enter/Space on a focused row | `MessageView.tsx:1637,1648` (UI) | PARTIAL | `View/Thread.elm:605` | Rows are not tab stops and Enter/Space do not reveal; `:focus-within` covers touch |
+| E22 | Right-click on a row opens the ⋯ menu | `MessageView.tsx:2209` (UI) | PARTIAL | `View/Thread.elm:484` | Only a touch `contextmenu` opens it; mouse right-click keeps the native menu |
 | E23 | Swipe-to-reply (touch, 72px arm, spring back) | `message/rowGesture.ts:14`; `MessageView.tsx:2213` (UI) | MISSING | — | No row gesture handling |
-| E24 | Long-press (450ms) opens the menu | `rowGesture.ts:14` (UI) | PARTIAL | `View/Thread.elm:454` | Depends on the browser firing `contextmenu` on touch; iOS Safari does not |
-| E25 | Hover/focus quick-action toolbar plus the ⋯ trigger | `message/MessageMenu.tsx:652-745` (UI) | FULL | `View/Thread.elm:390-446,630` | Elm bar is React/Reply/Reply-in-thread; Copy moved into the menu |
-| E26 | Device-local collapse filter (hide one nick's lines) | `MessageView.tsx:945` (auto) | FULL | `View/Thread.elm:115,1352` | |
-| E27 | "Hiding messages from … Show all" banner | `MessageView.tsx:1955-1982` (UI) | MISSING | `App.elm:38856` | Hidden rows take their menus with them, so a hidden sender can't be restored this session |
-| E28 | Empty-feed states (room "Say hi"/"Still waters", DM) | `MessageView.tsx:1983-2024` (UI) | FULL | `View/Home.elm:408`, `View/Thread.elm:82-101` | |
-| E29 | Skeleton while history loads | `MessageView.tsx:2027` (auto) | MISSING | — | |
-| E30 | "Very beginning of the conversation" intro | `MessageView.tsx:2050-2073` (auto) | FULL | `View/Thread.elm:149-155` | Scheduled-event line sits in the header, not the intro |
-| E31 | Offline/connecting banner | `MessageView.tsx:1808` (auto) | FULL | `View/Topbar.elm:249` | One global banner with different copy |
+| E24 | Long-press (450ms) opens the menu | `rowGesture.ts:14` (UI) | PARTIAL | `View/Thread.elm:484` | Depends on the browser firing `contextmenu` on touch; iOS Safari does not |
+| E25 | Hover/focus quick-action toolbar plus the ⋯ trigger | `message/MessageMenu.tsx:652-745` (UI) | FULL | `View/Thread.elm:420-476,674` | Elm bar is React/Reply/Reply-in-thread; Copy moved into the menu |
+| E26 | Device-local collapse filter (hide one nick's lines) | `MessageView.tsx:945` (auto) | FULL | `View/Thread.elm:135,1417` | |
+| E27 | "Hiding messages from … Show all" banner | `MessageView.tsx:1955-1982` (UI) | FULL | `View/Thread.elm:3009` `gapCollapsedBanner`, `App.elm:56361` (`CollapsedShowAll`), `:56388` `gapCollapsedIn` | v3/gap-convo: "Hiding N messages from … in this feed · Show all" (status region, names the senders and counts their held rows) brings every hidden sender back with a toast; a landing on a hidden sender's row also shows them (`GapConvoTest.elm:517,620`) |
+| E28 | Empty-feed states (room "Say hi"/"Still waters", DM) | `MessageView.tsx:1983-2024` (UI) | FULL | `View/Home.elm:412`, `View/Thread.elm:102-126` | |
+| E29 | Skeleton while history loads | `MessageView.tsx:2027` (auto) | FULL | `View/Thread.elm:98,3068` `gapLoadingFrame`, `App.elm:56401` `gapHistoryLoadingEmpty` | v3/gap-convo: five message-shaped placeholder rows with "Loading messages" for screen readers, shown only while an empty conversation's history request is in flight (so "say hi" never flashes); the log keeps its DOM position (`GapConvoTest.elm:756`) |
+| E30 | "Very beginning of the conversation" intro | `MessageView.tsx:2050-2073` (auto) | FULL | `View/Thread.elm:170-176` | Scheduled-event line sits in the header, not the intro |
+| E31 | Offline/connecting banner | `MessageView.tsx:1808` (auto) | FULL | `View/Topbar.elm:267` | One global banner with different copy |
 | E32 | Screen-reader conversation brief ("Current conversation: …") | `MessageView.tsx:1823` (auto) | MISSING | — | |
-| E33 | `role=log` "Message history" live region | `MessageView.tsx:1897` (auto) | FULL | `View/Thread.elm:193-202` | |
-| E34 | aria-live muted while the window grows or the conversation switches | `MessageView.tsx:1219,1770` (auto) | MISSING | `View/Thread.elm:196` | Log is always `polite`, so prepends can be re-announced |
-| E35 | Stay pinned to the bottom as rows arrive | `MessageView.tsx:1473` (auto) | FULL | `ports.js:3322,3326-3329` | |
-| E36 | Keep the scroll anchor when older rows prepend | `MessageView.tsx:1307` (auto) | FULL | `ports.js:3330-3333` | |
-| E37 | Open a conversation on its unread divider | `MessageView.tsx:1500` (auto) | FULL | `ports.js:3368-3373` | |
-| E38 | Jump-to-latest pill with an "N new" count | `MessageView.tsx:2384-2404` (UI) | FULL | `View/Thread.elm:659`, `App.elm:39269` | |
-| E39 | Bounded render window plus "Show earlier" (grow, then page) | `MessageView.tsx:1319,2101`; `messageWindow.ts` (UI) | FULL | `View/Thread.elm:137`, `App.elm:39196`, `MessageWindow.elm` | |
-| E40 | "Back to latest" when a historical page hides newer rows | `MessageView.tsx:2393` (UI) | FULL | `View/Thread.elm:167` | |
+| E33 | `role=log` "Message history" live region | `MessageView.tsx:1897` (auto) | FULL | `View/Thread.elm:214-223` | |
+| E34 | aria-live muted while the window grows or the conversation switches | `MessageView.tsx:1219,1770` (auto) | MISSING | `View/Thread.elm:217` | Log is always `polite`, so prepends can be re-announced |
+| E35 | Stay pinned to the bottom as rows arrive | `MessageView.tsx:1473` (auto) | FULL | `ports.js:4220,4224-4227` | |
+| E36 | Keep the scroll anchor when older rows prepend | `MessageView.tsx:1307` (auto) | FULL | `ports.js:4228-4231` | |
+| E37 | Open a conversation on its unread divider | `MessageView.tsx:1500` (auto) | FULL | `ports.js:4273-4278` | |
+| E38 | Jump-to-latest pill with an "N new" count | `MessageView.tsx:2384-2404` (UI) | FULL | `View/Thread.elm:703`, `App.elm:43458` | |
+| E39 | Bounded render window plus "Show earlier" (grow, then page) | `MessageView.tsx:1319,2101`; `messageWindow.ts` (UI) | FULL | `View/Thread.elm:158`, `App.elm:43385`, `MessageWindow.elm` | |
+| E40 | "Back to latest" when a historical page hides newer rows | `MessageView.tsx:2393` (UI) | FULL | `View/Thread.elm:188` | |
 | E41 | Window pages to the active search match | `MessageView.tsx:1675` (auto) | FULL | `App.elm` `threadAnchorIndex` searchIdx | |
-| E42 | Landing on a target message (?at=, pins, media, vault, review): page, scroll, focus, 1.4s pulse | `MessageView.tsx:1528-1554` (auto) | CORE-ONLY | `App.elm:13638,528` | `historyLanding` is set but nothing reads it; anchor passes `landingIndex = Nothing` |
-| E43 | Scroll and pulse to the active visible search match | `search/MessageSearch.tsx:85,419` (UI) | PARTIAL | `View/Thread.elm:559` | Highlight class only; no row scroll in `ports.js` |
-| E44 | Page older history from the server | none (DEAD) | N/A | `App.elm:39196`, `View/Thread.elm:137` | Elm has the rewind fold, but its button only renders when hiddenBefore>0, so it is unreachable |
-| E45 | Reader-memory strip (device memory, reviewed span, context trail, other rooms, Start/New/Latest/Home/Find text) | `MessageView.tsx:426-561,2081` (pref readerMode) | MISSING | `Prefs.elm:605` | The pref is stored but has no UI |
-| E46 | In-room "Since you left" digest with "Review unread" (records review, clears divider) | `MessageView.tsx:1101,1394,2074` (UI) | PARTIAL | `View/Attention.elm` (Home digest, each row jumps to its first unread line) | v3/gap-organize: moved to Home by design (V3_ROADMAP 1.4a); the divider review-clear is still gone |
-| E47 | Typing indicator line | `TypingIndicator.tsx:39,105` (auto) | FULL | `App.elm:8430`, `View/Thread.elm:161` | 3 typers read "3 people…" instead of three names |
-| E48 | Transcript density | `preferences.ts:49` (pref, CSS only) | FULL | `View/Thread.elm:190,543`, `View/Appearance.elm:167` | Elm Compact is an IRC-style line layout |
-| E49 | Topic filter chips (All plus per-topic, with unread badge) | `MessageView.tsx:1838` (pref topicTools) | FULL | `View/Thread.elm:901-926,1250` | |
-| E50 | Topic-chip unread counts from the per-topic read ledger | `MessageView.tsx:1072-1099` (auto) | PARTIAL | `View/Thread.elm:1297`, `App.elm:35464` | Chips count from the divider/first-unread only; the ledger feeds only the sidebar cursor |
-| E51 | Start a new topic (validated, max 50 chars) | `MessageView.tsx:1617,1845` (UI) | FULL | `View/Thread.elm:983`, `App.elm:42710` | Folded into a "Topics" disclosure |
-| E52 | Forum view toggle | `MessageView.tsx:1863` (UI) | FULL | `View/Thread.elm:1008`, `App.elm:42731` | |
-| E53 | Pin forum (persisted), forum auto-opens when pinned | `MessageView.tsx:990,1584,1872` (UI/auto) | FULL | `View/Thread.elm:1015`, `App.elm:42777,35303` | |
-| E54 | Forum cards (count, unread, latest, preview); open focuses the chip | `MessageView.tsx:1602,1905-1953` (UI) | FULL | `View/Thread.elm:1048-1162`, `App.elm:42750` | |
-| E55 | Follow room/topic toggle and per-card Follow | `MessageView.tsx:1882,1939` (UI) | FULL | `View/Thread.elm:1031,1138`, `App.elm:42804` | |
-| E56 | Topic-tools on/off preference control | `PreferencesPanel` (UI) | CORE-ONLY | `Prefs.elm:617` | Elm reads the pref but nothing sets it |
-| E57 | Boost chips: toggle own, aria-pressed, reactor title (4 + N) | `BoostBar.tsx:9,50-67` (UI) | FULL | `View/Thread.elm:2219-2249`, `App.elm:8360` | |
-| E58 | Reaction density rendering (full / compact +N / counts-only / hidden) | `BoostBar.tsx:33-82`; `reactions/density.ts:22` (pref) | FULL | `View/Thread.elm:2165-2200`, `App.elm:8312` | |
-| E59 | Reaction-density preference control | `PreferencesPanel.tsx:3628` (UI) | CORE-ONLY | `Prefs.elm:619` | No Elm view sets it |
-| E60 | "Add a boost" opener on the boost bar | `BoostBar.tsx:84` (DEAD: `MessageView.tsx:2303` never passes `onAdd`) | N/A | `View/Thread.elm:423,2203` | Reachable only in Elm |
-| E61 | Reaction picker (search, grid, "no matches", Escape) | `MessageMenu.tsx:655-707` (UI) | FULL | `View/Thread.elm:2027-2101`, `App.elm:38602-38640` | Search field is not auto-focused |
-| E62 | Menu capability gating (live, own, edit/redact caps, channel, encrypted) | `MessageMenu.tsx:109` (auto) | FULL | `App.elm:7926`, `View/Thread.elm:1542` | |
-| E63 | Reply | `MessageMenu.tsx:347,710` (UI) | FULL | `View/Thread.elm:429,1622`, `App.elm:38506` | Composer focus: see E114 |
-| E64 | Copy text, with toast and sr status | `MessageMenu.tsx:449,472,721` (UI) | FULL | `View/Thread.elm:1640`, `App.elm:38728,39901` | |
-| E65 | Quote in composer (prefix, toast, focus) | `MessageMenu.tsx:799` (UI) | PARTIAL | `View/Thread.elm:1653`, `App.elm:38459` | Sends `m.body`, so decrypted E2EE rows quote the ciphertext envelope; no composer focus |
-| E66 | Copy moment link | `MessageMenu.tsx:491,826` (UI) | FULL | `View/Thread.elm:1658`, `App.elm:38936` | |
-| E67 | Room ledger link | `MessageMenu.tsx:838` (UI) | FULL | `View/Thread.elm:1667` | |
-| E68 | Search this text (first 8 words, URLs stripped) | `MessageMenu.tsx:151,512,850` (UI) | PARTIAL | `View/Thread.elm:1681`, `App.elm:38746` | Seeds the whole message text, not the suggested query |
-| E69 | Translate on this device (pending/done/busy/failed, 4-concurrent cap) | `MessageMenu.tsx:378,862`; `intelligence/translateMessage.ts` (UI) | FULL | `View/Thread.elm:1695`, `App.elm:38773`, `ports.js:4016` | |
-| E70 | Translation panel: Retry / Copy translation / Dismiss / copy status | `MessageMenu.tsx:1005-1073` (UI) | FULL | `View/Thread.elm:1855-1971` | |
-| E71 | Device-provenance badge on the translation | `MessageMenu.tsx:1012` (UI) | MISSING | `View/Thread.elm:1884` | Header shows only the language label |
-| E72 | "On-device translation is unavailable" note | `MessageMenu.tsx:1000` (UI) | FULL | `View/Thread.elm:1866` | |
-| E73 | Translation target language and readiness probe | `intelligence/localLanguage.ts`; `YouSettings` (UI) | FULL | `View/Appearance.elm:372`, `App.elm:38751`, `ports.js:3985-4012` | |
-| E74 | Start topic from here (label suggestion, warning toast, arms reply) | `MessageMenu.tsx:134,353,875` (UI) | FULL | `View/Thread.elm:1722`, `App.elm:38895` | |
-| E75 | Edit own message (edit cap, plain msg, not encrypted) | `MessageMenu.tsx:372,887` (UI) | FULL | `View/Thread.elm:1731`, `App.elm:38521` | |
-| E76 | Pin/Unpin (ops, channels) | `MessageMenu.tsx:560,899` (UI) | FULL | `View/Thread.elm:1740`, `App.elm:38844` | |
-| E77 | Ignore/Unignore sender, with toast | `MessageMenu.tsx:911` (UI) | FULL | `View/Thread.elm:1766`, `App.elm:31090` | Elm toast offers Undo |
-| E78 | Hide/Show sender in this feed, with toast | `MessageMenu.tsx:951` (UI) | FULL | `View/Thread.elm:1803`, `App.elm:38856` | One-way in practice (E27) |
-| E79 | Delete for everyone with inline confirm (Keep/Delete) | `MessageMenu.tsx:522-547,746,985` (UI) | FULL | `View/Thread.elm:1832,1990`, `App.elm:38718,42849` | Focus does not move to "Keep message" |
-| E80 | Menu keyboard: focus first item on open, Arrow/Home/End roving, focus restore | `MessageMenu.tsx:592-638,792` (UI) | MISSING | `View/Thread.elm:2106` | Escape only; the menu is not on the overlay-focus helper |
-| E81 | Menu and picker mutually exclusive; reopening resets the translation | `MessageMenu.tsx:576` (auto) | FULL | `App.elm:38567-38624` | |
-| E82 | Links: http(s) only, new tab, noopener | `message/MessageText.tsx:917` (auto) | FULL | `View/MessageText.elm:84`, `MessageText.elm:319` | |
+| E42 | Landing on a target message (?at=, pins, media, vault, review): page, scroll, focus, 1.4s pulse | `MessageView.tsx:1528-1554` (auto) | FULL | `App.elm:55984` `gapSettleLanding` (pins, media, vault, `?at=`, saved / first-unread), `:56114` `gapSettleSearchHit`, `:48694` `mergeVaultAround`, `:16485` `focusMessage`; `ports.js:4297` `landOn`; `css/gap-convo.css:246-259` | v3/gap-convo: pages the window to the row, shows a hidden sender, centres the row, pulses it (1.6 s `gap-landed`; static tint under reduced motion) and focuses it (not for search). A row not loaded yet waits for history (a pin that never arrives gets a "Pinned message not found" toast); a dropped link lands nowhere. `historyLanding` (`App.elm:597`) is now a write-only leftover. Tests `GapConvoTest.elm:506-598`; gc-land scenario not re-run |
+| E43 | Scroll and pulse to the active visible search match | `search/MessageSearch.tsx:85,419` (UI) | FULL | `App.elm:56114` `gapSettleSearchHit` -> `ports.js:4297` `landOn` (quiet); `View/Thread.elm:595` | v3/gap-convo: every Next / Previous / query change centres and pulses the current match without taking focus from the field (`GapConvoTest.elm:507`) |
+| E44 | Page older history from the server | none (DEAD) | N/A | `App.elm:43385`, `View/Thread.elm:158` | Elm has the rewind fold, but its button only renders when hiddenBefore>0, so it is unreachable |
+| E45 | Reader-memory strip (device memory, reviewed span, context trail, other rooms, Start/New/Latest/Home/Find text) | `MessageView.tsx:426-561,2081` (pref readerMode) | PARTIAL | `View/Attention.elm:438` `readerOn`, `:450` `readerPill`; `View/Prefs.elm:211`; `Prefs.elm:605` | v3/gap-organize: Reader mode is now a Display toggle that steps the rails and chrome aside and keeps an Exit bar. The Solid strip (device-memory summary, reviewed span, context trail, other rooms, Start / New / Latest / Home / Find text nav) is still absent |
+| E46 | In-room "Since you left" digest with "Review unread" (records review, clears divider) | `MessageView.tsx:1101,1394,2074` (UI) | PARTIAL | `View/Attention.elm:346` `digestHead`, `:360` `digestLine`; `View/Home.elm:198`; `App.elm:53036` `JumpFirstUnread` | v3/gap-organize: moved to Home by design (V3_ROADMAP 1.4a): a "Since you left" head plus a summary line under each unread row, and the row jumps to its first unread line. There is still no in-room digest and no Review-unread button that records the review and clears the divider |
+| E47 | Typing indicator line | `TypingIndicator.tsx:39,105` (auto) | FULL | `App.elm:8821`, `View/Thread.elm:182` | 3 typers read "3 people…" instead of three names |
+| E48 | Transcript density | `preferences.ts:49` (pref, CSS only) | FULL | `View/Thread.elm:211,578`, `View/Appearance.elm:169` | Elm Compact is an IRC-style line layout |
+| E49 | Topic filter chips (All plus per-topic, with unread badge) | `MessageView.tsx:1838` (pref topicTools) | FULL | `View/Thread.elm:966-991,1315` | |
+| E50 | Topic-chip unread counts from the per-topic read ledger | `MessageView.tsx:1072-1099` (auto) | PARTIAL | `View/Thread.elm:1362`, `App.elm:39235` | Chips count from the divider/first-unread only; the ledger feeds only the sidebar cursor |
+| E51 | Start a new topic (validated, max 50 chars) | `MessageView.tsx:1617,1845` (UI) | FULL | `View/Thread.elm:1048`, `App.elm:47066` | Folded into a "Topics" disclosure |
+| E52 | Forum view toggle | `MessageView.tsx:1863` (UI) | FULL | `View/Thread.elm:1073`, `App.elm:47087` | |
+| E53 | Pin forum (persisted), forum auto-opens when pinned | `MessageView.tsx:990,1584,1872` (UI/auto) | FULL | `View/Thread.elm:1080`, `App.elm:47133,39074` | |
+| E54 | Forum cards (count, unread, latest, preview); open focuses the chip | `MessageView.tsx:1602,1905-1953` (UI) | FULL | `View/Thread.elm:1113-1227`, `App.elm:47106` | |
+| E55 | Follow room/topic toggle and per-card Follow | `MessageView.tsx:1882,1939` (UI) | FULL | `View/Thread.elm:1096,1203`, `App.elm:47160` | |
+| E56 | Topic-tools on/off preference control | `PreferencesPanel` (UI) | FULL | `View/Prefs.elm:245` toggle, `Prefs.elm:761` `updatePreference` | v3/gap-appearance: Conversation preferences carry "Show topic, forum and follow tools" |
+| E57 | Boost chips: toggle own, aria-pressed, reactor title (4 + N) | `BoostBar.tsx:9,50-67` (UI) | FULL | `View/Thread.elm:2364-2394`, `App.elm:8746` | |
+| E58 | Reaction density rendering (full / compact +N / counts-only / hidden) | `BoostBar.tsx:33-82`; `reactions/density.ts:22` (pref) | FULL | `View/Thread.elm:2310-2345`, `App.elm:8698` | |
+| E59 | Reaction-density preference control | `PreferencesPanel.tsx:3628` (UI) | FULL | `View/Prefs.elm:229-236` segmented control, `Prefs.elm:764` | v3/gap-appearance: Conversation preferences carry Reactions Full / Fewer / Totals / Hidden |
+| E60 | "Add a boost" opener on the boost bar | `BoostBar.tsx:84` (DEAD: `MessageView.tsx:2303` never passes `onAdd`) | N/A | `View/Thread.elm:453,2348` | Reachable only in Elm |
+| E61 | Reaction picker (search, grid, "no matches", Escape) | `MessageMenu.tsx:655-707` (UI) | FULL | `View/Thread.elm:2094-2168`, `App.elm:42800-42838`; `ports.js:12640` `installGapFocus` | v3/gap-convo: opens on its search field, ArrowDown enters the grid, arrows move, ArrowUp returns to search, focus goes back to the opener on close (`gapConvo.smoke.mjs:521`) |
+| E62 | Menu capability gating (live, own, edit/redact caps, channel, encrypted) | `MessageMenu.tsx:109` (auto) | FULL | `App.elm:8302`, `View/Thread.elm:1607` | |
+| E63 | Reply | `MessageMenu.tsx:347,710` (UI) | FULL | `View/Thread.elm:459,1687`, `App.elm:42704` | Reply hands the keyboard to the composer (E114) |
+| E64 | Copy text, with toast and sr status | `MessageMenu.tsx:449,472,721` (UI) | FULL | `View/Thread.elm:1705`, `App.elm:42926,44091` | |
+| E65 | Quote in composer (prefix, toast, focus) | `MessageMenu.tsx:799` (UI) | FULL | `View/Thread.elm:1714-1720`, `App.elm:42657` `MessageQuote`, `:56137` `gapSettleComposerFocus` | v3/gap-convo: quotes `App.loadedActionText` (the opened plaintext of an E2EE row, never the envelope) and hands the keyboard to the composer (`GapConvoTest.elm:767`) |
+| E66 | Copy moment link | `MessageMenu.tsx:491,826` (UI) | FULL | `View/Thread.elm:1724`, `App.elm:43134` | |
+| E67 | Room ledger link | `MessageMenu.tsx:838` (UI) | FULL | `View/Thread.elm:1733` | |
+| E68 | Search this text (first 8 words, URLs stripped) | `MessageMenu.tsx:151,512,850` (UI) | PARTIAL | `View/Thread.elm:1747-1757`, `App.elm:42944` | Seeds the whole message text (bounded to the query limit), not the 8-word suggested query; `App.suggestSearchQuery` (`App.elm:8414`) is never called |
+| E69 | Translate on this device (pending/done/busy/failed, 4-concurrent cap) | `MessageMenu.tsx:378,862`; `intelligence/translateMessage.ts` (UI) | FULL | `View/Thread.elm:1761`, `App.elm:42971`, `ports.js:5379` | |
+| E70 | Translation panel: Retry / Copy translation / Dismiss / copy status | `MessageMenu.tsx:1005-1073` (UI) | FULL | `View/Thread.elm:1922-2038` | |
+| E71 | Device-provenance badge on the translation | `MessageMenu.tsx:1012` (UI) | MISSING | `View/Thread.elm:1951` | Header shows only the language label |
+| E72 | "On-device translation is unavailable" note | `MessageMenu.tsx:1000` (UI) | FULL | `View/Thread.elm:1933` | |
+| E73 | Translation target language and readiness probe | `intelligence/localLanguage.ts`; `YouSettings` (UI) | FULL | `View/Appearance.elm:374`, `App.elm:42949`, `ports.js:5348-5375` | |
+| E74 | Start topic from here (label suggestion, warning toast, arms reply) | `MessageMenu.tsx:134,353,875` (UI) | FULL | `View/Thread.elm:1788`, `App.elm:43093` | |
+| E75 | Edit own message (edit cap, plain msg, not encrypted) | `MessageMenu.tsx:372,887` (UI) | FULL | `View/Thread.elm:1797`, `App.elm:42719` | |
+| E76 | Pin/Unpin (ops, channels) | `MessageMenu.tsx:560,899` (UI) | FULL | `View/Thread.elm:1806`, `App.elm:43042` | |
+| E77 | Ignore/Unignore sender, with toast | `MessageMenu.tsx:911` (UI) | FULL | `View/Thread.elm:1833`, `App.elm:34816` | Elm toast offers Undo |
+| E78 | Hide/Show sender in this feed, with toast | `MessageMenu.tsx:951` (UI) | FULL | `View/Thread.elm:1870`, `App.elm:43054` | Reversible: the feed banner's Show all (E27), or a landing on one of their rows, brings the sender back |
+| E79 | Delete for everyone with inline confirm (Keep/Delete) | `MessageMenu.tsx:522-547,746,985` (UI) | FULL | `View/Thread.elm:1899,2057`, `App.elm:42916,47209` | Focus does not move to "Keep message" (the clicked item is replaced, so focus falls to the page) |
+| E80 | Menu keyboard: focus first item on open, Arrow/Home/End roving, focus restore | `MessageMenu.tsx:592-638,792` (UI) | FULL | `ports.js:12640` `installGapFocus` (menu layer, `onKey`), `View/Thread.elm:1647` `messageMenuPanel` | v3/gap-convo: opens on the first item; ArrowUp / ArrowDown and Home / End rove (ArrowUp from the first wraps to the last); focus returns to the opener, or to the row's ⋯ trigger when the row re-rendered (`gapConvo.smoke.mjs:468-520`; gc-menu-keys not re-run) |
+| E81 | Menu and picker mutually exclusive; reopening resets the translation | `MessageMenu.tsx:576` (auto) | FULL | `App.elm:42765-42822` | |
+| E82 | Links: http(s) only, new tab, noopener | `message/MessageText.tsx:917` (auto) | FULL | `View/MessageText.elm:138`, `MessageText.elm:319` | |
 | E83 | URL scan trims trailing punctuation | `format/parseMessage.ts:100` (auto) | FULL | `MessageText.elm:390,431` | |
-| E84 | @mention token, self-mention styled | `MessageText.tsx:939` (auto) | FULL | `View/MessageText.elm:90` | |
-| E85 | #channel button opens or joins the room | `MessageText.tsx:954`; `MessageView.tsx:2300` (UI) | FULL | `View/MessageText.elm:104`, `App.elm:39060` | |
+| E84 | @mention token, self-mention styled | `MessageText.tsx:939` (auto) | FULL | `View/MessageText.elm:145` | |
+| E85 | #channel button opens or joins the room | `MessageText.tsx:954`; `MessageView.tsx:2300` (UI) | FULL | `View/MessageText.elm:162`, `App.elm:43245` | |
 | E86 | mIRC bold/italic/underline/strike/mono/colour/hex/reverse/reset | `MessageText.tsx:776`; `format/ircFormat.ts` (auto) | FULL | `MessageText.elm:79-298` | |
-| E87 | Markdown bold/italic/strike/inline code | `MessageText.tsx:867-899` (auto) | FULL | `View/MessageText.elm:62-71`, `MessageText.elm:553-583` | |
-| E88 | Code block with language label | `MessageText.tsx:998` (auto) | FULL | `View/MessageText.elm:34` | |
-| E89 | Blockquote `> ` | `MessageText.tsx:1014` (auto) | FULL | `View/MessageText.elm:46` | |
-| E90 | Spoiler `\|\|…\|\|`, click or keyboard to reveal | `MessageText.tsx:728` (UI) | FULL | `View/MessageText.elm:74` | Native `details`; label stays "Reveal spoiler" once open |
-| E91 | Newlines rendered as line breaks | `MessageText.tsx:853` (auto) | FULL | `View/MessageText.elm:57` | |
-| E92 | `:shortcode:` emoji | `MessageText.tsx:970`; `format/emoji.ts:9` (274 codes) (auto) | PARTIAL | `View/MessageText.elm:114`, `Emoji.elm` | Only the 28 curated codes resolve; `:smile:` and most others stay literal |
+| E87 | Markdown bold/italic/strike/inline code | `MessageText.tsx:867-899` (auto) | FULL | `View/MessageText.elm:116-125`, `MessageText.elm:553-583` | |
+| E88 | Code block with language label | `MessageText.tsx:998` (auto) | FULL | `View/MessageText.elm:88` | |
+| E89 | Blockquote `> ` | `MessageText.tsx:1014` (auto) | FULL | `View/MessageText.elm:100` | |
+| E90 | Spoiler `\|\|…\|\|`, click or keyboard to reveal | `MessageText.tsx:728` (UI) | FULL | `View/MessageText.elm:128` | Native `details`; label stays "Reveal spoiler" once open |
+| E91 | Newlines rendered as line breaks | `MessageText.tsx:853` (auto) | FULL | `View/MessageText.elm:111` | |
+| E92 | `:shortcode:` emoji | `MessageText.tsx:970`; `format/emoji.ts:9` (274 codes) (auto) | PARTIAL | `View/MessageText.elm:172`, `Emoji.elm:22` | Only the 28 curated codes resolve; `:smile:` and most others stay literal |
 | E93 | 4000-char parse cap | `parseMessage.ts:86` (auto) | FULL | `MessageText.elm:34` | |
-| E94 | Attachment receipts: inline image/video or file chip with size | `MessageText.tsx:205-254` (auto) | FULL | `View/Thread.elm:2677-2731` | |
-| E95 | Inline media unfurl for direct image/video/audio links (pref, https, blocklist) | `MessageText.tsx:256,1194` (pref) | FULL | `View/Thread.elm:2308-2358` | |
-| E96 | Consent click before loading cross-origin media | `MessageText.tsx:292` (UI) | FULL | `View/Thread.elm:2431` | Consent keyed per row |
-| E97 | Media error falls back to an "open attachment" link | `MessageText.tsx:307` (auto) | FULL | `View/Thread.elm:2453` | |
-| E98 | Image lightbox (focus trap, Escape, Save, Close) | `MessageText.tsx:145` (UI) | FULL | `View/Thread.elm:2484-2528`, `App.elm:38456` | |
-| E99 | Open Graph link-preview card for the first link | `MessageText.tsx:1063,1176`; `preview/linkPreview.ts` (pref) | PARTIAL | `View/Thread.elm:2535-2658`, `App.elm:35935,36944` | Fetched at fold time; rows restored from the vault never fetch a card |
-| E100 | Preview thumbnail: consent click, hide on error | `MessageText.tsx:1131-1158` (UI) | PARTIAL | `View/Thread.elm:2648` | Consent works; a broken thumbnail is not hidden |
+| E94 | Attachment receipts: inline image/video or file chip with size | `MessageText.tsx:205-254` (auto) | FULL | `View/Thread.elm:2946-3000` | |
+| E95 | Inline media unfurl for direct image/video/audio links (pref, https, blocklist) | `MessageText.tsx:256,1194` (pref) | FULL | `View/Thread.elm:2474-2524` | |
+| E96 | Consent click before loading cross-origin media | `MessageText.tsx:292` (UI) | FULL | `View/Thread.elm:2597` | Consent keyed per row |
+| E97 | Media error falls back to an "open attachment" link | `MessageText.tsx:307` (auto) | FULL | `View/Thread.elm:2619` | |
+| E98 | Image lightbox (focus trap, Escape, Save, Close) | `MessageText.tsx:145` (UI) | FULL | `View/Thread.elm:2658-2752`, `App.elm:42597` (open), `:42654` (Save) | |
+| E99 | Open Graph link-preview card for the first link | `MessageText.tsx:1063,1176`; `preview/linkPreview.ts` (pref) | PARTIAL | `View/Thread.elm:2804-2927`, `App.elm:39706,41075` | Fetched at fold time; rows restored from the vault never fetch a card |
+| E100 | Preview thumbnail: consent click, hide on error | `MessageText.tsx:1131-1158` (UI) | PARTIAL | `View/Thread.elm:2917` | Consent works; a broken thumbnail is not hidden |
 | E101 | BlockKit-lite message block (title/text/fields/selects/buttons, safety hint) | `MessageText.tsx:535`; `integrations/blockKitLite.ts:64` (auto) | FULL | `View/BlockKit.elm` (cards), `BlockKit.elm` (strict decoder), `View/Thread.elm` `messageBody` | Strict decoder: payload ≤ 4 KiB, field/option/button caps, no truncation, unsafe/invisible characters refused; invalid blocks stay plain text (v3/gap-import) |
 | E102 | BlockKit URL buttons and copy-value buttons (Copied/failed) | `MessageText.tsx:404-503` (UI) | FULL | `View/BlockKit.elm` `buttonView` | http(s)-only URL buttons show their destination host and open `noopener noreferrer`; copy buttons report Copied / Copy failed (v3/gap-import) |
 | E103 | BlockKit actions: origin-scoped review dialog, then send | `MessageText.tsx:619-673`; `BlockKitActionConfirmation.tsx:32` (UI) | FULL | `BlockKit.elm` `Stage`/`ConfirmSend`, `View/BlockKit.elm` `reviewDialog`, `App.elm` `blockKitSend` | Origin-scoped (target must be the conversation the block is in; others render disabled); review shows exact destination + plaintext; re-validated at confirm; one message out as the user (v3/gap-import) |
 | E104 | BlockKit modal block ("Inspect structured data") | `message/BlockKitModal.tsx:186` (UI) | FULL | `View/BlockKit.elm` `inspectDialog` | "Inspect structured data" dialog lists every field, option and destination, with the exact text each control would send (v3/gap-import) |
-| E105 | Extension client actions (open-url/copy-text manifest, audit) | `extensions/clientActions.ts`; `PreferencesPanel.tsx:2522` (UI) | MISSING | — | Preferences/palette surface; listed for completeness |
-| E106 | Textarea: Enter sends, Shift+Enter newline, auto-grow | `Composer.tsx:697,902,1742` (UI) | FULL | `View/Composer.elm:98,628` | |
-| E107 | Destination and offline state in placeholder and accessible name | `Composer.tsx:368-383` (UI) | PARTIAL | `View/Composer.elm:100-119` | aria-label is just "Message"; DMs don't get the "@" prefix |
-| E108 | Compose brief (destination plus state line) | `Composer.tsx:388,1371` (UI) | MISSING | — | |
-| E109 | Per-room draft swap on conversation switch | `Composer.tsx:601-635` (auto) | FULL | `App.elm:7758` | |
-| E110 | Drafts survive reload (`onyx:composer-drafts`, per owner) with "Saved here" / "Only on this tab" status | `composer/drafts.ts:4`; `Composer.tsx:706,1363` (auto) | MISSING | `App.elm:3424` | Drafts live in memory only |
-| E111 | Reply bar (live re-resolve, withdrawn placeholder, Cancel) | `Composer.tsx:293,1415` (UI) | FULL | `View/Composer.elm:300` | |
-| E112 | Edit bar (Cancel restores the draft) | `Composer.tsx:1332,1429` (UI) | FULL | `View/Composer.elm:273`, `App.elm:38542` | |
-| E113 | Escape order: emoji, schedule, tools, edit, reply | `Composer.tsx:871-900` (UI) | FULL | `View/Composer.elm:606-642,225` | |
-| E114 | Composer takes focus when reply/edit/quote arms or a focus is requested | `Composer.tsx:610,656,668` (auto) | MISSING | `App.elm:38506,38521,38459` | None of these folds emits a focus |
-| E115 | Topic-mode chip with clear | `Composer.tsx:1341,1398` (UI) | FULL | `View/Composer.elm:386-442` | Elm can also pick any known topic |
-| E116 | Typing start/stop (non-slash input; stop on send/cancel) | `Composer.tsx:766-786,1142` (auto) | FULL | `App.elm:38290,38516` | |
-| E117 | Slash-suggestion popover (listbox, arrows/Tab/Enter/Escape, hover) | `Composer.tsx:796,1517` (UI) | FULL | `View/Composer.elm:703`, `ComposerAssist.elm:505` | |
-| E118 | @ / prefix nick-suggestion popover | `Composer.tsx:821,1544` (UI) | FULL | `View/Composer.elm:725` | |
-| E119 | Tab nick cycling at the caret | `Composer.tsx:847`; `composer/nickComplete.ts` (UI) | PARTIAL | `ComposerAssist.elm:398` | Caret isn't tracked, so it only completes at the end of the draft |
-| E120 | Combobox ARIA on the field | `Composer.tsx:1761-1776` (UI) | FULL | `View/Composer.elm:655` | |
-| E121 | Emoji picker (search, 36 results, insert, Escape back to composer) | `Composer.tsx:729,1573` (UI) | PARTIAL | `View/Composer.elm:760`, `App.elm:38347` | Inserts at the end of the draft, not the caret |
+| E105 | Extension client actions (open-url/copy-text manifest, audit) | `extensions/clientActions.ts`; `PreferencesPanel.tsx:2522` (UI) | MISSING | `PrefsPanel.elm:38` | No extension surface in the Elm client (the `App & tools` preference category is not ported); listed for completeness |
+| E106 | Textarea: Enter sends, Shift+Enter newline, auto-grow | `Composer.tsx:697,902,1742` (UI) | FULL | `View/Composer.elm:104,649` | Auto-grow rides CSS `field-sizing: content` (`css/pol-thread.css:1152`); a browser without it keeps a one-line scrolling box |
+| E107 | Destination and offline state in placeholder and accessible name | `Composer.tsx:368-383` (UI) | PARTIAL | `View/Composer.elm:106-125` | aria-label is just "Message"; DMs don't get the "@" prefix |
+| E108 | Compose brief (destination plus state line) | `Composer.tsx:388,1371` (UI) | MISSING | `View/Composer.elm:76` | Only a visually hidden destination label for assistive tech; no state line (reply / edit / offline / topic) |
+| E109 | Per-room draft swap on conversation switch | `Composer.tsx:601-635` (auto) | FULL | `App.elm:8134` | |
+| E110 | Drafts survive reload (`onyx:composer-drafts`, per owner) with "Saved here" / "Only on this tab" status | `composer/drafts.ts:4`; `Composer.tsx:706,1363` (auto) | FULL | `App.elm:55855` `gapSettleDrafts`, `:55888` `gapDraftsLoaded`, `:55763` `gapDraftSnapshot`, `:55795` `gapDraftStatus`; `View/Composer.elm:867` `gapDraftLine`; `ports.js:12582` `createGapDrafts` | v3/gap-convo: the oracle's own journal (`onyx:composer-drafts:owner:…`, 50 drafts of 8 KiB), debounced and write-verified, restored at the owner transition, with the "Saved here" / "Only on this tab" / limits / could-not-save line under the field. Encrypted-DM drafts and `/commands` are never written (Solid writes them). `GapConvoTest.elm:421-504`, `gapConvo.smoke.mjs:295-366` |
+| E111 | Reply bar (live re-resolve, withdrawn placeholder, Cancel) | `Composer.tsx:293,1415` (UI) | FULL | `View/Composer.elm:314` | |
+| E112 | Edit bar (Cancel restores the draft) | `Composer.tsx:1332,1429` (UI) | FULL | `View/Composer.elm:287`, `App.elm:42740` | |
+| E113 | Escape order: emoji, schedule, tools, edit, reply | `Composer.tsx:871-900` (UI) | FULL | `View/Composer.elm:627-663,239` | |
+| E114 | Composer takes focus when reply/edit/quote arms or a focus is requested | `Composer.tsx:610,656,668` (auto) | PARTIAL | `App.elm:56137` `gapSettleComposerFocus`; `ports.js:4595,4601` (Enter / Alt+Enter `composer-focus`) | v3/gap-convo: Reply, Edit and Quote emit `PrefsFocus` on the field (`GapConvoTest.elm:600`), and Enter / Alt+Enter focus it from anywhere (v3/gap-commands). Missing: Reply from the thread panel (`ThreadReplyParent`) and the member-card Mention append (`MemberMention`, `App.elm:46406`) leave focus where it was; the first-hour room-landing autofocus is D158 |
+| E115 | Topic-mode chip with clear | `Composer.tsx:1341,1398` (UI) | FULL | `View/Composer.elm:401-457` | Elm can also pick any known topic |
+| E116 | Typing start/stop (non-slash input; stop on send/cancel) | `Composer.tsx:766-786,1142` (auto) | FULL | `App.elm:42477,42714` | |
+| E117 | Slash-suggestion popover (listbox, arrows/Tab/Enter/Escape, hover) | `Composer.tsx:796,1517` (UI) | FULL | `View/Composer.elm:724`, `ComposerAssist.elm:505` | |
+| E118 | @ / prefix nick-suggestion popover | `Composer.tsx:821,1544` (UI) | FULL | `View/Composer.elm:746` | |
+| E119 | Tab nick cycling at the caret | `Composer.tsx:847`; `composer/nickComplete.ts` (UI) | PARTIAL | `ComposerAssist.elm:398` `cycleNickCompletion` | Tab completion still runs with the caret at the end of the draft; the field's caret is tracked now (`GapConvo.composerCaret`) but only the emoji insert reads it |
+| E120 | Combobox ARIA on the field | `Composer.tsx:1761-1776` (UI) | FULL | `View/Composer.elm:676` | |
+| E121 | Emoji picker (search, 36 results, insert, Escape back to composer) | `Composer.tsx:729,1573` (UI) | FULL | `View/Composer.elm:800` `emojiPicker`, `:133-135` caret decoders; `App.elm:42534` `ComposerEmojiInsert`; `GapConvo.elm:574` `insertAtCaret`; `ports.js:12775` `gapCaretSet` | v3/gap-convo: the glyph goes where the caret was (a selection is replaced) and the cursor lands after it (`GapConvoTest.elm:685-731`); Escape from the toggle closes the picker (v3/rx-convo) |
 | E122 | Emoji recents/favourites/skin tone/custom emoji | `emojiMemory.ts` (store-only, DEAD) | N/A | — | No Solid UI reads them |
-| E123 | Attach button and multi-file picker | `Composer.tsx:1011,1710` (UI) | FULL | `View/Composer.elm:343`, `App.elm:38358`, `ports.js:6908` | |
-| E124 | Attachment caps (5 files, 25 MB) with copy | `upload/attachmentCaps.ts:7`; `Composer.tsx:926` (UI) | FULL | `App.elm:35813` | |
-| E125 | Paste files from the clipboard | `Composer.tsx:1038` (UI) | MISSING | — | |
-| E126 | Drag-and-drop files (drag state) | `Composer.tsx:1045-1062` (UI) | MISSING | — | |
-| E127 | Strip photo EXIF/GPS before upload | `upload/photoPolicy.ts:127`; `Composer.tsx:964` (auto) | CORE-ONLY | `Upload.elm:51-52`, `ports.js:6934`, `App.elm:35810` | Strip functions are never called; the raw File is posted |
-| E128 | Photo quality (Original/Compact) and "Send original" | `photoPolicy.ts:154,190`; `Composer.tsx:1462-1488` (UI) | MISSING | `Upload.elm:27` | `photoQualityOptions` is unused |
-| E129 | Staged file: thumbnail and size | `Composer.tsx:1446-1461` (UI) | PARTIAL | `View/Composer.elm:445` | Name and status only |
-| E130 | Upload progress (%, bar) | `Composer.tsx:1489-1495`; `upload/upload.ts:215` (auto) | FULL | `View/Composer.elm:453-480`, `App.elm:38391` | |
-| E131 | Remove a staged file (disabled while uploading) | `Composer.tsx:1002,1501` (UI) | PARTIAL | `View/Composer.elm:485` | Always enabled |
-| E132 | Staged files cleared/aborted on room or account switch | `Composer.tsx:246-263,1085` (auto) | PARTIAL | `App.elm:9554,7758` | Account switch clears; room switch keeps them, so they send to the newly opened room |
-| E133 | Protected-DM attachment refusal | `Composer.tsx:916,1012` (UI) | FULL | `View/Composer.elm:345-366`, `App.elm:38371` | |
-| E134 | Offline: attachments/edits refused, commands not queued | `Composer.tsx:1170-1180,1291` (auto) | FULL | `App.elm:35852-35858`, `ComposerSend` fold | |
-| E135 | Attachment receipt message (caption plus `[file]` lines) | `upload/attachmentMessage.ts:69`; `Composer.tsx:1263` (auto) | FULL | `App.elm:36100-36126` | Caption on its own line |
-| E136 | Send outcomes: refused / may-have-sent copy, draft kept | `Composer.tsx:1302-1316` (auto) | FULL | `View/Thread.elm:579`, `View/Composer.elm:179` | |
-| E137 | Blocked-DM send refusal with toast | `Composer.tsx:1158` (auto) | FULL | `App.elm:34500` | |
-| E138 | Outbox chrome (queued/failed, retry) | `Composer.tsx:1375-1396` (UI) | FULL | `View/Composer.elm:204-216` | |
+| E123 | Attach button and multi-file picker | `Composer.tsx:1011,1710` (UI) | FULL | `View/Composer.elm:357`, `App.elm:42551`, `ports.js:8456` | |
+| E124 | Attachment caps (5 files, 25 MB) with copy | `upload/attachmentCaps.ts:7`; `Composer.tsx:926` (UI) | FULL | `App.elm:39584` | |
+| E125 | Paste files from the clipboard | `Composer.tsx:1038` (UI) | FULL | `ports.js:12515` paste listener in `wireGapComposer`; `App.elm:42564` `UploadPicked` | v3/gap-convo: pasted files stage like picked ones (caps and the edit / protected-DM refusals apply) and never send; text paste is left alone (`gapConvo.smoke.mjs:395`) |
+| E126 | Drag-and-drop files (drag state) | `Composer.tsx:1045-1062` (UI) | FULL | `ports.js:12523-12548` dragover / drop; `View/Composer.elm:892` `gapDropTarget`; `App.elm:56354` (`DropActive`) | v3/gap-convo: a file drag shows "Drop to attach to <room>" and "Nothing sends until you press Send"; a file drag is always claimed so a miss never navigates away, and with a modal open nothing stages (`gapConvo.smoke.mjs:411-428,585`) |
+| E127 | Strip photo EXIF/GPS before upload | `upload/photoPolicy.ts:127`; `Composer.tsx:964` (auto) | FULL | `ports.js:12288` `gapCleanBytes` (JPEG 12023, PNG 12105, WebP 12129, HEIF 12201), `:8483` `uploadSend`; `GapConvo.elm:454` `photoNote` | v3/gap-convo: every staged file is sniffed by its bytes and cleaned before any POST; EXIF / GPS / XMP / maker notes / trailing bytes drop (Orientation kept so the photo stays upright). A photo that cannot be cleaned (TIFF / raw, malformed) is refused unless the user taps "Send with location data". The pure `Upload.stripJpegExif` / `stripPngExif` are still uncalled. `gapConvo.smoke.mjs:48-292`; gc-paste scenarios not re-run |
+| E128 | Photo quality (Original/Compact) and "Send original" | `photoPolicy.ts:154,190`; `Composer.tsx:1462-1488` (UI) | FULL | `View/Composer.elm:911` `gapStagedPrivacy` (`Upload.photoQualityOptions`), `App.elm:56291` (`PhotoQuality`); `ports.js:12332` `gapCompact` | v3/gap-convo: an Original / Compact radio per photo (Compact is a 1600 px q0.72 JPEG, offered only when smaller); "Send with location data" is the explicit send-original |
+| E129 | Staged file: thumbnail and size | `Composer.tsx:1446-1461` (UI) | PARTIAL | `View/Composer.elm:460` `stagedRow`, `:911` `gapStagedPrivacy` | Name, status, size and the photo privacy line; no thumbnail |
+| E130 | Upload progress (%, bar) | `Composer.tsx:1489-1495`; `upload/upload.ts:215` (auto) | FULL | `View/Composer.elm:468-496`, `App.elm:42585` | |
+| E131 | Remove a staged file (disabled while uploading) | `Composer.tsx:1002,1501` (UI) | FULL | `View/Composer.elm:501-510` | Remove is disabled while the file uploads (v3/gap-convo) |
+| E132 | Staged files cleared/aborted on room or account switch | `Composer.tsx:246-263,1085` (auto) | FULL | `App.elm:55649` `gapSwapStaged`, `:55585` `gapSettleUploadDone`, `:9961` (account switch) | v3/gap-convo: staged files wait with their conversation (and its draft) and come back on return; an upload that finishes after you left sends to ITS room and a failure becomes a toast; an account switch clears them. Solid discards them on a room switch; Elm never aborts an in-flight upload (no abort port) |
+| E133 | Protected-DM attachment refusal | `Composer.tsx:916,1012` (UI) | FULL | `View/Composer.elm:359-380`, `App.elm:42564` | |
+| E134 | Offline: attachments/edits refused, commands not queued | `Composer.tsx:1170-1180,1291` (auto) | FULL | `App.elm:39623-39629`, `ComposerSend` fold | |
+| E135 | Attachment receipt message (caption plus `[file]` lines) | `upload/attachmentMessage.ts:69`; `Composer.tsx:1263` (auto) | FULL | `App.elm:39871-39897` | Caption on its own line |
+| E136 | Send outcomes: refused / may-have-sent copy, draft kept | `Composer.tsx:1302-1316` (auto) | FULL | `View/Thread.elm:623`, `View/Composer.elm:193` | |
+| E137 | Blocked-DM send refusal with toast | `Composer.tsx:1158` (auto) | FULL | `App.elm:38255` | |
+| E138 | Outbox chrome (queued/failed, retry) | `Composer.tsx:1375-1396` (UI) | FULL | `View/Composer.elm:218-230` | |
 | E139 | Composer hint (Enter / Tab / Shift+Enter / paste) | `Composer.tsx:1965` (UI) | MISSING | — | |
-| E140 | More tools tray: Send later, Jump to date, Room ledger, slash tip | `Composer.tsx:1843-1927` (UI) | FULL | `View/Polish.elm:83-196` | Elm also has Attach and Emoji |
-| E141 | "Insert /" at the caret | `Composer.tsx:508` (UI) | PARTIAL | `App.elm:45722` | Prefixes "/" at the start of the draft |
-| E142 | Schedule popover (presets, custom datetime, errors, "View N scheduled") | `Composer.tsx:555-595,1619-1700` (UI) | FULL | `View/Composer.elm:496-596`, `App.elm:37323-37389` | |
-| E143 | Schedule disabled reasons | `Composer.tsx:531` (UI) | FULL | `View/Polish.elm:130-142` | |
-| E144 | Scheduled sheet: state labels, ledger, cancel/remove uncertain | `ScheduledMessagesSheet.tsx:40-100` (UI) | FULL | `View/Scheduled.elm:23-129`, `App.elm:37296` | |
-| E145 | Scheduled auto-dispatch (due + connected, protected/E2EE holds) | `schedule/dispatch.ts:132` (auto) | FULL | `App.elm:12277` | |
-| E146 | Search panel takes focus on open and returns it on close | `search/MessageSearch.tsx:404`; `useMessageSearch.ts:235` (UI) | PARTIAL | `View/RoomHeader.elm:208`, `App.elm:39553` | Opens, but focus stays on the trigger |
-| E147 | Visible search: count, Previous/Next | `MessageSearch.tsx:563-610` (UI) | FULL | `View/Search.elm:163-182`, `App.elm:39679` | |
-| E148 | Search keys: Enter / Shift+Enter / Ctrl+Enter / Escape | `MessageSearch.tsx:453-487` (UI) | FULL | `View/Search.elm:69,422` | |
-| E149 | Placeholder variants; input disabled with no conversation and history off | `MessageSearch.tsx:514-519` (UI) | PARTIAL | `View/Search.elm:138` | One placeholder only |
-| E150 | "Device history is off" state with "Open history preferences" | `MessageSearch.tsx:620` (UI) | MISSING | — | |
+| E140 | More tools tray: Send later, Jump to date, Room ledger, slash tip | `Composer.tsx:1843-1927` (UI) | FULL | `View/Polish.elm:83-197` | Elm also has Attach and Emoji |
+| E141 | "Insert /" at the caret | `Composer.tsx:508` (UI) | PARTIAL | `App.elm:51563` `Polish.ToolsSlash` | Prefixes "/" at the start of the draft |
+| E142 | Schedule popover (presets, custom datetime, errors, "View N scheduled") | `Composer.tsx:555-595,1619-1700` (UI) | FULL | `View/Composer.elm:515-617`, `App.elm:41449-41515` | |
+| E143 | Schedule disabled reasons | `Composer.tsx:531` (UI) | FULL | `View/Polish.elm:130-143` | |
+| E144 | Scheduled sheet: state labels, ledger, cancel/remove uncertain | `ScheduledMessagesSheet.tsx:40-100` (UI) | FULL | `View/Scheduled.elm:24-166`, `App.elm:41422` | Server-held sends are listed too (v3/gap-usermodes) |
+| E145 | Scheduled auto-dispatch (due + connected, protected/E2EE holds) | `schedule/dispatch.ts:132` (auto) | FULL | `App.elm:14945` | |
+| E146 | Search panel takes focus on open and returns it on close | `search/MessageSearch.tsx:404`; `useMessageSearch.ts:235` (UI) | FULL | `ports.js:12640` `installGapFocus` (search layer); `View/RoomHeader.elm:212`, `App.elm:43742` | v3/gap-convo: the field takes focus when the panel opens; on close focus returns to the opener, or to the composer when the opener is gone (a phone sheet closed). It does not select the existing query (`gapConvo.smoke.mjs:549-583`; gc-search-focus not re-run) |
+| E147 | Visible search: count, Previous/Next | `MessageSearch.tsx:563-610` (UI) | FULL | `View/Search.elm:149-168`, `App.elm:43869` | |
+| E148 | Search keys: Enter / Shift+Enter / Ctrl+Enter / Escape | `MessageSearch.tsx:453-487` (UI) | FULL | `View/Search.elm:70,427` | |
+| E149 | Placeholder variants; input disabled with no conversation and history off | `MessageSearch.tsx:514-519` (UI) | PARTIAL | `View/Search.elm:141` | One placeholder only |
+| E150 | "Device history is off" state with "Open history preferences" | `MessageSearch.tsx:620` (UI) | FULL | `View/Search.elm:548` `gapHistoryOff`, `App.elm:56379` (`OpenHistoryPrefs`) | v3/gap-convo: shown whenever device history is off (Solid only with no conversation): "only messages loaded in this session are searched" plus Open history preferences |
 | E151 | Room ledger link in search | `MessageSearch.tsx:611` (UI) | MISSING | — | |
-| E152 | Saved searches: save, run, delete, count, persisted, cross-tab | `MessageSearch.tsx:355-700` (UI) | FULL | `View/Search.elm:441-509`, `App.elm:39705-39730`, `ports.js:1460` | |
+| E152 | Saved searches: save, run, delete, count, persisted, cross-tab | `MessageSearch.tsx:355-700` (UI) | FULL | `View/Search.elm:446-514`, `App.elm:43895-43920`, `ports.js:2224` | |
 | E153 | Saved-search error status copy | `MessageSearch.tsx:702` (UI) | MISSING | — | |
-| E154 | Recall-term chips | `MessageSearch.tsx:710` (UI) | FULL | `View/Search.elm:202-224` | |
-| E155 | Archived server search (button, counts, errors, notices, open result) | `MessageSearch.tsx:726-793` (UI) | FULL | `View/Search.elm:287-405`, `App.elm:39713,39716` | |
-| E156 | "E2EE DM search stays on this device" notice | `MessageSearch.tsx:795` (UI) | FULL | `View/Search.elm:410` | |
-| E157 | "No matches yet" empty state | `MessageSearch.tsx:801` (UI) | MISSING | — | |
-| E158 | Device recall mode (hybrid/exact/semantic) "Advanced" control | `MessageSearch.tsx:807-848` (UI) | PARTIAL | `View/Search.elm:247` | Cycle button only shows once vault hits exist |
-| E159 | Vault ("remembered elsewhere") hits open at the message | `MessageSearch.tsx:850-890`; `useMessageSearch.ts:650` (UI) | PARTIAL | `View/Search.elm:233-277`, `App.elm:36978` | Travels by timestamp but never scrolls to the row (E42); shows time only |
-| E160 | Provenance badges on search sections | `MessageSearch.tsx:557,639,712,738,854`; `ProvenanceBadge.tsx` (UI) | FULL | `View/Search.elm:55` | |
-| E161 | Live status regions and screen-reader key help | `MessageSearch.tsx:893-923` (UI) | PARTIAL | `View/Search.elm:188-193` | No help text and no `aria-keyshortcuts` on the input |
-| E162 | Ctrl/Cmd+F opens search without touching the draft | `AppShell.tsx:224` (shortcut) | PARTIAL | `App.elm:39559` | `SearchHotkey` sets `composer = ""`, wiping the visible draft |
-| E163 | Jump-to-date sheet (presets, UTC fields, validation, offline/loading notices, Copy moment, ledger) | `JumpToDateSheet.tsx:43-340` (UI) | FULL | `View/Boost.elm:26-230`, `App.elm:38652-38700` | |
-| E164 | Jump-to-date openers (composer tools, room More) | `Composer.tsx:498`; `PresenceRibbon.tsx:595` (UI) | FULL | `View/Polish.elm:143`, `View/RoomHeader.elm:365` | |
-| E165 | Time scrubber: 24 UTC hour bars, 60s refresh, roving keys, click to travel, date, Copy moment, ledger | `TimeScrubber.tsx:34-321`; `AppShell.tsx:1480` (pref) | FULL | `View/Polish.elm:246-427`, `App.elm:45827-45970` | Opened from room More, not a pref |
-| E166 | Pinned-messages drawer opener | `PresenceRibbon.tsx:1286` (UI) | FULL | `View/RoomHeader.elm:325`, `App.elm:39181` | |
-| E167 | Pin rows: from / time / state (Deleted/Locked/Loaded) / body | `PinnedMessages.tsx:84,247-275` (UI) | FULL | `View/Pins.elm:149-192` | |
-| E168 | Jump to a pin: loaded one lands; unloaded one loads via history (with feedback) | `PinnedMessages.tsx:147-162` (UI) | PARTIAL | `App.elm:39187` `jumpToPinned` | Loaded pins only set the unused landing field (E42) |
-| E169 | Unpin from the drawer (ops) | `PinnedMessages.tsx:167,287` (UI) | FULL | `View/Pins.elm:193`, `App.elm:39193` | |
-| E170 | Pins context, ledger link, op/non-op empty copy, load feedback | `PinnedMessages.tsx:188-226` (UI) | FULL | `View/Pins.elm:50-146` | |
+| E154 | Recall-term chips | `MessageSearch.tsx:710` (UI) | FULL | `View/Search.elm:207-229` | |
+| E155 | Archived server search (button, counts, errors, notices, open result) | `MessageSearch.tsx:726-793` (UI) | PARTIAL | `View/Search.elm:292-410`, `App.elm:43903,43906` | Button, counts, errors and notices match, but a result click only selects its conversation (`ServerOpenResult { target }`): no travel to the archived row's time and no landing, where Solid travels and focuses the row. The row title still promises "jump to this message" |
+| E156 | "E2EE DM search stays on this device" notice | `MessageSearch.tsx:795` (UI) | FULL | `View/Search.elm:415` | |
+| E157 | "No matches yet" empty state | `MessageSearch.tsx:801` (UI) | FULL | `View/Search.elm:523` `gapSearchEmpty` | v3/gap-convo: "No matches yet" once every tier has answered empty (Solid's condition) |
+| E158 | Device recall mode (hybrid/exact/semantic) "Advanced" control | `MessageSearch.tsx:807-848` (UI) | PARTIAL | `View/Search.elm:252` | The "Mode:" cycle button (hybrid / exact / semantic) only shows once vault hits exist; no Advanced disclosure with a segmented control |
+| E159 | Vault ("remembered elsewhere") hits open at the message | `MessageSearch.tsx:850-890`; `useMessageSearch.ts:650` (UI) | FULL | `View/Search.elm:238-282`, `App.elm:41109` `VaultOpenHit`, `:48694` `mergeVaultAround` | v3/gap-convo: opening a hit selects the conversation, hydrates around its stamp and lands on the nearest row (centred, pulsed, focused); rows show conversation, time, sender and text like Solid |
+| E160 | Provenance badges on search sections | `MessageSearch.tsx:557,639,712,738,854`; `ProvenanceBadge.tsx` (UI) | FULL | `View/Search.elm:56` | |
+| E161 | Live status regions and screen-reader key help | `MessageSearch.tsx:893-923` (UI) | PARTIAL | `View/Search.elm:193-198` | No help text and no `aria-keyshortcuts` on the input |
+| E162 | Ctrl/Cmd+F opens search without touching the draft | `AppShell.tsx:224` (shortcut) | FULL | `App.elm:43748` `SearchHotkey`; `ports.js:7197` | v3/gap-convo: opens the panel without touching the draft (`GapConvoTest.elm:617`). Ctrl+F while the panel is already open does nothing (no re-focus of the field) |
+| E163 | Jump-to-date sheet (presets, UTC fields, validation, offline/loading notices, Copy moment, ledger) | `JumpToDateSheet.tsx:43-340` (UI) | FULL | `View/Boost.elm:26-230`, `App.elm:42850-42898` | The travel window lands on the row nearest the chosen moment (v3/gap-convo) |
+| E164 | Jump-to-date openers (composer tools, room More) | `Composer.tsx:498`; `PresenceRibbon.tsx:595` (UI) | FULL | `View/Polish.elm:144`, `View/RoomHeader.elm:387` | |
+| E165 | Time scrubber: 24 UTC hour bars, 60s refresh, roving keys, click to travel, date, Copy moment, ledger | `TimeScrubber.tsx:34-321`; `AppShell.tsx:1480` (pref) | FULL | `View/Polish.elm:247-428`, `App.elm:51667-51810` | Opened from room More, not a pref |
+| E166 | Pinned-messages drawer opener | `PresenceRibbon.tsx:1286` (UI) | FULL | `View/RoomHeader.elm:347`, `App.elm:43370` | |
+| E167 | Pin rows: from / time / state (Deleted/Locked/Loaded) / body | `PinnedMessages.tsx:84,247-275` (UI) | FULL | `View/Pins.elm:151-197` | |
+| E168 | Jump to a pin: loaded one lands; unloaded one loads via history (with feedback) | `PinnedMessages.tsx:147-162` (UI) | FULL | `App.elm:16496` `jumpToPinned`, `:56009` (pinned window settled), `:27028` `requestPinnedMessage` | v3/gap-convo: a loaded pin lands (centred, pulsed, focused) and the drawer closes; an unloaded one loads its window first and lands on arrival ("Pinned message not found" toast otherwise) |
+| E169 | Unpin from the drawer (ops) | `PinnedMessages.tsx:167,287` (UI) | FULL | `View/Pins.elm:198`, `App.elm:43382` | |
+| E170 | Pins context, ledger link, op/non-op empty copy, load feedback | `PinnedMessages.tsx:188-226` (UI) | FULL | `View/Pins.elm:52-148` | |
 | E171 | Pins server-provenance badge | `PinnedMessages.tsx:194` (UI) | MISSING | — | |
 | E172 | Local DM pins | `dmPins.ts`; `store.ts:16729` (DEAD) | N/A | — | No Solid shell caller |
-| E173 | Room media panel (Pictures/Files/Links tabs, loading, retry, empty) | `RoomMediaIndex.tsx:148-200`; `PresenceRibbon.tsx:1557` (UI) | FULL | `View/Media.elm:33-180`, `View/RoomHeader.elm:350` | |
+| E173 | Room media panel (Pictures/Files/Links tabs, loading, retry, empty) | `RoomMediaIndex.tsx:148-200`; `PresenceRibbon.tsx:1557` (UI) | FULL | `View/Media.elm:33-180`, `View/RoomHeader.elm:372` | |
 | E174 | Media: picture consent and fallback; links open in a new tab | `RoomMediaIndex.tsx:271-359` (UI) | FULL | `View/Media.elm:197-310` | |
-| E175 | Media: jump to the item's message | `RoomMediaIndex.tsx:312,332,376` (UI) | PARTIAL | `App.elm:38452,13761` | Loaded rows only set the unused landing field (E42) |
+| E175 | Media: jump to the item's message | `RoomMediaIndex.tsx:312,332,376` (UI) | FULL | `App.elm:42650` `MediaIndexJump`, `:16611` `jumpToMedia` | v3/gap-convo: loaded rows land; others travel to the item's stamp and land on the nearest row |
 | E176 | Room AI-policy badge | `AiPolicyBadge.tsx`; `PresenceRibbon.tsx:956` (UI) | CORE-ONLY | `AiPolicy.elm` | Module is never imported |
 | E177 | Message multi-select / bulk actions | `store.ts:2110` (DEAD) | N/A | — | No UI caller |
 | E178 | `format/byteSize`, `format/duration`, `text/{highlightRanges,mentionParse,truncateMiddle}`, `topics/suggestTopic` | no non-test importers (DEAD) | N/A | — | No search-hit highlight or char counter in Solid either |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- **COVERAGE, Boost/jump-to-date row:** "Narrowings: no `TimeScrubber`; openers are topbar-only (no composer More-tools …)". This is understated: the scrubber exists (`View/Polish.elm:276`, opened from `View/RoomHeader.elm:279`) and the tray has a Jump to date entry (`View/Polish.elm:143`). The same row cites `BoostBar.tsx (onAdd)` as the oracle, but that path is unreachable in Solid (`MessageView.tsx:2303` never passes `onAdd`).
-- **COVERAGE, Thread paging row:** "no scroll/DOM coupling (preserve-scroll, aria-live muting, jump pill counts)". Preserve-scroll (`ports.js:3330-3333`) and pill counts (`View/Thread.elm:659`) both exist now. Only the aria-live muting is still missing.
-- **COVERAGE, Message render windowing row:** "thread paging state, earlier-messages affordance, and reader handoffs stay ahead". The first two have landed (`View/Thread.elm:137`, `App.elm:39196`). Reader handoffs are still missing (E45).
-- **COVERAGE, Message timestamps row:** "clock shows UTC, not the oracle's local zone / 12h preference". Stale: `App.elm:1934` `formatRowClock` uses the `Time.here` zone and `Prefs.Clock`.
-- **COVERAGE, Composer assist row:** "the composer stays a single-line `input` … the More tools tray are not ported". Stale: the composer is a textarea with Shift+Enter (`View/Composer.elm:98,628`) and the tray is ported (`View/Polish.elm:43`).
-- **COVERAGE, App core/shell row (composer and menu narrowings):** it lists "no per-target drafts", "no message-menu popover Edit entry", "no Escape-to-cancel" and "text buttons instead of icon buttons". All four are now done: `App.elm:7758`, `View/Thread.elm:1731`, `View/Composer.elm:225` and the icon toolbar at `View/Thread.elm:408-419`.
-- **COVERAGE, Uploads row:** "EXIF pure byte layer done … EXIF file ops stay ports-side". This is overstated. `ports.js:6934-6960` posts the raw File and `App.elm:35810` says "originals stage as-is", so photos still upload with their EXIF/GPS data.
-- **COVERAGE, Uploads/media row:** "loaded jumps focus via the landing machinery". Overstated: `historyLanding` (`App.elm:528`) has no reader, and `threadAnchorIndex` passes `landingIndex = Nothing`. Pin and media jumps therefore don't move the transcript.
-- **COVERAGE, translation narrowing:** "no caption-transcript row (no Elm captions yet)". Stale: Elm has captions and caption translation (calls C8, `CallCaptionTranslate`).
-- **V3_ROADMAP Phase 2 table:** rows 2.1–2.3 carry no status, but the progress log says rich message text landed. The table is behind (understated). 2.8 BlockKit and 2.9 edit history are correctly listed as deferred; edit history is still only a revision-count tooltip (E16).
-- **V3_ROADMAP 7.1:** "Focus traps + Escape + focus restore on every overlay — done … except the image lightbox". Overstated: the message menu, reaction picker, search panel and composer menus have no focus move or restore. COVERAGE row 220 itself lists them as "Not migrated".
+Checked against HEAD `609cb240`. COVERAGE.md and V3_ROADMAP.md have no entry for v3/gap-convo or v3/rx-convo (no text match), so "still true" below means the doc still says the old thing.
+- **COVERAGE, Boost/jump-to-date row (COVERAGE.md:98):** "Narrowings: no `TimeScrubber`; openers are topbar-only (no composer More-tools …)". Still understated: the scrubber exists (`View/Polish.elm:277`, opened from `View/RoomHeader.elm:288`) and the tray has a Jump to date entry (`View/Polish.elm:144`). The same row cites `BoostBar.tsx (onAdd)` as the oracle, but that path is unreachable in Solid (`MessageView.tsx:2303` never passes `onAdd`).
+- **COVERAGE, Thread paging row (COVERAGE.md:95):** "no scroll/DOM coupling (preserve-scroll, aria-live muting, jump pill counts), no time-travel landing anchor (vault ids do not map onto chat rows)". Was stale for preserve-scroll (`ports.js:4228-4231`) and pill counts (`View/Thread.elm:703`); the landing anchor was fixed by v3/gap-convo (`App.elm:48694` `mergeVaultAround` and `:55984` `gapSettleLanding` land on the nearest row). Only the aria-live muting is still missing (E34).
+- **COVERAGE, Message render windowing row (COVERAGE.md:97):** "thread paging state, earlier-messages affordance, and reader handoffs stay ahead". The first two landed (`View/Thread.elm:158`, `App.elm:43385`). Reader mode itself landed in v3/gap-organize, but the reader handoffs (Start / New / Latest / Home / Find text strip) are still missing (E45). Still true.
+- **COVERAGE, Message timestamps row (COVERAGE.md:101):** "clock shows UTC, not the oracle's local zone / 12h preference". Still stale: `App.elm:2107` `formatRowClock` uses the `Time.here` zone and `Prefs.Clock`.
+- **COVERAGE, Composer assist row (COVERAGE.md:206):** "the composer stays a single-line `input` … focus restore after insert, and the More tools tray are not ported". Still stale: the composer is a textarea with Shift+Enter (`View/Composer.elm:104,649`) and the tray is ported (`View/Polish.elm:43`). "Focus restore after insert" is also done now: the emoji lands at the caret and the field is re-focused (v3/gap-convo, `ports.js:12775` `gapCaretSet`).
+- **COVERAGE, App core/shell row (COVERAGE.md:199, composer and menu narrowings):** it lists "no per-target drafts", "no message-menu popover Edit entry", "no Escape-to-cancel", "text buttons instead of icon buttons" and "no caret/focus motion". All are done: `App.elm:8134`, `View/Thread.elm:1797`, `View/Composer.elm:239`, the icon toolbar at `View/Thread.elm:438-449`, and focus on Reply / Edit / Quote (v3/gap-convo, `App.elm:56137`). Focus after a thread-panel Reply or a member-card Mention is still missing (E114). Still stale as written.
+- **COVERAGE, Uploads row (COVERAGE.md:202):** "EXIF pure byte layer done … Compact recompression + EXIF file ops stay ports-side". Was overstated (the raw File was posted, so photos kept their EXIF / GPS); fixed by v3/gap-convo: `ports.js:12288` `gapCleanBytes` cleans JPEG / PNG / WebP / HEIC before every POST and fails closed, and Compact is `ports.js:12332`. The pure `Upload.stripJpegExif` / `stripPngExif` (`Upload.elm:764,880`) are still never called. The in-code comment at `App.elm:39582-39583` ("per-file photo sniffing stays a later slice — originals stage as-is") is still stale at HEAD.
+- **COVERAGE, Uploads/media row:** "loaded jumps focus via the landing machinery". Was overstated: `historyLanding` (`App.elm:597`) had no reader. Fixed by v3/gap-convo, which lands through `gapConvo.landing` (`App.elm:56407` `gapLandOn`) and the `"message"` scroll action (`ports.js:4297`); `historyLanding` is still written (`App.elm:16488,48766`) and still never read.
+- **COVERAGE, translation narrowing:** "no caption-transcript row (no Elm captions yet)". Still stale: Elm has captions and caption translation (calls C8, `CallCaptionTranslate`).
+- **V3_ROADMAP Phase 2 table:** rows 2.1–2.3 still carry no status although rich message text landed (understated). 2.8 BlockKit is now marked done (v3/gap-import). 2.9 edit history was "correctly deferred, still only a revision-count tooltip"; local edit history landed in v3/rx-convo (E16), but row 2.9 (V3_ROADMAP.md:72) still has no status and the long-tail row 8.x (V3_ROADMAP.md:170) still lists "edit history (2.9)" as deferred. Stale.
+- **V3_ROADMAP 7.1:** "Focus traps + Escape + focus restore on every overlay — done … except the image lightbox". Was overstated for the message menu, reaction picker and search panel; fixed by v3/gap-convo (`ports.js:12640` `installGapFocus`: focus in, roving, restore). The composer's emoji picker, tools tray and schedule popover are non-modal and have no Tab trap (they move focus in / out on their own), so the sentence is closer to true but still not literal.
+- **In-code comments (verified at HEAD):** `App.elm:7897-7899` (`isCtcpQueryBody` doc: "unknown CTCP (ACTION included) remain"), `App.elm:7912` (`isSwallowedCtcpWire` doc lists ACTION) and `App.elm:38504-38509` ("ACTION included … swallow the row either way") are stale since v3/gap-commands (`App.elm:7907` exempts ACTION). `App.elm:42661` ("Caret/focus motion stays a narrowing (no caret state)") is stale for Quote (focus and the readable text are done) and `App.elm:46411` repeats it for Mention, where it is still true. `View/Search.elm:12-22`: "the history-off branch stays ahead" is stale (`View/Search.elm:548`); "open-navigates without server time-travel" is still true (E155). `View/Thread.elm:1617-1618,1646` ("translate stays a later slice") is stale (`View/Thread.elm:1761`). `ComposerAssist.elm:39-40` ("Elm does not track the caret") is half stale: the caret is tracked (`GapConvo.elm:564`) but nick completion still ignores it.
 
 #### Elm better than Solid
-- **Reply in thread** quick action (`View/Thread.elm:430`) opens the thread panel for any message. Solid only offers the indicator once replies already exist.
-- **Add a boost** is reachable from the toolbar and the bar (`View/Thread.elm:423,2203`). The Solid `onAdd` path was never wired.
-- **Ignore from the menu** gives an Undo toast (`App.elm:31098-31103`).
-- **Delivery uncertain** is shown as a row state (`View/Thread.elm:579`); Solid only shows "Queued".
-- **STATUSMSG audience toggle** in the composer (`View/Composer.elm:85-97`); Solid has no equivalent.
-- **Unresolved DM key hold** with an explicit "Send unencrypted" consent (`View/Composer.elm:187-195`).
-- **Composer topic picker** lets you pick any known conversation, not just clear the current one (`View/Composer.elm:386-442`).
-- **Menu header** shows the sender and a preview (`View/Thread.elm:1617`).
-- **More tools tray** also carries Attach and Emoji, so the phone bar can be a single row (`View/Polish.elm:115,153`).
-- **Time scrubber** is discoverable from room More (`View/RoomHeader.elm:279`); in Solid it is a hidden Preferences toggle.
-- **Compact IRC-style density** (`View/Thread.elm:543`).
-- **Keyed and lazy rows** (`View/Thread.elm:278-296`).
+- **Reply in thread** quick action (`View/Thread.elm:460`) opens the thread panel for any message. Solid only offers the indicator once replies already exist.
+- **Add a boost** is reachable from the toolbar and the bar (`View/Thread.elm:453,2348`). The Solid `onAdd` path was never wired.
+- **Ignore from the menu** gives an Undo toast (`App.elm:34824-34829`).
+- **Delivery uncertain** is shown as a row state (`View/Thread.elm:623`); Solid only shows "Queued".
+- **STATUSMSG audience toggle** in the composer (`View/Composer.elm:91-103`); Solid has no equivalent.
+- **Unresolved DM key hold** with an explicit "Send unencrypted" consent (`View/Composer.elm:201-209`).
+- **Composer topic picker** lets you pick any known conversation, not just clear the current one (`View/Composer.elm:401-457`).
+- **Menu header** shows the sender and a preview (`View/Thread.elm:1682`).
+- **More tools tray** also carries Attach and Emoji, so the phone bar can be a single row (`View/Polish.elm:115,154`).
+- **Time scrubber** is discoverable from room More (`View/RoomHeader.elm:288`); in Solid it is a hidden Preferences toggle.
+- **Compact IRC-style density** (`View/Thread.elm:578`).
+- **Keyed and lazy rows** (`View/Thread.elm:299-325`).
+- **Photo privacy** (v3/gap-convo): files are cleaned by their bytes (JPEG, PNG, WebP, HEIC / AVIF; Solid only strips JPEG APP1 and PNG eXIf), an uncleanable photo is refused until the user taps "Send with location data", and each staged photo says what was removed (`ports.js:12288`, `View/Composer.elm:911`, `GapConvo.elm:454`).
+- **Drafts are safer** (v3/gap-convo): encrypted-DM drafts and half-typed `/commands` are never written to storage (`App.elm:55785`); Solid persists both.
+- **Staged files belong to their conversation** (v3/gap-convo): they wait while you are elsewhere, and an upload that finishes after you left sends to its own room (`App.elm:55649,55585`). Solid discards them on a room switch.
+- **Inbound `/me`** renders as a `* nick text` action row (`View/Thread.elm:526`, v3/gap-commands); Solid swallows it (E11).
+- **Search says when device history is off** whenever it is off, with a button to the setting (`View/Search.elm:548`); Solid only shows it with no conversation.
+- **Save message** in the message menu (`View/Thread.elm:1832`, v3/gap-organize), the **slow-mode countdown** over the composer that disables Send while you wait (`View/Composer.elm:88,152`, v3/gap-chanserv), and **Send later on the server** with a held-sends list in the Scheduled sheet (`View/Composer.elm:542`, `View/Scheduled.elm:77`, v3/gap-usermodes) have no Solid counterpart.
 
 #### Gaps (ranked by user impact)
-- `[High]` **Photo EXIF/GPS leak.** In the `ports.js` `uploadSend`, read the File's bytes, run the JPEG/PNG EXIF strip (mirror `Upload.stripJpegExif`/`stripPngExif`) and post the Blob. Add the Original/Compact picker to `View.Composer.stagedRow`.
-- `[High]` **Landing never scrolls (pins, media, vault, ?at=, search).** Feed `model.historyLanding` into `App.threadAnchorIndex` as `landingIndex`. Add a `scrollPolicy` action `"message"` in the `ports.js` scroller (center, focus, pulse) and clear it on arrival.
-- `[High]` **Staged attachments follow you to another room.** Clear `model.attachments` (and abort pending sends) in `swapComposerDraft`/`selectChannel` (`App.elm:7758`), or key staged files by target.
-- `[High]` **Drafts lost on reload.** Add a `composerDraftsSave`/load port over the owner-scoped `onyx:composer-drafts` slot and render the "Saved here" status in `View.Composer`.
-- `[High]` **No paste or drag-drop attachments.** Add `ports.js` paste/drop listeners on `#shell-composer-input` and the composer form that hand held files to `uploadPicked`, plus a drag-state class.
-- `[Med]` **Hidden senders can't be restored.** Add the "Hiding messages from … Show all" banner to `View.Thread.channelTranscript` with a new `CollapsedShowAll` Msg.
-- `[Med]` **Quote inserts ciphertext for E2EE rows.** Pass `App.loadedActionText m` at `View/Thread.elm:1653`, and emit `PrefsFocus {id="shell-composer-input"}` from the `MessageQuote` fold.
-- `[Med]` **Composer focus on reply/edit/quote.** Emit `PrefsFocus` for the composer from the `ReplyArm`, `EditArm` and `MessageQuote` folds.
-- `[Med]` **Message menu keyboard pattern.** Register `.onyx-msg-menu` and `.onyx-react-picker` with `installOverlayFocus` and add Arrow/Home/End roving.
-- `[Med]` **Ctrl/Cmd+F wipes the draft.** Drop `composer = ""` from the `SearchHotkey` fold (`App.elm:39559`).
-- `[Med]` **BlockKit-lite.** Port `blockKitLite.ts` as `BlockKit.elm`, render it in `View.Thread.messageBody`, and route actions through a `View.Sheet` review dialog (`BlockKitStage`/`Confirm` Msgs).
-- `[Med]` **Swipe-to-reply and iOS long-press.** Add a pointer gesture handler in `ports.js` (or Elm pointer decoders on `rowShell`) that dispatches `ReplyArm` and `MessageMenuOpen`.
-- `[Med]` **Search panel states.** Focus the input on `SearchOpen` and restore focus on close; add the "No matches yet", history-off and room-ledger blocks to `View.Search.panel`.
-- `[Low]` **Caret-aware insertion** for nick completion, emoji and "/". Add a `selectionStart` field to `ComposerInput` through the keydown/input decoders.
-- `[Low]` **`:shortcode:` coverage.** Extend `Emoji.elm` with the 274-entry `EMOJI_MAP` for inline rendering.
-- `[Low]` **Edit history view.** Turn `editTitle` into a disclosure button that lists `App.revisionsFor` bodies.
-- `[Low]` **Reader-memory strip and in-room unread review.** Build these as a new `View.Thread` block backed by the vault and review-history ports.
-- `[Low]` **Small a11y and chrome items.** History-loading skeleton, sr conversation brief, composer brief and hint line, aria-live muting during window changes.
-- `[Low]` **Topic-chip unread from the ledger.** Use `TopicRead.projectRoomTopicUnread` in `View.Thread.topicUnreadFor`.
-- `[Low]` **Missing pref controls and badges.** Add reaction-density and topic-tools controls to `View.Prefs`; render `AiPolicy` in `View.RoomHeader`; add provenance badges to the translation and pins.
-- `[Low]` **Cards for vault-restored rows.** Fetch link previews for vault-restored rows in the `VaultRowsReceived` fold (`App.elm:36944`).
+- `[High]` **Photo EXIF/GPS leak.** **[Closed — v3/gap-convo]** `ports.js:12288` cleans JPEG / PNG / WebP / HEIC by bytes before every POST, fails closed, offers Original / Compact and an explicit "Send with location data" (E127, E128).
+- `[High]` **Landing never scrolls (pins, media, vault, ?at=, search).** **[Closed — v3/gap-convo]** `gapSettleLanding` / `gapSettleSearchHit` drive a `"message"` scroll action (`ports.js:4297`) that centres, pulses and focuses the row (E42, E43, E159, E168, E175).
+- `[High]` **Staged attachments follow you to another room.** **[Closed — v3/gap-convo]** `gapSwapStaged` keys staged files by conversation and settles uploads against their own room (E132).
+- `[High]` **Drafts lost on reload.** **[Closed — v3/gap-convo]** owner-scoped `onyx:composer-drafts` journal with the "Saved here" line (E110).
+- `[High]` **No paste or drag-drop attachments.** **[Closed — v3/gap-convo]** `wireGapComposer` stages pasted / dropped files (never sends) and the composer shows a drop target (E125, E126).
+- `[Med]` **Hidden senders can't be restored.** **[Closed — v3/gap-convo]** "Hiding N messages from … · Show all" banner (E27).
+- `[Med]` **Quote inserts ciphertext for E2EE rows.** **[Closed — v3/gap-convo]** the menu quotes `App.loadedActionText` (E65).
+- `[Med]` **Composer focus on reply/edit/quote.** **[Closed — v3/gap-convo]** `gapSettleComposerFocus` (E114). The two arm paths it misses are listed below.
+- `[Med]` **Message menu keyboard pattern.** **[Closed — v3/gap-convo]** `installGapFocus` focuses the first item, roves with Arrow / Home / End and restores focus; the picker and the search panel use it too (E61, E80, E146). The delete confirm still drops focus (below).
+- `[Med]` **Ctrl/Cmd+F wipes the draft.** **[Closed — v3/gap-convo]** the `SearchHotkey` fold no longer clears the composer (E162).
+- `[Med]` **BlockKit-lite.** **[Closed — v3/gap-import]** strict `[onyx:block]` decoder, cards, URL / copy buttons, origin-scoped send review and the inspect dialog (E101–E104).
+- `[Med]` **Archived-search results do not jump.** `ServerOpenResult { target }` (`App.elm:43906`) only selects the conversation. Carry the hit's `at` and msgid in the message, then call `requestTravelTo` and `gapLandOn` like Solid's `openServerResult` (E155).
+- `[Med]` **Swipe-to-reply, iOS long-press, right-click and keyboard reveal.** Add a pointer gesture handler in `ports.js` (or Elm pointer decoders on `rowShell`) that dispatches `ReplyArm` and `MessageMenuOpen` for the 72 px swipe and the 450 ms press, open the menu on mouse right-click (`View/Thread.elm:484` only takes touch `contextmenu`), and make rows tab stops with Enter / Space revealing the action bar (E21–E24).
+- `[Med]` **Row accessible label.** `App.messageAccessibleLabel` (`App.elm:8775`) omits Solid's "at <time>" (the row clock is `aria-hidden`, so a screen reader never hears when a line was sent). Add the `formatRowClock` time; optionally run the body through `BlockKit.summary` for BlockKit rows (E5).
+- `[Low]` **Search panel leftovers.** Focus, "No matches yet" and the history-off block are done (v3/gap-convo). Still missing: the Room ledger link (E151), placeholder variants and the disabled state (E149), the Advanced recall-mode control (E158), the key-help text and `aria-keyshortcuts` on the input (E161), saved-search error / success status copy (E153), selecting the existing query on open, and re-focusing the field when Ctrl+F is pressed with the panel already open (E146, E162).
+- `[Low]` **Composer focus misses two arm paths.** Add `ThreadReplyParent` (E20) and `MemberMention` (`App.elm:46406`) to `gapSettleComposerFocus` (E114).
+- `[Low]` **Caret-aware insertion** is done for the emoji picker (v3/gap-convo). Nick completion (`ComposerAssist` runs with the caret at the end, E119) and "Insert /" (`App.elm:51563`, E141) still use the draft's end / start. Feed `model.gapConvo.composerCaret` to `ComposerAssist.cycleNickCompletion` and to `Polish.ToolsSlash`.
+- `[Low]` **`:shortcode:` coverage.** Extend `Emoji.elm` with the 274-entry `EMOJI_MAP` for inline rendering (E92).
+- `[Low]` **Edit history view.** **[Closed — v3/rx-convo]** the "· edited" marker is a disclosure listing prior bodies (E16).
+- `[Low]` **Reader-memory strip and in-room unread review.** Reader mode (v3/gap-organize) and a Home "Since you left" digest exist; the Solid strip (Start / New / Latest / Home / Find text, reviewed span, context trail) and the in-room Review-unread button that clears the divider do not (E45, E46). Build them as a new `View.Thread` block backed by the vault and review-history ports.
+- `[Low]` **Small a11y and chrome items.** The history-loading skeleton is done (v3/gap-convo). Still missing: the sr conversation brief (E32), the composer brief and hint line (E108, E139), the composer's destination-and-offline accessible name and `@` placeholder (E107), and aria-live muting while the window grows (E34).
+- `[Low]` **Delete confirm drops focus.** After "Delete for everyone" swaps in the confirm, focus falls to the page; move it to "Keep message" (E79).
+- `[Low]` **Search-this-text seeds the whole message.** Use `App.suggestSearchQuery` (`App.elm:8414`, currently uncalled) in `View/Thread.elm:1747-1757` (E68).
+- `[Low]` **Topic-chip unread from the ledger.** Use `TopicRead.projectRoomTopicUnread` in `View.Thread.topicUnreadFor` (E50).
+- `[Low]` **Missing badges.** Reaction-density and topic-tools controls are done (v3/gap-appearance). Still missing: render `AiPolicy` in `View.RoomHeader` (E176, the module is never imported), a device-provenance badge on the translation (E71) and a server-provenance badge on pins (E171).
+- `[Low]` **Cards for vault-restored rows.** Fetch link previews for vault-restored rows in the `VaultRowsReceived` fold (`App.elm:41075`) and hide a broken preview thumbnail (E99, E100).
+- `[Low]` **Staged-file thumbnail and upload abort.** Staged rows show name / status / size but no thumbnail (E129, needs an object-URL port); an in-flight upload is never aborted on an account switch because the bridge has no abort port (E132).
+- `[Low]` **Dead code to retire or wire.** `Upload.stripJpegExif` / `stripPngExif` (superseded by the ports.js cleaner), `App.suggestSearchQuery`, `AiPolicy.elm` and the write-only `historyLanding` field (`App.elm:597`).
 
 ### K — Command surfaces — slash verbs, command palette, keyboard shortcuts, gestures
 
-Walked: `src/lib/commands/registry.ts` (`SLASH_COMMANDS` 214–260), the slash arm of
+Walked (Solid): `src/lib/commands/registry.ts` (`SLASH_COMMANDS` 214–260), the slash arm of
 `sendMessage` (`store.ts` 8113–8530, raw fallthrough `client.sendRaw(cmd.toUpperCase(), …args)`
 at 8528), `src/chat/spotlight/commands.ts` (palette rows 300–1480), `useSpotlight.ts`,
-`src/lib/keyboard/shortcutsRegistry.ts` + `useKeyboardShortcuts.ts`, `src/shell/message/rowGesture.ts`.
-Elm: `App.elm` composer send path (38992–39058), `parseSlashLocal` (10981), `sendRawSlashCommand`
-(11164), `runSlashLocal` (14474–15011), registry `slashCommands` (12976), `Switcher.elm`
-(`actionEntries` 234, `shortcutGroups` 609), `ports.js` `classifyShortcut` (3483), `CALL_CHORDS` (3478).
-Server cross-check: `/home/kain/onyx-server/src/daemon` has no `ME`, `MSG`, `J`, `OP`, `DEOP`, `VOICE`,
-`DEVOICE`, `BAN`, `UNBAN`, `BACK`, `UNAWAY`, `QUOTE`, `RAW`, `CTCP`, `STAGE`, `SHARE` verbs; unknown verbs
-answer `421` (`dispatch.zig:2370`).
+`src/lib/keyboard/shortcutsRegistry.ts` (22 registry chords) + `useKeyboardShortcuts.ts`,
+`src/shell/message/rowGesture.ts`.
+Walked (Elm, HEAD `609cb240`): `App.elm` composer send path (offline refusal 43238, then
+`dispatchComposerSlash` 13387 called at 43243), `planSlash` (12966; the translated verbs) →
+`runSlashPlan` (13438), `parseSlashLocal` (12572), `runSlashLocal` (17323), `sendRawSlashCommand`
+(12763), registry `slashCommands` (15634), `slashHelpGroups` (49716); palette `Switcher.elm`
+(`actionEntries` 299, `build` 358, `typedActions` 469, `roomActions` 551, `globalActions` 597,
+`shortcutGroups` 1291) run by `App.runPaletteEntry` (49049) / `runGapPaletteTarget` (49313);
+shortcuts `ports.js` `classifyShortcut` (4531), `runLocalShortcut` (4643), `wireShortcuts` (5162)
+→ `Switcher.shortcutFromString` (1194) → `App.runAppChord` (49449); `CALL_CHORDS` (4484).
+Server cross-check (re-read at HEAD): `/home/kain/onyx-server/src/daemon` still has no `ME`, `MSG`, `J`,
+`OP`, `DEOP`, `VOICE`, `DEVOICE`, `BAN`, `UNBAN`, `BACK`, `UNAWAY`, `QUOTE`, `RAW`, `CTCP`, `STAGE`,
+`SHARE` verbs; unknown verbs answer `421` (`dispatch.zig:2370`).
 
-**Shared defect, called out once:** both clients send every registry verb they do not handle locally
-as a raw uppercase IRC line. Verbs that need client-side translation therefore do not work in
-EITHER client — `/me` becomes `ME …` (421), `/msg` → `MSG` (421), `/op nick` → `OP nick` (421),
-`/kick nick` → `KICK nick` with no channel, `/topic text` → `TOPIC text` with no channel. Both
-clients also SWALLOW inbound CTCP `ACTION` (`store.ts:12684–12703` `break`; Elm `App.elm:7443`
-`foldCtcpQuery` + `isCtcpQueryBody` 7533), so `/me` lines from other IRC clients vanish. These
-rows are marked FULL (parity) with "⚠ shared" in the note; they are gaps against the product,
-not against Solid, and they are where Elm can cheaply beat Solid.
+**Shared defect — closed in Elm by v3/gap-commands, still open in Solid.** When this map was written both
+clients sent every registry verb they did not handle locally as a raw uppercase IRC line, so verbs that
+need client-side translation worked in NEITHER client (`/me` → `ME …` (421), `/msg` → `MSG`, `/op nick`
+→ `OP nick`, `/kick nick` with no channel, `/topic text` with no channel), and both swallowed inbound
+CTCP `ACTION`. Elm now translates them in `planSlash` and renders inbound ACTION as a `* nick text` row
+(`isCtcpQueryBody` 7900 lets ACTION through). The rows that were “⚠ shared” are plain FULL with the closing
+slice named. Solid is unchanged and still has the defect (it is the oracle, not a target).
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K3 | `/nick <nick>` | `registry.ts:217` (slash, raw) | FULL | `App.elm:11164` | NICK is a real verb |
-| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K7 | `/whois <nick>` opens profile sheet | `store.ts:8494` (slash) | FULL | `App.elm:14627` / `14634` usage toast | — |
-| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K9 | `/event <when> <title>` / `/event clear` | `store.ts:8122` (slash) | FULL | `App.elm:14990` → `runSlashEvent` 13850 | — |
-| K10 | `/webhook create\|list\|delete` | `registry.ts:224` (slash, raw) | FULL | `App.elm:11164` | server `WEBHOOK` module exists |
-| K11 | `/notice <target> <text>` | `registry.ts:226` (slash, raw) | FULL | `App.elm:11164`, `rawContentVerbs` guard | Elm better: refuses plaintext into designated/unresolved DMs |
-| K12 | `/away [message]` | `registry.ts:227` (slash, raw) | FULL | `App.elm:11164` | — |
-| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K14 | `/mode <target> [modes]` | `registry.ts:229` (slash, raw) | FULL | `App.elm:11164` | — |
-| K15 | `/modex [#room[,nick]]` (IRCX MODEX) | — | FULL | `App.elm:14648` | Elm-only addition |
-| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K20 | `/clear` local scrollback | `store.ts:8139` (slash) | FULL | `App.elm:14553` | — |
-| K21 | `/ignore [nick]`, `/unignore <nick>`, bare list | `store.ts:8160` (slash) | FULL | `App.elm:14476/14494/14512` | — |
-| K22 | `/read`, alias `/markread` | `store.ts:8198` (slash) | FULL | `App.elm:14609` | — |
-| K23 | `/star`, `/unstar [#channel]` | `store.ts:8207` (slash) | FULL | `App.elm:14814/14817` | — |
-| K24 | `/mute`, `/unmute [#channel]` | `store.ts:8226` (slash) | FULL | `App.elm:14703/14737` | — |
-| K25 | `/autojoin`, `/unautojoin` | `store.ts:8253` (slash) | FULL | `App.elm:14820/14854` | — |
-| K26 | `/highlight`, `/unhighlight` | `store.ts:8280` (slash) | FULL | `App.elm:14655/14673` | — |
-| K27 | `/snooze <min>`, `/dnd [on\|off\|min]` | `store.ts:8307` (slash) | FULL | `App.elm:14697/14700` | — |
-| K28 | `/color`, alias `/colour` | `store.ts:8349` (slash) | FULL | `App.elm:14888` | — |
-| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K30 | `/export [txt\|json]` | `store.ts:8401` (slash) | FULL | `App.elm:14597` | — |
-| K31 | `/import` vault snapshot | — (Solid imports via Preferences) | FULL | `App.elm:14603` | Elm-only verb |
-| K32 | `/notify all\|mentions\|mute` | `store.ts:8427` (slash) | FULL | `App.elm:14771` | — |
-| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K36 | `/history` opens search | `store.ts:8156` (slash) | FULL | `App.elm:14571` | — |
-| K37 | `/search <query>` | `store.ts:8147` (slash) | FULL | `App.elm:14577` | — |
-| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.planSlash` / `runSlashPlan` (`GapCommandsTest`) | closed by v3/gap-commands |
-| K39 | Oper verbs `/broadcast` (`/wallops`) `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8510` `parseOperSlashCommand` (slash) | FULL | `App.elm:14993-15011` → `runSlashOper` | shared `planOperAction` gate |
-| K40 | Text verbs `/shrug` `/tableflip` `/unflip` `/lenny` `/disapprove` | `registry.ts:255-259` (slash) | FULL | `App.elm:11101` `expandSlashTextCommand` | — |
-| K41 | Unknown verb raw passthrough | `store.ts:8528` (slash) | FULL | `App.elm:11164` | Elm better: `plaintextWouldLeak` refusal for content verbs |
-| K42 | Offline slash refusal copy | `Composer.tsx:1291` (UI) | FULL | `App.elm:39033` | identical copy |
-| K43 | Slash suggestions (prefix, aliases, oper-hidden, Tab/Enter) | `Composer.tsx:401,1524` (UI) | FULL | `ComposerAssist.elm`, `View/Composer.elm` | see E section |
-| K44 | Palette: `Go to #room` rows | `commands.ts:1430` (palette) | FULL | `Switcher.elm:171` | — |
-| K45 | Palette: `Open DM with nick` rows | `commands.ts:1449` (palette) | FULL | `Switcher.elm:180` | — |
-| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K48 | Palette: Browse rooms | `commands.ts:1195` | FULL | `Switcher.elm:236` | — |
-| K49 | Palette: Start a room | `commands.ts:1203` | FULL | `Switcher.elm:237` | — |
-| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K51 | Palette: New conversation | — | FULL | `Switcher.elm:238` | Elm-only |
-| K52 | Palette: Jump to date… | `commands.ts:1280` | FULL | `Switcher.elm:242` | — |
-| K53 | Palette: Notifications | — | FULL | `Switcher.elm:247` | Elm-only |
-| K54 | Palette: Appearance — theme & background | `commands.ts:1227` | FULL | `Switcher.elm:248` | — |
-| K55 | Palette: You | — | FULL | `Switcher.elm:249` | Elm-only |
-| K56 | Palette: Open keyboard shortcuts | `commands.ts:1077` | FULL | `Switcher.elm:250` | — |
-| K57 | Palette: Disconnect | `commands.ts:1347` | FULL | `Switcher.elm:251` | — |
-| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K59 | Palette: Open Theme Studio | `commands.ts:1243` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K60 | Palette: Show/Hide member list | `commands.ts:1251` | PARTIAL | — | v3/gap-commands: Alt+M shows/hides the member list; no palette row |
-| K61 | Palette: Focus composer | `commands.ts:1259` | PARTIAL | — | v3/gap-commands: Enter / Alt+Enter focus the composer; no palette row |
-| K62 | Palette: Scheduled messages | `commands.ts:1272` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K63 | Palette: AI policy row for active room | `commands.ts:1305` | MISSING | `AiPolicy.elm` (no UI) | — |
-| K64 | Palette: Start voice in current room | `commands.ts:1317` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K1 | `/me <action>` | `registry.ts:215`, raw `store.ts:8528` (slash) | FULL | `App.planSlash` 12966 (`"me"` 13046) → `runSlashPlan` 13438 → `sendSlashContent` 13617; inbound `isCtcpQueryBody` 7900, `normalizeActionRow` 12862; `GapCommandsTest` | (v3/gap-commands) was ⚠ shared (raw `ME` → 421). Now a CTCP ACTION through the composer seal path (protected DM / required room seals, unresolved peer holds); inbound ACTION renders as a `* nick text` row |
+| K2 | `/topic <text>` | `registry.ts:216` (slash, raw) | FULL | `planSlash` `"topic"` 13105; `PlanTopicShow` 13549; `GapCommandsTest` | (v3/gap-commands) `/topic text` → `TOPIC <room> :text` (a leading `#room` works); bare `/topic` toasts the current topic |
+| K3 | `/nick <nick>` | `registry.ts:217` (slash, raw) | FULL | `sendRawSlashCommand` 12763 (no `planSlash` arm) | NICK is a real server verb |
+| K4 | `/join #room`, alias `/j` | `registry.ts:218` (slash, raw) | FULL | `planSlash` `"j"` / `"join"` 13076–13079; `planJoin` 13346; `PlanJoin` 13461; `GapCommandsTest` | (v3/gap-commands) a bare name gets its `#`; a new room opens on the self-JOIN echo, a joined one just opens |
+| K5 | `/part [#room]`, alias `/leave` | `registry.ts:219` (slash, raw) | FULL | `planSlash` `"part"` / `"leave"` 13082 / 13102; `GapCommandsTest` | (v3/gap-commands) `PART <room> [reason]`; `/part` outside a room coaches inline and keeps the draft |
+| K6 | `/msg <nick> <text>`, alias `/query` | `registry.ts:220` (slash, raw) | FULL | `planOpen` 13300; `openSlashConversation` 13673; `GapCommandsTest` | (v3/gap-commands) opens the DM (creating its shell), then sends through the composer path so sealing and the key-lookup hold apply |
+| K7 | `/whois <nick>` opens profile sheet | `store.ts:8494` (slash) | FULL | `App.elm:17477` / `17484` usage toast | — |
+| K8 | `/invite` bare = copy room link; `/invite <nick>` = wire | `store.ts:8376` (slash) | FULL | `planSlash` `"invite"` 13145 → `PlanInviteSheet` / `INVITE`; `GapCommandsTest` | (v3/gap-commands) bare `/invite` opens the invite-share sheet for the room (copy / share) instead of silently copying; `/invite <nick> [#room]` sends INVITE |
+| K9 | `/event <when> <title>` / `/event clear` | `store.ts:8122` (slash) | FULL | `App.elm:17831` → `runSlashEvent` 16700 | — |
+| K10 | `/webhook create\|list\|delete` | `registry.ts:224` (slash, raw) | FULL | `sendRawSlashCommand` 12763; listed under Rooms in `slashHelpGroups` 49716 | server `WEBHOOK` module exists (`modules/webhook.zig`); the subcommands go out as a raw line, like Solid |
+| K11 | `/notice <target> <text>` | `registry.ts:226` (slash, raw) | FULL | `planSlash` `"notice"` 13062 → `sendSlashContent` 13617 (`notice = True`); `GapCommandsTest` | (v3/gap-commands) was raw. Elm better: a notice to a designated DM seals as a message, to an unresolved peer holds, never goes plaintext; one target per notice |
+| K12 | `/away [message]` | `registry.ts:227` (slash, raw) | FULL | `planSlash` `"away"` 13197 → `PlanAway` (`runSlashPlan` 13477) | (v3/gap-commands) sends `AWAY :msg` and sets the local status; bare `/away` = “Away” |
+| K13 | `/back`, alias `/unaway` | `registry.ts:228` (slash, raw) | FULL | `planSlash` `"back"` / `"unaway"` 13210–13213 → `PlanAway Nothing` 13470 (`setUserStatus`); `GapCommandsTest` | (v3/gap-commands) was raw `BACK` → 421 |
+| K14 | `/mode <target> [modes]` | `registry.ts:229` (slash, raw) | FULL | `sendRawSlashCommand` 12763 | MODE is a real server verb |
+| K15 | `/modex [#room[,nick]]` (IRCX MODEX) | — | FULL | `App.elm:17498`; `requestModex` 22397 | Elm-only addition |
+| K16 | `/kick <nick> [reason]` | `registry.ts:230` (slash, raw) | FULL | `planSlash` `"kick"` 13117; `GapCommandsTest` | (v3/gap-commands) `KICK <room> <nick> [reason]`; the room is the open one unless a `#room` leads |
+| K17 | `/ban <mask>`, `/unban <mask>` | `registry.ts:231-232` (slash, raw) | FULL | `planSlash` `"ban"` / `"unban"` 13191 / 13194 (`banVerb`); `GapCommandsTest` | (v3/gap-commands) `MODE ±b`; a nick or `nick!user@host` goes through `Ircx.normalizeAccessMask`, bad input coaches |
+| K18 | `/op` `/deop` `/voice` `/devoice` | `registry.ts:233-236` (slash, raw) | FULL | `planSlash` `"op"` / `"deop"` / `"voice"` / `"devoice"` 13179–13188 (`grant`); `GapCommandsTest` | (v3/gap-commands) `MODE ±o` / `±v`, three targets per line |
+| K19 | `/quote <raw>`, alias `/raw` | `registry.ts:237` (slash, raw) | FULL | `planSlash` `"quote"` / `"raw"` 13216 / 13223 → `sendSlashRaw` 13584; `GapCommandsTest` | (v3/gap-commands) the tail goes out verbatim as ONE line; content verbs and `MEMO SEND` to protected targets are refused |
+| K20 | `/clear` local scrollback | `store.ts:8139` (slash) | FULL | `App.elm:17403` | — |
+| K21 | `/ignore [nick]`, `/unignore <nick>`, bare list | `store.ts:8160` (slash) | FULL | `App.elm:17326` / `17344` / `17362` (bare list); `applyBlocklistAction` 34813 | — |
+| K22 | `/read`, alias `/markread` | `store.ts:8198` (slash) | FULL | `App.elm:17459` | — |
+| K23 | `/star`, `/unstar [#channel]` | `store.ts:8207` (slash) | FULL | `App.elm:17664` / `17667`; `runSlashStar` 17193 | — |
+| K24 | `/mute`, `/unmute [#channel]` | `store.ts:8226` (slash) | FULL | `App.elm:17553` / `17587`; `setChannelNotify` 14026 | — |
+| K25 | `/autojoin`, `/unautojoin` | `store.ts:8253` (slash) | FULL | `App.elm:17670` / `17704`; `addAutoJoin` 14268 | — |
+| K26 | `/highlight`, `/unhighlight` | `store.ts:8280` (slash) | FULL | `App.elm:17505` / `17523`; `addHighlightWord` 34776 | — |
+| K27 | `/snooze <min>`, `/dnd [on\|off\|min]` | `store.ts:8307` (slash) | FULL | `App.elm:17547` / `17550` | — |
+| K28 | `/color`, alias `/colour` | `store.ts:8349` (slash) | FULL | `App.elm:17738`; `setChannelColor` 14396 | — |
+| K29 | `/share` copy room deep link | `store.ts:8376-8399` (slash) | FULL | `planSlash` `"share"` 13260 → `PlanShare` 13482 (`ClipboardCopy`, tag `room-link:`); `roomDeepLink` 13769; receipt toast `settleStepGapCommands` 49655 | (v3/gap-commands) copies the https deep link (`/app/?join=`) |
+| K30 | `/export [txt\|json]` | `store.ts:8401` (slash) | FULL | `App.elm:17447` → `runSlashExport` 22466 | — |
+| K31 | `/import` vault snapshot | — (Solid imports via Preferences) | FULL | `App.elm:17453` → `historyImportOpen` | Elm-only verb (v3/gap-import: the file is staged for review in Preferences → Import & export) |
+| K32 | `/notify all\|mentions\|mute` | `store.ts:8427` (slash) | FULL | `App.elm:17621` | — |
+| K33 | `/ping [nick]` | `registry.ts:248` (slash, raw) | FULL | `planSlash` `"ping"` 13282 → `PlanPing` 13496 / 13520; `GapCommandsTest` | (v3/gap-commands) bare `/ping` toasts the round trip and probes now; `/ping <nick>` is a CTCP PING |
+| K34 | `/ctcp <nick> <cmd>` | `registry.ts:249` (slash, raw) | FULL | `planSlash` `"ctcp"` 13230 → `PlanCtcp` 13523; reply toast `foldCtcpReplyNotice` 13787; `GapCommandsTest` | (v3/gap-commands) the reply notice lands as a toast, not a row; `/ctcp … ACTION` rides the sealed content path; arguments to a protected peer are refused |
+| K35 | `/stage [on\|off]` | `registry.ts:250` (slash, raw) | FULL | `planSlash` `"stage"` 13263 → `runSlashStage` 13726 (`StageStart` / `StageEnd` / `StageLeave`); `GapCommandsTest` | (v3/gap-commands) only room operators can start a stage; bare `/stage` toasts the state |
+| K36 | `/history` opens search | `store.ts:8156` (slash) | FULL | `App.elm:17421` | — |
+| K37 | `/search <query>` | `store.ts:8147` (slash) | FULL | `App.elm:17427` | — |
+| K38 | `/help [command]` | `store.ts:8459` (slash) | FULL | `App.elm:17794` (`"help"` arm); `slashHelpGroups` 49716; `View/GapCommands.elm commandsHelp`; `GapCommandsTest` | (v3/gap-commands) bare `/help` opens a grouped Slash commands sheet listing only verbs that work (each row drops `/verb ` into the composer); `/help <verb>` toasts the usage. Elm better |
+| K39 | Oper verbs `/broadcast` (`/wallops`) `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8510` `parseOperSlashCommand` (slash) | FULL | `App.elm:17841-17859` → `runSlashOper` 17134 | shared `planOperAction` gate; `/desk` and `/appeal` are Elm-only additions (v3/gap-oper) |
+| K40 | Text verbs `/shrug` `/tableflip` `/unflip` `/lenny` `/disapprove` | `registry.ts:255-259` (slash) | FULL | `App.elm:12700` `expandSlashTextCommand` | — |
+| K41 | Unknown verb raw passthrough | `store.ts:8528` (slash) | FULL | `dispatchComposerSlash` 13387 → `sendRawSlashCommand` 12763; `rawContentVerbs` 52120, `rawContentDestination` 52129 | Elm better: content verbs (`MSG`, `NOTICE`, `ME`, `WHISPER`, `EDIT`, `MEMO SEND`…) refuse plaintext into protected DMs / required-encryption rooms (`rawSlashLeakCopy`); an unknown verb still draws the server’s 421 like Solid |
+| K42 | Offline slash refusal copy | `Composer.tsx:1291` (UI) | FULL | `App.elm:43238` | identical copy |
+| K43 | Slash suggestions (prefix, aliases, oper-hidden, Tab/Enter) | `Composer.tsx:401,1524` (UI) | FULL | `ComposerAssist.slashSuggestions` 163; `View/Composer.elm keyDecoder` 625, `assistPopovers`; `App.composerAssistInputs` 48867 | see E section; oper verbs hidden unless `isOper` |
+| K44 | Palette: `Go to #room` rows | `commands.ts:1430` (palette) | FULL | `Switcher.elm:236` | — |
+| K45 | Palette: `Open DM with nick` rows | `commands.ts:1449` (palette) | FULL | `Switcher.elm:245` | — |
+| K46 | Palette: People rows (`Message <nick>` from rosters) | `commands.ts:1403` (palette) | FULL | `Switcher.build` 358 (`personRow` / `profileRow`); `App.palettePeople` 49140; `GapCommandsTest` palette suite | (v3/gap-commands) members of the open room plus contacts, never self or an existing DM (5 quiet / 12 typing); typing adds `View profile: nick` (Elm-only) |
+| K47 | Palette: recents (owner-scoped, ranked first) | `registry.ts` recents + `Spotlight.tsx` (palette) | FULL | `Switcher.matchesWith` 674; `App.recordPaletteRecent` 49216; `wireGapPrefs` (`ports.js:5205`, `onyx:palette-recents`) | (v3/gap-commands) owner-scoped, 8 ids, 5 shown first in a Recent section; Disconnect and typed rows never recorded |
+| K48 | Palette: Browse rooms | `commands.ts:1195` | FULL | `Switcher.elm:301` | — |
+| K49 | Palette: Start a room | `commands.ts:1203` | FULL | `Switcher.elm:302` | — |
+| K50 | Palette: Join room… (typed name) | `commands.ts:1211` | FULL | `Switcher.typedActions` 469 (`JoinTyped`); `App.joinRoomByName` | (v3/gap-commands) typing `#room` / `join room` offers `Join #room` (not for a joined room, not offline); no empty-query `Join room…` prompt row |
+| K51 | Palette: New conversation | — | FULL | `Switcher.elm:303` | Elm-only |
+| K52 | Palette: Jump to date… | `commands.ts:1280` | FULL | `Switcher.elm:307` | — |
+| K53 | Palette: Notifications | — | FULL | `Switcher.elm:312` | Elm-only |
+| K54 | Palette: Appearance — theme & background | `commands.ts:1227` | FULL | `Switcher.elm:313` | — |
+| K55 | Palette: You | — | FULL | `Switcher.elm:314` | Elm-only |
+| K56 | Palette: Open keyboard shortcuts | `commands.ts:1077` | FULL | `Switcher.elm:315` | — |
+| K57 | Palette: Disconnect | `commands.ts:1347` | FULL | `Switcher.elm:316` | — |
+| K58 | Palette: Preferences — display & behaviour | `commands.ts:1235,1066` | FULL | `Switcher.globalActions` 616; `runGapPaletteTarget` 49329 | (v3/gap-commands) |
+| K59 | Palette: Open Theme Studio | `commands.ts:1243` | FULL | `Switcher.globalActions` 617; `runGapPaletteTarget` 49332 | (v3/gap-commands) same destination as the Appearance row (`/appearance`) |
+| K60 | Palette: Show/Hide member list | `commands.ts:1251` | PARTIAL | — | Alt+M exists (narrow: opens / closes the member sheet; wide: moves focus into the always-visible rail, see K97) but there is no palette row |
+| K61 | Palette: Focus composer | `commands.ts:1259` | PARTIAL | — | Enter / Alt+Enter focus the composer (`runLocalShortcut`, K89); there is no palette row |
+| K62 | Palette: Scheduled messages | `commands.ts:1272` | FULL | `Switcher.globalActions` 600; `runGapPaletteTarget` 49335 | (v3/gap-commands) |
+| K63 | Palette: AI policy row for active room | `commands.ts:1305` | MISSING | `AiPolicy.elm` (parser only; nothing outside the module reads it) | no row and no UI; Solid shows the row only for a non-open room and it opens Preferences |
+| K64 | Palette: Start voice in current room | `commands.ts:1317` | FULL | `Switcher.voiceActions` 582; `runGapPaletteTarget` 49358 (`CallJoin`) | (v3/gap-commands) offered in a room when `prefs.voiceEntry` is on and live; guests are offered an account instead (v3/rx-calls); during a call the row becomes `Return to call` (Elm-only) |
 | K65 | Palette: Start video in current room | `commands.ts:1331` | N/A | video off on live network (`fbe04585`) | revisit when video ships |
-| K66 | Palette: Copy node address | `commands.ts:1355` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K67 | Palette: Copy room link | `commands.ts:1365` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K69 | Palette: Switch background rows | `commands.ts:1473` | MISSING | — | — |
+| K66 | Palette: Copy node address | `commands.ts:1355` | FULL | `Switcher.globalActions` 624; `runGapPaletteTarget` 49347 (tag `node-address`; receipt toast 49655) | (v3/gap-commands) |
+| K67 | Palette: Copy room link | `commands.ts:1365` | FULL | `Switcher.roomActions` 559; `runGapPaletteTarget` 49344; `roomDeepLink` 13769 | (v3/gap-commands) copies the https deep link (`/app/?join=`), not Solid’s `ircs://` URL; also an `Invite people to #room` row (Elm-only) |
+| K68 | Palette: Switch theme: <theme> rows | `commands.ts:1464` | FULL | `Switcher.build` 407 (`themeRow`); `runGapPaletteTarget` 49430 (`AppearanceSetTheme`) | (v3/gap-commands) rows list only while typing; a theme recolors the whole shell (v3/gap-appearance) |
+| K69 | Palette: Switch background rows | `commands.ts:1473` | MISSING | — | background scenes exist (v3/gap-appearance) but the palette has no `Switch background:` rows; the Appearance row opens the page |
 | K70 | Palette: extension action rows | `commands.ts:1162` | MISSING | — | extensions not ported (see F) |
-| K71 | Palette time grammar: "jump [#room] <time>" (`timeGrammar.ts`) | `commands.ts:328,354,568` | MISSING | — | — |
-| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
-| K73 | Palette: Mark all read | `commands.ts:444` | FULL | `Switcher.build` / `App.runGapPaletteTarget` | closed by v3/gap-commands |
+| K71 | Palette time grammar: "jump [#room] <time>" (`timeGrammar.ts`) | `commands.ts:328,354,568` | MISSING | — | `typedActions` 469 accepts only `#room`, `join room` and `mute\|snooze\|dnd\|pause N`; `Jump to date…` opens the sheet, but no typed time (`at <time>`, `@<time>`, `at #room <time>`, `goto #room at <time>`) is parsed and there is no time parser in Elm |
+| K72 | Palette: Catch up — jump to first unread in X | `commands.ts:418` | FULL | `Switcher.build` 400 (`catchUpRow`, up to 6 unread rooms / DMs); `runGapPaletteTarget` 49375 | (v3/gap-commands) opens the conversation (the unread divider is the landing); Solid offered one row for the busiest room |
+| K73 | Palette: Mark all read | `commands.ts:444` | FULL | `Switcher.build` 438; `runGapPaletteTarget` 49369 (`HomeMarkAllCaughtUp`) | (v3/gap-commands) shown only while something is unread |
 | K74 | Palette: Reopen reviewed anchors | `commands.ts:493` | MISSING | — | no review history in Elm |
-| K75 | Palette: vault search mode toggle / `vault exact\|semantic\|hybrid` | `commands.ts:524,942` | MISSING | mode toggle lives in search panel | — |
-| K76 | Grammar: hide room / close conversation | `commands.ts:594-657` | PARTIAL | `View/Organize.elm` (row menu, room / DM More menus, Room settings) | v3/gap-organize: hidden rooms and closed conversations exist now; palette verbs for them are not added (hidden rooms and closed DMs do stay reachable from the palette) |
-| K77 | Grammar: leave / PART room | `commands.ts:671-713` | MISSING | — | — |
-| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | PARTIAL | — | v3/gap-commands: palette star/unstar/mark-read/DM rows; no typed grammar |
-| K79 | Grammar: schedule message "<text> in 2h" | `commands.ts:801` | MISSING | — | — |
-| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | PARTIAL | — | v3/gap-commands: `mute N` / DND / away rows; no `away set\|clear` grammar |
-| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | PARTIAL | — | v3/gap-commands: palette search/home rows; no focus-mode or `search X` grammar |
-| K82 | Grammar: translate to X / clear | `commands.ts:976-988` | MISSING | — | — |
-| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | PARTIAL | — | v3/gap-commands: density toggle row; reader mode, width and motion stay in Preferences |
-| K84 | Shortcut Ctrl/Cmd+K palette | `shortcutsRegistry.ts` (shortcut) | FULL | `ports.js:3492` | — |
-| K85 | Shortcut `/` palette when not typing | `useSpotlight.ts:32` | FULL | `ports.js:3509` | — |
-| K86 | Shortcut `?` shortcuts overlay | `shortcutsRegistry.ts` | FULL | `ports.js:3512` | — |
-| K87 | Shortcut Escape closes topmost overlay | `useKeyboardShortcuts.ts:670` | FULL | `ports.js:3488` + `App.escapeMsg` | Elm single ordered stack (better) |
-| K88 | Shortcut Ctrl/Cmd+F search | `shortcutsRegistry.ts` | FULL | `ports.js:5770` `isFindHotkey`, `App.elm:39559` | — |
-| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K94 | Shortcut Ctrl/Cmd+Shift+R reader mode | `shortcutsRegistry.ts` | MISSING | — | no reader mode in Elm |
-| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | FULL | `ports.js classifyShortcut` → `App.runAppChord` | closed by v3/gap-commands |
-| K103 | Call chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S | (Solid VoiceBar local keys; see H) | FULL | `ports.js:3478`, `Switcher.elm:637` | Elm-wide, `aria-keyshortcuts` |
-| K104 | Push-to-talk talk key | `useCadenceMedia.ts` (see H) | FULL | `ports.js:3751` `createPushToTalk` | — |
-| K105 | Swipe-to-reply on touch rows | `rowGesture.ts` (gesture) | MISSING | — | — |
-| K106 | Long-press opens message menu | `rowGesture.ts` (gesture) | FULL | `View/Thread.elm:450-458` `contextmenu` | — |
-| K107 | Swipe-down to dismiss sheets | — | FULL | `View/Sheet.elm:207` | Elm-only |
+| K75 | Palette: vault search mode toggle / `vault exact\|semantic\|hybrid` | `commands.ts:524,942` | MISSING | mode toggle lives in the search panel: `View/Search.elm:256` (`CycleVaultSearchMode`) | no palette row and no `vault exact\|semantic\|hybrid` grammar |
+| K76 | Grammar: hide room / close conversation | `commands.ts:594-657` | PARTIAL | `View/Organize.elm` (rail row menu, room / DM More menus); `Switcher.roomActions` 574 | (v3/gap-organize) hidden rooms and closed conversations exist, but there is no `hide room` / `close conversation` palette verb (the `Leave` row has hide / close keywords yet PARTs). Hidden rooms and closed DMs stay reachable as `Go to` / `Open DM` rows |
+| K77 | Grammar: leave / PART room | `commands.ts:671-713` | PARTIAL | `Switcher.roomActions` 574 (`leave-room`); `runGapPaletteTarget` 49378 | (v3/gap-commands) a `Leave <open room>` row sends PART at once (toast, no confirm sheet — the rail and room header ask first via `GapShell.LeaveAsk`); no typed `leave #other` / `part` grammar; shown but inert offline |
+| K78 | Grammar: unread / star / unstar / dm nick | `commands.ts:732-787` | PARTIAL | `Switcher.roomActions` 559–579; `Switcher.build` 400; People rows | (v3/gap-commands) Star / Unstar and Mark read for the open room, `Catch up: X` for unread rooms and DMs, People `Message nick` rows; no typed `star #other`, `unread #room` or `dm <anyone>` grammar (a non-member nick needs New conversation) |
+| K79 | Grammar: schedule message "<text> in 2h" | `commands.ts:801` | MISSING | — | the `Scheduled messages` row only opens the queue; no `schedule <when>: <text>` grammar |
+| K80 | Grammar: mute N / DND on\|off / away set\|clear | `commands.ts:822-896` | PARTIAL | `Switcher.typedActions` 469 (`pauseRow`); `globalActions` 601–611 (DND and Away toggles) | (v3/gap-commands) `mute\|snooze\|dnd\|pause N` takes bare minutes (1–1440) only; missing: `30m` / `2h` / `1d` units (to 7 days), `mute off`, typed `dnd on\|off`, `away <message>` (the row toggles Idle with no message), `away clear` |
+| K81 | Grammar: focus mode / go home / search X | `commands.ts:907-930` | PARTIAL | `Switcher.globalActions` 599 (`Search messages`) | (v3/gap-commands) a `Search messages` row opens the panel empty; there is no `search X` row that carries the query, no `go home` row (Home is `g h` / the rail) and no focus mode in Elm |
+| K82 | Grammar: translate to X / clear | `commands.ts:976-988` | MISSING | — | `Translate.elm` has the target list and resolver, but no `translate to X` / `translate clear` palette grammar |
+| K83 | Grammar: reader mode / density / width / motion | `commands.ts:1005-1056` | PARTIAL | `Switcher.globalActions` 612–615 (density row); `View/Organize.elm:1054-1059`, `View/Prefs.elm:211` (reader mode) | (v3/gap-commands) a Compact / Comfortable density toggle row; (v3/gap-organize) reader mode exists in Preferences and the More menu but has no palette row; no width or motion grammar (Preferences only) |
+| K84 | Shortcut Ctrl/Cmd+K palette | `shortcutsRegistry.ts` (shortcut) | FULL | `ports.js:4542` `classifyShortcut`; `App.elm` `ShortcutPressed` 48997 | works while typing; yields to a foreign modal |
+| K85 | Shortcut `/` palette when not typing | `useSpotlight.ts:32` | FULL | `ports.js:4614` | outside editable fields; off when the single-key switch is off (K86) |
+| K86 | Shortcut `?` shortcuts overlay | `shortcutsRegistry.ts` | FULL | `ports.js:4613`; `Switcher.shortcutGroups` 1291; `View/GapCommands.elm singleKeysSwitch` | the overlay carries the WCAG 2.1.4 single-key switch (Elm-only) |
+| K87 | Shortcut Escape closes topmost overlay | `useKeyboardShortcuts.ts:670` | FULL | `ports.js:4538` + `App.escapeMsg` 49882 / `overlayStack` 49754 | Elm single ordered stack (better) |
+| K88 | Shortcut Ctrl/Cmd+F search | `shortcutsRegistry.ts` | FULL | `ports.js:7202` `isFindHotkey`, `App.elm:43748` `SearchHotkey` | — |
+| K89 | Shortcut Enter focuses composer | `useKeyboardShortcuts.ts:781` | FULL | `ports.js:4595` / `4601-4605` → `runLocalShortcut` 4643 (`composer-focus`); focus runs in `ports.js` and never reaches Elm | (v3/gap-commands) Enter from anywhere that is not a control, Alt+Enter anywhere not typing |
+| K90 | Shortcut Ctrl/Cmd+H / `g h` Go home | `shortcutsRegistry.ts`, `useKeyboardShortcuts.ts:750` | PARTIAL | `ports.js:4607-4611` (`g` then `h`) → `App.runAppChord` 49449 (`GoHome`) | (v3/gap-commands) `g h` works; Ctrl/Cmd+H (also the browser History key) is not bound, and the overlay does not list it |
+| K91 | Shortcut Alt+↓ / Alt+↑ next / previous room | `shortcutsRegistry.ts` | FULL | `ports.js:4589-4591` → `App.runAppChord` (`ConversationStep`); `Switcher.conversationOrder` 738 | (v3/gap-commands) favorites, rooms, then DMs by recency, wrapping |
+| K92 | Shortcut `n` next unread | `shortcutsRegistry.ts` | FULL | `ports.js:4622` (`n`), `4590` (Alt+Shift+↑/↓) → `runAppChord` (`UnreadStep`); `Switcher.stepUnread` 816 | (v3/gap-commands) Alt+Shift+↑/↓ is an Elm addition |
+| K93 | Shortcut `u` follow conversation | `shortcutsRegistry.ts` | FULL | `ports.js:4623` → `runAppChord` (`FollowToggle`) | (v3/gap-commands) |
+| K94 | Shortcut Ctrl/Cmd+Shift+R reader mode | `shortcutsRegistry.ts` | MISSING | — | `SHELL_SHIFT_CHORDS` (`ports.js:4490`) has no `r`. Reader mode now exists (v3/gap-organize: Preferences, More menu, exit bar `View/Attention.elm:453`) but has no chord and no palette row |
+| K95 | Shortcut Ctrl/Cmd+, preferences | `shortcutsRegistry.ts` | FULL | `ports.js:4549-4551` → `runAppChord` (`OpenPreferences`) | (v3/gap-commands) works while typing |
+| K96 | Shortcut Ctrl/Cmd+Shift+A account | `shortcutsRegistry.ts` | FULL | `ports.js:4490` (`a`) → `runAppChord` (`OpenAccount`) | (v3/gap-commands) |
+| K97 | Shortcut Alt+M member list / Alt+S focus sidebar | `shortcutsRegistry.ts` | PARTIAL | `ports.js:4593-4594` → `runLocalShortcut` 4643 (`members`, `sidebar-focus`); `View/Roster.elm membersToggle` | (v3/gap-commands) Alt+S works. Alt+M opens / closes the member sheet on narrow layouts but only moves focus into the always-visible rail on wide ones; Elm cannot hide the rail (Solid toggled it). The overlay copy “Show / hide member list” overstates |
+| K98 | Shortcut Ctrl/Cmd+Shift+E mark read | `shortcutsRegistry.ts` | FULL | `ports.js:4490` (`e`) → `runAppChord` (`MarkConversationRead`) | (v3/gap-commands) outside a call; Ctrl/Cmd+Shift+E is camera during one |
+| K99 | Shortcut Ctrl/Cmd+Shift+U attach / Ctrl+Shift+L schedule (composer) | `useKeyboardShortcuts.ts:701` | FULL | `ports.js:4490` (`u`, `l`), `COMPOSER_CHORDS` 4493 → `runAppChord` (`AttachFiles`, `ScheduleSend`) | (v3/gap-commands) fire from inside the composer too; Ctrl/Cmd+Shift+L is leave-call during a call |
+| K100 | Shortcut Ctrl/Cmd+Shift+D DND / Ctrl+B star / Ctrl+Shift+M mute room / Ctrl+Alt+E export | `shortcutsRegistry.ts` | FULL | `ports.js:4490` (`d`, `m`), `4578-4581` (Ctrl+B, Ctrl+Alt+E) → `runAppChord` | (v3/gap-commands) Ctrl/Cmd+Shift+M is the microphone during a call; Option-letter chords read `e.code` (macOS safe) |
+| K101 | `j` / `k` transcript message navigation | `useKeyboardShortcuts.ts:721` | FULL | `ports.js:4618-4621` → `runLocalShortcut` 4643 (`message-next` / `message-prev`) | (v3/gap-commands) focus moves in `ports.js` over `li.onyx-message`; needs the single-key switch on |
+| K102 | `g d` jump to date | `useKeyboardShortcuts.ts:756` | FULL | `ports.js:4607-4611` (`g` then `d`) → `runAppChord` (`GoJumpToDate`) | (v3/gap-commands) needs an open conversation |
+| K103 | Call chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S | (Solid VoiceBar local keys; see H) | FULL | `ports.js:4484` `CALL_CHORDS`, `4561-4567`; `Switcher.callShortcutRows` 1351 | Elm-wide, `aria-keyshortcuts` |
+| K104 | Push-to-talk talk key | `useCadenceMedia.ts` (see H) | FULL | `ports.js:5035` `createPushToTalk` | user-bound key, off until set |
+| K105 | Swipe-to-reply on touch rows | `rowGesture.ts` (gesture) | MISSING | — | tap reveals the row actions (a Reply quick action, `View/Thread.elm:459`); no horizontal swipe gesture exists |
+| K106 | Long-press opens message menu | `rowGesture.ts` (gesture) | FULL | `View/Thread.elm:484-503` `longPressMenu` (touch `contextmenu`); tap-to-reveal + `More actions` button `View/Thread.elm:681-691` | relies on the browser firing `contextmenu` on a touch long-press (Chrome / Android does; iOS Safari unverified); no 450 ms pointer timer like Solid; the More button is the fallback |
+| K107 | Swipe-down to dismiss sheets | — | FULL | `View/Sheet.elm:215` `swipeDismissDecoder`; `SheetTest` | Elm-only; the media lightbox has the same swipe (`View/Thread.elm:2778`) |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- COVERAGE "Ctrl/Cmd+K action palette … done" lists narrowings "no recents, time grammar, people/extension/theme rows" but omits that ~40 grammar/palette actions (hide, leave, star, mute N, DND, away, focus, reader, density, width, translate, schedule, catch-up, mark all read, copy link/node, theme/background switch) are missing — the palette is ~25% of Solid's.
-- COVERAGE: "overlay lists only the chords this client handles … no Alt+↑/↓, J/K, G-sequences yet" — accurate, but understates: 17 of Solid's 21 registry chords are absent.
-- The `/help` list (`App.elm:13065`) advertises `/share`, which Elm does not handle (raw `SHARE` → 421).
-- Neither doc records that `/me`, `/msg`, `/j`, `/op`, `/ban`, `/quote` etc. are broken on Onyx Server in both clients, nor that inbound CTCP ACTION is dropped.
+- **Fixed (v3/gap-commands).** COVERAGE’s palette row said “done” and listed narrowings that omitted ~40 grammar and
+  palette actions. `COVERAGE.md:201` and `V3_ROADMAP.md` 1.7 now describe People, recents, the oracle action rows
+  and the `#room` / `mute N` grammar and name the narrowings. **Still understated there:** they do not list the
+  missing Show / Hide member list and Focus composer rows, the schedule / leave / star / `search X` / vault-mode /
+  reviewed-anchor grammar, or Switch-background rows (their list is “time grammar, hide/close, translate, reader-mode,
+  width or motion verbs, extension / background-switch / AI-policy rows”).
+- **Fixed, with a new caveat.** “17 of Solid’s 21 registry chords are absent”: Solid’s registry has 22 chords; Elm
+  binds 20 (Alt+M only partly, K97). Unbound: Ctrl/Cmd+H (K90) and Ctrl/Cmd+Shift+R reader mode (K94). V3_ROADMAP 1.8 says
+  the overlay lists “exactly the chords this client handles” — true, but its “Show / hide member list” copy for Alt+M
+  overstates the wide layout (the rail cannot be hidden).
+- **Fixed.** The `/help` list advertised `/share`, which Elm did not handle: `/share` works (`planSlash`) and bare `/help`
+  now opens a sheet listing only working verbs (`GapCommandsTest` “every non-operator registry verb is listed once”).
+- **Fixed in Elm; the docs still do not say so.** `/me`, `/msg`, `/j`, `/op`, `/ban`, `/quote` etc. were broken against
+  Onyx Server in both clients and inbound CTCP ACTION was dropped. Elm translates and renders them now; COVERAGE /
+  ROADMAP never recorded the original defect or its closure, and Solid itself is still broken (oracle only).
+- **Overstated in this map before the refresh (now corrected).** K60 said Alt+M “shows/hides the member list” and K81
+  said “palette search/home rows”: on wide layouts Alt+M only moves focus into the rail, and there is no Home row.
+- **Stale code comments still at HEAD:** `App.elm:15631` (`slashCommands` doc: “same order and copy; the suggestion
+  query layer stays ahead — only the `/help` lookup ships here” — suggestions ship in `ComposerAssist`, `/help` is a
+  sheet, and the registry now carries Elm-only verbs and different copy); `App.elm:7912` (`isSwallowedCtcpWire` doc
+  lists ACTION among swallowed wrappers — `isCtcpQueryBody` 7900 now lets it through); `App.elm:15722-15738`
+  (`localSlashCommandNames` / `localSlashCommandList` are dead since bare `/help` opens the sheet; still exported);
+  `Switcher.elm:46-48` and `1048` (palette order described as Rooms → DMs → Actions; it is Recent, Rooms, DMs,
+  People, Actions) and `Switcher.elm:1334` (Alt+M copy “Show / hide member list”).
 
 #### Elm better than Solid
-- Raw content verbs (`/msg`, `/notice`, `/privmsg`, `/me`, `/query`, `/whisper`, `/edit`…) refuse to leak plaintext into designated/unresolved DMs or required-encryption rooms (`App.elm:11171`, `rawContentVerbs`); Solid's raw fallthrough had no such guard.
-- `/modex` and `/import` verbs.
-- One ordered Escape stack + one focus mechanism; call chords are modifier-only with `aria-keyshortcuts` and a user-bound PTT key.
-- Swipe-down-to-dismiss sheets on phones.
+- Raw content verbs (`/msg`, `/notice`, `/privmsg`, `/me`, `/query`, `/whisper`, `/edit`, `MEMO SEND`…) refuse to leak
+  plaintext into designated / unresolved DMs or required-encryption rooms (`rawContentVerbs` 52120,
+  `rawContentDestination` 52129, `destinationsLeak` 12905); Solid’s raw fallthrough had no such guard.
+- `/me`, `/msg` / `/query`, `/notice` and `/ctcp … ACTION` ride the composer’s sealing and key-lookup hold; a key change
+  holds them; usage problems and protection refusals keep the draft with an inline reason instead of a silent 421.
+- Inbound ACTION from other IRC clients renders as `* nick text`; an own `/me` stays an action row through echo, vault,
+  edit/delete rules and `/export` (Solid dropped inbound ACTION).
+- `/help` is a grouped Slash commands sheet that lists only verbs that work and doubles as a launcher
+  (`View/GapCommands.elm`); `/modex`, `/import`, `/appeal` and `/desk` are Elm-only verbs.
+- Palette: an owner-scoped Recent section, People + `View profile` rows, per-room Star / Mute / Invite / Leave / Mark
+  read, `Return to call`, `Pause alerts for N minutes`, Away / DND / density toggles, and `Copy room link` that copies a
+  working https deep link rather than an `ircs://` URL.
+- One ordered Escape stack + one focus mechanism; a WCAG 2.1.4 single-key switch in the `?` overlay; call chords are
+  modifier-only with `aria-keyshortcuts` and a user-bound PTT key; Option-letter chords read `e.code` (macOS safe);
+  Alt+Shift+↑/↓ steps through unread conversations.
+- Swipe-down-to-dismiss sheets on phones, and the same swipe on the media lightbox.
 
 #### Gaps (ranked by user impact)
-- `[High]` `/me` + inbound ACTION — in `parseSlashLocal` add `me` → `PRIVMSG <target> :\x01ACTION …\x01` through `sendComposerText` (seal path intact); in `foldCtcpQuery`/`isCtcpQueryBody` let `ACTION` through to a `msgType = "action"` row rendered `* nick text` in `View/Thread.elm`.
-- `[High]` Translate registry verbs instead of raw: `/msg`/`/query` → select DM + send; `/op /deop /voice /devoice /ban /unban /kick /topic /invite <nick> /part` → fill the active channel and build `MODE`/`KICK`/`TOPIC`/`INVITE`/`PART`; `/back`/`/unaway` → `AWAY`; `/quote`/`/raw` → send the tail verbatim; `/j` → `JOIN`; `/ctcp` → wrapped PRIVMSG. One table in `App.elm` beside `parseSlashLocal`.
-- `[High]` `/share` (and bare `/invite`) — reuse `InviteShare.payload` + `ClipboardCopy` tag `room-link`; toast copy from `store.ts:8384`.
-- `[Med]` Palette breadth — add People rows (roster nicks → `MemberMessage`), Preferences, Scheduled messages, Copy room link, Start voice, Mark all read, Theme rows in `Switcher.actionEntries`; recents via a `palette-recents` ports key.
-- `[Med]` Navigation chords — Alt+↑/↓, `n`, `g h`, `g d`, Enter-to-composer, Ctrl+, in `ports.js classifyShortcut` → `Switcher` Msgs; list them in `shortcutGroups`.
-- `[Med]` `j`/`k` message focus + Ctrl+Shift+E mark read (outside calls) — `TranscriptRows` focus index + `ChannelSelect` read marker.
-- `[Low]` Palette time grammar (port `timeGrammar.ts` to `Switcher`), grammar verbs (mute N, away, DND), theme/background switch rows.
-- `[Low]` Swipe-to-reply — a ports pointer helper on `[data-row]` dispatching `ReplyArm`.
+- `[High]` ~~`/me` + inbound ACTION~~ **[Closed — v3/gap-commands]** `planSlash` `"me"` → sealed CTCP ACTION; `isCtcpQueryBody` lets ACTION through to an action row rendered `* nick text` (`View/GapCommands.actionLead`).
+- `[High]` ~~Translate registry verbs instead of raw~~ **[Closed — v3/gap-commands]** `/msg` `/query` `/j` `/part` `/topic` `/kick` `/ban` `/unban` `/op` `/deop` `/voice` `/devoice` `/invite` `/back` `/quote` `/raw` `/ctcp` `/ping` `/stage` `/notice` `/away` are one table in `planSlash` (12966) with `GapCommandsTest` covering that none reaches the wire as a verb Onyx Server lacks.
+- `[High]` ~~`/share` and bare `/invite`~~ **[Closed — v3/gap-commands]** `PlanShare` copies `roomDeepLink` (tag `room-link:`); bare `/invite` opens the invite-share sheet.
+- `[Med]` ~~Palette breadth~~ **[Closed — v3/gap-commands]** People, recents, Preferences, Theme Studio, Scheduled, copy room link / node address, Invite, Start voice / Return to call, Mark (all) read, Catch up, Leave / Star / Mute, DND, Away, density and `Switch theme:` rows. Rows still absent are gap 11.
+- `[Med]` ~~Navigation chords~~ **[Closed — v3/gap-commands]** Alt+↑/↓, Alt+Shift+↑/↓, `n`, `g h`, `g d`, Enter / Alt+Enter, Ctrl/Cmd+, are bound in `ports.js classifyShortcut` and listed in `shortcutGroups`. Ctrl/Cmd+H is not (gap 12).
+- `[Med]` ~~`j` / `k` message focus + Ctrl+Shift+E mark read~~ **[Closed — v3/gap-commands]** `runLocalShortcut` focuses `li.onyx-message`; Ctrl/Cmd+Shift+E → `runAppChord` `MarkConversationRead` (outside calls).
+- `[Low]` Palette time grammar, grammar verbs, theme / background rows — **[Partly closed — v3/gap-commands]** `mute N`, DND, Away, density and `Switch theme:` rows shipped. Still open: the time grammar and everything in gaps 10–11.
+- `[Low]` Swipe-to-reply (K105) — **still open**. Add a ports pointer helper on `[data-row-key]` rows (touch only, vertical scroll wins until a horizontal swipe commits, ~72 px arms) dispatching `ReplyArm { target, msgid }`; the long-press half is already done (K106).
+- `[Med]` The palette `Leave <room>` row PARTs at once (K77): `runGapPaletteTarget` 49378 sends `PART` with only a toast, while the rail menu and room header ask first (`GapShell.LeaveAsk`, `View/GapShell.elm:458`). The row is one Enter away once “leave” is typed, which can cost an invite-only room. Route the row through `GapShell.LeaveAsk`.
+- `[Low]` Palette grammar still missing (all rows are typed-query rows in `Switcher.typedActions`): time grammar `at <time>` / `@<time>` / `at #room <time>` / `goto #room at <time>` (K71, needs a port of `timeGrammar.ts`, then `requestTravelTo`); `hide room` / `close conversation` (K76, over `Organizer.Hide` / `CloseConversation`); `leave #other` / `part` (K77); `star #other` / `unread #room` / `dm <anyone>` (K78); `schedule <when>: <text>` (K79, over `requestScheduleMessage`); `mute 30m|2h|1d|off`, `away <message>|clear`, typed `dnd on|off` (K80 — `pauseRow` takes bare minutes only); `search X` carrying the query, `go home`, focus mode (K81); `translate to X` / `translate clear` (K82); `reader`, `width`, `motion` (K83, over `PrefsTogglePref "readerMode"` / `AppearanceSetPref`); `vault exact|semantic|hybrid` (K75).
+- `[Low]` Palette rows still absent: Show / Hide member list (K60), Focus composer (K61), AI policy (K63, `AiPolicy.elm` is unused outside its module), Switch background (K69, over the gap-appearance scenes), extension actions (K70, extensions not ported), Reopen reviewed anchors (K74, no review history in Elm), Start video (K65, N/A while video is off).
+- `[Low]` Chords: Ctrl/Cmd+Shift+R reader mode (K94) and Ctrl/Cmd+H home (K90) are unbound (add `r` to `SHELL_SHIFT_CHORDS`, `ports.js:4490`, plus a `ReaderToggle` chord over `PrefsTogglePref "readerMode"`); Alt+M cannot hide the wide member rail and the overlay copy says it can (K97).
+- `[Low]` Touch long-press (K106) depends on the browser firing `contextmenu`; iOS Safari is unverified and Elm has no 450 ms pointer timer. If it fails there, add the pointer helper from the swipe-to-reply gap and drive `MessageMenuOpen` from it.
 
 ### F — Sheets & settings (preferences, appearance, themes, backgrounds, notification settings, room settings)
 Solid walked: `src/shell/PreferencesPanel.tsx` (all 6 tabs, every card/toggle/segmented/button), `src/lib/prefs/{preferences,sceneMotion,vaultSearchMode}.ts`, `src/app/Appearance.tsx`, `src/shell/AppearancePanel.tsx`, `src/theme/*` (ThemeStudio every control, ThemeProvider, publicLooks/PublicLookPicker, themeStorage, highContrastTheme), `src/shell/ThemeImportDialog.tsx`, `src/backgrounds/**` (Background/engine/catalogue/picker/backgroundPolicy/reactivity/scenes), `NotificationControls`, `CalmModeControl`, `SmartMuteSection`, `ChannelOrganizationSection`, `KeywordListControl`, `IgnoredUsersControl`, `ChannelNotifyControl`, `ChannelSettings.tsx` (every section), `HarborConfirmSheet`+`roomVerbConfirm`, `RoomInviteShare`+state, `RoomInsightsStrip`, `ScheduledEventLine`, `BridgeStatusBadge`, `GroupControlRoomIndicator`, `CapabilityMatrixSection`, `AccessibilityStatement`, `app/YouSettings.tsx`, lib/notifications/{quietHours,calmMode,smartMute*,highlightMemory,channelNotify*}, `lib/irc/aiPolicyProp.ts`, `lib/customCssRemoval.ts`, `lib/invite/*`.
-Elm checked: `Prefs.elm`, `PrefsPanel.elm`, `View/Prefs.elm`, `View/Appearance.elm`, `Studio.elm`, `View/Studio.elm`, `ThemeLook.elm`, `ThemeTokens.elm`, `RoomSettings.elm`, `View/RoomSettings.elm`, `View/Notify.elm`, `NotifyCenter.elm`, `Notify.elm`, `View/Account2.elm`, `InviteShare.elm`, `View/DmSafety.elm`, `Retention.elm`, `HistoryPolicy.elm`, `AiPolicy.elm`, `App.elm` folds, `Main.elm`, `ports.js`, `index.html`, `app.css` + `css/*.css` (grep of every `data-*` pref selector and every `var(--…)` consumer).
-**Headline:** Elm renders no background at all (no canvas/scene code anywhere in `ports.js`/views), Elm chrome is painted from a fixed `--onyx-*` palette so theme Looks barely recolor the shell, and Text size / spacing Density are persisted + stamped on `<html>` but no Elm CSS consumes `data-font-scale`/`data-density`.
+Elm checked (re-verified at HEAD `609cb240`): `Prefs.elm`, `PrefsPanel.elm`, `View/Prefs.elm`, `View/Appearance.elm`, `Studio.elm`, `View/Studio.elm`, `ThemeLook.elm`, `ThemeTokens.elm`, `ShellPalette.elm`, `RoomSettings.elm`, `View/RoomSettings.elm`, `View/RoomTools.elm`, `View/Chanserv.elm`, `View/Notify.elm`, `View/Attention.elm`, `Attention.elm`, `Organizer.elm`, `View/Organize.elm`, `NotifyCenter.elm`, `Notify.elm`, `View/Account2.elm`, `View/GapAccount.elm`, `View/GapClaim.elm`, `View/HistoryImport.elm`, `View/UserModes.elm`, `InviteShare.elm`, `View/DmSafety.elm`, `Retention.elm`, `HistoryPolicy.elm`, `AiPolicy.elm`, `Switcher.elm`, `App.elm` folds, `Main.elm`, `ports.js`, `historyImport.js`, `media/backdrop*.ts`, `index.html`, `app.css` + `css/gap-appearance.css` + `css/gap-organize.css` + the other `css/*.css`.
+**Headline (HEAD):** the Preferences sheet now has six tabs (Display, Conversation, Privacy, History & data, Import & export, Accessibility) and carries nearly every Solid control except the `App & tools` tab. Themes recolor the whole shell (`ShellPalette` → `--onyx-*`), Text size / Density / Conversation width / contrast are real CSS, backgrounds paint through `window.OnyxBackdrop` (17 canvas variants, the 7 DOM scenes as nearest canvas presets), local-history opt-out and the live E2EE-DM toggle are enforced, and quiet hours / Calm-Regular-Power / smart mute / folders exist. Still open: `App & tools` (PWA readiness, storage persist and estimate, extensions), three clear cards (followed, topic reads, reviewed anchors), gzip export / save / share, scene reactivity, Discord bot import, the DND More-menu item, the AI-policy badge, native share.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| F1 | Open device Preferences sheet from You hub | `src/shell/YouHubNav.tsx:41`, `src/app/YouSettings.tsx:288` (UI) | FULL | `View/Nav.elm:344` → `App.elm:44036` `prefsOpen` (`App.elm:44400`) | |
-| F2 | Mod+, opens Preferences (allowed from editable fields) | `src/lib/keyboard/shortcutsRegistry.ts:84`, `useKeyboardShortcuts.ts:694` (shortcut) | MISSING | `Switcher.elm:564` `Shortcut` has no prefs chord | |
-| F3 | Palette "Open preferences" grammar + "Preferences — display & behaviour" action | `src/chat/spotlight/commands.ts:1066`, `:1235` (palette) | MISSING | `Switcher.elm:235-252` action list has no Preferences | COVERAGE excuse "no palette exists yet" is stale |
-| F4 | Category deep-link (`openPreferences('history')` from search; DND-on ribbon item) | `src/shell/search/MessageSearch.tsx:628`, `PresenceRibbon.tsx:1330` (UI) | MISSING | `PrefsSelectCategory` only dispatched by tabs (`View/Prefs.elm:119`) | |
-| F5 | Category tablist, roving Arrow/Home/End, horizontal on ≤42rem | `PreferencesPanel.tsx:3082-3230` (UI) | PARTIAL | `View/Prefs.elm:66-132`, `PrefsPanel.elm:59`, `App.elm:40328` | 5 of 6 tabs (no App & tools); aria-orientation fixed vertical |
-| F6 | Reset to defaults (prefs + scene motion) with re-arming live announcement | `PreferencesPanel.tsx:3130`, `:3210` (UI) | FULL | `View/Prefs.elm:83`, `App.elm:44498` | |
+| F1 | Open device Preferences sheet from You hub | `src/shell/YouHubNav.tsx:41`, `src/app/YouSettings.tsx:288` (UI) | FULL | `View/Nav.elm:348` → `App.elm:48854` `Nav.YouPreferences` → `prefsOpen` (`App.elm:49894`) | Also reachable by palette (F3) and Ctrl+, (F2) |
+| F2 | Mod+, opens Preferences (allowed from editable fields) | `src/lib/keyboard/shortcutsRegistry.ts:84`, `useKeyboardShortcuts.ts:694` (shortcut) | FULL | `ports.js:4551` (`prefs`, allowed while typing) → `Switcher.elm:1231` → `App.elm:49507` `OpenPreferences`; tests `gapShortcuts.smoke.mjs:60-62`, `GapCommandsTest.elm:953` | (v3/gap-commands) was MISSING |
+| F3 | Palette "Open preferences" grammar + "Preferences — display & behaviour" action | `src/chat/spotlight/commands.ts:1066`, `:1235` (palette) | FULL | `Switcher.elm:616` action row → `App.elm:49329`; `GapCommandsTest.elm:835`, `:863` | (v3/gap-commands) was MISSING. Typed `prefs` finds the row by fuzzy title match; there is no separate exact-command grammar row |
+| F4 | Category deep-link (`openPreferences('history')` from search; DND-on ribbon item) | `src/shell/search/MessageSearch.tsx:628`, `PresenceRibbon.tsx:1330` (UI) | PARTIAL | search "history is off" link `View/Search.elm:559` → `App.elm:56379`; `UserModes.OpenPrivacy` `App.elm:47988`; `historyImportShowTransfer` `App.elm:52323`; tabs `View/Prefs.elm:129` | (v3/gap-convo) search link lands on History & data. No generic open-at-category message and no DND-on item in room More (F98) |
+| F5 | Category tablist, roving Arrow/Home/End, horizontal on ≤42rem | `PreferencesPanel.tsx:3082-3230` (UI) | PARTIAL | `View/Prefs.elm:73-145`, `PrefsPanel.elm:67` `categories`, `:97` `categoryAfterKey`, `App.elm:44518` | Six tabs: no App & tools; Elm adds Privacy (v3/gap-usermodes). `aria-orientation` is fixed vertical although phones show a scrolling chip row (`app.css:3307`, `css/ui-sheets.css:888`, v3/rx-sheets) |
+| F6 | Reset to defaults (prefs + scene motion) with re-arming live announcement | `PreferencesPanel.tsx:3130`, `:3210` (UI) | FULL | `View/Prefs.elm:85-103`, `App.elm:50003` `prefsReset` | Resets Local history and Encrypted DMs to on; the live E2EE gate follows (F25) |
 | F7 | Preference storage status line (unknown/pending/saved/unavailable) | `PreferencesPanel.tsx:3495`, `preferences.ts:267` (UI) | MISSING | — | |
-| F8 | Display: Appearance launcher card (nested sheet, focus restore) | `PreferencesPanel.tsx:3394`, `:3520` (UI) | PARTIAL | `View/Prefs.elm:282` → `YouHubGo Nav.YouAppearance` (route push) | Leaves the sheet for `/appearance` route |
-| F9 | Message density Compact/Cozy/Roomy (spacing) | `PreferencesPanel.tsx:3521`, `preferences.css:16-84` (UI) | PARTIAL | Prefs placeholder `View/Prefs.elm:165`; chips `View/Appearance.elm:132`; stamped `ports.js:6051` | Inert: no Elm CSS reads `data-density`; placeholder tells users to use these inert chips |
-| F10 | Font scale / Text size Small/Medium/Large | `PreferencesPanel.tsx:3529`, `Appearance.tsx:79`, `preferences.css:92` (UI) | PARTIAL | `View/Appearance.elm:99-124`, `ports.js:6052` | Inert: no `data-font-scale` CSS in `elm/app.css`/`css/*`; absent from Prefs Display |
-| F11 | Conversation width measured/full | `PreferencesPanel.tsx:3539`, `preferences.css:111` (UI) | CORE-ONLY | `Prefs.elm:711` (`"width"`), `App.elm:1573` | No UI, no CSS |
-| F12 | Reader mode toggle + Mod+Shift+R | `PreferencesPanel.tsx:3547`, `useKeyboardShortcuts.ts:547`, `preferences.css:1636` (UI/shortcut) | CORE-ONLY | `App.elm:44438` bool key, `App.elm:1574` | No toggle, chord, or `data-reader` CSS |
-| F13 | Experience level Standard/Advanced/Network Ops | `PreferencesPanel.tsx:3554`; gates `AppShell.tsx:1499` (UI) | CORE-ONLY | read `View/Bans.elm:476`, `View/Profile.elm:769` | Not settable in Elm (inherits stored value; Reset clears) |
-| F14 | Clock 24h/12h | `PreferencesPanel.tsx:3562` (UI) | FULL | `View/Prefs.elm:170`, `View/Appearance.elm:197` | |
-| F15 | Notification mode Calm/Regular/Power (drives alert tier) | `CalmModeControl.tsx:35`, `PreferencesPanel.tsx:3584`, `NotificationControls.tsx:383`, `NotificationRuntime.tsx:158` (UI/auto) | MISSING | `Notify.elm:37` input has no preset | No `onyx:calm` read/write |
-| F16 | Hide join, part & quit | `PreferencesPanel.tsx:3585`, `preferences.css:102` (UI) | PARTIAL | `View/Prefs.elm:182`, `View/Thread.elm:304`, `PrefsPanel.elm` `hidesEvent` | Hides only join/part/quit; Solid hides every system row |
-| F17 | Time scrubber (persisted show/hide) | `PreferencesPanel.tsx:3594` (UI) | PARTIAL | `View/Polish.elm:276`, `App.elm:45827` | Session toggle from room More only, not a persisted pref |
-| F18 | Show join voice/video controls | `PreferencesPanel.tsx:3601` (UI) | CORE-ONLY | `View/CallPresence.elm:226` reads `prefs.voiceEntry` | No toggle |
-| F19 | Show topic/forum/follow tools | `PreferencesPanel.tsx:3608` (UI) | CORE-ONLY | `View/Thread.elm:938` | No toggle |
-| F20 | Watch together activity toggle | `PreferencesPanel.tsx:3615` (UI) | MISSING | — | Watch-together surface itself absent |
-| F21 | Blocked hosts (unfurl suffix blocklist, commit on blur/Enter) | `PreferencesPanel.tsx:543`, `:3622` (UI) | CORE-ONLY | `App.elm:35927` `liveUnfurlPrivacy` | No editor |
-| F22 | Reaction density Full/Fewer/Total/Hidden | `PreferencesPanel.tsx:3623` (UI) | CORE-ONLY | `View/Thread.elm:2172`, `:2233` | No control |
-| F23 | Link previews toggle | `PreferencesPanel.tsx:3632` (UI) | FULL | `View/Appearance.elm:233`, `App.elm:35925` | Moved to Appearance › Privacy |
-| F24 | HTTPS-only previews | `PreferencesPanel.tsx:3639` (UI) | FULL | `View/Appearance.elm:234` | |
-| F25 | Encrypted DMs toggle | `PreferencesPanel.tsx:3646`, `YouSettings.tsx:93` (UI) | PARTIAL | `View/Appearance.elm:232` → `App.elm:40260` sets `prefs.e2eeDms`; gates read `model.e2eeDms` (`App.elm:35653`, `:10578`) seeded only at boot (`Main.elm:917`) | Toggle has no effect until reload |
-| F26 | Personal mute & block (ignored names) list | `IgnoredUsersControl.tsx:28`, `PreferencesPanel.tsx:3653` (UI) | FULL | `View/Notify.elm:410`, `App.elm:11264` | In Notifications sheet |
-| F27 | Local history switch (erase on off, retry, verified copy) | `PreferencesPanel.tsx:600`, `:3667` (UI) | MISSING | `prefs.localHistory` never read (no hit in `App.elm`/`ports.js`) | Elm keeps writing the vault even if user opted out |
+| F8 | Display: Appearance launcher card (nested sheet, focus restore) | `PreferencesPanel.tsx:3394`, `:3520` (UI) | PARTIAL | `View/Prefs.elm:390` `appearanceLauncher` → `YouHubGo Nav.YouAppearance` (`:398`, route push) | Leaves the sheet for `/appearance` |
+| F9 | Message density Compact/Cozy/Roomy (spacing) | `PreferencesPanel.tsx:3521`, `preferences.css:16-84` (UI) | FULL | `View/Prefs.elm:185-192`, `View/Appearance.elm:134-163`, `ports.js:7436`; rules `css/gap-appearance.css:160-203` (rhythm, avatar gutter, row heights, 44px touch kept); `GapAppearanceTest.elm:231` | (v3/gap-appearance) was inert: no CSS read `data-density`. The Prefs placeholder row is gone |
+| F10 | Font scale / Text size Small/Medium/Large | `PreferencesPanel.tsx:3529`, `Appearance.tsx:79`, `preferences.css:92` (UI) | FULL | `View/Prefs.elm:177-184`, `View/Appearance.elm:101-126`, `ports.js:7437`; `css/gap-appearance.css:143-152` (root 93.75% / 100% / 112.5%); `GapAppearanceTest.elm:239`, `gapAppearanceCss.smoke.mjs` | (v3/gap-appearance) was inert. Every shell font-size is rem so it reaches everything; 16px inputs stay px for iOS |
+| F11 | Conversation width measured/full | `PreferencesPanel.tsx:3539`, `preferences.css:111` (UI) | FULL | `View/Prefs.elm:193-200`, `Prefs.elm:754` `"width"`, `css/gap-appearance.css:205-232` (`--pt-measure` / `--convo-measure` lifted) | (v3/gap-appearance) was CORE-ONLY |
+| F12 | Reader mode toggle + Mod+Shift+R | `PreferencesPanel.tsx:3547`, `useKeyboardShortcuts.ts:547`, `preferences.css:1636` (UI/shortcut) | PARTIAL | toggle `View/Prefs.elm:209-216`; room More item `View/Organize.elm:1051`; exit bar `View/Attention.elm:450` `readerPill`; `css/gap-organize.css:639-676`; stamp `App.elm:1724` | (v3/gap-organize) toggle, More item, exit bar and `data-reader` CSS exist. No Mod+Shift+R chord (`ports.js:4490` shell chords are a, e, d, m, u, l) |
+| F13 | Experience level Standard/Advanced/Network Ops | `PreferencesPanel.tsx:3554`; gates `AppShell.tsx:1499` (UI) | N/A | field kept `Prefs.elm:423`, stamped `ports.js:7444`; nothing reads it; role gates `View/Profile.elm:792`, `View/Bans.elm:553`, `App.elm:46701` | Absent by design (v3/gap-people): Elm gates moderation and oper surfaces on the server-enforced role (`ModAuthority`), not a local level. No control sets the field |
+| F14 | Clock 24h/12h | `PreferencesPanel.tsx:3562` (UI) | FULL | `View/Prefs.elm:201-208`, `View/Appearance.elm:199-229` | |
+| F15 | Notification mode Calm/Regular/Power (drives alert tier) | `CalmModeControl.tsx:35`, `PreferencesPanel.tsx:3584`, `NotificationControls.tsx:383`, `NotificationRuntime.tsx:158` (UI/auto) | FULL | `View/Attention.elm:136` `presetSection` in the Notifications sheet (`View/Notify.elm:128`); `Attention.elm:347` `allowsAlert`; `App.elm:53259` `organizePresetKind` ← `alertForDelivery` (`App.elm:35395`); `AttentionTest.elm`, `OrganizerTest.elm` | (v3/gap-organize) was MISSING. Power is a real tier (Solid's never differed from Regular). Lives in the Notifications sheet only |
+| F16 | Hide join, part & quit | `PreferencesPanel.tsx:3585`, `preferences.css:102` (UI) | PARTIAL | `View/Prefs.elm:219-227`, `View/Thread.elm:329-333`, `PrefsPanel.elm:249` `hidesEvent` | Hides only join/part/quit; Solid hides every system row |
+| F17 | Time scrubber (persisted show/hide) | `PreferencesPanel.tsx:3594` (UI) | PARTIAL | `View/Polish.elm:247` `scrubberToggle`, `:277` `timeScrubber`, `App.elm:51667` `Polish.ScrubberOpen` | Session toggle from room More only. `Prefs.timeScrubber` exists but nothing reads it and `updatePreference` has no key for it |
+| F18 | Show join voice/video controls | `PreferencesPanel.tsx:3601` (UI) | FULL | toggle `View/Prefs.elm:237-243`, `App.elm:49936`; read `View/CallPresence.elm:227`, `App.elm:49126` | (v3/gap-appearance) was CORE-ONLY |
+| F19 | Show topic/forum/follow tools | `PreferencesPanel.tsx:3608` (UI) | FULL | toggle `View/Prefs.elm:244-250`, `App.elm:49939`; read `View/Thread.elm:978`, `:1003`, `:1125` | (v3/gap-appearance) was CORE-ONLY |
+| F20 | Watch together activity toggle | `PreferencesPanel.tsx:3615` (UI) | FULL | toggle `View/Prefs.elm:251-258`, `App.elm:49943`; gate `WatchTogether.elm:1729`; room card `View/Thread.elm:68`; `WatchTogetherAppTest.elm` | (v3/gap-watch) was MISSING. Shared clock over the `ocean.watch` channel PROP; only channel operators can publish (server gate). Not exercised against a live server by this audit |
+| F21 | Blocked hosts (unfurl suffix blocklist, commit on blur/Enter) | `PreferencesPanel.tsx:543`, `:3622` (UI) | FULL | `View/Prefs.elm:345-379` (commits on `change`), `Prefs.elm` `parseBlockedHosts`; read `App.elm:39695` `liveUnfurlPrivacy` → `View/Thread.elm:2478`, `:2808`, `:2848`; `GapAppearanceTest.elm:271` | (v3/gap-appearance) was CORE-ONLY. Shows the normalized effective list |
+| F22 | Reaction density Full/Fewer/Total/Hidden | `PreferencesPanel.tsx:3623` (UI) | FULL | `View/Prefs.elm:229-236`; read `View/Thread.elm:2317`, `:2327`, `:2378`; `BoostTest.elm:278` | (v3/gap-appearance) was CORE-ONLY |
+| F23 | Link previews toggle | `PreferencesPanel.tsx:3632` (UI) | FULL | `View/Appearance.elm:232-239` (`privacySwitch :391`), `App.elm:39694` | Moved to Appearance › Privacy; Preferences › Conversation points to it (`View/Prefs.elm:271-274`) |
+| F24 | HTTPS-only previews | `PreferencesPanel.tsx:3639` (UI) | FULL | `View/Appearance.elm:232-239` | Same placement as F23 |
+| F25 | Encrypted DMs toggle | `PreferencesPanel.tsx:3646`, `YouSettings.tsx:93` (UI) | FULL | `View/Appearance.elm:232-239` → `AppearanceSetPref` (`App.elm:44450`); live gate `App.elm:54342` `gapSettleE2ee` flips `model.e2eeDms`, publishes the DM key, looks up the open peer; tests `GapAccountAppTest.elm:633-707` | (v3/gap-account) was PARTIAL: toggle needed a reload. Turning it on warns about queued DMs that will send unencrypted |
+| F26 | Personal mute & block (ignored names) list | `IgnoredUsersControl.tsx:28`, `PreferencesPanel.tsx:3653` (UI) | FULL | `View/Notify.elm:477` `ignoredSection`, `App.elm:34816` `IgnoreUser`, `:34840` `UnignoreUser` | In the Notifications sheet. Lists are per account (v3/gap-account); optional server-side block mirror `View/UserModes.elm:745` (v3/gap-usermodes) |
+| F27 | Local history switch (erase on off, retry, verified copy) | `PreferencesPanel.tsx:600`, `:3667` (UI) | FULL | `View/GapAccount.elm:416-437`, `App.elm:54995` `LocalHistorySet`, `:54145` `gapGateVault`, `Main.elm:1887`, bridge re-check `ports.js:189`, `:289`; tests `GapAccountAppTest.elm:509-621`, `gapAccount.smoke.mjs:345` | (v3/gap-account) was MISSING: Elm kept writing the vault. Off stops writes first, erases with verified readback and offers "Try erasing again" |
 | F28 | Clear reviewed catch-up anchors (confirm) | `PreferencesPanel.tsx:1277` (UI) | MISSING | — | No review-history store |
-| F29 | Default device-search mode | `PreferencesPanel.tsx:3669` (UI) | FULL | `View/Prefs.elm:208`, `App.elm:39695` | |
-| F30 | Discard queued sends (count, re-confirm drift, verified readback) | `PreferencesPanel.tsx:2162` (UI) | FULL | `View/Prefs.elm:460`, `App.elm:44528`, `outboxReview` port | Elm adds per-row discard |
-| F31 | Discard local drafts (room + topic drafts) | `PreferencesPanel.tsx:1946` (UI) | PARTIAL | `View/Prefs.elm:536`, `App.elm:44689` | Room composer drafts only; no topic drafts |
+| F29 | Default device-search mode | `PreferencesPanel.tsx:3669` (UI) | FULL | `View/Prefs.elm:285-292`, `App.elm:43885` | |
+| F30 | Discard queued sends (count, re-confirm drift, verified readback) | `PreferencesPanel.tsx:2162` (UI) | FULL | `View/Prefs.elm:568-641`, `App.elm:50033` `prefsOutboxDiscardConfirm`, `outboxReview` port | Elm adds per-row discard. The queue is per account (v3/gap-account) |
+| F31 | Discard local drafts (room + topic drafts) | `PreferencesPanel.tsx:1946` (UI) | PARTIAL | `View/Prefs.elm:644-717`, `App.elm:50194` `prefsDraftsDiscardConfirm`, `PrefsPanel.elm:226` `roomDrafts` | Room composer drafts only; no topic drafts, DM drafts not listed. Drafts persist per account now (v3/gap-convo), so a discard changes the saved snapshot |
 | F32 | Clear followed conversations | `PreferencesPanel.tsx:1768` (UI) | MISSING | — | |
-| F33 | Clear all saved searches (+query text, verified) | `PreferencesPanel.tsx:1404` (UI) | CORE-ONLY | `SearchClearRequest` `App.elm:1037` → `Main.elm:1469` port; never emitted | |
+| F33 | Clear all saved searches (+query text, verified) | `PreferencesPanel.tsx:1404` (UI) | FULL | `View/GapAccount.elm:489-522`, `App.elm:55075` → `SearchClearRequest` (`Main.elm:1747`) → `ports.js:8000` | (v3/gap-account) was CORE-ONLY: the port existed but was never emitted. Confirm step, count and status line |
 | F34 | Clear topic read positions | `PreferencesPanel.tsx:1612` (UI) | MISSING | — | |
-| F35 | On-device history: keep count + max age (prune) | `PreferencesPanel.tsx:2835` (UI) | FULL | `View/Prefs.elm:398`, `App.elm:39569` | |
-| F36 | Clear local history (vault + outbox, confirm) | `PreferencesPanel.tsx:2942` (UI) | MISSING | — | |
-| F37 | Portable vault export (JSON download) | `PreferencesPanel.tsx:1146`, `:823` (UI) | PARTIAL | `View/Prefs.elm:228`, `ports.js:6820` | Messages only (`onyx-vault`); no drafts/follows/saved searches/prefs/handoffs |
-| F38 | Compressed `.json.gz` export + import | `PreferencesPanel.tsx:1159`, `:978` (UI) | MISSING | `ports.js:6886` accepts `.json` only | |
-| F39 | Save vault to file (FS Access) / Share vault file (Web Share) | `PreferencesPanel.tsx:1169-1204` (UI) | MISSING | — | |
-| F40 | Import portable JSON with Review step, cross-tab lock, merge | `PreferencesPanel.tsx:1205-1249`, `:1084` (UI) | PARTIAL | `View/Prefs.elm:229` → `App.elm:37003` | Imports immediately, messages only, result goes to server log not panel |
-| F41 | Discord JSON / Discord package / Discord bot / Slack / IRC-log importers | `PreferencesPanel.tsx:3359-3387` (UI) | MISSING | — | |
+| F35 | On-device history: keep count + max age (prune) | `PreferencesPanel.tsx:2835` (UI) | FULL | `View/Prefs.elm:506-565`, `App.elm:43759`, `:43785` | |
+| F36 | Clear local history (vault + outbox, confirm) | `PreferencesPanel.tsx:2942` (UI) | FULL | `View/GapAccount.elm:438-488`, `App.elm:54909` `gapStartErase` → `Main.elm:1966` → `ports.js:8365`; erased rows are watermarked so they are not rewritten | (v3/gap-account) was MISSING. Erases the vault for every account on this browser; queued sends and scheduled messages are separate cards |
+| F37 | Portable vault export (JSON download) | `PreferencesPanel.tsx:1146`, `:823` (UI) | PARTIAL | `View/HistoryImport.elm:655` `vaultCard`, review `View/GapAccount.elm:539-569`, `ports.js:866` `vaultExportSnapshot`, `:8264` | Export review before download added (v3/gap-account). File is still `onyx-vault` messages only; saved searches export separately (`View/GapAccount.elm:575`); no drafts, follows, prefs or handoffs |
+| F38 | Compressed `.json.gz` export + import | `PreferencesPanel.tsx:1159`, `:978` (UI) | PARTIAL | import accepts `.gz` (`historyImport.js:854-881`, `:968`; `HistoryImport.elm:191`); export is plain `onyx-vault-export.json` (`ports.js:8275`) | (v3/gap-import) import side done; no compressed export |
+| F39 | Save vault to file (FS Access) / Share vault file (Web Share) | `PreferencesPanel.tsx:1169-1204` (UI) | MISSING | no `showSaveFilePicker` or `navigator.share` in `ports.js` | |
+| F40 | Import portable JSON with Review step, cross-tab lock, merge | `PreferencesPanel.tsx:1205-1249`, `:1084` (UI) | PARTIAL | `View/Prefs.elm` Transfer tab → `PrefsVaultImport` (`App.elm:44538`) → `HistoryImport.Choose Portable` → `View/HistoryImport.elm:325` `reviewCard`; merge via `vaultPut` with id/fingerprint dedupe | (v3/gap-import) review (per-conversation include and destination, exact counts), merge and inline result done. No cross-tab import lock; blocked while local history is off (`App.elm:54929`) |
+| F41 | Discord JSON / Discord package / Discord bot / Slack / IRC-log importers | `PreferencesPanel.tsx:3359-3387` (UI) | PARTIAL | `HistoryImport.elm:98` `sources`, `View/HistoryImport.elm:176` `importCard`, `historyImport.js`; `HistoryImportTest.elm`, `GapImportViewTest.elm`, `historyImport.smoke.mjs` | (v3/gap-import) Discord export, Discord data package, Slack, IRC logs are done, worker-parsed, reviewed, undoable. The Discord bot-token route is not built |
 | F42 | Installed-app readiness rows + Install guide link | `PreferencesPanel.tsx:2670`, `:2760` (UI) | MISSING | — | No App & tools tab |
-| F43 | Refresh app shell (update recovery) | `PreferencesPanel.tsx:2749` (UI) | MISSING | only prompted banner `View/Polish.elm` `updateBanner` | |
+| F43 | Refresh app shell (update recovery) | `PreferencesPanel.tsx:2749` (UI) | MISSING | update strip `View/Polish.elm:590` `updateBanner`, `App.elm:51653` `Polish.UpdateApprove` | The strip now appears when `/sw.js` has a waiting update (v3/gap-pwa-safety); no manual Refresh button in Preferences |
 | F44 | Keep vault on this device (storage.persist) | `PreferencesPanel.tsx:2773-2798` (UI) | MISSING | no `navigator.storage` in `ports.js` | |
 | F45 | Origin storage estimate + refresh/retry | `PreferencesPanel.tsx:2799` (UI) | MISSING | — | |
 | F46 | Extension action manifest review/import/export/clear | `PreferencesPanel.tsx:2394` (UI) | MISSING | — | |
 | F47 | Extension action audit list + Clear | `PreferencesPanel.tsx:2331` (UI) | MISSING | — | |
-| F48 | Local language tools (readiness + translation target select) | `PreferencesPanel.tsx:2606`, `YouSettings.tsx` language (UI) | PARTIAL | `View/Appearance.elm:344`, `App.elm:38757` | Lives on Appearance; no "Caption transcript copy" row |
-| F49 | Background motion Adaptive/Animated/Still/Off | `PreferencesPanel.tsx:3731`, `AppearancePanel.tsx:243` (UI) | PARTIAL | `View/Prefs.elm:243`, `App.elm:44472` | Persisted only; no scene renderer to obey it |
-| F50 | Reduce motion | `PreferencesPanel.tsx:3739` (UI) | FULL | `View/Prefs.elm:251`, `app.css:3135` | |
-| F51 | Reduce transparency | `PreferencesPanel.tsx:3746` (UI) | FULL | `View/Prefs.elm:258`, `app.css:3149` | |
-| F52 | Raise contrast (+ OS `prefers-contrast: more`, per-theme derived HC tokens) | `PreferencesPanel.tsx:3753`, `ThemeProvider.tsx:204`, `:331`, `highContrastTheme.ts` (UI/auto) | PARTIAL | `View/Prefs.elm:265`, `app.css:3143` | Static 3-token block; ignores OS signal; not per-theme |
+| F48 | Local language tools (readiness + translation target select) | `PreferencesPanel.tsx:2606`, `YouSettings.tsx` language (UI) | PARTIAL | `View/Appearance.elm:346` `languageTools`, `App.elm:42955` | Lives on Appearance; no "Caption transcript copy" row |
+| F49 | Background motion Adaptive/Animated/Still/Off | `PreferencesPanel.tsx:3731`, `AppearancePanel.tsx:243` (UI) | FULL | `View/Prefs.elm:309-317`, `App.elm:49977` `prefsSetSceneMotion`; obeyed by `App.elm:40300` `sceneSpecFor` → `media/backdrop-core.ts:127` `policyFor` | (v3/gap-appearance) was PARTIAL: persisted but nothing rendered |
+| F50 | Reduce motion | `PreferencesPanel.tsx:3739` (UI) | FULL | `View/Prefs.elm:318-324`, `app.css:3314`, `:4114`, `css/gap-appearance.css:137` | |
+| F51 | Reduce transparency | `PreferencesPanel.tsx:3746` (UI) | FULL | `View/Prefs.elm:325-331`, `app.css:3325`; scene hidden `css/gap-appearance.css:285` | |
+| F52 | Raise contrast (+ OS `prefers-contrast: more`, per-theme derived HC tokens) | `PreferencesPanel.tsx:3753`, `ThemeProvider.tsx:204`, `:331`, `highContrastTheme.ts` (UI/auto) | FULL | `View/Prefs.elm:332-338`; `css/gap-appearance.css:43-70` (switch and `@media (prefers-contrast: more)` select the same `--onyx-theme-hc-*` set); per-theme HC from `ShellPalette.elm`; `ShellPaletteTest.elm:101`, `gapAppearanceCss.smoke.mjs` | (v3/gap-appearance) was PARTIAL: static 3-token block, ignored the OS signal |
 | F53 | Client access audit ledger (+ public ledger link) | `PreferencesPanel.tsx:677`, `:3760` (UI) | MISSING | — | |
-| F54 | You hub inline device controls (calm, keywords, privacy, blocked, reading comfort, motion, language) | `src/app/YouSettings.tsx:82-251` (UI) | PARTIAL | `View/Nav.elm:320-350` link-outs | Entries open sheets/route; calm mode absent |
-| F55 | `/appearance` page shell (back/home, lede, device note) | `src/app/Appearance.tsx:64` (UI) | FULL | `View/Appearance.elm:72-92` | |
-| F56 | Look picker (Ocean/Pearl + active extra) | `PublicLookPicker.tsx:7`, `publicLooks.ts` (UI) | FULL | `View/Appearance.elm:94`, `:313`, `ThemeLook.elm:269` | |
-| F57 | Chosen look recolors the app (tokens + color-scheme incl. light) | `ThemeProvider.tsx:204` `applyThemeToDom` (auto) | PARTIAL | tokens written `ports.js:6046`; shell CSS uses fixed `--onyx-*` (`app.css:4-14`; ~926 `--onyx` vs 13 theme-var uses) | Only Appearance/Studio/avatars change; Pearl/Frost shell stays dark |
-| F58 | All looks: 18 built-in + custom chips | `Appearance.tsx:149`, `AppearancePanel.tsx:205` (UI) | FULL | `View/Appearance.elm:272`, `App.elm:40411` | Custom chips use static swatch |
-| F59 | Motion & data: Reduce motion + Use less data | `Appearance.tsx:121-141` (UI) | FULL | `View/Appearance.elm:239-256`, `App.elm:40281`, `:40298` | |
-| F60 | Background stage: hover/focus preview (160 ms), Cancel preview / Apply, Saved/Preview label | `Appearance.tsx:171-181`, `BackgroundPicker.tsx:43` (UI) | PARTIAL | `View/Appearance.elm:281-298`, `App.elm:40435-40480`, `ports.js:6180` | State machine complete; nothing paints the preview |
-| F61 | Escape cancels a dirty background preview | `Appearance.tsx:58` (shortcut) | MISSING | — | |
-| F62 | PWA update held while theme/background edit is dirty | `Appearance.tsx:42`, `ThemeStudio.tsx:888` (auto) | MISSING | `App.elm:45572` holds only for calls | |
+| F54 | You hub inline device controls (calm, keywords, privacy, blocked, reading comfort, motion, language) | `src/app/YouSettings.tsx:82-251` (UI) | PARTIAL | `View/Nav.elm:325-355` link-outs (Notifications, Appearance, Preferences, voice settings, Organize, People, Theme share) | Entries open sheets or the route; calm mode, quiet hours and keywords are reachable in the Notifications sheet but not inline on the hub |
+| F55 | `/appearance` page shell (back/home, lede, device note) | `src/app/Appearance.tsx:64` (UI) | FULL | `View/Appearance.elm:60-94` | |
+| F56 | Look picker (Ocean/Pearl + active extra) | `PublicLookPicker.tsx:7`, `publicLooks.ts` (UI) | FULL | `View/Appearance.elm:96-100`, `:315` `lookChip`, `ThemeLook.elm:269` | |
+| F57 | Chosen look recolors the app (tokens + color-scheme incl. light) | `ThemeProvider.tsx:204` `applyThemeToDom` (auto) | FULL | `App.elm:1740` `shellPaletteCommit` rides `appearanceApply` (`ports.js:7430`, `applyShellChrome :12867`); bridge `css/gap-appearance.css:20-39`; `ShellPalette.elm`; `GapAppearanceTest.elm:99-147`, `ShellPaletteTest.elm:124` | (v3/gap-appearance) was PARTIAL: shell stayed dark. Pearl/Frost now paint a light shell (`data-shell-scheme`, `theme-color`, first-paint cache `ports.js:12877`) |
+| F58 | All looks: 18 built-in + custom chips | `Appearance.tsx:149`, `AppearancePanel.tsx:205` (UI) | FULL | `View/Appearance.elm:265-280`, `:412` `themeChip`, `ThemeTokens.elm:26`, `App.elm:44606` | Custom chips use static swatch |
+| F59 | Motion & data: Reduce motion + Use less data | `Appearance.tsx:121-141` (UI) | FULL | `View/Appearance.elm:241-264`, `App.elm:44471`, `:44488` | |
+| F60 | Background stage: hover/focus preview (160 ms), Cancel preview / Apply, Saved/Preview label | `Appearance.tsx:171-181`, `BackgroundPicker.tsx:43` (UI) | FULL | `View/Appearance.elm:281-303`, `App.elm:44630-44677`, `ports.js:7580`; paint `App.elm:40300` `sceneSpecFor` (Appearance surface uses the staged or previewed id) | (v3/gap-appearance) was PARTIAL: nothing painted the preview. `GapAppearanceTest.elm:178` |
+| F61 | Escape cancels a dirty background preview | `Appearance.tsx:58` (shortcut) | FULL | `App.elm:49838` `background-stage` entry in `overlayStack`, `:43938` `NavMenuEscape`; `GapAppearanceTest.elm:188` | (v3/gap-appearance) was MISSING |
+| F62 | PWA update held while theme/background edit is dirty | `Appearance.tsx:42`, `ThemeStudio.tsx:888` (auto) | MISSING | `App.elm:51412` `polishWorkActive` is calls only | |
 | F63 | In-shell Appearance sheet (motion radios, effective-motion readout, immediate background browser, Open Theme Studio) | `AppearancePanel.tsx:48`, `:85`, `:262` (UI) | PARTIAL | route only (V3_ROADMAP 1.3) | No effective-motion readout ("Still · Reduced motion") |
-| F64 | Theme share & import dialog (code/link, Ready preview, copy share link) | `ThemeImportDialog.tsx:38`, `AppearancePanel.tsx:197` (UI) | FULL | `View/Account2.elm:262`, `App.elm:41882-41918`, `View/Appearance.elm:274` | Also a You hub entry |
-| F65 | `?theme=` one-time import + URL strip | `ThemeProvider.tsx:265`, `:125` (auto) | FULL | `App.elm:40228`, `StudioStripShareParam` | |
-| F66 | Cross-tab theme coherence (storage events) | `ThemeProvider.tsx:291-316` (auto) | PARTIAL | `ports.js:4084` → `App.elm:40910` | Custom-theme list syncs; active theme id change in another tab not adopted |
-| F67 | Legacy theme-id remaps | `themeStorage.ts:9` (auto) | FULL | `ThemeLook.elm:156` | |
-| F68 | Palette: Switch theme (×18), Switch background (×24), Open Theme Studio | `commands.ts:1464`, `:1470`, `:1243` (palette) | PARTIAL | `Switcher.elm:248` single "Appearance" action | |
+| F64 | Theme share & import dialog (code/link, Ready preview, copy share link) | `ThemeImportDialog.tsx:38`, `AppearancePanel.tsx:197` (UI) | FULL | `View/Account2.elm:264`, `App.elm:46156-46192`, `View/Appearance.elm:276` | Also a You hub entry (`View/Account2.elm:583`) |
+| F65 | `?theme=` one-time import + URL strip | `ThemeProvider.tsx:265`, `:125` (auto) | FULL | `App.elm:44428`, `:44446` `StudioStripShareParam`, `ports.js:7567` | |
+| F66 | Cross-tab theme coherence (storage events) | `ThemeProvider.tsx:291-316` (auto) | PARTIAL | `ports.js:5447` → `App.elm:45105` `StudioCustomThemesRefreshed` | Custom-theme list syncs; active theme id change in another tab not adopted (COVERAGE:196 lists it as remaining) |
+| F67 | Legacy theme-id remaps | `themeStorage.ts:9` (auto) | FULL | `ThemeLook.elm:156` `legacyThemeMap`, `:183` `normalizeThemeId` | |
+| F68 | Palette: Switch theme (×18), Switch background (×24), Open Theme Studio | `commands.ts:1464`, `:1470`, `:1243` (palette) | PARTIAL | `Switcher.elm:407` `themeRow` (shown while typing), `:313` Appearance, `:617` Open Theme Studio; `App.elm:49430` | (v3/gap-commands) theme rows and Studio row added. No Switch background rows |
 | F69 | Theme Studio header, modified badge, Choose-a-look shelf | `ThemeStudio.tsx:1189-1210` (UI) | FULL | `View/Studio.elm:189`, `:221` | |
-| F70 | Generate: dark/light, primary/accent seed colour, 6 sliders, live regen after first Generate | `ThemeStudio.tsx:1229-1350`, `:781` (UI) | FULL | `View/Studio.elm:374-428`, `App.elm:40520-40570` | No 120 ms debounce |
-| F71 | Eyedropper accent sample (status/errors) | `ThemeStudio.tsx:1281`, `:955` (UI) | FULL | `View/Studio.elm:514`, `App.elm:40865` | |
-| F72 | Randomize / Seed from current / Export seed / Import seed (fail-closed + warnings) | `ThemeStudio.tsx:1351-1381` (UI) | FULL | `View/Studio.elm:429-433`, `:562`, `App.elm:40603` | |
-| F73 | Adjust hue/sat/warmth/contrast + Bake/Revert | `ThemeStudio.tsx:1408-1451` (UI) | FULL | `View/Studio.elm:595`, `App.elm:40656` | |
-| F74 | Base theme grid + delete custom theme | `ThemeStudio.tsx:1466-1516` (UI) | FULL | `View/Studio.elm:663`, `:728`, `App.elm:40774` | |
-| F75 | Studio background grid (immediate apply) | `ThemeStudio.tsx:1523` (UI) | PARTIAL | `View/Studio.elm:736`, `App.elm:40809` | Persists `onyx:bg`; not rendered |
-| F76 | Token editor tabs (color/radius/duration/font/easing) + per-token revert | `ThemeStudio.tsx:1562`, `:443` (UI) | FULL | `View/Studio.elm:795-980`, `App.elm:40504`, `:40950` | |
-| F77 | Live preview + WCAG contrast audit + auto-fix to AA | `ThemeStudio.tsx:304`, `:1591` (UI) | FULL | `View/Studio.elm:995`, `:1091`, `App.elm:40693` | |
-| F78 | Reset + Save named theme (inline name, Enter/Escape) | `ThemeStudio.tsx:1600-1646` (UI) | FULL | `View/Studio.elm:1173`, `:1210`, `App.elm:40704`, `:40737` | |
-| F79 | Share link / Import blob / Export blob (clipboard) | `ThemeStudio.tsx:1667-1710` (UI) | FULL | `View/Studio.elm:1202`, `:1234`, `:1264`, `App.elm:40827`, `:40843` | |
-| F80 | Animated canvas background behind the app shell (17 variants) | `AppShell.tsx:1367`, `backgrounds/Background.tsx:50`, `variants/*` (auto) | MISSING | no canvas/scene code in `ports.js`; `View.elm` mounts none | |
-| F81 | DOM/SVG scenes (Aurora Borealis, Lightning, Neon Night, Phoenix, Retro Arcade, Starfield, Volcanic) | `backgrounds/scenes/*.tsx` (auto) | MISSING | — | |
-| F82 | Background picker (5 groups, auto + 24, labelled radios) | `BackgroundPicker.tsx:70` (UI) | PARTIAL | `View/Appearance.elm:437`, `ThemeLook.elm:364` | Faithful UI; selection never rendered |
-| F83 | Auto = theme signature background | `shell/themeBackground.ts` `resolveBackgroundId` (auto) | CORE-ONLY | `App.elm:2182` → only a `data-background-id` attr (`pol-studio.css:31` empty host) | |
-| F84 | Scene policy (adaptive still/off for reduced-motion/data-saver/narrow, fps/DPR caps, pause unfocused, preview motion) | `backgroundPolicy.ts:141`, `appearanceRuntime.ts`, `lib/a11y/reducedData.ts` (auto) | MISSING | `App.elm:2193` `appearancePreviewMotion` unused | |
-| F85 | Scene reactivity (voice RMS bloom, accent hue, time-of-day warmth) | `backgrounds/reactivity.ts` (auto) | MISSING | — | |
-| F86 | Scene atmosphere on Connect/public pages | `app/Connect.tsx:93`, `ui/public/PublicFrame.tsx:36` (auto) | MISSING | — | |
-| F87 | Notifications settings entry points (You hub, palette, Prefs link) | `ChannelSidebar.tsx:610`, `YouHubNav.tsx` (UI) | FULL | `View/Nav.elm:326`, `Switcher.elm:247`, `View/Prefs.elm:197`, `App.elm:39304` | |
-| F88 | Desktop notifications toggle (permission request, blocked/unsupported copy) | `NotificationControls.tsx:367`, `:314` (UI) | FULL | `View/Notify.elm:131-200` | |
-| F89 | Notification sound toggle | `NotificationControls.tsx:394` (UI) | FULL | `View/Notify.elm:239` | |
-| F90 | Web push (closed-tab) toggle + auto re-bind on owner/SW change | `NotificationControls.tsx:405`, `:198`, `YouNotifications.tsx:214` (UI/auto) | PARTIAL | `View/Account.elm:476`, `App.elm:43380` | Account panel only; no "What can ping" page |
-| F91 | Do-not-disturb toggle (manual + timed expiry) | `NotificationControls.tsx:419`, `:335` (UI) | FULL | `View/Notify.elm:256`, `App.elm:39344` | Elm adds snooze-minutes input |
-| F92 | Quiet hours schedule (start/end selects; default 22→08 silencing) | `NotificationControls.tsx:430-479`, `store.ts:16624`, `:16661` (UI/auto) | MISSING | `Account2.elm:253` "no quiet-hours state" | Elm alerts fire overnight where Solid was silent by default |
+| F70 | Generate: dark/light, primary/accent seed colour, 6 sliders, live regen after first Generate | `ThemeStudio.tsx:1229-1350`, `:781` (UI) | FULL | `View/Studio.elm:374-428`, `App.elm:44715-44765` | No 120 ms debounce |
+| F71 | Eyedropper accent sample (status/errors) | `ThemeStudio.tsx:1281`, `:955` (UI) | FULL | `View/Studio.elm:514`, `App.elm:45060` | |
+| F72 | Randomize / Seed from current / Export seed / Import seed (fail-closed + warnings) | `ThemeStudio.tsx:1351-1381` (UI) | FULL | `View/Studio.elm:429-433`, `:562`, `App.elm:44770-44798` | |
+| F73 | Adjust hue/sat/warmth/contrast + Bake/Revert | `ThemeStudio.tsx:1408-1451` (UI) | FULL | `View/Studio.elm:595`, `App.elm:44851-44876` | |
+| F74 | Base theme grid + delete custom theme | `ThemeStudio.tsx:1466-1516` (UI) | FULL | `View/Studio.elm:663`, `:728`, `App.elm:44969` | |
+| F75 | Studio background grid (immediate apply) | `ThemeStudio.tsx:1523` (UI) | FULL | `View/Studio.elm:736`, `App.elm:45004` `StudioApplyBackground` → `settleStepScene` repaints | (v3/gap-appearance) was PARTIAL: persisted but not rendered |
+| F76 | Token editor tabs (color/radius/duration/font/easing) + per-token revert | `ThemeStudio.tsx:1562`, `:443` (UI) | FULL | `View/Studio.elm:795-980`, `App.elm:44699`, `:44708` | Radius, duration and font tokens now drive the shell (`css/gap-appearance.css:100-141`, v3/gap-appearance) |
+| F77 | Live preview + WCAG contrast audit + auto-fix to AA | `ThemeStudio.tsx:304`, `:1591` (UI) | FULL | `View/Studio.elm:995`, `:1091`, `App.elm:44888` | |
+| F78 | Reset + Save named theme (inline name, Enter/Escape) | `ThemeStudio.tsx:1600-1646` (UI) | FULL | `View/Studio.elm:1173`, `:1210`, `App.elm:44899`, `:44906-44966` | |
+| F79 | Share link / Import blob / Export blob (clipboard) | `ThemeStudio.tsx:1667-1710` (UI) | FULL | `View/Studio.elm:1202`, `:1234`, `:1264`, `App.elm:45022`, `:45038` | |
+| F80 | Animated canvas background behind the app shell (17 variants) | `AppShell.tsx:1367`, `backgrounds/Background.tsx:50`, `variants/*` (auto) | FULL | `media/backdrop-core.ts:63` `CANVAS_VARIANTS` (17 variants from the Solid engine), `media/backdrop.ts` mounts `#onyx-scene`; `ports.js:7488` `backgroundScene`; `App.elm:40338` `settleStepScene`; `index.html:85`; `backdrop.smoke.mjs` | (v3/gap-appearance) was MISSING. The scene shows through the transcript behind a veil; rails, composer and sheets stay opaque. Fails closed with no 2D context. Not seen in a browser by this audit |
+| F81 | DOM/SVG scenes (Aurora Borealis, Lightning, Neon Night, Phoenix, Retro Arcade, Starfield, Volcanic) | `backgrounds/scenes/*.tsx` (auto) | PARTIAL | `media/backdrop-core.ts:84` `SCENE_FALLBACK` | (v3/gap-appearance) each scene paints its nearest canvas preset (reported as `data-background-fallback`); their own DOM animation is not ported |
+| F82 | Background picker (5 groups, auto + 24, labelled radios) | `BackgroundPicker.tsx:70` (UI) | FULL | `View/Appearance.elm:439-515`, `ThemeLook.elm:364` `backgroundGroups` | (v3/gap-appearance) was PARTIAL: selection never rendered; it is now (7 DOM scenes as stand-ins, F81) |
+| F83 | Auto = theme signature background | `shell/themeBackground.ts` `resolveBackgroundId` (auto) | FULL | `App.elm:40329` `sceneSpecFor` → `ThemeLook.resolveBackgroundId`; `GapAppearanceTest.elm:151-156` | (v3/gap-appearance) was CORE-ONLY |
+| F84 | Scene policy (adaptive still/off for reduced-motion/data-saver/narrow, fps/DPR caps, pause unfocused, preview motion) | `backgroundPolicy.ts:141`, `appearanceRuntime.ts`, `lib/a11y/reducedData.ts` (auto) | FULL | `media/backdrop-core.ts:127` `policyFor` → Solid `deriveBackgroundPolicy`; env signals `media/backdrop.ts:37`; `App.elm:40323` feeds `appearancePreviewMotion` | (v3/gap-appearance) was MISSING. Reduced data, OS and in-app reduced motion, narrow/coarse, Off |
+| F85 | Scene reactivity (voice RMS bloom, accent hue, time-of-day warmth) | `backgrounds/reactivity.ts` (auto) | MISSING | no reactivity code in `media/backdrop*.ts` | COVERAGE:196 lists it as remaining |
+| F86 | Scene atmosphere on Connect/public pages | `app/Connect.tsx:93`, `ui/public/PublicFrame.tsx:36` (auto) | MISSING | `App.elm:40300` `sceneSpecFor` returns surface `none` outside `/app` and `/appearance`; `GapAppearanceTest.elm:171` | Public pages tear the scene down by design today |
+| F87 | Notifications settings entry points (You hub, palette, Prefs link) | `ChannelSidebar.tsx:610`, `YouHubNav.tsx` (UI) | FULL | `View/Nav.elm:325-338`, `Switcher.elm:312`, `View/Prefs.elm:260-270`, `App.elm:43494` | |
+| F88 | Desktop notifications toggle (permission request, blocked/unsupported copy) | `NotificationControls.tsx:367`, `:314` (UI) | FULL | `View/Notify.elm:196-265` | |
+| F89 | Notification sound toggle | `NotificationControls.tsx:394` (UI) | FULL | `View/Notify.elm:267-311` | |
+| F90 | Web push (closed-tab) toggle + auto re-bind on owner/SW change | `NotificationControls.tsx:405`, `:198`, `YouNotifications.tsx:214` (UI/auto) | FULL | toggle `View/Notify.elm:140` `closedTabRow` (also `View/Account.elm:492`), `App.elm:24906` `toggleWebPush`; re-bind `App.elm:5720` (login), `:34952` (permission granted), `:47753` `WebPushRecoveryHint` (SW `controllerchange`), `:25037` `foldWebPushActiveState`; `pwaSafety.smoke.mjs`, `webPush.smoke.mjs` | (v3/gap-pwa-safety) was PARTIAL: Account panel only, no re-bind. Guests see why it is unavailable. Closed-tab pushes ignore quiet hours (see gaps) |
+| F91 | Do-not-disturb toggle (manual + timed expiry) | `NotificationControls.tsx:419`, `:335` (UI) | FULL | `View/Notify.elm:322` `dndSection`, `App.elm:43533` | Elm adds snooze-minutes input |
+| F92 | Quiet hours schedule (start/end selects; default 22→08 silencing) | `NotificationControls.tsx:430-479`, `store.ts:16624`, `:16661` (UI/auto) | FULL | `View/Attention.elm:62` `quietSection` (`View/Notify.elm:127`), `Attention.elm:97` `QuietHours`, `App.elm:53282` `organizeQuietNow` → `alertForDelivery` DND input (`App.elm:35434`); `AttentionTest.elm` | (v3/gap-organize) was MISSING. Default is OFF in both clients: Solid's loader read a missing key as hour 0 (`store.ts:5164` `Number(null)`), so start equals end and nothing is silenced. The earlier claim that Solid silenced 22→08 by default was wrong |
 | F93 | Effective-alerts explanation + SR state summary | `NotificationControls.tsx:359-366` (UI) | MISSING | — | |
-| F94 | Extra ping keywords add/remove (+ validation status, per-account storage) | `KeywordListControl.tsx:20`, `highlightMemory.ts:35` (UI) | PARTIAL | `View/Notify.elm:347`, `App.elm:31050`, `ports.js:4405` | No "Enter a short word"/save-fail status; stored device-global, not per account |
-| F95 | Room header notify strip All/@/Mute (roving keys) | `ChannelNotifyControl.tsx:80`, `PresenceRibbon.tsx:953` (UI) | PARTIAL | `View/Notify.elm:49`, `View/RoomHeader.elm:248`, `App.elm:11369` | No Arrow/Home/End; `onyx:channel-notify` unscoped (`ports.js:4469`) |
-| F96 | Smart mute (keyword OS-alert mute + mute system alerts) | `SmartMuteSection.tsx:18`, `NotificationRuntime.tsx:102` (UI) | MISSING | `App.elm:31699` smartMuted = ignored names only | |
-| F97 | Room folders (create/assign/delete; sidebar grouping) | `ChannelOrganizationSection.tsx:15`, `ChannelSidebar.tsx:770` (UI) | MISSING | `Sidebar.elm:36` narrowing | |
-| F98 | "Do not disturb is on" item in room More menu | `PresenceRibbon.tsx:1323` (UI) | MISSING | — | |
-| F99 | Room settings sheet from room More + context line (online / host access) | `PresenceRibbon.tsx:1547`, `ChannelSettings.tsx:619` (UI) | FULL | `View/RoomHeader.elm:273`, `View/RoomSettings.elm:83`, `:132` | |
-| F100 | Topic editor (+t gating, read-only fallback, Save) | `ChannelSettings.tsx:627-678` (UI) | FULL | `View/RoomSettings.elm:206` | |
-| F101 | Per-device topic draft durability | `ChannelSettings.tsx:187`, `:646` (auto) | MISSING | — | COVERAGE narrowing |
-| F102 | In-sheet invite builder (guest-name prefill, E2EE badge+param, share, Open invite) | `ChannelSettings.tsx:682-773` (UI) | PARTIAL | header `InviteShareOpen` `View/RoomHeader.elm:265` | No guest name, E2EE badge/param, native share, open link |
-| F103 | Export transcript txt/json | `ChannelSettings.tsx:776-817` (UI) | PARTIAL | `/export` `App.elm:19339` | Slash only, no button |
-| F104 | Hide / Show room | `ChannelSettings.tsx:820-852` (UI) | MISSING | `Sidebar.elm:36` (no hidden rooms) | |
-| F105 | Leave room with harbor confirm | `ChannelSettings.tsx:854`, `HarborConfirmSheet.tsx`, `roomVerbConfirm.ts:15` (UI/palette) | PARTIAL | `/part` `App.elm:12982` | Slash only, no confirm |
-| F106 | Close conversation (DM) with harbor confirm | `roomVerbConfirm.ts:21`, `PresenceRibbon.tsx:1432` (UI) | MISSING | — | |
-| F107 | Per-room notify select in sheet | `ChannelSettings.tsx:877-900` (UI) | FULL | `View/RoomSettings.elm:267` | |
-| F108 | Room rules m/i/t/n/s switches; member read-only summary | `ChannelSettings.tsx:909-951` (UI) | FULL | `View/RoomSettings.elm:304` | |
-| F109 | Join key (+k) / member limit (+l) | `ChannelSettings.tsx:954-980` (UI) | FULL | `View/RoomSettings.elm:337-370` | |
-| F110 | Ephemeral history (EPHEMERAL presets) | `ChannelSettings.tsx:985-1021` (UI) | FULL | `View/RoomSettings.elm:380` | |
-| F111 | Roles: ACCESS list/refresh/add(level,mask,timeout)/remove | `ChannelSettings.tsx:1024-1153` (UI) | FULL | `View/RoomSettings.elm:414`, `:482`, `App.elm:44932` | Elm also lists role holders |
-| F112 | Encryption policy off/optional/required | `ChannelSettings.tsx:1156-1192` (UI) | FULL | `View/RoomSettings.elm:649` | |
-| F113 | History visibility public/members/opers | `ChannelSettings.tsx:1195-1239`, `historyPolicy.ts` (UI) | FULL | `View/RoomSettings.elm:694`, `HistoryPolicy.elm` | |
-| F114 | Public insights strip (Room pulse, rhythm, metrics, ledger) | `RoomInsightsStrip.tsx:111`, `ChannelSettings.tsx:1244`, `AppShell.tsx:1621` (UI) | PARTIAL | `View/RoomSettings.elm:1070` | Sheet only; no error state; not in mobile More |
-| F115 | Bridge status badge | `BridgeStatusBadge.tsx:36`, `ChannelSettings.tsx:1253` (UI) | FULL | `View/RoomSettings.elm:774`, `:796` | Also in header |
-| F116 | Incoming webhooks create/list/delete + notices | `ChannelSettings.tsx:1256-1305` (UI) | PARTIAL | `View/RoomSettings.elm:734`; `/webhook` `App.elm:12987` | UI only via Room care in 3–30 member band |
-| F117 | Group-control room indicator | `GroupControlRoomIndicator.tsx:96`, `PresenceRibbon.tsx:835` (UI) | PARTIAL | `View/RoomSettings.elm:852`, `:882` | No activation/"active" state |
-| F118 | Scheduled event line (countdown, Join call, op Clear) | `ScheduledEventLine.tsx:15`, `MessageView.tsx:2071` (UI) | FULL | `View/RoomSettings.elm:912`, `View/RoomHeader.elm:479` | |
-| F119 | AI-policy badge (room More) + palette entry | `AiPolicyBadge.tsx`, `PresenceRibbon.tsx:954`, `commands.ts:1305` (UI/palette) | CORE-ONLY | `AiPolicy.elm` parsers, imported nowhere | |
-| F120 | Invite friends sheet (room/network link, copy, status, native share) | `RoomInviteShare.tsx:26`; openers `PresenceRibbon.tsx:1011`, `ChannelSidebar.tsx:842` (UI) | PARTIAL | `View/DmSafety.elm:430`, `InviteShare.elm`, `App.elm:41757` | No `navigator.share` (fallback line always shown) |
-| F121 | Session capability matrix | `CapabilityMatrixSection.tsx`, `Account.tsx:1109`, `AppShell.tsx:1499` (UI) | PARTIAL | `View/Account.elm:278` | Account only; no experience-mode status-stack surface |
-| F122 | Accessibility statement (About) | `AccessibilityStatement.tsx:95`, `routes/About.tsx:228` (UI) | FULL | `View/About.elm:109` | |
+| F94 | Extra ping keywords add/remove (+ validation status, per-account storage) | `KeywordListControl.tsx:20`, `highlightMemory.ts:35` (UI) | PARTIAL | `View/Notify.elm:414` `keywordsSection`, `App.elm:43487`, `:34796` `highlightWordsSaveOut`; per account via `AccountScope.elm`, `ports.js:8351` | Per-account storage done (v3/gap-account). No "Enter a short word" or save-failed status line |
+| F95 | Room header notify strip All/@/Mute (roving keys) | `ChannelNotifyControl.tsx:80`, `PresenceRibbon.tsx:953` (UI) | PARTIAL | `View/Notify.elm:52`, `View/RoomHeader.elm:257`, `View/Rail.elm:918`, `App.elm:43500` | No Arrow/Home/End on the strip. Levels are per account now (v3/gap-account). Also in the sidebar row menu (v3/rx-shell) |
+| F96 | Smart mute (keyword OS-alert mute + mute system alerts) | `SmartMuteSection.tsx:18`, `NotificationRuntime.tsx:102` (UI) | FULL | `View/Attention.elm:208` `smartMuteSection` (`View/Notify.elm:130`), `Attention.elm:555` `smartMuted`, `App.elm:35431`; `AttentionTest.elm` | (v3/gap-organize) was MISSING. Words (whole-word match) and people, per account. Solid's "Mute system / error alerts" checkbox has no control: `muteSystemNoise` is stored but Elm raises no OS alerts for system rows |
+| F97 | Room folders (create/assign/delete; sidebar grouping) | `ChannelOrganizationSection.tsx:15`, `ChannelSidebar.tsx:770` (UI) | FULL | `View/Organize.elm:135` `folderSections` ← `View/Rail.elm:135`; manage in Preferences `View/Organize.elm:1210` `prefsOrganize` (create, rename, reorder, delete); row menu `View/Organize.elm:352` / `:407`, picker `:544` `sheets`; `Organizer.elm` `Folder*` msgs; `OrganizerTest.elm` | (v3/gap-organize) was MISSING. Per account; deleting a folder returns its rooms to Rooms |
+| F98 | "Do not disturb is on" item in room More menu | `PresenceRibbon.tsx:1323` (UI) | MISSING | `View/RoomHeader.elm:230-310` More menu has no DND item | |
+| F99 | Room settings sheet from room More + context line (online / host access) | `PresenceRibbon.tsx:1547`, `ChannelSettings.tsx:619` (UI) | FULL | `View/RoomHeader.elm:282`, `View/RoomSettings.elm:64` `settingsToggle`, `:86`, `:138` `contextLine` | Side-placed sheet (v3/rx-sheets) |
+| F100 | Topic editor (+t gating, read-only fallback, Save) | `ChannelSettings.tsx:627-678` (UI) | FULL | `View/RoomSettings.elm:212` | |
+| F101 | Per-device topic draft durability | `ChannelSettings.tsx:187`, `:646` (auto) | MISSING | topic draft is a plain model field (`RoomSettings.elm:83`) | |
+| F102 | In-sheet invite builder (guest-name prefill, E2EE badge+param, share, Open invite) | `ChannelSettings.tsx:682-773` (UI) | PARTIAL | header `InviteShareOpen` `View/RoomHeader.elm:274`; sheet footnote `View/RoomSettings.elm:162` | No guest name, E2EE badge/param, native share, open link. Invite lives in the room More menu, not inside the sheet |
+| F103 | Export transcript txt/json | `ChannelSettings.tsx:776-817` (UI) | FULL | sheet section `View/RoomSettings.elm:116` → `View/RoomTools.elm:104` `transcriptExport` (text and JSON buttons) → `GapPeople.TranscriptExport` (`App.elm:52836`); also More item `View/GapShell.elm:401-408` and `/export` (`App.elm:22466`) | (v3/gap-people) was PARTIAL: slash only. Local scrollback only, stated in the sheet |
+| F104 | Hide / Show room | `ChannelSettings.tsx:820-852` (UI) | FULL | switch `View/Organize.elm:1065` `roomSettingsSection` (`chset-hide`), sidebar footer `:221` `hiddenFooter`, Preferences list `:1210`; `Organizer.elm:642` `Unhide` | (v3/gap-organize) was MISSING. A hidden room returns on a mention or your own fresh line (`App.elm:53178` `organizeShouldReveal`, `:53121` `settleStepOrganize`) |
+| F105 | Leave room with harbor confirm | `ChannelSettings.tsx:854`, `HarborConfirmSheet.tsx`, `roomVerbConfirm.ts:15` (UI/palette) | PARTIAL | More item `View/GapShell.elm:419-427`, confirm sheet `:435` `leaveConfirm`, folds `App.elm:11270-11310`, row menu `View/Rail.elm:919`; unconfirmed `App.elm:49378` palette `LeaveRoom`, `/part` `App.elm:13082` | (v3/gap-shell) harbor confirm from the room More menu and the sidebar row menu. Not in the settings sheet (footnote `View/RoomSettings.elm:162`); palette and `/part` skip the confirm |
+| F106 | Close conversation (DM) with harbor confirm | `roomVerbConfirm.ts:21`, `PresenceRibbon.tsx:1432` (UI) | PARTIAL | `View/Organize.elm:1038` DM More item, row menu `:465`, `Organizer.elm:656` `CloseConversation`; reopen `View/Organize.elm:292` `closedFooter` | (v3/gap-organize) was MISSING. No confirm: it closes at once with a toast and is reversible (reopens when the person writes, or from the Closed footer) |
+| F107 | Per-room notify select in sheet | `ChannelSettings.tsx:877-900` (UI) | FULL | `View/RoomSettings.elm:273` | |
+| F108 | Room rules m/i/t/n/s switches; member read-only summary | `ChannelSettings.tsx:909-951` (UI) | FULL | `View/RoomSettings.elm:310` | More rules (flags, forward, join throttle, timed rules) in `View/Chanserv.elm:351` (v3/gap-chanserv) |
+| F109 | Join key (+k) / member limit (+l) | `ChannelSettings.tsx:954-980` (UI) | FULL | `View/RoomSettings.elm:343-376` | |
+| F110 | Ephemeral history (EPHEMERAL presets) | `ChannelSettings.tsx:985-1021` (UI) | FULL | `View/RoomSettings.elm:387` | |
+| F111 | Roles: ACCESS list/refresh/add(level,mask,timeout)/remove | `ChannelSettings.tsx:1024-1153` (UI) | FULL | `View/RoomSettings.elm:421`, `:489` `accessManager`, `App.elm:50437` `roomSettingsUpdate` | Elm also lists role holders |
+| F112 | Encryption policy off/optional/required | `ChannelSettings.tsx:1156-1192` (UI) | FULL | `View/RoomSettings.elm:656` | |
+| F113 | History visibility public/members/opers | `ChannelSettings.tsx:1195-1239`, `historyPolicy.ts` (UI) | FULL | `View/RoomSettings.elm:701`, `HistoryPolicy.elm` | |
+| F114 | Public insights strip (Room pulse, rhythm, metrics, ledger) | `RoomInsightsStrip.tsx:111`, `ChannelSettings.tsx:1244`, `AppShell.tsx:1621` (UI) | PARTIAL | `View/RoomSettings.elm:1065` `insightsStrip` (inside the Advanced disclosure) | Sheet only; no error state (empty reads "No public stats for this room yet."); not in mobile More |
+| F115 | Bridge status badge | `BridgeStatusBadge.tsx:36`, `ChannelSettings.tsx:1253` (UI) | FULL | `View/RoomSettings.elm:769`, `:791` | Also in header (`View/RoomHeader.elm:502`) |
+| F116 | Incoming webhooks create/list/delete + notices | `ChannelSettings.tsx:1256-1305` (UI) | FULL | `View/RoomSettings.elm:741` `integrationsSection` → `View/RoomTools.elm:24` `webhookManager` (create with optional name, list, delete by id, notices); `/webhook` `App.elm:15645` | (v3/gap-people) was PARTIAL: only via Room care in 3–30 member rooms. Now every room host, any size; members see a read-only note |
+| F117 | Group-control room indicator | `GroupControlRoomIndicator.tsx:96`, `PresenceRibbon.tsx:835` (UI) | PARTIAL | `View/RoomSettings.elm:847`, `:877` | No activation/"active" state |
+| F118 | Scheduled event line (countdown, Join call, op Clear) | `ScheduledEventLine.tsx:15`, `MessageView.tsx:2071` (UI) | FULL | `View/RoomSettings.elm:907`, `View/RoomHeader.elm:501` | |
+| F119 | AI-policy badge (room More) + palette entry | `AiPolicyBadge.tsx`, `PresenceRibbon.tsx:954`, `commands.ts:1305` (UI/palette) | CORE-ONLY | `AiPolicy.elm` parsers, imported nowhere (only `tests/AiPolicyTest.elm`) | |
+| F120 | Invite friends sheet (room/network link, copy, status, native share) | `RoomInviteShare.tsx:26`; openers `PresenceRibbon.tsx:1011`, `ChannelSidebar.tsx:842` (UI) | PARTIAL | `View/DmSafety.elm:430` `inviteShareSheet`, `InviteShare.elm:24`, `App.elm:34443` `inviteSharePayload`; openers `View/RoomHeader.elm:274`, `View/Home.elm:323`, `View/CallStage.elm:693` | No `navigator.share` (fallback line always shown) |
+| F121 | Session capability matrix | `CapabilityMatrixSection.tsx`, `Account.tsx:1109`, `AppShell.tsx:1499` (UI) | PARTIAL | `View/Account.elm:287-303` | Account sheet only. Solid also shows it in the Status buffer for Advanced/Network Ops levels; Elm has no such level (F13) and no matrix in the Activity view |
+| F122 | Accessibility statement (About) | `AccessibilityStatement.tsx:95`, `routes/About.tsx:228` (UI) | FULL | `View/About.elm:109` | Its "honors prefers-contrast: more" line (`View/About.elm:51`) is now true (v3/gap-appearance) |
 | F123 | Purge retired `onyx:custom-css` payload on boot | `lib/customCssRemoval.ts:34` (auto) | MISSING | — | Low: Elm never reads it |
 | F124 | Invite room pulse helper | `lib/invite/inviteRoomPulse.ts` (DEAD) | N/A | — | No non-test importer |
 | F125 | DND modal (`openDndModal`) | `store.ts:16668` (DEAD) | N/A | — | No caller |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- COVERAGE:189 "runtime toggle **done** (Appearance Privacy … re-applied through `AppearanceSetPref`)" — overstated: the fold only updates `prefs.e2eeDms` (`App.elm:40260`); every gate reads `model.e2eeDms` (`App.elm:35653`, `:10578`, `:5030`), set only from the boot flag (`Main.elm:917/989`). Toggle needs a reload.
-- COVERAGE:213 / V3_ROADMAP 4.1 "**done**" — roughly half the panel is absent (App & tools, local-history switch, 5 clear-* cards, gzip/save/share/review transfer, width/reader/experience/reaction/voice/topic/watch/blocked-hosts). Its "no command palette entry (no palette exists yet)" is stale: `Switcher.elm` palette exists and still lacks the entry.
-- COVERAGE:213 + `View/Prefs.elm:165` placeholder ("set density in Appearance") — the Appearance Density and Text size chips are inert: `ports.js:6051-6052` stamps `data-density`/`data-font-scale` but no rule in `elm/app.css` or `elm/css/*.css` reads them.
-- COVERAGE:202 / V3_ROADMAP 3.3 "**done**" while quiet hours + calm presets (2 of the 3 named components) are absent; Solid's default quiet hours (22→08, `store.ts:16624`) silenced alerts, so Elm behaviour differs by default, not just in UI.
-- COVERAGE:195 says "14 themes"; both clients ship 18 (`ThemeTokens.elm:13`, `themes.ts:1138-1275`). Also "done" implies themes work, but Elm chrome is painted from fixed `--onyx-*` (`app.css:4-14`) so theme choice barely shows outside Appearance/Studio.
-- Backgrounds are untracked: no COVERAGE or V3_ROADMAP row for the 24-option renderer, scene policy or reactivity. `View/Appearance.elm` header says the canvas engine "lands with the backgrounds slice" and `pol-studio.css:29` mentions a "Ports-side scene canvas mount", but no such slice or ports code exists.
-- `View/About.elm:51` (Elm's accessibility statement) claims "The interface honors prefers-contrast: more" — Elm has no `prefers-contrast` query or handler anywhere.
-- UNDERSTATED: `VaultImport.elm` module doc says "There is no file-pick UI … nothing calls this parser", but `App.elm:37020` calls it and `View/Prefs.elm:229` exposes the picker.
-- V3_ROADMAP 4.2 "partial" for smart mute + folders is accurate. V3_ROADMAP 1.3 "in-shell sheet not built" is also accurate.
+- COVERAGE:189 "runtime toggle **done**" was overstated (the fold only updated `prefs.e2eeDms`; every gate read the boot-seeded `model.e2eeDms`). **Fixed** by v3/gap-account: `gapSettleE2ee` (`App.elm:54342`) now flips the live flag, publishes the key and warns about queued DMs. The COVERAGE text is now accurate.
+- COVERAGE:215 / V3_ROADMAP 4.1 "**done**" was overstated. **Mostly fixed**: density, width, reader, reaction, voice, topic, watch and blocked-hosts controls exist (v3/gap-appearance, gap-organize, gap-watch), the local-history switch plus clear-local-history and clear-saved-searches cards exist (v3/gap-account), and the portable import has a staged review (v3/gap-import). The palette entry exists (`Switcher.elm:616`). **Still true**: no `App & tools` tab, no followed / topic-read / reviewed-anchor clear cards, no gzip export / file save / share, no storage persist or estimate cards, no access-audit ledger, no experience level (now N/A), no topic drafts, and `Hide join, part & quit` still hides only three row types. The COVERAGE:215 narrowings list itself was never updated.
+- COVERAGE:203 / V3_ROADMAP 3.3 "**done**" while "no quiet-hours schedule, no calm presets, no smart-mute rules, no room folders". **Fixed** by v3/gap-organize (COVERAGE:231). The rest of the :203 narrowing is still true: no roving arrows on the room strip, no focus trap. V3_ROADMAP 3.3 and 4.2 rows still carry the old "narrowed out / todo" wording.
+- The earlier note here that Solid's default quiet hours (22→08) silenced alerts, "so Elm behaviour differs by default", was wrong. Solid's `_loadDndHour` reads a missing key as 0 (`store.ts:5164`), so start equals end and the window is empty; Elm defaults to off as well (`Attention.elm:105` `defaultQuietHours`, recorded in COVERAGE:231).
+- COVERAGE:195 still labels the row "14 themes"; both clients ship 18 (`ThemeTokens.elm:26`). Still true (label only; the body says 18). Its "done" now holds: themes recolor the shell (COVERAGE:196, v3/gap-appearance).
+- COVERAGE:213 / `View/Prefs.elm:165` density placeholder ("set density in Appearance") and the inert Text size / Density chips. **Fixed** by v3/gap-appearance (`css/gap-appearance.css:143-203`); the placeholder is gone.
+- Backgrounds untracked. **Fixed**: COVERAGE:196 now tracks the renderer, policy and DOM-scene stand-ins. Still open there: scene reactivity, DOM scene animation, cross-tab active-theme sync. V3_ROADMAP has no background row.
+- `View/About.elm:51` claimed `prefers-contrast: more` with no handler. **Fixed** (`css/gap-appearance.css:57`).
+- `VaultImport.elm:42` still says "There is no file-pick UI in the Elm client yet, so nothing calls this parser". **Still stale** at HEAD: the portable import runs through `HistoryImport`/`historyImport.js` (v3/gap-import).
+- Code comments that are stale at HEAD: `Account2.elm:252-253`, `:267-268`, `:458-466` and `View/Account2.elm:21` say this client has no room folders or quiet hours (they exist now; the residence export still hard-codes quiet hours 22→8 at `Account2.elm:288`, and the import report tells users folders "aren't available"). `View/RoomSettings.elm:24-27` lists local transcript export and hide / leave as not ported (export and hide are in the sheet now; leave is in the room More menu); its footnote `:162` ("Leave is not in this sheet yet") is still true. `Prefs.elm:706` says the Appearance page only edits fontScale, density and reduceMotion (it also carries the Privacy, clock and layout keys). `css/pol-studio.css:29` still describes `.ap-background-host` as the scene mount, but the canvas is `#onyx-scene` under `<html>` and the host div stays empty. `View/Appearance.elm` header was updated and is accurate.
+- V3_ROADMAP 4.2 "partial (smart mute + room folders todo)" is now stale: both shipped (v3/gap-organize). V3_ROADMAP 1.3 "in-shell sheet not built" is still true. V3_ROADMAP 4.5 "done except the Discord bot-token route" is accurate.
 
 #### Elm better than Solid
-- Queued sends and room drafts get per-row Discard buttons with previews (`View/Prefs.elm:490`, `:568`). Solid only offers bulk discard.
-- The Notifications sheet has a 1–1440 minute snooze field plus Clear (`View/Notify.elm:310-330`). In Solid a timed DND needs the slash command; its DND modal is dead code.
-- Room settings › Roles lists who currently holds Owner/Op/Voice, in words (`View/RoomSettings.elm:433`).
-- The bridge badge also appears in the room header (`View/RoomHeader.elm:480`). Solid shows it only inside the settings sheet.
-- Appearance gains a Message layout control (Default / IRC-compact, `View/Appearance.elm:167`), plus Timestamps, Privacy and Language on one page.
-- The Prefs Conversation tab links straight to the Notifications sheet (`View/Prefs.elm:197`), and the palette has a Notifications action (`Switcher.elm:247`).
+- Queued sends and room drafts get per-row Discard buttons with previews (`View/Prefs.elm:593-600`, `:672-678`). Solid only offers bulk discard.
+- The Notifications sheet has a 1–1440 minute snooze field plus Clear (`View/Notify.elm:322-410`). In Solid a timed DND needs the slash command; its DND modal is dead code.
+- Room settings › Roles lists who currently holds Owner/Op/Voice, in words (`View/RoomSettings.elm:440`).
+- The bridge badge also appears in the room header (`View/RoomHeader.elm:502`). Solid shows it only inside the settings sheet.
+- Appearance gains a Message layout control (Default / IRC-compact, `View/Appearance.elm:169`), plus Timestamps, Privacy and Language on one page.
+- The Prefs Conversation tab links straight to the Notifications sheet (`View/Prefs.elm:260-270`), and the palette has a Notifications action (`Switcher.elm:312`).
+- A Privacy tab with the user-mode switches (who can message you, what others see), re-applied on every connect (`View/UserModes.elm:141`; v3/gap-usermodes). Server-side blocks sit beside the device block list (`View/UserModes.elm:745`).
+- Local history opt-out is enforced in three places: Elm drops vault writes (`App.elm:54145`, `Main.elm:1887`), the ports bridge re-reads the stored pref so a stale write cannot land (`ports.js:189`), and turning it off erases with verified readback and a retry (v3/gap-account).
+- Export review before any vault download (`View/GapAccount.elm:552`) and a separate saved-searches export/import (`View/GapAccount.elm:575`).
+- History import is worker-parsed and reviewed before any write, with per-conversation include/destination, Undo, a past-imports list with removal, retention-aware counts, and de-duplication of overlapping exports (`View/HistoryImport.elm:36`, `historyImport.js:1-60`; v3/gap-import).
+- A one-time "attach history from before this update" card on Home and under History & data (`View/GapClaim.elm:47`; v3/gap-claim).
+- Preferences › Conversation has an "Organize your lists" group: folders (create, rename, reorder, delete), hidden rooms and closed conversations (`View/Organize.elm:1210`; v3/gap-organize). Quiet hours keep their chosen hours when switched off (explicit enabled flag), and smart mute matches whole words (`Attention.elm:49-66`).
+- Reader mode shows an always-reachable Exit bar (`View/Attention.elm:450`).
+- Every built-in theme's shell palette is derived and AA-checked with a high-contrast set one rung up (`ShellPalette.elm`, `ShellPaletteTest.elm`), the last palette is cached for a no-flash first paint (`ports.js:12877`), and custom themes and Studio edits re-skin the whole UI.
+- Blocked link hosts show the normalized effective list back to the user (`View/Prefs.elm:370-378`).
+- Room settings gains hosts' tools beyond Solid: Welcome and slow mode, Registration, mutes and exceptions, more rules (`View/Chanserv.elm:182`, `:351`, `:556`, `:981`; v3/gap-chanserv); webhooks and transcript export for every host/member (`View/RoomTools.elm`; v3/gap-people); On-this-device folder and hide switches (`View/Organize.elm:1065`).
+- Throttled desktop alerts coalesce into one "N new alerts in X" instead of being dropped (`App.elm:35456`; v3/gap-account).
 
 #### Gaps (ranked by user impact)
-- `[High]` Theme looks don't recolor the shell. Derive `--onyx-bg/panel/panel-2/line/text/dim/faint/accent` from theme tokens, either in `app.css` (`:root{--onyx-bg:var(--ink);…}`) or in `appearanceApplyFor` (`App.elm:1561`), so Pearl/Frost turn light.
-- `[High]` Text size and Density do nothing. Port the `preferences.css` font-scale/density rules into `elm/app.css`, keyed on `:root[data-font-scale]`/`[data-density]` and targeting the `.onyx-message`/`.onyx-thread` classes, then replace the Prefs placeholder with a real `segmented`.
-- `[High]` The local-history opt-out is ignored. Gate `flushVaultBuffer`/`VaultPersist` on `model.prefs.localHistory`, add a `PrefsTogglePref "localHistory"` switch with a `vaultClear` port erase/retry, and add a "Clear local history" card.
-- `[High]` The encrypted-DM toggle needs a reload. In the `AppearanceSetPref "e2eeDms"` fold (and `prefsReset`), also set `model.e2eeDms` and publish/withdraw the DM key the way the 001 path does.
-- `[High]` Quiet hours are missing (default 22→08 silence lost). Add `dndQuietStart/End` model fields with `onyx:dnd-quiet-*` ports, a `quiet` input to `Notify.shouldNotify`, and two hour selects in `View/Notify.elm` `dndSection`.
-- `[Med]` Calm/Regular/Power presets are missing. Add a `NotifyCenter.CalmPreset` with `onyx:calm` storage and `classifyNotification` in the alert decision, plus a segmented control in `View.Notify` and `View/Prefs.elm` Conversation.
-- `[Med]` No background renderer. Add a ports-side scene host for `.ap-background-host` (Appearance) and a shell host that reads `renderedBackground`/`sceneMotion`, starting with the solid and low-detail canvas variants.
-- `[Med]` Hidden prefs can't be changed (width, reader + Mod+Shift+R, experience level, voiceEntry, topicTools, reactionDensity, blockedHosts). Add `toggle`/`segmented` rows in `View/Prefs.elm`, extend `Prefs.updatePreference`/`prefsBoolValue`, and port the width/reader CSS.
-- `[Med]` Clear controls are missing. Emit the existing `SearchClearRequest` from a confirm card, and add followed / topic-read / reviewed-anchor clears in `View/Prefs.elm` History.
-- `[Med]` Room verbs are missing from the sheet. Add Hide/Show room (model `hiddenRooms` + sidebar filter), a Leave confirm sheet (overlayStack + `/part`), DM Close conversation, and an Export button that reuses `runSlashExport`.
-- `[Med]` Keyword and per-room notify storage aren't scoped per account. Key `highlightWordsSave`/`channelNotifySave` (`ports.js:4396`/`:4454`) by `deviceMemoryOwner`, as `highlightMemory.ts:35` does.
-- `[Med]` Portable vault fidelity. Export drafts/follows/saved searches/prefs, and add a staged Review step (count summary + confirm/cancel) before the `VaultImportFile` merge, with status shown in the panel.
-- `[Low]` Smart mute keyword rules and room folders (V3_ROADMAP 4.2). New `onyx:smart-mute` state feeding `Notify.smartMuted`; folder model in `Sidebar`.
-- `[Low]` Preferences reachability: Mod+, chord (`Switcher.Shortcut`), palette "Preferences" action, `PrefsOpenAt category` deep links (search history-off, DND More item).
-- `[Low]` App & tools tab: PWA readiness rows, Refresh app shell, `navigator.storage.persist`/`estimate` ports, extension manifest/audit.
-- `[Low]` High contrast should follow OS `prefers-contrast: more` and per-theme HC derivation. Port `highContrastOverrides` into `Studio`/`Theme`, and add a media-query listener.
-- `[Low]` AI-policy badge in the room More menu (wire `AiPolicy.parseAiPolicyProp` over `props`). Native `navigator.share` port for Invite friends. Guest-name and E2EE badge in the invite builder.
-- `[Low]` Webhooks UI for ops outside the Room care band. Insights error state. Escape cancels a background preview. Theme-edit update hold. Storage status line. Access-audit ledger. Custom-CSS purge.
+- `[High]` **[Closed — v3/gap-appearance]** Theme looks don't recolor the shell. Shipped: `ShellPalette` derives `--onyx-*` from the theme tokens, committed with every look, custom theme and Studio edit; Pearl/Frost paint a light shell.
+- `[High]` **[Closed — v3/gap-appearance]** Text size and Density do nothing. Shipped: `css/gap-appearance.css` sections 5-6, rem sizing everywhere, real `segmented` rows in Display.
+- `[High]` **[Closed — v3/gap-account]** The local-history opt-out is ignored. Shipped: `gapGateVault`, bridge re-check, verified erase and "Clear local history" card.
+- `[High]` **[Closed — v3/gap-account]** The encrypted-DM toggle needs a reload. Shipped: `gapSettleE2ee` updates the live flag and key publication.
+- `[High]` **[Closed — v3/gap-organize]** Quiet hours missing. Shipped: schedule with explicit enable flag in the Notifications sheet, fed into the alert decision. The premise was wrong: Solid's effective default was also off (see stale list).
+- `[Med]` **[Closed — v3/gap-organize]** Calm/Regular/Power presets. Shipped: `presetSection`, `organizePresetKind` in the alert path.
+- `[Med]` **[Closed — v3/gap-appearance]** No background renderer. Shipped: `window.OnyxBackdrop` with the Solid canvas engine, policy and 17 variants. Open remainder is listed below (DOM scenes, reactivity, public pages).
+- `[Med]` **[Closed — v3/gap-appearance, gap-organize, gap-watch]** Hidden prefs can't be changed. Shipped: width, reader, reaction density, voice, topic tools, watch, blocked hosts, text size, density. Left: the Mod+Shift+R chord (Low, F12), the persisted time-scrubber pref (Low, F17), and the Experience level, now N/A by design.
+- `[Med]` Clear controls: partly closed (v3/gap-account: clear local history and clear saved searches). Still missing: Clear followed conversations (F32), Clear topic read positions (F34), Clear reviewed catch-up anchors (F28). Fix: add three confirm cards in `View/Prefs.elm` History, each emitting a clear on the existing follow / topic-read stores, plus a review-history store for anchors.
+- `[Med]` Room verbs: mostly closed. Shipped: Hide/Show (v3/gap-organize), Export txt/json in the sheet (v3/gap-people), Leave harbor confirm from More and row menus (v3/gap-shell), DM Close conversation (v3/gap-organize). Still missing: Leave inside the settings sheet (F105), a confirm on palette `LeaveRoom` and `/part`, a confirm on Close conversation (F106). Fix: reuse `GapShell.LeaveAsk` / a close-ask in those three entry points.
+- `[Med]` **[Closed — v3/gap-account]** Keyword and per-room notify storage aren't scoped per account. Shipped: `AccountScope` owner-scoped ignored / muted / keywords / per-room levels, with migration from device-global and Solid owner keys.
+- `[Med]` Portable vault fidelity: partly closed (v3/gap-import: staged review with counts and per-conversation choices, merge, inline result). Still missing: export carries messages only (drafts, follows, prefs, handoffs, F37), no cross-tab import lock (F40), no `.json.gz` export (F38), no file save / share (F39). Fix: extend `ports.js:866` `vaultExportSnapshot` and add a `navigator.locks` guard around the write.
+- `[Med]` Keep-vault-on-device and storage estimate (F44, F45; part of App & tools). Without `navigator.storage.persist()` the browser may evict the local vault under pressure and the user cannot see usage. Fix: two small ports (`persist`, `estimate`) and a card in History & data.
+- `[Med]` Closed-tab Web Push ignores quiet hours (the service worker has no schedule; noted in COVERAGE:231). Users who set quiet hours still get woken by closed-tab pushes. Fix: sync the quiet window and mode to the worker (IndexedDB or postMessage) or to the server's push preferences.
+- `[Low]` **[Closed — v3/gap-organize]** Smart mute keyword rules and room folders. Shipped (F96, F97).
+- `[Low]` **[Closed — v3/gap-commands, gap-convo]** Preferences reachability. Shipped: Ctrl+, chord, palette action, search "history is off" deep link. Left: a generic open-at-category message and the DND-on More-menu item (F98).
+- `[Low]` App & tools tab (rest): PWA readiness rows and install guide (F42), manual Refresh app shell (F43), extension manifest and audit (F46, F47), access-audit ledger (F53), storage status line (F7).
+- `[Low]` **[Closed — v3/gap-appearance]** High contrast should follow OS `prefers-contrast: more` and per-theme HC derivation. Shipped in `ShellPalette` and `css/gap-appearance.css:43-70`.
+- `[Low]` AI-policy badge in the room More menu (wire `AiPolicy.parseAiPolicyProp` over `props`, F119). Native `navigator.share` port for Invite friends (F120). Guest-name and E2EE badge in the invite builder, and the builder inside the sheet (F102).
+- `[Low]` Webhooks UI for ops outside Room care — **[Closed — v3/gap-people]**; Escape cancels a background preview — **[Closed — v3/gap-appearance]**. Still open: insights error state (F114), theme/background edit holds the PWA update (F62), custom-CSS purge (F123), topic draft durability (F101).
+- `[Low]` Background remainder: the 7 DOM scenes only paint canvas stand-ins (F81), no scene reactivity to voice level or time of day (F85), no scene on Connect/public pages (F86), no Switch background palette rows (F68), no effective-motion readout (F63). Fix: port the scene components or their animation to canvas; add `reactivity` inputs to `backdrop-core.ts`.
+- `[Low]` Notification detail: no "Effective alerts" explanation and screen-reader summary (F93), no keyword add/save status line (F94), no roving arrow keys on the room notify strip (F95), no Mod+Shift+R reader chord (F12), `Prefs.timeScrubber` never read (F17), cross-tab active-theme id not adopted (F66).
+- `[Low]` Residence export/import ignores Elm's folders and quiet hours: `Account2.elm:288` writes quiet hours 22→8 and an empty folder list, and the import report says folders "aren't available in this client yet". Fix: write `Organizer` folders and the quiet window into `serializePortable` and apply them on import; update the stale comments.
 
 ### J — Public website: routes, pages, route a11y, static metadata
 Solid walked: `src/index.tsx` (route table, providers, boot side effects), every `src/routes/*` page (Landing, HomeRoomBoard, ProductPreview, About, Download+downloadMeta, Guides, Invite, NotFound, OnyxOS, PublicInfo, Roadmap, Stats (all 1047 lines) + PublicRoomComparison, Status, TrustPages, pageMeta), `src/ui/public/*`, `src/ui/navigation/publicRouteManifest.ts`, `src/ui/a11y/*`, `src/ui/proof/*`, `src/ui/lab/SystemSpecimen.tsx`, `Mascot.tsx`, `PublicLookPicker`/`publicLooks`, `src/lib/stats/*`, `src/lib/guides/*`, `src/lib/invite/*`, `tools/materialize-route-entrypoints.mjs`, `public/`, `StaleChunkRecovery.tsx`, `pwa/serviceWorkerRuntime.ts`, plus the @solidjs/router 0.15.4 anchor/scroll handler.
-Elm checked: `Route.elm`, `View.elm`, every public `View/*.elm` page, `Download/Guides/Invite/Stats/Status.elm`, `App.elm` LinkClicked/UrlChanged/Tick/HttpResult and per-page folds, `Main.elm` init, `elm/index.html`, `elm/tools/build.sh`, `ports.js`, plus `deploy.sh` + `tools/elm-overlay.mjs`, which is the only place the Elm build gets per-route documents, OG metadata, sw.js and the manifest.
-Key mechanics: `Browser.application` intercepts **every** `<a>` (fragment links included) and `LinkClicked → PushUrl` (`App.elm:36600-36606`). Nothing restores scroll or focus. `App.init` seeds only the invite query and the roadmap fragment. Feed fetches (download catalog, status, stats query) are wired to `UrlChanged`, which never fires on a cold load.
+Elm checked: `Route.elm`, `View.elm`, every public `View/*.elm` page, `Download/Guides/Invite/Stats/Status.elm`, `App.elm` LinkClicked/UrlChanged/RouteEntered/Tick/HttpResult and per-page folds, `Main.elm` init, `elm/index.html`, `elm/tools/build.sh`, `ports.js` (`focusFragment`, `installPublicMenuFocus`, `registerServiceWorker`, the polish update bridge), `tests/RxPublicNavTest.elm`, `pwaSafety.smoke.mjs`, plus `deploy.sh` + `tools/elm-overlay.mjs`, which is the only place the Elm build gets per-route documents, OG metadata, sw.js and the manifest. Re-verified at HEAD `609cb240` (v3/rx-public and v3/gap-pwa-safety closed most of the original gaps).
+Key mechanics (HEAD): `Browser.application` intercepts **every** `<a>`. `LinkClicked` sends same-origin static-file paths (`/downloads/`, `/source/`, or a file extension) to `LoadUrl` and everything else to `PushUrl` (`App.elm:40707-40720`, `isStaticFilePath` `:28016`). `UrlChanged` (`:40722-40794`) then closes the menu, emits `pageNavigationOut` (scroll to top on a path change, or scroll and focus the `#fragment` through the `pageNavigated` port), seeds the `/app` deep-link query on arrival from a public page (`seedAppQuery` `:28068`), and runs `routeEntry` (`:28125-28161`: status, download catalog, stats index plus `?room/?compare/?window`). `Main.init` sends `RouteEntered` once (`Main.elm:1276`) so a cold load runs the same `routeEntry` plus the fragment focus. Open weakness: `routeEntry` runs on every `UrlChanged`, including fragment-only ones (see gaps).
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
 | J1 | Route table: 19 paths + `/install` alias, slash/slashless forms | `src/index.tsx:125-138` (UI) | FULL | `Route.elm:44-72` | 20 constructors incl. NotFound |
-| J2 | Catch-all 404 "Route terminus", app-miss action (Open Onyx vs Back to home) | `src/routes/NotFound.tsx:31-51` (UI) | FULL | `View.elm:124-125`, `View/NotFound.elm:206-229` | Elm adds "Other places to go". App-miss test is `startsWith "/app"`, so it also matches `/apple…` |
-| J3 | Per-route document title | `src/routes/pageMeta.ts:59` (auto) | FULL | `View.elm:145-200` | — |
-| J4 | Runtime description/OG/Twitter/canonical/WebPage JSON-LD on client nav | `src/routes/pageMeta.ts:55-123` (auto) | PARTIAL | no meta port (grep `og:`/`canonical` in `ports.js`: none) | Title only. After SPA nav the head keeps the hard-loaded page's canonical/description |
-| J5 | 404 runtime `robots noindex` + strip canonical/og:url/JSON-LD | `src/routes/NotFound.tsx:8-29` (auto) | PARTIAL | `View/NotFound.elm:195-197` (says "ports-side"; no port exists) | Only the hard-loaded `404.html` is noindex |
-| J6 | Per-route static entrypoint docs (title/desc/canonical/OG/Twitter) for hard loads/crawlers | `tools/materialize-route-entrypoints.mjs:17-116,134-181,218-230` (auto) | FULL | `tools/elm-overlay.mjs:105-139`, `deploy.sh:796-803` | Only via `deploy.sh ONYX_CLIENT=elm`. `elm/tools/build.sh` emits none. `elm/index.html` has no description/OG/canonical/favicon |
-| J7 | Flat `404.html` noindex document | `materialize-route-entrypoints.mjs:194-216,235` (auto) | FULL | `tools/elm-overlay.mjs:141-143` | — |
+| J2 | Catch-all 404 "Route terminus", app-miss action (Open Onyx vs Back to home) | `src/routes/NotFound.tsx:31-51` (UI) | FULL | `View.elm:140-141`, `View/NotFound.elm:16-41` | Elm adds "Other places to go" (`View/NotFound.elm:34`). App-miss test is `startsWith "/app"` (`View.elm:162-164`), so it also matches `/apple…` |
+| J3 | Per-route document title | `src/routes/pageMeta.ts:59` (auto) | FULL | `View.elm:167-225` | — |
+| J4 | Runtime description/OG/Twitter/canonical/WebPage JSON-LD on client nav | `src/routes/pageMeta.ts:55-123` (auto) | PARTIAL | no meta port (grep `og:`/`canonical`/`noindex` in `ports.js` at HEAD: none) | Title only. After SPA nav the head keeps the hard-loaded page's canonical/description |
+| J5 | 404 runtime `robots noindex` + strip canonical/og:url/JSON-LD | `src/routes/NotFound.tsx:8-29` (auto) | PARTIAL | `View/NotFound.elm:5-7` (says "ports-side"; no port exists at HEAD) | Only the hard-loaded `404.html` is noindex |
+| J6 | Per-route static entrypoint docs (title/desc/canonical/OG/Twitter) for hard loads/crawlers | `tools/materialize-route-entrypoints.mjs:17-116,134-181,218-230` (auto) | FULL | `tools/elm-overlay.mjs:109-143`, `deploy.sh:794-806` | Only via `deploy.sh ONYX_CLIENT=elm`. `elm/tools/build.sh` emits none. `elm/index.html` still has no description/OG/canonical/favicon (manifest and apple-touch only, `:13-14`) |
+| J7 | Flat `404.html` noindex document | `materialize-route-entrypoints.mjs:194-216,235` (auto) | FULL | `tools/elm-overlay.mjs:145-147` | — |
 | J8 | Invite-card OG/description meta | `src/routes/Invite.tsx:81-83` (auto) | CORE-ONLY | `Invite.elm:683-689` (only caller `tests/InviteTest.elm:131`) | Title applied. The OG list is never written to the head |
-| J9 | Service worker registration + replaced-controller self-heal reload | `src/index.tsx:12-16`, `src/pwa/serviceWorkerRuntime.ts:29-55` (auto) | MISSING | `ports.js:9747` ("registers NO service worker") | New visitors get no offline shell and no update detection. Web Push waits on `serviceWorker.ready` (`ports.js:8284`) forever |
-| J10 | Manifest, icons, apple-touch, robots, sitemap | `public/manifest.json`, `index.html:14-18` (auto) | FULL | `elm/index.html:13-14`, `tools/elm-overlay.mjs:18-22` | Static files. The overlay keeps route heads |
-| J11 | Legacy `ocean-*` → `onyx:*` storage migration at boot | `src/lib/migrateStorage.ts:22-40`, `src/index.tsx:5` (auto) | PARTIAL | `ports.js:5121-5133` | Only identity-profile keys. Other `ocean-*` prefs are not copied |
+| J9 | Service worker registration + replaced-controller self-heal reload | `src/index.tsx:12-16`, `src/pwa/serviceWorkerRuntime.ts:29-55` (auto) | PARTIAL | `ports.js:11440-11549 registerServiceWorker`, wired `ports.js:8591`; `pwaSafety.smoke.mjs:107-156` | Registers `/sw.js` (scope `/`, `updateViaCache: none`) on https or loopback, after `load`, and only if a HEAD probe says it is JavaScript; re-checks every 30 min while visible (v3/gap-pwa-safety). No auto self-heal reload on a replaced controller: updates ask first (J14, J96). Web Push no longer waits forever (`ports.js:9919-9927`) |
+| J10 | Manifest, icons, apple-touch, robots, sitemap | `public/manifest.json`, `index.html:14-21` (auto) | FULL | `elm/index.html:13-14`, `tools/elm-overlay.mjs:18-22` | Static files. The overlay keeps route heads |
+| J11 | Legacy `ocean-*` → `onyx:*` storage migration at boot | `src/lib/migrateStorage.ts:22-40`, `src/index.tsx:5` (auto) | MISSING | `ports.js:6492-6522` (purge only; grep `ocean-` finds nothing else in `elm/`) | No `ocean-*` to `onyx:*` copy runs. The ports only delete six legacy ownerless identity-profile keys (`purgeLegacyIdentityProfile`); all other `ocean-*` prefs are never read. Was PARTIAL, which over-called a purge as a migration. Only matters to a browser whose `ocean-*` keys the Solid client never migrated |
 | J12 | Lazy route chunks + stale-chunk recovery (Reload / Continue home / Try again), "Loading page…" | `src/index.tsx:60-90`, `src/app/StaleChunkRecovery.tsx` (auto) | N/A | single bundle | Absent by design |
-| J13 | Global command palette on every route incl. public pages | `src/index.tsx:97-108,143` (shortcut) | PARTIAL | `View.elm:340` (overlays render only in `appFrame`) | Public pages render no palette |
-| J14 | Global update-available banner on every route | `src/index.tsx:144-146` (auto) | PARTIAL | `View.elm:345`, `ports.js:9897-9906` | App frame only, and it needs a SW that Elm never registers |
-| J15 | Scroll to top on page change | `@solidjs/router dist/index.js:1021-1028,1518` (auto) | MISSING | `App.elm:36600-36606` (PushUrl only; no `setViewport`) | The next page opens at the previous scroll offset |
-| J16 | In-page `#anchor` links scroll the target into view | `@solidjs/router dist/index.js:1021-1028` (auto) | MISSING | `App.elm:36602` (every `<a>` intercepted) | About topics, Download `#keep-here`, Stats/OnyxOS section navs, Guides index/route/Go-to, Roadmap legend: all inert |
-| J17 | Route-change live announcement (route label / "Route not found") | `src/ui/a11y/RouteLifecycle.tsx:117-139`, `RouteAnnouncer.tsx:70-145` (auto) | MISSING | — | SPA navigation is silent for screen readers |
+| J13 | Global command palette on every route incl. public pages | `src/index.tsx:97-108,143` (shortcut) | PARTIAL | `App.elm:48936 shellKeysLive`; `View.elm:390` (palette renders only in `overlays`, reached via `appFrame`) | Public pages render no palette, and Ctrl/Cmd-K does nothing there: `switcherUpdate` opens it only on `Route.App` with the gate down |
+| J14 | Global update-available banner on every route | `src/index.tsx:144-146` (auto) | PARTIAL | `View.elm:397` (`updateBanner` inside `overlays`); `ports.js:11715-11846` (`wirePolish` update bridge, `pwaUpdateApprove`) | Update detection now runs (the SW is registered, J9) but the strip renders only inside the app frame. Public pages and the connect gate never show it |
+| J15 | Scroll to top on page change | `@solidjs/router dist/index.js:1021-1028,1518` (auto) | FULL | `App.elm:28040 pageNavigationOut` (via `UrlChanged` `pageOut` `:40771`); `Main.elm:752 port pageNavigated`; `ports.js:4848-4878 focusFragment`; `tests/RxPublicNavTest.elm:103` | A public page whose path changes scrolls to the top after paint (v3/rx-public); `/app` never asks. Back/forward also resets to the top, and a same-path query change never scrolls (Solid always does) - read from code, not browser-run |
+| J16 | In-page `#anchor` links scroll the target into view | `@solidjs/router dist/index.js:1021-1028` (auto) | FULL | `App.elm:40707-40720` (every `<a>` to `PushUrl`), `:28040-28058`, `:40801-40811` (cold-load fragment); `ports.js:4848-4878 focusFragment`; `tests/RxPublicNavTest.elm:90,109` | Fragment links scroll the target into view (smooth unless reduced motion) and focus it (temporary `tabindex=-1`). Solid only scrolls. Targets verified present on About, Download, Stats, OnyxOS, Guides and Roadmap (v3/rx-public) |
+| J17 | Route-change live announcement (route label / "Route not found") | `src/ui/a11y/RouteLifecycle.tsx:117-139`, `RouteAnnouncer.tsx:70-145` (auto) | PARTIAL | `View/PublicFrame.elm:253` (`data-testid=route-announcer`); `tests/RxPublicNavTest.elm:218` | Public pages carry a persistent `sr-only` `role=status` polite node that speaks the page's main label on SPA change (v3/rx-public). Not covered: `/app` (no label), public/app swaps mount a fresh node, and the text is the main landmark name (404: "Onyx page not found"), not the RouteLifecycle label table. Actual screen-reader speech not tested |
 | J18 | `SkipLinkSet` primitive | `src/ui/a11y/SkipLinkSet.tsx:67-93` (DEAD) | N/A | — | No caller |
-| J19 | SPA nav from public CTAs into `/app/?join=&at=&topic=&as=` honours the params | `src/app/Connect.tsx:242-264` (UI; read on each AppRoute mount) | PARTIAL | `App.elm:3317,3410,3842` (init only); `App.elm:36608-36632` | Guides "Open the public room", Stats Open room/Join, Invite Join click all land in a plain gate. Works only on hard load |
-| J20 | `?signin=1` opens sign-in mode | `src/app/Connect.tsx:245` (UI) | MISSING | `App.elm:2600-2607` (emitted, never read) | Invite "Sign in" lands in guest mode |
-| J21 | Links to static files (`/downloads/*.NOTICE.txt`/`.sha256`, `/source/onyxos/*.c`) | `src/routes/Download.tsx:192-205`, `OnyxOS.tsx:220` (UI) | FULL | `App.elm:36600-36606` | Shared bug: both routers SPA-intercept these and show the 404 terminus |
-| J22 | "Skip to content" moves focus to `#public-main` | `src/ui/public/PublicSkipLink.tsx:4-40` (UI) | PARTIAL | `View/PublicFrame.elm:148,213` | Link renders, but the click is intercepted (pushUrl only): no focus, no scroll. WCAG 2.4.1 |
-| J23 | Brand home link, `aria-current` on Home | `src/ui/public/PublicHeader.tsx:12-37` (UI) | FULL | `View/PublicFrame.elm:151-164` | Mark drawn in CSS (no raster lockup) |
-| J24 | Primary nav About/Download from manifest + `aria-current` | `src/ui/public/PublicNav.tsx:55-70` (UI) | FULL | `View/PublicFrame.elm:42-46,110-125` | — |
-| J25 | Header "Open Onyx" → `/app/` | `src/ui/public/PublicNav.tsx:73` (UI) | FULL | `View/PublicFrame.elm:179` | — |
-| J26 | Menu toggle (`aria-expanded`/controls/label); closes on navigate + Escape | `src/ui/public/PublicNav.tsx:17-23,65,74-85` (UI) | FULL | `View/PublicFrame.elm:180-202`; `App.elm:39550,39744-39752,36631,44205` | — |
-| J27 | Menu focus: focus first link on open, Tab trap, Escape restores toggle focus, close at desktop breakpoint | `src/ui/public/PublicNav.tsx:15-51` (UI) | PARTIAL | narrowing documented `View/PublicFrame.elm:20-23` | None of the four focus behaviours exist |
-| J28 | Optional context line between header and main | `src/ui/public/PublicFrame.tsx:40-42` (UI) | FULL | `View/PublicFrame.elm:207-212` | — |
-| J29 | Labelled `main#public-main tabindex=-1` | `src/ui/public/PublicFrame.tsx:43` (UI) | FULL | `View/PublicFrame.elm:213` | — |
-| J30 | Footer identity + Explore links | `src/ui/public/PublicFooter.tsx:5-35` (UI) | FULL | `View/PublicFrame.elm:65-76,214-229` | Elm: 9 links + Open Onyx (Solid: 5) |
-| J31 | Public scene-atmosphere host | `src/ui/public/PublicFrame.tsx:35-37` (CSS `display:none`) | N/A | `View/PublicFrame.elm:147` | Hidden in Solid too |
+| J19 | SPA nav from public CTAs into `/app/?join=&at=&topic=&as=` honours the params | `src/app/Connect.tsx:242-264` (UI; read on each AppRoute mount) | FULL | `App.elm:28068 seedAppQuery` (called from `UrlChanged` `:40774-40777`); cold load `App.elm:3550,4090`; `tests/RxPublicNavTest.elm:148` | Arriving at `/app` by navigation from a public page queues `join`/`at`/`topic`, seats `as` and opens Sign in; a live session ignores them (v3/rx-public). Guides, Stats and Invite links now land correctly |
+| J20 | `?signin=1` opens sign-in mode | `src/app/Connect.tsx:245` (UI) | FULL | `App.elm:3648` (cold load), `:28098` (navigation), `:28108 signInParam`; emitter `:2770-2780 inviteSignInHref`; `tests/RxPublicNavTest.elm:160` | `signin=1` or `true` opens the sign-in mode; garbage does not (v3/rx-public) |
+| J21 | Links to static files (`/downloads/*.NOTICE.txt`/`.sha256`, `/source/onyxos/*.c`) | `src/routes/Download.tsx:192-205`, `OnyxOS.tsx:220` (UI) | FULL | `App.elm:28016 isStaticFilePath`, `:40713` (`LoadUrl`); `tests/RxPublicNavTest.elm:129` | Elm loads `/downloads/*`, `/source/*` and any path with a file extension as documents (v3/rx-public). Solid's router still SPA-intercepts them and shows the 404 terminus (Solid-only bug) |
+| J22 | "Skip to content" moves focus to `#public-main` | `src/ui/public/PublicSkipLink.tsx:4-40` (UI) | FULL | `View/PublicFrame.elm:184,249`; chain as J16 (`#public-main` to `PageNavigated`); `tests/RxPublicNavTest.elm:109` | The skip link now moves focus to `main#public-main` (`tabindex=-1`) and scrolls (v3/rx-public) |
+| J23 | Brand home link, `aria-current` on Home | `src/ui/public/PublicHeader.tsx:12-37` (UI) | FULL | `View/PublicFrame.elm:187-200` | Mark drawn in CSS (no raster lockup) |
+| J24 | Primary nav About/Download from manifest + `aria-current` | `src/ui/public/PublicNav.tsx:55-70` (UI) | FULL | `View/PublicFrame.elm:43-47,146-161` | — |
+| J25 | Header "Open Onyx" → `/app/` | `src/ui/public/PublicNav.tsx:73` (UI) | FULL | `View/PublicFrame.elm:215` | — |
+| J26 | Menu toggle (`aria-expanded`/controls/label); closes on navigate + Escape | `src/ui/public/PublicNav.tsx:17-23,65,74-85` (UI) | FULL | `View/PublicFrame.elm:216-238`; `App.elm:43739,43934-43942,40744,49024` | — |
+| J27 | Menu focus: focus first link on open, Tab trap, Escape restores toggle focus, close at desktop breakpoint | `src/ui/public/PublicNav.tsx:15-51` (UI) | PARTIAL | `ports.js:4880-4940 installPublicMenuFocus`, wired `:7360-7363`; `View/PublicFrame.elm:21-24` (module doc still says narrowed) | First link focused on open, Tab ring, close returns focus to the toggle, auto-close past 768px (v3/rx-public; observes `aria-expanded`). The ring is the toggle plus nav links only, so the header "Open Onyx" link is skipped by Tab while the menu is open (Solid includes it). No automated test of the DOM side |
+| J28 | Optional context line between header and main | `src/ui/public/PublicFrame.tsx:40-42` (UI) | FULL | `View/PublicFrame.elm:243-248` | — |
+| J29 | Labelled `main#public-main tabindex=-1` | `src/ui/public/PublicFrame.tsx:43` (UI) | FULL | `View/PublicFrame.elm:249` | — |
+| J30 | Footer identity + Explore links | `src/ui/public/PublicFooter.tsx:5-35` (UI) | FULL | `View/PublicFrame.elm:66-77,254-269` | Elm: 9 links + Open Onyx (Solid: 5) |
+| J31 | Public scene-atmosphere host | `src/ui/public/PublicFrame.tsx:35-37` (CSS `display:none`) | N/A | `View/PublicFrame.elm:183` | Hidden in Solid too |
 | J32 | Retire bootstrap `.html-shell-skip` | `src/ui/public/PublicFrame.tsx:23-31` (auto) | N/A | overlay replaces `<body>` | — |
-| J33 | Landing hero: h1, lede, Open Onyx, See the public room, device note | `src/routes/Landing.tsx:47-65` (UI) | FULL | `View/Landing.elm:162-180` | Device-note copy reworded |
-| J34 | Interactive fictional product preview (Room/Home/Messages tabs, arrow keys, mascot) | `src/routes/ProductPreview.tsx:74-178` (UI) | PARTIAL | `View/Landing.elm:98-131` | Static `aria-hidden` sketch; no tabs |
-| J35 | Trust claims list + privacy link | `src/routes/Landing.tsx:20-25,73-86` (UI) | FULL | `View/Landing.elm:59-65,183-201` | — |
-| J36 | Room-board tabs swap title/copy/action/note; public-room footnote | `src/routes/HomeRoomBoard.tsx:54-115` (UI) | FULL | `View/Landing.elm:202-243`; `App.elm:41718` | — |
-| J37 | Board-tab keyboard (Arrow/Home/End + focus), roving tabindex, `aria-controls`/tabpanel ids, polite note | `src/routes/HomeRoomBoard.tsx:59-71,80-101` (UI) | PARTIAL | `View/Landing.elm:207-226` | Click only; no roving or ARIA wiring |
-| J38 | Board quick links + "More to explore" shelf | `src/routes/HomeRoomBoard.tsx:103-108`, `Landing.tsx:11-18,92-104` (UI) | FULL | `View/Landing.elm:227-251` | Slashless hrefs (canonical form is `/x/`) |
+| J33 | Landing hero: h1, lede, Open Onyx, See the public room, device note | `src/routes/Landing.tsx:47-65` (UI) | FULL | `View/Landing.elm:179-197` | Device-note copy reworded |
+| J34 | Interactive fictional product preview (Room/Home/Messages tabs, arrow keys, mascot) | `src/routes/ProductPreview.tsx:74-178` (UI) | PARTIAL | `View/Landing.elm:115-148` | Static `aria-hidden` sketch; no tabs |
+| J35 | Trust claims list + privacy link | `src/routes/Landing.tsx:20-25,73-86` (UI) | FULL | `View/Landing.elm:60-66,200-218` | — |
+| J36 | Room-board tabs swap title/copy/action/note; public-room footnote | `src/routes/HomeRoomBoard.tsx:54-115` (UI) | FULL | `View/Landing.elm:219-266`; `App.elm:45970` | — |
+| J37 | Board-tab keyboard (Arrow/Home/End + focus), roving tabindex, `aria-controls`/tabpanel ids, polite note | `src/routes/HomeRoomBoard.tsx:59-71,80-101` (UI) | PARTIAL | `View/Landing.elm:96-110 onTabKey`, `:224-249`; `App.elm:40819 BoardTabKey`; `tests/RxPublicNavTest.elm:183,196` | Arrow/Home/End rove selection and focus, roving `tabindex`, tab ids, `aria-controls` and `aria-labelledby` now match (v3/rx-public). Still missing: the panel's `tabindex=0` and the `aria-live=polite` on the note, so a tab swap is silent beyond `aria-selected` |
+| J38 | Board quick links + "More to explore" shelf | `src/routes/HomeRoomBoard.tsx:103-108`, `Landing.tsx:11-18,92-104` (UI) | FULL | `View/Landing.elm:250-274` | Slashless hrefs (canonical form is `/x/`) |
 | J39 | About hero, product-sketch figure, CTAs, context line | `src/routes/About.tsx:19-77` (UI) | FULL | `View/About.elm:170-220,333-335` | — |
-| J40 | About topic nav (Rooms/People/Join/Hosting/Accessibility) | `src/routes/About.tsx:79-85` (UI) | PARTIAL | `View/About.elm:221-227` | Inert (J16) |
+| J40 | About topic nav (Rooms/People/Join/Hosting/Accessibility) | `src/routes/About.tsx:79-85` (UI) | FULL | `View/About.elm:221-227` | Anchors scroll and focus their section (J16) |
 | J41 | About Rooms/People/Join/Hosting sections + quiet operator links | `src/routes/About.tsx:87-213` (UI) | FULL | `View/About.elm:228-313` | — |
-| J42 | Accessibility statement disclosure (5 topics + client audit list) | `src/routes/About.tsx:215-231`, `src/shell/AccessibilityStatement.tsx:15` (UI) | FULL | `View/About.elm:27-167,314-328` | Copy inherited verbatim; claims not re-verified for Elm |
-| J43 | `/accessibility` `/glossary` `/integrations` `/agents` pages (content, main label, context, title) | `src/routes/PublicInfo.tsx:15-20,55-97` (UI) | FULL | `View/PublicInfo.elm:28-170`; `View.elm:83-85` | — |
+| J42 | Accessibility statement disclosure (5 topics + client audit list) | `src/routes/About.tsx:215-231`, `src/shell/AccessibilityStatement.tsx:15` (UI) | FULL | `View/About.elm:27-167,314-328` | Copy inherited verbatim. HEAD spot-checks: the `prefers-contrast: more` claim (`View/About.elm:51`) is now true (`css/gap-appearance.css:57,281`); the `prefers-reduced-transparency` claim (`:52`) is not - Elm reads only the in-app switch (`app.css:3325-3327`), unlike Solid's media query; the Watch together line (`:100`) is now backed by `View/WatchTogether.elm`. Rest not re-verified |
+| J43 | `/accessibility` `/glossary` `/integrations` `/agents` pages (content, main label, context, title) | `src/routes/PublicInfo.tsx:15-20,55-97` (UI) | FULL | `View/PublicInfo.elm:28-171`; `View.elm:99-101` | — |
 | J44 | Slashless PublicInfo aliases | `src/routes/PublicInfo.tsx:23-42` (UI) | FULL | `View/PublicInfo.elm:76-104` | — |
 | J45 | Privacy facts page | `src/routes/TrustPages.tsx:106-140` (UI) | FULL | `View/Trust.elm:159-180` | — |
 | J46 | House rules (12) + security-report link | `src/routes/TrustPages.tsx:22-35,91-105` (UI) | FULL | `View/Trust.elm:129-156` | — |
 | J47 | Contact page (GitHub new tab, SECURITY.md) | `src/routes/TrustPages.tsx:141-164` (UI) | FULL | `View/Trust.elm:183-199` | — |
-| J48 | Status feed fetch with 3-path fallback + bounded normalize | `src/lib/stats/status.ts:76-138` (auto) | FULL | `Status.elm:57-61,416`; `App.elm:41110-41138` | — |
+| J48 | Status feed fetch with 3-path fallback + bounded normalize | `src/lib/stats/status.ts:76-138` (auto) | FULL | `Status.elm:57-61,416`; `App.elm:45315-45343` | — |
 | J49 | One honest sentence per feed state (7 states) | `src/routes/Status.tsx:18-56,101-112` (UI) | FULL | `Status.elm:235`; `View/Status.elm:52-63` | — |
-| J50 | "Check again" (busy/disabled) | `src/routes/Status.tsx:114-125` (UI) | FULL | `View/Status.elm:64-79`; `App.elm:40999` | — |
-| J51 | 30 s auto-recheck | `src/routes/Status.tsx:65-70` (auto) | FULL | `App.elm:37477-37491` | Driven by Tick |
-| J52 | Status fetches immediately on load | `src/routes/Status.tsx:64` (auto) | PARTIAL | `App.elm:37486` (Tick only; init has no fetch) | Cold load shows "no public report" in the live region for ≤1 s |
+| J50 | "Check again" (busy/disabled) | `src/routes/Status.tsx:114-125` (UI) | FULL | `View/Status.elm:64-79`; `App.elm:45204` | — |
+| J51 | 30 s auto-recheck | `src/routes/Status.tsx:65-70` (auto) | FULL | `App.elm:41603-41617` | Driven by Tick |
+| J52 | Status fetches immediately on load | `src/routes/Status.tsx:64` (auto) | FULL | `App.elm:28125-28128 routeEntry`; `Main.elm:1276` (`RouteEntered`); `App.elm:40796`; no status-specific test (`tests/RxPublicNavTest.elm:65` pins the same fold for /download) | A cold load of `/status/` fetches at once (v3/rx-public); the 30 s recheck stays on Tick (J51) |
 | J53 | Roadmap pointer section | `src/routes/Status.tsx:130-137` (UI) | FULL | `View/Status.elm:83-88` | — |
-| J54 | Download hero, `/install` kicker, keep-here section, honesty aside | `src/routes/Download.tsx:365-486` (UI) | FULL | `View/Download.elm:36-97`; `App.elm:2591` | `#keep-here` CTA inert (J16) |
-| J55 | Download catalog fetch + live catalog receipt | `src/routes/Download.tsx:373-386,498-508` (auto) | PARTIAL | `App.elm:2403-2413,36661-36666` | Never fetched on a hard load of `/download/` or `/install/`: page shows "Catalog unavailable" and withholds all download controls |
+| J54 | Download hero, `/install` kicker, keep-here section, honesty aside | `src/routes/Download.tsx:365-486` (UI) | FULL | `View/Download.elm:36-97`; `App.elm:2764` | `#keep-here` CTA works (J16), but every fragment click on this route re-runs route entry and refetches the catalog (see gap on same-route `UrlChanged`) |
+| J55 | Download catalog fetch + live catalog receipt | `src/routes/Download.tsx:373-386,498-508` (auto) | FULL | `App.elm:28125-28131 routeEntry` to `:2576 requestDownloadCatalog`; `Main.elm:1276`; `tests/RxPublicNavTest.elm:65` | A hard load of `/download/` or `/install/` fetches the catalog and sidecars (v3/rx-public). Same-route fragment or query changes also re-run it (resets catalog, hashes and copy state) |
 | J56 | Per-lane availability states + withheld-control copy | `src/routes/Download.tsx:96-115,172-206` (UI) | FULL | `View/Download.elm:169-273` | — |
-| J57 | Archive download (`download` attr), Honesty notice, SHA-256 file links | `src/routes/Download.tsx:184-205` (UI) | FULL | `View/Download.elm:238-257` | Notice/sha links hit J21 |
-| J58 | Per-lane SHA-256 sidecar fetch + catalog fallback + loading copy | `src/routes/Download.tsx:38-47,101-106,219-239` (auto) | FULL | `App.elm:41008-41044,41075-41093` | — |
-| J59 | Copy hash / Copy steps (Copied / Copy failed, 1.6 s revert) | `src/routes/Download.tsx:59-89` (UI) | FULL | `View/Download.elm:392-414`; `App.elm:40031-40040` | — |
+| J57 | Archive download (`download` attr), Honesty notice, SHA-256 file links | `src/routes/Download.tsx:184-205` (UI) | FULL | `View/Download.elm:238-257` | Notice and sha links are plain document loads (J21) |
+| J58 | Per-lane SHA-256 sidecar fetch + catalog fallback + loading copy | `src/routes/Download.tsx:38-47,101-106,219-239` (auto) | FULL | `App.elm:45213-45250,45293-45312` | — |
+| J59 | Copy hash / Copy steps (Copied / Copy failed, 1.6 s revert) | `src/routes/Download.tsx:59-89` (UI) | FULL | `View/Download.elm:392-414`; `App.elm:44221-44230` | — |
 | J60 | Per-lane install steps + notes | `src/routes/Download.tsx:242-285` (UI) | FULL | `View/Download.elm:274-358` | Collapsed inside `<details>` |
 | J61 | macOS coming-soon card | `src/routes/Download.tsx:295-358` (UI) | FULL | `View/Download.elm:420-466` | — |
 | J62 | Verify-a-download block | `src/routes/Download.tsx:519-536` (UI) | FULL | `View/Download.elm:99-109` | — |
-| J63 | Stats index fetch + 30 s poll | `src/routes/Stats.tsx:349,363-367` (auto) | FULL | `App.elm:2222,37506-37526` | On cold load the first fetch waits ≤1 s for Tick |
-| J64 | Feed observation label, ledger, Refresh data (index + inspected room) | `src/routes/Stats.tsx:567-595` (UI) | FULL | `View/Stats.elm:52-62,149-156`; `App.elm:40042-40061` | — |
+| J63 | Stats index fetch + 30 s poll | `src/routes/Stats.tsx:349,363-367` (auto) | FULL | `App.elm:28133-28157 routeEntry`, `:2395`, `:41632-41652` | First fetch is immediate on a cold load (v3/rx-public); polling stays on Tick |
+| J64 | Feed observation label, ledger, Refresh data (index + inspected room) | `src/routes/Stats.tsx:567-595` (UI) | FULL | `View/Stats.elm:52-62,149-156`; `App.elm:44232-44251` | — |
 | J65 | Network summary (people online, rooms moving, messages, latest day ± delta) | `src/routes/Stats.tsx:596-622` (UI) | FULL | `View/Stats.elm:157-190` | — |
 | J66 | Signal-path timeline (3 checks) + note | `src/routes/Stats.tsx:40-136,626-657` (UI) | FULL | `View/Stats.elm:193-225` | — |
-| J67 | Stats section nav anchors | `src/routes/Stats.tsx:659-664` (UI) | PARTIAL | `View/Stats.elm:68-73` | Inert (J16) |
-| J68 | 7/14-day window toggle + status + URL replaceState | `src/routes/Stats.tsx:518-527,674-707` (UI) | FULL | `View/Stats.elm:668-688`; `App.elm:40129-40141` | — |
+| J67 | Stats section nav anchors | `src/routes/Stats.tsx:659-664` (UI) | PARTIAL | `View/Stats.elm:68-73`; `App.elm:40722-40794` (`UrlChanged` to `routeEntry` `:28133-28157`) | Anchors scroll and focus (J16), but each click is a same-route `UrlChanged` that re-runs stats route entry: `requestStatsIndex True` blanks the index and detail and refetches, so the page can collapse before the scroll lands. Read from code, not browser-run |
+| J68 | 7/14-day window toggle + status + URL replaceState | `src/routes/Stats.tsx:518-527,674-707` (UI) | FULL | `View/Stats.elm:668-688`; `App.elm:44319-44331` | — |
 | J69 | Network pulse bars + sr-only list + chart note | `src/routes/Stats.tsx:711-745` (UI) | FULL | `View/Stats.elm:228-372` | — |
-| J70 | Room spotlight + "Join the conversation" | `src/routes/Stats.tsx:749-782` (UI) | FULL | `View/Stats.elm:374-409` | Deep link hits J19 |
-| J71 | Inspect → URL `?room=` + scroll/focus reveal (user-activated only) | `src/routes/Stats.tsx:257-265,412-423` (UI) | FULL | `App.elm:40072-40083`; `ports.js:6218-6237` | — |
-| J72 | Inspector defaults to busiest room; match-gated loading copy | `src/routes/Stats.tsx:375-397` (auto) | FULL | `App.elm:41047-41071` | — |
+| J70 | Room spotlight + "Join the conversation" | `src/routes/Stats.tsx:749-782` (UI) | FULL | `View/Stats.elm:374-409` | Deep link now honoured on arrival (J19) |
+| J71 | Inspect → URL `?room=` + scroll/focus reveal (user-activated only) | `src/routes/Stats.tsx:257-265,412-423` (UI) | FULL | `App.elm:44262-44273`; `ports.js:7618-7637` | — |
+| J72 | Inspector defaults to busiest room; match-gated loading copy | `src/routes/Stats.tsx:375-397` (auto) | FULL | `App.elm:45252-45276` | — |
 | J73 | Inspector metrics (8) + hour/day/flow cards + week×hour heatmap | `src/routes/Stats.tsx:831-972` (UI) | FULL | `View/Stats.elm:460-640` | First-seen shown as a UTC label, not locale |
-| J74 | Compare toggle (max 2, disabled when full) + URL `compare` | `src/routes/Stats.tsx:424-444` (UI) | FULL | `App.elm:40085-40116` | — |
-| J75 | Comparison Copy link (copying/copied/failed) + Clear selection | `src/routes/PublicRoomComparison.tsx:150-215` (UI) | FULL | `View/Stats.elm:740-790`; `App.elm:40118,40143-40160` | — |
+| J74 | Compare toggle (max 2, disabled when full) + URL `compare` | `src/routes/Stats.tsx:424-444` (UI) | FULL | `App.elm:44275-44306` | — |
+| J75 | Comparison Copy link (copying/copied/failed) + Clear selection | `src/routes/PublicRoomComparison.tsx:150-215` (UI) | FULL | `View/Stats.elm:740-790`; `App.elm:44308,44333-44350` | — |
 | J76 | Comparison chips, missing-from-export, 5-row table, headline, feed note | `src/routes/PublicRoomComparison.tsx:218-318` (UI) | FULL | `View/Stats.elm:791-890` | — |
 | J77 | Directory search + scope (All/Here now/24h) + sort (4) + result count | `src/routes/Stats.tsx:456-475,996-1022` (UI) | FULL | `View/Stats.elm:901-987`; `Stats.elm:1739-1780` | — |
 | J78 | Room row: sparkline, numbers, Compare, Inspect, Open room, Room ledger | `src/routes/Stats.tsx:267-341` (UI) | FULL | `View/Stats.elm:989-1074` | — |
-| J79 | Shareable stats state restored on load (`?room` `?compare` `?window`) | `src/routes/Stats.tsx:353-361` (auto) | PARTIAL | `App.elm:36673-36686` (UrlChanged only); `App.elm:3660-3668` (init blanks) | Hard-loaded share links ignore their query |
+| J79 | Shareable stats state restored on load (`?room` `?compare` `?window`) | `src/routes/Stats.tsx:353-361` (auto) | FULL | `App.elm:28133-28157 routeEntry` (seeds `?room` `?compare` `?window`); `Main.elm:1276`; `tests/RxPublicNavTest.elm:76` | Hard-loaded share links seed their query once `RouteEntered` lands (v3/rx-public); `init` still blanks the fields first (`App.elm:3908-3916`) |
 | J80 | Roadmap hero, legend, priority cards, no-dates note | `src/routes/Roadmap.tsx:64-139` (UI) | FULL | `View/Roadmap.elm:133-162` | — |
-| J81 | Active priority from `#roadmap-x` on load and navigation | `src/routes/Roadmap.tsx:31-35,43-54` (auto) | FULL | `App.elm:1367-1387,3633,36631` | — |
-| J82 | Legend click selects priority (modified clicks stay native) | `src/routes/Roadmap.tsx:56-62,89-101` (UI) | FULL | `View/Roadmap.elm:60-97`; `App.elm:39754` | — |
-| J83 | Scroll to + focus the selected roadmap card | `src/routes/Roadmap.tsx:37-41,61` (UI) | MISSING | narrowing `View/Roadmap.elm:14-15` | Card neither scrolls nor takes focus |
-| J84 | OnyxOS sections, hero, native grid, source specimen, workbench, close | `src/routes/OnyxOS.tsx:121-250` (UI) | FULL | `View/Onyxos.elm:183-280` | Section nav inert (J16); source link hits J21 |
-| J85 | OnyxOS method tabs: click select | `src/routes/OnyxOS.tsx:174-206` (UI) | FULL | `App.elm:40984-40992` | — |
-| J86 | Method tabs: Arrow/Home/End roving with focus following | `src/routes/OnyxOS.tsx:86-119` (UI) | PARTIAL | `View/Onyxos.elm:120-140`; `App.elm:40994-40997` | Selection roves; DOM focus stays on the old (now `tabindex -1`) tab |
-| J87 | Invite card from query (join/as/at/topic/reader/by/with) + live title | `src/lib/invite/inviteCard.ts:81-105`, `src/routes/Invite.tsx:47-55` (auto) | FULL | `App.elm:1401`; `View.elm:164-165` | — |
+| J81 | Active priority from `#roadmap-x` on load and navigation | `src/routes/Roadmap.tsx:31-35,43-54` (auto) | FULL | `App.elm:1517-1537,3881,40744` | — |
+| J82 | Legend click selects priority (modified clicks stay native) | `src/routes/Roadmap.tsx:56-62,89-101` (UI) | FULL | `View/Roadmap.elm:60-97`; `App.elm:43944` | Legend click selects and also navigates to `#roadmap-x` (J83) |
+| J83 | Scroll to + focus the selected roadmap card | `src/routes/Roadmap.tsx:37-41,61` (UI) | FULL | `View/Roadmap.elm:83-97 legendLink` (href `#roadmap-x`), `:100-107 priorityCard` (`id`, `tabindex -1`); `ports.js:4848-4878`; `tests/RxPublicNavTest.elm:90` | The fragment navigation scrolls to and focuses the card (generic `focusFragment`, v3/rx-public; also on a cold load of `#roadmap-next`). `View/Roadmap.elm:11-15` still calls this a narrowing (stale) |
+| J84 | OnyxOS sections, hero, native grid, source specimen, workbench, close | `src/routes/OnyxOS.tsx:121-250` (UI) | FULL | `View/Onyxos.elm:183-280` | Section nav works (J16); source link is a document load (J21) |
+| J85 | OnyxOS method tabs: click select | `src/routes/OnyxOS.tsx:174-206` (UI) | FULL | `App.elm:45181-45189` | — |
+| J86 | Method tabs: Arrow/Home/End roving with focus following | `src/routes/OnyxOS.tsx:86-119` (UI) | FULL | `View/Onyxos.elm:98-99,120-140,160-163`; `App.elm:45191-45205 OnyxosStageKey` (`PrefsFocus onyxos-method-tab-<id>`); `tests/RxPublicNavTest.elm:208` | Arrow/Home/End move selection and DOM focus together (v3/rx-public). `View/Onyxos.elm:9-12` still calls focus a narrowing (stale) |
+| J87 | Invite card from query (join/as/at/topic/reader/by/with) + live title | `src/lib/invite/inviteCard.ts:81-105`, `src/routes/Invite.tsx:47-55` (auto) | FULL | `App.elm:1551`; `View.elm:186-187` | — |
 | J88 | Invite heading/welcome/room mark; no-room recovery; access note | `src/routes/Invite.tsx:150-180` (UI) | FULL | `View/Invite.elm:64-122` | — |
 | J89 | Invite preview card (title, description, topic) | `src/routes/Invite.tsx:165-177` (UI) | PARTIAL | `View/Invite.elm:92-117` | Title dropped; description shown only with `?by=` |
-| J90 | Display name field, validation, `?as=` prefill | `src/routes/Invite.tsx:57-60,112-115,192-202` (UI) | FULL | `View/Invite.elm:145-165`; `App.elm:39763,36622-36627` | — |
-| J91 | Join link click → `/app` with join/as/at/topic | `src/routes/Invite.tsx:204` (UI) | PARTIAL | `View/Invite.elm:134-141` | SPA nav drops the params (J19) |
-| J92 | Enter-submit join (full page load) | `src/routes/Invite.tsx:186-190` (UI) | FULL | `App.elm:40973-40982` (LoadUrl) | — |
-| J93 | Invalid submit focuses the name field | `src/routes/Invite.tsx:117-125` (UI) | MISSING | narrowing `App.elm:40974-40976` | Error is shown; focus stays put |
-| J94 | Copy invite link + assertive/polite status | `src/routes/Invite.tsx:90-110,207-239` (UI) | FULL | `App.elm:39766-39773`; `View/Invite.elm:168-190` | — |
-| J95 | "Sign in" (`?signin=1`) + "How Onyx works" links | `src/routes/Invite.tsx:75-79,219-226` (UI) | PARTIAL | `View/Invite.elm:178-183` | Sign-in intent lost (J19 + J20) |
-| J96 | Hold update-reload while a name is typed | `src/routes/Invite.tsx:38-44` (auto) | N/A | `ports.js:9914-9935` | Elm never auto-reloads (approval only) |
-| J97 | `/guides` + `/community` surfaces (kicker/title/main label/context) | `src/routes/Guides.tsx:39-59,430-438` (UI) | FULL | `Guides.elm:142-200`; `View.elm:118-122` | — |
+| J90 | Display name field, validation, `?as=` prefill | `src/routes/Invite.tsx:57-60,112-115,192-202` (UI) | FULL | `View/Invite.elm:145-165`; `App.elm:43953,40736-40741` | — |
+| J91 | Join link click → `/app` with join/as/at/topic | `src/routes/Invite.tsx:204` (UI) | FULL | `View/Invite.elm:134-141`; `App.elm:28068` (arrival seeding); `tests/RxPublicNavTest.elm:148` | Join link SPA-navigates to `/app` and the params are honoured (J19) |
+| J92 | Enter-submit join (full page load) | `src/routes/Invite.tsx:186-190` (UI) | FULL | `App.elm:45168-45179` (`LoadUrl`) | — |
+| J93 | Invalid submit focuses the name field | `src/routes/Invite.tsx:117-125` (UI) | FULL | `App.elm:45168-45179` (`PrefsFocus invite-display-name`); `tests/RxPublicNavTest.elm:213` | Error shows and focus returns to the field (v3/rx-public). `View/Invite.elm:16-17` still calls this a DOM-only narrowing (stale) |
+| J94 | Copy invite link + assertive/polite status | `src/routes/Invite.tsx:90-110,207-239` (UI) | FULL | `App.elm:43956-43963`; `View/Invite.elm:168-190` | — |
+| J95 | "Sign in" (`?signin=1`) + "How Onyx works" links | `src/routes/Invite.tsx:75-79,219-226` (UI) | FULL | `View/Invite.elm:178-183`; `App.elm:2770-2780`, `:28098` | "Sign in" now opens the sign-in mode on arrival (J19 + J20) |
+| J96 | Hold update-reload while a name is typed | `src/routes/Invite.tsx:38-44` (auto) | N/A | `ports.js:11825-11846` | Elm never auto-reloads (approval only) |
+| J97 | `/guides` + `/community` surfaces (kicker/title/main label/context) | `src/routes/Guides.tsx:39-59,430-438` (UI) | FULL | `Guides.elm:142-200`; `View.elm:134-138` | — |
 | J98 | Guides hero + "Join a room" | `src/routes/Guides.tsx:230-240` (UI) | FULL | `View/Guides.elm:248-255` | — |
-| J99 | Task index, route-map cards, "Go to: next" anchors | `src/routes/Guides.tsx:246-250,285-300,359` (UI) | PARTIAL | `View/Guides.elm:191-208,257-268,337-345` | Inert (J16) |
+| J99 | Task index, route-map cards, "Go to: next" anchors | `src/routes/Guides.tsx:246-250,285-300,359` (UI) | FULL | `View/Guides.elm:191-208,257-268,337-345` | Index, route-map and Go-to anchors work (J16) |
 | J100 | Progress meter, count, "Next:" status | `src/routes/Guides.tsx:264-280` (UI) | FULL | `View/Guides.elm:270-293` | — |
-| J101 | Persisted progress `onyx:guides-progress-v1` (allowlisted ids) | `src/lib/guides/progress.ts:3-57`, `src/routes/Guides.tsx:171-189` (auto) | FULL | `ports.js:6282-6305`; `App.elm:40000-40017,40957` | — |
+| J101 | Persisted progress `onyx:guides-progress-v1` (allowlisted ids) | `src/lib/guides/progress.ts:3-57`, `src/routes/Guides.tsx:171-189` (auto) | FULL | `ports.js:7684-7707`; `App.elm:44190-44207,45152` | — |
 | J102 | Room-starter route (Done / Start here / Then, `aria-current=step`) | `src/lib/guides/roomStarter.ts:53-69` (UI) | FULL | `Guides.elm:225`; `View/Guides.elm:191-208` | — |
 | J103 | Safety snapshot with call-recording note substitution | `src/routes/Guides.tsx:62-69`, `src/lib/guides/roomStarter.ts:22-28` (UI) | FULL | `Guides.elm:51-76` | — |
-| J104 | Copy plan + status | `src/routes/Guides.tsx:191-206` (UI) | FULL | `App.elm:40024-40029`; `View/Guides.elm:313-333` | — |
+| J104 | Copy plan + status | `src/routes/Guides.tsx:191-206` (UI) | FULL | `App.elm:44214-44219`; `View/Guides.elm:313-333` | — |
 | J105 | Download plan as text (data URL, filename) | `src/routes/Guides.tsx:161-163,330` (UI) | FULL | `View/Guides.elm:230-231,322` | — |
-| J106 | Reset plan | `src/routes/Guides.tsx:185-189` (UI) | FULL | `App.elm:40019-40022` | — |
+| J106 | Reset plan | `src/routes/Guides.tsx:185-189` (UI) | FULL | `App.elm:44209-44212` | — |
 | J107 | How-to cards: Mark done toggles, optional card, external links in new tab | `src/routes/Guides.tsx:376-420` (UI) | FULL | `View/Guides.elm:123-188` | — |
 | J108 | Principles card | `src/routes/Guides.tsx:366-374` (UI) | FULL | `View/Guides.elm:356-361` | — |
-| J109 | Public route manifest (ids/groups/primary-nav projection) | `src/ui/navigation/publicRouteManifest.ts:56-113` (UI) | FULL | `View/PublicFrame.elm:42-76` | Hard-coded, not data-driven |
-| J110 | PublicLookPicker (public looks + active extra; radio roving) | `src/theme/PublicLookPicker.tsx:7-48`, `src/theme/publicLooks.ts:37-80` (UI) | FULL | `View/Appearance.elm:62,96,313-329`; `View/Studio.elm:220-240` | — |
-| J111 | `/appearance` route | `src/index.tsx:128` (UI) | FULL | `View.elm:115-116` | Page detail belongs to the theming section |
-| J112 | `/app` route → connect gate / shell | `src/index.tsx:127`, `src/routes/AppRoute.tsx:29-51` (UI) | FULL | `View.elm:130-135` | App runtimes belong to other sections |
-| J113 | Encryption-policy chip + `?e2ee=` on room invite share | `src/lib/invite/encryptionPolicyBadge.ts`, `src/shell/ChannelSettings.tsx:261-266,723-732` (UI) | MISSING | `InviteShare.elm` (no policy) | Overlaps room-settings section |
-| J114 | Copy call invite link from voice bar | `src/lib/invite/roomCallInvite.ts:18-35`, `src/shell/voice/VoiceBar.tsx:1198-1218` (UI) | MISSING | — | Overlaps calls section |
+| J109 | Public route manifest (ids/groups/primary-nav projection) | `src/ui/navigation/publicRouteManifest.ts:56-113` (UI) | FULL | `View/PublicFrame.elm:43-77` | Hard-coded, not data-driven |
+| J110 | PublicLookPicker (public looks + active extra; radio roving) | `src/theme/PublicLookPicker.tsx:7-48`, `src/theme/publicLooks.ts:37-80` (UI) | FULL | `View/Appearance.elm:64,98,315-331`; `View/Studio.elm:220-240` | — |
+| J111 | `/appearance` route | `src/index.tsx:128` (UI) | FULL | `View.elm:131-132` | Page detail belongs to the theming section |
+| J112 | `/app` route → connect gate / shell | `src/index.tsx:127`, `src/routes/AppRoute.tsx:29-51` (UI) | FULL | `View.elm:146-157` | App runtimes belong to other sections |
+| J113 | Encryption-policy chip + `?e2ee=` on room invite share | `src/lib/invite/encryptionPolicyBadge.ts`, `src/shell/ChannelSettings.tsx:261-266,723-732` (UI) | MISSING | `InviteShare.elm:45-56 payload` (no policy param); `View/RoomSettings.elm:654-690` (policy select only) | No policy chip or `?e2ee=` on the room invite share. Overlaps the room-settings section |
+| J114 | Copy call invite link from voice bar | `src/lib/invite/roomCallInvite.ts:18-35`, `src/shell/voice/VoiceBar.tsx:1198-1218` (UI) | PARTIAL | `View/CallStage.elm:688-699` (`call-invite` in the More tray to `InviteShareOpen`); `App.elm:46030` | Rooms only: "Invite people" opens the standard invite sheet with the room link (v3/rx-calls), not a one-tap copy. The link carries no `?e2ee=` policy (J113). Overlaps the calls section |
 | J115 | `inviteRoomPulse` | `src/lib/invite/inviteRoomPulse.ts` (DEAD) | N/A | — | — |
 | J116 | Stats backup-manifest fetch | `src/lib/stats/backups.ts:64` (DEAD) | N/A | `Stats.elm:2-7` (decode only) | — |
-| J117 | Channel pulse feed (feeds the shell scrubber/heatline) | `src/lib/stats/channelStats.ts:68` (auto) | FULL | `App.elm:45911-45964` | Out of section |
+| J117 | Channel pulse feed (feeds the shell scrubber/heatline) | `src/lib/stats/channelStats.ts:68` (auto) | FULL | `App.elm:51751-51804` | Out of section |
 | J118 | ProofRail / ProofReceipt | `src/ui/proof/*` (DEAD) | N/A | — | — |
 | J119 | SystemSpecimen lab surface | `src/ui/lab/SystemSpecimen.tsx` (DEAD) | N/A | — | — |
 | J120 | Mascot SVG component | `src/components/brand/Mascot.tsx` (DEAD) | N/A | — | — |
 
-Row counts: FULL 80 · PARTIAL 20 · CORE-ONLY 1 · MISSING 9 · N/A 10 (120 rows).
+Row counts: FULL 95 · PARTIAL 12 · CORE-ONLY 1 · MISSING 2 · N/A 10 (120 rows).
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- `V3_ROADMAP.md:8` says "all public routes at parity". Overstated. A hard load of `/download/` never fetches the catalog (J55). SPA navigation into `/app` drops `join`/`as`/`signin` (J19, J20). The skip link and all in-page anchors are inert (J22, J16). There is no route announcer (J17), no SW registration (J9), and stats share links are ignored on hard load (J79).
-- `COVERAGE.md:198` says "PublicFrame chrome **done** (… skip link …)". The link renders, but `Browser.application` intercepts it into a `PushUrl`; focus never reaches `#public-main`.
-- `COVERAGE.md:198` says "Download page **done** … App catalog + available-lane sidecar fetch fold". The fetch exists only in `UrlChanged` (`App.elm:36661`); `init`/`Main.init` never request it, and the only test (`tests/ViewTest.elm:4757`) drives `UrlChanged`.
-- `COVERAGE.md:198` says "Stats page **done** (… query/deeplink/href helpers …)". `?room/?compare/?window` are parsed only on `UrlChanged` (`App.elm:36680-36682`); `init` blanks them (`App.elm:3660-3668`).
-- `COVERAGE.md:198` says "Landing revamp **done** … copy 1:1". Slightly overstated: the device-note copy is reworded, and the interactive ProductPreview is replaced by a static sketch (J34).
-- `COVERAGE.md:197` says "All 13 routes resolve". Understated: `Route` has 20 constructors (19 paths + NotFound) plus the `/install` alias.
-- `V3_ROADMAP.md:131` (7.5) says "Pending: deploy path (deliberately none) … minification (no uglify/esbuild resolvable)". Understated: `deploy.sh:796-803` has `ONYX_CLIENT=elm` with `tools/elm-overlay.mjs`, and `elm/tools/build.sh:43-74` minifies with esbuild. CSP is still pending, since the inline boot script remains at `elm/index.html:52-221`.
-- `COVERAGE.md:207` says "no minification or CSP". Minification is done (`elm/tools/build.sh:61-66`); CSP is still open.
-- Module docs `View/NotFound.elm:195-197`, `View/Invite.elm:11-12,16-17` and `View/Guides.elm:12` say document metadata and the update-hold "stay ports-side". No such ports exist in `ports.js`.
+- `V3_ROADMAP.md:8` says "all public routes at parity" (a dated 2026-10-10 baseline line). It was overstated when written (J55, J19, J20, J22, J16, J17, J9, J79). v3/rx-public and v3/gap-pwa-safety closed all of those, so the claim is now close to true, but still overstated: no runtime head metadata (J4, J5, J8), no palette or update strip on public pages (J13, J14), no `ocean-*` migration (J11), a static landing preview (J34), a trimmed invite preview (J89), and in-page anchors on `/stats/` re-run route entry (J67). Neither doc records the rx-public public-nav work.
+- `COVERAGE.md:199` (the App-core row, was `:198`) says "PublicFrame chrome **done** (… skip link …)". Was: the link rendered but was intercepted into a `PushUrl`. Fixed by v3/rx-public (J22): focus and scroll reach `#public-main`. The row still says nothing about the phone-menu focus ring (J27) or the route announcer (J17).
+- `COVERAGE.md:199` says "Download page **done** … App catalog + available-lane sidecar fetch fold". Was: the fetch existed only in `UrlChanged`. Fixed by v3/rx-public: `RouteEntered` runs `routeEntry` on a cold load (`App.elm:28130-28131`, `Main.elm:1276`, `tests/RxPublicNavTest.elm:65`). Still true that the fetch also re-runs on same-route fragment clicks.
+- `COVERAGE.md:199` says "Stats page **done** (… query/deeplink/href helpers …)". Was: `?room/?compare/?window` were parsed only on `UrlChanged`. Fixed by v3/rx-public (`routeEntry` `App.elm:28133-28157`, `tests/RxPublicNavTest.elm:76`); `init` still blanks the fields until `RouteEntered` lands.
+- `COVERAGE.md:199` says "Landing revamp **done** … copy 1:1". Still slightly overstated: the device-note copy is reworded and the interactive ProductPreview is a static sketch (J34). The board tabs are now keyboard-roving (J37), which the row does not mention.
+- `COVERAGE.md:198` (was `:197`) says "All 13 routes resolve". Still understated: `Route` has 20 constructors (19 paths + NotFound) plus the `/install` alias (`Route.elm:21-42,66`).
+- `V3_ROADMAP.md:132` (7.5; was `:131`) says "Pending: deploy path (deliberately none) … minification (no uglify/esbuild resolvable)". Still understated: `deploy.sh:794-806` has `ONYX_CLIENT=elm` with `tools/elm-overlay.mjs`, and `elm/tools/build.sh:56-83` minifies with esbuild. CSP is still pending: the inline boot script remains at `elm/index.html:90-260`.
+- `COVERAGE.md:208` (was `:207`) says "no minification or CSP". Minification is done (`elm/tools/build.sh:67-70`); CSP is still open.
+- Module docs that name "ports-side" metadata or the update-hold: `View/NotFound.elm:5-7`, `View/Invite.elm:11-12`, `View/Guides.elm:12` - still stale at HEAD (no document-metadata port exists in `ports.js`; the update-hold is N/A, J96).
+- Module docs that call focus behaviour an unimplemented narrowing are now stale because v3/rx-public built it: `View/PublicFrame.elm:21-24` (menu focus trap and toggle refocus, now `ports.js:4880-4940`), `View/Landing.elm:9-10` ("no focus juggling", now roving tabs), `View/Onyxos.elm:9-12` (focus follows the selection, `App.elm:45191-45205`), `View/Roadmap.elm:11-15` (card focus, now generic `focusFragment`), `View/Invite.elm:14-17` (focus on a failed submit, `App.elm:45168-45179`; the update-hold clause stays true by design).
+- `View/About.elm` accessibility statement: `:51` ("honors prefers-contrast: more") was false at map time and is now true (`css/gap-appearance.css:57,281`, v3/gap-appearance); `:100` (Watch together groups, bounded roster, polite status, focus restoration) is now backed by `View/WatchTogether.elm` (v3/gap-watch; `WatchTogether.Focus` `App.elm:16220`). `:52` ("honor prefers-reduced-transparency where supported") is still false: Elm reads only the in-app switch (`app.css:3325-3327`), no media query.
 
 #### Elm better than Solid
 - One optimized bundle. Public routes have no lazy-chunk "Loading page…" fallbacks and no stale-chunk failure mode (Solid needs `withLazyRoute` + `StaleChunkRecovery`, `src/index.tsx:60-90`).
-- More reachable destinations: the footer has 9 links plus Open Onyx (`View/PublicFrame.elm:65-76,222`), and the phone menu adds "More from Onyx" (`View/PublicFrame.elm:52-60,174-175`). Solid shows 5 footer links and 2 nav items.
-- The 404 terminus adds "Other places to go" (Guides/Status/About) (`View/NotFound.elm:224-228`).
-- Same-route query navigation (e.g. "Room ledger" `/stats/?room=` from the directory, Composer, JumpToDate or ConnectPulse) re-seeds inspector/compare/window via `UrlChanged` (`App.elm:36673-36686`). Solid reads the query once at mount (`src/routes/Stats.tsx:353-361`), so on `/stats` such links most likely only change the URL.
+- More reachable destinations: the footer has 9 links plus Open Onyx (`View/PublicFrame.elm:66-77,262`), and the phone menu adds "More from Onyx" (`View/PublicFrame.elm:53-61,210-211`). Solid shows 5 footer links and 2 nav items.
+- The 404 terminus adds "Other places to go" (Guides/Status/About) (`View/NotFound.elm:34`).
+- Same-route query navigation (e.g. "Room ledger" `/stats/?room=` from the directory, Composer, JumpToDate or ConnectPulse) re-seeds inspector/compare/window via `UrlChanged` to `routeEntry` (`App.elm:40722-40794`, `:28133-28157`). Solid reads the query once at mount (`src/routes/Stats.tsx:353-361`), so on `/stats` such links most likely only change the URL.
+- (v3/rx-public) In-page `#fragment` links scroll and focus their target (`ports.js:4848-4878`); Solid's router only scrolls. Static-file links (download notice, sha, OnyxOS source) load as documents (`App.elm:28016`); Solid's router shows the 404 terminus for them.
+- (v3/rx-public) Reading pages (privacy, house rules, contact, accessibility, glossary, integrations, agents) carry an "Also on Onyx" related-pages rail with `aria-current` (`View/PublicFrame.elm:83-112`, used by `View/Trust.elm:232` and `View/PublicInfo.elm:155`). Solid has no such rail.
+- (v3/gap-pwa-safety) Service-worker registration is gated (secure origin or loopback, after `load`, `/sw.js` HEAD-probed as JavaScript so an SPA fallback never logs a registration error) and re-checks for a new worker every 30 min while visible (`ports.js:11440-11549`). The update is approval-only, so a typed invite name or composer is never reloaded away (`ports.js:11825-11846`); Solid reloads on a replaced controller behind a coordinator hold.
 
 #### Gaps (ranked by user impact)
-- `[High]` Download catalog never loads on a hard visit (J55). Same root cause makes Status/Stats wait for Tick (J52, J63). Fix: in `Main.init`, run the same route-entry fold `UrlChanged` uses (`requestDownloadCatalog` / `requestStatus` / `requestStatsIndex` plus stats query seeding) when `Route.fromUrl url` matches.
-- `[High]` SPA navigation into `/app/?join=&at=&topic=&as=&signin=` loses the params (J19, J20, J91, J95). Fix: in the `App.elm` `UrlChanged` fold, when the route becomes `App`, reparse with `parseDeepLinkQuery` into `pendingDeepLink*`, seed `connectForm.nick` from `as` and the mode from `signin`. Alternative: make public→app links `LoadUrl`.
-- `[High]` Skip link and every in-page `#anchor` are inert (J22, J16, J40, J67, J99). Fix: in `LinkClicked`, when only the fragment differs, emit a new `scrollToFragment` port (scrollIntoView + focus, temporary `tabindex=-1`) and `replaceUrl`.
-- `[High]` No service worker registration (J9): no offline shell, no update banner, and Web Push hangs on `serviceWorker.ready`. Fix: in `ports.js` `wire`, `navigator.serviceWorker.register('/sw.js', {updateViaCache:'none'})` plus a guarded `controllerchange` reload.
-- `[Med]` No scroll reset when the page changes (J15). Fix: in `UrlChanged`, when the path changes and there is no fragment, run `Task.perform (\_ -> NoOp) (Browser.Dom.setViewport 0 0)` from `Main.perform`.
-- `[Med]` No route-change announcement (J17). Fix: a persistent visually hidden `role=status` node in `View.view` fed by a `routeAnnouncement` field set in `UrlChanged` from a Route→label table (`RouteLifecycle` labels).
-- `[Med]` Stats share links ignore their query on hard load (J79). Fix: seed `statsInspected`/`statsCompare`/`statsWindow` from `url.query` in `App.init` (`App.elm:3660-3668`).
-- `[Med]` Static-file links (download notice/sha, OnyxOS source) render the 404 terminus (J21; shared bug). Fix: guard in `LinkClicked`: paths under `/downloads/` or `/source/`, or with a file extension, become `LoadUrl`.
-- `[Med]` Public menu focus management missing (J27). Fix: a `focusById`/trap port fired from `ToggleNavMenu`/`NavMenuEscape`; close on a desktop-breakpoint resize.
-- `[Med]` Keyboard focus follow-through is missing on tabs and cards (J37, J86, J83, J93). Fix: one generic `focusAfterRender` port emitted by `SelectBoardTab`, `OnyxosStageKey`, `SelectRoadmapPriority` and `InviteJoinSubmit` (plus roving tabindex/`aria-controls` in `View/Landing.elm`).
-- `[Low]` Palette and update banner are absent on public routes (J13, J14). Fix: render `View.Switcher.palette` + `View.Polish.updateBanner` alongside `frame` in `View.view`.
+- `[High]` **[Closed — v3/rx-public]** Download catalog never loads on a hard visit (J55). `Main.init` now sends `RouteEntered`, which runs the same `routeEntry` as `UrlChanged` (`requestStatus` / `requestDownloadCatalog` / `requestStatsIndex` plus stats query seeding): J52, J55, J63, J79 are FULL.
+- `[High]` **[Closed — v3/rx-public]** SPA navigation into `/app/?join=&at=&topic=&as=&signin=` lost the params (J19, J20, J91, J95). `UrlChanged` now calls `seedAppQuery` on arrival from a public page; `?signin=1` is read on cold load and on arrival.
+- `[High]` **[Closed — v3/rx-public]** Skip link and every in-page `#anchor` were inert (J22, J16, J40, J67, J99). `UrlChanged` emits `pageNavigated` and `focusFragment` scrolls and focuses the target. Residual: see the `[Med]` same-route entry gap (J67).
+- `[High]` **[Closed — v3/gap-pwa-safety]** No service worker registration (J9). `registerServiceWorker` registers `/sw.js`, update detection and Web Push ride on it. Residual: no auto reload on a replaced controller by design; the update strip shows only in the app frame (J14).
+- `[Med]` **[Closed — v3/rx-public]** No scroll reset when the page changes (J15). Path changes scroll to the top via `pageNavigated`.
+- `[Med]` Route-change announcement is only partly there (J17). Public pages announce their main label through a persistent polite node; `/app` has no label and public/app swaps mount a fresh node. Fix: add a route label to the app frame node and keep one announcer in `View.view` fed from a Route-to-label table (RouteLifecycle labels).
+- `[Med]` **[Closed — v3/rx-public]** Stats share links ignored their query on hard load (J79). Seeded by `routeEntry` after `RouteEntered`.
+- `[Med]` **[Closed — v3/rx-public]** Static-file links rendered the 404 terminus (J21). `isStaticFilePath` sends them to `LoadUrl`.
+- `[Med]` **[Closed — v3/rx-public]** Public menu focus management missing (J27). `installPublicMenuFocus` provides first-link focus, a Tab ring, refocus on close and auto-close past 768px. Residual in the `[Low]` ring bullet below.
+- `[Med]` **[Closed — v3/rx-public]** Keyboard focus follow-through on tabs and cards (J86, J83, J93; J37 partly). `BoardTabKey`, `OnyxosStageKey`, `InviteJoinSubmit` emit `PrefsFocus`; the roadmap legend rides the generic fragment focus. Residual: J37 lacks the panel `tabindex=0` and the `aria-live=polite` note.
+- `[Low]` Palette and update banner are absent on public routes (J13, J14). Fix: render `View.Switcher.palette` (and let `shellKeysLive` accept public routes) plus `View.Polish.updateBanner` alongside `frame` in `View.view`.
 - `[Low]` Head metadata is not updated on SPA nav (J4, J5, J8). Fix: a `documentMeta` port called from `UrlChanged` that writes description/canonical/OG, `robots noindex` for NotFound, and `Invite.inviteOgMeta`.
-- `[Low]` Landing preview is a static sketch (J34), the invite preview card is trimmed (J89), and legacy `ocean-*` keys are not migrated (J11). Restore the tabbed preview in `View/Landing.elm`; add a one-shot copy loop in `elm/index.html` before `Elm.Main.init`.
-- `[Low]` No E2EE-policy chip/param on room invite share (J113) and no voice-bar call invite (J114). Fix: `InviteShare.payload` + `View/RoomSettings`/`View/CallStage` buttons (owned by the room-settings and calls sections).
+- `[Low]` Landing preview is a static sketch (J34), the invite preview card is trimmed (J89), and legacy `ocean-*` keys are not migrated (J11, re-graded MISSING: the ports only purge six identity keys). Restore the tabbed preview in `View/Landing.elm`; add a one-shot `ocean-*` to `onyx:*` copy loop (new-key-wins, never delete) in `elm/index.html` before `Elm.Main.init`.
+- `[Low]` No E2EE-policy chip/param on room invite share (J113). The call "Invite people" item (J114, v3/rx-calls) reuses the same sheet, so it has no policy param either. Fix: `InviteShare.payload` + `View/RoomSettings` read-out (owned by the room-settings and calls sections).
+- `[Med]` **(new)** Same-route `UrlChanged` re-runs route entry (J67, J54, J55). `UrlChanged` calls `routeEntry` whether or not the route or its query changed (`App.elm:40789`), so clicking "All rooms" or "Network pulse" on `/stats/` runs `requestStatsIndex True`, which blanks the index and detail and refetches; the scroll then lands on a collapsed page. `/download/` `#keep-here` resets the catalog, hashes and copy state. Fix: call `routeEntry` only on a route change, or when the stats query differs from the model; fragment-only changes emit just `pageOut`. Read from code, not browser-run.
+- `[Med]` **(new)** The accessibility statement claims `prefers-reduced-transparency` support (`View/About.elm:52`) that Elm does not have: only the in-app Reduce transparency switch applies (J42). Fix: add the media query beside `data-reduce-transparency` (Solid: `src/ui/tokens/accessibility.css:100`), or drop the sentence.
+- `[Low]` **(new)** The phone menu's Tab ring skips the header "Open Onyx" link (J27): `installPublicMenuFocus` rings the toggle and nav links only. Fix: include `.public-frame__open` between the last nav link and the toggle.
+- `[Low]` **(new)** Back/forward between public pages also scrolls to the top (J15): `pageNavigationOut` cannot tell a popstate from a link click, so the browser's scroll restoration is overridden. Fix: skip the reset when the navigation is a history traversal. Read from code, not browser-run.
+- `[Low]` **(new)** Seven module docs still describe built behaviour as a narrowing, or name ports that do not exist (see the stale-docs list above): fix the comments in `View/PublicFrame.elm`, `View/Landing.elm`, `View/Onyxos.elm`, `View/Roadmap.elm`, `View/Invite.elm`, `View/Guides.elm`, `View/NotFound.elm`.
 
 ### H — Calls — voice, video, screen share, stage, Watch Together
 Solid walked: `src/shell/CallsHub.tsx`, `StagePanel.tsx`, `WatchTogetherActivity.tsx`, all of `src/shell/voice/**` (VoiceBar every control/popover, VoiceStage, ParticipantTile, VoicePip, CallJoinBanner, CallStatusAnnouncer, callRejoinState, voiceParticipants, 4 overlays, VoiceSettings), `src/media/useCadenceMedia.ts`, `src/lib/media/*`, user-visible parts of `src/lib/cadence-media/*`, `callMediaSession.ts`, `screenWakeLock.ts`, `mediaEngineMount.ts`, store voice/DM/stage/stream actions (`store.ts:15569–15690`, `17890–18333`), MEDIA inbound (`store.ts:11022–11190`), CTCP STAGE (`store.ts:12597`), AppShell join/rejoin/mount (`AppShell.tsx:332–660`, `1410–1725`), PresenceRibbon voice arm, spotlight palette.
-Elm checked: `Cadence`, `Media`, `CallUi`, `CallDock`, `CallMedia`, `CallCaptions`, `VoiceSettings`, `Stage`, `View/{Calls,CallPresence,CallStage,CallVideo,CallDock,CallOverlays,VoiceSettings,StageMode}.elm`, App folds (`App.elm:41139–41720`, `45215–45500`), `elm/media/{voice-engine,voice-core,platform}.ts`, `ports.js` voice bridge (`2182–2560`, `3738–3900`, `4092–4360`), `design/calls/CALLS_DESIGN.md`.
-**Shipped state (commit fbe04585):** video is switched OFF on the live network (`media/voice-engine.ts:101` `VIDEO_ENABLED = false`; `startCamera` refuses); intended UI: no camera button, no "Join with video". **But see H21/H12b: the hide never takes effect and video join bypasses the switch.**
+Elm checked (refreshed at HEAD `609cb240`): `Cadence`, `Media`, `CallUi`, `CallDock`, `CallMedia`, `CallCaptions`, `VoiceSettings`, `Stage`, `WatchTogether`, `View/{Calls,CallPresence,CallStage,CallVideo,CallDock,CallOverlays,VoiceSettings,StageMode,WatchTogether}.elm`, App folds (`App.elm:45345–45967` calls, `51060–51131` stage, `16183–16370` Watch Together), `elm/media/{voice-engine,voice-core,platform}.ts`, `ports.js` voice bridge (`2946–3430` feed + session assist, `4503–4570` chords, `5475–5620` commands), `design/calls/CALLS_DESIGN.md`, `callSession.smoke.mjs` / `voiceEngine.smoke.mjs` / `bundleBoot.smoke.mjs`, `tests/{CallsRx,WatchTogether,WatchTogetherApp}Test.elm`. Onyx Server read for the PROP / MEDIA rules: `daemon/server.zig` (`handleProp`, `propAccess`), `daemon/media_cmd.zig`.
+**Product facts (read these before the gap list):** voice works end to end for signed-in accounts in rooms. Video is deliberately switched OFF on the live network (`media/voice-engine.ts:107` `VIDEO_ENABLED = false`; cadencevis is too heavy for the production node's stock SendQ) — a product switch, not a client gap; since `a96afd2e` it fails closed on every path (no camera button, no "Join with video", audio-only join forced). Calls need an Onyx account (server: `daemon/media_cmd.zig:341` AUTH_REQUIRED, `:362` UNENROLLED_E2EE_IDENTITY) and have no DM path (server: `daemon/media_cmd.zig:36` takes channel targets only). Watch Together (v3/gap-watch) is built end to end, but only room operators can write the shared `ocean.watch` property (server: `daemon/server.zig:39768 propAccess`), so ordinary members can follow it but not join it (H108).
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| H1 | Calls hub: status pip, title, intro, "What happens next" truth copy per presentation | `src/shell/CallsHub.tsx:59` (UI) | FULL | `View/Calls.elm:166`, `Media.classifyHubPresentation` | Elm status `<p>` lacks `aria-live=polite` |
-| H2 | Hub "Return to call" (provisional/established) | `CallsHub.tsx:174`, `AppShell.tsx:1174` (UI) | FULL | `App.elm:41144` `CallsReturnToCall` | — |
-| H3 | Hub "Choose a room" | `CallsHub.tsx:166`, `AppShell.tsx:1166` (UI) | FULL | `App.elm:41139` `CallsChooseRoom` | Elm just closes hub to reveal rail (no mobile Rooms drawer open) |
-| H4 | Hub never joins (navigation-only rule) | `CallsHub.tsx:3` (UI) | PARTIAL | `View/Calls.elm:245–256` | Elm hub adds "Join call in X" / "Join with video in X"; video button ungated by `cameraSupported` (see H12b) |
-| H5 | Room header voice chip (count, ≤3 faces, status, click joins audio / returns) | `PresenceRibbon.tsx:758` (UI) | FULL | `View/CallPresence.elm:150` | local-health arm omits "captions" (Solid `PresenceRibbon.tsx:146`) |
-| H6 | Header lifecycle pills Incoming/Calling/Connecting…/In call | `PresenceRibbon.tsx:388` (UI) | FULL | `View/CallPresence.elm:198` | — |
-| H7 | Header "Join call"/"Call" button (voiceEntry pref) | `PresenceRibbon.tsx:821` (UI) | FULL | `View/CallPresence.elm:230` | — |
-| H8 | voiceEntry off → More menu "Join call" fallback | `PresenceRibbon.tsx:984` (UI) | MISSING | `View/CallPresence.elm:226` (hidden) | Elm hides; empty room then only joinable via hub |
-| H9 | Palette "Start voice / Start video in current room" | `src/chat/spotlight/commands.ts:1317` (palette) | MISSING | `Switcher.elm:637` (chords only) | no switcher action |
-| H10 | Scheduled-event "Join call" | `ScheduledEventLine.tsx:77` (UI) | FULL | `View/RoomSettings.elm:955` | — |
-| H11 | Join flow: synchronous provisional surface, in-gesture capture, engine boot, rollback | `AppShell.tsx:486` (UI) | PARTIAL | `App.elm:41150` `CallJoin`; `media/voice-core.ts:713` | in-gesture capture kept; no provisional state until engine `in_call` (permission prompt + ≤20 s IDENTITY ADD wait show nothing) |
-| H12 | Join failure → toast + "Couldn't join. Try again." banner + Try again | `AppShell.tsx:557`, `CallJoinBanner.tsx:14` (UI) | FULL | `View/CallPresence.elm:313`, `CallDock.elm:608` | Elm classifies permission/no-device/account/encryption; no toast |
-| H12b | "Join with video" (pre-join) | `commands.ts:1340` (palette only) | PARTIAL | `View/CallPresence.elm:279–290`, `View/Calls.elm:254` | Shown despite video-off: `cameraSupported` never forwarded; `joinVoice({video})`→`engine.joinVideo` bypasses `VIDEO_ENABLED` (voice-core.ts:803) |
-| H13 | Rejoin banner after transport loss | `callRejoinState.ts:9`, `AppShell.tsx:461` (auto/UI) | FULL | `CallUi.elm:378` `bannerFor`, CallDock rejoin memory | — |
-| H14 | Join-muted preference applied after capture | `store.ts:17991` (UI pref) | FULL | `App.elm:41180`, `VoiceSettings.elm:102` | Elm default ON (Solid default off, `voiceSettingsPersistence.ts:34`) — provisional §7.2 |
-| H15 | Leave call (bar) | `VoiceBar.tsx:1863`, `store.ts:18026` (UI) | FULL | `View/CallStage.elm:327` `call-leave`, `App.elm:41195` | — |
-| H16 | Bar people: avatars + names "You, alice +2" | `VoiceBar.tsx:1365` (UI) | PARTIAL | `View/CallStage.elm:327` | Elm shows where + "· N people" only |
-| H17 | Call timer (role=timer, anchored to start) | `VoiceBar.tsx:704` (UI) | FULL | `CallUi.elm:602`, `View/CallStage.elm:327` | "—" while reconnecting |
-| H18 | Participant count | `VoiceBar.tsx:1389` (UI) | FULL | `CallUi.peopleLabel` (`CallUi.elm:592`) | — |
-| H19 | Active-speaker chip (sticky dominant tracker) | `VoiceBar.tsx:1002`, `:1405` (auto) | PARTIAL | `App.elm:45410` (Ctrl+Shift+S), `CallMedia.advanceSpeaker` | chip dropped by spec; tracker drives spotlight/tile order |
-| H20 | Mute / unmute | `VoiceBar.tsx:1447`, `store.ts:18088` (UI) | FULL | `View/CallStage.elm:327` `call-mute`, `App.elm:41211` | + Ctrl+Shift+M |
-| H21 | Camera on/off | `VoiceBar.tsx:1463`, `store.ts:18066` (UI) | PARTIAL | `View/CallStage.elm:435`/`482`, `App.elm:41366`, `ports.js:2410` | Video off by design; hide broken (default `cameraSupported=True`, CallJoin resets it) → button shows, click silently does nothing |
-| H22 | Invite with room link (clipboard, toast, `invite-status`) | `VoiceBar.tsx:1198`, `:1477` (UI) | MISSING | `View/CallStage.elm:554` (absent) | room invite share exists elsewhere (`InviteShare.elm`), not in call |
-| H23 | "More call tools" popover (dialog, Escape) | `VoiceBar.tsx:1523` (UI) | FULL | `View/CallStage.elm:554`, `App.elm:41262` | focus trap via ports `[data-call-dialog]` |
-| H24 | Deafen / undeafen | `VoiceBar.tsx:1548`, `store.ts:18095` (UI) | FULL | `View/CallStage.elm:554` `deafen-button`, `App.elm:41393` | engine-confirmed |
-| H25 | Screen share start/stop, pending/unavailable labels, `screenshare-status` | `VoiceBar.tsx:1050`, `:1566` (UI) | FULL | `View/CallStage.elm:515`, `CallMedia.elm:174–270`, `App.elm:41383` | hidden on iOS; stop rejoins as voice (`voice-core.ts:878`) |
-| H26 | Record local audio → WebM download, statuses, auto-finalize on end | `VoiceBar.tsx:1108`, `:1584` (UI) | MISSING | `media/voice-core.ts:181` (no record API) | engine has `startRecording`; adapter doesn't expose |
-| H27 | Raise / lower hand (✋ reaction out) | `VoiceBar.tsx:1604`, `store.ts:18130` (UI) | FULL | `View/CallOverlays.elm:60`, `App.elm:41489` | + Ctrl+Shift+H |
-| H28 | Reaction picker (8 quick, roving arrows/Home/End) | `VoiceBar.tsx:371`, `:1619` (UI) | FULL | `View/CallOverlays.elm:87`, `:181`, `App.elm:41565` | disabled for DM calls |
-| H29 | Captions toggle | `VoiceBar.tsx:1653` (UI) | FULL | `View/CallOverlays.elm:104`, `App.elm:41518` | + Ctrl+Shift+C |
-| H30 | Spatial audio popover: per-peer XY pad (drag, arrows/Home), peer picker, SR readout, unavailable state | `VoiceBar.tsx:1673–1800` (UI) | MISSING | `media/voice-core.ts:181` (no pan API) | spec defers "post-ship"; engine `setPeerPan` unused |
-| H31 | Layout toggle grid ↔ spotlight | `VoiceBar.tsx:1808` (UI) | FULL | `View/CallStage.elm:554` `layout-button`, `App.elm:41444` | Ctrl+Shift+G 3-way cycle |
-| H32 | Stage size cycle compact→expanded→fullscreen | `VoiceBar.tsx:1834` (UI) | FULL | `View/CallStage.elm:554`, `App.elm:41456` | — |
+| H1 | Calls hub: status pip, title, intro, "What happens next" truth copy per presentation | `src/shell/CallsHub.tsx:59` (UI) | FULL | `View/Calls.elm:193 callsHub`, `Media.classifyHubPresentation` | Elm status `<p>` (`View/Calls.elm:227`) lacks `aria-live=polite` |
+| H2 | Hub "Return to call" (provisional/established) | `CallsHub.tsx:174`, `AppShell.tsx:1174` (UI) | FULL | `App.elm:45350 CallsReturnToCall` | — |
+| H3 | Hub "Choose a room" | `CallsHub.tsx:166`, `AppShell.tsx:1166` (UI) | FULL | `App.elm:45345 CallsChooseRoom` | Elm just closes hub to reveal rail (no mobile Rooms drawer open) |
+| H4 | Hub never joins (navigation-only rule) | `CallsHub.tsx:3` (UI) | PARTIAL | `View/Calls.elm:166 joinButtons`, `:273` | Elm hub deliberately adds explicit "Join call in X"; "Join with video" now only while the engine reports a camera (a96afd2e); a guest gets the sign-in card instead (v3/rx-calls). Code-read, not run: the join row uses `activeChannel` with no channel check, so an open DM offers "Join call in <nick>" and `MEDIA JOIN <nick>` is refused by the server (`daemon/media_cmd.zig:36`) |
+| H5 | Room header voice chip (count, ≤3 faces, status, click joins audio / returns) | `PresenceRibbon.tsx:758` (UI) | FULL | `View/CallPresence.elm:146`, `CallMedia.elm:316 roomStatus` | local-health arm (muted/deafened/sharing/video, v3/calls-c4) is wired; still omits "captions" (Solid `PresenceRibbon.tsx:146`) |
+| H6 | Header lifecycle pills Incoming/Calling/Connecting…/In call | `PresenceRibbon.tsx:388` (UI) | FULL | `View/CallPresence.elm:205` | — |
+| H7 | Header "Join call"/"Call" button (voiceEntry pref) | `PresenceRibbon.tsx:821` (UI) | FULL | `View/CallPresence.elm:226` | — |
+| H8 | voiceEntry off → More menu "Join call" fallback | `PresenceRibbon.tsx:984` (UI) | MISSING | `View/CallPresence.elm:227` | Elm hides the button; no room More-menu fallback (module doc `:21` says there is no More menu, but one exists, `View/RoomHeader.elm:289`) and the palette row is gated on the same pref (`App.elm:49126`); an empty room is then joinable only via the hub |
+| H9 | Palette "Start voice / Start video in current room" | `src/chat/spotlight/commands.ts:1317` (palette) | FULL | `Switcher.elm:583 voiceActions`, `App.elm:49358`, `tests/GapCommandsTest.elm:868` | (v3/gap-commands) palette row "Start voice call" (live room, `voiceEntry` on; a guest gets the sign-in banner) and "Return to call" while in one; no "Start video" row while video is off (BOUND) |
+| H10 | Scheduled-event "Join call" | `ScheduledEventLine.tsx:77` (UI) | FULL | `View/RoomSettings.elm:950` | — |
+| H11 | Join flow: synchronous provisional surface, in-gesture capture, engine boot, rollback | `AppShell.tsx:486` (UI) | FULL | `App.elm:45355 CallJoin` (provisional hub `:45405`), `media/voice-core.ts:789 startJoin`, `ports.js:5475 voiceJoin`, `View/CallStage.elm:269`, `tests/CallsRxTest.elm:397` | (v3/rx-calls) in-gesture capture kept; provisional InCall at once ("Connecting to the call…" + permission hint) while capture and the ≤20 s IDENTITY ADD wait run; Leave cancels an in-flight join (`voice-core.ts:885`); a double press is ignored; failure rolls back to the failed banner |
+| H12 | Join failure → toast + "Couldn't join. Try again." banner + Try again | `AppShell.tsx:557`, `CallJoinBanner.tsx:14` (UI) | FULL | `View/CallPresence.elm:329`, `CallDock.elm:615 failedSub` | Elm classifies permission/no-device/account/encryption/lost-mic on the banner; a toast only for a lost microphone (`CallDock.elm:737`) |
+| H12b | "Join with video" (pre-join) | `commands.ts:1340` (palette only) | FULL | `View/CallPresence.elm:280`, `View/Calls.elm:174`, `App.elm:45407`, `media/voice-engine.ts:114`, `ports.js:3186`, `CallMedia.elm:118`, `bundleBoot.smoke.mjs:358` | (a96afd2e) fails closed: the button shows only while the engine reports a camera and the adapter forces an audio-only join. Video itself is switched off on the live network (stock SendQ) — BOUND |
+| H13 | Rejoin banner after transport loss | `callRejoinState.ts:9`, `AppShell.tsx:461` (auto/UI) | FULL | `CallUi.elm:386` `bannerFor`, CallDock rejoin memory | — |
+| H14 | Join-muted preference applied after capture | `store.ts:17991` (UI pref) | FULL | `App.elm:45399`, `VoiceSettings.elm:102` | Elm default ON (Solid default off, `voiceSettingsPersistence.ts:34`) — provisional §7.2 |
+| H15 | Leave call (bar) | `VoiceBar.tsx:1863`, `store.ts:18026` (UI) | FULL | `View/CallStage.elm:440` `call-leave`, `App.elm:45421` | — |
+| H16 | Bar people: avatars + names "You, alice +2" | `VoiceBar.tsx:1365` (UI) | PARTIAL | `View/CallStage.elm:289 headFaces`, `:416` | (v3/rx-calls) stage head shows up to 5 initial faces + "+N" (decorative) and "· N people"; names appear only in the person cells and tooltips, never "You, alice +2" in the bar |
+| H17 | Call timer (role=timer, anchored to start) | `VoiceBar.tsx:704` (UI) | FULL | `CallUi.elm:638`, `View/CallStage.elm:398` | "—" while reconnecting |
+| H18 | Participant count | `VoiceBar.tsx:1389` (UI) | FULL | `CallUi.peopleLabel` (`CallUi.elm:628`) | — |
+| H19 | Active-speaker chip (sticky dominant tracker) | `VoiceBar.tsx:1002`, `:1405` (auto) | PARTIAL | `App.elm:51250` (Ctrl+Shift+S), `CallMedia.advanceSpeaker` | chip dropped by spec; tracker drives spotlight/tile order |
+| H20 | Mute / unmute | `VoiceBar.tsx:1447`, `store.ts:18088` (UI) | FULL | `View/CallStage.elm:465` `call-mute`, `App.elm:45442` | + Ctrl+Shift+M |
+| H21 | Camera on/off | `VoiceBar.tsx:1463`, `store.ts:18066` (UI) | FULL | `View/CallStage.elm:499`/`559`, `App.elm:45614`, `ports.js:3186`, `media/voice-engine.ts:112` | (a96afd2e) button hidden while the engine reports no camera: video is deliberately off on the live network (BOUND). The Ctrl+Shift+E chord is not gated (`App.elm:51275`): it sets camera optimistically and the engine refuses (`startCamera` resolves false) |
+| H22 | Invite with room link (clipboard, toast, `invite-status`) | `VoiceBar.tsx:1198`, `:1477` (UI) | FULL | `View/CallStage.elm:689` `call-invite`, `App.elm:46030 InviteShareOpen`, `View/DmSafety.elm:430`, `tests/CallsRxTest.elm:558` | (v3/rx-calls) "Invite people" More item (rooms only) opens the shared Invite sheet (copy button + polite status) instead of copying in place with a toast |
+| H23 | "More call tools" popover (dialog, Escape) | `VoiceBar.tsx:1523` (UI) | FULL | `View/CallStage.elm:631 moreTools`, `App.elm:45510` | (v3/rx-calls) a row under the controls on wide stages, a bottom sheet on phones; scrim and Escape close it; focus trap via ports `[data-call-dialog]` |
+| H24 | Deafen / undeafen | `VoiceBar.tsx:1548`, `store.ts:18095` (UI) | FULL | `View/CallStage.elm:642` `deafen-button`, `App.elm:45642` | engine-confirmed |
+| H25 | Screen share start/stop, pending/unavailable labels, `screenshare-status` | `VoiceBar.tsx:1050`, `:1566` (UI) | FULL | `View/CallStage.elm:592 shareButton`, `CallMedia.elm:154 shareDisabled`, `:170 requestShare`, `App.elm:45631` | where there is no picker (iOS) the bar button is disabled "Screen sharing unavailable" and More does not offer it; stop rejoins as voice (`voice-core.ts:962`) |
+| H26 | Record local audio → WebM download, statuses, auto-finalize on end | `VoiceBar.tsx:1108`, `:1584` (UI) | MISSING | `media/voice-core.ts:201 OnyxVoiceAdapter` (no record API) | engine has `startRecording`; adapter doesn't expose |
+| H27 | Raise / lower hand (✋ reaction out) | `VoiceBar.tsx:1604`, `store.ts:18130` (UI) | FULL | `View/CallOverlays.elm:60`, `App.elm:45741` | + Ctrl+Shift+H |
+| H28 | Reaction picker (8 quick, roving arrows/Home/End) | `VoiceBar.tsx:371`, `:1619` (UI) | FULL | `View/CallOverlays.elm:87`, `:181`, `App.elm:45817` | disabled for DM calls |
+| H29 | Captions toggle | `VoiceBar.tsx:1653` (UI) | FULL | `View/CallOverlays.elm:104`, `App.elm:45770` | + Ctrl+Shift+C |
+| H30 | Spatial audio popover: per-peer XY pad (drag, arrows/Home), peer picker, SR readout, unavailable state | `VoiceBar.tsx:1673–1800` (UI) | MISSING | `media/voice-core.ts:201 OnyxVoiceAdapter` (no pan API) | spec defers "post-ship"; engine `setPeerPan` unused |
+| H31 | Layout toggle grid ↔ spotlight | `VoiceBar.tsx:1808` (UI) | FULL | `View/CallStage.elm:672` `layout-button`, `App.elm:45693` | Ctrl+Shift+G 3-way cycle |
+| H32 | Stage size cycle compact→expanded→fullscreen | `VoiceBar.tsx:1834` (UI) | FULL | `View/CallStage.elm:680`, `App.elm:45708` | — |
 | H33 | Open voice settings | `VoiceBar.tsx:1847` (UI) | FULL | `View/CallOverlays.elm:146` | — |
-| H34 | Security chip (hop/E2EE/degraded/insecure, padlock honesty) | `VoiceBar.tsx:125` (UI) | FULL | `View/CallStage.elm:654`, `CallUi.elm:897` | Elm adds "Stage broadcast" level |
-| H35 | Privacy sheet: media path, reserved privacy code, local fingerprint | `VoiceBar.tsx:196` (UI) | FULL | `View/CallStage.elm:679` | Elm adds per-peer fingerprints |
-| H36 | SFU topology (bar badge + sheet row) from live loss + room STATS | `VoiceBar.tsx:460`, `:317` (auto) | CORE-ONLY | `CallUi.elm:1043` | no producer: adapter never emits `sfu`, no STATS fold → always "SFU path unknown" |
-| H37 | Connection-quality pip (4 bars + bitrate; tooltip jitter/loss) | `VoiceBar.tsx:620` (auto) | PARTIAL | `View/CallVideo.elm:516` | tier only; no bitrate/jitter/loss |
-| H38 | Turn-off-camera prompt on sustained Poor | `VoiceBar.tsx:663` (auto) | FULL | `View/CallVideo.elm:543`, `App.elm:41412` | moot while video off |
-| H39 | Bandwidth-ladder step-down toasts | `VoiceBar.tsx:569` (auto) | FULL | `CallMedia.elm:527`, `App.elm:36446` | — |
-| H40 | Live regions `invite-status` / `record-status` | `VoiceBar.tsx:1491`, `:1511` (UI) | MISSING | — | features absent (H22, H26) |
-| H41 | Screen wake lock while in call | `VoiceBar.tsx:864`, `screenWakeLock.ts` (auto) | MISSING | — | — |
-| H42 | OS Media Session call controls (togglemicrophone/togglecamera/hangup, neutral metadata) | `VoiceBar.tsx:750`, `callMediaSession.ts` (auto) | MISSING | — | — |
-| H43 | Local VAD → own speaking indicator | `VoiceBar.tsx:917` (auto) | FULL | `media/voice-core.ts:455` | Elm also broadcasts `MEDIA SPEAKING` |
-| H44 | Persistent full call bar across rooms / Home / Calls | `AppShell.tsx:1529` (UI) | PARTIAL | `View/CallDock.elm:303` | elsewhere Elm shows mini view (Mute/Return/Leave) only |
-| H45 | Stage status line (prejoin/connecting/live/ended) | `VoiceStage.tsx:197` (UI) | PARTIAL | `CallUi.elm:417`, `View/CallStage.elm:144` | no "local media unavailable — you can stay and listen" |
+| H34 | Security chip (hop/E2EE/degraded/insecure, padlock honesty) | `VoiceBar.tsx:125` (UI) | FULL | `View/CallStage.elm:743`, `CallUi.elm:933` | Elm adds "Stage broadcast" level |
+| H35 | Privacy sheet: media path, reserved privacy code, local fingerprint | `VoiceBar.tsx:196` (UI) | FULL | `View/CallStage.elm:768` | Elm adds per-peer fingerprints |
+| H36 | SFU topology (bar badge + sheet row) from live loss + room STATS | `VoiceBar.tsx:460`, `:317` (auto) | CORE-ONLY | `CallUi.elm:1079 sfuView` | no producer: adapter never emits `sfu` nor wires `onRoomStats`, so the sheet always reads "SFU path unknown". The server does answer `MEDIA STATS` (`daemon/media_cmd.zig:93`) |
+| H37 | Connection-quality pip (4 bars + bitrate; tooltip jitter/loss) | `VoiceBar.tsx:620` (auto) | PARTIAL | `View/CallVideo.elm:527` | tier only; no bitrate/jitter/loss |
+| H38 | Turn-off-camera prompt on sustained Poor | `VoiceBar.tsx:663` (auto) | FULL | `View/CallVideo.elm:554`, `App.elm:45661` | moot while video off |
+| H39 | Bandwidth-ladder step-down toasts | `VoiceBar.tsx:569` (auto) | FULL | `CallMedia.elm:525 noticeCopy`, `App.elm:40556 settleCallMedia` | — |
+| H40 | Live regions `invite-status` / `record-status` | `VoiceBar.tsx:1491`, `:1511` (UI) | PARTIAL | `View/DmSafety.elm:430 inviteShareSheet` | (v3/rx-calls) invite copy status is announced by the Invite sheet's polite region; no `record-status` region because recording is absent (H26) |
+| H41 | Screen wake lock while in call | `VoiceBar.tsx:864`, `screenWakeLock.ts` (auto) | FULL | `ports.js:3340 createVoiceSessionAssist` (acquire `:3349`), `callSession.smoke.mjs:48` | (v3/rx-calls) wake lock held while `in_call`, re-acquired when the page is visible again, released on idle; feature-detected |
+| H42 | OS Media Session call controls (togglemicrophone/togglecamera/hangup, neutral metadata) | `VoiceBar.tsx:750`, `callMediaSession.ts` (auto) | FULL | `ports.js:3368 sessionHandlers`, `:5513`, `callSession.smoke.mjs:48` | (v3/rx-calls) OS togglemicrophone + hangup via the `shortcut` port (`call-mute` / `call-leave`, so the >2-person leave confirm applies), neutral "Call in #room" metadata; no togglecamera (video off) |
+| H43 | Local VAD → own speaking indicator | `VoiceBar.tsx:917` (auto) | FULL | `media/voice-core.ts:505` | Elm also broadcasts `MEDIA SPEAKING` |
+| H44 | Persistent full call bar across rooms / Home / Calls | `AppShell.tsx:1529` (UI) | PARTIAL | `View/CallDock.elm:302 pip` | elsewhere Elm shows the mini view (faces, Mute/Return/Leave) only |
+| H45 | Stage status line (prejoin/connecting/live/ended) | `VoiceStage.tsx:197` (UI) | PARTIAL | `CallUi.elm:453 stageStatus`, `View/CallStage.elm:144`, `:269` | still no "local media unavailable — you can stay and listen"; (v3/rx-calls) adds an in-flight "Allow the microphone…" hint |
 | H46 | Audio-only avatar strip vs video mode | `VoiceStage.tsx:166` (auto) | FULL | `View/CallStage.elm:144` | density + collapsed list |
 | H47 | Grid layout, responsive columns | `VoiceStage.tsx:285` (UI) | FULL | `View/CallVideo.elm:228` | + pages of 16 |
-| H48 | Spotlight (pinned → speaker → self) + filmstrip | `VoiceStage.tsx:311` (UI) | FULL | `View/CallVideo.elm:281` | — |
+| H48 | Spotlight (pinned → speaker → self) + filmstrip | `VoiceStage.tsx:311` (UI) | FULL | `View/CallVideo.elm:292` | — |
 | H49 | Screenshare layout (primary + filmstrip) | `VoiceStage.tsx:350` (auto) | FULL | `View/CallVideo.elm:182` | Elm also remote shares + grid escape |
-| H50 | Pin / unpin to spotlight | `ParticipantTile.tsx:358`, `store.ts:18116` (UI) | FULL | `View/CallVideo.elm:385`, `App.elm:41462` | — |
-| H51 | Stage chrome buttons Compact / Expand / Fullscreen | `VoiceStage.tsx:221` (UI) | PARTIAL | `App.elm:41459` `CallStageSizeSet` (Esc only) | no direct buttons; cycle via More / Ctrl+Shift+F |
-| H52 | Esc exits fullscreen stage | `VoiceStage.tsx:188` (shortcut) | FULL | `App.elm:44306` | — |
-| H53 | Roster join/leave announcer | `CallStatusAnnouncer.tsx:42` (auto) | FULL | `View/CallStage.elm:807`, `CallUi.elm:701` | + "raised a hand" |
-| H54 | Tile video binding + avatar fallback | `ParticipantTile.tsx:166` (auto) | FULL | `View/CallVideo.elm:313`, `ports.js:2500` | — |
-| H55 | Tile badges: speaking, muted, deafened, camera off, hand, you | `ParticipantTile.tsx:381` (UI) | FULL | `View/CallVideo.elm:313` | + "Video paused" |
+| H50 | Pin / unpin to spotlight | `ParticipantTile.tsx:358`, `store.ts:18116` (UI) | FULL | `View/CallVideo.elm:396`, `App.elm:45714` | — |
+| H51 | Stage chrome buttons Compact / Expand / Fullscreen | `VoiceStage.tsx:221` (UI) | PARTIAL | `App.elm:45711 CallStageSizeSet` (Esc only) | no direct buttons; cycle via More / Ctrl+Shift+F |
+| H52 | Esc exits fullscreen stage | `VoiceStage.tsx:188` (shortcut) | FULL | `App.elm:49784` | — |
+| H53 | Roster join/leave announcer | `CallStatusAnnouncer.tsx:42` (auto) | FULL | `View/CallStage.elm:896`, `CallUi.elm:737` | + "raised a hand" |
+| H54 | Tile video binding + avatar fallback | `ParticipantTile.tsx:166` (auto) | FULL | `View/CallVideo.elm:324`, `ports.js:3276` | — |
+| H55 | Tile badges: speaking, muted, deafened, camera off, hand, you | `ParticipantTile.tsx:381` (UI) | FULL | `View/CallVideo.elm:324` | + "Video paused" |
 | H56 | Tile role badge ~ @ + | `ParticipantTile.tsx:405` (UI) | PARTIAL | `View/CallStage.elm` personCell | video tiles draw none; audio cells show role word |
-| H57 | Tile native video PiP (open/close/pending state) | `ParticipantTile.tsx:343` (UI) | PARTIAL | `View/CallVideo.elm:357`, `App.elm:41481` | label always "Open…"; no active/pending state |
-| H58 | Tile per-peer quality pips | `ParticipantTile.tsx:323` (DEAD: never passed) | N/A | `View/CallVideo.elm:416` | Elm renders when engine reports |
-| H59 | Mini voice PiP (drag, keys, persisted) | `VoicePip.tsx:189` (DEAD) | N/A | `View/CallDock.elm:303` | Solid never visible: AppShell passes `activeSurface` (`VoicePip.tsx:191`); Elm ships it |
-| H60 | Incoming DM ring dialog (Accept/Decline, accepting, error) | `IncomingCallOverlay.tsx:54` (auto) | FULL | `View/CallDock.elm:102`, `App.elm:41277` | no server ring verb; unreachable in practice both sides |
-| H61 | Outgoing DM ring + 30 s timeout + Cancel | `store.ts:18177` (DEAD: no caller) | N/A | `View/CallDock.elm:183`, `voice-core.ts:833` | Elm "Call" item always fails closed ("Direct calls aren't available yet") |
+| H57 | Tile native video PiP (open/close/pending state) | `ParticipantTile.tsx:343` (UI) | PARTIAL | `View/CallVideo.elm:368`, `App.elm:45733` | label always "Open…"; no active/pending state |
+| H58 | Tile per-peer quality pips | `ParticipantTile.tsx:323` (DEAD: never passed) | N/A | `View/CallVideo.elm:427` | Elm renders when engine reports |
+| H59 | Mini voice PiP (drag, keys, persisted) | `VoicePip.tsx:189` (DEAD) | N/A | `View/CallDock.elm:302` | Solid never visible: AppShell passes `activeSurface` (`VoicePip.tsx:191`); Elm ships it |
+| H60 | Incoming DM ring dialog (Accept/Decline, accepting, error) | `IncomingCallOverlay.tsx:54` (auto) | FULL | `View/CallDock.elm:104 incoming`, `App.elm:45525 CallAccept` | dialog is complete but nothing can ring it: no server ring verb and media targets are channels only (`daemon/media_cmd.zig:36`; `voice-core.ts:917` fails closed) — BOUND (server) |
+| H61 | Outgoing DM ring + 30 s timeout + Cancel | `store.ts:18177` (DEAD: no caller) | N/A | `View/CallDock.elm:187 dmCallItem`, `voice-core.ts:917` | (v3/rx-calls) the DM More menu now says "Direct calls aren't available yet" instead of offering a Call item that always failed; `CallStart` (`App.elm:45566`) has no UI caller. No server DM media target — BOUND |
 | H62 | Live captions overlay (last 3, source line, role=log) | `CaptionsOverlay.tsx:58` (UI) | FULL | `View/CallOverlays.elm:287` | — |
-| H63 | Copy caption transcript | `CaptionsOverlay.tsx:77` (UI) | FULL | `App.elm:41586` | — |
+| H63 | Copy caption transcript | `CaptionsOverlay.tsx:77` (UI) | FULL | `App.elm:45838` | — |
 | H64 | Per-caption on-device translate / retry | `CaptionsOverlay.tsx:156` (UI) | FULL | `View/CallOverlays.elm:369` | — |
 | H65 | Caption provenance badges, "You · local"/"Remote", nick colour | `CaptionsOverlay.tsx:196`, `:230` (UI) | PARTIAL | `View/CallOverlays.elm:369` | nick + text only |
 | H66 | "On-device caption translation is unavailable" note | `CaptionsOverlay.tsx:206` (UI) | PARTIAL | — | dropped by design (button hidden) |
@@ -1433,893 +1515,970 @@ Elm checked: `Cadence`, `Media`, `CallUi`, `CallDock`, `CallMedia`, `CallCaption
 | H71 | Voice settings sheet (bar + You hub) | `VoiceSettings.tsx:468`, `src/app/YouSettings.tsx:232` (UI) | FULL | `View/VoiceSettings.elm:92`, `:38` | — |
 | H72 | Device pickers mic/speaker/camera, enumeration states, stale reset, devicechange | `VoiceSettings.tsx:173` (UI) | FULL | `View/VoiceSettings.elm:142` | — |
 | H73 | Choose speaker (`selectAudioOutput`) | `VoiceSettings.tsx:216` (UI) | FULL | `View/VoiceSettings.elm:191` | — |
-| H74 | Output volume (live) | `VoiceSettings.tsx:352` (UI) | FULL | `View/VoiceSettings.elm:230`, `ports.js:3828` | — |
+| H74 | Output volume (live) | `VoiceSettings.tsx:352` (UI) | FULL | `View/VoiceSettings.elm:230`, `ports.js:5112` | — |
 | H75 | Join muted toggle | `VoiceSettings.tsx:370` (UI) | FULL | `View/VoiceSettings.elm:315` | — |
-| H76 | Voice activity + sensitivity | `VoiceSettings.tsx:377` (UI, inert) | N/A | `View/VoiceSettings.elm:322`, `ports.js:3860` | Solid persists only, never applied; Elm shows only if engine has `setVoiceActivity` |
+| H76 | Voice activity + sensitivity | `VoiceSettings.tsx:377` (UI, inert) | N/A | `View/VoiceSettings.elm:322`, `ports.js:5144` | Solid persists only, never applied; Elm shows only if engine has `setVoiceActivity` |
 | H77 | Noise suppression / echo cancellation | `VoiceSettings.tsx:403` (UI) | FULL | `View/VoiceSettings.elm:352` | capability-gated |
-| H78 | Push-to-talk: toggle, key capture/clear, runtime guards, blur release | `VoiceSettings.tsx:423`, `useCadenceMedia.ts:543` (UI) | FULL | `View/VoiceSettings.elm:399`, `ports.js:3751` | + hidden-page release, bar hint |
+| H78 | Push-to-talk: toggle, key capture/clear, runtime guards, blur release | `VoiceSettings.tsx:423`, `useCadenceMedia.ts:543` (UI) | FULL | `View/VoiceSettings.elm:399`, `ports.js:5035` | + hidden-page release, bar hint |
 | H79 | Stage strip (live / op-dormant), hint, availability | `StagePanel.tsx:63` (UI) | FULL | `View/StageMode.elm:304` | — |
-| H80 | Start stage (+m, PROP STAGE 1) | `StagePanel.tsx:127`, `store.ts:15642` (UI) | FULL | `App.elm:45220`, `Stage.elm:247` | — |
-| H81 | End stage | `StagePanel.tsx:147` (UI) | FULL | `App.elm:45232` | + bar "End stage" |
-| H82 | Join as audience | `StagePanel.tsx:140` (UI) | FULL | `App.elm:45240` | — |
-| H83 | Leave stage | `StagePanel.tsx:158` (UI) | FULL | `App.elm:45252` | — |
-| H84 | Stage raise / lower hand | `StagePanel.tsx:171` (UI) | FULL | `App.elm:45256` | — |
-| H85 | Speak-invite alert Accept / Decline | `StagePanel.tsx:181` (UI) | FULL | `View/StageMode.elm:453`, `App.elm:45278` | — |
+| H80 | Start stage (+m, PROP STAGE 1) | `StagePanel.tsx:127`, `store.ts:15642` (UI) | FULL | `App.elm:51060`, `Stage.elm:247` | — |
+| H81 | End stage | `StagePanel.tsx:147` (UI) | FULL | `App.elm:51072` | + bar "End stage" |
+| H82 | Join as audience | `StagePanel.tsx:140` (UI) | FULL | `App.elm:51080` | — |
+| H83 | Leave stage | `StagePanel.tsx:158` (UI) | FULL | `App.elm:51092` | — |
+| H84 | Stage raise / lower hand | `StagePanel.tsx:171` (UI) | FULL | `App.elm:51096` | — |
+| H85 | Speak-invite alert Accept / Decline | `StagePanel.tsx:181` (UI) | FULL | `View/StageMode.elm:453`, `App.elm:51118` | — |
 | H86 | Host raised-hands queue + Invite to speak | `StagePanel.tsx:210` (UI) | FULL | `View/StageMode.elm:276` | + local Dismiss, 375px sheet |
 | H87 | Inbound CTCP STAGE fold (moderator invite, host +v on accept) | `store.ts:12597` (auto) | FULL | `Stage.elm:353` | Elm: only invited accept earns +v |
 | H88 | moveToAudience / grantSpeaker / revokeSpeaker | `store.ts:15616` (DEAD) | N/A | — | no callers |
-| H89 | Engine mount + idle lazy preload, reduced-data skip | `AppShell.tsx:355`, `mediaEngineMount.ts` (auto) | PARTIAL | `elm/index.html:50` | voice.js loaded eagerly at boot |
-| H90 | Generic media error toast + inbox "Voice: …" | `useCadenceMedia.ts:321` (auto) | MISSING | `media/voice-core.ts:410` | adapter only logs |
-| H91 | Codec init/ladder-exhaust toast | `useCadenceMedia.ts:329` (auto) | CORE-ONLY | `CallDock.elm:628` | needs `errorKind` codec/encoder; adapter never emits |
-| H92 | Per-peer decode-failure toast (rate-limited) | `useCadenceMedia.ts:348` (auto) | MISSING | `media/voice-core.ts:414` | logs only |
-| H93 | Room near capacity toast | `useCadenceMedia.ts:430` (auto) | MISSING | — | adapter lacks `onRoomNearFull` |
-| H94 | "Removed from voice by X" (VOICE_KICK) | `MediaEngine.ts:1965` → onError (auto) | MISSING | `media/voice-core.ts:410` | Elm shows plain "Call ended" |
+| H89 | Engine mount + idle lazy preload, reduced-data skip | `AppShell.tsx:355`, `mediaEngineMount.ts` (auto) | PARTIAL | `index.html:82` | voice.js is a plain `<script>` loaded at boot (as are backdrop.js, historyImport.js); no idle lazy-load or reduced-data skip |
+| H90 | Generic media error toast + inbox "Voice: …" | `useCadenceMedia.ts:321` (auto) | FULL | `media/voice-core.ts:444 onError`, `:158 classifyMediaError`, `CallDock.elm:672 mediaToast`, `App.elm:40390 callsC6Snapshot`, `tests/CallsRxTest.elm:473`, `voiceEngine.smoke.mjs:308` | (v3/rx-calls) in-call engine errors raise one calm "Call media problem" toast (never the raw engine text); Solid also adds an inbox "Voice: …" row, Elm does not |
+| H91 | Codec init/ladder-exhaust toast | `useCadenceMedia.ts:329` (auto) | FULL | `media/voice-core.ts:158`, `CallDock.elm:638 codecToast`, `voiceEngine.smoke.mjs:309` | (v3/rx-calls) "Codec unavailable" and encoder errors map to `codec` / `encoder` words and their toasts; encoder is moot while video is off |
+| H92 | Per-peer decode-failure toast (rate-limited) | `useCadenceMedia.ts:348` (auto) | FULL | `media/voice-core.ts:458 onDecodeError`, `CallDock.elm:740`, `voiceEngine.smoke.mjs:329` | (v3/rx-calls) one toast per peer per minute, audio included (Solid skips voice) |
+| H93 | Room near capacity toast | `useCadenceMedia.ts:430` (auto) | MISSING | `media/voice-core.ts:383` (callbacks have no `onRoomNearFull`) | the engine fires it at 24 members; the adapter never forwards it |
+| H94 | "Removed from voice by X" (VOICE_KICK) | `MediaEngine.ts:1965` → onError (auto) | FULL | `media/voice-core.ts:452`, `ports.js:3014`, `CallDock.elm:734`, `callSession.smoke.mjs:97`, `voiceEngine.smoke.mjs:323` | (v3/rx-calls) VOICE_KICK / VIDEO_KICK ends the call, then a second idle snapshot carries `errorKind: removed` → toast "You were removed from the call" with the engine's "by X" text |
 | H95 | Peer recording started/stopped + consent toasts | `useCadenceMedia.ts:418` (auto, no sender) | N/A | — | engine never puts RECORD_START on the wire |
-| H96 | Media peer key changed → "Encryption key changed" warning | `useCadenceMedia.ts:466` (auto) | MISSING | `media/voice-engine.ts:74` | Elm refuses handshake silently |
-| H97 | Update reload held during a call | `AppShell.tsx:396` (auto) | FULL | `App.elm:45572` | — |
-| H98 | Capability detection: display capture, native PiP, recording | `VoiceBar.tsx:415`, `ParticipantTile.tsx:85` (auto) | FULL | `ports.js:2298`, `media/platform.ts` | recording n/a (H26) |
+| H96 | Media peer key changed → "Encryption key changed" warning | `useCadenceMedia.ts:466` (auto) | PARTIAL | `media/voice-engine.ts:74 verifyPeerMediaKey`, `media/voice-core.ts:994 peerKeyChanged`, `CallDock.elm:747`, `tests/CallsRxTest.elm:509` | (v3/rx-calls) the changed key is refused and announced by a warning toast in the DM key-change language; Solid also flags the peer's DM key change (`store.ts _flagPeerKeyChange`: pending banner + accept flow), Elm's call path sets no DM key-change state |
+| H97 | Update reload held during a call | `AppShell.tsx:396` (auto) | FULL | `App.elm:51412 polishWorkActive`, `:52100` | also holds the service-worker update (v3/gap-pwa-safety) |
+| H98 | Capability detection: display capture, native PiP, recording | `VoiceBar.tsx:415`, `ParticipantTile.tsx:85` (auto) | FULL | `ports.js:3071`, `media/platform.ts` | recording n/a (H26) |
 | H99 | Engine internals: bandwidth ladder, hi-res probe, replay window, media MAC, VAD meter | `MediaEngine.ts` (auto) | FULL | `media/voice-engine.ts:51`, `Cadence.elm` | same engine bundled; Elm camera 320×176@12 |
 | H100 | Streaming / Go Live / raid / stream polls / breakout + spatial pad flags | `store.ts:18239–18330` (DEAD) | N/A | `Media.elm:541` (builder uncalled) | — |
 | H101 | Voice window events (audio-level/presence/network/mooring/e2ee) | `useCadenceMedia.ts:375` (DEAD: no listeners) | N/A | — | — |
-| H102 | Watch Together enable preference | `PreferencesPanel.tsx:3619` (UI) | CORE-ONLY | `Prefs.elm:421` | persisted field; no toggle, no surface |
-| H103 | WT activity card: state, progress, host, count, Close | `WatchTogetherActivity.tsx:965`, `AppShell.tsx:1483` (UI) | MISSING | — | — |
-| H104 | WT start editor (title/URL/duration, validation) → review → confirm (PROP `ocean.watch`) | `WatchTogetherActivity.tsx:612–780` (UI) | MISSING | — | — |
-| H105 | WT host Play / Pause / Seek (local tick) | `WatchTogetherActivity.tsx:1046` (UI) | MISSING | — | — |
-| H106 | WT host handoff offer / accept / cancel | `WatchTogetherActivity.tsx:1088` (UI) | MISSING | — | — |
-| H107 | WT end activity with confirmation | `WatchTogetherActivity.tsx:1140` (UI) | MISSING | — | — |
-| H108 | WT join / leave (cap 128, host can't leave) | `WatchTogetherActivity.tsx:1185` (UI) | MISSING | — | — |
-| H109 | WT participant roster disclosure | `WatchTogetherActivity.tsx:1006` (UI) | MISSING | — | — |
-| H110 | WT open media URL (http/https only) | `WatchTogetherActivity.tsx:1230` (UI) | MISSING | — | — |
-| H111 | WT stale-revision guards + participation live region | `WatchTogetherActivity.tsx:372` (auto) | MISSING | — | — |
+| H102 | Watch Together enable preference | `PreferencesPanel.tsx:3619` (UI) | FULL | `Prefs.elm:421`, `View/Prefs.elm:253`, `App.elm:49943`, `tests/WatchTogetherAppTest.elm:175` | (v3/gap-watch) real switch "Show watch-together activities", default off like Solid; starting or opening an activity from the room More menu turns it on; Hide on the card turns it off |
+| H103 | WT activity card: state, progress, host, count, Close | `WatchTogetherActivity.tsx:965`, `AppShell.tsx:1483` (UI) | FULL | `View/WatchTogether.elm:157 cardView`, `View/Thread.elm:68`, `tests/WatchTogetherAppTest.elm:195` | (v3/gap-watch) sticky card above the transcript: state, title, clock, host site, progress, participant count, Open, details, Hide (Solid "Close" = turn the pref off). Readable by every member on an IRCX link; a delete or new value updates it live (`App.elm:16310 settleStepWatch`) |
+| H104 | WT start editor (title/URL/duration, validation) → review → confirm (PROP `ocean.watch`) | `WatchTogetherActivity.tsx:612–780` (UI) | FULL | `View/WatchTogether.elm:891 startSheet`, `WatchTogether.elm:2199 validate`, `:2288 confirmStart`, `App.elm:16207 watchEffect`, `tests/WatchTogetherAppTest.elm:338` | (v3/gap-watch) room More menu → title / link / length → review → confirm sends `PROP #room ocean.watch :<value>`. Room operators only, because Onyx Server refuses `PROP` set from anyone else (`daemon/server.zig:39768 propAccess`); a member gets a toast, not the sheet. Value budget is the server's 512 bytes (Solid budgets 4096 and can publish a value the server refuses) |
+| H105 | WT host Play / Pause / Seek (local tick) | `WatchTogetherActivity.tsx:1046` (UI) | FULL | `WatchTogether.elm:1292 play`, `:1319 pause`, `:1329 seek`, `View/WatchTogether.elm:341 leadControl`, `:493 seekRow`, `tests/WatchTogetherAppTest.elm:478` | (v3/gap-watch) host (an operator) plays, pauses, nudges ±10 s or scrubs; the clock ticks locally from a published `at=` anchor so late joiners agree (Solid anchored at receipt) |
+| H106 | WT host handoff offer / accept / cancel | `WatchTogetherActivity.tsx:1088` (UI) | FULL | `WatchTogether.elm:1423 offer`, `:1438 cancelHandoff`, `:1448 accept`, `:1479 claim`, `View/WatchTogether.elm:748 handoffPicker`, `tests/WatchTogetherAppTest.elm:394` | (v3/gap-watch) offer / accept / cancel, plus "Take over hosting" when the host has left the room. Targets are limited to operator participants because accepting writes the property |
+| H107 | WT end activity with confirmation | `WatchTogetherActivity.tsx:1140` (UI) | FULL | `WatchTogether.elm:2104 AskEnd`, `:2119 ConfirmEnd`, `View/WatchTogether.elm:789 endRow`, `App.elm:49835`, `tests/WatchTogetherAppTest.elm:494` | (v3/gap-watch) "End activity…" asks first (names title and head-count), sends `PROP #room ocean.watch :` and applies the delete on the server's 819; host, or any operator once the host is gone |
+| H108 | WT join / leave (cap 128, host can't leave) | `WatchTogetherActivity.tsx:1185` (UI) | PARTIAL | `WatchTogether.elm:1359 join`, `:1389 leave`, `:2335 guard`, `View/WatchTogether.elm:645 actions`, `tests/WatchTogetherAppTest.elm:291` | (v3/gap-watch) works for room operators only: joining or leaving rewrites the shared property and Onyx Server accepts `PROP` set only from op/owner/founder or an IRC oper (`daemon/server.zig:39768`, `913`). An ordinary member sees an honest note instead of Join and the roster holds operators only — needs a server change (member-writable key or a WATCH verb). Cap 128 and "host can't leave" are kept. ⚠ shared: Solid's Join sends the same `PROP` and never handles the 913 |
+| H109 | WT participant roster disclosure | `WatchTogetherActivity.tsx:1006` (UI) | FULL | `View/WatchTogether.elm:607 roster`, `:547 metaRow`, `WatchTogether.elm:1243 rosterEntries` | (v3/gap-watch) disclosure with Host / Pending host / You labels; lists only those who joined (operators, see H108) |
+| H110 | WT open media URL (http/https only) | `WatchTogetherActivity.tsx:1230` (UI) | FULL | `View/WatchTogether.elm:399 openLink`, `WatchTogether.elm:498 checkUrl`, `tests/WatchTogetherAppTest.elm:224` | (v3/gap-watch) only http(s) links without credentials become an `href`; shown with their host first, new tab, `noopener noreferrer`, no referrer |
+| H111 | WT stale-revision guards + participation live region | `WatchTogetherActivity.tsx:372` (auto) | FULL | `WatchTogether.elm:2335 guard` (`Rev`), `:2463 settleLine`, `:2594 settleRoom`, `View/WatchTogether.elm:292` | (v3/gap-watch) a click against a changed room, value or identity fails closed with a message; polite atomic `watch-status` region; 10 s no-answer timeout; 913 / 461 explained |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- **fbe04585 claim "Elm hides the camera button and 'Join with video' while it is off"** — false in practice. `ports.js:2410–2412` back-fills only `shareSupported`/`pipSupported`; `voiceCapabilities().cameraSupported` (`ports.js:2313`) never reaches a snapshot; `voice-core.ts` never emits it; `CallMedia.blankLocal` defaults `True` and `CallJoin` resets to it (`App.elm:41181`). The CallsC4Test vector only feeds `cameraSupported` by hand. Worse, `joinVoice(ch,{video:true})` → `engine.joinVideo` (`voice-core.ts:803`, `:697`) is not covered by `VIDEO_ENABLED` (only `startCamera` is wrapped, `voice-engine.ts:102`), so "Join with video" still publishes camera.
-- COVERAGE §12 MEDIA row "done … STATS/LAYER/BREAKOUT/POS …": `Media.elm` folds none of STATS/LAYER/BREAKOUT/POS/PROFILE; `mediaBreakout`/`mediaOffer` builders have no caller.
-- C1 "SFU cascade copy" done: copy exists, data never arrives — the sheet always reads "SFU path unknown".
-- C6 "codec / encoder toasts": unreachable — the adapter never emits `errorKind` codec/encoder (only join-path error names).
-- C4 narrowing "CadenceMediaEngine has none [stopScreenShare] — bridge reports the share still live": stale; `voice-core.ts:878` implements stop (stopBroadcast + voice rejoin).
-- C8 narrowing "reaction chips show the glyph only": understated — chips render avatar initial + nick + glyph (`View/CallOverlays.elm:262–276`).
-- C1 narrowing "no connection-quality pip (C4)": superseded by C4 (pip at `View/CallVideo.elm:516`).
-- `View/Calls.elm:9–14` module doc "No join / accept / start control exists for any presentation" contradicts the hub's own Join buttons (`:245–256`).
-- V3_ROADMAP lines 186–191 repeat the C-slice line twice with conflicting done marks (C4/C5 vs C6/C7/C10); row 6.7 lumps Stage (done, C11) with Watch Together (not started).
-- `View/About.elm:100` advertises Watch Together a11y features that do not exist in Elm. `CALLS_DESIGN.md` says WT is "unchanged from the oracle" — it is unported.
+- **fbe04585 claim "Elm hides the camera button and 'Join with video' while it is off"** — was false in practice (`cameraSupported` never reached a snapshot, `CallJoin` reset it to `True`, and `joinVoice({video:true})` → `engine.joinVideo` bypassed `VIDEO_ENABLED`); **fixed by `a96afd2e`**: `CallMedia.blankLocal` defaults it `False` (`CallMedia.elm:118`), `CallJoin` keeps it (`App.elm:45407`), `ports.js:3186` back-fills it from `engine.videoEnabled`, the hub / banner buttons are gated (`View/Calls.elm:174`, `View/CallPresence.elm:280`) and the adapter forces audio-only joins (`media/voice-engine.ts:114`); `bundleBoot.smoke.mjs:358` proves the join asks `getUserMedia` for audio only. Residual: the Ctrl+Shift+E chord is still ungated (`App.elm:51275`), and the flag is only back-filled on non-idle snapshots (`ports.js:3181–3187`), so once video ships the pre-join "Join with video" stays hidden until the first call of a session.
+- COVERAGE §12 MEDIA row "done … STATS/LAYER/BREAKOUT/POS …": **still true** — `Media.elm` folds none of STATS/LAYER/BREAKOUT/POS/PROFILE; the `mediaBreakout` / `mediaOffer` builders (`Media.elm:541`, `:506`) have no caller (the server does answer `MEDIA STATS`, `daemon/media_cmd.zig:93`).
+- C1 "SFU cascade copy" done: **still true** — copy exists, data never arrives (`voice-core.ts` never emits `sfu` or wires `onRoomStats`); the sheet always reads "SFU path unknown" (H36).
+- C6 "codec / encoder toasts" (COVERAGE.md:218): was unreachable (the adapter never emitted `errorKind` codec/encoder); **fixed by v3/rx-calls** (`media/voice-core.ts:158 classifyMediaError`, `CallDock.elm:672 mediaToast`). The same COVERAGE line's "removed-by-op / capacity toasts not done" is half stale: removed-by-op is done (H94), capacity is still not (H93).
+- C4 narrowing "CadenceMediaEngine has none [stopScreenShare] — bridge reports the share still live" (COVERAGE.md:220): **stale**; `voice-core.ts:962` implements stop (end the publisher, rejoin as voice).
+- C8 narrowing "reaction chips show the glyph only" (COVERAGE.md:221): **stale / understated**; chips render avatar initial + nick + glyph (`View/CallOverlays.elm:247`).
+- C1 narrowings (COVERAGE.md:217) "no connection-quality pip", "More holds only a disabled Open voice settings stub", "no aria-keyshortcuts/chords", "local health mute-only": **all stale** — C4 / C8 / C9 / C12 landed (`View/CallVideo.elm:527`, `View/CallStage.elm:631`, `App.elm:51250`, `CallMedia.elm:316`). "No 'local media unavailable' status" is **still true** (H45).
+- COVERAGE.md:218 C6 "DM 'Call' item in the room header More menu": **stale** — v3/rx-calls replaced it with a plain-words "Direct calls aren't available yet" note (`View/CallDock.elm:187`).
+- `View/Calls.elm:9–18` module doc "No join / accept / start control exists for any presentation" contradicted the hub's own Join buttons: **fixed by v3/rx-calls** (`:9–13` now describe the explicit join; the remaining "no accept / start" line is true for accept). The same doc (`:3–5`), `Media.elm:571` and `App.elm:45452` still say the engine bridge "lands with the engine itself" (**still stale**), and `ports.js:5455–5457` still says Elm "never commands the engine (the hub renders no join/accept/start control)" (**still stale** — `voiceJoin` / `voiceLeave` / `voiceMute` / `voiceCommand` command it).
+- Other in-code comments **still stale at HEAD**: `View/CallPresence.elm:17–22` (the `voiceEntry`-off fallback is absent "because there is no Elm More menu yet" — the menu exists, `View/RoomHeader.elm:289`; the gap is real, H8); `View/CallStage.elm:10–26` ("pip waits for C4's qualityTier", "chords land with C12") and `:628–630` ("v1 carries the Settings stub only"); `CallMedia.elm:313` ("captions excluded until C8" — C8 landed but the chip arm still omits captions, H5).
+- V3_ROADMAP lines 183–191 repeat the C-slice line twice with conflicting done marks (C4/C5 vs C6/C7/C10): **still true**. Row 6.7 (`V3_ROADMAP.md:122`) still lumps Stage (done, C11) with Watch Together (now done, v3/gap-watch) and row 8.x (`:170`) still lists "Stage/Watch Together (6.7)" as deferred: **still true**; neither mentions v3/gap-watch.
+- `View/About.elm:100` advertised Watch Together a11y features that did not exist in Elm: **now true** — named review and host-control groups (`View/WatchTogether.elm:740`, `:1135`), a participant list bounded at 128, a polite atomic status (`:292`), focus restoration (`WatchTogether.Focus` effects). `CALLS_DESIGN.md` said Watch Together was "unchanged from the oracle": **fixed** (`CALLS_DESIGN.md:9–11`, `:684–689` now describe the built v3/gap-watch).
 
 #### Elm better than Solid
-- Mini voice PiP actually renders (`View/CallDock.elm:303`); Solid's `VoicePip` is unreachable because AppShell always passes `activeSurface` (`VoicePip.tsx:191`).
-- Call keyboard chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S with a leave-confirm sheet for >2 people (`App.elm:45410`, `View/StageMode.elm:518`); Solid has none.
-- Reconnecting state, "Connection lost." banner, "Reconnected" announcer, controls disabled while reconnecting (`View/CallDock.elm:476`, `:505`).
-- Classified join-failure copy (permission / no device / account required / encryption) vs Solid's single generic line (`CallDock.elm:608`).
-- Privacy sheet lists every peer with their media fingerprint (`View/CallStage.elm:679`).
-- Sidebar rail voice count + "Rooms with voice" hub list + last-call outcome on hub (`View/CallPresence.elm:59`, `:340`).
-- Video: paging of 16, dominant-speaker tile reordering, remote screen shares force the screenshare layout with a grid escape (`View/CallVideo.elm:228`, `:400`).
-- Local VAD is broadcast as `MEDIA SPEAKING` so cross-node peers see you speak (`voice-core.ts:455`); `MUTE … video` no longer misread as mic mute (`Media.elm:255`).
-- iOS/WebKit hardening: share hidden without a picker, audio unlock, call audio session, capture recovery on foreground/route change (`media/platform.ts`, `voice-core.ts`). The adapter also enrolls the device key (IDENTITY ADD) so E2EE handshakes are admitted.
+- Mini voice PiP actually renders (`View/CallDock.elm:302`); Solid's `VoicePip` is unreachable because AppShell always passes `activeSurface` (`VoicePip.tsx:191`).
+- Call keyboard chords Ctrl/Cmd+Shift+M/E/H/C/L/G/F/S with a leave-confirm sheet for >2 people (`App.elm:51250`, `View/StageMode.elm:518`); Solid has none.
+- Reconnecting state, "Connection lost." banner, "Reconnected" announcer, controls disabled while reconnecting (`View/CallDock.elm:477`, `:506`).
+- Classified join-failure copy (permission / no device / account required / encryption / lost microphone) vs Solid's single generic line (`CallDock.elm:615`).
+- Privacy sheet lists every peer with their media fingerprint (`View/CallStage.elm:768`).
+- Sidebar rail voice count + "Rooms with voice" hub list + last-call outcome on hub (`View/CallPresence.elm:60`, `:443`, `View/Calls.elm:240`).
+- Video: paging of 16, dominant-speaker tile reordering, remote screen shares force the screenshare layout with a grid escape (`View/CallVideo.elm:228`, `:404`).
+- Local VAD is broadcast as `MEDIA SPEAKING` so cross-node peers see you speak (`voice-core.ts:505`); `MUTE … video` no longer misread as mic mute (`Media.elm:255`, `voice-core.ts:601`).
+- iOS/WebKit hardening: share hidden without a picker, audio unlock, call audio session, capture recovery on foreground/route change (`media/platform.ts`, `voice-core.ts:805`). The adapter also enrolls the device key (IDENTITY ADD) so E2EE handshakes are admitted.
 - Stage: only an invited ACCEPT_SPEAK earns +v, host-local Dismiss, 375px hands sheet, speakers-only stage cells + audience facepile, forced "Stage broadcast" chip (`Stage.elm:353`, `View/StageMode.elm`).
 - Push-to-talk bar hint and hidden-page release; VAD/sensitivity toggles hidden instead of Solid's inert, persisted-only controls.
+- (v3/rx-calls) A join is provisional at once ("Connecting to the call…" + microphone hint), Leave cancels an in-flight join and a double press is ignored (`App.elm:45355–45432`, `media/voice-core.ts:885`).
+- (v3/rx-calls) A guest gets a "Sign in to join calls" card (banner and hub) instead of a join that fails on the server (`View/CallPresence.elm:370 guestCard`, `App.elm:45370`).
+- (v3/rx-calls) Calm per-word media toasts — media problem, timeout, removed, lost microphone, per-peer decode (once a minute, audio too), peer key change — instead of Solid's raw "Media error: <engine text>" (`CallDock.elm:672`, `media/voice-core.ts:158`).
+- (v3/rx-calls) Screen wake lock and OS media-session call controls routed through the `shortcut` port so the >2-person leave confirm applies (`ports.js:3340`).
+- (v3/rx-calls) A peer's changed media key is refused and announced in the DM key-change language (`media/voice-engine.ts:74`, `CallDock.elm:747`); node-less device-key enrollment at 376 so call handshakes are admitted without ACCOUNTRESIDENCE (`Attribution.elm:253`, `tests/CallsRxTest.elm:163`).
+- (v3/rx-calls) Docked stage: head row (faces, where, timer, count, push-to-talk hint, quality pip, security chip), a controls-only bar, and a More row / phone sheet with a closing scrim (`View/CallStage.elm:215`, `:529`).
+- (v3/rx-calls) The DM More menu says "Direct calls aren't available yet" instead of offering a Call item that always failed (`View/CallDock.elm:187`).
+- (v3/gap-commands) Palette "Start voice call" and "Return to call" rows (`Switcher.elm:583`).
+- (v3/gap-watch) Watch Together is server-honest: it says plainly that only room operators can start, control or join; budgets the server's 512-byte value (Solid's 4096 can publish a value the server refuses); publishes an `at=` anchor so late joiners show the same clock (Solid drifts by the age of the last publish); lets an operator take over an abandoned activity; rejects over-long nicks/links instead of truncating them; accepts IPv6 link literals; applies a delete on the setter's `819`; 178 `test` blocks (`tests/WatchTogetherTest.elm` 143, `tests/WatchTogetherAppTest.elm` 35).
 
 #### Gaps (ranked by user impact)
-- `[High]` Video-off switch leaks: in `ports.js` `mountVoiceFeedPush`, back-fill `cameraSupported` on every snapshot (idle too) and push one at boot. In `voice-engine.ts`, force `opts.video=false` in `joinVoice` when `!VIDEO_ENABLED`. In `App.CallJoin`, keep `cameraSupported` and coerce `video` to False. Gate the `View/Calls.elm` video button.
-- `[High]` Watch Together missing: add a `WatchTogether` module (port `watchTogether.ts` parse/serialize + controller tick/play/pause/seek/join/leave/handoff), a `View.WatchTogether` card in `View/Thread.elm`, Msgs `Watch*`, publishing `PROP ocean.watch` via `writeChannelProp`, and the toggle in `View/Prefs.elm`.
-- `[High]` Media failures are silent: `voice-core.ts` `onError`/`onDecodeError`/VOICE_KICK should `emitLocal({mediaError, errorKind})`. Fold it in `CallDock` into toasts (codec/encoder via `codecToast`, generic "Media error", "Removed from voice").
-- `[Med]` No feedback during permission prompt / enrollment: in `CallJoin`, set `calls` provisional (InCall, no `startedAt`) locally, or have `ports.js` push `{state:'in_call'}` before `engine.joinVoice`; failure already rolls back via `joinFailed`.
-- `[Med]` Media peer key change unannounced: `voice-engine.ts verifyPeerMediaKey` 'changed' → push `{peerKeyChanged:nick}`. Fold into the existing DM key-change toast/banner in `App`.
-- `[Med]` Local recording: expose `startRecording`/`stopRecording` on the adapter, add `voiceCommand` verb `record` and a Download port hand-off, plus a More item and a `record-status` region in `View/CallStage.moreTools`.
-- `[Med]` Screen wake lock + OS Media Session: in `ports.js`, on `voiceCallHub` in_call, acquire `navigator.wakeLock` (re-acquire on visibility). Register `mediaSession` handlers that send `call-mute`/`call-camera`/`call-leave` on the `shortcut` port.
-- `[Med]` In-call Invite: add a `CallInvite` Msg that reuses `InviteShare` link + `ClipboardCopy`. Put the More item and an `invite-status` live region in `View/CallStage.elm:554`.
-- `[Med]` SFU topology always unknown: wire `onRoomStats` + 1 Hz `getNetworkStats` loss in `voice-core.ts` → `emitLocal({sfu})`. This also feeds H37 bitrate/jitter/loss for the pip tooltip.
-- `[Low]` Spatial audio pad: adapter `setPeerPosition(nick,pos)` → `engine.registry.setPositionForNick`. Add a More popover with a pointer-drag assist in ports.
-- `[Low]` Stage chrome Compact/Expand/Fullscreen buttons (`CallStageSizeSet` already exists). Tile role badges; native PiP active label. "Local media unavailable" status in `CallUi.stageStatus`.
-- `[Low]` Palette "Start voice/video in current room" in `Switcher`; voiceEntry-off "Join call" fallback in the room header More menu.
-- `[Low]` Bar people faces/names; captions provenance/source tags; "captions" in the chip's local-health arm (`CallMedia.roomStatus`).
-- `[Low]` Hide the DM "Call" item (`View/CallDock.elm:183`) while the adapter has no DM path, rather than offering an action that always fails.
-- `[Low]` Room-near-capacity toast; lazy-load `voice.js` (respect reduced data) instead of eager boot load.
+- `[High]` **[Closed — a96afd2e]** Video-off switch leak: the flag now defaults False, survives `CallJoin`, is back-filled by `ports.js:3186`, the hub / banner video buttons are gated and `voice-engine.ts:114` forces audio-only joins. Residuals: see the capabilities back-fill gap below.
+- `[High]` **[Closed — v3/gap-watch]** Watch Together missing: shipped `WatchTogether` (parse / serialize / transitions / settling), `View.WatchTogether` card + start sheet + More-menu entry, `WatchMsg`, `PROP ocean.watch` publishing and the Preferences toggle (H102–H111). What is left is server-bound: see the member-join gap below.
+- `[High]` **[Closed — v3/rx-calls]** Media failures were silent: `voice-core.ts onError` / `onDecodeError` / VOICE_KICK now emit `errorKind` and `CallDock.mediaToast` turns each word into a toast (codec, encoder, media, timeout, removed, capture, decode, peer key). Not mirrored: Solid's inbox "Voice: …" row and the near-capacity toast (both below).
+- `[Med]` **[Closed — v3/rx-calls]** No feedback during the permission prompt / enrollment: `CallJoin` now sets a provisional InCall (`App.elm:45405`) and the stage shows the microphone hint; a failed join rolls back through `joinFailed`.
+- `[Med]` **[Partly closed — v3/rx-calls]** Media peer key change: the key is now refused AND announced (`voice-engine.ts verifyPeerMediaKey` → `peerKeyChanged` → warning toast). Still missing: Solid also flags the peer's DM key change (pending banner + accept flow); the call path should hand `{peerKeyChanged: nick}` to the existing `DmSafety` pending state instead of toast-only.
+- `[Med]` Local recording (H26, H40): expose `startRecording` / `stopRecording` on the adapter (`media/voice-core.ts` `OnyxVoiceAdapter`), add a `voiceCommand` verb `record` and a Download port hand-off, plus a More item and a `record-status` region in `View/CallStage.moreTools`.
+- `[Med]` **[Closed — v3/rx-calls]** Screen wake lock + OS Media Session: `ports.js:3340 createVoiceSessionAssist` (togglemicrophone + hangup through the `shortcut` port; no togglecamera while video is off).
+- `[Med]` **[Closed — v3/rx-calls]** In-call Invite: a "Invite people" More item opens the shared Invite sheet (`View/CallStage.elm:689`).
+- `[Med]` SFU topology always unknown (H36): wire `onRoomStats` + a 1 Hz `getNetworkStats` loss sample in `media/voice-core.ts` → `emitLocal({sfu})` (the server already answers `MEDIA STATS`, `daemon/media_cmd.zig:93`). This also feeds H37 bitrate / jitter / loss for the pip tooltip.
+- `[Low]` Spatial audio pad (H30): adapter `setPeerPosition(nick,pos)` → `engine.registry.setPositionForNick`; a More popover with a pointer-drag assist in ports.
+- `[Low]` Still open: stage chrome Compact / Expand / Fullscreen buttons (`CallStageSizeSet` exists, H51); tile role badges (H56); native PiP active / pending label (H57); "Local media unavailable — you can stay and listen" in `CallUi.stageStatus` (H45).
+- `[Low]` **[Partly closed — v3/gap-commands]** Palette "Start voice call" and "Return to call" rows (`Switcher.elm:583`); no video row while video is off (BOUND). Still missing: the `voiceEntry`-off "Join call" fallback in the room More menu (`View/RoomHeader.elm:289`, H8); the palette row is also gated on that pref (`App.elm:49126`).
+- `[Low]` Bar people names ("You, alice +2", H16 — faces now exist); caption provenance tags "You · local" / "Remote" (H65); "captions" in the chip's local-health arm (`CallMedia.roomStatus`, H5).
+- `[Low]` **[Closed — v3/rx-calls]** Hide the DM "Call" item: the DM More menu now shows a plain "Direct calls aren't available yet" note (`View/CallDock.elm:187`).
+- `[Low]` Still open: room-near-capacity toast (H93: forward the engine's `onRoomNearFull` from `voice-core.ts` callbacks); lazy-load `voice.js` and respect reduced data instead of the boot-time `<script>` (`index.html:82`, H89).
+- `[Med]` **(new, BOUND — server)** Watch Together: ordinary members cannot join, leave or accept hosting (H108), and handoff targets are limited to operators (H106). Onyx Server lets only op/owner/founder (or an IRC oper) set a channel property (`daemon/server.zig:39768 propAccess`; `913`), so the roster holds operators only. Needs a server change (a member-writable key or a WATCH verb); then drop the `canWrite` gate for Join / Leave / Accept in `WatchTogether.guard` and `View/WatchTogether.actions`.
+- `[Low]` **(new)** The Calls hub offers "Join call in <nick>" when a DM is the active conversation (`View/Calls.elm:283`, no `isChannelName` guard) and `MEDIA JOIN <nick>` is refused by the server (`daemon/media_cmd.zig:36`); code-read, not run. Guard on `App.isChannelName` (as `View/CallDock.dmCallItem` does).
+- `[Low]` **(new, latent until video ships)** Capabilities (`cameraSupported`, `shareSupported`, `pipSupported`) reach Elm only on non-idle snapshots (`ports.js:3181–3187`), so with `VIDEO_ENABLED = true` the pre-join "Join with video" would stay hidden until the first call of a session: push the capabilities at boot / on idle. Also gate the Ctrl+Shift+E chord (`App.elm:51275`) on `callLocal.cameraSupported`.
+- `[Low]` **(new)** Media errors leave no inbox record (Solid adds "Voice: <message>", H90): add a `NotifyCenter` row from `callsC6Snapshot` (`App.elm:40390`).
+- `[Low]` **(new)** Calls hub status `<p>` lacks `aria-live=polite` (`View/Calls.elm:227`, H1).
+- `[Bound]` Video is off on the live network (`media/voice-engine.ts:107`): cadencevis is ~2 Mbit/s per camera and the production node's stock 1 MiB SendQ could disconnect the other people in the call. Revisit when the codec is lighter or the SendQ is raised; the UI follows `engine.videoEnabled`.
+- `[Bound]` No DM calls: Onyx Server's MEDIA plane takes channel targets only and has no ring / accept verb (`daemon/media_cmd.zig:36`), so `startCall` fails closed (`media/voice-core.ts:917`) and the ring dialogs (H60) can never be reached.
+- `[Bound]` Calls need an Onyx account with an enrolled device key (`daemon/media_cmd.zig:341`, `:362`); guests get the sign-in card.
+- `[Bound]` Stage has no server verb: it is MODE +m / +v and `PROP STAGE` (operators) plus client-to-client CTCP `STAGE …` (`Stage.elm` module doc), so a stage is a cooperative convention, not a server-enforced role.
 
 ### I — Moderation, operators, people, stewardship
 Solid, walked in full: `src/shell/ModerationCockpit.tsx`, `moderation/BanListPanel.tsx`, `moderation/ModerationActionReview.tsx`, `OperDesk.tsx`, `OperEventConsole.tsx`, `MemberList.tsx`, `memberWindow.ts`, `PeopleProfileCard.tsx`, `Facepile.tsx` (card host), `people/PersonSafetySheet.tsx` + `personSafetyState.ts`, `WhoisSheet.tsx`, `RoomStewardshipSheet.tsx` + `roomStewardshipState.ts`, `ContextRail.tsx`/`AppShell.tsx` (entry gating), `ChannelSettings.tsx` (webhooks/ACCESS), `src/lib/moderation/*`, `lib/oper/operDesk.ts`, `lib/people/*`, `lib/rooms/*`, `lib/memberGroups.ts`, the identity/contact memory libs, and store actions 7640–7752, 8160–8529 (slash), 8723, 9696–9870, 10134, 10359–10402, 15717–15725, 16325–16760, 17196–17460. Reachability came from a non-test caller grep over `src/shell src/app src/chat src/routes src/pwa src/theme src/media`.
-Elm, checked: `Moderation.elm`, `View/ModDesk.elm`, `View/Bans.elm`, `OperDesk.elm`, `EventReplay.elm`, `Spine.elm`, `Roster.elm`, `View/Roster.elm`, `View/Profile.elm`, `PersonSafety.elm`, `IdentityOverrides.elm`, `Stewardship.elm`, `View/Stewardship.elm`, `Webhook.elm`, `View/RoomSettings.elm` (webhook and ACCESS parts), `View/Account2.elm` (People), `View/RoomHeader.elm`, `View/Topbar.elm`, `Prefs.elm`, the App.elm folds, and `ports.js`/`index.html` (blocklists, temp-ban timers, receipts).
+Elm, checked: `Moderation.elm`, `View/ModDesk.elm`, `View/Bans.elm`, `OperDesk.elm`, `EventReplay.elm`, `Spine.elm`, `Roster.elm`, `View/Roster.elm`, `View/Profile.elm`, `PersonSafety.elm`, `IdentityOverrides.elm`, `Stewardship.elm`, `View/Stewardship.elm`, `Webhook.elm`, `View/RoomSettings.elm` (webhook and ACCESS parts), `View/Account2.elm` (People), `View/RoomHeader.elm`, `View/Topbar.elm`, `Prefs.elm`, the App.elm folds, and `ports.js`/`index.html` (blocklists, temp-ban timers, receipts). Docs refresh at HEAD `609cb240` also read: `ModAuthority.elm`, `GapPeople.elm`, `PeerAccount.elm`, `RosterWindow.elm`, `RoomTransfer.elm`, `TimedBlock.elm`, `View/RoomTools.elm`, `OperConsole.elm`, `OperFeed.elm`, `OperPlan.elm`, `OperReply.elm`, `View/OperTabs.elm`, `View/OperFeedPanel.elm`, `View/OperKit.elm`, `View/Appeal.elm`, `AccountScope.elm` + `GapAccount.elm` (scoped lists), `View/Organize.elm` (DM mute, private notes), `View/Chanserv.elm` (card Mute, delete room), `UserModes.elm` + `View/UserModes.elm` (server blocks, last seen), `View/GapShell.elm`.
 In the Solid column, "adv+" means the surface only renders when `experienceMode` is advanced or network-ops (`ContextRail.tsx:123`, `PresenceRibbon.tsx:1041`).
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| I1 | Room desk entry point | `src/shell/ContextRail.tsx:127`, `src/shell/AppShell.tsx:1622` (UI adv+) | FULL | `View/RoomHeader.elm:281` More→Moderation, `View/ModDesk.elm:51`, `App.elm:42475` | Elm opens for ops in every experience mode, which Solid does not |
-| I2 | Read-only desk view for non-moderators (fallback copy + mode state) | `src/shell/ModerationCockpit.tsx:279` (UI adv+) | FULL | `View/Bans.elm` `banPanel`, `View/ModDesk.elm` `moderationToggle`, `App.elm` `ModerationSheetOpen` | v3/gap-people: members open the read-only desk ("Room safety": safeguards, who moderates, open-wire state) |
-| I3 | Authority rail (Connected / Moderator / Last room update) + boundary note | `src/shell/ModerationCockpit.tsx:253` (UI adv+) | FULL | `View/Bans.elm:313`, `:615` | Moderator is hard-coded "Yes" because the sheet is op-gated |
-| I4 | Offline coaching line | `src/shell/ModerationCockpit.tsx:273` (UI adv+) | FULL | `View/Bans.elm:334` | |
-| I5 | Safeguard toggles +m / +i / +t with On/Off state | `src/shell/ModerationCockpit.tsx:280`, `:162` (UI adv+) | FULL | `View/Bans.elm:346`, `App.elm:42437` | |
-| I6 | Invite someone (`INVITE nick chan`) + "People here" hint | `src/shell/ModerationCockpit.tsx:296`, `:167` (UI adv+) | FULL | `View/Bans.elm:397`, `App.elm:42415` | Elm sorts candidates alphabetically; Solid keeps join order |
-| I7 | Member action form (member + mode-gated action + optional reason) → review | `src/shell/ModerationCockpit.tsx:308` (UI adv+) | FULL | `View/Bans.elm` `deskMemberForm`, `ModAuthority.deskKinds`, `App.elm` `ModerationDeskSubmitMember` | v3/gap-people: the form hides for non-moderators and the submit refuses kinds the role cannot stage |
-| I8 | Block an address mask → review | `src/shell/ModerationCockpit.tsx:352` (UI adv+) | FULL | `View/Bans.elm:437`, `App.elm:42383` | |
-| I9 | Review-first modal (errors, Permission/Scope/Receipt facts, summary, impact, blocked reason) | `src/shell/moderation/ModerationActionReview.tsx:322` (UI) | FULL | `View/Profile.elm:831`, `App.elm:42821` | |
-| I10 | Review invalidated on authority change (account/server/client/device) and room switch | `src/shell/ModerationCockpit.tsx:140`, `:184` (auto) | PARTIAL | `App.elm:42821` | Elm only re-checks live op and connection at confirm; the draft is not cleared on room switch |
-| I11 | Dispatch reviewed action (KICK, MODE ±b/±o/±v) | `src/lib/moderation/applyMemberModeration.ts:7` (UI) | FULL | `App.elm:10922` | |
-| I12 | Validation rules (self-moderation, match-everyone mask, caps, control chars) | `src/lib/moderation/actionModel.ts:97` (UI) | FULL | `Moderation.elm:193`, `:524` | Copy is verbatim |
-| I13 | Block list auto-fetch when op + connected | `src/shell/moderation/BanListPanel.tsx:115` (auto) | FULL | `App.elm:35689` room open, `:18674` op grant, `:5170` welcome | Elm fetches more eagerly (on every room open) |
-| I14 | Refresh list (`MODE #c +b`) | `src/shell/moderation/BanListPanel.tsx:190` (UI adv+) | FULL | `View/Bans.elm:59`, `App.elm:19059` | |
-| I15 | List status strings (loading / refreshing / empty / error / unavailable / idle) | `src/shell/moderation/BanListPanel.tsx:163` (UI adv+) | FULL | `View/Bans.elm:202` | |
-| I16 | Block rows: mask + "Set by" | `src/shell/moderation/BanListPanel.tsx:206` (UI adv+) | FULL | `View/Bans.elm:263` | |
-| I17 | Review lift (unban) with authority recheck | `src/shell/moderation/BanListPanel.tsx:128`, `:135` (UI adv+) | FULL | `View/Bans.elm:285`, `App.elm:18739`, `:18762` | Elm uses a simpler inline confirm with no facts or impact copy; it snapshots account and endpoint |
-| I18 | Server activity log (echoed KICK/MODE, 12 newest) | `src/shell/ModerationCockpit.tsx:366`, `store.ts:18498` (UI adv+) | FULL | `View/Bans.elm:545`, `App.elm:18238`, `:28871` | |
-| I19 | Open-wire `MODE` disclosure | `src/shell/ModerationCockpit.tsx:385` (UI adv+) | FULL | `View/Bans.elm:581` | |
-| I20 | Timed block with auto-lift + extban builder | `store.ts:16415` tempBan (DEAD; the cockpit says "not exposed") | N/A | `View/Bans.elm` `timedBlockReview`, `TimedBlock.check`, `GapPeople.TempBanConfirm` | Elm-only. v3/gap-people: a review step first; match-everyone, match-you and bad-extban masks are refused |
-| I21 | Card moderation controls (Op/Deop, Voice/Devoice, Kick, Ban → review) | `src/shell/PeopleProfileCard.tsx:428` (UI adv+) | FULL | `View/Profile.elm` `moderationControls`, `ModAuthority.cardKinds` | v3/gap-people: gated on the room role the server enforces (rank at or above the target, network-oper protection), not on the experience level |
-| I22 | "Experience level" pref (gates desk actions and card moderation) | `src/shell/PreferencesPanel.tsx:3555` (UI) | N/A | `Prefs.elm` `experienceMode` (still loaded, no longer read by any gate) | v3/gap-people: nothing in Elm needs an experience level now that moderation is role-gated, so no control was added; the stored value is kept for the shared preferences key |
-| I23 | Raw moderation slash verbs (`/kick` `/mode` `/invite nick` …) | `store.ts:8529` raw fallthrough (slash) | FULL | `App.elm:39055`, `:11164` | |
-| I24 | Operator desk entry | `src/shell/ContextRail.tsx:134` (inside the adv+ Show at :123), `AppShell.tsx:1627` (UI adv+, needs a room) | FULL | `View/Topbar.elm:48`, `View/ModDesk.elm:77`, `App.elm:42493` | Elm puts it on the global topbar with no room or mode needed |
-| I25 | Oper authority rail (role, network, signed-in nick) | `src/shell/OperDesk.tsx:115` (UI) | FULL | `View/ModDesk.elm:204` | Network is hard-coded "Onyx"; Solid uses the ISUPPORT `networkName` |
-| I26 | Announce (`EVENT BROADCAST`), counter, review | `src/shell/OperDesk.tsx:142` (UI) | FULL | `View/ModDesk.elm:243` | |
-| I27 | Event Spine subscribe / unsubscribe by category | `src/shell/OperDesk.tsx:171`, `:192` (UI) | FULL | `View/ModDesk.elm:266`, `:283` | |
-| I28 | List subscriptions / Show my privileges | `src/shell/OperDesk.tsx:205`, `:213` (UI) | FULL | `View/ModDesk.elm:294`, `:301` | |
-| I29 | Reload node config (`REHASH`, reviewed) | `src/shell/OperDesk.tsx:221` (UI) | FULL | `View/ModDesk.elm:308` | |
-| I30 | Observe mask + List / Clear watches | `src/shell/OperDesk.tsx:233`, `:258` (UI) | FULL | `View/ModDesk.elm:318`, `:339` | |
-| I31 | Disconnect (`KILL`, reason required, reviewed) | `src/shell/OperDesk.tsx:277` (UI) | FULL | `View/ModDesk.elm:355` | |
-| I32 | Inline review with wire preview; fields clear after send | `src/shell/OperDesk.tsx:316`, `:96` (UI) | FULL | `View/ModDesk.elm:410`, `App.elm:17606` | |
-| I33 | Plan errors list + "Sent …" receipt | `src/shell/OperDesk.tsx:136`, `:352` (UI) | FULL | `View/ModDesk.elm:235`, `:392` | |
-| I34 | Oper choke point (refusal toast when oper status is lost) | `store.ts:15725` operAction (auto) | FULL | `App.elm:17643` | |
-| I35 | Oper slash verbs `/broadcast` `/wallops` `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8514` (slash) | FULL | `App.elm:14284`, `:14993` | |
-| I36 | Event console: 25/50/100 limit + Refresh (`EVENT REPLAY JSON ALL n`) | `src/shell/OperEventConsole.tsx:94`, `:70` (UI; also in Account panel `Account.tsx:1108`) | FULL | `View/ModDesk.elm:473`, `App.elm:17678` | Elm has it only in the oper sheet |
-| I37 | Replay status (requested / waiting / n of expected / floor) | `src/shell/OperEventConsole.tsx:122` (UI) | FULL | `View/ModDesk.elm:493` | |
-| I38 | Local category / severity / text filters + empty state | `src/shell/OperEventConsole.tsx:140`, `:207` (UI) | FULL | `View/ModDesk.elm:540`, `:584` | |
-| I39 | Structured event rows | `src/shell/OperEventConsole.tsx:184` (UI) | FULL | `View/ModDesk.elm:576`, `:606` | |
-| I40 | Recent spine-tagged prose notices (last 40) | `src/shell/OperEventConsole.tsx:213` (UI) | MISSING | none | Elm keeps no `serviceNotices` list |
+| I1 | Room desk entry point | `src/shell/ContextRail.tsx:127`, `src/shell/AppShell.tsx:1622` (UI adv+) | FULL | `View/RoomHeader.elm:291` More menu, `View/ModDesk.elm:59 moderationToggle`, `App.elm:46825 ModerationSheetOpen` | Elm opens for ops in every experience mode, which Solid does not; members get the read-only desk (I2) |
+| I2 | Read-only desk view for non-moderators (fallback copy + mode state) | `src/shell/ModerationCockpit.tsx:279` (UI adv+) | FULL | `View/Bans.elm:28 banPanel` (read-only branch `:36`, `readOnlySafeguards` `:768`, `readOnlyModerators` `:802`), `View/ModDesk.elm:59 moderationToggle`, `App.elm:46825 ModerationSheetOpen` | v3/gap-people: members open it from More as “Room safety” (safeguards, who moderates, open-wire state); `ModerationSheetOpen` admits room members |
+| I3 | Authority rail (Connected / Moderator / Last room update) + boundary note | `src/shell/ModerationCockpit.tsx:253` (UI adv+) | FULL | `View/Bans.elm:393 deskRail` (Moderator `:405`, Last room update `:409`) | Moderator is hard-coded “Yes” because the sheet is op-gated |
+| I4 | Offline coaching line | `src/shell/ModerationCockpit.tsx:273` (UI adv+) | FULL | `View/Bans.elm:418` |  |
+| I5 | Safeguard toggles +m / +i / +t with On/Off state | `src/shell/ModerationCockpit.tsx:280`, `:162` (UI adv+) | FULL | `View/Bans.elm:426 deskToggles`, `App.elm:46787 ModerationDeskToggleMode` |  |
+| I6 | Invite someone (`INVITE nick chan`) + "People here" hint | `src/shell/ModerationCockpit.tsx:296`, `:167` (UI adv+) | FULL | `View/Bans.elm:477 deskInviteForm`, `:847 deskCandidates`, `App.elm:46765 ModerationDeskSubmitInvite` | Elm sorts candidates alphabetically; Solid keeps join order |
+| I7 | Member action form (member + mode-gated action + optional reason) → review | `src/shell/ModerationCockpit.tsx:308` (UI adv+) | FULL | `View/Bans.elm:557 deskMemberFormBody`, `ModAuthority.elm:57 deskKinds`, `App.elm:46690 ModerationDeskSubmitMember` | v3/gap-people: the form hides for non-moderators and the submit refuses kinds the role cannot stage |
+| I8 | Block an address mask → review | `src/shell/ModerationCockpit.tsx:352` (UI adv+) | FULL | `View/Bans.elm:517 deskBanForm`, `App.elm:46733 ModerationDeskSubmitBan` | The review refuses masks that match everyone or you (`Moderation.elm:524`, `:638`) |
+| I9 | Review-first modal (errors, Permission/Scope/Receipt facts, summary, impact, blocked reason) | `src/shell/moderation/ModerationActionReview.tsx:322` (UI) | FULL | `View/Profile.elm:865 moderationReview`, `View.elm:360` (app root; the desk renders its own copy, `View/ModDesk.elm:156`), `App.elm:47177 ModerationConfirm` |  |
+| I10 | Review invalidated on authority change (account/server/client/device) and room switch | `src/shell/ModerationCockpit.tsx:140`, `:184` (auto) | PARTIAL | `App.elm:47177 ModerationConfirm`, `:21855 UnbanReview` / `:21889 confirmUnbanReview`, `:10029` (dropped on an identity change) | Only the unban review snapshots account and endpoint. A staged member or mask draft (`moderationDraft`) keeps no snapshot and is not cleared on a room switch or identity change; confirm still re-checks live connection, op status in the draft’s own room and rank |
+| I11 | Dispatch reviewed action (KICK, MODE ±b/±o/±v) | `src/lib/moderation/applyMemberModeration.ts:7` (UI) | FULL | `App.elm:12513 applyModerationAction` |  |
+| I12 | Validation rules (self-moderation, match-everyone mask, caps, control chars) | `src/lib/moderation/actionModel.ts:97` (UI) | FULL | `Moderation.elm:193 validateDraft`, `:524 isDangerousBanMask`, `:638 isSelfBanMask` | Copy is verbatim |
+| I13 | Block list auto-fetch when op + connected | `src/shell/moderation/BanListPanel.tsx:115` (auto) | FULL | `App.elm:39460` room open (`requestBanList`), `:21801 fetchBansOnOpGrant` (called `:5192`), `:5529` welcome | Elm fetches more eagerly (on every room open) |
+| I14 | Refresh list (`MODE #c +b`) | `src/shell/moderation/BanListPanel.tsx:190` (UI adv+) | FULL | `View/Bans.elm:71`, `App.elm:22186 requestBanList` |  |
+| I15 | List status strings (loading / refreshing / empty / error / unavailable / idle) | `src/shell/moderation/BanListPanel.tsx:163` (UI adv+) | FULL | `View/Bans.elm:282 statusLine` |  |
+| I16 | Block rows: mask + "Set by" | `src/shell/moderation/BanListPanel.tsx:206` (UI adv+) | FULL | `View/Bans.elm:343 banRow` |  |
+| I17 | Review lift (unban) with authority recheck | `src/shell/moderation/BanListPanel.tsx:128`, `:135` (UI adv+) | FULL | `View/Bans.elm:365 reviewDialog`, `App.elm:21866 requestUnbanReview`, `:21889 confirmUnbanReview` | Elm uses a simpler inline confirm with no facts or impact copy; it snapshots account and endpoint |
+| I18 | Server activity log (echoed KICK/MODE, 12 newest) | `src/shell/ModerationCockpit.tsx:366`, `store.ts:18498` (UI adv+) | FULL | `View/Bans.elm:644 deskActivity`, `App.elm:21365 addModerationEntry` (echo folds `:32576` KICK, `:33086`–`:33154` MODE) |  |
+| I19 | Open-wire `MODE` disclosure | `src/shell/ModerationCockpit.tsx:385` (UI adv+) | FULL | `View/Bans.elm:680 protocolDisclosure` |  |
+| I20 | Timed block with auto-lift + extban builder | `store.ts:16415` tempBan (DEAD; the cockpit says "not exposed") | N/A | `View/Bans.elm:94 addFormFields`, `TimedBlock.elm:54 check`, `App.elm:23585 requestTempBan` / `:23681 validateBanAdd` / `:23756 reviewBanAdd`, `ports.js:8205` | Elm-only (Solid’s `tempBan` is dead). v3/rx-sheets + v3/gap-people: a review step first; match-everyone, match-you and bad-extban masks are refused. The auto-lift is a timer in the open tab (`tempBans` is not persisted): a reload or closed tab leaves the block in place until a moderator lifts it (see Gaps) |
+| I21 | Card moderation controls (Op/Deop, Voice/Devoice, Kick, Ban → review) | `src/shell/PeopleProfileCard.tsx:428` (UI adv+) | FULL | `View/Profile.elm:796 moderationControls`, `ModAuthority.elm:116 cardKinds`, `App.elm:52526 moderationCardKinds`, `View/Chanserv.elm:1372 muteButton` | v3/gap-people: gated on the room role the server enforces (rank at or above the target, network-oper protection), not on the experience level. v3/gap-chanserv adds Mute (+Z) beside Kick/Ban |
+| I22 | "Experience level" pref (gates desk actions and card moderation) | `src/shell/PreferencesPanel.tsx:3555` (UI) | N/A | `Prefs.elm:423 experienceMode` (stored, read by no gate), `Moderation.elm:179 kindsForMode` (only `ModerationTest` calls it) | v3/gap-people: nothing in Elm needs an experience level now that moderation is role-gated, so no control was added; the stored value is kept for the shared preferences key. `kindsForMode` and its doc comment are dead |
+| I23 | Raw moderation slash verbs (`/kick` `/mode` `/invite nick` …) | `store.ts:8529` raw fallthrough (slash) | FULL | `App.elm:12966 planSlash` (`/kick` `:13117`, `/invite` `:13145`, `/op` … `/unban` `:13179`–`:13195`), raw fall-through `:13410 sendRawSlashCommand` | v3/gap-commands: `/kick /ban /unban /op /deop /voice /devoice /invite nick` are translated to KICK / MODE / INVITE with room inference and usage hints; `/mode` and other verbs still go out as raw uppercase IRC, as in Solid |
+| I24 | Operator desk entry | `src/shell/ContextRail.tsx:134` (inside the adv+ Show at :123), `AppShell.tsx:1627` (UI adv+, needs a room) | FULL | `View/Topbar.elm:48`, `View/ModDesk.elm:104 operToggle`, `App.elm:46844 OperDeskOpen`, `:20608 runSlashDesk` | Elm puts it on the global topbar with no room or mode needed; v3/gap-oper adds `/desk [tab]` |
+| I25 | Oper authority rail (role, network, signed-in nick) | `src/shell/OperDesk.tsx:115` (UI) | FULL | `View/ModDesk.elm:228 operDesk` (role `:243`, network `:247`), `Isupport.elm:316` | Network is hard-coded “Onyx”; Solid uses the ISUPPORT `networkName`. `model.isupport.network` is parsed but no view reads it |
+| I26 | Announce (`EVENT BROADCAST`), counter, review | `src/shell/OperDesk.tsx:142` (UI) | FULL | `View/ModDesk.elm:389 announceForm`, `App.elm:17029 planOperAction` | v3/gap-oper: now under Live > “Announce to operators”; the broadcast is staged for review (`destructive = True`) |
+| I27 | Event Spine subscribe / unsubscribe by category | `src/shell/OperDesk.tsx:171`, `:192` (UI) | FULL | `View/OperFeedPanel.elm:32 followPanel`, `OperConsole.elm:682 FollowToggle`, `OperPlan.elm:636 Follow`, `App.elm:17135 runSlashOper` (`/events`) | v3/gap-oper: one chip per category (`EVENT ADD/DEL`, sent at once, no review) plus a quietest-severity picker (`EVENT SEVERITY`); `/events add\|del` still works |
+| I28 | List subscriptions / Show my privileges | `src/shell/OperDesk.tsx:205`, `:213` (UI) | FULL | `View/ModDesk.elm:529` (Show my privileges, Network tab), `OperConsole.elm:593 Opened` (auto `EVENT LIST`), `View/OperFeedPanel.elm:32` | v3/gap-oper: the subscription list loads itself when the desk opens and reads as “Following n of m”; there is no manual List button (`/events list` remains) |
+| I29 | Reload node config (`REHASH`, reviewed) | `src/shell/OperDesk.tsx:221` (UI) | FULL | `View/ModDesk.elm:537` (Network > This node), `App.elm:17029 planOperAction` (REHASH `destructive = True`) | Reviewed before it sends |
+| I30 | Observe mask + List / Clear watches | `src/shell/OperDesk.tsx:233`, `:258` (UI) | FULL | `View/ModDesk.elm:449` (Network > Watch someone), `:471` List, `:479` Clear |  |
+| I31 | Disconnect (`KILL`, reason required, reviewed) | `src/shell/OperDesk.tsx:277` (UI) | FULL | `View/ModDesk.elm:490` (Network > Disconnect someone) | Reason required; reviewed |
+| I32 | Inline review with wire preview; fields clear after send | `src/shell/OperDesk.tsx:316`, `:96` (UI) | FULL | `View/ModDesk.elm:881 reviewBlock`, `App.elm:20487 confirmOperDesk` | The review sits above the tabs, so it shows on every tab; changes staged by the tabbed console use their own review (`View/OperKit.elm:235`) |
+| I33 | Plan errors list + "Sent …" receipt | `src/shell/OperDesk.tsx:136`, `:352` (UI) | PARTIAL | `View/ModDesk.elm:275` (errors), `:561` (“Sent …”, Network tab only) | Plan errors show above the tabs, but the “Sent …” receipt renders only on the Network tab, so an announce sent from the Live tab shows none (the server does not acknowledge `EVENT BROADCAST`) |
+| I34 | Oper choke point (refusal toast when oper status is lost) | `store.ts:15725` operAction (auto) | FULL | `App.elm:20524 dispatchOperDesk`, `:20608 runSlashDesk` | Refusal toast “Operator access required” |
+| I35 | Oper slash verbs `/broadcast` `/wallops` `/kill` `/rehash` `/privs` `/events` `/observe` | `store.ts:8514` (slash) | FULL | `App.elm:17135 runSlashOper`, registry `:15685`–`:15691` | `/desk` (open on a tab) and `/appeal` are v3/gap-oper additions |
+| I36 | Event console: 25/50/100 limit + Refresh (`EVENT REPLAY JSON ALL n`) | `src/shell/OperEventConsole.tsx:94`, `:70` (UI; also in Account panel `Account.tsx:1108`) | FULL | `View/ModDesk.elm:943` (Live > Earlier events, `eventConsole` `:921`), `App.elm:20561 requestOperEventReplay` | Elm has it only in the oper sheet |
+| I37 | Replay status (requested / waiting / n of expected / floor) | `src/shell/OperEventConsole.tsx:122` (UI) | FULL | `View/ModDesk.elm:965` |  |
+| I38 | Local category / severity / text filters + empty state | `src/shell/OperEventConsole.tsx:140`, `:207` (UI) | FULL | `View/ModDesk.elm:1011` filters, `:1055` empty; live-feed filters `View/OperFeedPanel.elm:135` | v3/gap-oper: the Live feed has its own category / severity / text filters, pause and clear |
+| I39 | Structured event rows | `src/shell/OperEventConsole.tsx:184` (UI) | FULL | `View/ModDesk.elm:1050`, `:1077 eventRow`; live rows `View/OperFeedPanel.elm:135 feedPanel` |  |
+| I40 | Recent spine-tagged prose notices (last 40) | `src/shell/OperEventConsole.tsx:213` (UI) | PARTIAL | `View/ModDesk.elm:1060` (empty copy), `View/OperFeedPanel.elm:135 feedPanel`, `View/GapShell.elm:57 activitySheet` | Elm keeps no `serviceNotices` list and the desk shows no spine-hint prose rows. The same traffic arrives as parsed Event Spine rows in the Live feed (400-row ring) and as raw server notices in the Activity sheet (500 lines). The empty copy “No recent spine-tagged notices yet.” under Earlier events names a list that does not exist |
 | I41 | `OPER` login / oper panel | `store.ts:15717` (DEAD) | N/A | — | No OPER verb (491) by design |
-| I42 | Roster grouped by role in learned PREFIX order, with counts | `src/shell/MemberList.tsx:317`, `lib/memberGroups.ts:105` (UI) | FULL | `Roster.elm:47`, `View/Roster.elm:237` | |
-| I43 | Presence: away dim, presence dot, Away word | `src/shell/MemberList.tsx:197` (UI) | FULL | `Roster.elm:77`, `View/Roster.elm:319` | Elm adds a separate collapsible Away section |
-| I44 | Role badge glyph (@ + etc.) | `src/shell/MemberList.tsx:220` (UI) | FULL | `View/Roster.elm:271` | By design Elm shows words only; mode letters never render |
-| I45 | Filter field, Escape clears, v/t count, "No members match" | `src/shell/MemberList.tsx:594`, `:601`, `:571`, `:647` (UI) | FULL | `View/Roster.elm:194`, `:224`, `:161`, `App.elm:41722` | Elm folds the filter into an icon at ≤20 members |
-| I46 | Windowed / virtualized roster for large rooms | `src/shell/MemberList.tsx:345`, `memberWindow.ts` (auto) | FULL | `View/Roster.elm` `rosterBody`, `RosterWindow` | v3/gap-people: each group paints 120 rows then "Show more" (300 at a time); headings keep real counts, Away stays collapsible, the filter searches everyone, `content-visibility` skips off-screen rows |
-| I47 | Loading skeleton + "sync" refreshing label | `src/shell/MemberList.tsx:629`, `:559` (UI) | MISSING | none | No `rosterSyncing` state in Elm |
-| I48 | Room ledger link in roster header | `src/shell/MemberList.tsx:551` (UI) | MISSING | none | The ledger link is available in the card (I62) |
-| I49 | Mobile roster drawer (dialog, close, "N here", "Find someone") | `src/shell/MemberList.tsx:523`, `:578`, `:595` (UI) | FULL | `View/Roster.elm:70`, `:124`, `:182` | Popover sheet below 1100px; copy differs |
-| I50 | Double-click row → DM (no-op on self) | `src/shell/MemberList.tsx:181` (UI) | FULL | `View/Roster.elm:301` | Elm adds a per-row Message icon (`:347`) |
-| I51 | Row → people card; card also from facepile | `src/shell/MemberList.tsx:175`, `Facepile.tsx:112` (UI) | FULL | `View/Roster.elm:309`, `View/RoomHeader.elm:547`, `App.elm:42058` | |
-| I52 | Card identity: display name (override > published > nick), pronouns, Away, about | `src/shell/PeopleProfileCard.tsx:85`, `:276` (UI) | FULL | `View/Profile.elm:375`, `:399` | |
-| I53 | Card "Guest" badge + account row | `src/shell/PeopleProfileCard.tsx:96`, `:301` (UI) | FULL | `PeerAccount.foldMessage`, `View/Profile.elm` `cardFor` | v3/gap-people: accounts fold from extended-join, account-notify, account-tag, the roster WHOX (`WHO #room %tcnfa,616`) and WHOIS 330 |
-| I54 | Card Message (blocked peer → toast) | `src/shell/PeopleProfileCard.tsx:157` (UI) | FULL | `View/Profile.elm:561`, `App.elm:42142` | |
-| I55 | Card Mention (append to room composer + toast) | `src/shell/PeopleProfileCard.tsx:174` (UI) | FULL | `View/Profile.elm:569`, `App.elm:42064` | Elm also switches to the room |
-| I56 | Card Block (confirm) / Unblock (toast) | `src/shell/PeopleProfileCard.tsx:250` (UI) | FULL | `View/Profile.elm:578`, `:588` | Elm's unblock toast has Undo |
-| I57 | Card Report → report sheet | `src/shell/PeopleProfileCard.tsx:264` (UI) | FULL | `View/Profile.elm:596` | |
-| I58 | Advanced: account, room role, network oper role, hostmask | `src/shell/PeopleProfileCard.tsx:374` (UI) | FULL | `View/Profile.elm:620` | |
-| I59 | Copy name + toast | `src/shell/PeopleProfileCard.tsx:191` (UI) | FULL | `View/Profile.elm:698`, `App.elm:42126`, `:39931` | |
-| I60 | Network profile (card → WHOIS sheet) | `src/shell/PeopleProfileCard.tsx:204` (UI) | FULL | `View/Profile.elm:705`, `App.elm:42136` | |
-| I61 | `/whois nick` (+ usage toast) | `store.ts:8494` (slash) | FULL | `App.elm:14627` | |
-| I62 | WHOIS sheet: summary, loading, error, empty note | `src/shell/WhoisSheet.tsx:107` (UI) | FULL | `View/Profile.elm:26`, `:68`, `:92` | |
-| I63 | WHOIS details: account/name/identity/host/node/role/away/idle/signed-on/transport/cert/rooms+ledger/notes | `src/shell/WhoisSheet.tsx:137` (UI) | FULL | `View/Profile.elm:114`, `:240`, `:283` | Signed-on shows ISO UTC, not locale |
-| I64 | WHOIS request timeout | `store.ts:9862` (auto) | FULL | `App.elm:10900`, `:42046` | |
-| I65 | Block confirm sheet → device ignore + quiet toast | `src/shell/people/PersonSafetySheet.tsx:69` (UI) | FULL | `View/Profile.elm:976`, `App.elm:42241` | |
-| I66 | Report: reasons, optional note (500), guest flag | `src/shell/people/PersonSafetySheet.tsx:154` (UI) | FULL | `View/Profile.elm:990`, `:1027` | |
-| I67 | Report submit: owner receipt, offline warn, JOIN #root + append + navigate | `src/shell/people/PersonSafetySheet.tsx:81` (UI) | FULL | `App.elm:10787`, `ports.js:6434` | |
+| I42 | Roster grouped by role in learned PREFIX order, with counts | `src/shell/MemberList.tsx:317`, `lib/memberGroups.ts:105` (UI) | FULL | `Roster.elm:47 groupMembers`, `View/Roster.elm:106 rosterBody`, `:265 rosterGroup` |  |
+| I43 | Presence: away dim, presence dot, Away word | `src/shell/MemberList.tsx:197` (UI) | FULL | `Roster.elm:77 presenceGroups`, `View/Roster.elm:331 rosterRow` (dot `:387`) | Elm adds a separate collapsible Away section |
+| I44 | Role badge glyph (@ + etc.) | `src/shell/MemberList.tsx:220` (UI) | FULL | `View/Roster.elm:331 rosterRow` (role words `:403`), `Roster.elm:168 rowSummary` | By design Elm shows words only; mode letters never render |
+| I45 | Filter field, Escape clears, v/t count, "No members match" | `src/shell/MemberList.tsx:594`, `:601`, `:571`, `:647` (UI) | FULL | `View/Roster.elm:222 filterField`, `:252 escapeClears`, `:189 header` (count), `:137` (no match), `App.elm:45974 MemberFilterInput` | Elm folds the filter into an icon at ≤20 members |
+| I46 | Windowed / virtualized roster for large rooms | `src/shell/MemberList.tsx:345`, `memberWindow.ts` (auto) | FULL | `View/Roster.elm:265 rosterGroup`, `:311 showMore`, `RosterWindow.elm:40 limitFor` / `:53 window`, `App.elm:52809 RosterShowMore`, `css/gap-people.css:22` | v3/gap-people: each group paints 120 rows then “Show more” (300 at a time), where Solid scrolls a 96-row window; headings keep real counts, Away stays collapsible, the filter searches everyone, limits reset on a room or filter change, `content-visibility` skips off-screen rows. `GapPeopleTest` “windowed member list” |
+| I47 | Loading skeleton + "sync" refreshing label | `src/shell/MemberList.tsx:629`, `:559` (UI) | MISSING | none | No `rosterSyncing` state; a room still joining reads “No one here yet” (`View/Roster.elm:127`) until NAMES lands |
+| I48 | Room ledger link in roster header | `src/shell/MemberList.tsx:551` (UI) | FULL | `View/GapShell.elm:412` (More > Room ledger), `View/RoomSettings.elm:1092`, `View/Profile.elm:739` | v3/gap-shell: not in the roster header; the link lives in the room More menu, Room settings > Insights and the member card |
+| I49 | Mobile roster drawer (dialog, close, "N here", "Find someone") | `src/shell/MemberList.tsx:523`, `:578`, `:595` (UI) | FULL | `View/Roster.elm:67 roster` (popover `:77`), `:151 membersToggle`, `:189 header`, `ports.js:4593` (Alt+M) | Popover sheet below 1100px; copy differs (“Filter members”, no “N here” or “Find someone”); Alt+M opens it (narrow) or focuses it (wide), as in Solid (v3/gap-commands) |
+| I50 | Double-click row → DM (no-op on self) | `src/shell/MemberList.tsx:181` (UI) | FULL | `View/Roster.elm:361` (double-click), `:416` (Message icon) | Elm adds a per-row Message icon |
+| I51 | Row → people card; card also from facepile | `src/shell/MemberList.tsx:175`, `Facepile.tsx:112` (UI) | FULL | `View/Roster.elm:375`, `View/RoomHeader.elm:569`, `App.elm:46401 UserProfileOpened` |  |
+| I52 | Card identity: display name (override > published > nick), pronouns, Away, about | `src/shell/PeopleProfileCard.tsx:85`, `:276` (UI) | FULL | `View/Profile.elm:381 cardFor` (override > published > nick, pronouns, away, about) |  |
+| I53 | Card "Guest" badge + account row | `src/shell/PeopleProfileCard.tsx:96`, `:301` (UI) | FULL | `PeerAccount.elm:184 foldMessage`, `App.elm:52482 foldPeopleWire`, `:5138` (roster WHOX), `View/Profile.elm:558` (Guest) | v3/gap-people: accounts fold from extended-join, account-notify, account-tag, the roster WHOX (`WHO #room %tcnfa,616`) and WHOIS 330; a peer nothing has reported still reads “Guest”, as in Solid |
+| I54 | Card Message (blocked peer → toast) | `src/shell/PeopleProfileCard.tsx:157` (UI) | FULL | `View/Profile.elm:591`, `App.elm:46485 MemberMessage` |  |
+| I55 | Card Mention (append to room composer + toast) | `src/shell/PeopleProfileCard.tsx:174` (UI) | FULL | `View/Profile.elm:599`, `App.elm:46407 MemberMention` | Elm also switches to the room |
+| I56 | Card Block (confirm) / Unblock (toast) | `src/shell/PeopleProfileCard.tsx:250` (UI) | FULL | `View/Profile.elm:608` (Unblock) / `:618` (Block), `App.elm:34840 UnignoreUser`, `:46584 SafetyConfirmBlock` | Elm’s unblock toast has Undo |
+| I57 | Card Report → report sheet | `src/shell/PeopleProfileCard.tsx:264` (UI) | FULL | `View/Profile.elm:626` |  |
+| I58 | Advanced: account, room role, network oper role, hostmask | `src/shell/PeopleProfileCard.tsx:374` (UI) | FULL | `View/Profile.elm:649 advancedRows` |  |
+| I59 | Copy name + toast | `src/shell/PeopleProfileCard.tsx:191` (UI) | FULL | `View/Profile.elm:727`, `App.elm:46469 MemberCopyNick`, `:44121` |  |
+| I60 | Network profile (card → WHOIS sheet) | `src/shell/PeopleProfileCard.tsx:204` (UI) | FULL | `View/Profile.elm:734`, `App.elm:46479 MemberCardWhois` |  |
+| I61 | `/whois nick` (+ usage toast) | `store.ts:8494` (slash) | FULL | `App.elm:17477` |  |
+| I62 | WHOIS sheet: summary, loading, error, empty note | `src/shell/WhoisSheet.tsx:107` (UI) | FULL | `View/Profile.elm:39 sheetFor`, `:74 profileSummary`, `:97 profileStatus`, `:119 profileDetails` | v3/gap-usermodes adds an offline person’s last-seen (WHOWAS/SEEN) block to the sheet (`View/UserModes.elm:988 offlineBlock`) |
+| I63 | WHOIS details: account/name/identity/host/node/role/away/idle/signed-on/transport/cert/rooms+ledger/notes | `src/shell/WhoisSheet.tsx:137` (UI) | FULL | `View/Profile.elm:119 profileDetails`, field helpers `:164`–`:307` | Signed-on shows ISO UTC, not locale |
+| I64 | WHOIS request timeout | `store.ts:9862` (auto) | FULL | `App.elm:12488 requestWhois` (timer `:12504`), `:6534 settleWhoisTimeout`, `:46389`, `ports.js:8220`; `whoisTimeout.smoke.mjs` |  |
+| I65 | Block confirm sheet → device ignore + quiet toast | `src/shell/people/PersonSafetySheet.tsx:69` (UI) | FULL | `View/Profile.elm:1015 personSafetySheet`, `App.elm:46584 SafetyConfirmBlock` | Writes the device list only. v3/gap-usermodes’ opt-in server SILENCE mirror (`App.elm:48093 userModesMirrorIgnore`) runs for `/ignore`, the message menu and undo but not for this confirm (see Gaps) |
+| I66 | Report: reasons, optional note (500), guest flag | `src/shell/people/PersonSafetySheet.tsx:154` (UI) | FULL | `View/Profile.elm:1015`–`:1066`, `PersonSafety.elm:42` |  |
+| I67 | Report submit: owner receipt, offline warn, JOIN #root + append + navigate | `src/shell/people/PersonSafetySheet.tsx:81` (UI) | FULL | `App.elm:12372 submitParsedReport`, `ports.js:7823` |  |
 | I68 | Report-receipt viewer | `lib/people/personReportReceipt.ts:56` (DEAD) | N/A | — | Neither client reads receipts back |
-| I69 | Ignore list manager (add/remove, undo) | `src/shell/IgnoredUsersControl.tsx:86` via `YouSettings.tsx:129` (UI) | FULL | `View/Notify.elm:442`, `:499`, `App.elm:11264` | |
-| I70 | Message-menu Ignore / Unignore | `src/shell/message/MessageMenu.tsx:926` (UI) | FULL | `View/Thread.elm:1794` | |
-| I71 | `/ignore` (bare lists) / `/unignore` | `store.ts:8160` (slash) | FULL | `App.elm:14476`, `:14512` | |
-| I72 | Blocklists (ignored users, muted DMs) scoped per account | `lib/ignoredUsers.ts:50`, `lib/mutedDMs.ts` (auto) | PARTIAL | `ports.js:4374`, `index.html:79` | Elm uses the unscoped key that Solid purges, so Solid users' per-account blocks don't load and the list is shared across accounts |
-| I73 | Blocked-DM compose refusal | `src/shell/Composer.tsx:1158` (auto) | FULL | `App.elm:34476`, `:34500` | |
-| I74 | DM mute / unmute toggle | `src/shell/PresenceRibbon.tsx:1392` (UI) | CORE-ONLY | `App.elm:31136`; no View dispatches `MuteDm`/`UnmuteDm` | Muted-DM suppression still applies (`App.elm:22872`) |
-| I75 | Room care entry (3–30 people) | `src/shell/PresenceRibbon.tsx:1064` (UI) | FULL | `View/Roster.elm:110`, `View/Stewardship.elm:26`, `View/RoomSettings.elm:753` | Opens from the roster footer, not the More menu |
-| I76 | Owner + helpers display | `src/shell/RoomStewardshipSheet.tsx:166`, `:172` (UI) | FULL | `View/Stewardship.elm:149` | No "no owner yet" fallback |
-| I77 | Add helper (MODE +o, cap two) | `src/shell/RoomStewardshipSheet.tsx:197` (UI) | FULL | `View/Stewardship.elm:183`, `App.elm:21382` | Elm uses free text, not a candidate select; the cap appears only on refusal |
-| I78 | Remove helper (MODE -o) | `src/shell/RoomStewardshipSheet.tsx:189` (UI) | FULL | `View/Stewardship.elm:212`, `App.elm:21400` | |
-| I79 | Invite friends from Room care | `src/shell/RoomStewardshipSheet.tsx:248` (UI) | FULL | `View/Stewardship.elm` `inviteSection` | v3/gap-people: Invite friends button opens the invite sheet |
-| I80 | Offer / hand over / cancel transfer (+q / -q) | `src/shell/RoomStewardshipSheet.tsx:262`, `lib/rooms/roomStewardshipActions.ts:71` (UI) | FULL | `RoomTransfer`, `View/Stewardship.elm` `transferSection` | v3/gap-people: the offer now reaches the recipient (`TAGMSG` with `+onyx/room-transfer`, relayed by the server to message-tags clients); Hand it over moves `CHANNEL TRANSFER` (registered rooms) plus `MODE +q`/`-q`. Server gap: no server-side pending-transfer state, so both parties must be online |
-| I81 | Take view: Accept / Not now | `src/shell/RoomStewardshipSheet.tsx:474`, `:486` (UI) | FULL | `View/Stewardship.elm` `takeView`, `App.elm` `foldTransferSignal` | v3/gap-people: the take view opens from the inbox row or the "Room offer" entry at any room size |
-| I82 | Close room (+si) with confirm | `src/shell/RoomStewardshipSheet.tsx:347`, `:371` (UI) | FULL | `View/Stewardship.elm:308`, `App.elm:21520` | |
-| I83 | Delete room (typed name, `CHANNEL DROP` + PART) | `src/shell/RoomStewardshipSheet.tsx:397` (UI) | FULL | `View/Stewardship.elm:350`, `App.elm:21536` | |
-| I84 | Last-member hint + Leave room button | `src/shell/RoomStewardshipSheet.tsx:422`, `:430` (UI) | FULL | `View/Stewardship.elm` `leaveSection` | v3/gap-people: Leave room with a confirm step (last-member and sole-owner consequences) |
-| I85 | Status line, name-mismatch hint, Done | `src/shell/RoomStewardshipSheet.tsx:435`, `:454` (UI) | FULL | `View/Stewardship.elm:95`, `:521`, `:162` | |
-| I86 | Webhooks create / list / delete + recent notices | `src/shell/ChannelSettings.tsx:577`, `:1256` (UI, any op, any size) | FULL | `View/RoomTools.elm` `webhookManager`, `App.elm` `webhookGate` | v3/gap-people: any room host (the server gates WEBHOOK on channel op), any room size, from Room settings > Integrations |
-| I87 | IRCX ACCESS list / add / delete / refresh | `src/shell/ChannelSettings.tsx:513`, `:550`, `:557` (UI) | FULL | `View/RoomSettings.elm:482` | The room-settings slice owns the details |
-| I88 | Friends add / remove + MONITOR presence | `store.ts:9709`, `:9724` (DEAD UI) | N/A | `View/Account2.elm:641`, `App.elm:25464` | Elm-only People sheet |
-| I89 | Watch list add / remove | `store.ts:17210`, `:17223` (DEAD) | N/A | `View/Account2.elm:700` | Elm-only |
-| I90 | Friend quick-add in room formation | `src/shell/CreateRoomFormation.tsx:296` (UI; reads friends that Solid can't add) | MISSING | `View/Formation.elm:10` | Elm now has friends but doesn't use them here |
-| I91 | MONITOR on DM open | `store.ts:8035` (auto) | FULL | `App.elm:35693` | |
-| I92 | Local display-name override (read in card; setter) | `src/shell/PeopleProfileCard.tsx:68` (auto); setter `store.ts:17352` DEAD | FULL | read `View/Profile.elm:399`; setter `App.elm:42616` CORE-ONLY | Neither client has a setter UI |
-| I93 | Nick colour overrides | `store.ts:16551` (DEAD) | N/A | `App.elm:42567` CORE-ONLY | |
-| I94 | Soft-ignore toggle | `store.ts:10390` (DEAD) | N/A | `App.elm:42537` CORE-ONLY | |
-| I95 | User notes | `store.ts:16509` (DEAD) | N/A | none | |
-| I96 | Nick aliases (433 fallback; setter) | `store.ts:14921` (auto); setter `:17196` DEAD | FULL | `App.elm:10139`, `:37809` | No setter UI in either client |
-| I97 | Invisible-mode memory | `store.ts:17423` (DEAD) | N/A | — | |
-| I98 | Announcements panel / audit log / user activity | `store.ts:16608`, `:10134`, `:9787` (auto write, no UI) | N/A | `App.elm:18218` audit CORE-ONLY | |
-| I99 | Legacy moderation panel / profile modals / sort / compact prefs | `store.ts:16327`, `:16967`, `:17297` (DEAD) | N/A | — | |
+| I69 | Ignore list manager (add/remove, undo) | `src/shell/IgnoredUsersControl.tsx:86` via `YouSettings.tsx:129` (UI) | FULL | `View/Notify.elm:481` (list), `:509` (add), `:569` (remove), `:542 View.UserModes.serverBlocks`, `App.elm:13921 submitNotifyIgnore` | v3/gap-usermodes: the same list also shows names blocked on the server and can mirror new blocks there |
+| I70 | Message-menu Ignore / Unignore | `src/shell/message/MessageMenu.tsx:926` (UI) | FULL | `View/Thread.elm:1861` |  |
+| I71 | `/ignore` (bare lists) / `/unignore` | `store.ts:8160` (slash) | FULL | `App.elm:17326` (`/ignore`), `:17344` (`/unignore`), `:17362` (bare list) |  |
+| I72 | Blocklists (ignored users, muted DMs) scoped per account | `lib/ignoredUsers.ts:50`, `lib/mutedDMs.ts` (auto) | FULL | `ports.js:13095 SCOPED_LIST_SPECS` / `:13184 loadScopedLists`, `AccountScope.elm:153 scopeKey`, `App.elm:54022 gapSaveLists` / `:55207 ScopedListsLoaded`, `Main.elm:1442`; `GapAccountAppTest` “list isolation”, `gapAccount.smoke.mjs` | v3/gap-account: lists persist per account scope (network + account, or the shared guest scope). A scope’s first load seeds once from the old plain key and the Solid `…:owner:*` slots, copied and never deleted. The old plain writer is retired |
+| I73 | Blocked-DM compose refusal | `src/shell/Composer.tsx:1158` (auto) | FULL | `App.elm:38231 isBlockedDmTarget`, `:38255 refuseBlockedDm` (callers `:13626`, `:13675`, `:43221`) |  |
+| I74 | DM mute / unmute toggle | `src/shell/PresenceRibbon.tsx:1392` (UI) | FULL | `View/Organize.elm:1008` (DM More menu), `:504 muteEntry` (row menu `:608`), `View/Rail.elm:937`, `App.elm:34863 MuteDm` / `:34908 UnmuteDm` | v3/gap-organize: Mute / Unmute conversation in the DM header’s More menu and the sidebar row menu. Muted-DM suppression still applies (`App.elm:26093`) |
+| I75 | Room care entry (3–30 people) | `src/shell/PresenceRibbon.tsx:1064` (UI) | FULL | `View/Roster.elm:94` (footer), `View/Stewardship.elm:27 roomCareButton`, `App.elm:47675 StewardOpen` | Opens from the roster footer, not the More menu (Room settings no longer links to it). Outside 3–30 people only “Room offer” shows, when the room was offered to you (v3/gap-people) |
+| I76 | Owner + helpers display | `src/shell/RoomStewardshipSheet.tsx:166`, `:172` (UI) | FULL | `View/Stewardship.elm:173` | No “no owner yet” fallback |
+| I77 | Add helper (MODE +o, cap two) | `src/shell/RoomStewardshipSheet.tsx:197` (UI) | FULL | `View/Stewardship.elm:199 helperSection`, `App.elm:24592 requestStewardAddHelper` | Elm uses free text, not a candidate select; the cap appears only on refusal |
+| I78 | Remove helper (MODE -o) | `src/shell/RoomStewardshipSheet.tsx:189` (UI) | FULL | `View/Stewardship.elm:234 helperRow`, `App.elm:24611 requestStewardRemoveHelper` |  |
+| I79 | Invite friends from Room care | `src/shell/RoomStewardshipSheet.tsx:248` (UI) | FULL | `View/Stewardship.elm:251 inviteSection`, `App.elm:52818 StewardInvite` | v3/gap-people: Invite friends button opens the invite sheet |
+| I80 | Offer / hand over / cancel transfer (+q / -q) | `src/shell/RoomStewardshipSheet.tsx:262`, `lib/rooms/roomStewardshipActions.ts:71` (UI) | FULL | `RoomTransfer.elm` (module), `View/Stewardship.elm:333 transferSection`, `App.elm:52609 foldTransferSignal` / `:52585 transferHandoverPlan` / `:52908 settleTransferActions`; `GapPeopleTest` “room handover offers” | v3/gap-people: the offer now reaches the recipient (`TAGMSG` with `+onyx/room-transfer`, relayed by the server to message-tags clients; refused with a status line without that cap). Hand it over moves `CHANNEL TRANSFER` (registered rooms, recipient’s account known) plus `MODE +q`/`-q`. Server gap: no server-side pending-transfer state, so both parties must be online |
+| I81 | Take view: Accept / Not now | `src/shell/RoomStewardshipSheet.tsx:474`, `:486` (UI) | FULL | `View/Stewardship.elm:121 takeView`, `App.elm:52609 foldTransferSignal`, `:52959 settleOfferNotification` | v3/gap-people: the take view opens from the inbox row or the “Room offer” entry at any room size |
+| I82 | Close room (+si) with confirm | `src/shell/RoomStewardshipSheet.tsx:347`, `:371` (UI) | FULL | `View/Stewardship.elm:422 closeSection`, `App.elm:24731 requestStewardCloseRoom` |  |
+| I83 | Delete room (typed name, `CHANNEL DROP` + PART) | `src/shell/RoomStewardshipSheet.tsx:397` (UI) | FULL | `View/Stewardship.elm:464 deleteSection`, `App.elm:24747 requestStewardDeleteRoom`, `:50849 chanservBeginDelete`, `Chanserv.elm:1263 beginDelete` | v3/gap-chanserv: registration-aware (INFO, then `CHANNEL DROP` only for a registered room when signed in), then `+si`, the room is emptied (`CLEAR USERS` for a founder, one KICK each for an owner up to 25 people) and you leave |
+| I84 | Last-member hint + Leave room button | `src/shell/RoomStewardshipSheet.tsx:422`, `:430` (UI) | FULL | `View/Stewardship.elm:277 leaveSection`, `:531 lastMemberHint`, `App.elm:52827 StewardConfirmLeave` | v3/gap-people: Leave room with a confirm step (last-member and sole-owner consequences) |
+| I85 | Status line, name-mismatch hint, Done | `src/shell/RoomStewardshipSheet.tsx:435`, `:454` (UI) | FULL | `View/Stewardship.elm:107 statusLine`, `:544 mismatchHint`, `:167 manageView` (Done) |  |
+| I86 | Webhooks create / list / delete + recent notices | `src/shell/ChannelSettings.tsx:577`, `:1256` (UI, any op, any size) | FULL | `View/RoomTools.elm:24 webhookManager`, `View/RoomSettings.elm:741 integrationsSection`, `App.elm:24784 requestWebhookCreate` / `:52570 webhookGate`; `GapPeopleTest` “webhooks in Room settings” | v3/gap-people: any room host (the server gates WEBHOOK on channel op), any room size, from Room settings > Integrations; members see a “Managed by room hosts” note |
+| I87 | IRCX ACCESS list / add / delete / refresh | `src/shell/ChannelSettings.tsx:513`, `:550`, `:557` (UI) | FULL | `View/RoomSettings.elm:489 accessManager` (op gate `:433`) | The room-settings slice owns the details |
+| I88 | Friends add / remove + MONITOR presence | `store.ts:9709`, `:9724` (DEAD UI) | N/A | `View/Account2.elm:641 friendsSection`, `App.elm:29141 requestFriendAdd` | Elm-only People sheet |
+| I89 | Watch list add / remove | `store.ts:17210`, `:17223` (DEAD) | N/A | `View/Account2.elm:700 watchSection` | Elm-only |
+| I90 | Friend quick-add in room formation | `src/shell/CreateRoomFormation.tsx:296` (UI; reads friends that Solid can't add) | MISSING | `View/Formation.elm:10` (stale comment) | Elm now has friends (I88) but Formation does not read `model.friends`; the comment at `Formation.elm:10` (“no Elm friends store yet”) is stale |
+| I91 | MONITOR on DM open | `store.ts:8035` (auto) | FULL | `App.elm:39465`–`:39474` (`monitorAddContact` on DM open) |  |
+| I92 | Local display-name override (read in card; setter) | `src/shell/PeopleProfileCard.tsx:68` (auto); setter `store.ts:17352` DEAD | FULL | read `View/Profile.elm:404`; setter `App.elm:46972 OverrideSetDisplayName` CORE-ONLY | Neither client has a setter UI |
+| I93 | Nick colour overrides | `store.ts:16551` (DEAD) | N/A | `App.elm:46923 OverrideSetNickColor` CORE-ONLY |  |
+| I94 | Soft-ignore toggle | `store.ts:10390` (DEAD) | N/A | `App.elm:46892 OverrideToggleSoftIgnore` CORE-ONLY |  |
+| I95 | User notes | `store.ts:16509` (DEAD) | N/A | `View/Organize.elm:1123 memberNote` | Solid’s notes are dead. v3/gap-organize gives Elm a live private note on each member card (yours only, kept on this device) |
+| I96 | Nick aliases (433 fallback; setter) | `store.ts:14921` (auto); setter `:17196` DEAD | FULL | `App.elm:10576` (433 fallback), `:41989 NickAliasesLoaded` | No setter UI in either client |
+| I97 | Invisible-mode memory | `store.ts:17423` (DEAD) | N/A | `UserModes.elm:152` (invisible switch) | Solid’s memory is dead. Elm has a live “Invisible to strangers” (+i) switch in Preferences (v3/gap-usermodes) |
+| I98 | Announcements panel / audit log / user activity | `store.ts:16608`, `:10134`, `:9787` (auto write, no UI) | N/A | `App.elm:21345 addAuditEntry` CORE-ONLY |  |
+| I99 | Legacy moderation panel / profile modals / sort / compact prefs | `store.ts:16327`, `:16967`, `:17297` (DEAD) | N/A | — |  |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- **COVERAGE.md:206 (roster) is stale.** It says the roster renders a "decorative prefix glyph plus role in words". The roster renders no glyph: `View/Roster.elm:19` says "Mode letters never render", and `rosterRow` (`:271`) never uses `role.symbol`.
-- **COVERAGE.md:209 names the wrong entry point.** It says the desk opens from an "op-gated topbar **Moderation** button". It now lives in the room header's More menu (`View/RoomHeader.elm:281`); the topbar only carries Operator (`View/Topbar.elm:48`).
-- **COVERAGE.md:209 leaves narrowings out.** It does not say that the timed block sends with no review and no match-everyone or self-mask guard (`App.elm:20427`). It also does not say the standard-mode desk shows an empty action select but still stages a kick (`App.elm:236`, `:42347`).
-- **V3_ROADMAP.md:83 and COVERAGE.md:206 overstate the card moderation controls.** They say the controls "were already ported", but `Moderation.kindsForMode` gates them on `experienceMode`. Elm has no setter for it (`Prefs.elm:449` defaults to standard; there is no View or Msg). COVERAGE.md:213 lists "experience … toggles not surfaced", but no row draws the link to moderation.
-- **COVERAGE.md:198 understates the member card.** It still lists "no Message/Report buttons and no moderation controls". All three now exist (`View/Profile.elm:561`, `:596`, `:765`).
-- **COVERAGE.md:202 overstates ignored users.** It marks them "done" without noting that Elm persists blocklists under the plain `onyx:ignored-users` and `onyx:muted-dms` keys (`ports.js:4374` admits this). Solid scopes them per account and purges the plain key, so existing blocks don't come across.
-- **COVERAGE.md:223 understates the webhook limit.** It says "webhooks link to Room care" but doesn't say that ops who aren't owners, and owners of rooms under 3 or over 30 people, cannot manage webhooks at all.
-- **V3_ROADMAP.md:81, :84, :86, :87 are stale duplicates.** They are leftover not-done rows for 3.4–3.7 that contradict the done rows at :82, :83, :85, :88.
-- **`View/Formation.elm:10` has a stale code comment.** It says there is "no Elm friends store yet", but friends landed in v3/account2 (`App.elm:25464`).
+Doc line numbers are at HEAD `609cb240` (several moved down one line since the map was written).
+- **COVERAGE.md:207 (roster) is still stale.** It says the roster renders a "decorative prefix glyph plus role in words". The roster renders no glyph: `View/Roster.elm` says "Mode letters never render", and `rosterRow` (`:331`) never uses `role.symbol`. Its narrowing "no roster windowing" is also stale now: fixed by v3/gap-people (I46). The "no loading skeleton or sync label" narrowing is still true (I47).
+- **COVERAGE.md:210 (was :209) names the wrong entry point and describes the pre-tab desk.** It says the desk opens from an "op-gated topbar **Moderation** button". It lives in the room header's More menu (`View/RoomHeader.elm:291`), where members get the read-only "Room safety" desk from the same item (v3/gap-people); the topbar carries only Operator (`View/Topbar.elm:48`). Its operator-desk text (announce, Event Spine add/del/list, …) predates v3/gap-oper's seven-tab console (COVERAGE.md:212 has that). Two of its narrowings are wrong: "network name shown as 'Onyx' (no ISUPPORT NETWORK in the model)" — `Isupport.elm:316` parses NETWORK into `model.isupport.network`, the desk just never reads it (`View/ModDesk.elm:247`); "no focus trap" — `View.Sheet` wraps Tab in the topmost sheet (`View/Sheet.elm:27`). "No review-authority snapshot" is still true for member and mask drafts (I10), and "no prose spine-notice rows" is still true (I40).
+- **Fixed by v3/rx-sheets + v3/gap-people: the old "leaves narrowings out" complaint about COVERAGE.md:209.** Was: the timed block sent with no review and no match-everyone or self-mask guard, and the standard-mode desk showed an empty action select yet still staged a kick. Now: the timed block reviews first and refuses unsafe masks (`TimedBlock.elm:54`, `App.elm:23681`), and the desk member form is hidden when the role has no actions (`View/Bans.elm:557`, `App.elm:46690`).
+- **Fixed by v3/gap-people: V3_ROADMAP.md:83 and COVERAGE.md:207 "moderation controls were already ported".** Was false: the controls were gated on `experienceMode`, which Elm had no way to set. They are now role-gated (`ModAuthority.elm:116`). The doc wording is unchanged and is now accurate.
+- **COVERAGE.md:199 (was :198) still understates the member card.** It lists "no Message/Report buttons and no moderation controls". All three exist (`View/Profile.elm:591`, `:626`, `:796`).
+- **Fixed by v3/gap-account: COVERAGE.md:203 (was :202) ignored users "done" without noting the unscoped key.** Was: blocklists persisted under the plain `onyx:ignored-users` / `onyx:muted-dms` keys. Now: per account scope (I72). The doc still says nothing about scoping. In code, the `ports.js:5745` comment (the old `ports.js:4374` "admits this") still says the bridge "persists the validated arrays (plain keys …)"; the `blocklistsSave` subscriber (`ports.js:5748`) is dead because `Main.elm:1442` retired the writer, so the comment is still stale.
+- **COVERAGE.md:226 (was :223) is stale on webhooks.** It says "webhooks link to Room care in its 3–30 band" and that "the Elm webhook folds are steward-owner gated". Fixed in code by v3/gap-people: any room host manages webhooks from Room settings > Integrations in any room size (`View/RoomTools.elm:24`, `App.elm:52570 webhookGate`). The code comment at `App.elm:24779` ("Owner-only webhook verbs … the Room-care sheet is owner-only already") is still stale.
+- **V3_ROADMAP.md:81, :84, :86, :87 are still stale duplicates.** They are leftover not-done rows for 3.4, 3.7, 3.5 and 3.6 that contradict the done rows at :85, :88, :82, :83 (checked at HEAD).
+- **`View/Formation.elm:10` still has a stale code comment.** It says there is "no Elm friends store yet", but friends landed in v3/account2 (`App.elm:29141`).
+- **More stale code comments found at HEAD.** `Moderation.elm:177`–`:179` (`kindsForMode`, "Card moderation controls per experience mode": unused since v3/gap-people, kept alive only by `ModerationTest`); `View/Profile.elm:368` (card doc "Message, Report, and moderation stay later slices behind their missing backends": all three exist); `View/Bans.elm:9` and `View/ModDesk.elm:1`–`:22` (module docs say the desk opens from the op-gated Moderation button and describe the pre-tab oper desk); `View/ModDesk.elm:1060` ("No recent spine-tagged notices yet." names a list that does not exist).
 
 #### Elm better than Solid
-- **Desk reachability.** The room desk and the oper desk open in every experience mode. Solid hides both unless the mode is advanced or network-ops (`ContextRail.tsx:123` wraps the oper desk too). The oper desk sits on the global topbar and needs no open room (`View/Topbar.elm:48`).
-- **People sheet.** Friends and watch list can be added, removed and messaged, with online-first ordering, and friend presence shows on sidebar DM rows (`View/Account2.elm:608`, `View/Rail.elm:493`). Solid's add/remove actions are DEAD.
-- **Timed block and extban builder.** Elm has an auto-lift timed block with a live-validated extban preview (`View/Bans.elm:76`, `:137`). Solid deliberately left these out, so treat this as divergence (see the caveat in I20).
-- **Roster.** Away people gather in one collapsible section, groups are native disclosures, the filter folds away at ≤20 members, rows have a per-row Message button, and your own row is tagged "you" (`Roster.elm:77`, `View/Roster.elm:237`, `:347`).
-- **Card actions.** Unblock gives an Undo toast (`App.elm:31113`), and Mention switches to the room before inserting (`App.elm:42064`).
-- **Block list.** Elm loads it whenever a moderator opens a room, and again after a welcome (`App.elm:35689`, `:5170`), not only while the panel is mounted.
+- **Desk reachability.** The room desk and the oper desk open in every experience mode. Solid hides both unless the mode is advanced or network-ops (`ContextRail.tsx:123` wraps the oper desk too). The oper desk sits on the global topbar and needs no open room (`View/Topbar.elm:48`); `/desk [tab]` opens it on a tab (`App.elm:20608`).
+- **Role-gated moderation.** Card and desk controls follow the room role and rank the server enforces ("Cannot kick a higher-ranked member", network-oper protection), and the review says why one is blocked. Solid gates on an experience level (v3/gap-people, `ModAuthority.elm`, `View/Profile.elm:796`).
+- **Room safety for members.** Members open a read-only desk: safeguards, who moderates, the open-wire mode state (`View/Bans.elm:36`, v3/gap-people).
+- **Operator console.** Seven tabs (`View/ModDesk.elm:344 tabBody`): a Live feed (follow chips, quietest-severity floor, a pausable, rate-limited, filterable ring of 400 rows), Bans (WARD with a "check before banning" preview), Silence (shun, gag, quarantine), Abuse (check a person, clone groups, who is connected), Appeals (answer, audited), Content (word filters, spam traps, held first messages, policy history, raid challenge) and Network (watch, disconnect, privileges, accounts admin, node controls, reports, audit trail). Every state change is planned and reviewed first (`OperConsole.elm`, `OperPlan.elm`, `View/OperTabs.elm`, v3/gap-oper). Solid's desk has only announce, Event Spine subscribe/unsubscribe, KILL, REHASH, PRIVS, OBSERVE and the replay console.
+- **User-side appeals.** `/appeal` and a connect-screen "Ask for a second look" button file an `APPEAL`, even before sign-in (`View/Appeal.elm`, `View/Connect.elm:164`). Solid has no user-side appeal.
+- **People sheet.** Friends and watch list can be added, removed and messaged, with online-first ordering, and friend presence shows on sidebar DM rows (`View/Account2.elm:608`, `View/Rail.elm:582`). Solid's add/remove actions are DEAD.
+- **Timed block and extban builder.** Elm has an auto-lift timed block with a live-validated extban preview, a review step and match-everyone/match-you guards (`View/Bans.elm:94`, `:217`, `TimedBlock.elm:54`). Solid deliberately left these out, so treat this as divergence (see the caveat in I20).
+- **Roster.** Away people gather in one collapsible section, groups are native disclosures, the filter folds away at ≤20 members, rows have a per-row Message button, your own row is tagged "you", and large rooms page with "Show more" and `content-visibility` (`Roster.elm:77`, `View/Roster.elm:265`, `:311`, `:361`).
+- **Card actions.** Unblock gives an Undo toast (`App.elm:34840`), Mention switches to the room before inserting (`App.elm:46407`), Mute (+Z) sits beside Kick/Ban (`View/Chanserv.elm:1372`), and a private note sits on the card (`View/Organize.elm:1123`).
+- **Room handover.** The offer reaches the recipient (a `TAGMSG` carrying `+onyx/room-transfer`) and the hand-over moves the registration (`CHANNEL TRANSFER`) as well as the owner rank (`RoomTransfer.elm`, `App.elm:52908`). Solid's accept-to-take never reaches the other person.
+- **Room care.** Delete room is registration-aware and empties the room; Leave room explains what leaving does; Invite friends is one click (`View/Stewardship.elm:277`, `:251`, `Chanserv.elm:1263`).
+- **Lists follow the account.** Block and mute lists are per account scope and seed once from the device-global key and Solid's owner slots without deleting them (`ports.js:13095`, `AccountScope.elm`). Solid purges the plain key.
+- **Server blocks.** An opt-in switch mirrors new blocks to the server (`SILENCE`) so they follow the account; the block list also shows server-only blocks (`View/Notify.elm:542`, `App.elm:48093`).
+- **Profile depth.** People not in the room can be checked for last-seen (WHOWAS/SEEN) and your own card edits your network name (SETNAME) (`View/UserModes.elm:988`, `:938`).
+- **DM mute.** Mute / Unmute conversation is in the DM header's More menu and the sidebar row menu (`View/Organize.elm:1008`, `View/Rail.elm:937`).
+- **Block list.** Elm loads it whenever a moderator opens a room, and again after a welcome (`App.elm:39460`, `:5529`), not only while the panel is mounted.
 
 #### Gaps (ranked by user impact)
-- `[High]` **Experience level.** Add an "Experience level" segmented control to `View/Prefs.elm` with a new `PrefsSetExperienceMode` Msg that writes `Prefs.experienceMode` and saves through `appearanceStorePrefs`. Alternatively, drop the mode gate on card and desk moderation (`View/Profile.elm:765`, `View/Bans.elm:476`) and gate on `isChannelOp` alone.
-- `[High]` **Per-account blocklists.** Add the owner suffix to `BlocklistsSave` (`ports.js:4376`) and replace the boot-flag read with an owner-scoped `BlocklistsLoaded` reload like `FriendsLoaded`. That way existing Solid `onyx:ignored-users:owner:*` lists load and accounts stay isolated.
-- `[Med]` **DM mute toggle.** Add a "Mute/Unmute conversation" item for DMs to the More menu in `View/RoomHeader.elm`, dispatching `MuteDm`/`UnmuteDm`.
-- `[Med]` **Webhooks for all ops.** Render the webhook forms in `View/RoomSettings.elm` `integrationsSection` when `ctx.isOp`, and gate `requestWebhookCreate`/`List`/`Delete` (`App.elm:21573`) on `isChannelOp` rather than `stewardOwnerMembers`.
-- `[Med]` **Roster windowing.** Window the rows in `View/Roster.elm` using a scroll-offset port plus `Html.Lazy`/`Html.Keyed`, or CSS `content-visibility`, so 4096-member rooms stay smooth.
-- `[Med]` **Peer accounts.** Store the peer account on `App.Member` from extended-join (`foldJoin`, `App.elm:23491`) and from peer `ACCOUNT` lines, then read it in `View/Profile.elm` `cardFor` for the Guest badge and account row.
-- `[Med]` **Room transfer (both clients).** Accept-to-take never reaches the recipient. Add a wire signal (for example a TAGMSG or NOTE offer the recipient folds into `roomTransfers`) or replace the flow with direct `+q` and a review.
-- `[Low]` **Desk action form.** Hide `deskMemberForm` when `kindsForMode` is empty, and in `ModerationDeskSubmitMember` (`App.elm:42347`) refuse kinds that aren't in it.
-- `[Low]` **Timed block safety.** Run `BanAddSubmit` through `Moderation.validateDraft` (match-everyone and self-mask checks) and the review sheet before `requestTempBan`.
-- `[Low]` **Oper prose notices.** Keep a bounded `serviceNotices` list in App and render spine-tagged rows in `View/ModDesk.eventConsole`.
-- `[Low]` **Review snapshot.** Capture `accountName` and `endpoint` in `ModerationPropose`/`ModerationDeskSubmit*`, compare them in `ModerationConfirm`, and clear `moderationDraft` when `activeChannel` changes.
-- `[Low]` **Room care buttons.** Add Invite friends (`InviteShareOpen`) and a last-member Leave button to `View/Stewardship.elm`.
-- `[Low]` **Roster polish.** Add a loading skeleton and "sync" label (needs `rosterSyncing` state) and a ledger link in the `View/Roster.elm` header.
-- `[Low]` **Read-only desk.** Let `ModerationSheetOpen` open for members so the read-only branch at `View/Bans.elm:27` becomes reachable.
-- `[Low]` **Network name.** Show the oper desk network from ISUPPORT `NETWORK`, not "Onyx" (`View/ModDesk.elm:211`).
-- `[Low]` **Formation quick-add.** Add friend chips from `model.friends` to `View/Formation.elm`.
+- `[High]` **Experience level.** **[Closed — v3/gap-people]** Moderation is gated on the room role the server enforces, not on the unsettable experience level, so ops see the controls (`ModAuthority.elm`, I21/I7). Housekeeping left: delete the dead `Moderation.kindsForMode` (`Moderation.elm:179`) and its test.
+- `[High]` **Per-account blocklists.** **[Closed — v3/gap-account]** Block and mute lists persist per account scope and seed once from the plain key and Solid's `…:owner:*` slots (I72, `App.elm:54022`, `ports.js:13184`). Housekeeping left: remove the dead `blocklistsSave` port and its stale `ports.js:5745` comment.
+- `[Med]` **DM mute toggle.** **[Closed — v3/gap-organize]** Mute / Unmute conversation is in the DM header's More menu and the sidebar row menu (I74).
+- `[Med]` **Webhooks for all ops.** **[Closed — v3/gap-people]** Room settings > Integrations hosts the webhook manager for any room host in any room size (I86).
+- `[Med]` **Roster windowing.** **[Closed — v3/gap-people]** Each group paints 120 rows then "Show more", with `content-visibility` and a lazy body (I46).
+- `[Med]` **Peer accounts.** **[Closed — v3/gap-people]** Accounts fold from extended-join, account-notify, account-tag, the roster WHOX and WHOIS 330 (I53).
+- `[Low]` **Room transfer (server gap).** **[Closed for the recipient — v3/gap-people; was Med]** The offer now reaches the other person and the hand-over moves `CHANNEL TRANSFER` + `MODE +q`/`-q` (I80, I81). Still missing: the server keeps no pending-transfer state, so an offer lives only in the two clients' memory (lost on reconnect, both must be online, both need `message-tags`; another app never sees it). A server-held offer/accept step is the real fix; the Elm side needs nothing more.
+- `[Low]` **Desk action form.** **[Closed — v3/gap-people]** The form is hidden when the role has no actions and the submit refuses kinds the role cannot stage (I7).
+- `[Low]` **Timed block safety.** **[Closed — v3/rx-sheets + v3/gap-people]** The form reviews first; match-everyone, match-you and bad-extban masks are refused (I20).
+- `[Low]` **Oper prose notices.** Partly covered (I40). The Live feed carries parsed spine rows and the Activity sheet keeps raw server notices, but the desk has no spine-hint prose list and its empty copy still names one. Either drop the “No recent spine-tagged notices yet.” copy (`View/ModDesk.elm:1060`) or keep a bounded `serviceNotices` list for `View/ModDesk.eventConsole`.
+- `[Low]` **Review snapshot.** Open (I10). Capture `accountName` and `endpoint` in `ModerationPropose` / `ModerationDeskSubmit*`, compare them in `ModerationConfirm` (`App.elm:47177`), and clear `moderationDraft` on a room switch or identity change (`App.elm:9919 quarantineOwnerChange` already drops the unban review only).
+- `[Low]` **Room care buttons.** **[Closed — v3/gap-people]** Invite friends and Leave room (with confirm) are in `View/Stewardship.elm` (I79, I84).
+- `[Low]` **Roster polish.** The ledger link is **[Closed — v3/gap-shell]** (room More menu, Room settings, card; I48). Still open: a loading skeleton and "sync" label (needs `rosterSyncing` state; I47).
+- `[Low]` **Read-only desk.** **[Closed — v3/gap-people]** Members open it as "Room safety" (I2).
+- `[Low]` **Network name.** Open (I25). Show `model.isupport.network` instead of the literal "Onyx" at `View/ModDesk.elm:247` (the field is already parsed, `Isupport.elm:316`).
+- `[Low]` **Formation quick-add.** Open (I90). Add friend chips from `model.friends` to `View/Formation.elm`, and fix the stale comment at `:10`.
+- `[Med]` **Timed-block lift is tab-lifetime (new).** The auto-lift is a `setTimeout` in the open tab (`ports.js:8205`; `tempBans` is not persisted). Reloading or closing the tab, or hopping to another endpoint or account, leaves the block in place until a moderator lifts it, while the review says “It lifts on its own when the time is up” (`View/Bans.elm:214 banAddReviewCopy`). The server cannot time a ban (`TEMPMODE` takes boolean flags only, `Chanserv.elm:91`). Fix: persist `(room, mask, due time, owner)` and replay due lifts when the moderator is next live in the room, and say in the review that the tab must stay open until that exists.
+- `[Med]` **Card Block skips the server block mirror (new).** The opt-in "Also block on the server" switch promises that new blocks follow the account, but the card's Block confirm (`App.elm:46584 SafetyConfirmBlock`) writes only the device list; `/ignore`, the message menu and undo go through `userModesMirrorIgnore` (`App.elm:48093`, called from `:34838`, `:34861`). The "Block n listed names on the server too" button is the manual catch-up. Fix: call `userModesMirrorIgnore True nick` from `SafetyConfirmBlock`.
+- `[Low]` **Announce receipt (new).** The “Sent …” line (`desk.lastSent`) renders only on the Network tab (`View/ModDesk.elm:561`), so an announce from the Live tab shows no receipt and the server sends no acknowledgement. Fix: render it under the announce form (`View/ModDesk.elm:389`) or write it into the Live tab's replies log.
 
 ### G — Connect, account, security, identity, E2EE UX
 Solid, all read in full: `src/app/Connect.tsx` (every mode, field, aside and action), `connectPageLifecycle.ts`, `StaleChunkRecovery.tsx`, `ConnectPulse.tsx` (no importer), `nodes.ts`, `Account.tsx` (all sections plus the advanced group), `AccountDataVerbs.tsx`, `shell/{Passkeys,RecoveryCodes,SessionsDevices}Section.tsx`, `SessionReclaimBanner.tsx`, `PortableIdentitySection.tsx`, `DmSafetySheet.tsx`, `DmKeyChangeBanner.tsx`, `GuestClaimPrompt.tsx` (the claim flow), `GroupControlRoomIndicator.tsx`, `lib/credentials.ts`, `lib/deeplink.ts`, `lib/migrateStorage.ts`, and the store account and E2EE actions (`store.ts` 5835–6010, 8541–8880, 17493–17815).
-Elm: `View/Connect.elm`, `View/Account.elm`, `View/Account2.elm`, `View/GuestClaim.elm`, `View/DmSafety.elm`, `View/Topbar.elm` (reclaim), `View/Nav.elm` (You hub), `View/RoomSettings.elm` (group mark), the `App.elm` connect/claim/account/E2EE folds, `Credentials.elm`, `Passkey.elm`, `Services.elm`, `Session.elm`, `GroupEnvelope.elm`, `Main.elm` init/ports, `ports.js` (credentials, SASL, probe, room crypto), `index.html` flags.
+Elm: `View/Connect.elm`, `View/Account.elm`, `View/Account2.elm`, `View/GuestClaim.elm`, `View/DmSafety.elm`, `View/Topbar.elm` (reclaim), `View/Nav.elm` (You hub), `View/RoomSettings.elm` (group mark), the `App.elm` connect/claim/account/E2EE folds, `Credentials.elm`, `Remembered.elm`, `Passkey.elm`, `Services.elm`, `Session.elm`, `GroupEnvelope.elm`, `Main.elm` init/ports, `ports.js` (credentials, SASL, probe, room crypto, page lifecycle), `index.html` flags. Added at HEAD: `View/AuthGate.elm` + `AuthGate.elm` (v3/gap-auth), `View/GapAccount.elm` + `GapAccount.elm` (v3/gap-account), `GapShell.elm` (sign-in failure copy), `View/Polish.elm` (update strip), `View/Chanserv.elm` and `View/UserModes.elm` (Account sections).
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| G1 | Guest join: display name, optional room, land on Home or in the room | `src/app/Connect.tsx:737` (UI) | FULL | `App.elm:24615` submitConnect, `View/Connect.elm:156` | — |
-| G2 | Room field normalization plus the "#lounge" error | `Connect.tsx:754` (UI) | FULL | `App.elm:24528`, `App.elm:24684` | — |
-| G3 | Nick validation (IRC rules) | `Connect.tsx:748` (UI) | FULL | `App.elm:24625` (`Invite.nicknameError`) | — |
-| G4 | Sign in: name + account password → SASL PLAIN/SCRAM | `Connect.tsx:786` (UI) | FULL | `App.elm:24725`, `View/Connect.elm:197`, ports `sasl` | Elm clears the password after submit, so a failed sign-in means retyping it |
-| G5 | Recovery-code sign-in (toggle, ≥8 chars, RECOVERYCODES LOGIN after 001) | `Connect.tsx:1410`, `:774` (UI) | FULL | `View/Connect.elm:209`, `App.elm:24707` | — |
-| G6 | Create account: name / optional email / password / confirm validation | `Connect.tsx:795` (UI) | FULL | `View/Connect.elm:238`, `App.elm:24635` | Elm also shows live short-password and mismatch hints |
-| G7 | Password strength meter | `Connect.tsx:1443` (UI) | FULL | `View/Connect.elm:290`, `App.elm:24480` | — |
-| G8 | Register → verification-code step → signed-in account | `Connect.tsx:1208`, `:837` (UI) | FULL | `App.elm:24746` settleConnectGate → claim sheet `View/GuestClaim.elm:245` | The verify step moves into the in-shell sheet; Elm sends IDENTIFY on the live socket instead of reconnecting with SASL |
-| G9 | Mode links (Join as guest / Sign in / Create account), clears errors | `Connect.tsx:1618`, `:651` (UI) | FULL | `View/Connect.elm:389`, `App.elm:37532` | — |
-| G10 | `?signin=1` opens Sign-in mode (the /invite "Sign in" link) | `Connect.tsx:245`, `routes/Invite.tsx:77` (UI) | MISSING | `App.elm:2604` builds the link; nothing in init reads it | The invite page's Sign in link lands on the guest form |
-| G11 | Phase-aware status copy (connecting / registered name / nick in use / bad password / unreachable) | `Connect.tsx:496` (UI) | FULL | `App.elm:24383`, `View/Connect.elm:94` | No "Ready / Connecting / Couldn't join" phase label |
-| G12 | "This name is protected — Sign in as X" action | `Connect.tsx:1528` (UI) | PARTIAL | `App.elm:24402` (status copy only) | No one-click switch to Sign-in mode |
-| G13 | Connect-time GHOST reclaim ("That name is taken — reclaim it?" + password) | `Connect.tsx:1541`, `:940` (UI) | MISSING | `App.elm:24426` connectShowReclaim is exported but no View uses it; `App.elm:28418` | Solid's `ghost()` needs a live client, so it may do nothing there |
-| G14 | Show/Hide password toggle (Connect and Account) | `Connect.tsx:186`, `Account.tsx:140` (UI) | MISSING | `View/Connect.elm:325` plain inputs | — |
-| G15 | Stay signed in (saves the password, private device) | `Connect.tsx:1482`, `:693` (UI) | MISSING | `ports.js:1151` ("needs a login UI") | Listed as a narrowing in COVERAGE.md:29 |
-| G16 | Remembered identities list ("Welcome back", per-identity status) | `Connect.tsx:1134` (UI) | MISSING | `Credentials.elm` is imported only by tests | — |
-| G17 | Remembered action: Resume / Sign in / Use identity | `Connect.tsx:971` (UI) | MISSING | — | Returning users retype their name and password every visit |
-| G18 | Forget a remembered identity | `Connect.tsx:1024` (UI) | MISSING | — | — |
-| G19 | "Not now" dismiss of remembered identities | `Connect.tsx:1195` (UI) | MISSING | — | — |
-| G20 | Invite preview aside (title, inviter copy, topic, access-rules note) | `Connect.tsx:1088` (UI) | PARTIAL | `View/Connect.elm:41` ("Join #room" title + room hint) | No description, topic or access note |
-| G21 | Invite `?as=` pre-fills the guest name | `Connect.tsx:280` (auto) | FULL | `App.elm:3326`, `App.elm:3410` | — |
-| G22 | `?join=` / `?at=` / `?topic=` queued for the post-connect join | `Connect.tsx:256` (auto) | FULL | `App.elm:15438`, `App.elm:3842` | — |
-| G23 | `?reader=1` turns on reader mode | `Connect.tsx:266` (auto) | MISSING | `Invite.elm:565` (share card only), `App.elm:1419` | Elm builds `reader=1` into links but `/app` ignores it |
-| G24 | Automatic fastest-node selection (HEAD probe, pin) | `Connect.tsx:371`, `app/nodes.ts` (auto) | FULL | `Nodes.elm`, `Main.elm:1056`, `ports.js:3932` | Elm probes when you submit; Solid probes as the page loads |
-| G25 | Fields lock while dialing; cancel the dial | `Connect.tsx:545` (lock only) | FULL | `View/Connect.elm:80`, `App.elm:37577` | Elm adds a Cancel button |
-| G26 | Shell stays up through a drop (autoReconnect) | `Connect.tsx:1080` (auto) | FULL | `App.elm:24306` | — |
-| G27 | Deliberate disconnect returns to the gate | `Connect.tsx:1047` (UI) | FULL | `App.elm:37596` | — |
-| G28 | Passkey sign-in on Connect | `Connect.tsx:105` PRESENT_PASSKEY_SIGNIN=false (DEAD) | N/A | v3/gap-auth: `View.AuthGate.signInLinks` → `AuthGate.PasskeyStart` → `Passkey.webauthnAuth` on a plain guest connection → AUTH-CHALLENGE/ALLOW-CRED → get ceremony → AUTH-FINISH → `NOTICE … You are now identified as` | Elm now offers it (the server path is complete); Solid still hides it |
-| G29 | Update reload deferred while the form holds typed data | `Connect.tsx:330` (auto) | FULL | `App.elm:46222` | Elm reloads only after the user approves |
-| G30 | bfcache/freeze page restore → reconnectNow, or mark offline | `connectPageLifecycle.ts:34` (auto) | MISSING | no pageshow/freeze listener in `ports.js` | — |
+| G1 | Guest join: display name, optional room, land on Home or in the room | `src/app/Connect.tsx:737` (UI) | FULL | `App.elm:27846` submitConnect, `View/Connect.elm:513` | — |
+| G2 | Room field normalization plus the "#lounge" error | `Connect.tsx:754` (UI) | FULL | `App.elm:27759`, `App.elm:27915` | — |
+| G3 | Nick validation (IRC rules) | `Connect.tsx:748` (UI) | FULL | `App.elm:27856` (`Invite.nicknameError`) | — |
+| G4 | Sign in: name + account password → SASL PLAIN/SCRAM | `Connect.tsx:786` (UI) | FULL | `App.elm:27956` submitConnect (password branch), `View/Connect.elm:554`, ports `sasl` | Elm clears the password after submit, so a failed sign-in means retyping it (an identity saved with "Stay signed in", G15, avoids that). v3/gap-auth adds "Forgot password?" and "Sign in with a passkey" links on this form (`View/AuthGate.elm:661`) |
+| G5 | Recovery-code sign-in (toggle, ≥8 chars, RECOVERYCODES LOGIN after 001) | `Connect.tsx:1410`, `:774` (UI) | FULL | `View/Connect.elm:566`, `App.elm:27938` | — |
+| G6 | Create account: name / optional email / password / confirm validation | `Connect.tsx:795` (UI) | FULL | `View/Connect.elm:601`, `App.elm:27866` | Elm also shows live short-password and mismatch hints |
+| G7 | Password strength meter | `Connect.tsx:1443` (UI) | FULL | `View/Connect.elm:653`, `App.elm:27711` | — |
+| G8 | Register → verification-code step → signed-in account | `Connect.tsx:1208`, `:837` (UI) | FULL | `App.elm:27977` settleConnectGate → claim sheet `View/GuestClaim.elm:245` | The verify step moves into the in-shell sheet; Elm sends IDENTIFY on the live socket instead of reconnecting with SASL |
+| G9 | Mode links (Join as guest / Sign in / Create account), clears errors | `Connect.tsx:1618`, `:651` (UI) | FULL | `View/Connect.elm:752`, `App.elm:41658` | — |
+| G10 | `?signin=1` opens Sign-in mode (the /invite "Sign in" link) | `Connect.tsx:245`, `routes/Invite.tsx:77` (UI) | FULL | `App.elm:3648` init (`signInParam bootParams`), `App.elm:28068` seedAppQuery, `App.elm:28108` signInParam; link built at `App.elm:2777`; `RxPublicNavTest.elm:148`–`:174` | (v3/rx-public) `?signin=1` (or `true`) opens Sign-in on a cold load and on in-app navigation; the invite page's Sign in link now lands on the sign-in form |
+| G11 | Phase-aware status copy (connecting / registered name / nick in use / bad password / unreachable) | `Connect.tsx:496` (UI) | FULL | `App.elm:27607` connectStatusMessage, `App.elm:10857` gapShellConnectCopy, `GapShell.elm:314` failureCopy, `View/Connect.elm:139` status line | No "Ready / Connecting / Couldn't join" phase label. v3/gap-shell puts this attempt's own failure first (wrong password, timeout, registered name, name taken, offline browser), then Solid's text heuristics |
+| G12 | "This name is protected — Sign in as X" action | `Connect.tsx:1528` (UI) | FULL | `View/Connect.elm:173` signInOffer, `App.elm:41725` ConnectSignInAs; `RxPublicNavTest.elm:254`, `GapShellTest.elm:901` | (v3/rx-public) After a failed guest join on a registered name or a name in use, "Sign in as <name>" switches to Sign-in with the name kept and the password focused. The copy differs from Solid's "This name is protected" banner |
+| G13 | Connect-time GHOST reclaim ("That name is taken — reclaim it?" + password) | `Connect.tsx:1541`, `:940` (UI) | PARTIAL | `View/Connect.elm:173` signInOffer (shown when `App.elm:27657` connectShowReclaim); `App.elm:32123` ghostNick has no caller outside tests | No GHOST-with-password form at the gate. v3/rx-public offers "Sign in as <name>" for a name in use instead, and after sign-in the in-shell alias reclaim (G84, G85) takes the name. Solid's `ghost()` needs a live client, so its form was in effect a redial (reasoned from code, not run). `App.ghostNick` / `Services.ghost` are test-only |
+| G14 | Show/Hide password toggle (Connect and Account) | `Connect.tsx:186`, `Account.tsx:140` (UI) | MISSING | `View/Connect.elm:688` field (plain inputs); also plain in `View/AuthGate.elm`, `View/GapAccount.elm:111`, `View/Account.elm` | Still no Show/Hide anywhere; v3/gap-auth and v3/gap-account added more plain password fields (reset panel, Protection) |
+| G15 | Stay signed in (saves the password, private device) | `Connect.tsx:1482`, `:693` (UI) | FULL | `View/Connect.elm:446` staySignedIn, `App.elm:41722` ConnectStaySignedIn, `App.elm:28391` settleStepRemembered, `ports.js:1617` rememberedIdentities.remember | (v3/rx-public) Off by default, on the password sign-in door only. A typed sign-in stages the switch and `remember` runs once the server accepts the account. An identity used from the list stays remembered (Solid resumes it one-shot with the switch off). `RememberedTest.elm`, `rememberedIdentities.smoke.mjs` |
+| G16 | Remembered identities list ("Welcome back", per-identity status) | `Connect.tsx:1134` (UI) | FULL | `View/Connect.elm:336` rememberedPanel, `Remembered.elm:243` visible, `App.elm:28264` rememberedListed, `ports.js:7858` credentialsRequest, `Main.elm:1270` | (v3/rx-public) "Welcome back" list with the same status labels as Solid ("Ready to continue" / "Saved sign-in" / "Saved name"). Secret-free metadata only; up to 12 identities. Hidden after a first attempt and in Create account |
+| G17 | Remembered action: Resume / Sign in / Use identity | `Connect.tsx:971` (UI) | FULL | `View/Connect.elm:398` action button, `App.elm:28283` rememberedAct, `:28309` rememberedReady, `Remembered.elm:251` actionLabel | (v3/rx-public) Resume / Sign in dial with the saved password armed ports-side; Use identity (and a Resume with no saved password) prefills Sign-in. Solid also starts a passkey prompt in that second case; Elm leaves the "Sign in with a passkey" link on the form |
+| G18 | Forget a remembered identity | `Connect.tsx:1024` (UI) | FULL | `View/Connect.elm:381` Forget button, `App.elm:28359` rememberedForget, `ports.js:1617` rememberedIdentities.forget | (v3/rx-public) Drops the whole slot (password and resume tokens) and clears the form if that identity was selected |
+| G19 | "Not now" dismiss of remembered identities | `Connect.tsx:1195` (UI) | FULL | `View/Connect.elm:419` "Not now", `App.elm:41719` RememberedDismiss | (v3/rx-public) Hides the panel for this visit |
+| G20 | Invite preview aside (title, inviter copy, topic, access-rules note) | `Connect.tsx:1088` (UI) | FULL | `View/Connect.elm:214` context, `:266` conn-invite, `:296` access-rules note, `App.elm:1549` inviteCard; `RememberedTest.elm:377` | (v3/rx-public) Title, inviter copy, topic and the access-rules note, plus a "With …" faces line Solid lacks. Shown only for the room the share card names |
+| G21 | Invite `?as=` pre-fills the guest name | `Connect.tsx:280` (auto) | FULL | `App.elm:3559` init bootGuestName, `App.elm:28068` seedAppQuery | — |
+| G22 | `?join=` / `?at=` / `?topic=` queued for the post-connect join | `Connect.tsx:256` (auto) | FULL | `App.elm:18286`, `App.elm:4090` | — |
+| G23 | `?reader=1` turns on reader mode | `Connect.tsx:266` (auto) | MISSING | `Invite.elm:316` parseReaderParam is used only by inviteCard (`App.elm:1569`); `App.init` / `seedAppQuery` never read `reader` | Elm builds `reader=1` into share links but `/app` ignores it. Reader mode now exists (v3/gap-organize `prefs.readerMode`, `App.elm:53249`), so the fix is a few lines in `App.init` and `seedAppQuery` |
+| G24 | Automatic fastest-node selection (HEAD probe, pin) | `Connect.tsx:371`, `app/nodes.ts` (auto) | FULL | `Nodes.elm`, `Main.elm:1261`, `ports.js:5295` | Elm probes when you submit; Solid probes as the page loads |
+| G25 | Fields lock while dialing; cancel the dial | `Connect.tsx:545` (lock only) | FULL | `View/Connect.elm:125`, `App.elm:41750` | Elm adds a Cancel button |
+| G26 | Shell stays up through a drop (autoReconnect) | `Connect.tsx:1080` (auto) | FULL | `App.elm:27527` | A kill or ban keeps the shell up with its reason instead of returning to the gate (v3/gap-shell, `App.elm:27527` connectGateVisible) |
+| G27 | Deliberate disconnect returns to the gate | `Connect.tsx:1047` (UI) | FULL | `App.elm:41769` | — |
+| G28 | Passkey sign-in on Connect | `Connect.tsx:105` PRESENT_PASSKEY_SIGNIN=false (DEAD) | N/A | v3/gap-auth: `View/AuthGate.elm:661` signInLinks → `AuthGate.PasskeyStart` (`AuthGate.elm:387`) → `App.elm:53373` StartPasskey (`Passkey.elm:339` webauthnAuth) on a plain guest connection → AUTH-CHALLENGE/ALLOW-CRED → get ceremony → `Passkey.elm:382` webauthnAuthFinish (`App.elm:47224`) → `NOTICE … You are now identified as`; `AuthGateTest.elm`, `authGate.smoke.mjs` | Elm offers it (the server path is complete); Solid still hides it |
+| G29 | Update reload deferred while the form holds typed data | `Connect.tsx:330` (auto) | FULL | `App.elm:52091` polishSettleUpdate, `View/Polish.elm:590` updateBanner (mounted only inside the shell frame, `View.elm:397`) | The gate never shows or applies the update strip, so typed form data cannot be lost. In the shell a reload needs the user's approval and waits for an active call (`App.elm:51412` polishWorkActive) |
+| G30 | bfcache/freeze page restore → reconnectNow, or mark offline | `connectPageLifecycle.ts:34` (auto) | FULL | `ports.js:11557` installPageLifecycle (installed `ports.js:8631`), `Main.elm:907` pageRestored, `App.elm:46008` PageRestored; `GapPwaSafetyTest.elm:197`, `pwaSafety.smoke.mjs:325` | (v3/gap-pwa-safety) A bfcache restore or freeze resume redials an offline session at once when the browser is online, and PING-probes a live socket (`ports.js:3508`) so a dead one closes into the normal reconnect. Solid instead redials any restored socket and marks an offline-restored one reconnecting |
 | G31 | Stale lazy-chunk recovery screen | `StaleChunkRecovery.tsx`, `Connect.tsx:1666` (auto) | N/A | single Elm bundle | Absent by design |
 | G32 | ConnectPulse live network rail | `ConnectPulse.tsx` (DEAD, no importer) | N/A | — | — |
-| G33 | Legacy `ocean-*` → `onyx:*` storage migration | `migrateStorage.ts:13` (auto) | MISSING | `ports.js:5128` purges only identity-profile keys | — |
-| G34 | Credential store compatibility (`onyx:credentials`) | `credentials.ts:300` v2 `{version,activeKey,entries}` (auto) | PARTIAL | `ports.js:1161` `{v:1,slots}`; `index.html:168` | An Elm token write wipes Solid's saved identities, and Elm can't read Solid's tokens |
-| G35 | Saved sign-in targets in the device-transfer bundle | `credentials.ts:686`, `vault/portableTransfer.ts:171` (UI via Prefs) | MISSING | `ports.js:1154` | — |
-| G36 | Session resume (TOKEN / MTOKEN / RESUME, mesh first) | `lib/irc/sessionReclaim.ts` (auto) | FULL | `Session.elm` planSessionReclaim, `ports.js:1205` | Across a reload it only resumes after a password sign-in |
-| G37 | Session reclaim banner (4 phases, Sign in again, dismiss) | `SessionReclaimBanner.tsx:87`, `:98` (UI) | FULL | `View/Account2.elm:47`, `App.elm:41952` | — |
-| G38 | Guest "Keep <nick>?" chip + dismiss (saved per owner) | `GuestClaimPrompt.tsx:357`, `:367` (UI) | PARTIAL | `View/GuestClaim.elm:79`, `View/Home.elm:112` | Chip shows on Home only; no first-hour suppression |
-| G39 | Claim sheet: REGISTER → VERIFY → IDENTIFY; can't close while busy | `GuestClaimPrompt.tsx:458`, `:513` (UI) | FULL | `View/GuestClaim.elm:177`, `App.elm:39434`, `:39441` | — |
-| G40 | Guest "Keep this name" from You / Account | `Account.tsx:690` (UI) | FULL | `View/Nav.elm:304`, `App.elm:44020` | Guest explainer and steps list missing |
-| G41 | Refresh on open (ACCOUNTINFO, TOTP / KEYTRANS / E2EEKEY status, VHOST LIST, codes, passkeys, sessions) | `Account.tsx:475` (auto) | FULL | `App.elm:26722` | — |
-| G42 | Overview: account, email, registered, loading | `Account.tsx:723` (UI) | FULL | `View/Account.elm:107` | Elm also shows nick, secure, enforce and flags |
-| G43 | Last account-action error banner ("command: description", alert) | `Account.tsx:777` (UI) | PARTIAL | `View/Account.elm:168` | Description only; not announced as an alert |
-| G44 | Section index with active-section tracking + mobile drill-in/back | `Account.tsx:252`, `:711` (UI) | PARTIAL | `View/Account.elm:85` | Plain anchors: no active state, no mobile master/detail |
-| G45 | Change email (password-checked ACCOUNTSET) | `Account.tsx:789` (UI) | FULL | `View/Account.elm:985`, `App.elm:27108` | — |
-| G46 | Change password | `Account.tsx:826` (UI) | FULL | `View/Account.elm:1043`, `App.elm:27142` | — |
-| G47 | Two-factor status + Enable | `Account.tsx:893` (UI) | FULL | `View/Account.elm:563`, `App.elm:37899` | — |
-| G48 | Copy TOTP secret / otpauth link with feedback | `Account.tsx:907` (UI) | FULL | `View/Account.elm:600`, `App.elm:37927` | Success shows as a label change, with no status line |
-| G49 | Confirm two-factor with a 6-digit code | `Account.tsx:946` (UI) | FULL | `View/Account.elm:676`, `App.elm:37913` | — |
-| G50 | Disable two-factor | `Account.tsx:976` (UI) | FULL | `View/Account.elm:713`, `App.elm:37902` | — |
-| G51 | Session rows (this device, attached/detached, age, sign-on time) | `SessionsDevicesSection.tsx:153` (UI) | PARTIAL | `View/Account.elm:223` | No age or sign-on time; rows read "Session N" |
-| G52 | Refresh session list | `SessionsDevicesSection.tsx:89` (UI) | FULL | `View/Account.elm:189`, `App.elm:37888` | — |
-| G53 | Revoke one session (SESSION DROP sid=/#n) | `SessionsDevicesSection.tsx:164` (UI) | FULL | `View/Account.elm:246`, `App.elm:38230` | — |
-| G54 | Revoke other devices (bulk, confirm) | `SessionsDevicesSection.tsx:100` (UI) | FULL | `View/Account2.elm:141`, `App.elm:41870` | Inline confirm instead of `window.confirm` |
-| G55 | Recovery codes: remaining count + Refresh | `RecoveryCodesSection.tsx:71` (UI) | FULL | `View/Account.elm:1130`, `:1167` | — |
-| G56 | Generate new codes (two-step, optional password) | `RecoveryCodesSection.tsx:102` (UI) | FULL | `View/Account.elm:1149`, `App.elm:38046` | — |
-| G57 | Clear all codes | `RecoveryCodesSection.tsx:36` (UI) | FULL | `View/Account.elm:1175`, `App.elm:38065` | — |
-| G58 | New codes shown once + Copy all + Done | `RecoveryCodesSection.tsx:171` (UI) | FULL | `View/Account.elm:1243`, `App.elm:38076` | — |
-| G59 | Passkeys: browser / server unsupported notices | `PasskeysSection.tsx:191`, `:199` (UI) | FULL | `View/Account.elm:1295` | — |
-| G60 | Add a passkey (label + device ceremony) | `PasskeysSection.tsx:208` (UI) | FULL | `View/Account.elm:1314`, `App.elm:38096` | — |
-| G61 | List / refresh passkeys (label, created, use count) | `PasskeysSection.tsx:257` (UI) | FULL | `View/Account.elm:1371`, `App.elm:38090` | — |
-| G62 | Rename a passkey (hidden when the server doesn't support it) | `PasskeysSection.tsx:298` (UI) | FULL | `View/Account.elm:1510`, `App.elm:38119` | — |
-| G63 | Remove a passkey (inline confirm) | `PasskeysSection.tsx:323` (UI) | FULL | `View/Account.elm:1479`, `App.elm:38141` | — |
-| G64 | Sign out (LOGOUT) | `Account.tsx:1009` (UI) | FULL | `View/Account.elm:259`, `App.elm:37894` | Panel stays open, showing the guest copy |
-| G65 | Download account record | `AccountDataVerbs.tsx:148` (UI) | FULL | `View/Account.elm:1555`, `App.elm:39500` | — |
-| G66 | Save this device's history | `AccountDataVerbs.tsx:178` (UI) | FULL | `View/Account.elm:1570`, `App.elm:39503` | — |
-| G67 | Delete account (type the name + password → DROP) | `AccountDataVerbs.tsx:207` (UI) | FULL | `View/Account.elm:1610`, `App.elm:27196` | Inline form instead of a Sheet |
-| G68 | Protection toggles: Require sign-in (secure) / Hold this name (enforce) | `Account.tsx:1033` (UI) | MISSING | `Services.elm:906` accountSet; `View/Account.elm:132` shows them read-only | Not tracked in COVERAGE or ROADMAP |
-| G69 | Bind this connection's certificate + notices | `Account.tsx:1080` (UI) | FULL | `View/Account.elm:743`, `App.elm:37955` | — |
-| G70 | Remove a certificate fingerprint | `Account.tsx:1093` (UI) | FULL | `View/Account.elm:760`, `App.elm:37973` | — |
-| G71 | Publish this device's key | `Account.tsx:1123` (UI) | FULL | `View/Account.elm:839`, `App.elm:38198`, `:38204` | — |
+| G33 | Legacy `ocean-*` → `onyx:*` storage migration | `migrateStorage.ts:13` (auto) | MISSING | `ports.js:6499` purges only identity-profile keys | — |
+| G34 | Credential store compatibility (`onyx:credentials`) | `credentials.ts:300` v2 `{version,activeKey,entries}` (auto) | FULL | `ports.js:1398` readCredentialsStore, `:1445` writeCredentialsStore, `:1373` slotFromLegacy; `rememberedIdentities.smoke.mjs:247`–`:295`; `index.html:206` | (v3/rx-public) One store, two shapes: Elm migrates Solid's v2 entries (and the bare single credential) into its own `slots` in memory and rewrites the Solid fields untouched, so saved identities survive an Elm write. One-way: Solid does not see identities or tokens Elm creates, and the boot-time token read in `index.html` looks only at `slots` |
+| G35 | Saved sign-in targets in the device-transfer bundle | `credentials.ts:686`, `vault/portableTransfer.ts:171` (UI via Prefs) | MISSING | `ports.js:1311` ("account handoffs are still Solid-only"), `Credentials.elm:28` | Elm has no device-transfer bundle: the portable vault export is history only (`ports.js:891` `{kind:"onyx-vault"}`), and the Residence file (G79) carries no sign-in targets |
+| G36 | Session resume (TOKEN / MTOKEN / RESUME, mesh first) | `lib/irc/sessionReclaim.ts` (auto) | FULL | `Session.elm` planSessionReclaim, `App.elm:20226` maybeSendSessionCommands, `ports.js:1473` storeResumeToken, `:1499` loadResumeTokens | A reload resumes only after fresh account proof: a typed password, or one saved by "Stay signed in". Resume with no saved password just prefills Sign-in (G17) |
+| G37 | Session reclaim banner (4 phases, Sign in again, dismiss) | `SessionReclaimBanner.tsx:87`, `:98` (UI) | FULL | `View/Account2.elm:47`, `App.elm:46226` | — |
+| G38 | Guest "Keep <nick>?" chip + dismiss (saved per owner) | `GuestClaimPrompt.tsx:357`, `:367` (UI) | PARTIAL | `View/GuestClaim.elm:34` guestClaimChip, `View/Home.elm:117`, `View/CallPresence.elm:407`, `App.elm:29681` persistGuestClaimDismiss | The chip shows on Home and in the call stage's guest banner, never over a conversation (the You hub keeps "Keep this name"). No first-hour suppression (`View/GuestClaim.elm:9`) |
+| G39 | Claim sheet: REGISTER → VERIFY → IDENTIFY; can't close while busy | `GuestClaimPrompt.tsx:458`, `:513` (UI) | FULL | `View/GuestClaim.elm:177`, `App.elm:43623` GuestClaimSubmit, `:43597` GuestClaimClose (busy refuses), `:28588` chainClaimIdentify | — |
+| G40 | Guest "Keep this name" from You / Account | `Account.tsx:690` (UI) | FULL | `View/Nav.elm:308` you-keep-name, `App.elm:48832` youHubGo | Guest explainer and steps list missing |
+| G41 | Refresh on open (ACCOUNTINFO, TOTP / KEYTRANS / E2EEKEY status, VHOST LIST, codes, passkeys, sessions) | `Account.tsx:475` (auto) | FULL | `App.elm:30399` | — |
+| G42 | Overview: account, email, registered, loading | `Account.tsx:723` (UI) | FULL | `View/Account.elm:123` | Elm also shows nick, secure, enforce and flags |
+| G43 | Last account-action error banner ("command: description", alert) | `Account.tsx:777` (UI) | PARTIAL | `View/Account.elm:184` | Description only; not announced as an alert |
+| G44 | Section index with active-section tracking + mobile drill-in/back | `Account.tsx:252`, `:711` (UI) | PARTIAL | `View/Account.elm:96` sectionNav | Plain anchors: no active state, no mobile master/detail. No link for "Your rooms" (`acct-rooms`) |
+| G45 | Change email (password-checked ACCOUNTSET) | `Account.tsx:789` (UI) | FULL | `View/Account.elm:985`, `App.elm:30786` | — |
+| G46 | Change password | `Account.tsx:826` (UI) | FULL | `View/Account.elm:1043`, `App.elm:30821` requestAccountSetPassword, `Services.elm:918` setPass | (v3/gap-auth) Sends `SETPASS <current> :<new>`. Solid sends `ACCOUNTSET … password`, which Onyx Server refuses (`FAIL ACCOUNTSET INVALID_FIELD`, `server.zig` handleAccountSet), so Solid's change-password cannot succeed (⚠ Solid defect). The new password replaces the held SASL credential only once the server confirms; the button reads "Changing…" and a "Password changed" line follows |
+| G47 | Two-factor status + Enable | `Account.tsx:893` (UI) | FULL | `View/Account.elm:563`, `App.elm:42086` | — |
+| G48 | Copy TOTP secret / otpauth link with feedback | `Account.tsx:907` (UI) | FULL | `View/Account.elm:600`, `App.elm:42114` | Success shows as a label change, with no status line |
+| G49 | Confirm two-factor with a 6-digit code | `Account.tsx:946` (UI) | FULL | `View/Account.elm:676`, `App.elm:42100` | — |
+| G50 | Disable two-factor | `Account.tsx:976` (UI) | FULL | `View/Account.elm:713`, `App.elm:42089` | — |
+| G51 | Session rows (this device, attached/detached, age, sign-on time) | `SessionsDevicesSection.tsx:153` (UI) | PARTIAL | `View/Account.elm:239` | No age or sign-on time; rows read "Session N" |
+| G52 | Refresh session list | `SessionsDevicesSection.tsx:89` (UI) | FULL | `View/Account.elm:205`, `App.elm:42075` | — |
+| G53 | Revoke one session (SESSION DROP sid=/#n) | `SessionsDevicesSection.tsx:164` (UI) | FULL | `View/Account.elm:262`, `App.elm:42417` | — |
+| G54 | Revoke other devices (bulk, confirm) | `SessionsDevicesSection.tsx:100` (UI) | FULL | `View/Account2.elm:141`, `App.elm:46144` | Inline confirm instead of `window.confirm` |
+| G55 | Recovery codes: remaining count + Refresh | `RecoveryCodesSection.tsx:71` (UI) | FULL | `View/Account.elm:1164`, `:1167` | — |
+| G56 | Generate new codes (two-step, optional password) | `RecoveryCodesSection.tsx:102` (UI) | FULL | `View/Account.elm:1183`, `App.elm:42233` | — |
+| G57 | Clear all codes | `RecoveryCodesSection.tsx:36` (UI) | FULL | `View/Account.elm:1209`, `App.elm:42252` | — |
+| G58 | New codes shown once + Copy all + Done | `RecoveryCodesSection.tsx:171` (UI) | FULL | `View/Account.elm:1277`, `App.elm:42263` | — |
+| G59 | Passkeys: browser / server unsupported notices | `PasskeysSection.tsx:191`, `:199` (UI) | FULL | `View/Account.elm:1336` | — |
+| G60 | Add a passkey (label + device ceremony) | `PasskeysSection.tsx:208` (UI) | FULL | `View/Account.elm:1355`, `App.elm:42283` | — |
+| G61 | List / refresh passkeys (label, created, use count) | `PasskeysSection.tsx:257` (UI) | FULL | `View/Account.elm:1412`, `App.elm:42277` | — |
+| G62 | Rename a passkey (hidden when the server doesn't support it) | `PasskeysSection.tsx:298` (UI) | FULL | `View/Account.elm:1551`, `App.elm:42306` | — |
+| G63 | Remove a passkey (inline confirm) | `PasskeysSection.tsx:323` (UI) | FULL | `View/Account.elm:1520`, `App.elm:42328` | — |
+| G64 | Sign out (LOGOUT) | `Account.tsx:1009` (UI) | FULL | `View/Account.elm:275`, `App.elm:42081` | Panel stays open, showing the guest copy |
+| G65 | Download account record | `AccountDataVerbs.tsx:148` (UI) | FULL | `View/Account.elm:1596`, `App.elm:43689` | — |
+| G66 | Save this device's history | `AccountDataVerbs.tsx:178` (UI) | FULL | `View/Account.elm:1611`, `App.elm:43692` | — |
+| G67 | Delete account (type the name + password → DROP) | `AccountDataVerbs.tsx:207` (UI) | FULL | `View/Account.elm:1651`, `App.elm:30901` | Inline form instead of a Sheet |
+| G68 | Protection toggles: Require sign-in (secure) / Hold this name (enforce) | `Account.tsx:1033` (UI) | FULL | `View/GapAccount.elm:111` protectionSection, `App.elm:55096` ProtectToggle → `Services.elm:907` accountSet, reply fold `App.elm:54481` gapApplyReply; `GapAccountAppTest.elm:724` | (v3/gap-account) "Require sign-in" (secure) and "Hold this name" (enforce) switches, gated on the account password, which is cleared on every send and when the sheet closes. A wrong password reports "Nothing was changed"; the overview refreshes after a save |
+| G69 | Bind this connection's certificate + notices | `Account.tsx:1080` (UI) | FULL | `View/Account.elm:743`, `App.elm:42142` | — |
+| G70 | Remove a certificate fingerprint | `Account.tsx:1093` (UI) | FULL | `View/Account.elm:760`, `App.elm:42160` | — |
+| G71 | Publish this device's key | `Account.tsx:1123` (UI) | FULL | `View/Account.elm:839`, `App.elm:42385` E2eeKeyPublishRequested, `:30960` requestE2eeKeyPublish | — |
 | G72 | List device keys / remove the legacy "browser" key + notices | `Account.tsx:1126`, `:1133` (UI) | FULL | `View/Account.elm:854`, `:861` | — |
-| G73 | Refresh key transparency root | `Account.tsx:1137` (UI) | FULL | `View/Account.elm:801`, `App.elm:38037` | Has its own section in Elm |
+| G73 | Refresh key transparency root | `Account.tsx:1137` (UI) | FULL | `View/Account.elm:801`, `App.elm:42224` | Has its own section in Elm |
 | G74 | KEYTRANS PROOF | `store.ts:8878` (DEAD) | N/A | `requestKeytransProof` (core only) | — |
-| G75 | Personas: list + Wear | `Account.tsx:1161` (UI) | FULL | `View/Account.elm:911`, `App.elm:37999` | — |
-| G76 | Take persona off | `Account.tsx:1182` (UI) | FULL | `View/Account.elm:900`, `App.elm:38002` | — |
-| G77 | Claim a persona host from open offers | `Account.tsx:1200` (UI) | FULL | `View/Account.elm:941`, `App.elm:38005` | — |
-| G78 | Recover a name (RECOVER nick [password]) | `Account.tsx:1232` (UI) | CORE-ONLY | `Services.elm:920` builder with no caller | No password argument; not tracked as a gap in any doc |
-| G79 | Residence file: download / copy JSON | `PortableIdentitySection.tsx:155` (UI) | FULL | `View/Account2.elm:187`, `App.elm:41926`, `:41936` | — |
-| G80 | Residence import (favorites + folders + quiet hours) | `PortableIdentitySection.tsx:199` (UI) | PARTIAL | `App.elm:41949` | Favorites only; Elm has no folders or quiet-hours state |
-| G81 | Session capability matrix | `Account.tsx:1109` (UI) | FULL | `View/Account.elm:274` | — |
-| G82 | Typed secrets cleared when the panel closes or the owner changes | `Account.tsx:449` (auto) | PARTIAL | `App.elm:5419` (901 only); `App.elm:37320` close | Email, current, drop and recovery passwords survive closing the panel |
-| G83 | Self-edit of METADATA profile (display name, bio, accent, links) | `store.ts:17493` via a window event nothing dispatches (DEAD) | N/A | `App.elm:42852` OwnMetadataSet (core only) | Not editable in either client |
-| G84 | Automatic NICK reclaim timer after 900 while on an alias | `store.ts:4018`, `:14778` (auto) | FULL | `App.elm` startNickReclaim / fireNickReclaim | — |
-| G85 | In-shell alias reclaim dialog (GHOST + NICK with password) | `store.ts:8796` reclaimNick (DEAD UI) | N/A | `View/Topbar.elm:135`, `:168`, `App.elm:24187` | Elm better |
-| G86 | DM sealed to every peer device key; fails closed | `store.ts:5955` (auto) | FULL | `App.elm:8811`, `ports dmSealRequest` | — |
-| G87 | DM open with trust-on-first-use pinning + locked placeholder | `store.ts:17625` (auto) | FULL | `App.elm:34958`, `DmCipher.elm:77` | — |
-| G88 | DM notification once decrypted | `store.ts:17669` (auto) | FULL | `App.elm:31538` | — |
-| G89 | Key-change toast + Inbox error notification | `store.ts:17703` (auto) | PARTIAL | `App.elm:43087` (serviceLog), `View/Rail.elm:477` (aria) | No toast or Inbox row; you only see it inside the DM |
-| G90 | Safety-number Verify panel (readiness rows, grouped number, device count) | `PresenceRibbon.tsx:723`, `DmSafetySheet.tsx` (UI) | FULL | `View/DmSafety.elm:113`, `:186`, `App.elm:41728` | — |
-| G91 | Key-change review: both numbers, Accept (save, reopen held messages), Keep locked, retry | `DmKeyChangeBanner.tsx` (UI) | FULL | `View/DmSafety.elm:292`, `App.elm:30839`, `:30866` | Elm adds a "Try again" for computing the numbers |
-| G92 | Encrypt-DMs preference toggle | `PreferencesPanel.tsx:3650` (UI) | FULL | `View/Appearance.elm:232` | — |
-| G93 | Device DM key published automatically on connect | `store.ts:11286`, `:17606` (auto) | FULL | `App.elm:5031` | — |
-| G94 | Offline queue refuses E2EE DMs / required rooms | `store.ts:8071` (auto) | FULL | `App.elm:8643`, `:8646` | — |
+| G75 | Personas: list + Wear | `Account.tsx:1161` (UI) | FULL | `View/Account.elm:911`, `App.elm:42186` | — |
+| G76 | Take persona off | `Account.tsx:1182` (UI) | FULL | `View/Account.elm:900`, `App.elm:42189` | — |
+| G77 | Claim a persona host from open offers | `Account.tsx:1200` (UI) | FULL | `View/Account.elm:941`, `App.elm:42192` | — |
+| G78 | Recover a name (RECOVER nick [password]) | `Account.tsx:1232` (UI) | FULL | `View/GapAccount.elm:191`–`:227` Recover a name / Release hold, `App.elm:54943` gapRecoverSend, `Services.elm:947` recover, `:952` releaseNick; `GapAccountAppTest.elm:898` | (v3/gap-account) Sends `RECOVER <nick>` (defaults to the signed-in name) and follows a success with `NICK`; also "Release hold" (`RELEASE`), which Solid lacks. No password field: Onyx Server's RECOVER takes only the nick and needs you already identified (`server.zig` handleRecover), so Solid's optional password does nothing there |
+| G79 | Residence file: download / copy JSON | `PortableIdentitySection.tsx:155` (UI) | FULL | `View/Account2.elm:187`, `App.elm:46200` PortableExportDownload, `:46210` PortableExportCopy | — |
+| G80 | Residence import (favorites + folders + quiet hours) | `PortableIdentitySection.tsx:199` (UI) | PARTIAL | `App.elm:50343` portableImportRun, `:50320` portableExport, `Account2.elm:270` serializePortable | Favorites only. Elm now keeps room folders and quiet hours (v3/gap-organize: `Organizer.elm`, `onyx:dnd-quiet-*`), but the file still writes empty categories and the default 22–8 quiet hours, and import ignores both |
+| G81 | Session capability matrix | `Account.tsx:1109` (UI) | FULL | `View/Account.elm:290` | — |
+| G82 | Typed secrets cleared when the panel closes or the owner changes | `Account.tsx:449` (auto) | PARTIAL | `App.elm:5778` (901 clear), `App.elm:54860` (sheet-close clear), `App.elm:41446` SetAccountOpen False | v3/gap-account clears the Protection password and the Recover / Names drafts when the sheet closes or the identity changes (`App.elm:54285`). The email, current, new, drop and recovery passwords still survive closing the panel (only logout clears them) |
+| G83 | Self-edit of METADATA profile (display name, bio, accent, links) | `store.ts:17493` via a window event nothing dispatches (DEAD) | N/A | `App.elm:47212` OwnMetadataSet (no view or port dispatches it) | Not editable in either client |
+| G84 | Automatic NICK reclaim timer after 900 while on an alias | `store.ts:4018`, `:14778` (auto) | FULL | `App.elm:27289` startNickReclaim, `:27313` fireNickReclaim | — |
+| G85 | In-shell alias reclaim dialog (GHOST + NICK with password) | `store.ts:8796` reclaimNick (DEAD UI) | N/A | `View/Topbar.elm:153` chip, `View/Nav.elm:404` reclaimEntry (You hub, v3/rx-sheets), `View/Topbar.elm:187` reclaimDialog, `App.elm:27408` submitReclaim | Elm better |
+| G86 | DM sealed to every peer device key; fails closed | `store.ts:5955` (auto) | FULL | `App.elm:9206`, `ports dmSealRequest` | — |
+| G87 | DM open with trust-on-first-use pinning + locked placeholder | `store.ts:17625` (auto) | FULL | `App.elm:38729`, `DmCipher.elm:77` | — |
+| G88 | DM notification once decrypted | `store.ts:17669` (auto) | FULL | `App.elm:35265` | — |
+| G89 | Key-change toast + Inbox error notification | `store.ts:17703` (auto) | FULL | `App.elm:40110` flagPeerKeyChange (called from `:46003` DmKeyChecked, seal-failed and scheduled-seal paths), `DmSafety.elm:148` keyChangeToastTitle, `View/Rail.elm:561` (aria); `GapPwaSafetyTest.elm` | (v3/gap-pwa-safety) Once per detected change: an error toast plus an Inbox row naming the peer, then the in-DM review. Directory updates (761 reply, METADATA push) and held sends raise it |
+| G90 | Safety-number Verify panel (readiness rows, grouped number, device count) | `PresenceRibbon.tsx:723`, `DmSafetySheet.tsx` (UI) | FULL | `View/DmSafety.elm:113`, `:186`, `App.elm:45980` | — |
+| G91 | Key-change review: both numbers, Accept (save, reopen held messages), Keep locked, retry | `DmKeyChangeBanner.tsx` (UI) | FULL | `View/DmSafety.elm:292` keyChangeRow, `App.elm:34552` dmKeyAccept, `:34588` dmKeyAccepted, `:46019` DmKeyKeepLocked | Elm adds a "Try again" for computing the numbers (`View/DmSafety.elm:359`). v3/gap-pwa-safety: Accept trusts only the keys the reviewed number binds, and a pending change also holds composer sends (`App.elm:12158` sendComposerText) |
+| G92 | Encrypt-DMs preference toggle | `PreferencesPanel.tsx:3650` (UI) | FULL | `View/Appearance.elm:234`, `App.elm:54342` gapSettleE2ee; `GapAccountAppTest.elm:633`–`:707` | (v3/gap-account) Takes effect live: turning it on publishes this device's key, asks for the open DM peer's key and warns about queued DMs that will send unencrypted; turning it off releases a pending key hold without sending the draft |
+| G93 | Device DM key published automatically on connect | `store.ts:11286`, `:17606` (auto) | FULL | `App.elm:5390` | Also published when the Encrypt-DMs switch is turned on (G92) |
+| G94 | Offline queue refuses E2EE DMs / required rooms | `store.ts:8071` (auto) | FULL | `App.elm:9027` offlineSealRefused, `:9033` refuseOfflineSeal, `:12158` sendComposerText | — |
 | G95 | DM list preview never shows ciphertext | `dmPrivacyChrome.ts:102` (auto) | FULL | `Sidebar.elm:355` | — |
-| G96 | Group room seal/open (ONYXROOM1) + "missing room key" placeholder | `store.ts:5861` (auto) | FULL | `App.elm:8621`, `:8953`, `ports.js:9197`, `GroupEnvelope.elm:100` | — |
-| G97 | Group room-controls indicator | `PresenceRibbon.tsx:835`, `GroupControlRoomIndicator.tsx:96` (UI) | PARTIAL | `View/RoomSettings.elm:852`, `:882`; `RoomSettings.elm:857` | Never shows "active"; no "identity pending" state |
-| G98 | Group device publication + trusted-signer pins | `groupDevicePublisher.ts`, `trustedGroupSignerStore.ts` (auto) | FULL | `App.elm:21199`, `ports.js:9411` | — |
+| G96 | Group room seal/open (ONYXROOM1) + "missing room key" placeholder | `store.ts:5861` (auto) | FULL | `App.elm:8998` sendRequiredRoomSeal (`RoomSealRequested` `:9016`), `:8977` roomEncryptionPolicy, `ports.js:10866`, `GroupEnvelope.elm:100` | — |
+| G97 | Group room-controls indicator | `PresenceRibbon.tsx:835`, `GroupControlRoomIndicator.tsx:96` (UI) | PARTIAL | `View/RoomSettings.elm:847` groupControlMark, `:877` groupControlIndicator, `RoomSettings.elm:858` groupMark | Never shows "active"; no "identity pending" state |
+| G98 | Group device publication + trusted-signer pins | `groupDevicePublisher.ts`, `trustedGroupSignerStore.ts` (auto) | FULL | `App.elm:24410`, `ports.js:11080` | — |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- `COVERAGE.md:137` says "RECOVER/RELEASE reclaim (`Services.recover`/`release`, …)" is done. Neither `Services.recover` nor `Services.releaseNick` has a caller in `src/`, and Elm has no "Recover a name" UI (G78).
-- `COVERAGE.md:63` lists GHOST/RECOVER/RELEASE as **done**. Only the builders exist. RECOVER and RELEASE can't be reached, and GHOST is used only by the in-shell alias dialog, not by the connect form (G13).
-- `COVERAGE.md:31` says "password entry UI still ahead". That is stale and understates Elm: the connect gate's sign-in password field exists (`View/Connect.elm:197`).
-- `COVERAGE.md:29` lists the connect narrowings but leaves out several gaps:
-  - no connect-time GHOST reclaim (G13);
-  - no "Sign in as X" action (G12);
-  - `?signin=1` ignored (G10);
-  - `?reader=1` ignored (G23);
-  - no show/hide password (G14).
-- `COVERAGE.md:54` says "credential hygiene" is done, but `ports.js:1161` writes a `{v:1,slots}` shape over Solid's v2 `onyx:credentials` store (G34).
-- No row in either doc tracks the missing Account sections: Protection toggles (G68) and Recover a name (G78).
-- `V3_ROADMAP.md:44` and `:84` are leftover copies of rows 1.2 and 3.7 with no status. They contradict `:40` and `:88`, which say **done**.
+- `COVERAGE.md:137` says "RECOVER/RELEASE reclaim (`Services.recover`/`release`, …)" is done. It was overstated when the map was written (no caller, G78). **Fixed by v3/gap-account**: Account → Protection → "Recover a name" and "Release hold" now call them (`View/GapAccount.elm:191`, `App.elm:54943` gapRecoverSend). The builder is named `Services.releaseNick`, not `release`.
+- `COVERAGE.md:63` lists GHOST/RECOVER/RELEASE as **done**. RECOVER and RELEASE are now reachable (G78). GHOST is still builders only: `Services.ghost` (`Services.elm:942`) and `App.ghostNick` (`App.elm:32123`) have no production caller. The in-shell alias dialog uses `reclaimNickWithPassword` (`App.elm:32138`), and the gate offers "Sign in as X" instead (G13). Still true for GHOST.
+- `COVERAGE.md:31` says "password entry UI still ahead". Still stale: the gate's password field exists (`View/Connect.elm:554`), and v3/rx-public (remembered sign-in) and v3/gap-auth (passkey, two-step) came after it.
+- `COVERAGE.md:29` was listed as leaving out several gaps (GHOST reclaim, "Sign in as X", `?signin=1`, `?reader=1`, show/hide password). **Partly fixed**: the row was rewritten by v3/rx-public and v3/gap-auth and now covers "Sign in as X", `?signin=1`, remembered identities and the new auth steps. Still not stated anywhere: no Show/Hide password (G14), `?reader=1` ignored (G23), no GHOST-with-password form (G13).
+- `COVERAGE.md:54` called "credential hygiene" done while `ports.js` wrote a `{v:1,slots}` shape over Solid's v2 `onyx:credentials` store (G34). **Fixed by v3/rx-public**: `ports.js:1398` / `:1445` migrate Solid's entries and carry its fields through. Caveat that stays: the sharing is one-way (Solid cannot see identities or tokens Elm creates).
+- No doc tracked the missing Account sections (Protection G68, Recover a name G78). **Fixed by v3/gap-account**: both shipped. Still untracked in COVERAGE/ROADMAP: the Residence file ignores folders and quiet hours (G80) and `?reader=1` (G23).
+- `V3_ROADMAP.md:44` and `:84` are leftover copies of rows 1.2 and 3.7 with no status. Still true: they contradict `:40` and `:88`, which say **done**.
+- `V3_ROADMAP.md` 0.3 (remembered identities / Stay signed in) and 0.4 (invite aside) were accurately marked todo when the map was written. **Fixed by v3/rx-public**: both now read **done** (`V3_ROADMAP.md:31`, `:32`).
 - Stale code comments:
-  - `ports.js:1151–1155` says the login UI "has not built yet"; the login UI exists.
-  - `View/Topbar.elm:163` says "Elm auto-connects, so there is no pre-connect form". The connect gate now exists.
-  - `Credentials.elm` is documented as the port of `credentials.ts`, but no `src` module imports it (tests only).
-- These claims are accurate: `V3_ROADMAP.md` 0.3 (remembered identities / Stay signed in) and 0.4 (invite aside) are marked todo.
+  - `ports.js:1151–1155` said the login UI "has not built yet". **Fixed**: that block was rewritten; the credentials comment is now `ports.js:1311–1322` and describes remembered identities.
+  - `View/Topbar.elm:184–185` says "Elm auto-connects, so there is no pre-connect form to return to". Still stale: the connect gate exists and `SessionDisconnect` returns to it.
+  - `Credentials.elm` was documented as the port of `credentials.ts` with no importer. **Fixed by v3/rx-public**: `Remembered.elm`, `View/Connect.elm` and `App.elm:28295` import it. Its header (`Credentials.elm:28`) still says handoff import/export lives behind `ports.js`, which has none (`ports.js:1315`).
+  - `App.elm:32117–32121` (the `ghostNick` doc) says the connect-screen reclaim dialog "has no Elm surface yet, so this constructor waits for it". Still stale: the gate offers "Sign in as X" instead and nothing calls `ghostNick`.
+  - `Account2.elm:253` and `:267` say Elm has no folder or quiet-hours state. Stale since v3/gap-organize (`Organizer.elm` folders, `onyx:dnd-quiet-*`); the residence code still behaves as if it were true (G80).
+  - `GapShell.elm:321` (`FailTwoStep`) says two-step sign-in is something "this screen can't finish yet". Stale since v3/gap-auth finished it; the copy is now reachable only when a two-factor 904 arrives with no held account.
+  - `View/GuestClaim.elm:9` says the first-hour handoff suppress has no Elm state. Still true (G38).
 
 #### Elm better than Solid
-- **Cancel while dialing.** Elm can cancel a dial in flight (`View/Connect.elm:80`, `App.elm:37577`). Solid only locks the form.
-- **Alias reclaim in the shell.** Elm has a dialog from the identity chip that sends GHOST + NICK (`View/Topbar.elm:135`, `:168`, `App.elm:24187`). Solid's `reclaimNick` has no UI.
+- **Cancel while dialing.** Elm can cancel a dial in flight (`View/Connect.elm:125`, `App.elm:41750`). Solid only locks the form.
+- **Alias reclaim in the shell.** Elm has a dialog from the identity chip (and, on phones, a "Take your name back" row in the You hub) that sends GHOST + NICK (`View/Topbar.elm:153`, `:187`, `View/Nav.elm:404`, `App.elm:27408`). Solid's `reclaimNick` has no UI.
 - **DM header status chip.** Elm shows Private / key changed / Not encrypted (`View/DmSafety.elm:156`). Solid mounts the sheet with `hideTrigger` (`AppShell.tsx:1475`), so it shows no chip.
-- **Safety-number retry.** Elm has a "Try again" button (`View/DmSafety.elm:356`); Solid only has copy telling you to try again.
-- **DM key hold.** Elm holds a DM until the peer-key lookup answers, then offers an explicit "send unencrypted" (`App.elm:45042`, `:45092`, `View/Composer.elm:192`). This closes a race where Solid can send plaintext right after opening the DM.
-- **Raw slash plaintext guard.** Elm blocks raw slash verbs that would send plaintext to an E2EE DM or a required room (`App.elm:11180`, `:46232`). Solid's `/msg` falls through to a raw `MSG` (`store.ts:8529`).
-- **Overview facts.** Elm's account Overview also shows nick, secure, enforce and flags (`View/Account.elm:112`).
-- **Register hints.** The create-account form shows live hints as you type (`View/Connect.elm:246`).
-- **Gate footer links.** The connect gate links to About, Privacy, House rules and Status (`View/Connect.elm:110`).
+- **Safety-number retry.** Elm has a "Try again" button (`View/DmSafety.elm:359`); Solid only has copy telling you to try again.
+- **DM key hold.** Elm holds a DM until the peer-key lookup answers, then offers an explicit "send unencrypted" (`App.elm:50932` holdUnresolvedDm, `:50882` dmKeyUnresolved, `:41759` DmSendUnencrypted, `View/Composer.elm:206`). This closes a race where Solid can send plaintext right after opening the DM.
+- **Raw slash plaintext guard.** Elm blocks raw slash verbs that would send plaintext to an E2EE DM or a required room (`App.elm:12763` sendRawSlashCommand, `:52110` plaintextWouldLeak, `:52129` rawContentDestination). v3/gap-commands extended the guard to the translated verbs (`App.elm:13524`, `:13600`), and v3/gap-pwa-safety adds peers with a pending key change (`App.elm:12905` destinationsLeak). Solid's `/msg` falls through to a raw `MSG` (`store.ts:8529`).
+- **Overview facts.** Elm's account Overview also shows nick, secure, enforce and flags (`View/Account.elm:128`).
+- **Register hints.** The create-account form shows live hints as you type (`View/Connect.elm:609`).
+- **Gate footer links.** The connect gate links to About, Privacy, House rules and Status (`View/Connect.elm:159`).
+- **Two-step sign-in at the gate (v3/gap-auth).** When the server refuses a password login for a TOTP account (904 "Two-factor authentication required"), the gate moves to a code step; the password stays ports-side and the ports compose `IDENTIFY <account> <password> <code>` on a plain connection (`App.elm:53482`, `View/AuthGate.elm:331`, `AuthGateTest.elm`, `authGate.smoke.mjs`). Solid's Connect has no TOTP step.
+- **Forgot password (v3/gap-auth).** "Forgot password?" runs `RESETPASS <account>` then `RESETPASS <account> <code> <new-password>` (`View/AuthGate.elm:477`, `AuthGate.elm`). Solid has no reset path.
+- **Pre-registration CHALLENGE (v3/gap-auth).** Elm solves the server's BLAKE3 proof of work in `ports.js`, asks the person a challenge question when the server does, and stops honestly on failure (`View/AuthGate.elm:240`, `:289`, `:683`, `challenge.smoke.mjs`). Solid has no CHALLENGE handling.
+- **Passkey sign-in on the gate (G28).** Reachable from the sign-in form; Solid hides it.
+- **Sign-in failure copy (v3/gap-shell).** Wrong password, timeout, missing mechanism, registered name, name taken and an offline browser each get their own line (`GapShell.elm:314` failureCopy).
+- **Change password that the server accepts (G46).** Elm uses `SETPASS`; Solid's `ACCOUNTSET … password` is refused by Onyx Server.
+- **Recover a name also takes it back.** After a successful `RECOVER`, Elm sends `NICK` to claim the freed name, and offers "Release hold" (`App.elm:54520`, `View/GapAccount.elm:227`).
+- **Names & addresses (v3/gap-account).** Account → Names lists, adds and removes recognised addresses (`RECOGNIZE`) and grouped names (`GROUP`, make primary) (`View/GapAccount.elm:238`). Solid has no UI for either.
+- **Rooms I join automatically (v3/gap-usermodes)** and **Your rooms (v3/gap-chanserv)** are Account sections with no Solid counterpart (`View/UserModes.elm:859`, `View/Chanserv.elm:919`).
+- **Invite preview extras.** The gate shows a "With …" faces line for an invite and, for plain guests, a short "what you get" list (`View/Connect.elm:288`, `:314`).
+- **Queued-DM warning.** Switching encrypted DMs on warns that DMs queued while it was off will send unencrypted (`App.elm:54342`); Solid has no such warning.
+- **Key-change hold and alert.** A pending key change holds composer sends and raises one toast plus one Inbox row per change (`App.elm:12158`, `:40110`).
 
 #### Gaps (ranked by user impact)
-- `[High]` **Remembered identities + Stay signed in (G15–G19).**
-  - In `ports.js`, add list / select / save / forget ports over the `onyx:credentials` store.
-  - Wire the `Credentials.elm` access/sort logic into new `ConnectRemembered{Select,Act,Forget,Dismiss}` and `ConnectStaySignedIn` Msgs.
-  - Render the "Welcome back" block in `View/Connect.elm`.
-- `[High]` **Credential schema collision (G34).** Make `ports.js` `read/writeCredentialsStore` and the `index.html` boot read use Solid's v2 `{version:2,activeKey,entries[].sessionToken/meshToken}` shape, merging instead of overwriting.
-- `[Med]` **Protection toggles (G68).** Add `AccountProtectPasswordInput` and `AccountProtectionToggle "secure"|"enforce" Bool` → `Services.accountSet acct pw field "on"/"off"`, plus a Protection section in `View/Account.elm`.
-- `[Med]` **`?signin=1` (G10).** Read it in `App.init` (`bootParams`) and set `connectForm.mode = ConnectSignIn`.
-- `[Med]` **Connect-time reclaim (G13).** When `connectShowReclaim` is true, render a reclaim form in `View/Connect.elm`. `ConnectReclaimSubmit` should stage GHOST (+NICK) for after 001 on a fresh dial.
-- `[Med]` **Key-change alert (G89).** In the `DmOpenFailed`, seal-failed and scheduled `keyChanged` arms of `App.elm`, add a once-per-change `addToast` + `addNotification` ("<peer>'s encryption key changed — verify before continuing").
-- `[Med]` **Recover a name (G78).** Add `RecoverNickInput`, `RecoverPasswordInput` and `RecoverSubmitted` Msgs. Extend `Services.recover` with an optional password, and add a section to `View/Account.elm`.
-- `[Low]` **"Sign in as X" button (G12).** In `View/Connect.elm`, dispatch `ConnectModeSet ConnectSignIn` when the registered-name error shows.
-- `[Low]` **Invite preview aside (G20).** Render `App.inviteCard` (title, description, topic, access note) in `View/Connect.elm`.
-- `[Low]` **Page-restore reconnect (G30).** Have `ports.js` send a `pageRestored` port on `pageshow(persisted)` / `resume`; `App` calls `reconnectNow` when `autoReconnect`.
-- `[Low]` **Session row meta (G51).** Render age and sign-on time from `signonMs` in `View/Account.elm` sessionRow.
-- `[Low]` **Clear secrets on close (G82).** Have `SetAccountOpen False` clear the email, current, new, drop and recovery password fields.
-- `[Low]` **Show/hide password (G14).** Add a shared toggle for the password fields in `View/Connect.elm` and `View/Account.elm`.
-- `[Low]` **`?reader=1` (G23).** Parse it in `App.init` and set `prefs.readerMode`.
-- `[Low]` **Device-transfer sign-in targets (G35).** Add account handoffs to the Elm device-transfer bundle once G16 exists.
+- **[Closed — v3/rx-public]** (was High) **Remembered identities + Stay signed in (G15–G19).** Shipped as `credentialsRequest` / `credentialsListed` / `credentialsReady` ports over the `onyx:credentials` store (`ports.js:1617`, `:7858`), `Remembered.elm`, the "Welcome back" panel and the Stay signed in switch (`View/Connect.elm:336`, `:446`).
+- **[Closed — v3/rx-public]** (was High) **Credential schema collision (G34).** `ports.js` now migrates Solid's v2 entries and carries its fields through every write (`ports.js:1398`, `:1445`).
+- **[Closed — v3/gap-account]** (was Med) **Protection toggles (G68).** `View/GapAccount.elm:111`, `App.elm:55096` ProtectToggle → `Services.accountSet`.
+- **[Closed — v3/rx-public]** (was Med) **`?signin=1` (G10).** `App.elm:3648` init and `:28068` seedAppQuery.
+- **[Partly closed — v3/rx-public]** (was Med) **Connect-time reclaim (G13).** The nick-in-use error now offers "Sign in as <name>" (`View/Connect.elm:173`). Still missing, now `[Low]`: a GHOST-with-password form at the gate. Solid's was in effect a redial, so the missing piece is cosmetic.
+- **[Closed — v3/gap-pwa-safety]** (was Med) **Key-change alert (G89).** `flagPeerKeyChange` raises one toast and one Inbox row per change (`App.elm:40110`).
+- **[Closed — v3/gap-account]** (was Med) **Recover a name (G78).** `View/GapAccount.elm:191`, `App.elm:54943`. It has no password field because Onyx Server's RECOVER takes only the nick.
+- **[Closed — v3/rx-public]** (was Low) **"Sign in as X" button (G12).** `View/Connect.elm:173`, `App.elm:41725`.
+- **[Closed — v3/rx-public]** (was Low) **Invite preview aside (G20).** `View/Connect.elm:214`.
+- **[Closed — v3/gap-pwa-safety]** (was Low) **Page-restore reconnect (G30).** `ports.js:11557`, `App.elm:46008`.
+- `[Med]` **Clear secrets on close (G82).** `SetAccountOpen False` (`App.elm:41446`) only closes the sheet. v3/gap-account clears the Protection password and the Recover / Names drafts (`App.elm:54860`), but the email password, current / new / confirm password, delete confirm and delete password, and recovery-code password stay in the model and reappear when the panel reopens. Fix: have the same close step reset the fields that the 901 arm already clears (`App.elm:5778`).
+- `[Low]` **Show/hide password (G14).** Add one shared toggle for the password inputs in `View/Connect.elm:688`, `View/AuthGate.elm`, `View/GapAccount.elm:111` and `View/Account.elm`.
+- `[Low]` **`?reader=1` (G23).** Parse `Invite.parseReaderParam` in `App.init` and `seedAppQuery` and set `prefs.readerMode`; the reader-mode pref and fold exist now (`App.elm:53249`).
+- `[Low]` **Residence file folders and quiet hours (G80).** Export `Organizer` folders into `categories` and `onyx:dnd-quiet-start/end` into `quietHours` (`Account2.elm:270`), and apply them in `portableImportRun` (`App.elm:50343`) through `OrganizeMsg`.
+- `[Low]` **Device-transfer sign-in targets (G35).** Elm has no device-transfer bundle (the vault export is history only, `ports.js:891`); add saved sign-in targets (nick + server, never secrets) if one is built.
 - `[Low]` **`ocean-*` migration (G33).** Add a one-shot copy-only migration in `index.html` before the flags are read.
-- `[Low]` **Group indicator (G97).** Add an activation projection so `RoomSettings.groupMark` can show "active" and "identity pending".
-- `[Low]` **Guest chip placement (G38).** Also render `guestClaimChip` in the conversation column, not just Home.
-- `[Low]` **Account nav and error banner (G43–G44).** Add active-section tracking and a mobile drill-in to `View/Account.elm` sectionNav; show `command: description` with `role=alert`.
+- `[Low]` **Group indicator (G97).** Add an activation projection so `RoomSettings.groupMark` (`RoomSettings.elm:858`) can show "active" and "identity pending".
+- `[Low]` **Guest chip placement (G38).** The chip is on Home and in the call guest banner; also render it in the conversation column, and honour the first-hour suppress once Elm tracks it.
+- `[Low]` **Account nav and error banner (G43–G44).** Add active-section tracking and a mobile drill-in to `View/Account.elm:96` sectionNav (and a link for "Your rooms"); show `command: description` with `role=alert` in `errorNote` (`View/Account.elm:184`).
+- `[Low]` **Session row meta (G51).** Render age and sign-on time from `Session.AccountSessionRow.signonMs` in `View/Account.elm:239` sessionRow.
+- `[Low]` **Resume without a saved password (G17).** Solid also starts a passkey prompt there; Elm only prefills Sign-in (`App.elm:28309` rememberedReady).
+- `[Low]` **Stay signed in stores the account password in `localStorage` (G15).** Same as Solid and behind an explicit, off-by-default switch with a private-device warning; noted because it is the only place Elm keeps a password at rest (`ports.js:1617` remember).
 
 ### V — Data & vault — history vault, outbox, saved searches, import/export, notification & PWA runtime
 Solid walked: `src/lib/vault/*` (historyVault, vaultSync, outbox*, savedSearch*, retentionPolicy, searchVault*, embeddingIndex, dmSearchPrivacy, persistentStorage, storageEstimate, portable*, vaultResumeMemory, searchBounds, editHistory), `src/lib/import/*`, `src/shell/HistoryImportControls.tsx`, `src/shell/importFileLimits.ts`, `PreferencesPanel.tsx` (History & data / Import & export / App & tools), `src/lib/export/*`, `src/lib/notifications/*` (runtime, webPush, closed-tab, permission, digests, readState), `YouNotifications.tsx`, `NotificationCenter.tsx`, `home/homeController.ts` + `HomeBriefingView.tsx`, `src/pwa/*`, `public/sw.js`, misc libs (backgroundTask, autoJoin/ctcp memory, platform, net/*, clipboard, persistParse).
-Elm checked: `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`, `Push`, `Notify`, `NotifyCenter`, `Home`, `View/Prefs`, `View/Search`, `View/Inbox`, `View/Home`, `View/Account`, `View/Composer`, `View/Thread`, `View.elm`, `App.elm` folds, `Main.elm` ports, `ports.js`, `index.html`, `tools/build.sh`, `tools/elm-overlay.mjs`.
+Elm checked (re-verified at HEAD 609cb240): `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`, `Push`, `Notify`, `NotifyCenter`, `Home`, `AccountScope`, `GapAccount`, `GapClaim`, `HistoryImport`, `Attention`, `Organizer`, `Polish`, `View/Prefs`, `View/Search`, `View/Inbox`, `View/Home`, `View/Account`, `View/GapAccount`, `View/GapClaim`, `View/HistoryImport`, `View/Attention`, `View/Organize`, `View/Notify`, `View/GapShell`, `View/RoomSettings`, `View/RoomTools`, `View/Composer`, `View/Thread`, `View.elm`, `App.elm` folds, `Main.elm` ports, `ports.js`, `historyImport.js`, `index.html`, `tools/build.sh`, `tools/elm-overlay.mjs`, `public/sw.js`.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| V1 | Persist conversation buffers to IndexedDB (signature-gated, 400/target) | `src/lib/vault/vaultSync.ts:423` (auto) | FULL | `App.elm:43819` flushVaultBuffer, `App.elm:43707` signature, `ports.js:204` vaultPut | — |
-| V2 | Hydrate vault rows when a conversation buffer appears | `vaultSync.ts:294` hydrate (auto) | PARTIAL | `App.elm:35640` selectChannel | Fetch only on select of an EMPTY buffer; buffers with live rows never hydrate |
-| V3 | Cold-paint last-active room before connect (resume memory) | `vaultSync.ts:373`, `vaultResumeMemory.ts:48` (auto) | MISSING | — | No `onyx:vault-resume-target`; offline reload shows nothing until select |
-| V4 | Owner-scoped device memory (vault rows keyed per server+account) | `historyVault.ts:1451` owner_key (auto) | MISSING | `ports.js:13` single `onyx-vault` store | Shared device: next identity reads/searches prior identity's history |
-| V5 | Time travel `?at=` / open-at-message (loadAround) | `store.ts:7109` (auto/UI) | FULL | `App.elm:35752` requestTravelTo, `App.elm:43893` mergeVaultAround | — |
-| V6 | Ciphertext-only E2EE persistence | `historyVault.ts:113` OMIT_AT_REST (auto) | FULL | `App.elm:43779` chatToVaultRow | — |
-| V7 | Tombstones persisted, excluded from recall/time travel | `historyVault.ts:2266` (auto) | FULL | `App.elm:43779`, `ports.js:116` | — |
-| V8 | Local edit history (prior bodies of own edits) | `editHistory.ts:20`, `MessageView.tsx:651` (UI) | FULL | `App.elm:7068`, `View/Thread.elm:2157` | — |
-| V9 | Room media index reads vault | `RoomMediaIndex.tsx:115` (UI) | FULL | `App.elm:38428`, `View/RoomHeader.elm:350` | — |
-| V10 | Device recall pane "Remembered elsewhere" in search | `search/MessageSearch.tsx:851` (UI) | FULL | `App.elm:36953`, `View/Search.elm:233` | — |
-| V11 | Exact / related / hybrid engines (hash vectorizer, RRF, boosts) | `searchVaultHybrid.ts`, `searchVaultSemantic.ts` (auto) | FULL | `ports.js:579`, `ports.js:599` | Ollama provider DEAD in Solid |
-| V12 | In-search matching-mode switch | `MessageSearch.tsx:832` Advanced (UI) | PARTIAL | `View/Search.elm:251` CycleVaultSearchMode | Toggle only rendered when hits exist; label fixed "Saved on this device" |
-| V13 | Open a vault hit at its message | `MessageSearch.tsx:879` (UI) | FULL | `View/Search.elm:267`, `App.elm:36978` | — |
-| V14 | Encrypted-DM vault privacy classification | `search/useMessageSearch.ts:316` (auto) | FULL | `App.elm:1303`, `App.elm:36971` | — |
-| V15 | Device recall chips (lexical pivots) | `MessageSearch.tsx:711` (UI) | FULL | `App.elm:29502`, `View/Search.elm:222` | — |
-| V16 | Default search-mode preference | `PreferencesPanel.tsx:3669` (UI) | FULL | `View/Prefs.elm:207`, `App.elm:39695` | — |
+| V1 | Persist conversation buffers to IndexedDB (signature-gated, 400/target) | `src/lib/vault/vaultSync.ts:423` (auto) | FULL | `App.elm:48620 flushVaultBuffer`, `App.elm:48508 vaultBufferSignature`, `ports.js:284 vaultPut`, `Main.elm:1884 performIn` | Writes also need an owner scope and the local-history switch on; `App.elm:54145 gapGateVault` drops persists in the update that switches identity and rows erased this session (v3/gap-account) |
+| V2 | Hydrate vault rows when a conversation buffer appears | `vaultSync.ts:294` hydrate (auto) | PARTIAL | `App.elm:39404 selectChannel` (fetch at 39411), `App.elm:52271 historyImportTouched`, `App.elm:56454 gapClaimApply` | Fetch only on select of an EMPTY buffer (an import or a legacy-history claim also re-hydrates open empty buffers: v3/gap-import, v3/gap-claim); buffers with live rows never hydrate |
+| V3 | Cold-paint last-active room before connect (resume memory) | `vaultSync.ts:373`, `vaultResumeMemory.ts:48` (auto) | MISSING | `Main.elm:1884 performIn`, `ports.js:495 vaultGet` | No `onyx:vault-resume-target`; offline reload shows nothing until select. The vault cannot be read before the first registration either: the owner scope is only resolved on a live socket, and with no scope a read answers empty |
+| V4 | Owner-scoped device memory (vault rows keyed per server+account) | `historyVault.ts:1451` owner_key (auto) | FULL | `ports.js:146` owner-scope block, `ports.js:284 vaultPut`, `ports.js:490 vaultGet`, `Main.elm:1877 performIn`, `App.elm:54179 gapSettleScope`, `AccountScope.elm:132 scopeFor` | v3/gap-account: every vault row, search, DM-privacy proof, export, media index and outbox row carries an owner key (an account, or the one guest scope of the network; all mesh nodes are one network) and reads filter on it; no scope means reads answer empty and writes refuse. Rows from before scoping stay quarantined until an explicit Attach / Delete (v3/gap-claim: `View/GapClaim.elm:38 homeCard`, `:47 prefsCard`). Auto-join memory is still device-wide (V92) |
+| V5 | Time travel `?at=` / open-at-message (loadAround) | `store.ts:7109` (auto/UI) | FULL | `App.elm:39523` requestTravelTo, `App.elm:48694` mergeVaultAround | — |
+| V6 | Ciphertext-only E2EE persistence | `historyVault.ts:113` OMIT_AT_REST (auto) | FULL | `App.elm:48580` chatToVaultRow | — |
+| V7 | Tombstones persisted, excluded from recall/time travel | `historyVault.ts:2266` (auto) | FULL | `App.elm:48580`, `ports.js:140` | — |
+| V8 | Local edit history (prior bodies of own edits) | `editHistory.ts:20`, `MessageView.tsx:651` (UI) | FULL | `App.elm:7442`, `View/Thread.elm:2224` | — |
+| V9 | Room media index reads vault | `RoomMediaIndex.tsx:115` (UI) | FULL | `App.elm:42626`, `View/RoomHeader.elm:372` | — |
+| V10 | Device recall pane "Remembered elsewhere" in search | `search/MessageSearch.tsx:851` (UI) | FULL | `App.elm:41084`, `View/Search.elm:238` | Searches only the signed-in scope's rows (v3/gap-account) |
+| V11 | Exact / related / hybrid engines (hash vectorizer, RRF, boosts) | `searchVaultHybrid.ts`, `searchVaultSemantic.ts` (auto) | FULL | `ports.js:708`, `ports.js:728` | Ollama provider DEAD in Solid |
+| V12 | In-search matching-mode switch | `MessageSearch.tsx:832` Advanced (UI) | PARTIAL | `View/Search.elm:256` CycleVaultSearchMode | Toggle only rendered when hits exist; label fixed "Saved on this device" |
+| V13 | Open a vault hit at its message | `MessageSearch.tsx:879` (UI) | FULL | `View/Search.elm:272`, `App.elm:41109` | — |
+| V14 | Encrypted-DM vault privacy classification | `search/useMessageSearch.ts:316` (auto) | FULL | `App.elm:1453`, `App.elm:41102` | Proofs are cached per owner (`ports.js:386`) |
+| V15 | Device recall chips (lexical pivots) | `MessageSearch.tsx:711` (UI) | FULL | `App.elm:33207`, `View/Search.elm:227` | — |
+| V16 | Default search-mode preference | `PreferencesPanel.tsx:3669` (UI) | FULL | `View/Prefs.elm:285`, `App.elm:43885` | — |
 | V17 | Palette "Switch vault search to …" / `vault <mode>` | `chat/spotlight/commands.ts:519`, `:942` (palette) | MISSING | — | Switcher has no vault commands |
-| V18 | Save current search with a name | `MessageSearch.tsx:656` (UI) | FULL | `View/Search.elm:449`, `App.elm:39730` | — |
-| V19 | Run saved search | `MessageSearch.tsx:673` (UI) | FULL | `View/Search.elm:495`, `App.elm:39705` | — |
-| V20 | Delete saved search | `MessageSearch.tsx:689` (UI) | FULL | `View/Search.elm:505`, `App.elm:39724` | — |
-| V21 | Cross-tab saved-search invalidation | `savedSearches.ts:119` (auto) | FULL | `ports.js:1460`, `App.elm:37714` | Single default DB (no owner DBs) |
-| V22 | Clear all saved searches (count + confirm) | `PreferencesPanel.tsx:1404` (UI) | CORE-ONLY | `App.elm:1037` SearchClearRequest, `App.elm:37685` | Outbound never emitted; no Prefs card |
-| V23 | Saved searches travel in portable export/import | `portableTransfer.ts:162`, `:295` (UI) | CORE-ONLY | `App.elm:1038`–`1040`, `App.elm:37707`, `ports.js:6569` | Export/pick ports + fold exist; nothing emits `SearchExportRequest`/`SearchImportPick` |
-| V24 | On-device history keep/age policy | `PreferencesPanel.tsx:2835` (UI) | FULL | `View/Prefs.elm:398`, `View/Account.elm:312`, `App.elm:39569` | — |
-| V25 | Retention applied at boot across all targets | `routes/AppRoute.tsx:41` (auto) | PARTIAL | `ports.js:6002` save-time + per-write trim | No boot prune: idle targets keep over-age rows until a write/save |
-| V26 | Local history on/off (off = erase + stop persisting, retry erase) | `PreferencesPanel.tsx:600` (UI) | MISSING | — | No `localHistory` pref; persistence always on |
-| V27 | Clear local history (confirm, verified erase) | `PreferencesPanel.tsx:2942` (UI) | MISSING | — | No vault-clear port |
+| V18 | Save current search with a name | `MessageSearch.tsx:656` (UI) | FULL | `View/Search.elm:454`, `App.elm:43920` | — |
+| V19 | Run saved search | `MessageSearch.tsx:673` (UI) | FULL | `View/Search.elm:500`, `App.elm:43895` | — |
+| V20 | Delete saved search | `MessageSearch.tsx:689` (UI) | FULL | `View/Search.elm:510`, `App.elm:43914` | — |
+| V21 | Cross-tab saved-search invalidation | `savedSearches.ts:119` (auto) | FULL | `ports.js:2224`, `App.elm:41887` | Single default DB (no owner DBs): saved searches are shared by every identity on this browser |
+| V22 | Clear all saved searches (count + confirm) | `PreferencesPanel.tsx:1404` (UI) | FULL | `View/GapAccount.elm:517 SearchClearAsk`, `App.elm:55069 SearchClearAsk`, `App.elm:55075 SearchClearConfirm`, `App.elm:41858 SearchClearedReceived`, `App.elm:54423 gapSettleSearchStatus` | v3/gap-account: Preferences → History & data card with count, two-step confirm and a status line. `GapAccountAppTest` "saved-search clear asks, then requests" |
+| V23 | Saved searches travel in portable export/import | `portableTransfer.ts:162`, `:295` (UI) | PARTIAL | `View/GapAccount.elm:575 transferCards`, `App.elm:55078 SearchExport`, `ports.js:8008 savedSearchesExport`, `ports.js:8028 savedSearchesPick`, `App.elm:41880 SearchImportFile` | v3/gap-account: Export / Import saved searches buttons in Import & export, import merges. They travel as their own JSON file, not inside the portable vault file (`vaultExportSnapshot` carries message rows only) |
+| V24 | On-device history keep/age policy | `PreferencesPanel.tsx:2835` (UI) | FULL | `View/Prefs.elm:506`, `View/Account.elm:328`, `App.elm:43759` | — |
+| V25 | Retention applied at boot across all targets | `routes/AppRoute.tsx:41` (auto) | PARTIAL | `ports.js:7387 retentionPolicySave`, `ports.js:13302 pruneAllTargets` | No boot prune: idle targets keep over-age rows until a write or a policy save. Trims run per owner scope and skip unstamped legacy rows (v3/gap-account, v3/gap-claim) |
+| V26 | Local history on/off (off = erase + stop persisting, retry erase) | `PreferencesPanel.tsx:600` (UI) | FULL | `View/GapAccount.elm:428 LocalHistorySet`, `App.elm:54995 LocalHistorySet`, `App.elm:54909 gapStartErase`, `ports.js:189 localHistoryEnabled`, `ports.js:13235 clearVaultMessages` | v3/gap-account: switch in Preferences → History & data. Off stops writes (also re-checked ports-side), erases the store and verifies it by re-count; a failed erase says so and offers "Try erasing again" |
+| V27 | Clear local history (confirm, verified erase) | `PreferencesPanel.tsx:2942` (UI) | FULL | `View/GapAccount.elm:470 HistoryClearAsk`, `App.elm:55021 HistoryClearAsk`, `App.elm:55034 VaultCleared`, `ports.js:8365 gapVaultClear`, `ports.js:13235 clearVaultMessages` | v3/gap-account: confirmed clear of every account's rows on this browser (including unclaimed legacy rows), verified by re-count; queued and scheduled sends are left alone |
 | V28 | Clear reviewed catch-up anchors | `PreferencesPanel.tsx:1277` (UI) | MISSING | — | No reviewed-anchor state (see V84) |
 | V29 | Clear topic read positions | `PreferencesPanel.tsx:1612` (UI) | MISSING | `TopicRead.elm` state exists | No clear control |
-| V30 | Clear followed conversations | `PreferencesPanel.tsx:1768` (UI) | MISSING | `App.elm:31288` follow keys exist | No clear control |
-| V31 | Discard local drafts (room + topic, confirm) | `PreferencesPanel.tsx:1946` (UI) | PARTIAL | `View/Prefs.elm:536` | In-memory room drafts only; no topic drafts; drafts not persisted across reload |
-| V32 | Discard queued sends (all, count re-confirm) | `PreferencesPanel.tsx:2162` (UI) | FULL | `View/Prefs.elm:460`, `App.elm:40375` | Elm adds per-row Discard |
-| V33 | Offline send → durable outbox (100 cap, 24h TTL) | `store.ts:8089` (auto) | FULL | `App.elm:10599`, `ports.js:894` | — |
-| V34 | Reconnect flush with wire-admission / claim guards | `store.ts:7147` flushOutbox (auto) | FULL | `App.elm:30035`, `App.elm:37132`, `ports.js:962` | — |
-| V35 | Auto-retry 5×4s + terminal classification | `store.ts:7318` (auto) | FULL | `App.elm:37287`, `Outbox.elm` | — |
-| V36 | Composer outbox chrome + Retry now | `shell/Composer.tsx:1375`, `:1389` (UI) | PARTIAL | `View/Composer.elm:212` | Queue never read at boot: offline reload shows no chrome until 001/Prefs open |
-| V37 | Queued / delivery-uncertain placeholder rows | `MessageView.tsx:2285` (UI) | FULL | `View/Thread.elm:557`, `:580` | — |
-| V38 | Home queued-sends card + Try sending now | `home/HomeBriefingView.tsx:411` (UI) | PARTIAL | `View/Home.elm:226`, `:254` | No uncertain/admitted row states (prunePending hard-coded 0) |
-| V39 | Open a queued send (re-materialise placeholder + focus) | `HomeBriefingView.tsx:458`, `store.ts:7368` (UI) | PARTIAL | `View/Organize.elm` `homeOutboxActions` | v3/gap-organize: Open goes to the conversation the send is queued for; the placeholder row is already in the transcript |
-| V40 | Remove one queued send from Home (two-step confirm) | `HomeBriefingView.tsx:466`, `store.ts:7419` (UI) | FULL | `View/Organize.elm` `homeOutboxActions` (Remove → Confirm remove / Keep) → `PrefsOutboxRemove` | v3/gap-organize |
-| V41 | Export portable vault JSON | `PreferencesPanel.tsx:1151` (UI) | PARTIAL | `View/Prefs.elm:228`, `App.elm:40345`, `ports.js:6821` | Vault rows only; drops drafts, topic drafts, followed, read cursors, saved searches, reviews, sign-in targets, prefs |
+| V30 | Clear followed conversations | `PreferencesPanel.tsx:1768` (UI) | MISSING | `App.elm:35015` follow keys exist | No clear control |
+| V31 | Discard local drafts (room + topic, confirm) | `PreferencesPanel.tsx:1946` (UI) | PARTIAL | `View/Prefs.elm:644 draftsCard`, `App.elm:50144 prefsRoomDrafts`, `App.elm:55855 gapSettleDrafts`, `App.elm:55888 gapDraftsLoaded` | Drafts now persist across reload per owner, except E2EE DMs (v3/gap-convo). Prefs lists and discards ROOM drafts only (DM drafts remain); there are no topic drafts |
+| V32 | Discard queued sends (all, count re-confirm) | `PreferencesPanel.tsx:2162` (UI) | FULL | `View/Prefs.elm:568`, `App.elm:44566` | Elm adds per-row Discard |
+| V33 | Offline send → durable outbox (100 cap, 24h TTL) | `store.ts:8089` (auto) | FULL | `App.elm:12184`, `ports.js:1037 outboxQueue` | Rows are owner-scoped (v3/gap-account); with no scope the queue refuses and the draft is kept with an "Offline" toast (Solid refuses too) |
+| V34 | Reconnect flush with wire-admission / claim guards | `store.ts:7147` flushOutbox (auto) | FULL | `App.elm:33738 flushRequest`, `App.elm:41258 OutboxFlushed`, `ports.js:1107 outboxFlush` | Walks only this owner's rows; a scope change on a live socket re-flushes (`App.elm:54830 settleStepGapAccount`) |
+| V35 | Auto-retry 5×4s + terminal classification | `store.ts:7318` (auto) | FULL | `App.elm:41413`, `Outbox.elm` | — |
+| V36 | Composer outbox chrome + Retry now | `shell/Composer.tsx:1375`, `:1389` (UI) | PARTIAL | `View/Composer.elm:226`, `App.elm:49894 prefsOpen` | Queue is read only on the 001 flush or when Preferences opens; the owner scope exists only after the first registration, so an offline reload shows no composer or Home queue chrome |
+| V37 | Queued / delivery-uncertain placeholder rows | `MessageView.tsx:2285` (UI) | FULL | `View/Thread.elm:593`, `:580` | — |
+| V38 | Home queued-sends card + Try sending now | `home/HomeBriefingView.tsx:411` (UI) | PARTIAL | `View/Home.elm:227 outboxSection`, `View/Home.elm:233`, `View/Home.elm:255` | No uncertain/admitted row states: `prunePendingCount` is hard-coded 0 |
+| V39 | Open a queued send (re-materialise placeholder + focus) | `HomeBriefingView.tsx:458`, `store.ts:7368` (UI) | PARTIAL | `View/Organize.elm:1364 homeOutboxActions`, `Organizer.elm:837 OutboxOpen` | v3/gap-organize: Open goes to the conversation the send is queued for; it does not re-materialise a placeholder (the placeholder exists only for sends queued in this session) |
+| V40 | Remove one queued send from Home (two-step confirm) | `HomeBriefingView.tsx:466`, `store.ts:7419` (UI) | FULL | `View/Organize.elm:1364 homeOutboxActions`, `App.elm:44542 PrefsOutboxRemove`, `App.elm:50067 prefsOutboxReviewed` | v3/gap-organize: Remove → Confirm remove / Keep; the transcript placeholder goes with it. No Home-specific test |
+| V41 | Export portable vault JSON | `PreferencesPanel.tsx:1151` (UI) | PARTIAL | `View/GapAccount.elm:539 exportButton`, `View/GapAccount.elm:552 exportReview`, `App.elm:44535 PrefsVaultExport`, `ports.js:894 vaultExportAll`, `ports.js:866 vaultExportSnapshot` | This owner's message rows only, behind a "Before you download" review (v3/gap-account). Drops drafts, topic drafts, followed, read cursors, saved searches, reviews, sign-in targets, prefs |
 | V42 | Export compressed vault (.json.gz) | `PreferencesPanel.tsx:1164` (UI) | MISSING | — | — |
 | V43 | Save vault (plain / gzip) to file via File System Access | `PreferencesPanel.tsx:1175`, `:1185` (UI) | MISSING | — | — |
 | V44 | Share vault file (Web Share) | `PreferencesPanel.tsx:1200` (UI) | MISSING | — | — |
-| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | FULL | `View/HistoryImport.elm`, `HistoryImport.elm`, `historyImport.js` (portable kind) | 64 MiB file guard before reading; parsed in a worker; staged for review before any write (v3/gap-import) |
-| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | FULL | `historyImport.js` `readText` | `.json.gz` opened through `DecompressionStream`, 64 MiB expanded cap (v3/gap-import) |
-| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | FULL | `View/HistoryImport.elm` `reviewCard` | Counts (new / already here / left out), per-conversation include + destination, Cancel / Import (v3/gap-import) |
-| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | PARTIAL | `App.elm` `settleStepGapImport`, `HistoryImport.ownerChanged` | Owner change aborts a running or staged import (v3/gap-import); the cross-tab import lock is not ported |
-| V49 | Import applies prefs, scene motion, retention handoff | `portableTransfer.ts:228` (UI) | MISSING | — | `preferenceHandoff` ignored |
+| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | FULL | `View/HistoryImport.elm:655 vaultCard`, `App.elm:44538 PrefsVaultImport`, `App.elm:52172 historyImportUpdate`, `historyImport.js:768 addPortable` | 64 MiB file guard before reading; parsed in a worker; staged for review before any write (v3/gap-import). `/import` opens this pane (`App.elm:17453`) |
+| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | FULL | `historyImport.js:867 readText` | `.json.gz` opened through `DecompressionStream`, 64 MiB expanded cap (v3/gap-import). Import only: export is plain JSON (V42) |
+| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | FULL | `View/HistoryImport.elm:325 reviewCard`, `HistoryImport.elm:1201 plan` | Counts (new / already here / left out), per-conversation include + destination, retention-aware plan, Cancel / Import; Undo and a past-imports list (v3/gap-import) |
+| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | PARTIAL | `App.elm:52397 settleStepGapImport`, `HistoryImport.elm:1161 ownerChanged` | Owner change aborts a running or staged import (v3/gap-import); the cross-tab import lock is not ported (no `navigator.locks` or channel anywhere in the importer) |
+| V49 | Import applies prefs, scene motion, retention handoff | `portableTransfer.ts:228` (UI) | MISSING | — | `preferenceHandoff` ignored: an Elm export carries no prefs, and import reads message rows only |
 | V50 | Saved sign-in targets (account handoffs) transfer | `portableTransfer.ts:167` (UI) | MISSING | — | — |
-| V51 | Export result echo | `PreferencesPanel.tsx:867` (UI) | FULL | `App.elm:36989` | Counts messages/conversations only |
-| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/HistoryImport.elm` | Portable vault + four third-party sources (radiogroup with arrow keys) + past imports; the Discord bot-token route (V55) and the other tools are not ported |
-| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | FULL | `historyImport.js` `addDiscordExport`, `View/HistoryImport.elm` | Multi-file / paginated exports merge by message id; replies, attachments (http(s) only); review step; chunked + worker, progress + cancel (v3/gap-import) |
-| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | FULL | `historyImport.js` `discordPackage` | JSON and CSV message files, DMs; review step (v3/gap-import) |
-| V55 | Discord bot-token server import (proxy consent, progress, cancel, pins) | `HistoryImportControls.tsx:635`, `:834` (UI) | MISSING | — | Uses `/discord-import` proxy |
-| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | FULL | `historyImport.js` `slackExport` | Real per-day export layout and the bundle shapes Solid read; Slack markup decoded; review step (v3/gap-import) |
-| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | FULL | `historyImport.js` `ircLog` | WeeChat, irssi, mIRC, ZNC, HexChat logs; the room is chosen in the review, not before parsing (v3/gap-import) |
-| V58 | Import byte/count limits with copy | `shell/importFileLimits.ts:6` (UI) | MISSING | `VaultImport.elm:22` row ceilings only | No file-size gate before FileReader |
-| V59 | `/export [txt\|json]` local transcript | `store.ts:8400` (slash) | FULL | `App.elm:19339`, `Transcript.elm` | Toast says "Export started" even if download fails |
-| V60 | Room More → Export local transcript | `shell/PresenceRibbon.tsx:1216` (UI) | MISSING | — | — |
-| V61 | Ctrl/Cmd+Alt+E export shortcut | `lib/keyboard/shortcutsRegistry.ts:150` (shortcut) | MISSING | — | — |
-| V62 | Download device-history copy (account data verbs) | `app/AccountDataVerbs.tsx:100` (UI) | FULL | `View/Account.elm:1575`, `App.elm:16422` | — |
-| V63 | Vault persistence status + "Keep vault on this device" | `PreferencesPanel.tsx:2794`, `persistentStorage.ts:51` (UI) | MISSING | — | No App & tools tab |
+| V51 | Export result echo | `PreferencesPanel.tsx:867` (UI) | FULL | `App.elm:41120` | Counts messages/conversations only; the status line sits in the Portable vault card |
+| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/HistoryImport.elm:176 importCard`, `View/HistoryImport.elm:221 sourceButton`, `HistoryImport.elm:98 sources` | Four third-party sources in a radiogroup with arrow keys, plus a separate Portable vault card and a past-imports list; no single six-tool picker, and the Discord bot-token route (V55) is not ported |
+| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | FULL | `historyImport.js:261 addDiscordExport`, `View/HistoryImport.elm:176 importCard` | Multi-file / paginated exports merge by message id; replies, attachments (http(s) only); review step; chunked + worker, progress + cancel (v3/gap-import) |
+| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | FULL | `historyImport.js:345 discordPackage`, `historyImport.js:302 isPackageFile` | JSON and CSV message files, DMs; review step (v3/gap-import) |
+| V55 | Discord bot-token server import (proxy consent, progress, cancel, pins) | `HistoryImportControls.tsx:635`, `:834` (UI) | MISSING | — | Not shipped: no bot-token route, consent or `/discord-import` proxy call anywhere in `historyImport.js` or the Elm client (v3/gap-import narrowed it out on purpose) |
+| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | FULL | `historyImport.js:438 slackExport` | Real per-day export layout and the bundle shapes Solid read; Slack markup decoded; review step (v3/gap-import) |
+| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | FULL | `historyImport.js:654 ircLog` | WeeChat, irssi, mIRC, ZNC, HexChat logs; the room is chosen in the review, not before parsing (v3/gap-import) |
+| V58 | Import byte/count limits with copy | `shell/importFileLimits.ts:6` (UI) | FULL | `historyImport.js:963 LIMITS`, `historyImport.js:983 checkSelection` | File count and byte ceilings are checked before any read, with the Solid copy; Elm accepts many IRC log files where Solid took one (v3/gap-import) |
+| V59 | `/export [txt\|json]` local transcript | `store.ts:8400` (slash) | FULL | `App.elm:22466 runSlashExport`, `App.elm:22490 exportTranscriptFor`, `Transcript.elm` | Toast says "Export started" even if download fails |
+| V60 | Room More → Export local transcript | `shell/PresenceRibbon.tsx:1216` (UI) | FULL | `View/GapShell.elm:406` (ribbon-export-transcript), `App.elm:11330 GapShell.ExportTranscript`, `View/RoomSettings.elm:116`, `App.elm:52836 TranscriptExport` | Room More menu "Export transcript" (v3/gap-shell) and Room settings → Export transcript, text or JSON (v3/gap-people) |
+| V61 | Ctrl/Cmd+Alt+E export shortcut | `lib/keyboard/shortcutsRegistry.ts:150` (shortcut) | FULL | `ports.js:4575` chord, `Switcher.elm:1256`, `App.elm:49573 Switcher.ExportTranscript` | Ctrl/Cmd+Alt+E exports the room as text; ignored while typing (v3/gap-commands) |
+| V62 | Download device-history copy (account data verbs) | `app/AccountDataVerbs.tsx:100` (UI) | FULL | `View/Account.elm:1616`, `App.elm:19270` | Reads only this owner's rows (`Main.elm:1877 performIn`) |
+| V63 | Vault persistence status + "Keep vault on this device" | `PreferencesPanel.tsx:2794`, `persistentStorage.ts:51` (UI) | MISSING | `PrefsPanel.elm:37` (category list) | No App & tools tab |
 | V64 | Origin storage estimate + refresh | `PreferencesPanel.tsx:2820`, `storageEstimate.ts:43` (UI) | MISSING | — | — |
 | V65 | Installed-app readiness checks + Refresh app shell | `PreferencesPanel.tsx:2750`, `pwa/readiness.ts:82` (UI) | MISSING | — | — |
-| V66 | Service-worker registration (offline shell cache) | `index.tsx:13`, `pwa/serviceWorkerRuntime.ts:26` (auto) | MISSING | `ports.js:9749` comment | Elm registers no SW; `sw.js` deployed but never registered |
-| V67 | Update reload held while protected work active | `pwa/updateCoordinator.ts:7`; holds `AppShell.tsx:399`, `:418`, `Composer.tsx:213` (auto) | PARTIAL | `App.elm:45572` polishWorkActive | Only calls hold; drafts/uploads/connect form/theme edits don't |
-| V68 | Installed-app icon badge = unread attention | `pwa/AppBadgeRuntime.tsx:42` (auto) | MISSING | — | No setAppBadge |
-| V69 | Tab title "(N) Onyx" attention count | `pwa/AttentionTitleRuntime.tsx:20` (auto) | MISSING | `View.elm:146` documentTitle | Title shows room name, never a count |
-| V70 | Alert decision (kind/self/mute/focus/DND/permission/throttle) | `notifications/decision.ts` shouldNotify (auto) | FULL | `Notify.elm`, `App.elm:31644` | — |
-| V71 | Desktop notification + beep emission | `NotificationRuntime.tsx:161` (auto) | PARTIAL | `App.elm:31644`, `ports.js:5693`, `:5669` | No calm-preset, smart-mute rule, or quiet-hours gates |
-| V72 | Encrypted-message alert body redaction | `notificationBody.ts:38` (auto) | FULL | `App.elm:31623` notificationBodyFor | — |
-| V73 | Alert click opens the conversation / followed topic | `NotificationRuntime.tsx:212` (auto) | MISSING | `ports.js:5706` | Click only focuses the window |
-| V74 | Throttled alerts coalesce into "N new alerts in X" | `NotificationRuntime.tsx:195`, `:286` (auto) | MISSING | — | Throttled alerts are dropped |
-| V75 | Live permission monitor (site-settings changes) | `permissionMonitor.ts:45` (auto) | PARTIAL | `ports.js:5742` | Read at boot and after a request only |
-| V76 | Turn closed-tab push on/off (WEBPUSH SUBSCRIBE/UNSUBSCRIBE) | `YouNotifications.tsx:219`, `:231`; `NotificationControls.tsx:405` (UI) | PARTIAL | `View/Account.elm:476`, `App.elm:21691` toggleWebPush, `ports.js:8432` | No SW registered ⇒ `serviceWorker.ready` never settles on fresh browsers ⇒ stuck "Turning on…" |
-| V77 | Push state reconcile + silent recovery on reload/reconnect | `YouNotifications.tsx:105` (auto) | PARTIAL | `App.elm:21672` requestWebPushCheck | Gated on `webPushOn`, which boots False ⇒ never checks/recovers after reload |
-| V78 | One-tap "Turn on alerts" (permission + desktop pref + push) | `armClosedTab.ts:24`; `YouNotifications.tsx:150`; `FirstRunNotifyPrompt.tsx:77` (UI) | PARTIAL | `App.elm:45748` | First-run/desktop only request permission; push is a separate Account toggle |
-| V79 | Closed-tab status copy, "What can ping" kinds, host honesty | `closedTabCopy.ts:54`, `YouNotifications.tsx:239` (UI) | MISSING | `View/Account.elm:490` | Elm copy is "Push is on/off." only |
-| V80 | SW push → OS notification (E2EE-redacted) + click opens `/app?join=` | `public/sw.js:377`, `:438` (auto) | PARTIAL | `App.elm` parseDeepLinkJoin | Works only where a legacy Solid SW registration persists |
-| V81 | Away-digest tiers (attention / followed / quiet, calm preset) | `home/homeController.ts:425`, `awayDigest.ts:102` (UI) | PARTIAL | `Home.elm:217` composeInbox | Mentions/unread only; no followed/continue tier or calm preset |
-| V82 | "Since you left" digest card in a room | `MessageView.tsx:2074`, `sinceDigest.ts:80` (auto UI) | PARTIAL | `View/Attention.elm` (Home) | v3/gap-organize: on Home by design, per conversation |
-| V83 | Home "On this device" cold vault rooms while offline | `HomeBriefingView.tsx:486`, `homeController.ts:496` (UI) | PARTIAL | `View/Attention.elm` `homeMemoryNote` | v3/gap-organize: while offline Home says what this device is holding (queued sends, drafts); vault-backed cold rooms are not listed |
-| V84 | Reviewed catch-up anchors (record on caught-up, palette recall, reader span) | `homeController.ts:915`, `commands.ts:483`, `MessageView.tsx:1141` (UI/palette) | MISSING | `App.elm:30694` marks read only | — |
+| V66 | Service-worker registration (offline shell cache) | `index.tsx:13`, `pwa/serviceWorkerRuntime.ts:26` (auto) | FULL | `ports.js:11478 registerServiceWorker`, `ports.js:8591` (boot call) | v3/gap-pwa-safety: registers `/sw.js` at scope `/` with `updateViaCache: none` — only on https or loopback, after `load`, and when a HEAD probe says it is JavaScript; re-checks every 30 min while visible. `pwaSafety.smoke.mjs` |
+| V67 | Update reload held while protected work active | `pwa/updateCoordinator.ts:7`; holds `AppShell.tsx:399`, `:418`, `Composer.tsx:213` (auto) | PARTIAL | `App.elm:51412 polishWorkActive`, `App.elm:52100` | The update strip is live (v3/gap-pwa-safety) but the reload is held only while a call is active; drafts, uploads, the connect form and theme edits do not hold it |
+| V68 | Installed-app icon badge = unread attention | `pwa/AppBadgeRuntime.tsx:42` (auto) | FULL | `ports.js:13266 createAppBadge`, `ports.js:8443`, `Main.elm:1969`, `App.elm:54157 gapAttention` | v3/gap-account: room mentions plus unread DMs (muted DMs excluded) set the installed-app badge; cleared at boot; serialised writes, silent when unsupported |
+| V69 | Tab title "(N) Onyx" attention count | `pwa/AttentionTitleRuntime.tsx:20` (auto) | FULL | `View.elm:168 documentTitle`, `AccountScope.elm:371 attentionTitle` | v3/gap-account: "(N) room — Onyx" on app routes, capped at 999. Solid's title is a fixed "(N) Onyx" |
+| V70 | Alert decision (kind/self/mute/focus/DND/permission/throttle) | `notifications/decision.ts` shouldNotify (auto) | FULL | `Notify.elm`, `App.elm:35371 alertForDelivery` | — |
+| V71 | Desktop notification + beep emission | `NotificationRuntime.tsx:161` (auto) | FULL | `App.elm:35371 alertForDelivery`, `App.elm:53259 organizePresetKind`, `App.elm:53282 organizeQuietNow`, `ports.js:7119 notifyAlert`, `ports.js:7095 playNotifyBeep` | Calm / Regular / Power preset, smart-mute rules and quiet hours now gate alerts (v3/gap-organize); silent OS notification plus 880→660 Hz beep as in Solid |
+| V72 | Encrypted-message alert body redaction | `notificationBody.ts:38` (auto) | FULL | `App.elm:35350 notificationBodyFor` | Ciphertext envelopes fail closed to "New encrypted message"; decrypted DM text only reaches the Inbox, never an OS alert |
+| V73 | Alert click opens the conversation / followed topic | `NotificationRuntime.tsx:212` (auto) | PARTIAL | `ports.js:7132 note.onclick`, `App.elm:55234 NotifyClicked`, `Main.elm:2166` | v3/gap-account: a click focuses the window and opens the room or DM the alert was about, only if it was raised for the identity signed in now. A followed-topic alert opens the room, not the topic |
+| V74 | Throttled alerts coalesce into "N new alerts in X" | `NotificationRuntime.tsx:195`, `:286` (auto) | FULL | `App.elm:54672 gapQueueAlert`, `App.elm:54728 gapFlushAlerts`, `App.elm:54750 gapFlushOne` | v3/gap-account: a throttled desktop alert is held per conversation (64 max) and shown once as "N new alerts in X" when the 6 s window opens, re-decided against current mute, DND, focus and permission. Edge: that re-decision skips quiet hours, the preset and smart-mute rules |
+| V75 | Live permission monitor (site-settings changes) | `permissionMonitor.ts:45` (auto) | PARTIAL | `ports.js:7174` | Read at boot and after a request only |
+| V76 | Turn closed-tab push on/off (WEBPUSH SUBSCRIBE/UNSUBSCRIBE) | `YouNotifications.tsx:219`, `:231`; `NotificationControls.tsx:405` (UI) | FULL | `View/Account.elm:492`, `View/Notify.elm:179`, `App.elm:24906 toggleWebPush`, `ports.js:9927 createWebPush`, `ports.js:10101 register` | v3/gap-pwa-safety: `/sw.js` is registered and enable waits for that attempt, then a 15 s bounded `serviceWorker.ready`, failing with a typed reason instead of "Turning on…" forever. `webPush.smoke.mjs`, `GapPwaSafetyTest` |
+| V77 | Push state reconcile + silent recovery on reload/reconnect | `YouNotifications.tsx:105` (auto) | FULL | `App.elm:24890 requestWebPushCheck`, `App.elm:5720`, `App.elm:34953`, `App.elm:47753 WebPushRecoveryHint`, `ports.js:10354` (controllerchange) | v3/gap-pwa-safety: checked for every signed-in owner on login (900), permission grant and a new worker taking control; recovery runs only when the ports-side intent marker says push was opted in |
+| V78 | One-tap "Turn on alerts" (permission + desktop pref + push) | `armClosedTab.ts:24`; `YouNotifications.tsx:150`; `FirstRunNotifyPrompt.tsx:77` (UI) | FULL | `App.elm:51588`, `App.elm:51955 polishNotifyAnswered`, `App.elm:52003 firstRunArmsPush`, `View/Notify.elm:140 closedTabRow` | v3/gap-pwa-safety: first-run Turn on chains permission then closed-tab push when signed in, live and VAPID is advertised; the Notifications sheet toggle also asks permission itself. The desktop-alert pref is not force-enabled (it defaults on) |
+| V79 | Closed-tab status copy, "What can ping" kinds, host honesty | `closedTabCopy.ts:54`, `YouNotifications.tsx:239` (UI) | PARTIAL | `Push.elm:233 statusCopy`, `View/Notify.elm:140 closedTabRow`, `View/Account.elm:506` | Status line (Turning on / on / off / typed reason) and a signed-out hint (v3/gap-pwa-safety); no layered-alerts lede, no "What can ping" kinds list, no host honesty |
+| V80 | SW push → OS notification (E2EE-redacted) + click opens `/app?join=` | `public/sw.js:377`, `:438` (auto) | FULL | `ports.js:11478 registerServiceWorker`, `public/sw.js:377`, `public/sw.js:438`, `App.elm:18145 parseDeepLinkJoin` | v3/gap-pwa-safety: the shipped worker is now registered, redacts E2EE bodies and opens `/app/?join=<room>`, which the Elm deep link joins and opens. Not exercised in a real browser here |
+| V81 | Away-digest tiers (attention / followed / quiet, calm preset) | `home/homeController.ts:425`, `awayDigest.ts:102` (UI) | PARTIAL | `Home.elm:217 composeInbox`, `View/Home.elm:162` | Home still splits Mentions and Unread only; no followed, quiet-tail or calm-preset tiers. Rows gain a "Since you left" summary line (v3/gap-organize, V82) |
+| V82 | "Since you left" digest card in a room | `MessageView.tsx:2074`, `sinceDigest.ts:80` (auto UI) | PARTIAL | `View/Attention.elm:280 digest`, `View/Attention.elm:346 digestHead`, `View/Attention.elm:360 digestLine`, `Attention.elm:690 buildDigest` | v3/gap-organize: on Home, a headline plus a per-conversation line (who, when, top terms); no card in the room above the unread divider |
+| V83 | Home "On this device" cold vault rooms while offline | `HomeBriefingView.tsx:486`, `homeController.ts:496` (UI) | PARTIAL | `View/Attention.elm:384 homeMemoryNote` | v3/gap-organize: offline, Home says how many queued sends and drafts this device holds; vault-backed cold rooms are not listed, and the queue count is only what this session loaded (V36) |
+| V84 | Reviewed catch-up anchors (record on caught-up, palette recall, reader span) | `homeController.ts:915`, `commands.ts:483`, `MessageView.tsx:1141` (UI/palette) | MISSING | `App.elm:34400 homeMarkAllCaughtUp` | Mark all caught up marks read only; no reviewed-anchor state, palette recall or reader span |
 | V85 | Home "more activity" (remembered rooms, quiet activity/boosts, reviews) | `homeController.ts:806` (DEAD) | N/A | — | `HomeBriefingView` types `more` but renders nothing |
-| V86 | Unread read-state core (incoming / viewed / total mentions) | `readState.ts:24` (auto) | FULL | `App.elm:30663`, `App.elm:18662` | — |
-| V87 | Inbox bell, attention badge, filters, mark all read | `NotificationCenter.tsx:293`, `:314` (UI) | FULL | `View/Inbox.elm:52`, `:109`, `:156` | — |
-| V88 | Inbox row open (marks read, jumps) | `NotificationCenter.tsx:355` (UI) | PARTIAL | `View/Inbox.elm:204`, `App.elm:18628` | Follow-topic rows open the room without the topic jump |
-| V89 | Inbox row dismiss | `NotificationCenter.tsx:383` (UI) | FULL | `View/Inbox.elm:237` | — |
+| V86 | Unread read-state core (incoming / viewed / total mentions) | `readState.ts:24` (auto) | FULL | `App.elm:34369`, `App.elm:21789` | — |
+| V87 | Inbox bell, attention badge, filters, mark all read | `NotificationCenter.tsx:293`, `:314` (UI) | FULL | `View/Inbox.elm:55`, `:109`, `:156` | — |
+| V88 | Inbox row open (marks read, jumps) | `NotificationCenter.tsx:355` (UI) | PARTIAL | `View/Inbox.elm:211`, `App.elm:21755 activateNotification` | Follow-topic rows open the room without the topic jump |
+| V89 | Inbox row dismiss | `NotificationCenter.tsx:383` (UI) | FULL | `View/Inbox.elm:244` | — |
 | V90 | Inbox room-ledger links (head + per row) | `NotificationCenter.tsx:297`, `:372` (UI) | MISSING | — | — |
-| V91 | Clipboard write with legacy fallback | `lib/clipboard/writeClipboardText.ts` (UI, 20+ callers) | FULL | `ports.js:3968` | — |
-| V92 | Auto-join memory | `autoJoinMemory.ts:44`, `store.ts:5447` (auto) | FULL | `App.elm:11576`, `:11603` | Not owner-scoped |
-| V93 | CTCP config load | `ctcpMemory.ts:60`, `store.ts:5468` (auto) | FULL | `App.elm:37844` | — |
+| V91 | Clipboard write with legacy fallback | `lib/clipboard/writeClipboardText.ts` (UI, 20+ callers) | FULL | `ports.js:5331` | — |
+| V92 | Auto-join memory | `autoJoinMemory.ts:44`, `store.ts:5447` (auto) | FULL | `App.elm:14233`, `:11603` | Not owner-scoped |
+| V93 | CTCP config load | `ctcpMemory.ts:60`, `store.ts:5468` (auto) | FULL | `App.elm:42024` | — |
 | V94 | CTCP config setters (version reply / TIME / PING) | `store.ts:16580` (DEAD) | N/A | — | No non-test caller |
-| V95 | Connection / reconnect banner copy | `net/partitionBanner.ts:21`, `ReconnectStatusBanner.tsx:46` (auto) | FULL | `App.elm:16872` | mesh-partition/read-only kinds never passed in Solid (DEAD) |
-| V96 | Client-surface detection (standalone, native host) | `platform.ts:115` (auto) | PARTIAL | `ports.js:9805`, `Polish.elm:406` | No zig-desktop host bridge in the Elm build |
+| V95 | Connection / reconnect banner copy | `net/partitionBanner.ts:21`, `ReconnectStatusBanner.tsx:46` (auto) | FULL | `App.elm:19720 reconnectBanner`, `App.elm:11183 gapShellBanner` | v3/gap-shell puts a server-halt and known-close-reason banner ahead of the base copy; mesh-partition/read-only kinds were never passed in Solid (DEAD) |
+| V96 | Client-surface detection (standalone, native host) | `platform.ts:115` (auto) | PARTIAL | `ports.js:11677 polishFlags`, `Polish.elm:349 surfaceFor` | No zig-desktop host bridge in the Elm build |
 | V97 | Idle task scheduler / bounded abort / persistParse | `backgroundTask.ts:93`, `net/boundedAbort.ts:32`, `store/persistParse.ts` (internal/DEAD) | N/A | — | Plumbing; persistParse is test-only |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- COVERAGE:184 (vault row) says export/import are done and "Flag flipped partial→done: every header item traces". That overstates it. The oracle's UI export is the PortableTransfer superset (`portableTransfer.ts:159`: drafts, topic drafts, followed, read cursors, saved searches, review history, sign-in targets, prefs + retention). Elm exports vault-kind rows only (`ports.js:6821`) and imports with no review, size limit or gzip. It also has no owner scoping (V4), no cold paint (V3), and no local-history toggle or clear (V26/V27).
-- COVERAGE:184 calls the import trigger "`/import` … new surface, no oracle UI". This is wrong: the oracle has Preferences → Import & export → Portable vault "Import portable JSON" with a staged review (`PreferencesPanel.tsx:1206`, `:1219`). Elm itself now also has a Prefs import button (`View/Prefs.elm:229`).
-- COVERAGE:188 (saved searches) lists "save/delete/clear/export/import outbounds, file pick + download" as done. Clear, export and import are CORE-ONLY: `SearchClearRequest`, `SearchExportRequest` and `SearchImportPick` (`App.elm:1037`–`1039`) have no emitter anywhere, so no user can reach them.
-- COVERAGE:187 claims "View.Composer offline-enabled with live Outbox chrome". In fact the outbox mirror is only loaded on the 001 flush (`App.elm:30035`) or when Prefs opens (`App.elm:44403`). After an offline reload the composer and Home show no queued rows.
-- COVERAGE:196 (Home) is UNDERSTATED: it still lists "dismissal not persisted (`onyx:first-hour-seen`)" and "first-run notifications prompt not ported". v3/polish shipped both (`ports.js:9754` POLISH_FLAG_KEYS, `App.elm:45581` firstRunNotifyOffered).
-- COVERAGE has no row at all for web push, the desktop-alert runtime, the app badge, the attention title, or SW registration. These are silent gaps, and web push hides two defects (V76/V77).
-- V3_ROADMAP:70 shows 2.7 "Since you left digest, mark caught up" as plain `M`. That is partly UNDERSTATED: Mark all caught up shipped in v3/home (`App.elm:30694`). The since-digest card (V82) is still missing.
-- V3_ROADMAP:100 shows 4.5 History import as plain `M`. Portable-vault import exists in partial form, while the Discord, Slack and IRC-log importers have not been started. Status should read partial.
-- V3_ROADMAP:129 (7.3) is accurate that the Elm build registers no SW. It does not mention that push subscription depends on `serviceWorker.ready`, which never settles without a registration.
+- COVERAGE:184 (vault row) says export/import are done and "Flag flipped partial→done: every header item traces". That overstated it when written. Now: the import half is fixed (review-staged, size-gated, gzip-aware: v3/gap-import, V45–V47/V58), owner scoping is fixed (V4, v3/gap-account) and so are the local-history toggle and clear (V26/V27). Still true: the export is message rows only (`ports.js:866 vaultExportSnapshot`; V41/V49/V50, not the PortableTransfer superset in `portableTransfer.ts:159`) and there is no cold paint (V3). The COVERAGE:184 text itself is unchanged at HEAD and still describes the old merge path.
+- COVERAGE:184 calls the import trigger "`/import` … new surface, no oracle UI". Wrong when written (the oracle has Preferences → Import & export with a staged review: `PreferencesPanel.tsx:1206`, `:1219`) and the text is unchanged at HEAD. In the product, `/import` now opens Preferences → Import & export (`App.elm:17453`) where the review lives (v3/gap-import).
+- COVERAGE:188 (saved searches) listed "save/delete/clear/export/import outbounds, file pick + download" as done while Clear, Export and Import had no emitter. Fixed by v3/gap-account (`View/GapAccount.elm:517`, `:589`, `:590`; `App.elm:55069`–`55081`). Still true in that row: owner-scoped DBs are narrowed to the single default database (V21).
+- COVERAGE:187 claims "View.Composer offline-enabled with live Outbox chrome". Still true that it overstates: the outbox mirror is read only on the 001 flush or when Preferences opens (`App.elm:49894 prefsOpen`), and the owner scope that now gates every outbox read only exists after the first registration. After an offline reload the composer and Home show no queued rows (V36).
+- COVERAGE:197 (Home; was :196 in the map) is still UNDERSTATED: it lists "dismissal not persisted (`onyx:first-hour-seen`)", "first-run notifications prompt not ported" and "queued rows lack per-row Open/Remove". The first two were fixed by v3/polish (`ports.js:11638 POLISH_FLAG_KEYS`, `App.elm:51421 firstRunNotifyOffered`); the third by v3/gap-organize (Remove is full, Open lands in the conversation: V39/V40). The row is also silent on the "Since you left" lines and the offline "On this device" note (v3/gap-organize). The module header at `View/Home.elm:16` repeats the stale "no per-row Open / Remove" claim.
+- COVERAGE had no row for web push, the desktop-alert runtime, the app badge, the attention title or SW registration. Partly fixed: COVERAGE:228 (v3/gap-pwa-safety) now documents SW registration and web push. Still true: no COVERAGE or V3_ROADMAP row for per-account scoping, the local-history switch and clear, alert coalescing and click-to-open, the app badge or the attention title (all v3/gap-account).
+- V3_ROADMAP:70 shows 2.7 "Since you left digest, mark caught up" as plain `M`. Still understated: Mark all caught up shipped in v3/home (`App.elm:34400`) and the digest summary on Home shipped in v3/gap-organize (V82). The in-room card is still missing, so "partial" is right.
+- V3_ROADMAP:100 showed 4.5 History import as plain `M`. Fixed: it now reads "done except the Discord bot-token route" (v3/gap-import).
+- V3_ROADMAP:129 (7.3; now :130) was accurate that the Elm build registered no SW, but did not mention that push subscription depends on `serviceWorker.ready`. Registration is fixed (the row now says `ports.js` registers `/sw.js`, v3/gap-pwa-safety). The row still does not mention the push dependency, which the code now bounds with a 15 s timeout and a typed reason (`ports.js:9927`).
+- In-code comment `ports.js:9749` ("The Elm build registers NO service worker of its own"): fixed. Replaced by the registration block at `ports.js:11440` and the note at `ports.js:11625`.
+- In-code comment `ports.js:2211` ("the Elm client has no device-memory-owner machinery"): still stale. The vault, outbox and lists are owner-scoped now (V4); only saved searches stay in one default DB (V21).
+- In-code comment `ports.js:5244` ("so owner scoping, when the vault gains it, changes one place"): stale. The importer's ports already carry `owner` (`Main.elm:294`).
+- In-code comment `PrefsPanel.elm:37` ("`App & tools` is not ported — no PWA/extension surfaces in the Elm client yet"): partly stale. Registration, the update strip and closed-tab alerts exist; the tab itself is still absent (V63–V65).
 
 #### Elm better than Solid
-- Prefs → Queued sends has a per-row Discard (`View/Prefs.elm:490`). The Solid Prefs card is bulk-only (`PreferencesPanel.tsx:2162`).
-- `/import` slash verb reopens the vault picker from the composer (`App.elm:13018`). Solid has no slash path for this.
-- Retention controls appear on two surfaces: Account "On-device history" (`View/Account.elm:312`) and Prefs (`View/Prefs.elm:398`).
-- The document title names the active room (`View.elm:146`). The Solid title is a fixed "Onyx"/"(N) Onyx".
+- Prefs → Queued sends has a per-row Discard (`View/Prefs.elm:598`). The Solid Prefs card is bulk-only (`PreferencesPanel.tsx:2162`).
+- `/import` opens the Import & export pane from the composer (`App.elm:17453`). Solid has no slash path for this.
+- Retention controls appear on two surfaces: Account "On-device history" (`View/Account.elm:328`) and Prefs (`View/Prefs.elm:506`).
+- The document title names the active room and carries the "(N)" attention count (`View.elm:168`). The Solid title is a fixed "(N) Onyx".
+- History that predates owner scoping is never lost or silently adopted: unstamped rows are detected (count, date range, conversation count, never text), protected from retention trims and offered an explicit one-time Attach / Not now / Delete on Home and in Preferences (v3/gap-claim: `View/GapClaim.elm:38`, `:47`). Solid had no owner-less rows.
+- History import reads files in a Web Worker with progress and Cancel, merges overlapping paginated Discord exports by message id, reads the real per-day Slack layout and decodes its markup, dates time-only IRC log lines from day markers, lets the room be chosen in the review, and lists past imports with per-batch Undo / Remove (v3/gap-import: `historyImport.js`, `View/HistoryImport.elm:688 batchesCard`).
+- A portable export asks first: a "Before you download" review says what is and is not in the file (v3/gap-account: `View/GapAccount.elm:552 exportReview`).
+- Saved searches have their own Export / Import / Clear controls with counts and status lines (`View/GapAccount.elm:575 transferCards`, `:398 historyCards`); Solid only carries them inside the portable file and clears them from one card.
+- Closed-tab alerts are reachable from three places through one machine (first-run Turn on, the Notifications sheet row, the Account panel), and enabling fails with a typed reason after 15 s instead of hanging (v3/gap-pwa-safety: `View/Notify.elm:140`, `ports.js:9927`).
+- Service-worker registration is gated so an SPA fallback or 404 never logs a console error, and the update strip ignores workers installed by the page's own boot check (`ports.js:11478`, `:11625`).
+- Room settings has a text / JSON "Export transcript" that shows how many stored messages it will hold (v3/gap-people: `View/RoomTools.elm:104`).
 
 #### Gaps (ranked by user impact)
-- [High] Web push hangs on fresh browsers (V76/V80/V66). Register `/sw.js` in `ports.js` at boot (`navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'})`) and feed `controllerchange` into `WebPushRecoveryHint`. Also time-limit `swReady()` in `createWebPush` so the toggle fails with a reason instead of hanging.
-- [High] Push is never reconciled after a reload (V77). In `App.requestWebPushCheck` (`App.elm:21672`), drop the `not model.webPushOn` gate for signed-in sessions; the ports intent marker already keeps it opt-in.
-- [High] The vault is not owner-scoped (V4). Stamp `owner_key` from `App.deviceMemoryOwner` onto `VaultPersist`/`VaultFetch`/`VaultSearch`/export in `ports.js`, filter reads by it, and clear the in-memory mirror on owner change.
-- [High] No local-history toggle and no clear-history control (V26/V27). Add a `localHistory` pref (`Prefs.updatePreference`) that gates `flushVaultBuffer`, a `VaultClear` port with verified erase, and toggle + clear cards in the `View/Prefs` History tab.
-- [High] No third-party importers (V53–V57). Write pure Elm parsers mirroring `lib/import/*` that emit `VaultImport` snapshots. Add a Transfer tool picker in `View/Prefs`, multi-file/folder pickers in `ports.js`, and a bot import over the `/discord-import` proxy.
-- [Med] Portable export/import completeness (V41/V45–V50, V23). Extend `vaultExportAll` to bundle saved searches, drafts, follows, topic cursors and prefs. Stage `VaultImportFile` into a review state (`prefsImportPending`) with Import/Cancel, add a FileReader size check and `.json.gz` via DecompressionStream, and fan the sections out on confirm.
-- [Med] Desktop alert click doesn't open the conversation (V73). In `ports.js` `note.onclick`, send a new `notifyClicked {tag}` port and fold it into `ChannelSelect` (or the follow-topic open).
-- [Med] No attention title or app badge (V68/V69). Prefix `View.documentTitle` with `(N)` from `unreadAttentionCount`; add an `appBadge` port fired when the count changes.
-- [Med] Saved-search clear is unreachable (V22). Add a History-tab card in `View/Prefs` with a count and confirm that emits `SearchClearRequest`.
-- [Med] Vault hydrate on buffer appearance + cold paint (V2/V3). Emit `VaultFetch` on JOIN/first buffer (not only on an empty select), and persist and replay the last-active target via a resume-memory port.
-- [Med] Since-you-left digest (V82) and Home offline memory card (V83). Port `sinceDigest.ts` into a pure module rendered above the unread divider in `View/Thread`; add a vault-backed Home card while disconnected.
-- [Med] Home queued rows lack Open/Remove (V39/V40). Add `HomeOutboxOpen`/`HomeOutboxRemove` Msgs: Open re-adds the placeholder and focuses it; Remove reuses `OutboxReview {discard=[id]}`. Load the outbox at boot so V36 also works offline.
-- [Low] Room More → Export and Ctrl+Alt+E (V60/V61). Add a `runSlashExport` menu item in `View/RoomHeader` and a chord in the shortcut port.
-- [Low] Closed-tab alerts sheet parity (V78/V79). Add a "Turn on alerts" arm chaining `NotifyPermissionRequest` → `WebPushProbe`, plus the `closedTabCopy` strings and the kinds list in `View/Notify`.
-- [Low] Alert coalescing and live permission monitor (V74/V75). Queue throttled alerts per tag in `App` and flush on `Tick`; have `ports.js` subscribe to `navigator.permissions.query({name:'notifications'}).onchange`.
-- [Low] Reviewed anchors (V84/V28), storage persistence/estimate (V63/V64), wider update holds (V67), palette vault commands (V17), inbox ledger links (V90), boot-time retention prune (V25), always-visible mode switch (V12).
+- [High] ~~Web push hangs on fresh browsers (V76/V80/V66)~~ **[Closed — v3/gap-pwa-safety]** `/sw.js` is registered (`ports.js:11478`), `createWebPush` waits for that attempt and then a 15 s bounded `ready` with a typed reason (`ports.js:9927`), and the worker's push / click path is live (V80). Not exercised in a real browser by this audit.
+- [High] ~~Push is never reconciled after a reload (V77)~~ **[Closed — v3/gap-pwa-safety]** `requestWebPushCheck` (`App.elm:24890`) no longer needs `webPushOn`; it runs on login, on a permission grant and when a new worker takes control.
+- [High] ~~The vault is not owner-scoped (V4)~~ **[Closed — v3/gap-account]** Rows, search, DM-privacy proofs, export, media index and the outbox are filtered by an owner key (`ports.js:146`, `Main.elm:1877`); legacy rows wait for an explicit claim (v3/gap-claim).
+- [High] ~~No local-history toggle and no clear-history control (V26/V27)~~ **[Closed — v3/gap-account]** Switch and verified clear in Preferences → History & data (`View/GapAccount.elm:398`).
+- [High] ~~No third-party importers (V53–V57)~~ **[Closed — v3/gap-import]** Discord export and data package, Slack, IRC logs and the portable file import through a worker, a review and Undo. Only the Discord bot-token route (V55) is open; see the Low list.
+- [Med] Saved searches and auto-join memory are not owner-scoped (V21, V92). Every identity on this browser sees the others' saved queries and auto-join list; Solid keeps both per owner. Key the `onyx-vault-searches` DB name and the `onyx:autojoin-channels` key by the scope key from `App.gapAccount.scope`, as `ports.js:13095 SCOPED_LIST_SPECS` does for the lists.
+- [Med] Portable export is not the Solid superset (V41, V49, V50, V23, V48). Export carries message rows only: no drafts, followed rooms, topic read cursors, saved searches, reviews, sign-in targets or prefs, and an import cannot apply prefs or retention. Saved searches travel in a separate file, there is no cross-tab import lock, and there is no `.json.gz` export, File System Access save or Web Share (V42–V44). Extend `vaultExportSnapshot` with those sections and add the matching fan-out to the import review.
+- [Med] Vault hydrate on buffer appearance and cold paint (V2/V3). Emit `VaultFetch` when a buffer first appears, not only when an empty one is selected, and persist the last-active target. Design caveat: the owner scope exists only after the first registration (`App.elm:54179 gapSettleScope`), so a cold paint before connecting also needs a remembered scope key.
+- [Med] Offline reload shows no queued sends (V36, V83). The outbox is read only on the 001 flush or when Preferences opens, and needs the owner scope. Remember the last scope key and load the outbox mirror at boot so the composer and Home chrome work offline.
+- [Med] Since-you-left digest, in-room (V81, V82, V83). The Home digest and offline note shipped (v3/gap-organize). Still missing: the card above the unread divider in a room, the followed / quiet / calm-preset tiers on Home, and vault-backed cold rooms in the offline note. Port `sinceDigest.ts` into a pure module rendered in `View/Thread`.
+- [Med] Home queued rows: Open does not re-materialise the placeholder (V39). Remove is closed (v3/gap-organize). Open only navigates; add a `HomeOutboxOpen` fold that re-adds the transcript row for a send queued in an earlier session and focuses it.
+- [Low] Discord bot-token server import (V55). Needs the `/discord-import` proxy; deferred in the roadmap (8.x). Add the consent, progress and cancel UI to `View/HistoryImport` when the proxy is deployed.
+- [Low] A followed-topic alert and inbox row open the room, not the topic (V73, V88). Keep a tag → topic map beside `gapAccount.alertTags` and route `NotifyClicked` and `activateNotification` through the topic open.
+- [Low] A held alert's flush skips quiet hours, the preset and smart-mute rules (V74). `gapFlushOne` (`App.elm:54750`) should call the same gates as `alertForDelivery`.
+- [Low] ~~Alert click opens the conversation (V73)~~ **[Closed — v3/gap-account]** except for topics (above). ~~No attention title or app badge (V68/V69)~~ **[Closed — v3/gap-account]**. ~~Saved-search clear is unreachable (V22)~~ **[Closed — v3/gap-account]**. ~~Room More → Export and Ctrl+Alt+E (V60/V61)~~ **[Closed — v3/gap-shell, v3/gap-commands, v3/gap-people]**. ~~Alert coalescing (V74)~~ **[Closed — v3/gap-account]**.
+- [Low] Closed-tab alerts sheet copy (V79). Add the layered-alerts lede, the "What can ping" kinds list and host honesty to `View/Notify`. V78 (one-tap Turn on) is closed (v3/gap-pwa-safety).
+- [Low] Live permission monitor (V75). `ports.js:7174` reads the permission at boot and after a request only; subscribe to `navigator.permissions.query({name:'notifications'}).onchange`.
+- [Low] Reviewed anchors (V84/V28), clear topic read positions and followed conversations (V29/V30), topic drafts (V31), storage persistence / estimate (V63/V64), installed-app readiness (V65), wider update holds (V67), palette vault commands (V17), inbox ledger links (V90), boot-time retention prune (V25), always-visible mode switch (V12), and the false "Export started" toast when a download fails (V59).
 
 ### A — Store actions I — connection, messaging, accounts, channels, panels
 
-Walked every action in `src/lib/store/store.ts` 6392–10432 (242 incl. `voice.startScreenshare/stopScreenshare` and the four `e2eeKey*` actions; `sendMessage` non-slash arms + `deliverChatMessage` 5756), grepping non-test callers across `src/**` and internal `get().x` callers (interface block 960–1650 excluded). Elm: `App.elm` Msg (2610–3258) + folds/helpers, `RoomSettings.Msg`, `Polish.Msg`, `Switcher.elm` (palette + shortcuts), `View/*.elm`, `View.elm`, `Main.elm`, `ports.js`. Open/close pairs and same-shape families share rows. "DEAD" = no non-test caller.
+Walked every action in `src/lib/store/store.ts` 6392–10432 (242 incl. `voice.startScreenshare/stopScreenshare` and the four `e2eeKey*` actions; `sendMessage` non-slash arms + `deliverChatMessage` 5756), grepping non-test callers across `src/**` and internal `get().x` callers (interface block 960–1650 excluded). Elm: `App.elm` Msg (2610–3258) + folds/helpers, `RoomSettings.Msg`, `Polish.Msg`, `Switcher.elm` (palette + shortcuts), `View/*.elm`, `View.elm`, `Main.elm`, `ports.js`. Open/close pairs and same-shape families share rows. "DEAD" = no non-test caller. Statuses were re-read against the Elm code at HEAD `609cb240` (every `file:line` re-opened; bare `:NNN` back-references re-found); slice provenance is in the notes as `(v3/gap-…)`.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| A1 | Page-lifecycle reconcile (`setConnectionStatus`): bfcache `pageshow`/`freeze`→`resume` reconnects or marks reconnecting when offline | `src/app/connectPageLifecycle.ts:67` (auto) | MISSING | ports only hook `visibilitychange` (`ports.js:5758`); no `pageshow`/`resume`/`online` | restored-from-bfcache tab keeps a dead socket until WS close fires |
-| A2 | Auto-reconnect countdown (`setReconnectIn`) | `store.ts:782` (auto) | FULL | `App.elm:10279` `scheduleReconnect`; "Retrying in Ns" `App.elm:16901` | |
-| A3 | Dismiss session-reclaim banner | `src/shell/SessionReclaimBanner.tsx:98` (UI) | FULL | `App.elm:41952`, `View/Account2.elm:115` | |
-| A4 | Latency ping/pong (`setLatency`) | `store.ts:15513` (auto) | FULL | `App.elm:19652` `foldLatencyPong`, `PingDue` `Main.elm:1650` | state-only on both sides; nothing renders latency |
-| A5 | LUSERS server stats (`setServerStats`) | `store.ts:15530` (auto) | FULL | `App.elm:19778` `foldLusers` | state-only on both sides |
-| A6 | Retry now (`reconnectNow`) | `src/shell/ReconnectStatusBanner.tsx:131` (UI) | FULL | `App.elm:39392`, `View/Topbar.elm:245` | |
-| A7 | Connect (guest / SASL) | `src/app/Connect.tsx:720` (UI) | FULL | `ConnectSubmit` `App.elm:37574`, `View/Connect.elm:68` | Connect page detail mapped elsewhere |
-| A8 | Reconnect re-JOIN + replacing NAMES burst, suppressed under `onyx/session-sync` | `store.ts` connect `onConnected` (auto) | FULL | `App.elm:23126` `rejoinLiveChannels` (gate `:23128`) | |
-| A9 | Disconnect / leave session | `src/app/Connect.tsx:644`, `src/chat/spotlight/commands.ts:1352`, `SessionReclaimBanner.tsx:88` (UI/palette) | FULL | `SessionDisconnect` `App.elm:37596` via `Nav.YouLeave` `App.elm:44033`, palette `Switcher.Leave` `App.elm:44261` | |
-| A10 | Join a room (`joinChannel`) | `src/shell/ChannelSidebar.tsx:484` quick-join field, `ChannelBrowser.tsx:140`, `home/homeController.ts:897` invite accept, spotlight (UI/palette) | PARTIAL | `/join` `App.elm:12981`, `BrowserEnterRoom` `View/Browser.elm:241`, `InviteJoinSubmit` `View/Invite.elm:136` | no sidebar quick-join field; no Home invite-accept row |
-| A11 | Create room (`createRoom`) | `src/shell/CreateRoomFormation.tsx:194` (UI) | FULL | `CreateSubmit` `App.elm:39497`, `View/Formation.elm:53` | |
-| A12 | Focus composer after create-without-first-line (`clearPendingComposerFocus`) | `src/shell/Composer.tsx:663` (auto) | MISSING | only `PrefsFocus` uses `Browser.Dom.focus` (`Main.elm:1184`) | Low |
-| A13 | Deep link `?join=&at=&topic=` (`setPendingDeepLinkJoin`) | `src/app/Connect.tsx:267` (auto) | FULL | `App.elm:15297` `parseDeepLinkJoin`, `:35726` `firePendingDeepLinkJoin` | |
-| A14 | Time travel (`travelTo`: vault around + `CHATHISTORY AROUND`) | `src/shell/JumpToDateSheet.tsx:131`, spotlight `:337` (UI/palette) | PARTIAL | `JumpToDateSubmit` `App.elm:38669` → `requestTravelTo` `:35752` | rows fetched, but no scroll/highlight to the landing (see A15) |
-| A15 | Land on a message (`focusMessage`) | `src/shell/PinnedMessages.tsx:157`, `RoomMediaIndex.tsx:136`, `search/useMessageSearch.ts:673`, keyboard `useKeyboardShortcuts.ts:331` (UI/shortcut) | CORE-ONLY | `App.elm:13636` writes `historyLanding`; no View/port/anchor reads it (`App.elm:29763` excludes landings) | High: jump/pin/search landings never scroll |
-| A16 | Clear landing pulse (`clearTimeTravelLanding`) | `src/shell/MessageView.tsx:1547` (auto) | MISSING | — | no landing pulse exists |
-| A17 | Flush offline outbox (`flushOutbox`) | `src/lib/vault/vaultSync.ts:100` (auto), `Composer.tsx:1389`, `home/homeController.ts:969` (UI) | FULL | `OutboxFlushRequest` `App.elm:37284`, `View/Home.elm:254`, `View/Composer.elm:212`; `OutboxRetryFired` `Main.elm:1629` | |
-| A18 | Open a queued send in its conversation (`openQueuedSend`) | `src/shell/home/HomeBriefingView.tsx:457` (UI) | MISSING | `View/Home.elm:16` doc: no per-row Open | |
-| A19 | Remove one queued send (`discardQueuedSend`) | `src/shell/home/HomeBriefingView.tsx:465` (UI) | PARTIAL | `PrefsOutboxRemove` `View/Prefs.elm:490` | Preferences only; not on Home, no success toast |
-| A20 | Open vault search hit (`openVaultResult`) | `src/shell/search/MessageSearch.tsx:879`, spotlight `:511` (UI/palette) | PARTIAL | `VaultOpenHit` `App.elm:36978`, `View/Search.elm:267` | opens conversation; never lands on the hit (A15) |
-| A21 | Paint device-memory history (`hydrateHistory`) | `src/lib/vault/vaultSync.ts:331` (auto) | PARTIAL | `VaultRowsReceived` `App.elm:36907` | no "Device memory… while the network catches up" toast (string absent) |
-| A22 | Leave room (`partChannel`) | `src/shell/HarborConfirmSheet.tsx:62` from room menu/settings/stewardship/spotlight (UI/palette) | PARTIAL | `/part` `App.elm:12982`; stewardship close `App.elm:21560` | no Leave-room button or confirm sheet |
-| A23 | Set topic | `src/shell/ChannelSettings.tsx:211` (UI) | FULL | `RoomSettings.TopicSubmit` `View/RoomSettings.elm:214`; `/topic` `App.elm:12979` | |
-| A24 | Channel modes (`setChannelMode`: flags, key, limit) | `ChannelSettings.tsx:400`, `ModerationCockpit.tsx:164`, `lib/rooms/roomStewardshipActions.ts:115` (UI) | FULL | `FlagToggle` `View/RoomSettings.elm:330`, `KeySubmit` `:342`, `LimitSubmit` `:357`, `ModerationDeskToggleMode` `View/Bans.elm:369` | |
-| A25 | Kick (`kickMember`) | `ModerationCockpit.tsx:203`, `lib/moderation/applyMemberModeration.ts:11` (UI) | FULL | `ModerationPropose` `View/Profile.elm:778` → `ModerationConfirm` `:956`; `ModerationDeskSubmitMember` `View/Bans.elm:534` | |
-| A26 | Ban mask (`banMask`) | `ModerationCockpit.tsx:123` (UI) | FULL | `ModerationDeskSubmitBan` `View/Bans.elm:460`, `BanAddSubmit` `:128` | |
-| A27 | Unban mask (`unbanMask`) | `src/shell/moderation/BanListPanel.tsx:153` (UI) | FULL | `UnbanReviewConfirmed` `View/Bans.elm:298` | Elm adds a review step |
-| A28 | Invite user (`inviteUser`) | `ModerationCockpit.tsx:171` (UI) | FULL | `ModerationDeskSubmitInvite` `View/Bans.elm:421`; `/invite` `App.elm:12985` | |
+| A1 | Page-lifecycle reconcile (`setConnectionStatus`): bfcache `pageshow`/`freeze`→`resume` reconnects or marks reconnecting when offline | `src/app/connectPageLifecycle.ts:67` (auto) | FULL | `ports.js:11557` `installPageLifecycle` (wired `ports.js:8631`) → `keepalive.probe` `ports.js:3508` + `PageRestored` `App.elm:46008`; `offline`/`online` arms of `foldShellEvent` `App.elm:11389`; tests `GapPwaSafetyTest.elm:197`, `pwaSafety.smoke.mjs:325` | (v3/gap-pwa-safety, v3/gap-shell) a restored tab pings at once and an offline session redials; a socket that died while frozen closes on the 15 s pong timeout (Solid force-redials at once); `offline` drops the socket so sends queue |
+| A2 | Auto-reconnect countdown (`setReconnectIn`) | `store.ts:782` (auto) | FULL | `App.elm:11859` `scheduleReconnect`; "Retrying in Ns" `App.elm:19761` | |
+| A3 | Dismiss session-reclaim banner | `src/shell/SessionReclaimBanner.tsx:98` (UI) | FULL | `App.elm:46226`, `View/Account2.elm:115` | |
+| A4 | Latency ping/pong (`setLatency`) | `store.ts:15513` (auto) | FULL | `App.elm:22787` `foldLatencyPong`, `PingDue` `Main.elm:2078` | state-only on both sides; nothing renders latency |
+| A5 | LUSERS server stats (`setServerStats`) | `store.ts:15530` (auto) | FULL | `App.elm:22913` `foldLusers` | state-only on both sides |
+| A6 | Retry now (`reconnectNow`) | `src/shell/ReconnectStatusBanner.tsx:131` (UI) | FULL | `ReconnectNow` `App.elm:43581`, `View/Topbar.elm:297` |  |
+| A7 | Connect (guest / SASL) | `src/app/Connect.tsx:720` (UI) | FULL | `ConnectSubmit` `App.elm:41700`, `View/Connect.elm:113` | Connect page detail mapped elsewhere |
+| A8 | Reconnect re-JOIN + replacing NAMES burst, suppressed under `onyx/session-sync` | `store.ts` connect `onConnected` (auto) | FULL | `App.elm:26347` `rejoinLiveChannels` (session-sync gate `:26349`) |  |
+| A9 | Disconnect / leave session | `src/app/Connect.tsx:644`, `src/chat/spotlight/commands.ts:1352`, `SessionReclaimBanner.tsx:88` (UI/palette) | FULL | `SessionDisconnect` `App.elm:41769` via `Nav.YouLeave` `App.elm:48851`, palette `Switcher.Leave` `App.elm:49094` | |
+| A10 | Join a room (`joinChannel`) | `src/shell/ChannelSidebar.tsx:484` quick-join field, `ChannelBrowser.tsx:140`, `home/homeController.ts:897` invite accept, spotlight (UI/palette) | FULL | rail join-by-name `View/GapShell.elm:270` `joinField` → `GapShell.JoinNameSubmit` `App.elm:11346`; `/join` `App.elm:13079` `planJoin`; palette `Switcher.JoinTyped` `App.elm:49326`; `BrowserEnterRoom` `View/Browser.elm:242`; `InviteJoinSubmit` `View/Invite.elm:136`; Inbox invite row → JOIN + open `settleJoinFocus` `App.elm:11700`; tests `GapShellTest.elm:676`–`:734` | (v3/gap-shell, v3/gap-commands) invites are accepted from the Inbox bell row, not a Home row |
+| A11 | Create room (`createRoom`) | `src/shell/CreateRoomFormation.tsx:194` (UI) | FULL | `CreateSubmit` `App.elm:43686`, `View/Formation.elm:53` | |
+| A12 | Focus composer after create-without-first-line (`clearPendingComposerFocus`) | `src/shell/Composer.tsx:663` (auto) | MISSING | `settlePendingCreateRoom` `App.elm:18569` opens the room but emits no focus; `PrefsFocus` is only used for reply/edit/quote arms (`gapSettleComposerFocus` `App.elm:56137`) | Low: after Start a room with no first line the composer is not focused (the function's own doc says it is) |
+| A13 | Deep link `?join=&at=&topic=` (`setPendingDeepLinkJoin`) | `src/app/Connect.tsx:267` (auto) | FULL | `App.elm:18145` `parseDeepLinkJoin`, `:39497` `firePendingDeepLinkJoin` |  |
+| A14 | Time travel (`travelTo`: vault around + `CHATHISTORY AROUND`) | `src/shell/JumpToDateSheet.tsx:131`, spotlight `:337` (UI/palette) | FULL | `JumpToDateSubmit` `App.elm:42867` → `requestTravelTo` `:39523` (vault-around + `CHATHISTORY AROUND`); a closed server window lands via `gapSettleLanding` `:55984`; the vault half lands in `mergeVaultAround` `:48694`; test `GapConvoTest.elm:531`, `:560` | (v3/gap-convo) lands on the row nearest the moment; a dropped connection that clears a pending travel lands nowhere |
+| A15 | Land on a message (`focusMessage`) | `src/shell/PinnedMessages.tsx:157`, `RoomMediaIndex.tsx:136`, `search/useMessageSearch.ts:673`, keyboard `useKeyboardShortcuts.ts:331` (UI/shortcut) | FULL | `focusMessage` `App.elm:16484` → `gapLandOn` `:56407` → `gapSettleLanding` `:55984` (pages the window, un-collapses the sender, emits `TranscriptScroll "message"` / `"message-quiet"`) → `ports.js:4297` `landOn` (centre, pulse, focus); `css/gap-convo.css:250` `.gap-landed`; tests `GapConvoTest.elm:517`, `:587` | (v3/gap-convo) `historyLanding` is still written but nothing reads it; landing runs through `gapConvo.landing`. No smoke test drives `landOn` itself |
+| A16 | Clear landing pulse (`clearTimeTravelLanding`) | `src/shell/MessageView.tsx:1547` (auto) | FULL | `ports.js:4297` `landOn` adds `.gap-landed` and removes it after 1.6 s; `gapSettleLanding` clears `gapConvo.landing` once emitted (`App.elm:56089`) | (v3/gap-convo) the pulse clears itself in the port; reduced motion keeps a static accent marker (`css/gap-convo.css:257`) |
+| A17 | Flush offline outbox (`flushOutbox`) | `src/lib/vault/vaultSync.ts:100` (auto), `Composer.tsx:1389`, `home/homeController.ts:969` (UI) | FULL | `OutboxFlushRequest` `App.elm:41410`, `View/Home.elm:255`, `View/Composer.elm:226`; `OutboxRetryFired` `Main.elm:2056` | |
+| A18 | Open a queued send in its conversation (`openQueuedSend`) | `src/shell/home/HomeBriefingView.tsx:457` (UI) | FULL | Home queued rows `View/Organize.elm:1364` `homeOutboxActions` "Open" → `Organizer.OutboxOpen` `Organizer.elm:837` → `OpenConversation` (`ChannelSelect`); test `OrganizerTest.elm:660` | (v3/gap-organize) opens the conversation (the pending placeholder is the newest row); it does not scroll to or focus the placeholder |
+| A19 | Remove one queued send (`discardQueuedSend`) | `src/shell/home/HomeBriefingView.tsx:465` (UI) | PARTIAL | Home "Remove" asks first (`OutboxRemoveAsk`) then `PrefsOutboxRemove` `View/Organize.elm:1378` → `App.elm:44542`; also `View/Prefs.elm:598`; test `OrganizerTest.elm:654` | (v3/gap-organize) Home Remove exists; the result text lands only in the Preferences status line - no "Queued message removed" toast, and a failure shows nothing on Home |
+| A20 | Open vault search hit (`openVaultResult`) | `src/shell/search/MessageSearch.tsx:879`, spotlight `:511` (UI/palette) | PARTIAL | `VaultOpenHit` `App.elm:41109` → `ChannelSelect` + `VaultFetchAround` → `mergeVaultAround` `:48694`; `View/Search.elm:272` | (v3/gap-convo) lands on the row nearest the hit when its conversation is loaded; a hit in a room you have left or a DM outside the working set opens no shell and does not rejoin (Solid `openVaultResult` creates one and joins) - read from code, not run |
+| A21 | Paint device-memory history (`hydrateHistory`) | `src/lib/vault/vaultSync.ts:331` (auto) | PARTIAL | `VaultRowsReceived` `App.elm:41038` | no "Device memory… while the network catches up" toast (string absent) |
+| A22 | Leave room (`partChannel`) | `src/shell/HarborConfirmSheet.tsx:62` from room menu/settings/stewardship/spotlight (UI/palette) | FULL | `GapShell.LeaveAsk` / `LeaveConfirm` `App.elm:11280` (PART + "Left #room" toast; offline drops it locally) with the confirm sheet `View/GapShell.elm:435` `leaveConfirm`; entries: room header More `View/GapShell.elm:427`, rail row menu `View/Rail.elm:919`, Room care `View/Stewardship.elm:320`, palette `Switcher.elm:574` → `App.elm:49378`; `/part` `App.elm:13082`; tests `GapShellTest.elm:769`, `:810` | (v3/gap-shell) the palette row and `/part` send PART without the confirm sheet (Solid's spotlight opens it) |
+| A23 | Set topic | `src/shell/ChannelSettings.tsx:211` (UI) | FULL | `RoomSettings.TopicSubmit` `View/RoomSettings.elm:220`; `/topic` `App.elm:13105` |  |
+| A24 | Channel modes (`setChannelMode`: flags, key, limit) | `ChannelSettings.tsx:400`, `ModerationCockpit.tsx:164`, `lib/rooms/roomStewardshipActions.ts:115` (UI) | FULL | `FlagToggle` `View/RoomSettings.elm:336`, `KeySubmit` `:348`, `LimitSubmit` `:363`, `ModerationDeskToggleMode` `View/Bans.elm:449` |  |
+| A25 | Kick (`kickMember`) | `ModerationCockpit.tsx:203`, `lib/moderation/applyMemberModeration.ts:11` (UI) | FULL | `ModerationPropose` `View/Profile.elm:807` → `ModerationConfirm` `:995`; `ModerationDeskSubmitMember` `View/Bans.elm:633`; offered by actor rank `moderationCardKinds` `App.elm:52526` | (v3/gap-people) role-gated: only the actions your rank allows are offered, refusals explain the rule (`moderationRefusal` `App.elm:52540`) |
+| A26 | Ban mask (`banMask`) | `ModerationCockpit.tsx:123` (UI) | FULL | `ModerationDeskSubmitBan` `View/Bans.elm:540`, `BanAddSubmit` `:153` |  |
+| A27 | Unban mask (`unbanMask`) | `src/shell/moderation/BanListPanel.tsx:153` (UI) | FULL | `UnbanReviewConfirmed` `View/Bans.elm:378` | Elm adds a review step |
+| A28 | Invite user (`inviteUser`) | `ModerationCockpit.tsx:171` (UI) | FULL | `ModerationDeskSubmitInvite` `View/Bans.elm:501`; `/invite` `App.elm:13145` |  |
 | A29 | `setChannelAccess` (bulk commit) | — (DEAD) | N/A | — | access commits via inbound fold |
-| A30 | ACCESS LIST refresh (`fetchChannelAccess`) | `ChannelSettings.tsx:513` (UI/auto) | FULL | `RoomSettings.AccessRefresh` `View/RoomSettings.elm:508` | |
-| A31 | ACCESS ADD (level, mask, timeout) | `ChannelSettings.tsx:550` (UI) | FULL | `AccessSubmit` `View/RoomSettings.elm:567` | |
-| A32 | ACCESS DELETE | `ChannelSettings.tsx:557` (UI) | FULL | `AccessRemove` `View/RoomSettings.elm:560` | |
-| A33 | Webhook create | `ChannelSettings.tsx:580` (UI) | FULL | `WebhookCreate` `View/Stewardship.elm:454` | lives in stewardship sheet |
-| A34 | Webhook list | `ChannelSettings.tsx:585` (UI) | FULL | `View/Stewardship.elm:461` | |
-| A35 | Webhook delete | `ChannelSettings.tsx:593` (UI) | FULL | `View/Stewardship.elm:480` | |
-| A36 | Op/deop (`opMember`) | `ModerationCockpit.tsx:213`, `roomStewardshipActions.ts:57` (UI) | FULL | `Moderation.elm:51` Op/Deop via `ModerationPropose`; `StewardAddHelper` | |
-| A37 | Voice/devoice (`voiceMember`) | `ModerationCockpit.tsx:219` (UI) | FULL | `Moderation.elm:53` Voice/Devoice | |
-| A38 | Network profile (`whois` → `openWhois`) | `src/shell/PeopleProfileCard.tsx:210`, `AppShell.tsx:1233` (UI); `/whois` `store.ts:8507` (slash) | FULL | `MemberCardWhois` `View/Profile.elm:705`; `/whois` `App.elm:14627` | |
-| A39 | Close whois sheet | `src/shell/WhoisSheet.tsx:102` (UI) | FULL | `WhoisClose` `View/Profile.elm:48` | |
+| A30 | ACCESS LIST refresh (`fetchChannelAccess`) | `ChannelSettings.tsx:513` (UI/auto) | FULL | `RoomSettings.AccessRefresh` `View/RoomSettings.elm:515` | |
+| A31 | ACCESS ADD (level, mask, timeout) | `ChannelSettings.tsx:550` (UI) | FULL | `AccessSubmit` `View/RoomSettings.elm:574` | |
+| A32 | ACCESS DELETE | `ChannelSettings.tsx:557` (UI) | FULL | `AccessRemove` `View/RoomSettings.elm:567` | |
+| A33 | Webhook create | `ChannelSettings.tsx:580` (UI) | FULL | `WebhookCreate` `View/RoomTools.elm:50` → `requestWebhookCreate` `App.elm:24784` | (v3/gap-people) moved to Room settings → Integrations for any room host (`View/RoomSettings.elm:748`); gate `webhookGate` `App.elm:52570` |
+| A34 | Webhook list | `ChannelSettings.tsx:585` (UI) | FULL | `WebhookList` `View/RoomTools.elm:58` → `requestWebhookList` `App.elm:24811` | same place as A33 |
+| A35 | Webhook delete | `ChannelSettings.tsx:593` (UI) | FULL | `WebhookDelete` `View/RoomTools.elm:78` → `requestWebhookDelete` `App.elm:24823` | same place as A33 |
+| A36 | Op/deop (`opMember`) | `ModerationCockpit.tsx:213`, `roomStewardshipActions.ts:57` (UI) | FULL | `Moderation.elm:51` Op/Deop via `ModerationPropose`; `StewardAddHelper` `View/Stewardship.elm:225` | (v3/gap-people) offered by actor rank |
+| A37 | Voice/devoice (`voiceMember`) | `ModerationCockpit.tsx:219` (UI) | FULL | `Moderation.elm:53` Voice/Devoice via `ModerationPropose` | (v3/gap-people) offered by actor rank |
+| A38 | Network profile (`whois` → `openWhois`) | `src/shell/PeopleProfileCard.tsx:210`, `AppShell.tsx:1233` (UI); `/whois` `store.ts:8507` (slash) | FULL | `MemberCardWhois` `View/Profile.elm:734`; `/whois` `App.elm:17477` | |
+| A39 | Close whois sheet | `src/shell/WhoisSheet.tsx:102` (UI) | FULL | `WhoisClose` `View/Profile.elm:51` | |
 | A40 | TOTP enroll | `src/app/Account.tsx:894` (UI) | FULL | `TotpEnrollRequested` `View/Account.elm:587` | |
 | A41 | TOTP confirm | `Account.tsx:613` (UI) | FULL | `TotpConfirmSubmitted` `View/Account.elm:682` | |
 | A42 | TOTP disable | `Account.tsx:977` (UI) | FULL | `View/Account.elm:723` | |
-| A43 | TOTP status | `Account.tsx:479` (auto on open) | FULL | `openAccountPanel` `App.elm:26741` | |
-| A44 | Recovery codes status | `src/shell/RecoveryCodesSection.tsx:23` (UI/auto) | FULL | `View/Account.elm:1172`, `App.elm:26747` | |
-| A45 | Recovery codes generate | `RecoveryCodesSection.tsx:32` (UI) | FULL | `View/Account.elm:1154` | |
-| A46 | Recovery codes clear | `RecoveryCodesSection.tsx:37` (UI) | FULL | `View/Account.elm:1180` | |
-| A47 | Sign in with a recovery code | `src/app/Connect.tsx:782` (UI) | FULL | `ConnectRecoveryToggle` `View/Connect.elm:213`; `App.elm:24718` | |
-| A48 | Dismiss fresh codes | `RecoveryCodesSection.tsx:178` (UI) | FULL | `View/Account.elm:1277` | |
-| A49 | VHOST list | `Account.tsx:482` (auto) | FULL | `App.elm:26756` | |
+| A43 | TOTP status | `Account.tsx:479` (auto on open) | FULL | `openAccountPanel` `App.elm:30418` | |
+| A44 | Recovery codes status | `src/shell/RecoveryCodesSection.tsx:23` (UI/auto) | FULL | `View/Account.elm:1206`, `App.elm:30424` | |
+| A45 | Recovery codes generate | `RecoveryCodesSection.tsx:32` (UI) | FULL | `View/Account.elm:1188` | |
+| A46 | Recovery codes clear | `RecoveryCodesSection.tsx:37` (UI) | FULL | `View/Account.elm:1214` | |
+| A47 | Sign in with a recovery code | `src/app/Connect.tsx:782` (UI) | FULL | `ConnectRecoveryToggle` `View/Connect.elm:570`; `App.elm:27949` | |
+| A48 | Dismiss fresh codes | `RecoveryCodesSection.tsx:178` (UI) | FULL | `View/Account.elm:1311` | |
+| A49 | VHOST list | `Account.tsx:482` (auto) | FULL | `App.elm:30433` | |
 | A50 | VHOST use | `Account.tsx:1174` (UI) | FULL | `View/Account.elm:924` | |
 | A51 | VHOST claim | `Account.tsx:1205` (UI) | FULL | `View/Account.elm:943` | |
 | A52 | VHOST off | `Account.tsx:1182` (UI) | FULL | `View/Account.elm:904` | |
-| A53 | Server history search | `src/shell/search/useMessageSearch.ts:414` (UI) | FULL | `SearchRunServer` `View/Search.elm:77` | |
-| A54 | Clear settled server search on close | `useMessageSearch.ts:261` (auto) | PARTIAL | `SearchClose` `App.elm:39556` | settled server results survive close/reopen |
-| A55 | Navigate (mark read, divider, MARKREAD, roster refresh, DM MONITOR + dm-key GET, memo clear) | ChannelSidebar/spotlight/etc. (UI) | FULL | `ChannelSelect` `View/Rail.elm:369` → `App.elm:35633` | |
-| A56 | Send: plain + labeled optimistic echo | `src/shell/Composer.tsx:1154` (UI) | FULL | `ComposerSend` `App.elm:38958`, `View/Composer.elm:68` | |
-| A57 | Send: offline queue + pending placeholder | `store.ts:8052` (UI) | FULL | `OutboxQueued` `App.elm:37055` | |
-| A58 | Send: refuse to queue E2EE DM / required room | `store.ts:8066`, `:8074` (UI) | FULL | `App.elm:8643`, `:8646` | |
-| A59 | Send: E2EE DM seal, fail-closed | `store.ts:5837` (UI) | FULL | `DmSealed` `App.elm:42881` (`Main.elm:1699`) | |
-| A60 | Send: required-room ONYXROOM1 seal | `store.ts:5844` (UI) | FULL | `RoomSealed` `App.elm:43095` | |
-| A61 | Send: reply tag only for same target | `store.ts:5775` (UI) | FULL | `replyTagFor` `App.elm:7798` | |
-| A62 | Send: multiline batches | `store.ts:6046` (UI) | FULL | `Multiline.planMultilineBatches` `App.elm:10626` | |
+| A53 | Server history search | `src/shell/search/useMessageSearch.ts:414` (UI) | FULL | `SearchRunServer` `View/Search.elm:78` | |
+| A54 | Clear settled server search on close | `useMessageSearch.ts:261` (auto) | PARTIAL | `SearchClose` `App.elm:43745` | settled server results survive close/reopen (the query is kept too, so they come straight back) |
+| A55 | Navigate (mark read, divider, MARKREAD, roster refresh, DM MONITOR + dm-key GET, memo clear) | ChannelSidebar/spotlight/etc. (UI) | FULL | `ChannelSelect` `View/Rail.elm:452` → `App.elm:39404` | |
+| A56 | Send: plain + labeled optimistic echo | `src/shell/Composer.tsx:1154` (UI) | FULL | `ComposerSend` `App.elm:43156` → `dispatchComposerSlash` → `sendComposerText` `App.elm:12158`, `View/Composer.elm:73` | (v3/gap-commands) plain text takes the same path as before; slow mode holds a send (v3/gap-chanserv) |
+| A57 | Send: offline queue + pending placeholder | `store.ts:8052` (UI) | FULL | `OutboxQueued` `App.elm:41181` | |
+| A58 | Send: refuse to queue E2EE DM / required room | `store.ts:8066`, `:8074` (UI) | FULL | `App.elm:9038` (room), `:9041` (DM) |  |
+| A59 | Send: E2EE DM seal, fail-closed | `store.ts:5837` (UI) | FULL | `DmSealed` `App.elm:47241` (`Main.elm:2130`); key-change hold in `sendComposerText` `App.elm:12158` | (v3/gap-pwa-safety) a pending DM key change holds the send; nothing seals toward it or goes out in plaintext |
+| A60 | Send: required-room ONYXROOM1 seal | `store.ts:5844` (UI) | FULL | `RoomSealed` `App.elm:47450` | |
+| A61 | Send: reply tag only for same target | `store.ts:5775` (UI) | FULL | `replyTagFor` `App.elm:8174` | |
+| A62 | Send: multiline batches | `store.ts:6046` (UI) | FULL | `Multiline.planMultilineBatches` `App.elm:12217` | |
 | A63 | `sendRaw` store action | — (DEAD; callers use `client.sendRaw`) | N/A | — | |
-| A64 | REGISTER (`registerAccount`) | `src/app/Connect.tsx:822`, `GuestClaimPrompt.tsx:303` (UI) | FULL | `GuestClaimSubmit` `View/GuestClaim.elm:177`; Connect register → `App.elm:24759` | |
+| A64 | REGISTER (`registerAccount`) | `src/app/Connect.tsx:822`, `GuestClaimPrompt.tsx:303` (UI) | FULL | `GuestClaimSubmit` `View/GuestClaim.elm:177`; Connect register → `App.elm:27990` | |
 | A65 | VERIFY (`verifyAccount`) | `Connect.tsx:846`, `GuestClaimPrompt.tsx:329` (UI) | FULL | `GuestClaimVerifySubmit` `View/GuestClaim.elm:245` | Connect register routes through claim sheet |
-| A66 | IDENTIFY after VERIFY (`identify`) | `src/shell/GuestClaimPrompt.tsx:250` (auto) | FULL | `chainClaimIdentify` `App.elm:24911` | |
-| A67 | Register passkey | `src/shell/PasskeysSection.tsx:146` (UI) | FULL | `PasskeyRegisterSubmitted` `View/Account.elm:1318` | |
-| A68 | Sign in with passkey (`WEBAUTHN AUTH`) | `src/app/Connect.tsx:925` (DEAD: gated off by `PRESENT_PASSKEY_SIGNIN = false`, `Connect.tsx:105`) | N/A | `Passkey.webauthnAuth` `Passkey.elm:336` never sent; finish fold `App.elm:42864`; no Connect control | coordinator correction: Solid never presents this control; parity holds, future work only |
-| A69 | List passkeys | `PasskeysSection.tsx:125` (UI/auto) | FULL | `View/Account.elm:1388`; open refresh `App.elm:26750` | |
-| A70 | Remove passkey | `PasskeysSection.tsx:166` (UI) | FULL | `PasskeyRemoveConfirmed` `View/Account.elm:1487` | |
-| A71 | Rename passkey | `PasskeysSection.tsx:160` (UI) | FULL | `PasskeyRenameSubmitted` `View/Account.elm:1514` | |
-| A72 | Dismiss passkey message | `src/app/Connect.tsx:867` (DEAD with A68) | N/A | — | tied to A68 (coordinator correction) |
-| A73 | Sign out (`LOGOUT`) | `src/app/Account.tsx:618` (UI) | FULL | `SessionLogoutRequested` `View/Account.elm:263`; `App.elm:26684` | |
-| A74 | ACCOUNTINFO on open | `Account.tsx:478` (auto) | FULL | `App.elm:26730` | |
-| A75 | SESSION LIST | `src/shell/SessionsDevicesSection.tsx:36` (UI/auto) | FULL | `SessionListRequested` `View/Account.elm:189` | |
-| A76 | Oper event replay | `src/shell/OperEventConsole.tsx:75` (UI) | FULL | `OperEventReplayRequested` `View/ModDesk.elm:488` | |
-| A77 | Drop session + revoke others | `SessionsDevicesSection.tsx:45`, `:58` (UI) | FULL | `View/Account.elm:246`, `View/Account2.elm:159` | |
-| A78 | ACCOUNTSET email / password | `Account.tsx:507`, `:556` (UI) | FULL | `View/Account.elm:993`, `:1051` | |
-| A79 | ACCOUNTSET secure / enforce toggles | `Account.tsx:573` (UI) | MISSING | `View/Account.elm:132` read-only facts | |
-| A80 | Recover a name (`RECOVER`) | `src/app/Account.tsx:582` (UI) | MISSING | `Services.recover` `Services.elm:920` has no caller | |
-| A81 | Delete account (`DROP`) | `src/app/AccountDataVerbs.tsx:119` (UI) | FULL | `DropSubmitted` `View/Account.elm:1618` | |
-| A82 | GHOST nick holder | `src/app/Connect.tsx:945` (UI, connect page) | FULL | `ReclaimSubmit` `View/Topbar.elm:200` → `App.elm:24187` | Elm: in-session dialog, GHOST+NICK+retry |
+| A66 | IDENTIFY after VERIFY (`identify`) | `src/shell/GuestClaimPrompt.tsx:250` (auto) | FULL | `chainClaimIdentify` `App.elm:28588` | |
+| A67 | Register passkey | `src/shell/PasskeysSection.tsx:146` (UI) | FULL | `PasskeyRegisterSubmitted` `View/Account.elm:1359` | |
+| A68 | Sign in with passkey (`WEBAUTHN AUTH`) | `src/app/Connect.tsx:925` (DEAD: gated off by `PRESENT_PASSKEY_SIGNIN = false`, `Connect.tsx:105`) | N/A | Solid never presents it. Elm does: `View/AuthGate.elm:670` "Sign in with a passkey" → `AuthGate.StartPasskey` `App.elm:53372` sends `Passkey.webauthnAuth` `Passkey.elm:339`; finish fold `App.elm:47224` | (v3/gap-auth) parity holds because Solid hides the control; Elm ships it (see Elm better) |
+| A69 | List passkeys | `PasskeysSection.tsx:125` (UI/auto) | FULL | `View/Account.elm:1429`; open refresh `App.elm:30427` | |
+| A70 | Remove passkey | `PasskeysSection.tsx:166` (UI) | FULL | `PasskeyRemoveConfirmed` `View/Account.elm:1528` | |
+| A71 | Rename passkey | `PasskeysSection.tsx:160` (UI) | FULL | `PasskeyRenameSubmitted` `View/Account.elm:1555` | |
+| A72 | Dismiss passkey message | `src/app/Connect.tsx:867` (DEAD with A68) | N/A | error line `conn-passkey-error` `View/AuthGate.elm:674` | tied to A68; Elm shows passkey sign-in errors on the Connect form |
+| A73 | Sign out (`LOGOUT`) | `src/app/Account.tsx:618` (UI) | FULL | `SessionLogoutRequested` `View/Account.elm:279`; `App.elm:30361` | |
+| A74 | ACCOUNTINFO on open | `Account.tsx:478` (auto) | FULL | `App.elm:30407` | |
+| A75 | SESSION LIST | `src/shell/SessionsDevicesSection.tsx:36` (UI/auto) | FULL | `SessionListRequested` `View/Account.elm:205` | |
+| A76 | Oper event replay | `src/shell/OperEventConsole.tsx:75` (UI) | FULL | `OperEventReplayRequested` `View/ModDesk.elm:958` | |
+| A77 | Drop session + revoke others | `SessionsDevicesSection.tsx:45`, `:58` (UI) | FULL | `View/Account.elm:262`, `View/Account2.elm:159` | |
+| A78 | ACCOUNTSET email / password | `Account.tsx:507`, `:556` (UI) | FULL | `AccountEmailSubmitted` `View/Account.elm:993`, `AccountPasswordSubmitted` `:1061` |  |
+| A79 | ACCOUNTSET secure / enforce toggles | `Account.tsx:573` (UI) | FULL | `View/GapAccount.elm:111` `protectionSection` ("Require sign-in", "Hold this name"; mounted `View/Account.elm:80`) → `GapAccount.ProtectToggle` `App.elm:55096` → `ACCOUNTSET`; tests `GapAccountTest.elm:33`, `GapAccountAppTest.elm:724` | (v3/gap-account) asks for the account password (cleared on send and when the sheet closes); shows "haven't loaded yet" until ACCOUNTINFO answers |
+| A80 | Recover a name (`RECOVER`) | `src/app/Account.tsx:582` (UI) | FULL | `View/GapAccount.elm:111` `protectionSection` "Recover a name" (+ "Release hold") → `GapAccount.RecoverSubmit` `App.elm:55147`, `ReleaseSubmit` `:55150` → `gapRecoverSend` `:54943` → `Services.recover` `Services.elm:947`; tests `GapAccountAppTest.elm:908` | (v3/gap-account) signed-in owners only; Release is an Elm extra |
+| A81 | Delete account (`DROP`) | `src/app/AccountDataVerbs.tsx:119` (UI) | FULL | `DropSubmitted` `View/Account.elm:1659` | |
+| A82 | GHOST nick holder | `src/app/Connect.tsx:945` (UI, connect page) | FULL | `ReclaimSubmit` `View/Topbar.elm:218` → `App.elm:27408` | Elm: in-session dialog, GHOST+NICK+retry |
 | A83 | `reclaimNick` | — (DEAD) | N/A | — | Elm ships it as A82 |
 | A84 | CERTADD | `Account.tsx:596` (UI) | FULL | `CertBindRequested` `View/Account.elm:754` | |
-| A85 | CERTLIST | `Account.tsx:597` (auto after add/del) | FULL | `App.elm:37963` | |
+| A85 | CERTLIST | `Account.tsx:597` (auto after add/del) | FULL | `App.elm:42150` | |
 | A86 | CERTDEL | `Account.tsx:604` (UI) | FULL | `CertRemoveSubmitted` `View/Account.elm:762` | |
-| A87 | E2EEKEY STATUS | `Account.tsx:480` (auto) | FULL | open refresh `App.elm:26753` | |
+| A87 | E2EEKEY STATUS | `Account.tsx:480` (auto) | FULL | open refresh `App.elm:30430` | |
 | A88 | E2EEKEY LIST | `Account.tsx:1126` (UI) | FULL | `View/Account.elm:858` | |
 | A89 | E2EEKEY ADD (publish device key) | `Account.tsx:533` (UI) | FULL | `E2eeKeyPublishRequested` `View/Account.elm:844` | |
 | A90 | E2EEKEY DEL legacy | `Account.tsx:1133` (UI) | FULL | `View/Account.elm:865` | |
 | A91 | KEYTRANS STATUS | `Account.tsx:481`, `:1137` (auto/UI) | FULL | `KeytransStatusRequested` `View/Account.elm:812` | |
-| A92 | KEYTRANS PROOF | — (DEAD) | N/A | `App.elm:26051` unused | |
-| A93 | History on join of empty room (`requestHistory`) | `store.ts:11938` (auto) | FULL | `requestJoinHistory` `App.elm:23583` | |
-| A94 | Toggle member list | `src/shell/PresenceRibbon.tsx:493`, keyboard `useKeyboardShortcuts.ts:572`, spotlight `:1256` (UI/shortcut/palette) | PARTIAL | `View/Roster.elm` `membersToggle` (popover under 1100px) | cannot hide on wide; no shortcut/palette entry |
+| A92 | KEYTRANS PROOF | — (DEAD) | N/A | `App.elm:29728` unused | |
+| A93 | History on join of empty room (`requestHistory`) | `store.ts:11938` (auto) | FULL | `requestJoinHistory` `App.elm:26804` | |
+| A94 | Toggle member list | `src/shell/PresenceRibbon.tsx:493`, keyboard `useKeyboardShortcuts.ts:572`, spotlight `:1256` (UI/shortcut/palette) | PARTIAL | `View/Roster.elm:151` `membersToggle` (popover under 1100px); `Alt+M` `ports.js:4593` → `runLocalShortcut "members"` `ports.js:4680` | (v3/gap-commands) Alt+M opens the member sheet (narrow) or focuses the rail (wide); the rail still cannot be hidden on wide layouts and there is no palette row |
 | A95 | `openSettings`/`closeSettings` | — (DEAD) | N/A | — | |
-| A96 | Open/close account panel | `src/shell/YouHubNav.tsx:24`, `AppShell.tsx:1029`, keyboard `:589` (UI/shortcut) | FULL | `YouHubGo` `View/Nav.elm:386`, `SetAccountOpen` `View/Account.elm:38` | no account shortcut |
-| A97 | Open/close appearance | `src/app/YouSettings.tsx:139`, spotlight `:1232` (UI/palette) | FULL | `/appearance` via `YouHubGo`; palette `Switcher.elm:121` | |
-| A98 | Set background | `src/shell/AppearancePanel.tsx:57`, `theme/ThemeStudio.tsx:1180`, spotlight `:1109` | FULL | `AppearanceApplyBackground` `View/Appearance.elm:298`, `StudioApplyBackground` `View/Studio.elm:779` | no palette command |
-| A99 | Mark read (+ MARKREAD) | navigate, spotlight `:409`, `lib/catchup/markCaughtUp.ts:8` (UI/palette) | FULL | `App.elm:30949`; `HomeMarkAllCaughtUp` `View/Home.elm:154`; `/read` `App.elm:14609` | |
-| A100 | Clear local scrollback | `/clear` `store.ts:8139` (slash) | FULL | `App.elm:14553` | |
-| A101 | Add inbox notification | `Account.tsx:567`, inbound (auto) | FULL | `addNotification` `App.elm:18547`; `View/Inbox.elm` | |
-| A102 | Dismiss notification | `src/shell/NotificationCenter.tsx:158` (UI) | FULL | `NotificationDismissed` `View/Inbox.elm:237` | |
-| A103 | Mark notification read (on open) | `NotificationCenter.tsx:177` (UI) | FULL | `NotificationActivated` `View/Inbox.elm:204` | |
-| A104 | Mark all notifications read | `NotificationCenter.tsx:293` (UI) | FULL | `NotificationsMarkedRead` `View/Inbox.elm:109` | |
-| A105 | `open/closeNotificationCenter` store pair | — (DEAD; center uses local state) | N/A | `View/Inbox.elm:52` | |
-| A106 | Toasts (`addToast`) | 48 callers (auto) but nothing renders `s.toasts` and `<Toaster>` is unmounted | FULL | `addToast` `App.elm:10468`; `View/Toast.elm` | Elm better: Solid store toasts are invisible |
+| A96 | Open/close account panel | `src/shell/YouHubNav.tsx:24`, `AppShell.tsx:1029`, keyboard `:589` (UI/shortcut) | FULL | `YouHubGo` `View/Nav.elm:393`, `SetAccountOpen` `View/Account.elm:43`; Ctrl/Cmd+Shift+A `ports.js:4490` → `Switcher.OpenAccount` `App.elm:49510` | (v3/gap-commands) account shortcut added |
+| A97 | Open/close appearance | `src/app/YouSettings.tsx:139`, spotlight `:1232` (UI/palette) | FULL | `/appearance` via `YouHubGo`; palette `Switcher.elm:313` |  |
+| A98 | Set background | `src/shell/AppearancePanel.tsx:57`, `theme/ThemeStudio.tsx:1180`, spotlight `:1109` | FULL | `AppearanceApplyBackground` `View/Appearance.elm:300`, `StudioApplyBackground` `View/Studio.elm:779` | no palette command for backgrounds (the palette has theme rows, v3/gap-commands) |
+| A99 | Mark read (+ MARKREAD) | navigate, spotlight `:409`, `lib/catchup/markCaughtUp.ts:8` (UI/palette) | FULL | `App.elm:34675`; `HomeMarkAllCaughtUp` `View/Home.elm:153`; `/read` `App.elm:17459`; Ctrl/Cmd+Shift+E `Switcher.MarkConversationRead` `App.elm:49513`; palette `Switcher.elm:573` |  |
+| A100 | Clear local scrollback | `/clear` `store.ts:8139` (slash) | FULL | `App.elm:17403` | |
+| A101 | Add inbox notification | `Account.tsx:567`, inbound (auto) | FULL | `addNotification` `App.elm:21674`; `View/Inbox.elm` | |
+| A102 | Dismiss notification | `src/shell/NotificationCenter.tsx:158` (UI) | FULL | `NotificationDismissed` `View/Inbox.elm:244` | |
+| A103 | Mark notification read (on open) | `NotificationCenter.tsx:177` (UI) | FULL | `NotificationActivated` `View/Inbox.elm:211` | |
+| A104 | Mark all notifications read | `NotificationCenter.tsx:293` (UI) | FULL | `NotificationsMarkedRead` `View/Inbox.elm:112` | |
+| A105 | `open/closeNotificationCenter` store pair | — (DEAD; center uses local state) | N/A | `View/Inbox.elm:55` | |
+| A106 | Toasts (`addToast`) | 48 callers (auto) but nothing renders `s.toasts` and `<Toaster>` is unmounted | FULL | `addToast` `App.elm:12053`; `View/Toast.elm` | Elm better: Solid store toasts are invisible |
 | A107 | `dismissToast` (store) | — (DEAD; primitives has its own) | N/A | `ToastDismiss` `View/Toast.elm:73` | |
-| A108 | Voice mute/deafen/output (`setVoiceCallState`) | `src/media/useCadenceMedia.ts:207`, VoiceBar (UI/auto) | FULL | `CallToggleMute` `View/CallStage.elm:415`, `CallToggleDeafen` `:576`, `VoiceSettingsMsg` | |
-| A109 | Screen share start/stop | `src/shell/voice/VoiceBar.tsx:1067`, `:1077` (UI) | FULL | `CallToggleShare` `View/CallStage.elm:532` | |
-| A110 | Peer speaking/muted | `store.ts:11139`, `:11145` (auto) | FULL | `CallPeerState` `Main.elm:1666` | |
-| A111 | Reply to message (`setReplyingTo`) | `message/MessageMenu.tsx:349`, swipe `MessageView.tsx:2216`, thread `:1573` (UI) | PARTIAL | `ReplyArm` `View/Thread.elm:429`, `ReplyCancel` `View/Composer.elm:248` | no touch swipe-to-reply |
-| A112 | Per-target composer drafts (get/set/clear) | `Composer.tsx:283`, `:709`, `:1144` (UI) | PARTIAL | `App.elm:7740`–`7793` in-memory swap | no device persistence; lost on reload |
-| A113 | Draft save receipt ("Saved here / Only on this tab") | `Composer.tsx:284`, `:1365` (UI) | MISSING | — | |
-| A114 | Inject composer text (quote, mention, report) | `MessageMenu.tsx:810`, `PeopleProfileCard.tsx:178`, `people/PersonSafetySheet.tsx:113` (UI) | FULL | `MessageQuote` `View/Thread.elm:1653`, `MemberMention` `View/Profile.elm:571` | |
-| A115 | Edit own message (arm) | `MessageMenu.tsx:374` (UI) | FULL | `EditArm` `View/Thread.elm:1735`, `EditCancel` `View/Composer.elm:243` | |
-| A116 | Open conversation (+topic) | `lib/notifications/NotificationRuntime.tsx:60` desktop click, `NotificationCenter.tsx:180`, `ChannelBrowser.tsx:122` (UI/auto) | PARTIAL | `ChannelSelect`/`NotificationActivated`/`BrowserEnterRoom`; desktop `note.onclick` only focuses (`ports.js:5706`) | desktop notification click doesn't open the conversation |
-| A117 | Reconcile topic unread | `lib/topics/TopicReadRuntime.tsx:66` (auto) | FULL | `App.elm:35439` | |
-| A118 | Select topic / start topic | `MessageView.tsx:1626`, `MessageMenu.tsx:367` (UI) | FULL | `ChannelTopicSelect` `View/Thread.elm:898`, `MessageStartTopic` `:1726` | |
+| A108 | Voice mute/deafen/output (`setVoiceCallState`) | `src/media/useCadenceMedia.ts:207`, VoiceBar (UI/auto) | FULL | `CallToggleMute` `View/CallStage.elm:479`, `CallToggleDeafen` `:653`, `VoiceSettingsMsg` |  |
+| A109 | Screen share start/stop | `src/shell/voice/VoiceBar.tsx:1067`, `:1077` (UI) | FULL | `CallToggleShare` `View/CallStage.elm:609` | screen share only; the camera is switched off network-wide (`voice-engine.ts` `VIDEO_ENABLED`) |
+| A110 | Peer speaking/muted | `store.ts:11139`, `:11145` (auto) | FULL | `CallPeerState` `Main.elm:2094` | |
+| A111 | Reply to message (`setReplyingTo`) | `message/MessageMenu.tsx:349`, swipe `MessageView.tsx:2216`, thread `:1573` (UI) | PARTIAL | `ReplyArm` `View/Thread.elm:459`, `ReplyCancel` `View/Composer.elm:262` | no touch swipe-to-reply |
+| A112 | Per-target composer drafts (get/set/clear) | `Composer.tsx:283`, `:709`, `:1144` (UI) | FULL | `gapSettleDrafts` `App.elm:55855` → `GapConvoOut DraftsSave` → port `gapDraftsSave` `Main.elm:409` → `ports.js:12558` `gapDraftsKey` (owner-scoped `onyx:composer-drafts:owner:…`); load `gapDraftsLoaded` `App.elm:55888`; `gapConvo.smoke.mjs:295`–`:357` | (v3/gap-convo) persisted per owner, bounded, write-verified; E2EE DMs stay in memory only (`gapDraftPersistable` `App.elm:55789`) |
+| A113 | Draft save receipt ("Saved here / Only on this tab") | `Composer.tsx:284`, `:1365` (UI) | FULL | `gapDraftLine` `View/Composer.elm:867` ("Saved here" / "Only on this tab") ← `gapDraftStatus` `App.elm:55795` ← `GapConvo.draftStatusCopy` `GapConvo.elm:330` | (v3/gap-convo) quiet status line under the composer once there is text |
+| A114 | Inject composer text (quote, mention, report) | `MessageMenu.tsx:810`, `PeopleProfileCard.tsx:178`, `people/PersonSafetySheet.tsx:113` (UI) | FULL | `MessageQuote` `View/Thread.elm:1719`, `MemberMention` `View/Profile.elm:601`, report draft `mergeReportDraft` `App.elm:12346` |  |
+| A115 | Edit own message (arm) | `MessageMenu.tsx:374` (UI) | FULL | `EditArm` `View/Thread.elm:1801`, `EditCancel` `View/Composer.elm:257` | |
+| A116 | Open conversation (+topic) | `lib/notifications/NotificationRuntime.tsx:60` desktop click, `NotificationCenter.tsx:180`, `ChannelBrowser.tsx:122` (UI/auto) | PARTIAL | desktop alert click `ports.js:7132` → port `gapNotifyClicked` `Main.elm:1031` → `GapAccount.NotifyClicked` `App.elm:55234` → `ChannelSelect`; Inbox `NotificationActivated` `View/Inbox.elm:211` → `activateNotification`; `BrowserEnterRoom`; test `GapAccountAppTest.elm:1274` | (v3/gap-account) the desktop alert click now opens the room or DM (only for the identity that raised it); a followed-topic alert or Inbox row opens the room, not the topic (`View/Inbox.elm:10`) |
+| A117 | Reconcile topic unread | `lib/topics/TopicReadRuntime.tsx:66` (auto) | FULL | `App.elm:39210` | |
+| A118 | Select topic / start topic | `MessageView.tsx:1626`, `MessageMenu.tsx:367` (UI) | FULL | `ChannelTopicSelect` `View/Thread.elm:987`, `:1342`; `MessageStartTopic` `:1792` |  |
 | A119 | `splitTopicIntoThread` | — (DEAD) | N/A | — | |
-| A120 | Boost / react (`addReaction` → `addLocalReaction` fallback) | `MessageView.tsx:2199`, `MessageMenu.tsx:342` (UI) | FULL | `ReactionSend` `View/Thread.elm:2244`, `ReactionPickerChoose` `:2099`; `App.elm:6807` | |
+| A120 | Boost / react (`addReaction` → `addLocalReaction` fallback) | `MessageView.tsx:2199`, `MessageMenu.tsx:342` (UI) | FULL | `ReactionSend` `View/Thread.elm:2389`, `ReactionPickerChoose` `:2166`; `App.elm:7181` |  |
 | A121 | Inbound unreact (`removeReaction`) | `store.ts:13598` (auto) | FULL | `foldTagmsgReact` | |
-| A122 | Edit send (`EDIT`) + history | `Composer.tsx:1190` (UI) | FULL | `requestEdit` `App.elm:8100` via `:38977` | |
-| A123 | Delete (`REDACT`) | `MessageMenu.tsx:524` (UI) | FULL | `MessageMenuDeleteAsk` `View/Thread.elm:1840` → `requestDelete` `App.elm:8154` | |
-| A124 | Inbound typing (`setTyping`; `_setTyping` alias DEAD) | `store.ts:13526` (auto) | FULL | `App.elm:6329`, `:6532` | |
-| A125 | Send typing start | `Composer.tsx:781` (UI) | FULL | `ComposerInput` → `sendTyping` `App.elm:38319` | |
-| A126 | Send typing done | `Composer.tsx:783`, `:1142` (UI) | FULL | `App.elm:10596` | |
+| A122 | Edit send (`EDIT`) + history | `Composer.tsx:1190` (UI) | FULL | `requestEdit` `App.elm:8486` via the `ComposerSend` edit arm `App.elm:43156`; inbound `+draft/edit` fan-out `gapEditLine` `App.elm:55286` | (v3/gap-convo) other people's edits fold in place, even if they arrive before the row |
+| A123 | Delete (`REDACT`) | `MessageMenu.tsx:524` (UI) | FULL | `MessageMenuDeleteAsk` `View/Thread.elm:1907` → `requestDelete` `App.elm:8540` | |
+| A124 | Inbound typing (`setTyping`; `_setTyping` alias DEAD) | `store.ts:13526` (auto) | FULL | `setTyping` `App.elm:6703`, `foldActivityTyping` `:6884`, `foldTagmsgTyping` `:6906` |  |
+| A125 | Send typing start | `Composer.tsx:781` (UI) | FULL | `ComposerInput` → `sendTyping` `App.elm:42506` | |
+| A126 | Send typing done | `Composer.tsx:783`, `:1142` (UI) | FULL | `App.elm:12181` | |
 | A127 | `open/close ChannelInfo`, `ServerSettings`, `AccessList` | — (DEAD) | N/A | — | |
-| A128 | Open/close pinned drawer | `PresenceRibbon.tsx:1286`, `PinnedMessages.tsx:166` (UI) | FULL | `PinnedMessagesOpen` `View/RoomHeader.elm:325`, close `View/Pins.elm:24` | |
-| A129 | Fetch unloaded pin (`requestPinnedMessage`) | `PinnedMessages.tsx:161` (UI) | FULL | `PinnedMessageJump` `View/Pins.elm:168` → `App.elm:13646` | loaded pins still don't land (A15) |
-| A130 | Open/close jump-to-date | `PresenceRibbon.tsx:595`, `Composer.tsx:501`, keyboard `:365`, spotlight `:1300` | FULL | `JumpToDateOpen` `View/RoomHeader.elm:365`, palette `Switcher.elm:119` | no dedicated shortcut |
-| A131 | Pin message | `MessageMenu.tsx:563` (UI) | FULL | `MessagePinToggle` `View/Thread.elm:1761` → `App.elm:13579` | |
-| A132 | Unpin message | `PinnedMessages.tsx:171`, `MessageMenu.tsx:562` (UI) | FULL | `PinnedMessageUnpin` `View/Pins.elm:199` | |
-| A133 | `_writePins` / `_writeChannelProp` | internal | FULL | `writeChannelProp` `App.elm:13501` | |
-| A134 | Schedule room event | `/event` `store.ts:8134` (slash) | FULL | `/event` `App.elm:14990` → `:13797` | |
-| A135 | Clear room event | `src/shell/ScheduledEventLine.tsx:80` (UI) | FULL | `RoomSettings.EventClear` `View/RoomSettings.elm:970`; `App.elm:13827` | |
-| A136 | Ephemeral retention | `ChannelSettings.tsx:457` (UI) | FULL | `EphemeralSubmit` `View/RoomSettings.elm:394` | |
-| A137 | Encryption policy | `ChannelSettings.tsx:476` (UI) | FULL | `EncryptionSubmit` `View/RoomSettings.elm:675` | |
-| A138 | History policy | `ChannelSettings.tsx:495` (UI) | FULL | `HistorySubmit` `View/RoomSettings.elm:715` | |
-| A139 | PROP fetch on join | `store.ts:11930` (auto) | FULL | `App.elm:23259` | |
+| A128 | Open/close pinned drawer | `PresenceRibbon.tsx:1286`, `PinnedMessages.tsx:166` (UI) | FULL | `PinnedMessagesOpen` `View/RoomHeader.elm:347`, close `View/Pins.elm:26` | |
+| A129 | Fetch unloaded pin (`requestPinnedMessage`) | `PinnedMessages.tsx:161` (UI) | FULL | `PinnedMessageJump` `View/Pins.elm:170` → `jumpToPinned` `App.elm:16496` → `requestPinnedMessage` `:27028` (`CHATHISTORY AROUND msgid=`); landing step 3 of `gapSettleLanding` `App.elm:55984` (`:56022`); test `GapConvoTest.elm:524` | (v3/gap-convo) loaded pins land at once; an unloaded one lands when its window arrives, or says "Pinned message not found" |
+| A130 | Open/close jump-to-date | `PresenceRibbon.tsx:595`, `Composer.tsx:501`, keyboard `:365`, spotlight `:1300` | FULL | `JumpToDateOpen` `View/RoomHeader.elm:387`, palette `Switcher.elm:307`; `g d` chord `ports.js:4611` → `Switcher.GoJumpToDate` `App.elm:49504` | (v3/gap-commands) `g d` added (single-key shortcuts can be switched off) |
+| A131 | Pin message | `MessageMenu.tsx:563` (UI) | FULL | `MessagePinToggle` `View/Thread.elm:1827` → `App.elm:16427` | |
+| A132 | Unpin message | `PinnedMessages.tsx:171`, `MessageMenu.tsx:562` (UI) | FULL | `PinnedMessageUnpin` `View/Pins.elm:204` | |
+| A133 | `_writePins` / `_writeChannelProp` | internal | FULL | `writeChannelProp` `App.elm:16161` | |
+| A134 | Schedule room event | `/event` `store.ts:8134` (slash) | FULL | `/event` `App.elm:17831` → `scheduleChannelEvent` `:16647` |  |
+| A135 | Clear room event | `src/shell/ScheduledEventLine.tsx:80` (UI) | FULL | `RoomSettings.EventClear` `View/RoomSettings.elm:965`; `App.elm:16677` | |
+| A136 | Ephemeral retention | `ChannelSettings.tsx:457` (UI) | FULL | `EphemeralSubmit` `View/RoomSettings.elm:401` | |
+| A137 | Encryption policy | `ChannelSettings.tsx:476` (UI) | FULL | `EncryptionSubmit` `View/RoomSettings.elm:682` | |
+| A138 | History policy | `ChannelSettings.tsx:495` (UI) | FULL | `HistorySubmit` `View/RoomSettings.elm:722` | |
+| A139 | PROP fetch on join | `store.ts:11930` (auto) | FULL | `App.elm:26480` | |
 | A140 | `requestUserProps` | — (DEAD) | N/A | — | |
-| A141 | MONITOR on DM open (`monitorAdd`) | `store.ts:8035` (auto) | FULL | `monitorAddContact` `App.elm:25365` | |
+| A141 | MONITOR on DM open (`monitorAdd`) | `store.ts:8035` (auto) | FULL | `monitorAddContact` `App.elm:29042` | |
 | A142 | `addFriend`/`removeFriend` | — (DEAD) | N/A | `PeopleFriendAdd` `View/Account2.elm:654` | Elm better |
-| A143 | `setFriendOnline` | `store.ts:13940` (auto; no friend UI) | N/A | `App.elm:25580`; presence `View/Rail.elm:507` | Elm better |
+| A143 | `setFriendOnline` | `store.ts:13940` (auto; no friend UI) | N/A | `App.elm:29257`; presence `View/Rail.elm:597` | Elm better |
 | A144 | `setUserStatus` (AWAY) | — (DEAD) | N/A | `UserStatusSet` `View/Account2.elm:553` | Elm better |
 | A145 | Custom status + expiry + dialog | — (DEAD) | N/A | `StatusEditSave` `View/Account2.elm:502`, `StatusExpiryChoose` `:519` | Elm better |
 | A146 | `setUserActivity`/`clearUserActivity` | — (DEAD) | N/A | — | |
-| A147 | `openUserProfile`/`openUserProfileCard` pairs | — (DEAD; card uses local state) | N/A | `UserProfileOpened` `View/Roster.elm:309` | |
-| A148 | Mute / unmute room | `PresenceRibbon.tsx:1124`, keyboard `useKeyboardShortcuts.ts:464` (UI/shortcut) | PARTIAL | `RoomNotifyLevel` `View/Notify.elm:92`; `/mute` `App.elm:14703` | no room-mute shortcut (chord given to mic) |
-| A149 | Notify mode all/mentions/mute (`setChannelNotifyMode`) | `src/shell/ChannelNotifyControl.tsx:76`, `ChannelSettings.tsx:394` (UI) | FULL | `RoomNotifyLevel` `View/RoomSettings.elm:291`; `/notify` `App.elm:14771` | |
+| A147 | `openUserProfile`/`openUserProfileCard` pairs | — (DEAD; card uses local state) | N/A | `UserProfileOpened` `View/Roster.elm:375` | |
+| A148 | Mute / unmute room | `PresenceRibbon.tsx:1124`, keyboard `useKeyboardShortcuts.ts:464` (UI/shortcut) | FULL | `RoomNotifyLevel` `View/Notify.elm:95`; `/mute` `App.elm:17553`; Ctrl/Cmd+Shift+M `ports.js:4490` → `Switcher.ToggleRoomMute` `App.elm:49519`; palette Mute/Unmute `Switcher.elm:572` | (v3/gap-commands) outside a live call; while a call is live the same chord is the mic |
+| A149 | Notify mode all/mentions/mute (`setChannelNotifyMode`) | `src/shell/ChannelNotifyControl.tsx:76`, `ChannelSettings.tsx:394` (UI) | FULL | `RoomNotifyLevel` `View/RoomSettings.elm:297`; `/notify` `App.elm:17621` | |
 | A150 | `channelNotifyMode`/`shouldNotify` store selectors | — (DEAD; lib fns used) | N/A | — | |
-| A151 | Thread store actions (`openThread`, close, seen, archive…) | — (DEAD; MessageView keeps local thread state) | N/A | `ThreadOpen` `View/Thread.elm:430` | |
+| A151 | Thread store actions (`openThread`, close, seen, archive…) | — (DEAD; MessageView keeps local thread state) | N/A | `ThreadOpen` `View/Thread.elm:460` | |
 | A152 | Forwarding, bookmarks, search overlay | — (DEAD) | N/A | — | |
-| A153 | Open/close keyboard shortcuts | spotlight `:1082`, keyboard `:428`, `homeController.ts:859`, `AppShell.tsx:1732` | FULL | `ShortcutPressed` `Main.elm:1615`; `ShortcutsClose` `View/Switcher.elm:282` | |
-| A154 | Capture unread divider | navigate (auto), spotlight `:406` | FULL | `App.elm:30663` | |
-| A155 | Clear divider after review (`clearViewUnreadDivider`) | `MessageView.tsx:1431` (UI) | MISSING | — | no since-digest review flow |
+| A153 | Open/close keyboard shortcuts | spotlight `:1082`, keyboard `:428`, `homeController.ts:859`, `AppShell.tsx:1732` | FULL | `ShortcutPressed` `Main.elm:2034`; `ShortcutsClose` `View/Switcher.elm:282`; `?` and `/` single keys `ports.js:4613` |  |
+| A154 | Capture unread divider | navigate (auto), spotlight `:406` | FULL | `App.elm:34369` | |
+| A155 | Clear divider after review (`clearViewUnreadDivider`) | `MessageView.tsx:1431` (UI) | MISSING | Home "Since you left" digest rows `DigestJump` → `Organizer.JumpFirstUnread` `App.elm:53036` (open + `focusMessage`); `View/Thread.elm` has no digest card | the in-feed digest card ("Review unread": jump to the divider, then clear it and record review history) does not exist; the divider is recaptured on the next open |
 | A156 | `markFirstUnread`/`forceMarkFirstUnread` | — (DEAD) | N/A | — | |
-| A157 | `clearFirstUnread` | navigate (auto) | FULL | `App.elm:30944` | |
-| A158 | Open room browser | `ChannelSidebar.tsx:826`, spotlight `:1200`, `homeController.ts:837` | FULL | `BrowserOpen` `View/Rail.elm:146`, `View/Home.elm:304` | |
-| A159 | Open create room | `ChannelSidebar.tsx:834`, `ChannelBrowser.tsx:73`, `HomeBriefingView.tsx:283` | FULL | `CreateRoomOpen` `View/Rail.elm:155` | |
-| A160 | Close room browser | `ChannelBrowser.tsx:72` (UI) | FULL | `BrowserClose` `View/Browser.elm:53` | |
-| A161 | LIST refresh | `ChannelBrowser.tsx:210` (UI/auto) | FULL | `RefreshChannelList` `View/Browser.elm:96` | |
-| A162 | `addAuditEntry` | `store.ts:11894` (auto; never rendered) | N/A | `App.elm:18218` (also unrendered) | |
-| A163 | History loading / exhausted flags | internal (auto) | FULL | `markHistoryExhausted` `App.elm:32761` | |
-| A164 | `loadHistory` on self-JOIN | `store.ts:11548` (auto) | FULL | `App.elm:23583` | |
+| A157 | `clearFirstUnread` | navigate (auto) | FULL | `App.elm:34670` | |
+| A158 | Open room browser | `ChannelSidebar.tsx:826`, spotlight `:1200`, `homeController.ts:837` | FULL | `BrowserOpen` `View/Rail.elm:168`, `View/Home.elm:308` | |
+| A159 | Open create room | `ChannelSidebar.tsx:834`, `ChannelBrowser.tsx:73`, `HomeBriefingView.tsx:283` | FULL | `CreateRoomOpen` `View/Rail.elm:177` | |
+| A160 | Close room browser | `ChannelBrowser.tsx:72` (UI) | FULL | `BrowserClose` `View/Browser.elm:54` | |
+| A161 | LIST refresh | `ChannelBrowser.tsx:210` (UI/auto) | FULL | `RefreshChannelList` `View/Browser.elm:97` | |
+| A162 | `addAuditEntry` | `store.ts:11894` (auto; never rendered) | N/A | `App.elm:21345` (also unrendered) | |
+| A163 | History loading / exhausted flags | internal (auto) | FULL | `markHistoryExhausted` `App.elm:36514` | |
+| A164 | `loadHistory` on self-JOIN | `store.ts:11548` (auto) | FULL | `App.elm:26804` | |
 | A165 | Raw log (toggle/add/enable/clear) | — (DEAD; never enabled) | N/A | — | |
-| A166 | `openMessageSearch`/`closeMessageSearch`/`searchMessages` store actions | — (DEAD; `useMessageSearch` signals) | N/A | `SearchOpen` `View/RoomHeader.elm:208` | |
+| A166 | `openMessageSearch`/`closeMessageSearch`/`searchMessages` store actions | — (DEAD; `useMessageSearch` signals) | N/A | `SearchOpen` `View/RoomHeader.elm:212` | |
 | A167 | MOTD close, server-rules modal | — (DEAD) | N/A | — | |
-| A168 | Mobile sidebar open/close | `src/shell/AppShell.tsx:899`, `:908` (UI) | FULL | `NavSelect` `View/Nav.elm:195` | section pages, not a drawer |
+| A168 | Mobile sidebar open/close | `src/shell/AppShell.tsx:899`, `:908` (UI) | FULL | `NavSelect` `View/Nav.elm:197` → `navSelect` `App.elm:48788` (`navDrawerOpen`); `data-nav-drawer` `View.elm:257` | (v3/rx-shell) under 600px the collection sidebar replaces the conversation, a conversation is a pushed page with a back control; not a slide-in drawer |
 | A169 | `open/close/toggleSpotlight` store actions | — (DEAD; `useSpotlight` signals) | N/A | `PaletteOpen` `View/Switcher.elm:52` | |
-| A170 | Set theme | `src/app/Appearance.tsx:160`, `theme/ThemeStudio.tsx:605` (UI) | FULL | `AppearanceSetTheme` `View/Appearance.elm:330`, `View/Studio.elm:41` | |
+| A170 | Set theme | `src/app/Appearance.tsx:160`, `theme/ThemeStudio.tsx:605` (UI) | FULL | `AppearanceSetTheme` `View/Appearance.elm:332`, `View/Studio.elm:41` | |
 | A171 | Theme modal, `setMessageDensity` | — (DEAD; density is a pref) | N/A | — | |
-| A172 | Join-refusal prompt (set/clear) | `store.ts:15031` (auto), `ChannelBrowser.tsx:129` (UI) | FULL | `App.elm:10210`, `:10225`; browser settle `:16753` | |
-| A173 | Media gallery, services panel, clear service notices | — (DEAD) | N/A | `MediaIndexOpen` `View/RoomHeader.elm:350` | |
+| A172 | Join-refusal prompt (set/clear) | `store.ts:15031` (auto), `ChannelBrowser.tsx:129` (UI) | FULL | `setChannelJoinPrompt` `App.elm:11790` (callers `App.elm:20102`–`:20112`); browser settle `settleBrowserJoin` `:19567` / `refuseBrowserJoin` `:19586` |  |
+| A173 | Media gallery, services panel, clear service notices | — (DEAD) | N/A | `MediaIndexOpen` `View/RoomHeader.elm:372` | |
 | A174 | Service notices in Account/oper/webhooks | `store.ts:12339` (auto); shown `Account.tsx:463` | FULL | `accountCertNotices`/`webhookNotices` (App exports) | |
-| A175 | Server log "Activity" view (`addServerLog`) | `store.ts:6621` (auto); `ChannelSidebar.tsx:731` + `MessageView.tsx:890` (UI) | CORE-ONLY | `serviceLog` `App.elm:8656`; no View reads it | disconnect/oper/numeric lines invisible |
+| A175 | Server log "Activity" view (`addServerLog`) | `store.ts:6621` (auto); `ChannelSidebar.tsx:731` + `MessageView.tsx:890` (UI) | FULL | `stampActivity` `App.elm:11463` copies new `serviceLog` lines into `gapShell.activity`; sheet `View/GapShell.elm:57` `activitySheet`; doors `activityButton` `:216` (rail `View/Rail.elm:185`, You hub `View/Nav.elm:364`); tests `GapShellTest.elm:904` | (v3/gap-shell) All / Problems filter, unseen-problem dot; kept for the session only |
 | A176 | `clearServerLog`, pin/follow channel toggles | — (DEAD) | N/A | — | |
-| A177 | Block (ignore) user | `IgnoredUsersControl.tsx:52`, `MessageMenu.tsx:933`, `PersonSafetySheet.tsx:72` (UI) | FULL | `IgnoreUser` `View/Thread.elm:1797` | |
-| A178 | Unblock user | `IgnoredUsersControl.tsx:63`, `PeopleProfileCard.tsx:254` (UI) | FULL | `UnignoreUser` `View/Notify.elm:499`, `View/Profile.elm:580` | |
+| A177 | Block (ignore) user | `IgnoredUsersControl.tsx:52`, `MessageMenu.tsx:933`, `PersonSafetySheet.tsx:72` (UI) | FULL | `IgnoreUser` `View/Thread.elm:1864` | (v3/gap-account) lists are owner-scoped |
+| A178 | Unblock user | `IgnoredUsersControl.tsx:63`, `PeopleProfileCard.tsx:254` (UI) | FULL | `UnignoreUser` `View/Notify.elm:569`, `View/Profile.elm:610` | |
 | A179 | `isIgnored` selector | `PeopleProfileCard.tsx:73` (UI) | FULL | ignore set reads in Profile view | |
-| A180 | Ignore-list modal, soft-ignore, reveal | — (DEAD) | N/A | `OverrideToggleSoftIgnore` `App.elm:42537` (no view) | |
-| A181 | Collapse a sender (`toggleNickCollapse`) | `MessageMenu.tsx:965` (UI) | FULL | `MessageCollapseToggle` `View/Thread.elm:1827` | |
-| A182 | Expand collapsed senders ("Show all" banner) | `MessageView.tsx:1975` (UI) | MISSING | rows filtered `View/Thread.elm:1352`; no banner | collapse can only be undone from a hidden row |
+| A180 | Ignore-list modal, soft-ignore, reveal | — (DEAD) | N/A | `OverrideToggleSoftIgnore` `App.elm:46892` (no view) | |
+| A181 | Collapse a sender (`toggleNickCollapse`) | `MessageMenu.tsx:965` (UI) | FULL | `MessageCollapseToggle` `View/Thread.elm:1894` | |
+| A182 | Expand collapsed senders ("Show all" banner) | `MessageView.tsx:1975` (UI) | FULL | `gapCollapsedBanner` `View/Thread.elm:3009` ("Hiding messages from … Show all", `:3057`) → `GapConvo.CollapsedShowAll` `App.elm:56361`; test `GapConvoTest.elm:620` | (v3/gap-convo) hidden senders can be restored without finding a hidden row |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- `COVERAGE.md:88`: "`?at=` time-travel AROUND (`App.requestTravelTo` + vault-around + landing)" is marked **done**. Nothing reads the landing. `historyLanding` is set at `App.elm:13638` and `:43955`, and no View or port reads it. `threadAnchorIndex` (`App.elm:29763`) explicitly leaves landings out.
-- `COVERAGE.md:108`: "`jumpToPinned` focuses loaded rows via `historyLanding`". The same write-only field, so nothing scrolls and nothing pulses.
-- `COVERAGE.md:174`: "WEBAUTHN REGISTER/AUTH exchanges … **done**" overstates AUTH. `Passkey.webauthnAuth` (`Passkey.elm:336`) has no caller, so AUTH is core-only. Solid also hides passkey sign-in (`PRESENT_PASSKEY_SIGNIN = false`, `Connect.tsx:105`), so this is not a parity gap.
-- `COVERAGE.md:137`: "RECOVER/RELEASE reclaim (`Services.recover`/`release`, `App.ghostNick`…) **done**". `Services.recover`, `Services.releaseNick` and `App.ghostNick` (`App.elm:28418`) have no callers. Only `reclaimNickWithPassword` (GHOST+NICK) is reachable.
-- `COVERAGE.md:213`: Preferences lists "Local drafts" as if they are stored on the device. Elm drafts live only in `composerDrafts` in memory. No port saves them, so a reload loses them.
+- `COVERAGE.md:88` ("`?at=` time-travel AROUND … + landing" **done**) and `COVERAGE.md:95` ("no time-travel landing anchor", "no scroll effect"): were overstated, because nothing read the landing; **fixed by v3/gap-convo**. `gapSettleLanding` (`App.elm:55984`) pages the window and emits `TranscriptScroll`, and `ports.js:4297` `landOn` centres, pulses and focuses the row. Still true as leftovers: `historyLanding` (`App.elm:597`, written at `:16488` and `:48766`) is read by no View or port, and `threadAnchorIndex` still passes `landingIndex = Nothing` (`App.elm:33499`). Landing runs through `gapConvo.landing` instead.
+- `COVERAGE.md:108` ("`jumpToPinned` focuses loaded rows via `historyLanding`"): was the same write-only field; **fixed by v3/gap-convo**. `jumpToPinned` (`App.elm:16496`) now lands through `focusMessage` → `gapLandOn`, and an unloaded pin lands from `gapSettleLanding` step 3.
+- `COVERAGE.md:178` (was `:174`; "WEBAUTHN REGISTER/AUTH exchanges … **done**"): AUTH was core-only; **fixed by v3/gap-auth**. `AuthGate.StartPasskey` (`App.elm:53372`) now sends `Passkey.webauthnAuth` from a Connect "Sign in with a passkey" link (`View/AuthGate.elm:670`). Solid still hides its own control (`PRESENT_PASSKEY_SIGNIN = false`, `Connect.tsx:105`).
+- `COVERAGE.md:137` ("RECOVER/RELEASE reclaim (`Services.recover`/`release`, `App.ghostNick`…) **done**"): `Services.recover` and `releaseNick` now have a caller (`gapRecoverSend` `App.elm:54943`, v3/gap-account), so that half is **fixed**. Still true: `App.ghostNick` (`App.elm:32123`) has no caller; the reachable reclaim is `submitReclaim` / `reclaimNickWithPassword` (GHOST+NICK).
+- `COVERAGE.md:215` (was `:213`; Preferences "Local drafts" list): the drafts were memory-only; **fixed by v3/gap-convo**. They persist per owner (`gapSettleDrafts` `App.elm:55855` → `ports.js:12558`).
+- In-code, still stale: `View/Home.elm:15-17` (module doc) says the queued-send rows have no per-row Open / Remove and that Elm has no INVITE projection. The controls shipped in v3/gap-organize (`View/Home.elm:272`), and invites reach the Inbox via `foldInvite` (`App.elm:28690`), though not Home.
+- In-code, still stale: `App.elm:18566` (`settlePendingCreateRoom` doc) says the composer is focused when the new room has no first line; the function emits no focus (A12).
+- In-code, still stale: `App.elm:11786` (`setChannelJoinPrompt` doc) says "Elm has no channel browser yet, so the prompt waits for it"; the browser exists and consumes the prompt (`refuseBrowserJoin` `App.elm:19586`).
+- In-code, partly stale: `App.elm:41112` (`VaultOpenHit` comment) says "the travel merge sets `historyLanding`"; the landing that matters is `gapConvo.landing`, set in `mergeVaultAround` (`App.elm:48770`).
 
 #### Elm better than Solid
 - Toasts render: `View/Toast.elm`, with undo through `ToastUndoFired`. Solid's ~48 `addToast` calls never reach the screen. Nothing reads `s.toasts`, and the primitives `<Toaster>` is only mounted in tests.
-- Friends and watch list: `PeopleFriendAdd`/`PeopleWatchAdd` (`View/Account2.elm:654`, `:714`) and rail presence (`View/Rail.elm:507`). Solid `addFriend`/`removeFriend` are DEAD.
+- Friends and watch list: `PeopleFriendAdd`/`PeopleWatchAdd` (`View/Account2.elm:654`, `:714`) and rail presence (`View/Rail.elm:597`). Solid `addFriend`/`removeFriend` are DEAD.
 - AWAY status and custom status with expiry: `UserStatusSet`, `StatusEditSave` (`View/Account2.elm:553`, `:502`). Solid `setUserStatus`/`setCustomStatus` are DEAD.
-- Nick reclaim works during a session, not only on the connect page: `ReclaimSubmit` does GHOST+NICK with a 30s retry (`App.elm:24187`). Solid's `reclaimNick` is DEAD.
-- Unban asks for review first (`UnbanReviewConfirmed`, `View/Bans.elm:298`).
+- Nick reclaim works during a session, not only on the connect page: `ReclaimSubmit` does GHOST+NICK with a 30s retry (`App.elm:27408`). Solid's `reclaimNick` is DEAD.
+- Unban asks for review first (`UnbanReviewConfirmed`, `View/Bans.elm:378`).
+- Passkey sign-in is offered on the Connect form (v3/gap-auth, `View/AuthGate.elm:670`); Solid keeps it switched off (A68).
+- Account has Recognised addresses (`RECOGNIZE`), Grouped names (`GROUP`) and a "Release hold" button next to Recover (v3/gap-account, `View/GapAccount.elm:238` `namesSection`, `:111` `protectionSection`). Solid's Account has none of these.
+- A desktop alert click only opens the conversation when the alert was raised for the identity that is signed in now (`GapAccount.NotifyClicked`, `App.elm:55234`, v3/gap-account).
+- A landing shows a hidden sender again, gives up when you have left the conversation, and keeps a static accent marker under reduced motion (`gapSettleLanding` `App.elm:55984`, `css/gap-convo.css:257`, v3/gap-convo).
+- Activity has an All / Problems filter and an unseen-problem dot on the rail and the You hub (`View/GapShell.elm:57`, `:216`, v3/gap-shell).
 
 #### Gaps (ranked by user impact)
-- `[High]` Message landing (A14/A15/A20/A129): use `historyLanding` in `threadAnchorIndex` and add a `TranscriptScroll {action="message"}` path in `ports.js:3389` that scrolls to the row and pulses it. Clear it afterwards (A16).
-- `[High]` Leave room (A22): add "Leave room" to the RoomHeader room menu and a confirm sheet (new `RoomLeaveAsk`/`RoomLeaveConfirm` Msg) that sends PART and shows a toast.
-- `[Med]` Activity/server log view (A175): add a Rail "Activity" entry and a read-only transcript over `model.serviceLog`.
-- `[Med]` Desktop notification click (A116): have `ports.js:5706` send the target back (new `NotifyClicked` port), then dispatch `ChannelSelect` or the topic open.
-- `[Med]` Persist composer drafts per owner (A112/A113): add a `DraftsSave` Outbound and port to localStorage, load at boot, and show a receipt line in `View/Composer.elm`.
-- `[Med]` Expand collapsed senders (A182): show a "N people collapsed · Show all" banner in `View/Thread.elm` that clears `collapsedNicks`.
-- `[Med]` Recover a name (A80) and ACCOUNTSET secure/enforce toggles (A79): add `View/Account.elm` forms that send `Services.recover` and `ACCOUNTSET` with the password.
-- `[Med]` Page-lifecycle reconnect (A1): in `ports.js`, listen for `pageshow` (persisted), `resume` and `online`, and dispatch `ReconnectNow` or an offline mark.
-- `[Low]` Passkey sign-in (A68/A72): Solid gates it off (`Connect.tsx:105`), so this is future work, not parity. When the product turns it on, add a Connect "Use a passkey" button that sends `Passkey.webauthnAuth`.
-- `[Low]` Home queued-send Open/Remove (A18/A19): add per-row buttons to `View/Home.elm` that reuse `PrefsOutboxRemove` and a new open-placeholder Msg.
-- `[Low]` Member list hide on wide layouts, plus shortcut and palette entries (A94). Swipe-to-reply (A111). Room-mute shortcut (A148). Sidebar quick-join (A10). Clear settled server search on close (A54). Composer focus after create (A12). "Device memory" toast (A21).
+- `[High]` **[Closed — v3/gap-convo]** Message landing (A14/A15/A16/A129): `focusMessage` → `gapSettleLanding` → `TranscriptScroll "message"` → `landOn` scrolls, pulses and focuses; pins, media, `?at=`, jump-to-date and search hits all use it. A20 is the one landing still open, see the `[Med]` bullet below.
+- `[High]` **[Closed — v3/gap-shell]** Leave room (A22): room header More, rail row menu, Room care and palette; confirm sheet, PART, "Left #room" toast, offline drop.
+- `[Med]` **[Closed — v3/gap-shell]** Activity/server log view (A175): `View.GapShell.activitySheet`, opened from the rail and the You hub.
+- `[Med]` **[Closed — v3/gap-account]** Desktop notification click (A116): `gapNotifyClicked` port → `NotifyClicked` → `ChannelSelect`. The topic part is a `[Low]` bullet below.
+- `[Med]` **[Closed — v3/gap-convo]** Persist composer drafts per owner (A112/A113): `gapDraftsSave` port, `onyx:composer-drafts:owner:…`, "Saved here" / "Only on this tab" line.
+- `[Med]` **[Closed — v3/gap-convo]** Expand collapsed senders (A182): `gapCollapsedBanner` with Show all.
+- `[Med]` **[Closed — v3/gap-account]** Recover a name (A80) and ACCOUNTSET secure/enforce toggles (A79): Account → Protection, password-gated, with Release hold.
+- `[Med]` **[Closed — v3/gap-pwa-safety, v3/gap-shell]** Page-lifecycle reconnect (A1): `installPageLifecycle` + `PageRestored`; `offline` / `online` handled in `foldShellEvent`. The timing difference is a `[Low]` bullet below.
+- `[Low]` **[Closed — v3/gap-auth]** Passkey sign-in (A68/A72): Solid still gates it off, and Elm now offers it on Connect (beyond parity).
+- `[Low]` **[Closed — v3/gap-organize]** Home queued-send Open / Remove (A18/A19): `homeOutboxActions`. What remains of A19 is a `[Low]` bullet below.
+- `[Low]` **[Closed — v3/gap-commands, v3/gap-shell]** Room-mute shortcut Ctrl/Cmd+Shift+M (A148), account shortcut Ctrl/Cmd+Shift+A (A96), `g d` jump-to-date (A130), Alt+M member list (A94, partly), sidebar quick-join (A10, rail "Join by name").
+- `[Med]` Vault hit in an unloaded conversation (A20): `VaultOpenHit` (`App.elm:41109`) calls `ChannelSelect`, which "selects without conjuring a room", and `mergeVaultAround` skips channels the client does not have, so a hit in a room you have left (or a DM outside the working set) opens no history. Fix: create the DM shell or `JOIN` the room first, as Solid's `openVaultResult` does, then fetch around the hit. Read from code, not run.
+- `[Low]` Dead socket after a bfcache restore (A1): the restore pings and waits for the 15 s pong timeout (`ports.js:3508`), where Solid redials at once, and a restore while the browser is offline waits for the same timeout. Fix: on `PageRestored` with a live socket call `reconnectNow`, or drop the socket when `online = False`.
+- `[Low]` Composer focus after "Start a room" with no first line (A12): `settlePendingCreateRoom` (`App.elm:18569`) should emit `PrefsFocus { id = "shell-composer-input" }`.
+- `[Low]` Home queued-send Remove has no "Queued message removed" toast or failure text (A19): `prefsOutboxReviewed` (`App.elm:50067`) only writes the Preferences status line. Open does not focus the placeholder row (A18).
+- `[Low]` "Device memory… while the network catches up" toast (A21): add it where `VaultRowsReceived` paints rows into an empty room (`App.elm:41038`).
+- `[Low]` Palette "Leave #room" (`App.elm:49378`) and `/part` send PART without the confirm sheet (A22); route the palette row through `GapShell.LeaveAsk`.
+- `[Low]` Followed-topic notifications (Inbox row, desktop alert) open the room, not the topic (A116): `activateNotification` and `NotifyClicked` ignore the note's topic; send `ChannelTopicSelect` after `ChannelSelect`.
+- `[Low]` In-feed "Since you left" digest card with Review unread, review history and divider clearing (A155): Home has the digest and `DigestJump`, but nothing clears `viewUnreadDividerId` after a review.
+- `[Low]` Member rail cannot be hidden on wide layouts and has no palette row (A94). Swipe-to-reply (A111). Clear settled server search on close (A54). Palette command for backgrounds (A98).
 
 ### B — Store actions II — stage, away, oper, scheduling, prefs, folders, identity, E2EE keys, calls, legacy
-Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window event bridge at 18366–18381 and the slash verbs at 8205–8530 that call them). Reachability came from `grep -w` over `src/` (non-test, outside store.ts) plus store-internal callers. A legacy state field with no non-store reader counts as write-only (dead), even when an inbound fold writes it. On the Elm side I checked the `App.elm` Msg folds, the `View/*.elm` dispatchers, `Main.elm`, `ports.js`, `index.html`, `Stage.elm`, `Switcher.elm`, `Sidebar.elm` and `Prefs.elm`. Many actions in this region are dead legacy; they're listed as N/A so the whole region is accounted for.
+Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window event bridge at 18366–18381 and the slash verbs at 8205–8530 that call them). Reachability came from `grep -w` over `src/` (non-test, outside store.ts) plus store-internal callers. A legacy state field with no non-store reader counts as write-only (dead), even when an inbound fold writes it. On the Elm side I checked the `App.elm` Msg folds, the `View/*.elm` dispatchers, `Main.elm`, `ports.js`, `index.html`, `Stage.elm`, `Switcher.elm`, `Sidebar.elm` and `Prefs.elm`. Many actions in this region are dead legacy; they're listed as N/A so the whole region is accounted for. Refreshed against HEAD `609cb240` (Elm code and tests read at that revision): the gap-organize, gap-commands, gap-account, gap-pwa-safety, gap-usermodes, gap-oper and rx-calls slices changed rows B12–B13, B24, B31, B49–B51, B58–B60, B80–B85, B110–B112, B119–B120, B127–B128 and B140.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
-| B1 | joinStage — join a live stage as audience (JOIN if not member) | `src/shell/StagePanel.tsx:82` (UI), store:15569 | FULL | `App.elm:45240` `StageJoinAudience`, `View/StageMode.elm:419`, `Stage.elm:231` | — |
-| B2 | leaveStage — PART "Left stage" + reset | `StagePanel.tsx:157` (UI), store:15587 | FULL | `App.elm:45252`, `View/StageMode.elm:237`, `Stage.elm:272` | Also bound to the C12 call chord |
-| B3 | raiseHand / lowerHand (CTCP STAGE RAISE_HAND/LOWER_HAND) | `StagePanel.tsx:170` (UI), store:15599/15605 | FULL | `App.elm:45256` `StageHandToggle`, `View/StageMode.elm:207`, `Stage.elm:285` | Speakers can't raise (same as Solid) |
-| B4 | inviteToSpeak (host → CTCP INVITE_SPEAK) | `StagePanel.tsx:219` (UI), store:15611 | FULL | `App.elm:45263` `StageInvite`, `View/StageMode.elm:287` | Elm records the invite so only its answer earns +v |
+| B1 | joinStage — join a live stage as audience (JOIN if not member) | `src/shell/StagePanel.tsx:82` (UI), store:15569 | FULL | `App.elm:51080` `StageJoinAudience`, `View/StageMode.elm:419`, `Stage.elm:231` | — |
+| B2 | leaveStage — PART "Left stage" + reset | `StagePanel.tsx:157` (UI), store:15587 | FULL | `App.elm:51092`, `View/StageMode.elm:237`, `Stage.elm:272` | Also bound to the C12 call chord |
+| B3 | raiseHand / lowerHand (CTCP STAGE RAISE_HAND/LOWER_HAND) | `StagePanel.tsx:170` (UI), store:15599/15605 | FULL | `App.elm:51096` `StageHandToggle`, `View/StageMode.elm:207`, `Stage.elm:285` | Speakers can't raise (same as Solid) |
+| B4 | inviteToSpeak (host → CTCP INVITE_SPEAK) | `StagePanel.tsx:219` (UI), store:15611 | FULL | `App.elm:51103` `StageInvite`, `View/StageMode.elm:287` | Elm records the invite so only its answer earns +v |
 | B5 | moveToAudience (CTCP MOVE_AUDIENCE) | DEAD, store:15616 | N/A | no Elm builder (`Stage.elm` has none) | No caller in Solid |
-| B6 | acceptSpeakInvite / declineSpeakInvite | `StagePanel.tsx:190/199` (UI), store:15621/15627 | FULL | `App.elm:45278/45285`, `View/StageMode.elm:456/457` | `role=alert` invite strip |
+| B6 | acceptSpeakInvite / declineSpeakInvite | `StagePanel.tsx:190/199` (UI), store:15621/15627 | FULL | `App.elm:51118` `StageAccept` / `App.elm:51125` `StageDecline`, `View/StageMode.elm:456/457` | `role=alert` invite strip |
 | B7 | grantSpeaker / revokeSpeaker (MODE ±v) | DEAD, store:15632/15637 | N/A | auto +v for an invited ACCEPT_SPEAK at `Stage.elm:432` | Solid exposes no manual grant/revoke UI |
-| B8 | startStage (MODE +m + PROP STAGE 1; host) | `StagePanel.tsx:73` (UI, ops strip), store:15642 | FULL | `App.elm:45220` (live + `isChannelOp`), `View/StageMode.elm:414`, `Stage.elm:247` | — |
-| B9 | endStage (MODE -m + PROP STAGE 0) | `StagePanel.tsx:77` (UI), store:15657 | FULL | `App.elm:45232`, `View/StageMode.elm:260`, `Stage.elm:259` | — |
-| B10 | addRaisedHand / removeRaisedHand (inbound queue, 128 cap) | auto (store:12621/12638) | FULL | `Stage.elm:171/189`, `Stage.elm:53` cap; `App.elm:45273` `StageDismissHand`, `View/StageMode.elm:293/473` | Elm adds a host Dismiss button and a 375px hands sheet |
+| B8 | startStage (MODE +m + PROP STAGE 1; host) | `StagePanel.tsx:73` (UI, ops strip), store:15642 | FULL | `App.elm:51060` (live + `isChannelOp`), `View/StageMode.elm:414`, `Stage.elm:247` | — |
+| B9 | endStage (MODE -m + PROP STAGE 0) | `StagePanel.tsx:77` (UI), store:15657 | FULL | `App.elm:51072`, `View/StageMode.elm:260`, `Stage.elm:259` | — |
+| B10 | addRaisedHand / removeRaisedHand (inbound queue, 128 cap) | auto (store:12621/12638) | FULL | `Stage.elm:171/189`, `Stage.elm:53` cap; `App.elm:51113` `StageDismissHand`, `View/StageMode.elm:293/473` | Elm adds a host Dismiss button and a 375px hands sheet |
 | B11 | openAwayModal / closeAwayModal | DEAD, store:15692 | N/A | — | No away modal in Solid |
-| B12 | setAway(message) — custom away text | palette `src/chat/spotlight/commands.ts:887` (palette), store:15694 | PARTIAL | `App.elm:12989` `/away` → raw `sendRawSlashCommand` `App.elm:11164`; presets `App.elm:19562`, `View/Account2.elm:553` | `/away gone to lunch` splits on spaces; the server keeps only params[0] (`server.zig:43292`). No palette `away <msg>` |
-| B13 | unsetAway — clear away | palette `commands.ts:899` (palette), store:15698 | PARTIAL | `View/Account2.elm:553` presence Online → `AWAY` `App.elm:19574`; `/back` listed `App.elm:12990` | `/back` and `/unaway` are sent raw as `BACK`, which the server doesn't know (true of both clients). No palette "back" |
+| B12 | setAway(message) — custom away text | palette `src/chat/spotlight/commands.ts:887` (palette), store:15694 | FULL | `/away [message]` → `PlanAway` `App.elm:13197`/`13477` (the whole message is one `AWAY` trailing param); presence menu `View/Account2.elm:553` → `setUserStatus` `App.elm:22697`; palette "Set yourself away" `Switcher.elm:610` → `toggleAway` `App.elm:49437`; test `GapCommandsTest.elm:470` | (v3/gap-commands) `/away gone to lunch` keeps the whole message (it used to go out raw and split on spaces). The palette row only toggles away with the fixed text "Away"; there is no `away <msg>` palette grammar, the slash verb carries the text |
+| B13 | unsetAway — clear away | palette `commands.ts:899` (palette), store:15698 | FULL | `/back` and `/unaway` → `PlanAway Nothing` `App.elm:13210/13213` → `setUserStatus StatusOnline` → bare `AWAY` `App.elm:22709`; presence Online `View/Account2.elm:553`; palette "Set yourself back" `Switcher.elm:607`; test `GapCommandsTest.elm:470` | (v3/gap-commands) `/back` no longer goes out raw as `BACK` (the server has no such verb). The `/back` registry row at `App.elm:15648` is now accurate |
 | B14 | setIdleAwayMinutes + idle auto-away | DEAD: no setter caller, and `idleAwayMinutes` is never read (store:15702, 5151) | N/A | no idle detector in `App.elm`/`ports.js` | Neither client auto-aways. Solid only persists `onyx:idle-away-minutes` (default 15). See gaps |
-| B15 | isAway / awayMessage self state | setAway writes it optimistically; no reader besides WHOIS | FULL | `App.elm:5540/5543` 305/306 fold | Elm tracks the server's answer, not an optimistic flag |
-| B16 | openOperPanel / closeOperPanel | DEAD (the desk renders inline when `isOper`, `src/shell/AppShell.tsx:1625`) | N/A | `View/ModDesk.elm:87` → `App.elm:42493` `OperDeskOpen` | Elm opens it from a topbar Operator sheet instead of inline |
+| B15 | isAway / awayMessage self state | setAway writes it optimistically; no reader besides WHOIS | FULL | `App.elm:5900` 305/306 fold (`isAway`); WHOIS self-away `App.elm:6343` `Services.SelfAway` | Elm tracks the server's answer, not an optimistic flag. The presence menu and palette read `userStatus` (`App.elm:49118`), not `isAway` |
+| B16 | openOperPanel / closeOperPanel | DEAD (the desk renders inline when `isOper`, `src/shell/AppShell.tsx:1625`) | N/A | `View/ModDesk.elm:112` → `App.elm:46844` `OperDeskOpen` (gated on `isOper`) | Elm opens it from a topbar Operator sheet instead of inline; v3/gap-oper then put the console tabs in that sheet |
 | B17 | operLogin (OPER) | DEAD, store:15717 (only adds a "SASL grants oper" note) | N/A | — | No OPER verb by design |
-| B18 | operAction choke point (desk + oper slash verbs; isOper/connected gate, toasts) | `src/shell/OperDesk.tsx:91` (UI); slash store:8525 | FULL | `App.elm:42510/42513`, `View/ModDesk.elm:192/432`, `App.elm:14284` `runSlashOper`, refusal `App.elm:17652` | Destructive plans are staged behind a review step |
-| B19 | scheduleMessage from the composer (Send later) | `src/shell/Composer.tsx:568` (UI), store:15761 | FULL | `View/Composer.elm:552/574` → `App.elm:11984` `requestScheduleMessage` | Lives in the Polish tray; presets + custom time |
-| B20 | Schedule refusals: required-E2EE room / designated E2EE DM | store:15762/15778 (UI) | FULL | `App.elm:11989`, `App.elm:12003` | Elm also holds a DM until its key lookup resolves (`App.elm:12248`) |
-| B21 | Palette grammar `schedule <text> at <time>` | `commands.ts:812` (palette) | MISSING | `Switcher.elm:233` action list has no schedule entry | — |
-| B22 | cancelScheduledMessage (durable cancel + toast) | `src/shell/ScheduledMessagesSheet.tsx:97` (UI), store:15824 | FULL | `View/Scheduled.elm:135` → `App.elm:12138` | — |
-| B23 | _dispatchScheduledMessages (tick, post-001 kick, 819 kick, claims, uncertain toasts) | auto store:5011/11322/12004 | FULL | `App.elm:12277` on the 1s Tick `App.elm:37464`; gating `App.elm:12240` | Prop-sync and E2EE holds match Solid |
-| B24 | openScheduledMessages / closeScheduledMessages | `Composer.tsx:1695`, palette `commands.ts:1277`, Ctrl+Shift+L (`shortcutsRegistry.ts:126`) | PARTIAL | `View/Composer.elm:562` `ScheduleViewQueue`, `View/Scheduled.elm:42` | No palette "Scheduled messages" entry, no Ctrl+Shift+L |
-| B25 | setSoundEnabled | `src/shell/NotificationControls.tsx:328` (UI), store:16179 | FULL | `App.elm:39337`, `View/Notify.elm:240` | — |
-| B26 | setSoundVolume | DEAD (the volume is only read, `NotificationRuntime`) | N/A | read at boot `index.html:145`, `Main.elm:949` | Volume is read-only in both clients |
-| B27 | setPushNotificationsEnabled | `NotificationControls.tsx:317`, `src/lib/notifications/armClosedTab.ts:27` (UI) | FULL | `App.elm:39330`, `View/Notify.elm:158`; Web Push `View/Account.elm:476` | — |
+| B18 | operAction choke point (desk + oper slash verbs; isOper/connected gate, toasts) | `src/shell/OperDesk.tsx:91` (UI); slash store:8525 | FULL | `View/ModDesk.elm:442` (and `:473/:531/:539`) → `OperDeskSubmit` `App.elm:46861` → `submitOperDesk` `App.elm:20462` → `dispatchOperDesk` `App.elm:20523` (refusal toast `App.elm:20532`); slash `runSlashOper` `App.elm:17134` (refusal `App.elm:17173`); console tabs `OperConsole.canSend` `OperConsole.elm:884` + `run` `:899` | Destructive plans are staged behind a review step (`command.destructive` / `cmd.mutates`). The v3/gap-oper console tabs go through the same live + `isOper` gate |
+| B19 | scheduleMessage from the composer (Send later) | `src/shell/Composer.tsx:568` (UI), store:15761 | FULL | Polish tools tray "Send later" `View/Polish.elm:137` → `App.elm:51538` → `ScheduleOpen` `App.elm:41449`; presets `View/Composer.elm:544/588`, custom `:573`; Ctrl+Shift+L `ports.js:4490` → `Switcher.elm:1252` → `App.elm:49558`; `requestScheduleMessage` `App.elm:14652` | Lives in the Polish tray; presets + custom time; Ctrl+Shift+L opens it (v3/gap-commands) |
+| B20 | Schedule refusals: required-E2EE room / designated E2EE DM | store:15762/15778 (UI) | FULL | `App.elm:14657`, `App.elm:14671` | Elm also holds a DM until its key lookup resolves (`dispatchableScheduledRow` `App.elm:14908`, `dmKeyUnresolved`) |
+| B21 | Palette grammar `schedule <text> at <time>` | `commands.ts:812` (palette) | MISSING | `Switcher.elm:469` `typedActions` knows only `#room`, `join <room>` and `mute\|snooze\|dnd\|pause <N>`; no schedule grammar | Still missing: the typed `schedule <text> at <time>` grammar (Solid takes `15m`, `in 2h` or an ISO time and queues it). Elm schedules from the composer tray and Ctrl+Shift+L, and the palette lists "Scheduled messages" (B24) |
+| B22 | cancelScheduledMessage (durable cancel + toast) | `src/shell/ScheduledMessagesSheet.tsx:97` (UI), store:15824 | FULL | `View/Scheduled.elm:149` → `App.elm:14806` | — |
+| B23 | _dispatchScheduledMessages (tick, post-001 kick, 819 kick, claims, uncertain toasts) | auto store:5011/11322/12004 | FULL | `App.elm:14945` on the 1s Tick `App.elm:41590`; gating `App.elm:14908` | Prop-sync and E2EE holds match Solid |
+| B24 | openScheduledMessages / closeScheduledMessages | `Composer.tsx:1695` (queue button), palette `commands.ts:1277` (palette), store:16173. Ctrl+Shift+L (`shortcutsRegistry.ts:126`) opens the schedule popover, not the queue (`useKeyboardShortcuts.ts:614`) | FULL | `View/Composer.elm:583` `ScheduleViewQueue` → `App.elm:41455`; palette "Scheduled messages" `Switcher.elm:600` → `App.elm:49335`; sheet `View/Scheduled.elm:43` | (v3/gap-commands) palette row added. The old note blamed a missing Ctrl+Shift+L, but in Solid that chord opens the schedule popover, which Elm also binds (B19) |
+| B25 | setSoundEnabled | `src/shell/NotificationControls.tsx:328` (UI), store:16179 | FULL | `App.elm:43526`, `View/Notify.elm:306` | — |
+| B26 | setSoundVolume | DEAD (the volume is only read, `NotificationRuntime`) | N/A | read at boot `index.html:183`, `Main.elm:1153` | Volume is read-only in both clients |
+| B27 | setPushNotificationsEnabled | `NotificationControls.tsx:317`, `src/lib/notifications/armClosedTab.ts:27` (UI) | FULL | `App.elm:43519`, `View/Notify.elm:223`; closed-tab row `View/Notify.elm:140`; permission grant arms closed-tab push `App.elm:51969`; Web Push toggle `View/Account.elm:492` → `App.elm:47735` | (v3/gap-pwa-safety) the Notifications sheet has the closed-tab alerts row, and granting permission arms Web Push for a signed-in owner (`GapPwaSafetyTest.elm:80`) |
 | B28 | openSoundSettings / closeSoundSettings | DEAD, store:16200 | N/A | — | — |
 | B29 | openGroupDM / closeGroupDM | DEAD, store:16205 | N/A | — | — |
-| B30 | addAutoJoin / removeAutoJoin (`/autojoin`, `/unautojoin`) | slash store:8264/8271 | PARTIAL | `App.elm:14820/14854` → `App.elm:11611/11628`; boot `index.html:202` | Elm stores the list under an ownerless key and never reads it. Solid feeds Home memory (`src/shell/home/homeController.ts:475`). Neither actually rejoins, despite the toast |
-| B31 | starChannel / unstarChannel | `src/shell/ChannelSidebar.tsx:354` (UI), slash store:8222, palette `commands.ts:758/774`, Ctrl+B (`src/lib/keyboard/useKeyboardShortcuts.ts:449`), portable import | PARTIAL | `View/Rail.elm:438` → `App.elm:41787`; `/star` `App.elm:14814`; `App.elm:11532` | No palette star, no Ctrl+B |
+| B30 | addAutoJoin / removeAutoJoin (`/autojoin`, `/unautojoin`) | slash store:8264/8271 | PARTIAL | `/autojoin` `App.elm:17670` / `/unautojoin` `:17704` → `addAutoJoin` `App.elm:14268` / `removeAutoJoin` `:14285` (device key `onyx:autojoin-channels`, boot flag `index.html:240`); signed in, also `AUTOJOIN ADD\|DEL` `userModesAutojoinOut` `App.elm:48114` (`UserModes.elm:797`); list UI `View/UserModes.elm:859` `autojoinSection` (`View/Account.elm:71`) | (v3/gap-usermodes) a signed-in `/autojoin` is real: the server joins the room on every device, and Preferences lists them (Elm better than Solid, whose list never rejoins anything). Still open: the device-only list (guests) is loaded into `autoJoinChannels` and never read, so the guest toast "rejoined on this device after reconnect" (`App.elm:48138`) promises a rejoin that never happens; and Solid's one reader, the Home memory feed (`homeController.ts:475`), has no Elm counterpart (B94) |
+| B31 | starChannel / unstarChannel | `src/shell/ChannelSidebar.tsx:354` (UI), slash store:8222, palette `commands.ts:758/774`, Ctrl+B (`src/lib/keyboard/useKeyboardShortcuts.ts:449`), portable import | FULL | `View/Rail.elm:521` (row star) / `:880` (row menu) → `SidebarStarToggle` `App.elm:46061`; `/star` `App.elm:17664`; palette Star/Unstar `Switcher.elm:564/567` → `App.elm:49385`; Ctrl+B `ports.js:4581` → `Switcher.elm:1246` → `App.elm:49533`; `starChannel` `App.elm:14189` | (v3/gap-commands) palette star/unstar and Ctrl+B added. The palette rows act on the open room only; Solid's `star #other` grammar can name another room (the sidebar star and `/star #room` cover that) |
 | B32 | addCustomEmoji / removeCustomEmoji / custom-emoji modal | DEAD (only a comment in `persistParse.ts`) | N/A | — | No reader renders custom emoji |
 | B33 | addRecentEmoji / incrementEmojiUsage | `Composer.tsx:736-737` (auto on insert) | N/A | none in Elm | Write-only in Solid: the picker never reads recents or counts, so it's effectively dead |
 | B34 | setEmojiSkinTone | DEAD, store:16307 | N/A | — | — |
 | B35 | setFavoriteEmojis | DEAD, store:17077 | N/A | — | — |
-| B36 | openModerationPanel / closeModerationPanel | DEAD (cockpit inline, `AppShell.tsx:1622`) | N/A | `View/ModDesk.elm:62` → `App.elm:42475` | Elm uses an op-gated sheet |
-| B37 | addModerationEntry → cockpit "Server activity" | auto store:11901/13328; reader `src/shell/ModerationCockpit.tsx:121` | FULL | `App.elm:18238`, `View/Bans.elm:552` | — |
-| B38 | setBanList (368 completion, bounded, ready meta) | auto store:15083 | FULL | `App.elm:18940` | — |
-| B39 | fetchBanList (MODE +b, loading/unavailable/error meta) | `src/shell/moderation/BanListPanel.tsx:119/125` (UI) | FULL | `View/Bans.elm:62` → `App.elm:37725`/`19059` | — |
-| B40 | tempBan (timed +b with auto-lift and retries) | DEAD, store:16415 (no UI in the cockpit) | N/A | `View/Bans.elm:84/102/128` → `App.elm:20427`, lift `App.elm:20570` | Elm is better: a reachable "Add a timed block" |
-| B41 | addHighlightWord / removeHighlightWord | `src/app/KeywordListControl.tsx:31/41` (UI), slash store:8291/8298 | FULL | `View/Notify.elm:362/403`, `App.elm:39317`; `/highlight` `App.elm:14655/14673` | Keyword sort uses codepoint order (COVERAGE narrowing) |
+| B36 | openModerationPanel / closeModerationPanel | DEAD (cockpit inline, `AppShell.tsx:1622`) | N/A | `View/ModDesk.elm:82` → `App.elm:46825` | Elm uses an op-gated sheet |
+| B37 | addModerationEntry → cockpit "Server activity" | auto store:11901/13328; reader `src/shell/ModerationCockpit.tsx:121` | FULL | `App.elm:21365` `addModerationEntry`, `View/Bans.elm:644` `deskActivity` | — |
+| B38 | setBanList (368 completion, bounded, ready meta) | auto store:15083 | FULL | `App.elm:22067` | — |
+| B39 | fetchBanList (MODE +b, loading/unavailable/error meta) | `src/shell/moderation/BanListPanel.tsx:119/125` (UI) | FULL | `View/Bans.elm:73` → `BanListRequested` `App.elm:41898` → `requestBanList` `App.elm:22186` (also on op grant `App.elm:5529` and room select `:39460`) | — |
+| B40 | tempBan (timed +b with auto-lift and retries) | DEAD, store:16415 (no UI in the cockpit) | N/A | `View/Bans.elm:98` form, `:172` review → `:153` `BanAddSubmit` → `App.elm:41902` `requestTempBan` `App.elm:23585`, lift `fireTempBan` `App.elm:23774` | Elm is better: a reachable "Add a timed block" (v3/rx-sheets added the review step, v3/gap-people the guard and notes) |
+| B41 | addHighlightWord / removeHighlightWord | `src/app/KeywordListControl.tsx:31/41` (UI), slash store:8291/8298 | FULL | `View/Notify.elm:429` (add) / `:470` (remove) → `App.elm:43506` / `:43490`; `/highlight` `App.elm:17505`, `/unhighlight` `:17523`; `addHighlightWord` `App.elm:34776` | Keyword sort uses codepoint order (COVERAGE narrowing) |
 | B42 | openHighlightModal / closeHighlightModal | DEAD, store:16503 | N/A | — | — |
 | B43 | setUserNote / getUserNote / deleteUserNote | DEAD, store:16509–16532 | N/A | `View/Organize.elm` `memberNote`; `Organize.setNote` | Solid never surfaced them; v3/gap-organize shows a private note on the member card (owner-scoped `onyx:user-notes`, 2048 chars, 512 people) |
 | B44 | openInviteModal / closeInviteModal | DEAD, store:16546 | N/A | (Elm `InviteShareOpen` is a different surface) | — |
-| B45 | setNickColorOverride / clearNickColorOverride | DEAD; `nickColorOverrides` has no reader | N/A | `App.elm:42567/42592` folds with no View dispatcher (CORE-ONLY) | — |
-| B46 | setCTCPVersionReply / TimeEnabled / PingEnabled / Enabled | DEAD setters; the persisted config drives auto-replies | N/A | config load `App.elm:37844`, `Main.elm:1646`; replies via `foldCtcpQuery` | Stored config is honoured in both; neither can edit it |
-| B47 | addAnnouncement (server NOTICE with no target) | auto store:12210/13088; no reader | N/A | — | Write-only (the panel is dead) |
+| B45 | setNickColorOverride / clearNickColorOverride | DEAD; `nickColorOverrides` has no reader | N/A | `App.elm:46923` `OverrideSetNickColor` / `OverrideClearNickColor` folds with no View dispatcher (CORE-ONLY) | — |
+| B46 | setCTCPVersionReply / TimeEnabled / PingEnabled / Enabled | DEAD setters; the persisted config drives auto-replies | N/A | config load `App.elm:42024`, `Main.elm:2073`; replies via `foldCtcpQuery` | Stored config is honoured in both; neither can edit it |
+| B47 | addAnnouncement (server NOTICE with no target) | auto store:12210/13088; no reader | N/A | Elm lists these lines in the Activity sheet: `View/GapShell.elm:236` → `App.elm:11255` `ActivityOpen`; `GapShell.elm:227` `classifyEntry` | Write-only in Solid (the panel is dead). Elm better (v3/gap-shell): server NOTICEs, MOTD, WALLOPS and ERROR lines get a timestamped Activity sheet |
 | B48 | open/closeAnnouncementsPanel, markAnnouncementsRead, clearAnnouncements | DEAD, store:16612–16620 | N/A | — | — |
-| B49 | setDndEnabled (manual DND) | `NotificationControls.tsx:347` (UI); palette `commands.ts:875`; Ctrl+Shift+D (`useKeyboardShortcuts.ts:457`); `/dnd` store:8311 | PARTIAL | `View/Notify.elm:294` → `App.elm:39344`; `/dnd` `App.elm:14700` → `14382` | No palette "dnd on/off", no Ctrl+Shift+D |
-| B50 | setDndUntil (timed snooze, auto-clear) | `NotificationControls.tsx:343` (UI); palette `mute 30m` `commands.ts:847`; `/snooze` store:8312 | PARTIAL | `View/Notify.elm:305/330` → `App.elm:39358/39361`; `/snooze` `App.elm:14697`; `App.elm:31607` | No palette "mute for N" grammar |
-| B51 | setDndQuietHours + isDndActive (daily quiet hours; default 22–08 **on**) | `NotificationControls.tsx:306/311` (UI), `src/shell/PortableIdentitySection.tsx:123`; enforced at `src/lib/notifications/NotificationRuntime.tsx:90` | FULL | `View/Attention.elm` `quietSection`; `Attention.quietActive`; `App.elm` `organizeQuietNow` (ORed into `dnd`) | v3/gap-organize: `onyx:dnd-quiet-{start,end,enabled}`. Default **off**: `_loadDndHour` (`store.ts:5162`) read a missing key as `Number(null)` = 0, so Solid's 22–08 default never ran (0 = 0 is an empty window). Web-push closed-tab alerts do not honour it |
+| B49 | setDndEnabled (manual DND) | `NotificationControls.tsx:347` (UI); palette `commands.ts:875`; Ctrl+Shift+D (`useKeyboardShortcuts.ts:457`); `/dnd` store:8311 | FULL | `View/Notify.elm:361` → `NotifyDndToggle` `App.elm:43533`; `/dnd` `App.elm:17550`; palette "Turn on/off Do Not Disturb" `Switcher.elm:602/605` → `App.elm:49407`; Ctrl+Shift+D `ports.js:4490` → `Switcher.elm:1240` → `App.elm:49516` | (v3/gap-commands) palette row and Ctrl+Shift+D added |
+| B50 | setDndUntil (timed snooze, auto-clear) | `NotificationControls.tsx:343` (UI); palette `mute 30m` `commands.ts:847`; `/snooze` store:8312 | PARTIAL | `View/Notify.elm:372` → `NotifyDndSnooze` `App.elm:43547` → `submitNotifySnooze` `App.elm:13938`; `/snooze` `App.elm:17547`; palette `mute 30` `Switcher.elm:534` → `PauseAlerts` `App.elm:49410`; expiry is implicit in `notifyDndActive` `App.elm:35334` | (v3/gap-commands) the palette `mute\|snooze\|dnd\|pause <N>` grammar exists, but takes plain minutes 1–1440 only. Solid also takes `30m` / `2 hours` / `1d` (up to 7 days) and `mute off` |
+| B51 | setDndQuietHours + isDndActive (daily quiet hours; default 22–08 **on**) | `NotificationControls.tsx:306/311` (UI), `src/shell/PortableIdentitySection.tsx:123`; enforced at `src/lib/notifications/NotificationRuntime.tsx:90` | FULL | `View/Attention.elm:62` `quietSection`; `Attention.elm:193` `quietActive`; `App.elm:53282` `organizeQuietNow`, ORed into `dnd` at `App.elm:35434`; test `GapOrganizeTest.elm:980` | v3/gap-organize: `onyx:dnd-quiet-{start,end,enabled}`. Default **off**: `_loadDndHour` (`store.ts:5162`) read a missing key as `Number(null)` = 0, so Solid's 22–08 default never ran (0 = 0 is an empty window; Solid has no enabled flag). Closed-tab Web Push is shown by `public/sw.js` with no quiet-hours or DND check (both clients). The residence export/import does not carry quiet hours (B85) |
 | B52 | openDndModal / closeDndModal | DEAD, store:16668 | N/A | — | — |
 | B53 | setTimeFormat | DEAD (replaced by prefs `clock`, `src/lib/prefs/preferences.ts:72`) | N/A | `Prefs.elm:110` `Clock` in the Prefs sheet | The live path belongs to the prefs mapper |
 | B54 | setChannelSortOrder | DEAD, store:16683 | N/A | — | — |
-| B55 | updateChannelActivity → sidebar stamp, catch-up, quiet activity | auto store:5834/12912; readers `ChannelSidebar.tsx`, `homeController.ts:388/521` | FULL | `Sidebar.elm:36-39` (activity from the newest buffered row) | No separate activity map, by design |
+| B55 | updateChannelActivity → sidebar stamp, catch-up, quiet activity | auto store:5834/12912; readers `ChannelSidebar.tsx`, `homeController.ts:388/521` | FULL | `Sidebar.elm:137` `channelActivityMs` / `:128` `dmActivityMs` (activity from the newest buffered row) | No separate activity map, by design |
 | B56 | openExportModal / closeExportModal | DEAD, store:16694 | N/A | — | — |
 | B57 | pinDMMessage / unpinDMMessage / openDMPins / closeDMPins | DEAD, store:16704–16730 | N/A | — | Elm pins are channel pins |
-| B58 | muteDM / unmuteDM (+isDMMuted) — "Mute conversation" | `src/shell/PresenceRibbon.tsx:1393/1401` (UI DM menu) | CORE-ONLY | `App.elm:31136/31181` folds; honoured at `App.elm:22872/31509`; no View dispatches `MuteDm` | The DM More menu (`View/RoomHeader.elm:275`) has no Mute item |
-| B59 | hideRoom / unhideRoom / isRoomHidden (local hide, never PART) | `src/shell/ChannelSettings.tsx:834/842`, `PresenceRibbon.tsx:1158/1166`, palette `commands.ts:599/621/660` | MISSING | none (`Sidebar.elm:36` narrowing) | — |
-| B60 | closeConversation / reopenConversation (auto-reopen on DM view or inbound) | palette `commands.ts:639/651`, `PresenceRibbon.tsx` + `HarborConfirmSheet.tsx:33`; reopen auto store:8027/13061 | MISSING | none (`Sidebar.elm:36`) | Every DM shell stays listed forever |
+| B58 | muteDM / unmuteDM (+isDMMuted) — "Mute conversation" | `src/shell/PresenceRibbon.tsx:1393/1401` (UI DM menu) | FULL | DM More menu `View/Organize.elm:963` `roomMoreItems` (via `View/RoomHeader.elm:292`) and sidebar row menu `View/Rail.elm:937` → `MuteDm` `App.elm:34863` / `UnmuteDm` `:34908`; honoured by unread `App.elm:26093`, alerts `:35236/35299/35421`, muted mark `View/Rail.elm:802`, app-badge count `App.elm:54169`; tests `GapOrganizeTest.elm:385/692` | (v3/gap-organize) was CORE-ONLY: the fold existed but nothing dispatched it. Muted DMs show a mark and drop out of the app badge |
+| B59 | hideRoom / unhideRoom / isRoomHidden (local hide, never PART) | `src/shell/ChannelSettings.tsx:834/842`, `PresenceRibbon.tsx:1158/1166`, palette `commands.ts:599/621/660` | PARTIAL | `Organizer.Hide`/`Unhide` `Organizer.elm:621/642` (owner-scoped `onyx:hidden-rooms`); room More menu `View/Organize.elm:981`, sidebar row menu `View/Rail.elm:916` (`railMenuEntries` `View/Organize.elm:407`), room settings `View/Organize.elm:1065` (via `View/RoomSettings.elm:117`); list filter `listed` `:107` + `hiddenFooter` `:221`; returns on a mention or your own line `App.elm:53178` `organizeShouldReveal` | (v3/gap-organize) Still missing: the palette hide grammar (`hide #room`, `close room`, Solid `commands.ts:599/621/660`). A palette search does find hidden rooms |
+| B60 | closeConversation / reopenConversation (auto-reopen on DM view or inbound) | palette `commands.ts:639/651`, `PresenceRibbon.tsx` + `HarborConfirmSheet.tsx:33`; reopen auto store:8027/13061 | PARTIAL | `Organizer.CloseConversation`/`Reopen` `Organizer.elm:656/690` (owner-scoped `onyx:closed-conversations`); DM More menu `View/Organize.elm:963`, row menu `View/Rail.elm:937`; list filter `listed` `:107` + `closedFooter` `:292`; auto-reopen when opened or the peer writes `App.elm:53142` `organizeShouldReopen`; tests `GapOrganizeTest.elm:286/890` | (v3/gap-organize) Still missing: the palette `close conversation` / `close dm` grammar (`commands.ts:639/651`). Closing is immediate with a toast; Solid asks first (`HarborConfirmSheet.tsx:33`) |
 | B61 | openDMMedia / closeDMMedia | DEAD, store:16815 | N/A | (Elm `MediaIndexOpen` is the room media index) | — |
 | B62 | openConnectionProfiles / closeConnectionProfiles | DEAD, store:16820 | N/A | — | — |
 | B63 | setCompactSidebar | DEAD, store:16825 | N/A | — | — |
-| B64 | setChannelColor / clearChannelColor (`/color #hex\|clear`) | slash store:8360/8368; `channelColors` has no reader | FULL | `App.elm:14888` → `11739/11763`; label at `View/Rail.elm:347` | Elm is better: it renders the label, and `/color clear` works (Solid passes `''`, which `normalizeNickColor` rejects) |
-| B65 | setMessageFontSize | DEAD, store:16860 | N/A | — | — |
+| B64 | setChannelColor / clearChannelColor (`/color #hex\|clear`) | slash store:8360/8368; `channelColors` has no reader | FULL | `App.elm:17738` `/color` → `setChannelColor` `App.elm:14396` / `clearChannelColor` `:14420`; label at `View/Rail.elm:429` | Elm is better: it renders the label, and `/color clear` works (Solid passes `''`, which `normalizeNickColor` rejects) |
+| B65 | setMessageFontSize | DEAD, store:16860 | N/A | live as the Text size pref: `Prefs.elm:405` `fontScale`, `View/Prefs.elm:179` | Prefs-owned in both (Solid `preferences.ts` `fontScale`, Elm v3/gap-appearance); the store setter is dead |
 | B66 | setAccentColor | DEAD, store:16872 | N/A | — | — |
 | B67 | setReducedMotion (store) | DEAD (the `VoiceBar.tsx:770` match is a local signal) | N/A | prefs path `PrefsTogglePref` | Live reduce-motion is the prefs one |
-| B68 | setChatBackground | DEAD, store:16894 | N/A | — | — |
+| B68 | setChatBackground | DEAD, store:16894 | N/A | Elm: `BackgroundScene` outbound → `media/backdrop.ts` (v3/gap-appearance). Solid's scenes live in `src/backgrounds/`, not behind this setter | The store setter is dead in Solid; Elm's live path is the scene picker |
 | B69 | setUiFont | DEAD, store:16906 | N/A | — | — |
 | B70 | setBubbleMode | DEAD, store:16918 | N/A | — | — |
 | B71 | setSidebarWidth (drag resize) | DEAD, store:16930 | N/A | — | — |
-| B72 | setMessageMaxWidth | DEAD, store:16943 | N/A | — | — |
+| B72 | setMessageMaxWidth | DEAD, store:16943 | N/A | live as the Conversation width pref: `Prefs.elm:407` `width`, `View/Prefs.elm:195` | Prefs-owned in both (Solid `preferences.ts` `width`); the store setter is dead |
 | B73 | setGlassSidebar | DEAD, store:16955 | N/A | — | — |
 | B74 | setMemberListSort | DEAD, store:16967 | N/A | — | — |
 | B75 | addLatencyReading (60-sample sparkline) | auto store:6456; `latencyHistory` has no reader | N/A | Elm keeps its own history (`maxLatencyHistory`) | Write-only |
 | B76 | setConnectedAt | DEAD, store:16978 | N/A | — | — |
 | B77 | openServerInfo / closeServerInfo | DEAD, store:16984 | N/A | — | — |
-| B78 | setNickAway | DEAD; `awayNicks` has no non-store reader | N/A | `App.elm:17981` away fold (roster marker) | — |
+| B78 | setNickAway | DEAD; `awayNicks` has no non-store reader | N/A | `App.elm:21108` away fold (roster marker) | — |
 | B79 | toggleFocusMode | palette `commands.ts:910`, but `focusMode` has no reader | N/A | — | No-op in Solid |
-| B80 | createFolder | `src/shell/ChannelOrganizationSection.tsx:39` (UI, Account page) | FULL | `Organize.createFolder`; `View/Organize.elm` | v3/gap-organize |
-| B81 | deleteFolder (orphans → first folder) | `ChannelOrganizationSection.tsx:155` (UI) | FULL | `Organize.deleteFolder` | v3/gap-organize: orphans return to the plain Rooms list |
-| B82 | addChannelToFolder | `ChannelOrganizationSection.tsx:51` (UI) | FULL | `Organize.assignRoom`; folder picker | v3/gap-organize: a room lives in one folder |
-| B83 | toggleFolderCollapsed + sidebar folder groups | `ChannelSidebar.tsx:361` (UI) | FULL | `Organize.toggleCollapsed`; `View/Organize.elm` `folderSections` | v3/gap-organize |
-| B84 | renameFolder | DEAD, store:17065 | FULL | `Organize.renameFolder`; `prefsOrganize` | v3/gap-organize: Elm ships it (Solid's was dead) |
-| B85 | setChannelFolders (portable import) | `PortableIdentitySection.tsx:122` (UI) | MISSING | `Account2.elm:466` reports that folders were skipped | Honest refusal copy |
+| B80 | createFolder | `ChannelOrganizationSection.tsx:39` (UI, Account page) | FULL | `Organize.createFolder` `Organize.elm:294` via `Organizer.FolderCreate`; Preferences → `View/Organize.elm:1210` `prefsOrganize` (`View/Prefs.elm:275`) and the row-menu picker | v3/gap-organize; tests `GapOrganizeTest.elm:415/428` |
+| B81 | deleteFolder (orphans → first folder) | `ChannelOrganizationSection.tsx:155` (UI) | FULL | `Organize.deleteFolder` `Organize.elm:347` via `Organizer.FolderDelete` | v3/gap-organize: orphans return to the plain Rooms list |
+| B82 | addChannelToFolder | `ChannelOrganizationSection.tsx:51` (UI) | FULL | `Organize.assignRoom` `Organize.elm:400` via `Organizer.FolderAssign`; "Move to folder…" in the room More / row menus and room settings | v3/gap-organize: a room lives in one folder |
+| B83 | toggleFolderCollapsed + sidebar folder groups | `ChannelSidebar.tsx:361` (UI) | FULL | `Organize.toggleCollapsed` `Organize.elm:385`; `View/Organize.elm:135` `folderSections` (a filter in use opens every folder) | v3/gap-organize |
+| B84 | renameFolder | DEAD, store:17065 | FULL | `Organize.renameFolder` `Organize.elm:317` via `Organizer.FolderRenameSave`; `prefsOrganize` | v3/gap-organize: Elm ships it (Solid's was dead) |
+| B85 | setChannelFolders (portable import) | `PortableIdentitySection.tsx:122` (UI) | MISSING | `App.elm:50343` `portableImportRun` applies favorites only; `Account2.elm:461` `portableImportStatus`; export `Account2.elm:270` `serializePortable` writes an empty `categories` and a fixed 22/8 `quietHours` | Folders and quiet hours now exist in Elm (B80–B84, B51) but the residence document neither exports nor imports them. The import report still says "Room folders aren't available in this client yet" (`Account2.elm:467`), which is now wrong, as are the comments at `Account2.elm:252/267/458` and `View/Account2.elm:21` |
 | B86 | openPollCreate / closePollCreate | DEAD, store:17086 | N/A | — | — |
 | B87 | openReactionStats / closeReactionStats | DEAD, store:17091 | N/A | — | — |
-| B88 | addTopicHistory (TOPIC/332 record, persisted) | auto store:12137 (vault only, no UI reader) | FULL | `App.elm:35126`; `TopicHistoryLoaded` `App.elm:37782` | Elm also uses it for composer topic options (`View/Composer.elm:403`) |
+| B88 | addTopicHistory (TOPIC/332 record, persisted) | auto store:12137 (vault only, no UI reader) | FULL | `App.elm:38897` `recordTopicHistory`; `TopicHistoryLoaded` `App.elm:41962` | Elm also uses it for composer topic options (`View/Composer.elm:418`) |
 | B89 | markWelcomeSeen | DEAD, store:17107 | N/A | — | — |
 | B90 | setSpeakingNick (speaking set, cap) | auto `src/media/useCadenceMedia.ts:266/286/298` | FULL | `Media.elm:124` speaking + `CallMedia` dominant speaker | — |
 | B91 | addVoiceChannel / removeVoiceChannel | DEAD, store:17136/17143 | N/A | — | — |
-| B92 | addChannelEvent (join/part/quit/kick/mode/nick log) | auto store:11613/11739/13235; `channelEvents` has no reader | N/A | `App.elm:18255` mirror with no View (CORE-ONLY) | Write-only |
+| B92 | addChannelEvent (join/part/quit/kick/mode/nick log) | auto store:11613/11739/13235; `channelEvents` has no reader | N/A | `App.elm:21382` mirror with no View (CORE-ONLY) | Write-only |
 | B93 | clearChannelEvents / open/closeEventLog / toggleEventFilter | DEAD, store:17168–17178 | N/A | — | — |
 | B94 | addJoinHistory → Home "recent rooms" + Home memory | auto store:11539; readers `homeController.ts:268/472/475` | MISSING | none (`requestJoinHistory` is CHATHISTORY, unrelated) | Home loses the rooms you recently left |
-| B95 | setNickAliases (editor) + 433 alias fallback | setter DEAD; fallback auto store:14911 | FULL | `NickAliasesLoaded` `App.elm:37809`, `App.elm:10078` `nextNickAlias` | Neither client has an editor; the fallback matches |
-| B96 | addToWatchList / removeFromWatchList | DEAD, store:17210/17223 | N/A | `View/Account2.elm:714/743` → `App.elm:41817/41823` | Elm is better: People sheet |
-| B97 | setWatchOnline (MONITOR 730/731) | auto store:14946–14965 | FULL | `App.elm:25599` | — |
+| B95 | setNickAliases (editor) + 433 alias fallback | setter DEAD; fallback auto store:14911 | FULL | `NickAliasesLoaded` `App.elm:41989`, `App.elm:10497` `nextNickAlias` | Neither client has an editor; the fallback matches |
+| B96 | addToWatchList / removeFromWatchList | DEAD, store:17210/17223 | N/A | `View/Account2.elm:714/743` → `App.elm:46091` `PeopleWatchAdd` / `:46097` `PeopleWatchRemove` | Elm is better: People sheet |
+| B97 | setWatchOnline (MONITOR 730/731) | auto store:14946–14965 | FULL | `App.elm:29276` | — |
 | B98 | setMobilePanel | DEAD, store:17244 | N/A | — | — |
 | B99 | setHighContrastMode (store) | DEAD (live: prefs `highContrast`, `preferences.ts:64`) | N/A | `PrefsTogglePref` (prefs mapper) | — |
 | B100 | setDevMode | DEAD, store:17258 | N/A | — | — |
 | B101 | setStreamerMode / setStreamerModeBlurLinks | DEAD, store:17269/17277 | N/A | — | — |
 | B102 | setReduceMotion / setCompactMemberList (store) | DEAD, store:17288/17297 | N/A | — | Prefs-owned in both |
 | B103 | toggleMessageSelection / clearSelection / enter/exitSelectMode | DEAD, store:17308–17316 | N/A | — | — |
-| B104 | toggleForumChannel | `src/shell/MessageView.tsx:993` (UI) | FULL | `View/Thread.elm:1019` → `App.elm:42777` | — |
+| B104 | toggleForumChannel | `src/shell/MessageView.tsx:993` (UI) | FULL | `View/Thread.elm:1084` → `App.elm:47133` | — |
 | B105 | addForumPost | auto store:12738; `forumPosts` has no reader | N/A | — | Write-only |
-| B106 | openForumCreate / closeForumCreate | DEAD, store:17339 | N/A | (Elm `TopicCreateSubmit` `View/Thread.elm:983` is the topic flow) | — |
+| B106 | openForumCreate / closeForumCreate | DEAD, store:17339 | N/A | (Elm `TopicCreateSubmit` `View/Thread.elm:1048` is the topic flow) | — |
 | B107 | toggleSuppressEmbed | DEAD, store:17344 | N/A | — | — |
-| B108 | setDisplayNameOverride / clearDisplayNameOverride | DEAD (reader `src/shell/PeopleProfileCard.tsx`) | N/A | read at `View/Profile.elm:399`; `App.elm:42616/42641` CORE-ONLY | Read path matches Solid |
-| B109 | setSelfDisplayName / Bio / Pronouns / BannerUrl (local identity memory) | DEAD, store:17375–17410 | N/A | — | Solid has no self-profile editor |
-| B110 | setInvisibleMode (MODE ±i) | DEAD, store:17423 | N/A | Elm's "Invisible" sends `AWAY Invisible` (`App.elm:19585`) | — |
-| B111 | markChannelRead (badge maps) | auto on focus store:8017; palette `commands.ts:462`; Ctrl+Shift+E (`useKeyboardShortcuts.ts:437`) | PARTIAL | read on select; `/read` `App.elm:14609`; `View/Home.elm:154` → `App.elm:39083` | No palette "Mark all read", no Ctrl+Shift+E |
-| B112 | incrementUnread → totalUnreadMentions → app badge + tab title | auto store:13052; `src/pwa/AppBadgeRuntime.tsx:43`, `AttentionTitleRuntime.tsx:21` | PARTIAL | per-row unread exists; no badge or title writer in `ports.js` | No OS app badge, no "(n)" title |
-| B113 | setUserProfile / getUserProfile (WHOIS + METADATA) | auto store:13514/15296…; get DEAD | FULL | `App.elm:5979/5992` | — |
+| B108 | setDisplayNameOverride / clearDisplayNameOverride | DEAD (reader `src/shell/PeopleProfileCard.tsx`) | N/A | read at `View/Profile.elm:404`; `App.elm:46972` `OverrideSetDisplayName` / clear folds, no View dispatcher (CORE-ONLY) | Read path matches Solid |
+| B109 | setSelfDisplayName / Bio / Pronouns / BannerUrl (local identity memory) | DEAD, store:17375–17410 | N/A | `View/UserModes.elm` `selfNameRow` (via `View/Profile.elm:580`) edits your network real name (`SETNAME`, `App.elm:6379` `foldSetname`) | Solid has no self-profile editor. v3/gap-usermodes added a SETNAME real-name row to your own member card; there is still no bio, pronouns or banner editor |
+| B110 | setInvisibleMode (MODE ±i) | DEAD, store:17423 | N/A | Elm's presence "Invisible" is `AWAY Invisible` (`App.elm:22720`), a different thing. The real `MODE ±i` is the "Invisible to strangers" switch: `UserModes.elm:151` (`modeLine` `:609`), `View/Prefs.elm:280` `privacyPanel` | Solid's setter is dead. Elm better (v3/gap-usermodes): a reachable Privacy pane with switches for +i, +p, +P, +R, +g, +C, +Q (`GapUserModesTest.elm:567/585`) |
+| B111 | markChannelRead (badge maps) | auto on focus store:8017; palette `commands.ts:462`; Ctrl+Shift+E (`useKeyboardShortcuts.ts:437`) | FULL | read on select (`ChannelSelect`); `/read` `App.elm:17459`; palette "Mark #room read" / "Mark all read" `Switcher.elm:573/438` → `App.elm:49369`; Ctrl+Shift+E `ports.js:4490` → `Switcher.elm:1237` → `App.elm:49513`; Home `View/Home.elm:153` → `App.elm:43268` | (v3/gap-commands) palette rows and Ctrl+Shift+E added. The chord is the camera while a call is live (`ports.js:4563`) |
+| B112 | incrementUnread → totalUnreadMentions → app badge + tab title | auto store:13052; `src/pwa/AppBadgeRuntime.tsx:43`, `AttentionTitleRuntime.tsx:21` | FULL | count `App.elm:54157` `gapAttention` (`AccountScope.attentionCount`: room mentions + unread DMs, muted DMs excluded) → `gapAccount.badge` `App.elm:54887` → `Main.elm:1969` `gapAppBadge` → `ports.js:8446` / `createAppBadge` `:13266`; tab title `View.elm:218` `AccountScope.attentionTitle`; tests `AccountScopeTest.elm:255`, `gapAccount.smoke.mjs:470` | (v3/gap-account) the installed-app badge and the "(n)" tab title. The title applies on the app shell only, not the public pages. Whether a given OS honours `setAppBadge` is browser-dependent and not checked here |
+| B113 | setUserProfile / getUserProfile (WHOIS + METADATA) | auto store:13514/15296…; get DEAD | FULL | `App.elm:6351` `foldWhoisProfile` / `:6364` `getUserProfile`; `:6379` `foldSetname` | — |
 | B114 | renameChannel (RENAME) | DEAD: `onyx:channel-rename` is never dispatched (store:18369) | N/A | both send `/rename` raw | — |
-| B115 | setOwnMetadata (METADATA * SET) | DEAD: `onyx:metadata-set` is never dispatched (store:18375) | N/A | `App.elm:42852` `OwnMetadataSet` → `9453` (CORE-ONLY) | No self-profile editor in either client |
-| B116 | _applyMetadata → profile card (display-name/pronouns/bio) + dm-key directory | auto (METADATA 761) | FULL | `App.elm:9366`, `9257`; `View/Profile.elm:397-516` | Neither renders banner, links or accent |
-| B117 | publishDeviceKey (METADATA ocean.dm-key(s) on 001, pref-gated) | auto store:11286 | FULL | `App.elm:5031` `DmPublishKey`; manual `View/Account.elm:844` | Elm adds a manual publish button |
-| B118 | _decryptDm (TOFU open, re-open on key arrival, notify after decrypt) | auto store:7617/12949/17579 | FULL | `App.elm:43078/43081` `DmOpenResult/Failed` | — |
-| B119 | _flagPeerKeyChange (toast + inbox notification) | auto (`_decryptDm`, `useCadenceMedia.ts:477`) | PARTIAL | `App.elm:12720` flag + service log; inline alert in `View/DmSafety.elm` | No toast and no inbox entry |
-| B120 | acceptPeerKeyChange (re-pin, re-open locked rows) | `src/shell/DmKeyChangeBanner.tsx:114` (UI) | FULL | `View/DmSafety.elm:381` → `DmKeyAccepted` `App.elm:41743` | Elm re-pins the full live device set |
+| B115 | setOwnMetadata (METADATA * SET) | DEAD: `onyx:metadata-set` is never dispatched (store:18375) | N/A | `App.elm:47212` `OwnMetadataSet` → `9860` (CORE-ONLY) | No self-profile editor in either client |
+| B116 | _applyMetadata → profile card (display-name/pronouns/bio) + dm-key directory | auto (METADATA 761) | FULL | `App.elm:9762`, `9257`; `View/Profile.elm:402-539` | Neither renders banner, links or accent |
+| B117 | publishDeviceKey (METADATA ocean.dm-key(s) on 001, pref-gated) | auto store:11286 | FULL | `App.elm:5390` `DmPublishKey`; manual `View/Account.elm:844`; turning the E2EE-DM pref on publishes at once `App.elm:54354` `gapSettleE2ee` | Elm adds a manual publish button, and (v3/gap-account) the live E2EE-DM toggle publishes immediately (`GapAccountAppTest.elm:641`) |
+| B118 | _decryptDm (TOFU open, re-open on key arrival, notify after decrypt) | auto store:7617/12949/17579 | FULL | `App.elm:47440` `DmOpenResult` / `:47443` `DmOpenFailed`; notify after decrypt `App.elm:35265` `notifyDmPlaintext` | — |
+| B119 | _flagPeerKeyChange (toast + inbox notification) | auto (`_decryptDm`, `useCadenceMedia.ts:477`) | FULL | `flagPeerKeyChange` `App.elm:40110` (TOFU flag, service-log line, then an error toast + Inbox row once per change); callers: decrypt fail `App.elm:47443`, directory update `DmKeyChecked` `:45998`, held sends `:47287/47403`, scheduled seals `:15387/15492`; inline alert `View/DmSafety.elm` | (v3/gap-pwa-safety) toast and Inbox row added, and the check also runs on directory updates and held sends. A call-handshake key change shows a call alert (`CallDock.elm:747`, `peer_key`) instead of raising the DM review |
+| B120 | acceptPeerKeyChange (re-pin, re-open locked rows) | `src/shell/DmKeyChangeBanner.tsx:114` (UI) | FULL | `View/DmSafety.elm:381` → `DmKeyAccept` `App.elm:45992` → `dmKeyAccept` `App.elm:34552` → `DmKeyAccepted` `App.elm:45995` / `dmKeyAccepted` `:34588`; `acceptKeys` `ports.js:9357` | (v3/gap-pwa-safety) was "re-pins the full live device set"; now acceptance pins only the pending keys the user reviewed (bound to the exact safety number shown) plus the still-presented old pins. A device added after the review stays pending |
 | B121 | dismissPeerKeyChange (keep locked) | `DmKeyChangeBanner.tsx:130` (UI) | FULL | `View/DmSafety.elm:388` `DmKeyKeepLocked` | — |
-| B122 | loadSafetyNumber / loadPendingKeySafetyNumber | `src/shell/DmSafetySheet.tsx:140`, `DmKeyChangeBanner.tsx:72-73` (UI) | FULL | `View/DmSafety.elm:119` → `DmSafetyResult` `App.elm:41737` | — |
-| B123 | clearOfflineMemo (on navigate) | `ChannelSidebar.tsx:888` (UI) | FULL | `App.elm:18118`, on select `App.elm:35707`; stamp `View/Rail.elm:472` | — |
+| B122 | loadSafetyNumber / loadPendingKeySafetyNumber | `src/shell/DmSafetySheet.tsx:140`, `DmKeyChangeBanner.tsx:72-73` (UI) | FULL | `View/DmSafety.elm:119` → `DmSafetyResult` `App.elm:45989` | — |
+| B123 | clearOfflineMemo (on navigate) | `ChannelSidebar.tsx:888` (UI) | FULL | `App.elm:21245`, on select `App.elm:39478`; stamp `View/Rail.elm:556` | — |
 | B124 | setChannelOrder (drag reorder) | DEAD, store:17831 | N/A | — | — |
 | B125 | markChannelNsfw / unmarkChannelNsfw / acknowledgeNsfw | DEAD, store:17843–17865 | N/A | — | — |
 | B126 | setDisplayTheme / setFontSize | DEAD, store:17876/17880 | N/A | — | The theme is owned by ThemeProvider/Studio |
-| B127 | joinVoiceChannel (voice) | `PresenceRibbon.tsx:504`, `AppShell.tsx:636`, `src/shell/ScheduledEventLine.tsx:77`, palette `commands.ts:1326` | PARTIAL | `View/CallPresence.elm:233`, `View/Calls.elm:249`, `View/RoomSettings.elm:955` → `App.elm:41150` | No palette "Start voice call" |
-| B128 | Video: joinVoiceChannel(withVideo) / toggleVideo / toggleCamera | `src/shell/voice/VoiceBar.tsx:609/849`, palette `commands.ts:1340`; toggleCamera DEAD | PARTIAL | `View/CallStage.elm:435/502`, `View/CallPresence.elm:279/288` → `App.elm:41366` | Hidden while the engine reports `videoEnabled=false` (`ports.js:2313`); the hub still offers "Join with video" (`View/Calls.elm:254`) |
-| B129 | leaveVoiceChannel | `VoiceBar.tsx:753`, `src/shell/voice/VoicePip.tsx:350`, `AppShell.tsx:351` | FULL | `View/CallDock.elm:444`, `View/Calls.elm:285` → `App.elm:41195` | Elm asks to confirm when more than 2 people are in the call |
-| B130 | toggleMute | `VoiceBar.tsx:751`, `VoicePip.tsx:418` | FULL | `View/CallStage.elm:415`, `View/CallDock.elm:412` → `App.elm:41211` | — |
-| B131 | toggleDeafen | `VoiceBar.tsx:848` | FULL | `View/CallStage.elm:576` → `App.elm:41393` | Moved into More |
-| B132 | setCallLayout | `VoiceBar.tsx:852` | FULL | `View/CallStage.elm:599` → `App.elm:41444` | Cycles grid → spotlight → screenshare |
-| B133 | setCallStageSize (+Escape back to compact) | `VoiceBar.tsx:857`, `src/shell/voice/VoiceStage.tsx:197/203` | FULL | `View/CallStage.elm:607` → `App.elm:41456`; Escape `App.elm:44306` | — |
-| B134 | pinParticipant (toggle; implies spotlight) | `VoiceStage.tsx:168` | FULL | `View/CallVideo.elm:386` → `App.elm:41462` | — |
-| B135 | toggleCaptions | `VoiceBar.tsx:851` | FULL | `View/CallOverlays.elm:124` → `App.elm:41518` | — |
-| B136 | toggleRaiseHand (sends ✋ + local echo) | `VoiceBar.tsx:850`, `useCadenceMedia.ts:401` | FULL | `View/CallOverlays.elm:74` → `App.elm:41489` | Room calls only, same as Solid's engine `activeRoom` |
-| B137 | sendCallReaction | `VoiceBar.tsx:1234` | FULL | `View/CallOverlays.elm:211` → `App.elm:41565` | — |
+| B127 | joinVoiceChannel (voice) | `PresenceRibbon.tsx:504`, `AppShell.tsx:636`, `src/shell/ScheduledEventLine.tsx:77`, palette `commands.ts:1326` | FULL | `View/CallPresence.elm:234`, `View/Calls.elm:171`, `View/RoomSettings.elm:950`; palette "Start voice call" `Switcher.elm:590` → `App.elm:49358` → `CallJoin` `App.elm:45355` | (v3/gap-commands) palette "Start voice call" (and "Return to call") added |
+| B128 | Video: joinVoiceChannel(withVideo) / toggleVideo / toggleCamera | `src/shell/voice/VoiceBar.tsx:609/849`, palette `commands.ts:1340`; toggleCamera DEAD | PARTIAL | camera button `View/CallStage.elm:579` (shown only when `cameraSupported`, `:499`) → `CallToggleCamera` `App.elm:45614`; "Join with video" `View/CallPresence.elm:289` (gated `:280`) and the hub `View/Calls.elm:177` (gated `:285`); `CallJoin` `App.elm:45407` forces `camera = video && cameraSupported`; `ports.js:3086`; test `CallsC4Test.elm` | Video is off by design on the live network (`cadencevis` is too heavy for the stock SendQ), so the camera control and "Join with video" stay hidden while the engine reports `videoEnabled=false`. The hub gate was added by `calls` (`a96afd2e`), closing the earlier inconsistency. No palette "Start video call" |
+| B129 | leaveVoiceChannel | `VoiceBar.tsx:753`, `src/shell/voice/VoicePip.tsx:350`, `AppShell.tsx:351` | FULL | `View/CallDock.elm:445`, `View/CallStage.elm:447`, `View/Calls.elm:316` → `App.elm:45421`; confirm `App.elm:45964` | Elm asks to confirm when more than 2 people are in the call |
+| B130 | toggleMute | `VoiceBar.tsx:751`, `VoicePip.tsx:418` | FULL | `View/CallStage.elm:479`, `View/CallDock.elm:413` → `App.elm:45442` | — |
+| B131 | toggleDeafen | `VoiceBar.tsx:848` | FULL | `View/CallStage.elm:653` → `App.elm:45642` | Moved into More |
+| B132 | setCallLayout | `VoiceBar.tsx:852` | FULL | `View/CallStage.elm:676` → `App.elm:45693` | Cycles grid → spotlight → screenshare |
+| B133 | setCallStageSize (+Escape back to compact) | `VoiceBar.tsx:857`, `src/shell/voice/VoiceStage.tsx:197/203` | FULL | `View/CallStage.elm:684` → `App.elm:45708`; Escape `App.elm:49784` | — |
+| B134 | pinParticipant (toggle; implies spotlight) | `VoiceStage.tsx:168` | FULL | `View/CallVideo.elm:397` → `App.elm:45714` | — |
+| B135 | toggleCaptions | `VoiceBar.tsx:851` | FULL | `View/CallOverlays.elm:124` → `App.elm:45770` | — |
+| B136 | toggleRaiseHand (sends ✋ + local echo) | `VoiceBar.tsx:850`, `useCadenceMedia.ts:401` | FULL | `View/CallOverlays.elm:74` → `App.elm:45741` | Room calls only, same as Solid's engine `activeRoom` |
+| B137 | sendCallReaction | `VoiceBar.tsx:1234` | FULL | `View/CallOverlays.elm:211` → `App.elm:45817` | — |
 | B138 | setPeerHandRaised (peer ✋, 15s) | auto `useCadenceMedia.ts:405/411` | FULL | `CallCaptions.elm:139` (15000 ms) | — |
-| B139 | openVoiceSettings / closeVoiceSettings | `src/app/YouSettings.tsx:232`, `VoiceBar.tsx:859`, `AppShell.tsx:1714` | FULL | `View/CallOverlays.elm:154`, `View/VoiceSettings.elm:32` → `App.elm:41643` | — |
-| B140 | startDmCall (ring out, 30s timeout) | DEAD, store:18177 | N/A | `View/CallDock.elm:201` → `App.elm:41318` | Elm is better: a reachable DM "Call" item |
-| B141 | acceptDmCall (join-muted honoured) | `src/shell/voice/overlays/IncomingCallOverlay.tsx:23` | FULL | `View/CallDock.elm:138` → `App.elm:41277` | — |
-| B142 | rejectDmCall | `IncomingCallOverlay.tsx:32` | FULL | `View/CallDock.elm:104/129` → `App.elm:41298` | Escape declines |
-| B143 | endDmCall (cancel ring / hang up) | `src/shell/voice/overlays/OutgoingCallOverlay.tsx:19`, `VoicePip.tsx:353` | FULL | `View/CallDock.elm:158` `CallCancel` → `App.elm:41309`; `CallLeave` | — |
+| B139 | openVoiceSettings / closeVoiceSettings | `src/app/YouSettings.tsx:232`, `VoiceBar.tsx:859`, `AppShell.tsx:1714` | FULL | `View/CallOverlays.elm:154`, `View/VoiceSettings.elm:32` → `App.elm:45895` | — |
+| B140 | startDmCall (ring out, 30s timeout) | DEAD, store:18177 | N/A | `CallStart` fold `App.elm:45566` has no View dispatcher (CORE-ONLY). The DM More menu item `View/CallDock.elm:187` `dmCallItem` is now a note: "Direct calls aren't available yet" | rx-calls replaced the DM "Call" item with that note because the server routes `MEDIA` to channels only. The ring-in/out dialogs below stay for when direct calls arrive. Not Elm-better any more |
+| B141 | acceptDmCall (join-muted honoured) | `src/shell/voice/overlays/IncomingCallOverlay.tsx:23` | FULL | `View/CallDock.elm:140` → `App.elm:45525` | The incoming-ring dialog is live code, but no server path can ring a DM today (see B140) |
+| B142 | rejectDmCall | `IncomingCallOverlay.tsx:32` | FULL | `View/CallDock.elm:106` (Escape) / `:131` → `App.elm:45546` | Escape declines |
+| B143 | endDmCall (cancel ring / hang up) | `src/shell/voice/overlays/OutgoingCallOverlay.tsx:19`, `VoicePip.tsx:353` | FULL | `View/CallDock.elm:173` `CallCancel` → `App.elm:45557`; `CallLeave` | — |
 | B144 | openSpatialPad / closeSpatialPad | DEAD, store:18241 | N/A | — | — |
 | B145 | openBreakoutSidebar / closeBreakoutSidebar | DEAD, store:18246 | N/A | — | — |
 | B146 | open/closeGoLiveModal, startStream / endStream | DEAD, store:18256/18263/18290 | N/A | — | — |
@@ -2328,417 +2487,447 @@ Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window e
 | B149 | openServerStats / closeServerStats | DEAD, store:18260 | N/A | (Elm `/stats` route is separate) | — |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
-- `COVERAGE.md:91` says "Ignore/mute **done** (… `MuteDm`/`UnmuteDm` actions …)". This is overstated. No View dispatches `MuteDm`/`UnmuteDm` (only the folds at `App.elm:31136/31181` exist), while Solid offers Mute/Unmute conversation in the DM ribbon (`PresenceRibbon.tsx:1393/1401`). The real status is CORE-ONLY.
-- `COVERAGE.md:218` marks Calls C4–C5 camera as "done". This went stale with commit fbe04585: the engine now reports `videoEnabled=false`, and the camera button and join-with-video banner are hidden (`View/CallStage.elm:435`, `View/CallPresence.elm:279`). The hub's "Join with video" (`View/Calls.elm:254`) is still ungated, which is inconsistent.
-- `COVERAGE.md:216` (C6) cites store `startDmCall` as the oracle source, which implies a port. Solid never calls it, so Elm's DM "Call" item (`View/CallDock.elm:201`) is new capability, not parity.
-- `V3_ROADMAP.md:121` lists "6.7 Stage (raised hands) | L" with no status, and `V3_ROADMAP.md:169` lists "Stage/Watch Together (6.7) | deferred". Both understate: stage is done (`COVERAGE.md:226`, `Stage.elm`, `View/StageMode.elm`).
-- `COVERAGE.md:202` narrows out the quiet-hours schedule correctly, but it understates the impact. Solid's quiet hours default to 22–08 and are active (store:16624-16625, `isDndActive` enabled:true), so Elm now delivers overnight alerts that Solid silenced.
-- `App.elm:12990` (the slash table, not a doc) advertises `/back` "Clear away status" (alias `unaway`). It is sent raw as `BACK`, and Onyx Server has no such verb.
+- `COVERAGE.md:91` says "Ignore/mute **done** (… `MuteDm`/`UnmuteDm` actions …)". It was overstated: no View dispatched them. **Fixed by v3/gap-organize**: the DM More menu and the sidebar row menu now dispatch them (B58), so the claim is true at HEAD.
+- `COVERAGE.md:220` marks Calls C4–C5 camera as "done". **Still stale.** Since fbe04585 the engine reports `videoEnabled=false` (video is off by design), so the camera button and "Join with video" are hidden (`View/CallStage.elm:499`, `View/CallPresence.elm:280`). The row says nothing about the switch. The hub inconsistency (`View/Calls.elm` still offering video) was **fixed by `calls` (`a96afd2e`)**, which gates it on `cameraSupported` (`View/Calls.elm:285`).
+- `COVERAGE.md:218` (C6) cites store `startDmCall` as the oracle source, which implies a port. **Still true**: Solid never calls it. Worse, rx-calls then replaced Elm's DM "Call" menu item with a "Direct calls aren't available yet" note (`View/CallDock.elm:187`), so `CallStart` (`App.elm:45566`) has no dispatcher. The earlier "new capability" reading no longer holds.
+- `V3_ROADMAP.md:122` lists "6.7 Stage (raised hands), Watch Together | L" with no status, and `V3_ROADMAP.md:170` lists "Stage/Watch Together (6.7) | deferred". **Still true**: both understate. Stage is done (`V3_ROADMAP.md:189/193`, `Stage.elm`, `View/StageMode.elm`).
+- `COVERAGE.md:203` (the v3/notify row) narrows out "quiet-hours schedule, calm presets, smart-mute rules, room folders". **Superseded by v3/gap-organize**, which shipped all four; the row itself is unedited. The earlier note that this "understates the impact" (Solid's 22–08 default silencing overnight alerts) was wrong: Solid's default window is empty (`_loadDndHour` returns 0 for a missing key, `store.ts:5162`), so Elm's default-off quiet hours match what Solid users actually got.
+- `App.elm:15648` (the slash table, not a doc) advertised `/back` "Clear away status" while sending raw `BACK`. **Fixed by v3/gap-commands**: `/back` and `/unaway` now plan an `AWAY` with no params (`App.elm:13210`).
+- New, found in this pass (code comments and copy that went stale when v3/gap-organize landed): `Sidebar.elm:36-39` says "no channel folders, hidden rooms or closed conversations (Elm carries none of that navigation memory)"; `Account2.elm:252/267/458` and `View/Account2.elm:21` say the client has no room folders or quiet hours; and the user-visible import report `Account2.elm:467` says "Room folders aren't available in this client yet". All still stale at HEAD.
 
 #### Elm better than Solid
-- **Timed block with auto-lift:** reachable in Elm (`View/Bans.elm:84-128`, `App.elm:20427/20570`). Solid's `tempBan` has no caller.
-- **Starting a DM call:** Elm has a "Call" item in the DM More menu (`View/CallDock.elm:201`). Solid's `startDmCall` is dead.
-- **Room colour labels:** Elm renders them (`View/Rail.elm:347`) and `/color clear` works (`App.elm:14911`). Solid's `channelColors` has no reader, and its clear passes `''`, which `normalizeNickColor` rejects.
+- **Timed block with auto-lift:** reachable in Elm (`View/Bans.elm:98-172`, `App.elm:23585`/`41902`), with a review step. Solid's `tempBan` has no caller.
+- **Room colour labels:** Elm renders them (`View/Rail.elm:429`) and `/color clear` works (`App.elm:17761`). Solid's `channelColors` has no reader, and its clear passes `''`, which `normalizeNickColor` rejects.
 - **Watch list management:** Elm has the People sheet (`View/Account2.elm:714/743`). Solid's add/remove watch actions are dead.
 - **Stage:**
-  - The host can dismiss a raised hand (`App.elm:45273`) and gets a 375px hands sheet.
+  - The host can dismiss a raised hand (`App.elm:51113`) and gets a 375px hands sheet.
   - `ACCEPT_SPEAK` only voices people the host actually invited (`Stage.recordInvite`).
-- **Scheduled sends:** Elm holds a scheduled DM until the peer key lookup resolves (`App.elm:12248`).
-- **Away state:** Elm folds `isAway` from the server's 305/306 replies (`App.elm:5540`). Solid sets it optimistically, without a server check.
-- **Device key:** besides the automatic publish on 001, Elm has a manual publish button (`View/Account.elm:844`).
+- **Scheduled sends:** Elm holds a scheduled DM until the peer key lookup resolves (`App.elm:14908`).
+- **Away state:** Elm folds `isAway` from the server's 305/306 replies (`App.elm:5900`). Solid sets it optimistically, without a server check.
+- **Device key:** besides the automatic publish on 001, Elm has a manual publish button (`View/Account.elm:844`), and turning the E2EE-DM pref on publishes at once (`App.elm:54354`).
+- **Account autojoin (v3/gap-usermodes):** a signed-in `/autojoin` sends `AUTOJOIN ADD`, so the server joins the room on every device, and Preferences lists the rooms (`View/UserModes.elm:859`). Solid's list never rejoins anything.
+- **Privacy user modes (v3/gap-usermodes):** a Privacy pane with real `MODE ±i/p/P/R/g/C/Q` switches (`View/Prefs.elm:280`, `UserModes.elm:151`). Solid's `setInvisibleMode` is dead.
+- **Activity sheet (v3/gap-shell):** server NOTICEs, MOTD, WALLOPS and ERROR lines are shown with timestamps (`View/GapShell.elm:236`). Solid files them in a write-only announcements list.
+- **Key-change review (v3/gap-pwa-safety):** a peer's directory entry moving off its pin raises the review with its toast and Inbox row even when nothing is sent or opened (`App.elm:45998`); Solid flags only when a seal or open meets the change. Accepting pins only the keys the user compared (`ports.js:9357`).
+- **Quiet hours with a switch (v3/gap-organize):** an on/off switch plus a live status line (`View/Attention.elm:62`, `Attention.elm:238`). Solid's schedule has no enabled flag, so it cannot be switched off short of making the window empty.
 
 #### Gaps (ranked by user impact)
-- `[High]` **Hide room and close conversation (B59/B60).** Add `hiddenRooms` and `closedConversations` sets to the `App.Model`, persisted through new ports slots. Add Msgs `RoomHide`/`RoomUnhide`/`ConversationClose`. Filter them in `Sidebar.elm`, and put the items in the `View/RoomHeader.elm` More menu and the room settings. Reopen a closed conversation on an inbound DM or when its DM is selected.
-- `[High]` **DM mute UI (B58).** Add "Mute conversation" / "Unmute" to the DM branch of the `View/RoomHeader.elm` More menu, dispatching the existing `MuteDm`/`UnmuteDm` (`App.elm:31136`).
-- `[Med]` **Quiet hours schedule, default 22–08 (B51).** Add `dndQuietStart`/`dndQuietEnd` to the Model, load them from `onyx:dnd-quiet-*` in `index.html`, and extend `notifyDndActive` (`App.elm:31607`). Add two selects to `View/Notify.elm`, and apply them on portable import (`Account2.elm`).
-- `[Med]` **`/away` message and `/back` (B12/B13).** Give `away`/`back`/`unaway` local arms in `parseSlashLocal` (`App.elm:10981`): join the args into one trailing param, and send `AWAY` with no args for back. Optionally add palette away/back actions in `Switcher.elm`.
-- `[Med]` **Room folders (B80–B85).** Add a `channelFolders` model and ports persistence (owner-scoped). Add create/delete/assign Msgs and a folder section in the Account view. Group and collapse folders in `Sidebar.elm`/`View/Rail.elm`, and apply folders on portable import.
-- `[Med]` **Palette grammar (B21/B24/B31/B49/B50/B111/B127/B128).** Extend `Switcher.actionEntries` with: schedule-at, Scheduled messages, star/unstar, DND on/off and "mute N min", Mark all read, Start voice/video, hide room, close conversation.
-- `[Med]` **App badge and tab-title mention count (B112).** Add a ports `attention` outbound fed from `unreadAttentionCount` that sets `navigator.setAppBadge` and a "(n)" document title.
-- `[Low]` **Keyboard shortcuts (B24/B31/B49/B111).** Ctrl+B star, Ctrl+Shift+D DND, Ctrl+Shift+E mark read and Ctrl+Shift+L schedule all need ports `shortcut` names plus `Switcher.Shortcut` arms. Ctrl+Shift+E collides with the in-call camera chord, so that one should only apply outside a call.
-- `[Low]` **Home recent rooms and memory (B94, autojoin B30).** Record successful self-JOINs into a bounded `joinHistory`, render "recent rooms" on `View/Home.elm`, and feed the autojoin list into the same section.
-- `[Low]` **Key-change toast and inbox entry (B119).** When `peerKeyChanges` gains a key at `App.elm:12720`, call `addToast` plus `addNotification` (`NotificationType` error).
-- `[Low]` **Hub "Join with video" is ungated (B128).** Gate the button at `View/Calls.elm:254` on `model.callLocal.cameraSupported`, like `View/CallPresence.elm:279`.
+- `[High]` **[Closed — v3/gap-organize]** **Hide room and close conversation (B59/B60).** Shipped as `Organizer` hide/close sets (owner-scoped), in the room and DM More menus, the sidebar row menu and room settings, with auto-reveal and auto-reopen. The palette part is still open (see the palette item below).
+- `[High]` **[Closed — v3/gap-organize]** **DM mute UI (B58).** "Mute conversation" / "Unmute" is in the DM More menu (`View/Organize.elm:963`) and the sidebar row menu (`View/Rail.elm:937`).
+- `[Med]` **[Closed — v3/gap-organize]** **Quiet hours schedule (B51).** Shipped (`Attention.quietActive`, ORed into `dnd` at `App.elm:35434`), default off. Still open: the residence export/import does not carry it (see the residence item below).
+- `[Med]` **[Closed — v3/gap-commands]** **`/away` message and `/back` (B12/B13).** `/away <message>`, `/back` and `/unaway` plan an `AWAY` line (`App.elm:13197`).
+- `[Med]` **[Closed — v3/gap-organize, except B85]** **Room folders (B80–B84).** Create, rename, delete, assign, collapse and reorder, in Preferences (`View/Organize.elm:1210`), the row menu and room settings, grouped in the sidebar (`View/Organize.elm:135`). Folders are still not part of the residence import (B85).
+- `[Med]` **Residence export/import round-trip (B85/B51/B80).** `Account2.serializePortable` (`Account2.elm:270`) writes an empty `categories` and a fixed 22/8 `quietHours`, and `portableImportRun` (`App.elm:50343`) applies favorites only. Export the real `Organize` folders and the `Attention.QuietHours` record, apply both on import (owner-gated, bounded by `maxFolders`), and fix the stale "Room folders aren't available" copy (`Account2.elm:467`) and comments.
+- `[Med]` **Palette grammar remnants (B21/B50/B59/B60/B12/B31).** Closed by v3/gap-commands: Scheduled messages, star/unstar, Do Not Disturb, `mute N`, Mark (all) read, Start voice call. Still missing: `schedule <text> at <time>` (B21); `mute 30m|2h|1d` units, up to 7 days, and `mute off` (B50, the palette takes plain minutes 1–1440); `hide #room` / `close conversation` rows (B59/B60; Solid also confirms before closing a conversation, Elm closes at once with a toast); `away <msg>` (B12); and `star #other` for a room that is not open (B31). Extend `Switcher.typedActions` (`Switcher.elm:469`) and `Switcher.roomActions` (`:551`), with `Switcher.Action` arms in `App.runGapPaletteTarget` (`App.elm:49313`).
+- `[Med]` **[Closed — v3/gap-account]** **App badge and tab-title mention count (B112).** `gapAppBadge` port and `AccountScope.attentionTitle` (see B112).
+- `[Low]` **[Closed — v3/gap-commands]** **Keyboard shortcuts (B24/B31/B49/B111).** Ctrl+B star, Ctrl+Shift+D DND, Ctrl+Shift+E mark read and Ctrl+Shift+L schedule are bound in `ports.js:4490/4581`; Ctrl+Shift+E and +L belong to the call while one is live.
+- `[Low]` **Home recent rooms and memory (B94).** Still open. Record successful self-JOINs into a bounded `joinHistory`, render "recent rooms" on `View/Home.elm`, and feed the autojoin list into the same section (`View/Home.elm:14` still lists "recently-visited rooms" as a narrowing).
+- `[Low]` **Guest autojoin does nothing (B30).** Partly closed by v3/gap-usermodes (signed-in accounts get a server-side list). The device-only list (`autoJoinChannels`, loaded at `index.html:240`) is never read, yet the guest toast at `App.elm:48138` says the room "will be rejoined on this device after reconnect". Either rejoin the list on 001 or change the guest copy to say sign in to keep rooms.
+- `[Low]` **[Closed — v3/gap-pwa-safety]** **Key-change toast and inbox entry (B119).** `flagPeerKeyChange` (`App.elm:40110`) now toasts and adds an Inbox row once per change. A call-handshake key change still only shows a call alert (`CallDock.elm:747`) instead of raising the DM review.
+- `[Low]` **[Closed — `calls` a96afd2e]** **Hub "Join with video" is ungated (B128).** Gated on `cameraSupported` (`View/Calls.elm:285`). Video itself stays off by design (SendQ), so B128 stays PARTIAL until the engine reports `videoEnabled`.
 - `[Low]` **Idle auto-away (B14), new in both clients.** Add a ports activity/visibility idle timer that emits `IdleAwayTick`. Fold it to `setUserStatus StatusIdle` after N minutes (read from `onyx:idle-away-minutes`), and restore Online on activity.
+- `[Low]` **DM Call item withdrawn (B140).** `CallStart` (`App.elm:45566`) is CORE-ONLY until the server grows a 1:1 media target; then rx-calls' `dmCallItem` (`View/CallDock.elm:187`) can go back to dispatching it.
 
 ### C — Inbound protocol — every server line the Solid client handles
 
-Walked Solid `src/lib/store/store.ts` `_handleMessage` 10432–15569 (pre-switch standard-reply block 10439–11217, every `case` arm 11219–15557 plus `default`), the connect callbacks 6605–6760, reconnect 5091 and the `online`/`offline` listeners 19242; `src/lib/irc/client.ts` (CAP/SASL/nick/LIST/005/keepalive/ERROR, 940–1655), `labels.ts`, `multiline.ts`, `sessionReclaim.ts`, `activitySubscribe.ts`. UI reach was checked in `src/shell` and `src/app`. Elm: `App.elm` `foldLine` 4591–5932 and every fold it calls (`foldStandardReply` 20833, `foldErrorNumeric` 17116, `foldNickError` 10119, `foldCap` 9878, `foldChat` 34673, …), plus `Media.elm`, `Passkey.elm`, `Ircx.elm`, `Isupport.elm`, `ports.js`, `Main.elm` and the views.
+Walked Solid `src/lib/store/store.ts` `_handleMessage` 10432–15569 (pre-switch standard-reply block 10439–11217, every `case` arm 11219–15557 plus `default`), the connect callbacks 6605–6760, reconnect 5091 and the `online`/`offline` listeners 19242; `src/lib/irc/client.ts` (CAP/SASL/nick/LIST/005/keepalive/ERROR, 940–1655), `labels.ts`, `multiline.ts`, `sessionReclaim.ts`, `activitySubscribe.ts`. UI reach was checked in `src/shell` and `src/app`. Elm (re-read at HEAD `609cb240`): `App.elm` `foldLine` 4926–6303 and every fold it calls (`foldStandardReply` 24037, `foldErrorNumeric` 19976, `foldNickError` 10538, `foldCap` 10297, `foldChat` 38428, …), plus `Media.elm`, `Passkey.elm`, `Ircx.elm`, `Isupport.elm`, `ports.js`, `Main.elm` and the views. Since the first pass, lines also pass through steps that did not exist then: `foldParsed` 48211 (`+draft/edit`, v3/gap-convo), `foldAuthGateLine` 53473 (v3/gap-auth), `foldLineUserModes` 47842 (v3/gap-usermodes), `foldStageWire` 51148 (v3/calls-c11), `foldPeopleWire` 52482 (v3/gap-people), and the post-update steps `settleStepGapShell` 11448, `settleStepChanserv` 50651 and `settleStepOper` 20709.
 
-**Cross-cutting finding:** Solid's `addServerLog` writes to `serverLog`, which renders as the sidebar **"Activity — Network updates"** status view (`ChannelSidebar.tsx:731` → `MessageView.tsx:888`). Elm's equivalents, `logService`/`logNumeric`, write to `model.serviceLog`. **No view renders `serviceLog`**: only the Account cert/keytrans filters and the webhook filter read it (`App.elm:26797,26825,21639`), and `View/Rail.elm:11` defers the Activity entry. So every row below marked "log only" is **invisible** in Elm, while the same text was visible in Solid.
+**Cross-cutting finding (closed by v3/gap-shell):** Solid's `addServerLog` writes `serverLog`, which renders as the sidebar **"Activity — Network updates"** status view (`ChannelSidebar.tsx:731` → `MessageView.tsx:888`). Elm's `logService`/`logNumeric` still write `model.serviceLog`, but `settleStepGapShell` (`App.elm:11448`, `stampActivity`) now stamps every new line into `gapShell.activity` (time and kind, `GapShell.elm:227 classifyEntry`) and `View.GapShell.activitySheet` (`View/GapShell.elm:57`, mounted at `View.elm:380`, Escape-closable via `overlayStack`) renders it as the **Activity** sheet, with an All/Problems filter and an unseen-problems dot. It is reached from a rail row (Rooms and Home; hidden in the Messages collection, `css/gap-shell.css:29`) and a "Network activity" row in the You hub (`View/GapShell.elm:341`). So every row that the first pass called "log only (invisible)" is now visible. The Activity list lives for the session only (500 entries). Remaining differences from Solid are noted per row.
 
 | # | Capability | Solid (reach) | Elm | Evidence | Gap / note |
 |---|---|---|---|---|---|
 | **Standard replies (pre-switch)** | | | | | |
-| C1 | Passkey service replies: REGISTER-CHALLENGE → create ceremony; REGISTERED shows "Passkey added (label)"; CRED/LIST rows; REMOVED/RENAMED notices; STATUS probe | `store.ts:10481-10612` (auto) | FULL | `Passkey.elm:543,577`; `App.elm:22796` | Panel reach is covered by the Account section |
-| C2 | Passkey sign-in: AUTH-CHALLENGE + ALLOW-CRED with an 80 ms settle, then the get ceremony | `store.ts:10614-10697` (auto) | FULL | `Passkey.elm:692,710`; `Main.elm:76` | Passkey sign-in button hidden on both sides |
-| C3 | FAIL/WARN WEBAUTHN sets passkeyError; TEMPORARILY_UNAVAILABLE disables the feature; INVALID_SUBCOMMAND shows "does not support renaming" copy | `store.ts:10448-10478` | FULL | `Passkey.elm:522` | |
-| C4 | NOTE SESSION TOKEN → persist bearer and update the live client | `store.ts:10702` (auto) | FULL | `App.elm:5872,17492,17310` | |
-| C5 | NOTE SESSION MTOKEN (with expires) → mesh token and deadline | `store.ts:10715` (auto) | FULL | `App.elm:17310-17347` | |
-| C6 | FAIL SESSION INVALID_TOKEN/NO_SESSION → "reclaim failed" banner, wipe bearers, canonical-only | `store.ts:10742-10765` | FULL | `App.elm:17409,17445` | |
-| C7 | Any FAIL SESSION → error inbox row | `store.ts:10767` (auto) | PARTIAL | `App.elm:17429-17455` | `logService` only, so no inbox row (LIST/DROP failures are invisible) |
-| C8 | FAIL REGISTER/VERIFY → registerError shown on the claim sheet | `store.ts:10769-10780` | FULL | `App.elm:20885,25888` | |
-| C9 | FAIL/WARN IDENTIFY → accountActionError + inbox row | `store.ts:10826,10849` | FULL | `App.elm:20882,21008` | |
-| C10 | FAIL/WARN ACCOUNTSET/LOGOUT/RECOVER/DROP/KEYTRANS/CERT* → action error + inbox "X failed (CODE)" | `store.ts:10786-10859` | FULL | `App.elm:20949-20993` | |
-| C11 | FAIL ACCOUNTINFO → inbox error | `store.ts:10822,10855` | PARTIAL | `App.elm:20900-20916` | Clears pending silently. Better than Solid (no stranded loader) but no inbox row |
-| C12 | FAIL E2EEKEY from Account key actions → accountActionError + inbox | `store.ts:10808,10849` (UI) | PARTIAL | `App.elm:20870,21979-22006` | Routed to the group publisher, otherwise "Group directory:" log line only; the panel never shows the error |
-| C13 | NOTE ACCOUNTINFO / ACCOUNTSET → panel fields, re-fetch | `store.ts:10860-10876` | FULL | `App.elm:20894-20899,26588,26658` | |
-| C14 | FAIL RENAME → inbox "RENAME failed (CODE)" | `store.ts:10878` | FULL | `App.elm:20918-20934` | |
-| C15 | NOTE MEMO offline memo → highlighted DM row + offline-memo stamp | `store.ts:10886-10942` (auto) | FULL | `App.elm:20624`; `View/Rail.elm:472` | Solid `OfflineMemoToast` never fires: the event detail carries `channel`, the toast reads `from` (`OfflineMemoToast.tsx:20`) |
-| C16 | FAIL CHATHISTORY → stop spinner, mark exhausted, release pin lookup and TARGETS | `store.ts:10944-10974` | FULL | `App.elm:20876,34127` | |
-| C17 | FAIL TOTP → TOTP panel error | `store.ts:10976` | FULL | `App.elm:20888,28361` | |
-| C18 | FAIL RECOVERYCODES → panel error | `store.ts:10982` | FULL | `App.elm:20891,28044` | |
-| C19 | FAIL SEARCH → server-search error state | `store.ts:10992-11021` | FULL | `App.elm:20873,21067` | |
-| C20 | MEDIA presence JOIN/ROSTER/LEAVE/SPEAKING/SILENT/MUTE/UNMUTE/HAND → call roster, speaking, mute, hands | `store.ts:11091-11160` (auto) | FULL | `Media.elm:224-346`; `App.elm:20852-20865` | Forwarding to the voice engine is covered by the calls section |
+| C1 | Passkey service replies: REGISTER-CHALLENGE → create ceremony; REGISTERED shows "Passkey added (label)"; CRED/LIST rows; REMOVED/RENAMED notices; STATUS probe | `store.ts:10481-10612` (auto) | FULL | `Passkey.elm:554,588`; `App.elm:26017 foldPasskeyReply` | Panel reach is covered by the Account section |
+| C2 | Passkey sign-in: AUTH-CHALLENGE + ALLOW-CRED with an 80 ms settle, then the get ceremony | `store.ts:10614-10697` (auto) | FULL | `Passkey.elm:703,721`; `Main.elm:76`; `App.elm:53372 StartPasskey`; `View/AuthGate.elm:661 signInLinks` | Solid hides its passkey sign-in button. Elm now offers "Sign in with a passkey" on the Connect form (v3/gap-auth: dials a guest socket, `WEBAUTHN AUTH`, confirms on `You are now identified as`). The real authenticator ceremony needs a browser and was not run here |
+| C3 | FAIL/WARN WEBAUTHN sets passkeyError; TEMPORARILY_UNAVAILABLE disables the feature; INVALID_SUBCOMMAND shows "does not support renaming" copy | `store.ts:10448-10478` | FULL | `Passkey.elm:533` | |
+| C4 | NOTE SESSION TOKEN → persist bearer and update the live client | `store.ts:10702` (auto) | FULL | `App.elm:6244,20372,20179` | |
+| C5 | NOTE SESSION MTOKEN (with expires) → mesh token and deadline | `store.ts:10715` (auto) | FULL | `App.elm:20179-20215` | |
+| C6 | FAIL SESSION INVALID_TOKEN/NO_SESSION → "reclaim failed" banner, wipe bearers, canonical-only | `store.ts:10742-10765` | FULL | `App.elm:20278 revokeSessionTokens,20315` | |
+| C7 | Any FAIL SESSION → error inbox row | `store.ts:10767` (auto) | FULL | `App.elm:20298-20334 foldSessionReply`; `tests/GapShellTest.elm:569` | v3/gap-shell: every FAIL SESSION other than the two terminal resume refusals (LIST/DROP refused…) is now an inbox error. INVALID_TOKEN/NO_SESSION stay calm (reclaim-failed banner plus Activity line) where Solid also adds an inbox row |
+| C8 | FAIL REGISTER/VERIFY → registerError shown on the claim sheet | `store.ts:10769-10780` | FULL | `App.elm:24089,29565` | |
+| C9 | FAIL/WARN IDENTIFY → accountActionError + inbox row | `store.ts:10826,10849` | FULL | `App.elm:24086,24219`; `App.elm:53508 foldAuthGateLine FAIL` | A login this client started through the two-step or passkey gate is claimed first by `authGateReply` (v3/gap-auth) and shown on the gate |
+| C10 | FAIL/WARN ACCOUNTSET/LOGOUT/RECOVER/DROP/KEYTRANS/CERT* → action error + inbox "X failed (CODE)" | `store.ts:10786-10859` | FULL | `App.elm:24153-24197` | |
+| C11 | FAIL ACCOUNTINFO → inbox error | `store.ts:10822,10855` | PARTIAL | `App.elm:24104-24120` | Clears pending silently. Better than Solid (no stranded loader) but no inbox row |
+| C12 | FAIL E2EEKEY from Account key actions → accountActionError + inbox | `store.ts:10808,10849` (UI) | PARTIAL | `App.elm:24074,25200-25225 foldDirectoryFailure` | Routed to the group publisher, otherwise a "Group directory: CODE." line. That line now shows in Activity (v3/gap-shell), but the Account panel never shows the error and there is no inbox row |
+| C13 | NOTE ACCOUNTINFO / ACCOUNTSET → panel fields, re-fetch | `store.ts:10860-10876` | FULL | `App.elm:24098-24103,30265,30335` | |
+| C14 | FAIL RENAME → inbox "RENAME failed (CODE)" | `store.ts:10878` | FULL | `App.elm:24122-24138` | |
+| C15 | NOTE MEMO offline memo → highlighted DM row + offline-memo stamp | `store.ts:10886-10942` (auto) | FULL | `App.elm:23828 foldOfflineMemo,23847 deliverOfflineMemo`; `View/Rail.elm:556`; `UserModes.elm:2496 serverNotice` | Solid `OfflineMemoToast` never fires: the event detail carries `channel`, the toast reads `from` (`OfflineMemoToast.tsx:20`). The NOTICE form `MEMO from X :text` also delivers (v3/gap-usermodes) |
+| C16 | FAIL CHATHISTORY → stop spinner, mark exhausted, release pin lookup and TARGETS | `store.ts:10944-10974` | FULL | `App.elm:24080,37880` | |
+| C17 | FAIL TOTP → TOTP panel error | `store.ts:10976` | FULL | `App.elm:24092,32066` | |
+| C18 | FAIL RECOVERYCODES → panel error | `store.ts:10982` | FULL | `App.elm:24095,31749` | |
+| C19 | FAIL SEARCH → server-search error state | `store.ts:10992-11021` | FULL | `App.elm:24077,24278` | |
+| C20 | MEDIA presence JOIN/ROSTER/LEAVE/SPEAKING/SILENT/MUTE/UNMUTE/HAND → call roster, speaking, mute, hands | `store.ts:11091-11160` (auto) | FULL | `Media.elm:224-346`; `App.elm:24056-24069` | Forwarding to the voice engine is covered by the calls section |
 | C21 | MEDIA REACT → voice reaction overlay | `store.ts:11165-11176` | FULL | `Media.elm:346` | |
 | C22 | MEDIA CAPTION/TRANSCRIPT → captions overlay and transcript | `store.ts:11037-11070` | FULL | `Media.elm:159` | |
-| C23 | Labeled FAIL → drop the optimistic row + toast "Message not delivered" (mesh-humanized copy) | `store.ts:11201-11210`, `3359` | FULL | `App.elm:31848-31880,16964` | |
-| C24 | Unlabeled messaging FAIL (PRIVMSG/NOTICE/TAGMSG/WHISPER) → same toast | `store.ts:11211-11217` | FULL | `App.elm:31832-31845` | |
-| C25 | Any other FAIL/WARN/NOTE → serviceNotices (shown only in the oper console and Account filters) | `store.ts:11219` | PARTIAL | `App.elm:20995` | Elm drops these silently. Low impact |
-| C26 | FAIL IDENTITY STALE_EPOCH → one bounded attribution retry | `client.ts:1260` (auto) | FULL | `App.elm:20936` | |
-| C27 | FAIL/WARN E2EEGROUP eligibility codes | groupControl bridge (auto) | PARTIAL | `App.elm:20867,22775` | Shown in the service log only, which has no view |
+| C23 | Labeled FAIL → drop the optimistic row + toast "Message not delivered" (mesh-humanized copy) | `store.ts:11201-11210`, `3359` | FULL | `App.elm:35578 foldLabeledFail,19824 notDeliveredToast` | |
+| C24 | Unlabeled messaging FAIL (PRIVMSG/NOTICE/TAGMSG/WHISPER) → same toast | `store.ts:11211-11217` | FULL | `App.elm:35585-35598` | |
+| C25 | Any other FAIL/WARN/NOTE → serviceNotices (shown only in the oper console and Account filters) | `store.ts:11212` | FULL | `App.elm:24204-24207`; `App.elm:11092 foldUnknownStandardReply`; `tests/GapShellTest.elm:531-566` | v3/gap-shell: an unclaimed FAIL/WARN is an inbox error plus an Activity "Problems" line; a NOTE goes to Activity. Better than Solid, which keeps them in `serviceNotices` only |
+| C26 | FAIL IDENTITY STALE_EPOCH → one bounded attribution retry | `client.ts:1260` (auto) | FULL | `App.elm:24140` | |
+| C27 | FAIL/WARN E2EEGROUP eligibility codes | groupControl bridge (auto) | FULL | `App.elm:24071,25996 foldE2eGroupReply` | Logged as "Group encryption: <plain text> (CODE)." and shown in Activity (v3/gap-shell). Solid has no E2EEGROUP FAIL handler (generic `serviceNotices`) |
 | **Switch arms** | | | | | |
-| C28 | ACK → promote the labeled pending row | `store.ts:11219` | FULL | `App.elm:5886-5901` | Also admits scheduled sends |
-| C29 | EVENT MEDIA / WEBAUTHN plane re-dispatch | `store.ts:11226-11250` | FULL | `App.elm:5866,8484` | |
-| C30 | 001 orchestration: IRCX, EVENT ADD MEDIA, LUSERS, publish key, MONITOR resub, TARGETS sweep, outbox flush, scheduled dispatch, `?join=`/`?at=`, recovery login, nick reclaim | `store.ts:11253-11380`, `client.ts:1220` | FULL | `App.elm:5013-5198` | Latency and scheduled dispatch run on the tick (`App.elm:37461`) |
-| C31 | 001 welcome text and "Connected to …/Reconnected." lines | `store.ts:11271,6612` (Activity) | PARTIAL | `App.elm:5052-5080` | Log only (invisible) |
-| C32 | `?topic=` deep-link slice resolution on JOIN/366/818/819/history | `store.ts:11519,11935,11992,12004` | PARTIAL | `App.elm:4741-4772` | Opens the whole room only; no topic slice |
-| C33 | ACCOUNT (account-notify, own only) → identity chip, owner-scoped reload, nick reclaim | `store.ts:11383-11441` | FULL | `App.elm:5373,28501` | |
-| C34 | REGISTER SUCCESS / VERIFICATION_REQUIRED, VERIFY SUCCESS → claim sheet phases | `store.ts:11443-11465` | FULL | `App.elm:4854-4858,24938,24981` | |
-| C35 | Self JOIN → create room, history, MARKREAD, WHO, ACTIVITY SUBSCRIBE, NAMES, settle create-room (topic, first line) | `store.ts:11497-11552` | FULL | `App.elm:4692-4800,23491,23583` | |
-| C36 | Self-JOIN echo focuses the joined room | `store.ts:11522-11529` (auto) | PARTIAL | `App.elm:4741-4772` | Elm focuses only for deep-link, link-click, browser and create. `/join`, invites and server-forced joins land unfocused |
-| C37 | Other user JOIN → row "nick (user@host) joined" + channel event | `store.ts:11553-11585` | PARTIAL | `App.elm:23550-23575` | Row has no `(user@host)` mask; `account` from extended-join is not kept |
-| C38 | PART → row "X left (reason)" + event; self-part drops the room and goes Home | `store.ts:11619-11744` | FULL | `App.elm:4802,23849` | |
-| C39 | QUIT → "X quit: reason" rows in every shared room + event | `store.ts:11746-11802` | FULL | `App.elm:4813,23964` | |
-| C40 | KICK → row "A kicked T: reason", event, audit, moderation; self: drop room, Home, reset stage | `store.ts:11804-11908` | FULL | `App.elm:4841,28784`; stage `45362` | Neither client tells you that *you* were kicked (silent removal) |
-| C41 | 353/366 NAMES burst (append vs replace), PROP fetch, history kick on 366 | `store.ts:11911-11946,12010-12118` | FULL | `App.elm:4638-4646,23377,23251,23272` | |
-| C42 | 818/819/PROP registry; user STATUS/ACTIVITY props → activity chips; ai-policy projection | `store.ts:11948-12008,13414-13457` | FULL | `App.elm:5809-5816,20297` | |
-| C43 | TOPIC/332 → topic, topic history, audit (live TOPIC only); replayed TOPIC diverted | `store.ts:12120-12151` | FULL | `App.elm:4863-4873,4948,34999,35239` | |
-| C44 | 324 channel modes (authoritative) and 329 creation time | `store.ts:12153-12194` | FULL | `App.elm:5604-5608,29102,29134` | |
-| C45 | PRIVMSG/NOTICE delivery: channel and DM rows, highlight, unread, mention/follow/DM inbox, hidden-room reveal | `store.ts:12812-13096` | FULL | `App.elm:34673-34925,30369,31476,31504,31644` | |
-| C46 | Global NOTICE to `$$*`/`*` → Activity line (+ announcements store, which has no UI) | `store.ts:12209-12217` | PARTIAL | `App.elm:34688,34634` | Server-sourced: invisible log. Nick-sourced: filed as a DM from the sender |
-| C47 | Server NOTICE with no sender (non-service) → Activity | `store.ts:13090-13096` | PARTIAL | `App.elm:34688` | Log only (invisible) |
-| C48 | NOTICE sub-parsers: SESSION list rows/end/drop, oper EVENT REPLAY JSON, TOTP:, RECOVERYCODES:, VHOST, ACCOUNTINFO, E2EEKEY/KEYTRANS/CERT replies, Webhook source | `store.ts:12239-12450,12503` | FULL | `App.elm:4878-4940,17515,17541,26141,26608,26637,27393,27718,28018,28321` | |
+| C28 | ACK → promote the labeled pending row | `store.ts:11219` | FULL | `App.elm:6258-6273` | Also admits scheduled sends |
+| C29 | EVENT MEDIA / WEBAUTHN plane re-dispatch | `store.ts:11226-11250` | FULL | `App.elm:6238,8875` | |
+| C30 | 001 orchestration: IRCX, EVENT ADD MEDIA, LUSERS, publish key, MONITOR resub, TARGETS sweep, outbox flush, scheduled dispatch, `?join=`/`?at=`, recovery login, nick reclaim | `store.ts:11253-11380`, `client.ts:1220` | FULL | `App.elm:5372-5557` | Latency and scheduled dispatch run on the tick (`App.elm:41522 Tick`) |
+| C31 | 001 welcome text and "Connected to …/Reconnected." lines | `store.ts:11271,6612` (Activity) | PARTIAL | `App.elm:5398-5464` | The welcome text now lands in Activity (v3/gap-shell). The "Connected to …" and "Reconnected." status lines are never written (the Back-online banner covers reconnects) |
+| C32 | `?topic=` deep-link slice resolution on JOIN/366/818/819/history | `store.ts:11519,11935,11992,12004` | PARTIAL | `App.elm:5100-5130` | Opens the whole room only. `pendingDeepLinkTopic` is stored (`App.elm:4092`) and cleared (`39486`) but never read, so no topic slice. The `?at=` travel after the join does land (v3/gap-convo) |
+| C33 | ACCOUNT (account-notify, own only) → identity chip, owner-scoped reload, nick reclaim | `store.ts:11383-11441` | FULL | `App.elm:5732,32206` | |
+| C34 | REGISTER SUCCESS / VERIFICATION_REQUIRED, VERIFY SUCCESS → claim sheet phases | `store.ts:11443-11465` | FULL | `App.elm:5207-5211,28615,28658` | |
+| C35 | Self JOIN → create room, history, MARKREAD, WHO, ACTIVITY SUBSCRIBE, NAMES, settle create-room (topic, first line) | `store.ts:11497-11552` | FULL | `App.elm:5043-5147,26712,26804` | The WHO is a WHOX with a token so the rows also carry accounts (v3/gap-people) |
+| C36 | Self-JOIN echo focuses the joined room | `store.ts:11522-11529` (auto) | FULL | `App.elm:11700 settleJoinFocus`; `tests/GapShellTest.elm:675-766` | v3/gap-shell: `/join`, accepted invites and the rail's Join-by-name field open the room once the echo lands (also deep link, browser, create). Reconnect rejoins and server-forced joins deliberately do not steal focus; Solid switches to any self-JOIN echo outside session restore |
+| C37 | Other user JOIN → row "nick (user@host) joined" + channel event | `store.ts:11553-11585` | PARTIAL | `App.elm:26762-26790 foldJoin`; `PeerAccount.elm:184 foldMessage` | The row says "nick joined" with no `(user@host)` mask. The extended-join account is now kept for the profile and roster (v3/gap-people) |
+| C38 | PART → row "X left (reason)" + event; self-part drops the room and goes Home | `store.ts:11619-11744` | FULL | `App.elm:5155,27070` | |
+| C39 | QUIT → "X quit: reason" rows in every shared room + event | `store.ts:11746-11802` | FULL | `App.elm:5166,27185` | |
+| C40 | KICK → row "A kicked T: reason", event, audit, moderation; self: drop room, Home, reset stage | `store.ts:11804-11908` | FULL | `App.elm:5194,32489`; stage `App.elm:51210 foldStageWire` | Neither client tells you that *you* were kicked (silent removal) |
+| C41 | 353/366 NAMES burst (append vs replace), PROP fetch, history kick on 366 | `store.ts:11911-11946,12010-12118` | FULL | `App.elm:4981-4989,26598,26472,26493` | |
+| C42 | 818/819/PROP registry; user STATUS/ACTIVITY props → activity chips; ai-policy projection | `store.ts:11948-12008,13414-13457` | FULL | `App.elm:6181-6188,23455` | |
+| C43 | TOPIC/332 → topic, topic history, audit (live TOPIC only); replayed TOPIC diverted | `store.ts:12120-12151` | FULL | `App.elm:5216-5226,5301,38770,39010` | |
+| C44 | 324 channel modes (authoritative) and 329 creation time | `store.ts:12153-12194` | FULL | `App.elm:5964-5968,32807,32839` | |
+| C45 | PRIVMSG/NOTICE delivery: channel and DM rows, highlight, unread, mention/follow/DM inbox, hidden-room reveal | `store.ts:12812-13096` | FULL | `App.elm:38428-38686,34075,35203,35231,35371`; reveal `App.elm:53131 organizeShouldReveal` | |
+| C46 | Global NOTICE to `$$*`/`*` → Activity line (+ announcements store, which has no UI) | `store.ts:12209-12217` | FULL | `App.elm:38444,38389` | Server-sourced: an Activity line (v3/gap-shell). Nick-sourced: filed as a DM from the sender (Elm better) |
+| C47 | Server NOTICE with no sender (non-service) → Activity | `store.ts:13090-13096` | FULL | `App.elm:38444` | Activity line since v3/gap-shell |
+| C48 | NOTICE sub-parsers: SESSION list rows/end/drop, oper EVENT REPLAY JSON, TOTP:, RECOVERYCODES:, VHOST, ACCOUNTINFO, E2EEKEY/KEYTRANS/CERT replies, Webhook source | `store.ts:12239-12450,12503` | FULL | `App.elm:5231-5293,20395,20421,29818,30285,30314,31098,31423,31723,32026` | |
 | C49 | NOTICE text confirmations ("logged out", "account dropped", ACCOUNTSET "… updated") → clear account / re-fetch | `store.ts:12452-12496` | PARTIAL | — | No text-form fold; relies on 901 / NOTE ACCOUNTSET |
-| C50 | CTCP SCREENSHARE START → inbox "🖥 X is sharing their screen" | `store.ts:12520` | FULL | `App.elm:7494-7510` | |
-| C51 | CTCP EDIT/DELETE from the sender → in-place edit/delete | `store.ts:12533-12590` | FULL | `App.elm:7344` | |
-| C52 | CTCP STAGE RAISE/LOWER_HAND, INVITE_SPEAK, ACCEPT/DECLINE_SPEAK | `store.ts:12592-12642` | FULL | `App.elm:45308-45380`; `Stage.elm:389-423` | |
+| C50 | CTCP SCREENSHARE START → inbox "🖥 X is sharing their screen" | `store.ts:12520` | FULL | `App.elm:7868-7884` | |
+| C51 | CTCP EDIT/DELETE from the sender → in-place edit/delete | `store.ts:12533-12590` | FULL | `App.elm:7718` | |
+| C52 | CTCP STAGE RAISE/LOWER_HAND, INVITE_SPEAK, ACCEPT/DECLINE_SPEAK | `store.ts:12592-12642` | FULL | `App.elm:51148-51220`; `Stage.elm:389-423` | |
 | C53 | CTCP POLL_VOTE → poll emoji reactions | `store.ts:12646-12681` | N/A | — | DEAD: no Solid sender, no poll UI |
-| C54 | CTCP VERSION/TIME/PING/CLIENTINFO auto-replies (pref-gated) | `store.ts:12684-12703` | FULL | `App.elm:7452-7480` | |
-| C55 | Inbound `\x01ACTION` (/me) from others | `store.ts:12684` (swallowed) | FULL | `App.elm:7536,34737` | **Shared bug**: both clients drop other users' /me lines |
+| C54 | CTCP VERSION/TIME/PING/CLIENTINFO auto-replies (pref-gated) | `store.ts:12684-12703` | FULL | `App.elm:7826-7854` | |
+| C55 | Inbound `\x01ACTION` (/me) from others | `store.ts:12684` (swallowed) | FULL | `App.elm:12800 ctcpActionText,38473 inboundAction,7900 isCtcpQueryBody`; `tests/GapCommandsTest.elm:596`, `tests/AppTest.elm:21082` | v3/gap-commands: Elm files other people's /me as an action row (live, DM, replay). Solid still swallows it at `store.ts:12684`, so the old shared bug is now Solid-only. Comments at `App.elm:7898,7912,38504` still say ACTION is swallowed |
 | C56 | CTCP FORUM → forumPosts | `store.ts:12720-12740` | N/A | — | DEAD: `forumPosts` has no consumer |
-| C57 | `+draft/edit` tagged PRIVMSG (server-native edit fan-out) → edit the referenced row in place | `store.ts:12748-12775` (auto) | MISSING | `App.elm:5833,7162` (EDIT cmd only) | onyx-server emits edits only as `PRIVMSG +draft/edit` (`server.zig:42417`), so Elm appends a duplicate row |
-| C58 | `+draft/reply` / CTCP REPLY wrapper → reply quote | `store.ts:12782-12811` | FULL | `App.elm:7261` | |
-| C59 | Labeled self-echo confirms the optimistic row (msgid filed) | `store.ts:12897-12912` | FULL | `App.elm:30216` | |
-| C60 | ONYXDM1 DM envelope open; METADATA GET for an unknown peer key on receive | `store.ts:13068-13077` | PARTIAL | `App.elm:34929,35660` | Elm fetches the key only on DM open; stays locked until then |
-| C61 | ONYXROOM group envelope open | `store.ts:12865` | FULL | `App.elm:8935` | |
-| C62 | WALLOPS → "WALLOPS: text" Activity line (+ announcement, no UI) | `store.ts:13099-13108` | PARTIAL | `App.elm:5869,17989` | Log only (invisible) |
-| C63 | NICK → "old → new" rows + events; forced Guest rename → toast "Renamed to …" + inbox | `store.ts:13115-13244` | FULL | `App.elm:4821,28609-28700` | |
-| C64 | CHGHOST no-op | `store.ts:13246` | FULL | `App.elm:5918` | |
-| C65 | Channel MODE → row "X set mode …", audit, moderation, ban-list delta, ban fetch on op grant | `store.ts:13250-13390` | FULL | `App.elm:4829-4839,29025,18674` | |
-| C66 | Own user MODE → Activity line "your user mode: …", +o oper flag | `store.ts:13391-13410` | PARTIAL | `App.elm:29207-29239` | Flag folds; line is log only (invisible) |
-| C67 | AWAY (away-notify) → member away dot | `store.ts:13459` | FULL | `App.elm:5818,17836` | |
-| C68 | INVITE → inbox "X invited you to #c"; other invitee → channel event | `store.ts:13481-13508` | FULL | `App.elm:4860,25013` | |
-| C69 | SETNAME → profile realname | `store.ts:13510` | FULL | `App.elm:5836,6007` | |
-| C70 | ACTIVITY typing / react / unreact stream | `store.ts:13520-13551` | FULL | `App.elm:5824,6510,6849,6898` | |
-| C71 | TAGMSG typing + `+draft/react` toggle | `store.ts:13553-13640` | FULL | `App.elm:5821,6532,6923` | |
-| C72 | REACT command toggle | `store.ts:13642-13716` | FULL | `App.elm:5827,6990` | |
-| C73 | RENAME → room migrates (messages, unread, active view) + note row | `store.ts:13718-13784` | FULL | `App.elm:4849,28906` | |
-| C74 | 761/766/METADATA → profiles (display-name, accent, links), DM keys | `store.ts:13786-13813` | FULL | `App.elm:5839-5856,8969,9433` | |
-| C75 | 762 / 767 / 769 metadata end and errors | default (Activity) | PARTIAL | `App.elm:5568,5845-5853` | 762 silent on both sides; 767/769 log only |
-| C76 | MARKREAD echo/GET/relay → read markers, unread re-derive | `store.ts:13815-13846` | FULL | `App.elm:5860,30588` | |
-| C77 | REDACT → "[Message deleted]" | `store.ts:13848-13883` | FULL | `App.elm:5830,7120,286` | |
-| C78 | EDIT command (forward-compat) | `store.ts:13885-13923` | FULL | `App.elm:5833,7162` | Server never sends it (see C57) |
-| C79 | 730/731 MONITOR → friend online flags + DM away state | `store.ts:13925-13961` | PARTIAL | `App.elm:5591-5600,25816,25833` | DM presence write skipped (Elm comment says so) |
-| C80 | 732/733 ignored; 734 → inbox "MONITOR list is full (N targets)" | `store.ts:13963-13977` | FULL | `App.elm:5562-5566,5601,25865` | |
-| C81 | WHISPER → highlighted whisper row | `store.ts:13979-14004` | FULL | `App.elm:5857,8468`; `Ircx.elm:1022` | |
-| C82 | CHATHISTORY TARGETS rows → DM discovery and unread | `store.ts:14006-14035` | FULL | `App.elm:4942,33618` | |
-| C83 | BATCH chathistory/search/quarantine/multiline/labeled-response/targets collectors and merge; `?at=` landing | `store.ts:14037-14483` | FULL | `App.elm:5903-5916,32806,32880` | |
-| C84 | 321/322/323 LIST → room directory (bounded, quarantine) | `client.ts:1180-1218`; `store.ts:14485-14521` | FULL | `App.elm:4960-4975,16501-16538` | |
-| C85 | 308/309 RULES → serverRules | `store.ts:14523-14538` | N/A | `App.elm:5546,25054` | DEAD: no rules UI on either side |
-| C86 | 375/372/376 MOTD → MOTD lines in Activity (motd/showMotd have no UI) | `store.ts:14540-14573` | MISSING | `App.elm:4624-4636,4541-4577` | Elm collects it but shows the MOTD nowhere |
-| C87 | 004 server version | `store.ts:14657` | N/A | `App.elm:4609` | DEAD: no UI either side |
-| C88 | 352 WHO → member away dots | `store.ts:14665-14699` | FULL | `App.elm:4651,17943` | |
-| C89 | 900 RPL_LOGGEDIN → account, owner reload, nick reclaim, session commands | `store.ts:14701-14786`; `client.ts:1113` | FULL | `App.elm:5200-5372` | |
-| C90 | 901 RPL_LOGGEDOUT → guest, purge, clear tokens | `store.ts:14788-14830`; `client.ts:1136` | FULL | `App.elm:5378-5459` | |
-| C91 | 401 → WHOIS sheet "No profile was found…" + inbox "No such nick: X" | `store.ts:14843-14860` | FULL | `App.elm:5659,6074-6150` | |
-| C92 | 401 answering a labeled DM send → drop the row + toast "Message not delivered" | `store.ts:14834-14842` | PARTIAL | `App.elm:6080-6113` | Elm drops the row silently (log only, no toast) |
-| C93 | 403/404 → inbox "No such channel"/"Cannot send to X: reason" + labeled-send toast | `store.ts:14863-14887` | FULL | `App.elm:17132-17171,16983` | |
-| C94 | 405/421/431/441/442/443/451/461/467/476 → inbox error copy | `store.ts:14889-15241` | FULL | `App.elm:17172-17195,17229,17245` | Copy is verbatim on both sides |
-| C95 | 432/437 post-registration → inbox "Erroneous nickname: X" / "Nick/channel temporarily unavailable" | `store.ts:14905,14937` | FULL | `App.elm:10127-10160` | |
-| C96 | 433 → nick-alias rotation, then inbox "Nickname in use: X" | `store.ts:14911-14935` | FULL | `App.elm:10138-10191` | |
-| C97 | 464 → inbox + Account notice; live IDENTIFY → accountActionError | `store.ts:15000-15020` | FULL | `App.elm:17196-17228` | |
-| C98 | 471/473/474 → inbox + browser join prompt "Could not join #x: …" | `store.ts:15027-15042,15220-15227`; `ChannelBrowser.tsx:150` | FULL | `App.elm:17232-17240,10211,16780`; `View/Browser.elm:278` | |
-| C99 | 475 → join prompt "Incorrect channel password" (no inbox) | `store.ts:15229` | FULL | `App.elm:17241-17244` | |
-| C100 | 482 → inbox "You need operator privileges in #x" + ban panel error | `store.ts:15243-15259` | FULL | `App.elm:17248-17271` | |
-| C101 | 477 (+R/+a room), 480 (join throttle), 407 → Activity text | default (Activity) | PARTIAL | `App.elm:5671,5720-5730` | Log only; browser waits 8 s, then shows "did not confirm" |
-| C102 | KNOCK replies 710/711/713/714 | default (Activity) | FULL | `Chanserv.elm` `fold` (710 → inbox row with Invite, 711/713/714 → toasts and prompt state); `View/Chanserv.elm` | v3/gap-chanserv: Ask to join on the 471/473/475 prompt; Elm better than the oracle's log line |
-| C103 | 600/601/604/605 WATCH → watch-list online/last-seen | `store.ts:14943-14967` | FULL | `App.elm:5571-5590,25779,25797` | |
-| C104 | 367/368 ban list → ban panel | `store.ts:15044-15092` | FULL | `App.elm:5803-5807,19108,19232` | |
-| C105 | 801–805 ACCESS → Roles access manager | `store.ts:15094-15203` | FULL | `App.elm:5782-5796,8446`; `View/RoomSettings.elm:482` | |
-| C106 | 775/776 ACCESS list notes | `store.ts:15205-15218` (no UI) | FULL | `Ircx.elm:696-721`; `App.elm:8456` | Elm better: visible system row in the room |
-| C107 | 491 ERR_NOOPERHOST → drop oper badge + inbox | `store.ts:15261` | N/A | `App.elm:5621` | Absent-by-design (OPER); both nevertheless implement it |
-| C108 | WHOIS 276/301/311/312/313/317/318/319/320/330/335/338/671 → profile sheet | `store.ts:15269-15492` | FULL | `App.elm:5637,5734-5781,5945` | |
-| C109 | 305/306 → own away state | `store.ts:15494-15497` | FULL | `App.elm:5540-5544` | |
-| C110 | 381 → oper/admin badge + Activity line | `store.ts:15500-15503` | FULL | `App.elm:5610-5620` | Badge folds; line is log only |
-| C111 | PONG latency RTT / 251–255 LUSERS stats | `store.ts:15506-15547` | N/A | `App.elm:19652,19778` | DEAD: no latency/LUSERS UI in Solid (Elm is core-only too) |
-| C112 | Default: any unhandled numeric → Activity line | `store.ts:15549-15556` | MISSING | `App.elm:5926-5930,9642` | `logNumeric` goes to the invisible serviceLog (HELP 704-706, 221, 331, 902/906 …) |
-| C113 | Activity / status buffer (the view behind every Activity row above) | `ChannelSidebar.tsx:731` (UI) | MISSING | `View/Rail.elm:11` | Deferred in Elm. The root cause of C31/46/47/62/66/86/101/102/112 |
-| C114 | 826/827 MODEX named modes | default (Activity) | CORE-ONLY | `App.elm:5530-5539,19441,19469` | `modexModes` has no view consumer; `/modex` output is invisible |
+| C57 | `+draft/edit` tagged PRIVMSG (server-native edit fan-out) → edit the referenced row in place | `store.ts:12748-12775` (auto) | FULL | `App.elm:48215 foldParsed`, `55286 gapEditLine`, `55364 gapFoldTaggedEdit`, `55457 gapRefreshReplay`; `tests/GapConvoTest.elm:134-300` | v3/gap-convo: the author's row is rewritten in place (sealed or withdrawn rows refused, a non-author edit ignored, an edit that beats its row waits in `pendingEdits`, a replayed held row takes the new text). onyx-server emits edits only as `PRIVMSG +draft/edit` (`server.zig:42417`) |
+| C58 | `+draft/reply` / CTCP REPLY wrapper → reply quote | `store.ts:12782-12811` | FULL | `App.elm:7635` | |
+| C59 | Labeled self-echo confirms the optimistic row (msgid filed) | `store.ts:12897-12912` | FULL | `App.elm:33921` | |
+| C60 | ONYXDM1 DM envelope open; METADATA GET for an unknown peer key on receive | `store.ts:13068-13077` | PARTIAL | `App.elm:38700,39431,50902 requestDmKeyLookup` | Receiving an envelope from a peer with no known key does not fetch it. The row stays locked until the DM is opened (`selectChannel`) or a send looks the key up |
+| C61 | ONYXROOM group envelope open | `store.ts:12865` | FULL | `App.elm:9331` | |
+| C62 | WALLOPS → "WALLOPS: text" Activity line (+ announcement, no UI) | `store.ts:13099-13108` | FULL | `App.elm:6241,21116` | Activity line since v3/gap-shell |
+| C63 | NICK → "old → new" rows + events; forced Guest rename → toast "Renamed to …" + inbox | `store.ts:13115-13244` | FULL | `App.elm:5174,32314-32405` | |
+| C64 | CHGHOST no-op | `store.ts:13246` | FULL | `App.elm:6290` | |
+| C65 | Channel MODE → row "X set mode …", audit, moderation, ban-list delta, ban fetch on op grant | `store.ts:13250-13390` | FULL | `App.elm:5182-5192,32730,21801` | |
+| C66 | Own user MODE → Activity line "your user mode: …", +o oper flag | `store.ts:13391-13410` | FULL | `App.elm:32912-32944` | The flag folds and the line shows in Activity (v3/gap-shell). The privacy toggles also read the MODE echo (`UserModes.elm:1965 foldWire`, v3/gap-usermodes) |
+| C67 | AWAY (away-notify) → member away dot | `store.ts:13459` | FULL | `App.elm:6190,20963` | |
+| C68 | INVITE → inbox "X invited you to #c"; other invitee → channel event | `store.ts:13481-13508` | FULL | `App.elm:5213,28690`; `App.elm:11700 settleJoinFocus` | Opening the inbox row joins and focuses the room (v3/gap-shell) |
+| C69 | SETNAME → profile realname | `store.ts:13510` | FULL | `App.elm:6208,6379` | |
+| C70 | ACTIVITY typing / react / unreact stream | `store.ts:13520-13551` | FULL | `App.elm:6196,6884,7223,7272` | |
+| C71 | TAGMSG typing + `+draft/react` toggle | `store.ts:13553-13640` | FULL | `App.elm:6193,6906,7297` | |
+| C72 | REACT command toggle | `store.ts:13642-13716` | FULL | `App.elm:6199,7364` | |
+| C73 | RENAME → room migrates (messages, unread, active view) + note row | `store.ts:13718-13784` | FULL | `App.elm:5202,32611` | |
+| C74 | 761/766/METADATA → profiles (display-name, accent, links), DM keys | `store.ts:13786-13813` | FULL | `App.elm:6211-6228,9365,9829` | |
+| C75 | 762 / 767 / 769 metadata end and errors | default (Activity) | FULL | `App.elm:5928,6217-6225` | 762 silent on both sides; 767/769 now show in Activity (v3/gap-shell) |
+| C76 | MARKREAD echo/GET/relay → read markers, unread re-derive | `store.ts:13815-13846` | FULL | `App.elm:6232,34294` | |
+| C77 | REDACT → "[Message deleted]" | `store.ts:13848-13883` | FULL | `App.elm:6202,7494,321` | |
+| C78 | EDIT command (forward-compat) | `store.ts:13885-13923` | FULL | `App.elm:6205,7536` | The server never sends it; its edits arrive as `PRIVMSG +draft/edit` (C57) |
+| C79 | 730/731 MONITOR → friend online flags + DM away state | `store.ts:13925-13961` | PARTIAL | `App.elm:5951-5959,29493,29510` | DM presence write skipped (the Elm comment at `App.elm:29488` says so) |
+| C80 | 732/733 ignored; 734 → inbox "MONITOR list is full (N targets)" | `store.ts:13963-13977` | FULL | `App.elm:5922-5926,5961,29542` | |
+| C81 | WHISPER → highlighted whisper row | `store.ts:13979-14004` | FULL | `App.elm:6229,8859`; `Ircx.elm:1022` | |
+| C82 | CHATHISTORY TARGETS rows → DM discovery and unread | `store.ts:14006-14035` | FULL | `App.elm:5295,37371` | |
+| C83 | BATCH chathistory/search/quarantine/multiline/labeled-response/targets collectors and merge; `?at=` landing | `store.ts:14037-14483` | FULL | `App.elm:6275-6288,36559,36633` | |
+| C84 | 321/322/323 LIST → room directory (bounded, quarantine) | `client.ts:1180-1218`; `store.ts:14485-14521` | FULL | `App.elm:5313-5328,19349-19386` | |
+| C85 | 308/309 RULES → serverRules | `store.ts:14523-14538` | N/A | `App.elm:5906,28731` | DEAD: no rules UI on either side |
+| C86 | 375/372/376 MOTD → MOTD lines in Activity (motd/showMotd have no UI) | `store.ts:14540-14573` | FULL | `App.elm:4959-4976,4876 startMotd,4885 appendMotd,4903 finishMotd`; `View/GapShell.elm:543 motdCard`; `tests/GapShellTest.elm:497-528` | v3/gap-shell: the lines go to Activity and to a dismissible "From the network" card on Home (hidden for 20 hours after dismissal, long MOTDs fold behind Show all). Better than Solid, which only logs it |
+| C87 | 004 server version | `store.ts:14657` | N/A | `App.elm:4944` | DEAD: no UI either side. The 004 user-mode letters do feed the privacy toggles (`UserModes.elm:1965`, v3/gap-usermodes) |
+| C88 | 352 WHO → member away dots | `store.ts:14665-14699` | FULL | `App.elm:4994,21070` | |
+| C89 | 900 RPL_LOGGEDIN → account, owner reload, nick reclaim, session commands | `store.ts:14701-14786`; `client.ts:1113` | FULL | `App.elm:5559-5730`; `App.elm:53681 authGateIdentified` | A two-step or passkey login synthesizes this 900 from `You are now identified as` (v3/gap-auth), since the server sends no 900 for IDENTIFY |
+| C90 | 901 RPL_LOGGEDOUT → guest, purge, clear tokens | `store.ts:14788-14830`; `client.ts:1136` | FULL | `App.elm:5737-5818` | |
+| C91 | 401 → WHOIS sheet "No profile was found…" + inbox "No such nick: X" | `store.ts:14843-14860` | FULL | `App.elm:6019,6446-6527` | |
+| C92 | 401 answering a labeled DM send → drop the row + toast "Message not delivered" | `store.ts:14834-14842` | FULL | `App.elm:6446-6487 fold401`, `55506 gapNotDelivered`; `tests/GapConvoTest.elm:316-360` | v3/gap-convo: the row is dropped, a "Message not delivered" toast names the person, and the text goes back to that conversation's composer when its draft is empty |
+| C93 | 403/404 → inbox "No such channel"/"Cannot send to X: reason" + labeled-send toast | `store.ts:14863-14887` | FULL | `App.elm:19992-20040,19843` | A slow-mode 404 reads "wait N seconds" copy (`Chanserv.slowmodeCopy`, v3/gap-chanserv) |
+| C94 | 405/421/431/441/442/443/451/461/467/476 → inbox error copy | `store.ts:14889-15241` | FULL | `App.elm:20041-20064,20098,20114` | Copy is verbatim on both sides |
+| C95 | 432/437 post-registration → inbox "Erroneous nickname: X" / "Nick/channel temporarily unavailable" | `store.ts:14905,14937` | FULL | `App.elm:10558-10599` | A 432 for a registered name says the name belongs to an account (v3/gap-shell) |
+| C96 | 433 → nick-alias rotation, then inbox "Nickname in use: X" | `store.ts:14911-14935` | FULL | `App.elm:10575-10628` | |
+| C97 | 464 → inbox + Account notice; live IDENTIFY → accountActionError | `store.ts:15000-15020` | FULL | `App.elm:20065-20096`; `App.elm:53501` | A 464 answering a two-step or passkey login goes to the gate first (v3/gap-auth) |
+| C98 | 471/473/474 → inbox + browser join prompt "Could not join #x: …" | `store.ts:15027-15042,15220-15227`; `ChannelBrowser.tsx:150` | FULL | `App.elm:20101-20109,11791,19628`; `View/Browser.elm:279` | |
+| C99 | 475 → join prompt "Incorrect channel password" (no inbox) | `store.ts:15229` | FULL | `App.elm:20110-20113` | |
+| C100 | 482 → inbox "You need operator privileges in #x" + ban panel error | `store.ts:15243-15259` | FULL | `App.elm:20117-20136` | |
+| C101 | 477 (+R/+a room), 480 (join throttle), 407 → Activity text | default (Activity) | FULL | `App.elm:6080-6097,11143 foldJoinDenied`; 407 `App.elm:6031`; `tests/GapShellTest.elm:577-615` | v3/gap-shell: 477 (sign-in only), 480 (join throttle), 489 (TLS-only) and 520 (operators only) naming a room answer the join prompt at once with plain copy, plus an inbox error and an Activity line (no 8 s browser wait). 477 for a DM target is a plain inbox error. 407 is an inbox error plus Activity |
+| C102 | KNOCK replies 710/711/713/714 | default (Activity) | FULL | `Chanserv.elm:2159-2224 fold` (710 → inbox row with Invite, 711/713/714 → toasts and prompt state), `App.elm:50651 settleStepChanserv`; `View/Chanserv.elm:1097` | v3/gap-chanserv: Ask to join on the 471/473/475 prompt. Elm better than the oracle's log line. The `foldLine` arms at `App.elm:5024-5041` still log them too; their comments ("neither client tracks knock state") are stale |
+| C103 | 600/601/604/605 WATCH → watch-list online/last-seen | `store.ts:14943-14967` | FULL | `App.elm:5931-5950,29456,29474` | |
+| C104 | 367/368 ban list → ban panel | `store.ts:15044-15092` | FULL | `App.elm:6175-6179,22235,22359` | |
+| C105 | 801–805 ACCESS → Roles access manager | `store.ts:15094-15203` | FULL | `App.elm:6154-6168,8837`; `View/RoomSettings.elm:489` | |
+| C106 | 775/776 ACCESS list notes | `store.ts:15205-15218` (no UI) | FULL | `Ircx.elm:696-721`; `App.elm:8847` | Elm better: visible system row in the room |
+| C107 | 491 ERR_NOOPERHOST → drop oper badge + inbox | `store.ts:15261` | N/A | `App.elm:5981` | Absent-by-design (OPER); both nevertheless implement it |
+| C108 | WHOIS 276/301/311/312/313/317/318/319/320/330/335/338/671 → profile sheet | `store.ts:15269-15492` | FULL | `App.elm:5997,6106-6153,6317` | |
+| C109 | 305/306 → own away state | `store.ts:15494-15497` | FULL | `App.elm:5900-5904` | |
+| C110 | 381 → oper/admin badge + Activity line | `store.ts:15500-15503` | FULL | `App.elm:5970-5979` | Badge folds and the "You are now an IRC operator." line shows in Activity (v3/gap-shell) |
+| C111 | PONG latency RTT / 251–255 LUSERS stats | `store.ts:15506-15547` | N/A | `App.elm:22787,22913` | DEAD: no latency/LUSERS UI in Solid (Elm is core-only too; no view reads `serverStats`) |
+| C112 | Default: any unhandled numeric → Activity line | `store.ts:15549-15556` | FULL | `App.elm:6298-6300,10050 logNumeric,11075 routeErrorNumeric` | v3/gap-shell: an unhandled numeric is an Activity line (HELP 704-706, 221, 331, 902/906 …), and an unclaimed error-class numeric (4xx, 5xx, 9xx except 900/901/903/908) is also an inbox error. Better than Solid |
+| C113 | Activity / status buffer (the view behind every Activity row above) | `ChannelSidebar.tsx:731` (UI) | FULL | `View/GapShell.elm:57 activitySheet,262 railExtras,341 youEntry`; `View.elm:380`; `App.elm:11448 settleStepGapShell`; `tests/GapShellTest.elm:459-528` | v3/gap-shell. A `Sheet.Side` sheet with time and kind per line, All/Problems filter and an unseen-problems dot. The rail row is absent from the Messages collection; the You hub row is always there |
+| C114 | 826/827 MODEX named modes | default (Activity) | FULL | `App.elm:5890-5898,22576 foldModexList,22604 foldModexEnd,22397 requestModex`; slash `App.elm:17498` | The `/modex` answer is one Activity line "Named modes for #room: …" (v3/gap-shell). `modexModes` is still read by no view, but Solid shows nothing beyond the log either |
 | **E2EE inbound** | | | | | |
-| C115 | E2EE.KEYPACKAGE/COMMIT/WELCOME delivery → group control | groupControlIntegration (auto) | FULL | `App.elm:5926-5930,22013` | |
-| C116 | E2EEKEY snapshot NOTICE (trusted prefix) → group directory | groupControlBridge (auto) | FULL | `App.elm:4893-4896,21157,21907` | |
-| C117 | Peer DM key change → toast "Encryption key changed" + inbox "X's encryption key changed — verify…" | `store.ts:17702-17712` | PARTIAL | `View/DmSafety.elm:97`; `App.elm:12721` | Shows a DM header marker only; no toast or inbox row |
+| C115 | E2EE.KEYPACKAGE/COMMIT/WELCOME delivery → group control | groupControlIntegration (auto) | FULL | `App.elm:6298-6302,25234` | |
+| C116 | E2EEKEY snapshot NOTICE (trusted prefix) → group directory | groupControlBridge (auto) | FULL | `App.elm:5246-5249,24368,25128` | |
+| C117 | Peer DM key change → toast "Encryption key changed" + inbox "X's encryption key changed — verify…" | `store.ts:17702-17712` | FULL | `App.elm:40110 flagPeerKeyChange` (callers `15387,15492,46003,47287,47403,47445`); `View/DmSafety.elm:97`; `tests/AppTest.elm:10549`, `tests/DmSafetyTest.elm` | v3/gap-pwa-safety: an error toast and an inbox row, once per detected change, on seal, open, directory update and held send, plus the DM header marker. Same copy as Solid |
 | **client.ts connection behaviours** | | | | | |
-| C118 | CAP LS 302 (multiline), REQ in 380-char chunks, ACK/NAK/NEW/DEL, capability matrix refresh | `client.ts:953-1060` | FULL | `App.elm:9878-9970,36789` | |
-| C119 | Wanted caps (tls/sts/no-implicit-names/file-upload/bot off; sasl only with creds) | `client.ts:1371-1422` | FULL | `Session.elm:657-667` | STS advertised, never REQ'd, on both sides |
-| C120 | SASL select SCRAM-SHA-256 > PLAIN > EXTERNAL; PLAIN/SCRAM exchange, 400-byte chunks, server-signature verify | `client.ts:994-1095,1316,1522` | FULL | `App.elm:9777,9803`; `ports.js:1338-1416` | |
-| C121 | SASL 15 s timeout; 903/904/905 honoured only mid-exchange (IRCX reuse) | `client.ts:1011,1097,1143` | FULL | `ports.js:1260`; `App.elm:5476-5506,37643` | |
-| C122 | SASL failure UX: inbox error, close 4003, auto-reconnect disarmed, Connect copy "That password was not accepted" | `client.ts:1305`; `store.ts:6662-6669,6752`; `Connect.tsx:512` | PARTIAL | `App.elm:9761-9775,24402`; `ports.js:6702` | Elm logs only, so the Connect gate shows "Couldn't reach Onyx just now"; reconnect is not disarmed |
-| C123 | Pre-registration 432 "nickname is registered" → error, close; Connect "That name belongs to an account. Sign in to use it." | `client.ts:1156-1167`; `Connect.tsx:455` | PARTIAL | `App.elm:10196-10199` | Inbox text is "Erroneous nickname: X"; the registered copy goes to the invisible log, so generic copy shows |
-| C124 | Pre-registration 433/432/437 → automatic `nick_` retry ×4 | `client.ts:1168-1175` | MISSING | `App.elm:10164-10202` | Alias list only. With no aliases, registration hangs on "Connecting to Onyx." |
-| C125 | Server PING → PONG | `client.ts:949` | FULL | `App.elm:4976-4979` | |
-| C126 | Keepalive: 25 s idle PING, 15 s pong timeout, close 4001 | `client.ts:1645-1655` | FULL | `ports.js:2596-2618`; `App.elm:4981-4986` | |
-| C127 | Server ERROR line → inbox error + status error + Activity | `client.ts:1252`; `store.ts:6752,13110` | PARTIAL | `App.elm:5008-5011` | Log only. Kill/ban/shutdown reasons are invisible; close text reads "Disconnected: " |
-| C128 | Close → inbox "Disconnected: reason" ("code N" fallback); auth-fatal suppresses reconnect | `store.ts:6655-6730` | PARTIAL | `App.elm:36799-36905` | No auth-fatal path; empty reason, no close code |
-| C129 | Reconnect backoff (5 tries, min(5·2ⁿ,60) s ±20%), countdown banner, Reconnect now, Back online | `store.ts:4048,5091`; `ReconnectStatusBanner.tsx:131` | FULL | `App.elm:10243-10330,16872,16933`; `View/Topbar.elm` | |
-| C130 | Rejoin storm on reconnect (suppressed under onyx/session-sync) | `store.ts:6614-6625` | FULL | `App.elm:5130-5135,23126` | |
-| C131 | Browser `offline` drops the socket (outbox queues); `online` → reconnect now | `store.ts:19242-19254` (auto) | MISSING | — | No listeners in `ports.js`/`Main.elm` |
-| C132 | Inbound frame bounds (text 1 MiB, binary 4 MiB) → error + close 1009 | `client.ts:849,878,913` | PARTIAL | `ports.js:2883,2939,3140` | Binary bound only; no text bound and no error notice |
-| C133 | WS subprotocols onyx.irc-media.v1 / text.ircv3.net | `client.ts:29-35` | FULL | `ports.js:2885,2935` | |
-| C134 | ISUPPORT fold (PREFIX roster remap, CHANTYPES, CASEMAPPING, NICKLEN, TOPICLEN, CHANLIMIT, MODES, CHANMODES, IRCX, SILENCE, VAPID, ACCOUNTRESIDENCE) | `client.ts:1549-1640`; `store.ts:14575-14655` | FULL | `App.elm:4594-4607,17880`; `Isupport.elm:316-386` | |
-| C135 | ISUPPORT NETWORK → network name in OperDesk "Network" row and invite card title/description | `store.ts:6903,14619`; `OperDesk.tsx:122`; `ChannelSettings.tsx:270` | PARTIAL | `Isupport.elm:316`; `App.elm:1401,15830,30739` | Parsed but never displayed; invite copy hardcodes "Onyx" |
-| C136 | 001 IRCX + once-per-socket SESSION RESUME (mesh-first) + TOKEN rotate; 900 account switch drops the old bearer | `client.ts:1113-1134,1220,1276`; `sessionReclaim.ts` | FULL | `App.elm:17357-17407,5200-5230`; `Session.elm` | |
-| C137 | Labeled-response mint/correlate (labels.ts) | `labels.ts`; `store.ts:3359-3410` | FULL | `Labels.elm`; `App.elm:30173,31825` | |
-| C138 | draft/multiline send plan + inbound reassembly (multiline.ts) | `multiline.ts`; `store.ts:14128-14260` | FULL | `Multiline.elm`; `App.elm:32880` | |
+| C118 | CAP LS 302 (multiline), REQ in 380-char chunks, ACK/NAK/NEW/DEL, capability matrix refresh | `client.ts:953-1060` | FULL | `App.elm:10297-10389,40920` | |
+| C119 | Wanted caps (tls/sts/no-implicit-names/file-upload/bot off; sasl only with creds) | `client.ts:1371-1422` | FULL | `Session.elm:650-667` | STS advertised, never REQ'd, on both sides |
+| C120 | SASL select SCRAM-SHA-256 > PLAIN > EXTERNAL; PLAIN/SCRAM exchange, 400-byte chunks, server-signature verify | `client.ts:994-1095,1316,1522` | FULL | `App.elm:10196,10222`; `ports.js:1843-1921` | |
+| C121 | SASL 15 s timeout; 903/904/905 honoured only mid-exchange (IRCX reuse) | `client.ts:1011,1097,1143` | FULL | `ports.js:1713`; `App.elm:5835-5866,41816` | |
+| C122 | SASL failure UX: inbox error, close 4003, auto-reconnect disarmed, Connect copy "That password was not accepted" | `client.ts:1305`; `store.ts:6662-6669,6752`; `Connect.tsx:512` | FULL | `App.elm:10176 failSasl,10673 failSignIn`; `GapShell.elm:292 classifySasl,314 failureCopy`; `App.elm:27607 connectStatusMessage,10857 gapShellConnectCopy`; `tests/GapShellTest.elm:152-245` | v3/gap-shell: a refused password adds an inbox "Sign-in failed. …" row, the gate reads "That name and password didn’t match an account…", and auto-reconnect is disarmed. A 904 "Two-factor authentication required" hands over to the code prompt instead (v3/gap-auth, `App.elm:53479`). The socket is closed with a plain `socket.close()`, not code 4003; the disarm is state, so the effect is the same |
+| C123 | Pre-registration 432 "nickname is registered" → error, close; Connect "That name belongs to an account. Sign in to use it." | `client.ts:1156-1167`; `Connect.tsx:455` | FULL | `App.elm:10886 foldRegistrationNickError,10950 failRegistrationNick`; `GapShell.elm:332`; `tests/GapShellTest.elm:202-230,890` | v3/gap-shell: inbox error, `WsDisconnect`, no reconnect, and the gate says "“name” belongs to an account. Sign in to use it, or pick another name." with a Sign in as action |
+| C124 | Pre-registration 433/432/437 → automatic `nick_` retry ×4 | `client.ts:1168-1175` | FULL | `App.elm:10977 retryRegistrationNick`; `GapShell.elm:351 maxNickRetries`; `tests/GapShellTest.elm:246-366` | v3/gap-shell: 433/437 rotate the nick aliases, then retry `nick_` up to 4 times, then fail with "Someone is using “X” right now…". It also catches onyx-server's post-001 tail collision (433 `<nick> <nick>`, then the server closes) by redialing. A 432 for a reserved name fails at once with the server's reason; Solid retries it with `_` too |
+| C125 | Server PING → PONG | `client.ts:949` | FULL | `App.elm:5329-5332` | |
+| C126 | Keepalive: 25 s idle PING, 15 s pong timeout, close 4001 | `client.ts:1645-1655` | FULL | `ports.js:3470-3492`; `App.elm:5334-5339` | Page restore reuses it as a probe (`ports.js` `probe`, v3/gap-pwa-safety) |
+| C127 | Server ERROR line → inbox error + status error + Activity | `client.ts:1252`; `store.ts:6752,13110` | FULL | `App.elm:5361 ERROR,10708 foldServerError,5368 KILL,10776 foldKill`; `GapShell.elm:387 closeReason`; `tests/GapShellTest.elm:368-457` | v3/gap-shell: the reason reaches the inbox, the reconnect banner, the connect gate and Activity. Kills, bans, access denials, ghosting and a newer login elsewhere stop auto-reconnect and keep the shell up with a toast; timeouts, flood and draining retry with backoff. A KILL line notifies once and the following ERROR does not repeat it |
+| C128 | Close → inbox "Disconnected: reason" ("code N" fallback); auth-fatal suppresses reconnect | `store.ts:6655-6730` | PARTIAL | `App.elm:40930-41036`; `ports.js:4033 reportClose` | The close row ("Disconnected: …", Connection kind in Activity) uses the browser's `event.reason`; when the close frame carries none it reads "Disconnected: " with nothing after it, and there is no "code N" fallback (whether the live server sends close reasons was not checked). Reconnect suppression exists, but at the cause (sign-in failure, registered name, kill or ban ERROR), not from the close code |
+| C129 | Reconnect backoff (5 tries, min(5·2ⁿ,60) s ±20%), countdown banner, Reconnect now, Back online | `store.ts:4048,5091`; `ReconnectStatusBanner.tsx:131` | FULL | `App.elm:11823-11915,19720,19793`; `View/Topbar.elm` | A known close reason, an offline browser and a server halt speak first in the banner (`App.elm:11183 gapShellBanner`) |
+| C130 | Rejoin storm on reconnect (suppressed under onyx/session-sync) | `store.ts:6614-6625` | FULL | `App.elm:5489-5494,26347` | |
+| C131 | Browser `offline` drops the socket (outbox queues); `online` → reconnect now | `store.ts:19242-19254` (auto) | FULL | `ports.js:13051 wireGapShell (offline/online at 13076)`; `App.elm:11389 foldShellEvent`; `tests/GapShellTest.elm:617-675`, `gapShell.smoke.mjs` | v3/gap-shell: offline drops the socket (sends queue to the outbox) and holds the countdown, online reconnects at once. Page restore from the bfcache or a freeze is `PageRestored` (`App.elm:46008`, v3/gap-pwa-safety; see G30). Real offline/online events need a browser; the tests use fakes |
+| C132 | Inbound frame bounds (text 1 MiB, binary 4 MiB) → error + close 1009 | `client.ts:849,878,913` | PARTIAL | `ports.js:3770,3826,4027` | Binary bound only; no text bound and no error notice |
+| C133 | WS subprotocols onyx.irc-media.v1 / text.ircv3.net | `client.ts:29-35` | FULL | `ports.js:3772,3822` | |
+| C134 | ISUPPORT fold (PREFIX roster remap, CHANTYPES, CASEMAPPING, NICKLEN, TOPICLEN, CHANLIMIT, MODES, CHANMODES, IRCX, SILENCE, VAPID, ACCOUNTRESIDENCE) | `client.ts:1549-1640`; `store.ts:14575-14655` | FULL | `App.elm:4929-4942,21007`; `Isupport.elm:316-386` | |
+| C135 | ISUPPORT NETWORK → network name in OperDesk "Network" row and invite card title/description | `store.ts:6903,14619`; `OperDesk.tsx:122`; `ChannelSettings.tsx:270` | PARTIAL | `Isupport.elm:316`; `App.elm:1551,1573,18678,34445,34642` | Parsed but never displayed; invite copy hardcodes "Onyx" |
+| C136 | 001 IRCX + once-per-socket SESSION RESUME (mesh-first) + TOKEN rotate; 900 account switch drops the old bearer | `client.ts:1113-1134,1220,1276`; `sessionReclaim.ts` | FULL | `App.elm:20226-20269,5559-5589`; `Session.elm` | |
+| C137 | Labeled-response mint/correlate (labels.ts) | `labels.ts`; `store.ts:3359-3410` | FULL | `Labels.elm`; `App.elm:33878,35578` | |
+| C138 | draft/multiline send plan + inbound reassembly (multiline.ts) | `multiline.ts`; `store.ts:14128-14260` | FULL | `Multiline.elm`; `App.elm:36633` | |
 | C139 | server-time tag → row timestamps | `store.ts:12835-12840` | FULL | `App.elm` `rowTime`; `Wire.parseServerTime` | |
-| C140 | ACTIVITY SUBSCRIBE/UNSUBSCRIBE on self join/part (activitySubscribe.ts) | `activitySubscribe.ts`; `store.ts:11544` | FULL | `App.elm:4787-4793` | |
-| C141 | Account attribution (ACCOUNTRESIDENCE, IDENTITY confirm NOTICE) | `client.ts:1260,1633` | FULL | `App.elm:4594-4607,21852` | |
+| C140 | ACTIVITY SUBSCRIBE/UNSUBSCRIBE on self join/part (activitySubscribe.ts) | `activitySubscribe.ts`; `store.ts:11544` | FULL | `App.elm:5139-5145` | |
+| C141 | Account attribution (ACCOUNTRESIDENCE, IDENTITY confirm NOTICE) | `client.ts:1260,1633` | FULL | `App.elm:4929-4942,25073` | |
 | C142 | Raw line log with SASL/E2EE redaction | `client.ts:130` | N/A | — | DEAD: no raw-log UI in Solid |
 | C143 | Hot-upgrade reconnect signal | — | N/A | — | None in Solid or the protocol; reclaim covers it |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
 
-I checked 27 claims in COVERAGE.md. These 14 are wrong, overstated or mis-cited:
-- **"432/433/437 → underscored retry ×4 then log fall-through"** (Registration row). This is false. `foldNickError` (`App.elm:10119-10202`) only rotates the alias list; there is no `_` suffix anywhere. Pre-registration 433 with no aliases hangs.
-- **"904/905 fail-closed (no guest fallback, socket closes 4003-equivalent)"**. This is overstated. `failSasl` goes through `WsDisconnect`, i.e. `socket.close()` with no code (`ports.js:6702`). It does not disarm auto-reconnect and logs only, so Connect shows the generic copy (C122).
-- **"password entry UI still ahead (creds enter via SaslCredentialsProvided)"** (SASL row). This is **understated** and stale: `View/Connect.elm:198` has the password field, and the connect-gate row itself says sign-in hands the secret to ports.
-- **"REDACT/EDIT done (`App.foldRedact`/`foldEdit`…)"** (Messaging row). This is overstated. Server edits arrive as `PRIVMSG +draft/edit=<msgid>` (onyx-server `server.zig:42417`, folded by Solid at `store.ts:12748`). Elm has no such fold, so edits duplicate rows (C57).
-- **"ERROR → service-log reason"** (keepalive row). The code matches the claim, but Solid surfaced ERROR as an inbox error via `onError` (`client.ts:1252` → `store.ts:6752`). This regression is not acknowledged.
-- **Many rows say "pinned to the generic numeric log … like the oracle"** (KNOCK 710-714, 477, 480, 407, 221, 331, 767/769, 902/906, SILENCE/ACCEPT, Queries catch-all). The equivalence is overstated. Solid's generic log is the user-visible Activity view (`ChannelSidebar.tsx:731`); Elm's `serviceLog` has no view (`Rail.elm:11` defers it).
-- **"App 730–734 folds mirroring the oracle"** (Accounts row). This is overstated: 730/731 skip the DM away write (`App.elm:5591-5597`).
-- **foldSessionReply doc says "every FAIL SESSION still surfaces its error, mirroring the oracle"**, and the Sessions row says "LIST/DROP failures only log". Solid adds an error inbox row for every FAIL SESSION (`store.ts:10767`); Elm only logs (C7).
-- **"Service FAIL/WARN → UI mapping done"**. Unknown commands fall to `( model, [] )` (`App.elm:20995`), and FAIL E2EEKEY account errors never reach the panel (C12).
-- **Transport row cites "`Wire.splitWireFrame`"**. That function is used only by `WireTest`; production framing is the `ports.js:3140` split. The behaviour is fine; the citation is wrong.
-- **"PASS/CAP LS 302/REQ/ACK/NAK/LIST/END/NEW/DEL"**. Neither client sends PASS or handles CAP LIST; `foldCap` covers LS/ACK/NAK/NEW/DEL.
-- **"MODEX named modes + 826/827 … done"**. This is core plus slash only: `modexModes` has no view and the 827 line is invisible.
-- **Absent-by-design says "no OPER (491)"**, yet `App.elm:5610-5636` folds 381/491 (mirroring Solid). The doc is inconsistent.
-- **MONITOR/Unread/Connect rows rely on `lastErrorText`**. Because SASL and registered-nick failures never add a `NotifError`, `connectStatusMessage` (`App.elm:24383`) cannot hit its password or registered-name branches in practice.
+The first pass checked 27 claims in COVERAGE.md and found 14 wrong, overstated or mis-cited. Status at HEAD (neither doc was updated for these slices, so every sentence below is still in `elm/COVERAGE.md`):
+- **"432/433/437 → underscored retry ×4 then log fall-through"** (Registration row, `COVERAGE.md:32`). Was false (`foldNickError` only rotated aliases); **fixed by v3/gap-shell**: `retryRegistrationNick` (`App.elm:10977`) now retries `nick_` ×4. The doc's "then log fall-through; post-reg only logs" is now loose: a registration collision fails with a clear reason.
+- **"904/905 fail-closed (no guest fallback, socket closes 4003-equivalent)"** (`COVERAGE.md:27`). Was overstated; **mostly fixed by v3/gap-shell**: it now adds an inbox row, shows the gate copy and disarms auto-reconnect. Still not literal: `failSasl` ends in `WsDisconnect`, a plain `socket.close()` with no 4003 code.
+- **"password entry UI still ahead (creds enter via SaslCredentialsProvided)"** (SASL row, `COVERAGE.md:31`). **Still stale (understated)**: `View/Connect.elm:555` has the password field, and the gate now also has forgot-password, two-step and passkey sign-in (v3/gap-auth).
+- **"REDACT/EDIT done (`App.foldRedact`/`foldEdit`…)"** (Messaging row, `COVERAGE.md:88`). Was overstated (server edits arrive as `PRIVMSG +draft/edit` and duplicated rows); **fixed by v3/gap-convo** (`gapFoldTaggedEdit`, C57). The row still does not mention `+draft/edit`.
+- **"ERROR → service-log reason"** (keepalive row, `COVERAGE.md:33`). Was an unacknowledged regression; **fixed by v3/gap-shell**: the reason is an inbox row, a banner/gate line and an Activity line.
+- **Many rows say "pinned to the generic numeric log … like the oracle"** (`COVERAGE.md:32,73,88`: KNOCK 710-714, 477, 480, 407, 221, 331, 767/769, 902/906, SILENCE/ACCEPT). Was overstated because Elm's log had no view; **fixed in effect by v3/gap-shell** (Activity sheet) with real handling added for 710–714 (v3/gap-chanserv), 477/480/489/520 (v3/gap-shell) and 221, 271/272, 281/282 (v3/gap-usermodes). The sentences themselves ("unhandled on both sides", "no invented state") are now stale.
+- **"App 730–734 folds mirroring the oracle"** (Accounts row, `COVERAGE.md:64`). **Still overstated**: 730/731 skip the DM away write (`App.elm:5951`, C79).
+- **foldSessionReply doc says "every FAIL SESSION still surfaces its error"; the Sessions row says "LIST/DROP failures only log"** (`COVERAGE.md:54`). The code comment at `App.elm:20292` is **now accurate** (v3/gap-shell, C7); the Sessions row's "only log" is now stale because they are inbox errors.
+- **"Service FAIL/WARN → UI mapping done"** (`COVERAGE.md:48`). Unknown commands used to fall to `( model, [] )`; **fixed by v3/gap-shell** (`foldUnknownStandardReply`, C25). **Still true**: FAIL E2EEKEY account errors never reach the Account panel (C12).
+- **Transport row cites "`Wire.splitWireFrame`"** (`COVERAGE.md:19`). **Still true**: only `tests/WireTest.elm` uses it; production framing is the `ports.js:4027` split.
+- **"PASS/CAP LS 302/REQ/ACK/NAK/LIST/END/NEW/DEL"** (`COVERAGE.md:27`). **Still true**: neither client sends PASS or handles CAP LIST; `foldCap` covers LS/ACK/NAK/NEW/DEL.
+- **"MODEX named modes + 826/827 … done"** (`COVERAGE.md:76`). Was core plus slash only (invisible output); **now acceptable** (v3/gap-shell): the 827 line shows in Activity. `modexModes` still has no view.
+- **Absent-by-design says "no OPER (491)"** (`COVERAGE.md:141`). **Still inconsistent**: `App.elm:5970-5996` folds 381/491 (mirroring Solid).
+- **MONITOR/Unread/Connect rows rely on `lastErrorText`**. Was wrong for SASL and registered-nick failures; **fixed by v3/gap-shell**: those failures add a `NotifError` and set `gapShell.connectFailure`, and `connectStatusMessage` reads `gapShellConnectCopy` first.
 
-These claims checked out as accurate: ISUPPORT token set (`Isupport.elm:316`), MODES default 4 (`Isupport.elm:113`), 473–476 copy, 437 verbatim, 480 via `foldErrorNumeric`, 221/271/272/281/282 named arms, netsplit/LINKS/SASLINFO oracle-gaps (grep empty), keepalive 25/15/4001 (`ports.js:2596-2618`), SASL 15 s guard (`ports.js:1260`), CAP LS 302 (`App.elm:36789`), `mediaAvailable` on every MEDIA line (`App.elm:20852`), 001 key publish plus DM-select key fetch, 401 fail-closed WHOIS sheet, WHISPER self-echo suppression (`Ircx.elm:1022`), ACTIVITY unreact (`App.elm:6849`), hot-upgrade "no signal".
+New drifts found in this pass:
+- `COVERAGE.md:64` says SILENCE/ACCEPT have "no invented state"; v3/gap-usermodes now keeps silence and accept lists (`UserModes.elm:1965 foldWire`, 271/272/281/282).
+- `View/Rail.elm:11` still says "folders and the Activity entry stay with later slices"; both shipped (v3/gap-organize, v3/gap-shell).
+- Stale code comments: `App.elm:5024-5041` (KNOCK "neither client tracks knock state"), `5341-5345` (221 "the modes surface reads 005/324"), `6001-6017` (271/272/281/282 "neither client keeps a silence list"), `7895-7899,7912,38504` (ACTION "swallowed"), `10530-10537` (`foldNickError` doc: "other 432/437 only log pre-registration"), `11785-11789` (`setChannelJoinPrompt`: "Elm has no channel browser yet").
+- Dead branch: `foldNickErrorLive` (`App.elm:10633-10636`) handles a registered-name 432 while `Registering`, but `foldRegistrationNickError` already claims every nick error in that state.
 
 #### Elm better than Solid
-- 775/776 ACCESS notes become visible system rows in the room (`Ircx.elm:715-721`, `App.elm:8456`); in Solid they are 'Channel' service notices with no UI.
-- FAIL ACCOUNTINFO clears `accountInfoPending` (`App.elm:20900-20916`); Solid leaves the loader stranded.
-- STATUSMSG `@#chan` inbound files under the bare room with an audience badge (`foldChat` `statusAudience`, `App.elm:34706`); Solid has no handling.
-- A nick-sourced global NOTICE is at least visible, filed as a DM (`dmFileBucket`, `App.elm:34634`); in Solid it lands in the Activity view and the `announcements` store, which has no UI.
-- The first 001 prefix wins as the trusted server prefix for directory/E2EEKEY gating (`App.elm:21125`).
+- 775/776 ACCESS notes become visible system rows in the room (`Ircx.elm:715-721`, `App.elm:8847`); in Solid they are 'Channel' service notices with no UI.
+- FAIL ACCOUNTINFO clears `accountInfoPending` (`App.elm:24104-24120`); Solid leaves the loader stranded.
+- STATUSMSG `@#chan` inbound files under the bare room with an audience badge (`foldChat` `statusAudience`, `App.elm:38461`); Solid has no handling.
+- A nick-sourced global NOTICE is at least visible, filed as a DM (`dmFileBucket`, `App.elm:38389`); in Solid it lands in the Activity view and the `announcements` store, which has no UI.
+- The first 001 prefix wins as the trusted server prefix for directory/E2EEKEY gating (`App.elm:24336`).
+- The Activity sheet adds a kind per line (Problem, Connection, Notice), an All/Problems filter and an unseen-problems dot on its rail and You-hub doors (`GapShell.elm:227`, `View/GapShell.elm:216`); Solid's status view is a flat list. (v3/gap-shell)
+- The MOTD and the welcome pack (`WELCOME :` / `[Welcome]` lines) show on Home as a dismissible "From the network" card (`View/GapShell.elm:543`); Solid only logs the MOTD. (v3/gap-shell)
+- Unclaimed FAIL/WARN replies and error-class numerics also reach the inbox (`App.elm:11092`, `11075`); Solid sends the former to `serviceNotices` and the latter to Activity only. (v3/gap-shell)
+- `ERROR` and `KILL` lines become plain-language copy, and kills, bans, denials and a newer login stop auto-reconnect with a toast (`GapShell.elm:387 closeReason`, `App.elm:10708`, `10776`); Solid prints the raw reason and always retries unless the close code is 4003. (v3/gap-shell)
+- onyx-server's post-001 name check (433 `<nick> <nick>`, then a close) is recognised and retried by redialing as `nick_` (`App.elm:10886`); the sign-in refusals, registered-name and two-step cases each have their own copy. (v3/gap-shell, v3/gap-auth)
+- 477 (+a), 480 (+j), 489 (+S) and 520 (operators only) answer the join prompt with plain copy, and 470 (+f) says where a forward went (`App.elm:11143`, `6100`). Solid logs them. (v3/gap-shell, v3/gap-chanserv)
+- Structured service replies are folded for registered rooms: CHANNEL/CS/SUCCESSOR notices and FAILs, KNOCK 710–714 with an Invite action, the +e/+I/+Z lists (346–349, 728/729), slow-mode 404 copy and TEMPMODE refusals (`Chanserv.elm:2121 fold`, run per line by `settleStepChanserv`, `App.elm:50651`). (v3/gap-chanserv)
+- Other people's CTCP ACTION lines render as action rows; Solid swallows them (`App.elm:38473`). (v3/gap-commands)
+- A `+draft/edit` that arrives before its row is held and applied when the row lands, a non-author or a sealed row is refused, and a replayed held row takes the new text (`App.elm:55364`, `55417`, `55457`); Solid applies a tagged edit to whichever held row has that id, with no sender check, and drops it if the row is not held yet (`store.ts:12748-12775`). A labeled 401 hands the unsent text back to the composer (`App.elm:55506`). (v3/gap-convo)
+- Peers' accounts are learned from extended-join, account-notify, account-tag, the roster WHOX (354) and WHOIS 330 (`PeerAccount.elm:184`). (v3/gap-people)
+- Sign-in lines Solid never handles: pre-001 `CHALLENGE` (proof of work or a question), the two-factor 904, the `You are now identified as` confirmation, RESETPASS and SETPASS replies, and 913 ERR_NOACCESS (shown as a status toast or inbox row) (`App.elm:53473 foldAuthGateLine`, `53771 authGateNoAccess`). (v3/gap-auth)
+- User-mode lines Solid never handles: 221, 271/272, 281/282, 716/717/718 (caller-id), WHOWAS 314/369/406, and the MEMO / DEFER / AUTOJOIN / SEEN notices (`UserModes.elm:1965 foldWire`, `2496 serverNotice`). (v3/gap-usermodes)
+- Operator replies (NOTICE tokens, numerics, standard replies) are classified into the desk tabs (`OperReply.elm:203 classify`, `App.elm:20709 settleStepOper`). (v3/gap-oper)
+- A room-handover TAGMSG signal becomes an offer toast and an inbox row (`App.elm:52609 foldTransferSignal`). (v3/gap-people)
+- A page restored from the bfcache or a freeze redials an offline session at once and probes a live socket (`App.elm:46008`, `ports.js` `installPageLifecycle`). (v3/gap-pwa-safety)
 
 #### Gaps (ranked by user impact)
-- `[High]` C57 server-native edits duplicate rows. In `foldChat` (`App.elm:34673`), before delivery, detect the `+draft/edit`/`draft/edit` tag, apply the `foldEdit` body/`edited` update to the row with that msgid from the same sender, and do the same in the history merge.
-- `[High]` C113/C112/C86 there is no Activity/status buffer. Add a Rail "Activity — Network updates" entry and a `View.Activity` that renders `model.serviceLog` (newest last, `maxServiceLog`). Optionally tag the welcome, MOTD, WALLOPS, ERROR, numeric and umode entries.
-- `[High]` C122 wrong-password copy and reconnect. In `failSasl` (`App.elm:9761`), `addNotification NotifError reason`, set `autoReconnect = False`, and add a `WsDisconnectWith {code=4003}` port.
-- `[High]` C124 pre-registration nick collision hangs. Add a `nickRetries` counter to `foldNickError`: while `Registering`, send `NICK ourNick++"_"` up to 4 times before the alias and error path.
-- `[High]` C123 registered-nick guest copy. In `foldNickError`'s 432-registered branch, add `NotifError "That nickname is registered. Sign in as its account before using it."` and disarm reconnect.
-- `[High]` C92 labeled 401 makes a DM vanish silently. In `fold401`'s `afterLabel` branch (`App.elm:6087-6113`), call `notDeliveredToast` like `failLabeledSend`.
-- `[Med]` C127 server ERROR reason is invisible. In the `"ERROR"` arm (`App.elm:5008`), add `NotifError` with the trailing text and keep it for the Connect copy.
-- `[Med]` C131 offline/online handling. In `ports.js`, add `window` `offline` → `wsClose`/`online` → a `BrowserOnline` Msg → `reconnectNow` when `autoReconnect`.
-- `[Med]` C36 `/join` and invites don't focus the room. In the self-JOIN branch (`App.elm:4718`), `selectChannel` unless a session-sync/restore replay is under way.
-- `[Med]` C117 peer key change has no toast or inbox row. At the key-change detection sites (`App.elm:12721,12831,42927`), add an `addToast` "Encryption key changed" and an inbox `NotifError`, once per change.
-- `[Med]` C101/C102 the 477/480/KNOCK outcome is invisible and the browser hangs 8 s. Map 477/480 through `setChannelJoinPrompt` ("Sign in to join this room" / "Joining too fast"); surface 710–714 as inbox system rows.
-- `[Med]` C7 FAIL SESSION has no inbox row. In `foldSessionReply`, `addNotification NotifError errText`.
-- `[Med]` C12 E2EEKEY account-panel failures. In `foldDirectoryFailure`, when there is no publisher send pending and an account key request is in flight, set `accountActionError` and add an inbox row.
-- `[Low]` C79 MONITOR → DM presence dot. Write the DM away flag in `foldMonitorOnline`/`foldMonitorOffline`.
-- `[Low]` C135 show `isupport.network` in OperDesk and the invite card copy instead of the hardcoded "Onyx".
-- `[Low]` C37 append the `(user@host)` mask to join rows; keep the extended-join account.
-- `[Low]` C128 include the close code in "Disconnected:" (pass `event.code` through `wsClosed`).
-- `[Low]` C49/C25/C11 text-form logout/ACCOUNTSET confirmations, generic service notices, and the ACCOUNTINFO inbox row.
-- `[Low]` C55 (shared bug) render inbound `\x01ACTION` as an action row instead of swallowing it, on both sides.
-- `[Low]` C132 add a 1 MiB text-frame bound and an error notice in `ports.js`.
+- `[High]` C57 server-native edits duplicate rows. **[Closed — v3/gap-convo]** `foldParsed` routes `+draft/edit` lines to `gapFoldTaggedEdit` (in place, author-checked, replay-refreshed).
+- `[High]` C113/C112/C86 there is no Activity/status buffer. **[Closed — v3/gap-shell]** `View.GapShell.activitySheet` renders `serviceLog`; the MOTD also shows on Home.
+- `[High]` C122 wrong-password copy and reconnect. **[Closed — v3/gap-shell]** `failSasl` → `failSignIn` adds the inbox row and gate copy and disarms auto-reconnect. Still not literal: no close code 4003 (a plain `socket.close()`); harmless.
+- `[High]` C124 pre-registration nick collision hangs. **[Closed — v3/gap-shell]** `retryRegistrationNick` rotates aliases, then `nick_` ×4, then fails with a reason.
+- `[High]` C123 registered-nick guest copy. **[Closed — v3/gap-shell]** `foldRegistrationNickError` fails with registered-name guidance and no reconnect.
+- `[High]` C92 labeled 401 makes a DM vanish silently. **[Closed — v3/gap-convo]** `gapNotDelivered` toasts and hands the text back.
+- `[Med]` C127 server ERROR reason is invisible. **[Closed — v3/gap-shell]** `foldServerError` / `foldKill`.
+- `[Med]` C131 offline/online handling. **[Closed — v3/gap-shell]** `wireGapShell` and `foldShellEvent`; page restore by v3/gap-pwa-safety.
+- `[Med]` C36 `/join` and invites don't focus the room. **[Closed — v3/gap-shell]** `settleJoinFocus`.
+- `[Med]` C117 peer key change has no toast or inbox row. **[Closed — v3/gap-pwa-safety]** `flagPeerKeyChange` toasts and files an inbox row once per change.
+- `[Med]` C101/C102 the 477/480/KNOCK outcome is invisible and the browser hangs 8 s. **[Closed — v3/gap-shell, v3/gap-chanserv]** `foldJoinDenied` and `Chanserv.fold`.
+- `[Med]` C7 FAIL SESSION has no inbox row. **[Closed — v3/gap-shell]** except the two calm resume refusals, by design.
+- `[Med]` C12 E2EEKEY account-panel failures. Still open: `foldDirectoryFailure` (`App.elm:25200`) logs "Group directory: CODE." (now visible in Activity) but never sets `accountActionError` or an inbox row. When no publisher send is pending and an account key request is in flight, set both.
+- `[Med]` C40 being kicked is silent (shared with Solid). `foldKick` (`App.elm:32489`) drops the room and clears the active view with no row, toast or inbox entry. In the self branch, add an error toast and an inbox row naming the actor and reason.
+- `[Low]` C79 MONITOR → DM presence dot. Write the DM away flag in `foldMonitorOnline`/`foldMonitorOffline` (`App.elm:29493`, `29510`).
+- `[Low]` C135 show `isupport.network` in OperDesk and the invite card copy instead of the hardcoded "Onyx" (`App.elm:1551,1573,18678,34445,34642`).
+- `[Low]` C37 append the `(user@host)` mask to join rows (`App.elm:26781`); the extended-join account is already kept.
+- `[Low]` C128 the close row reads "Disconnected: " when the browser gives no reason. Pass `event.code` through `wsClosed` (`ports.js:4033`) and fall back to "code N".
+- `[Low]` C49/C11 text-form logout/ACCOUNTSET confirmations and the ACCOUNTINFO inbox row. (C25 is closed.)
+- `[Low]` C55 **[Closed in Elm — v3/gap-commands]** inbound `\x01ACTION` renders as an action row. Solid still swallows it and is frozen.
+- `[Low]` C132 add a 1 MiB text-frame bound and an error notice in `ports.js` (`4027` splits any size).
+- `[Low]` C60 an envelope from a peer with no known key stays locked until the DM is opened. In `openForEnvelope` (`App.elm:38700`) request `ocean.dm-key` once per retry window (`requestDmKeyLookup`, `50902`).
+- `[Low]` C32 `?topic=` slice. `pendingDeepLinkTopic` is stored but never consumed; resolve it after the self-JOIN and 366 and open that topic.
+- `[Low]` C31 the "Connected to …" and "Reconnected." lines are never logged. Add them to the `001` arm's log (`App.elm:5414`) if parity matters; the Back-online banner already covers reconnects.
 
 ## Appendix
 
 ### N — Every narrowing recorded in `elm/COVERAGE.md`, classified
 
-Each COVERAGE row ends with "Narrowings:" (or "narrowed", "stays ahead", "pending", "not ported")
-clauses. All of them are listed here, keyed to the COVERAGE.md line of the row. Classes:
+The first version of this appendix classified the 146 narrowings recorded in `elm/COVERAGE.md` at map time. They were
+re-verified against `609cb240` while `COVERAGE.md` was rewritten: narrowings that are now fixed were removed from the file, the
+ones that remain are **Narrowed:** clauses, and three found while verifying are N54a–N54c. The "COVERAGE row" column names the row
+in the rewritten file (line numbers shift). Classes:
 
-- **FIX** — client-fixable gap; the Elm client can close it alone.
-- **STALE** — already resolved by a later slice; the narrowing text is out of date (evidence given).
+- **RESOLVED** — was a gap (or a stale claim); the code now does it. Evidence and the slice are given.
+- **FIX** — client-fixable gap that is still open at `609cb240`; the note says exactly what is missing.
 - **KEEP** — deliberate hardening or a better-than-oracle choice; no action.
 - **ORACLE-GAP** — Solid never had it either; optional new work, not parity.
-- **BOUND** — needs the server, the host media engine, a browser/tooling capability, or an Elm
-  platform limit.
+- **BOUND** — needs the server, the host media engine, a browser/tooling capability, or an Elm platform limit.
 
-| # | COVERAGE row (line) | Narrowing | Class | Evidence / fix sketch |
+| # | COVERAGE row | Narrowing | Class | Evidence / fix sketch |
 |---|---|---|---|---|
-| N1 | Connect gate (29) | no remembered-identity picker / "Stay signed in" (no credential listing port) | FIX | add `credentialsList`/`credentialsForget` ports over `onyx:credentials`; picker in `View/Connect.elm` |
-| N2 | Connect gate (29) | passkey sign-in hidden "like the oracle" | KEEP | oracle hides it too |
-| N3 | Connect gate (29) | no invite-preview aside on `?join=` | FIX | reuse `Invite.card` in `View/Connect.elm` aside |
-| N4 | Shell nav (30) | Appearance is the `/appearance` route, not an in-shell sheet | FIX | wrap `View/Appearance` body in `View.Sheet` from the You hub |
-| N5 | Shell nav (30) | You hub omits device toggles / language / Advanced and Notifications/Preferences links | FIX (part STALE) | Preferences link landed with v3/prefs (`View/Prefs.elm`); language / Advanced still absent |
-| N6 | Shell nav (30) | no focus trap / Escape (7.1) | STALE | v3/frame `installOverlayFocus` + `App.escapeMsg` (COVERAGE:220) |
-| N7 | Shell nav (30) | Rooms/Messages drawer reuses the unsectioned rail | STALE | sectioned `Sidebar` (COVERAGE:199) and collection pages (`a9bbac3a`) |
-| N8 | SASL (31) | "password entry UI still ahead" | STALE | `View/Connect.elm:198` `conn-password` |
-| N9 | SESSION (54) | "bouncer rewind stays ahead" | STALE | COVERAGE:56 marks bouncer rewind dedup done |
-| N10 | MODEX (76) | query-only; named modes not shown in the room header | FIX | render `model.modexModes` in `View/RoomSettings.elm` Advanced |
-| N11 | BATCH (89) | replayed non-chat events (QUIT/NICK/JOIN/MODE) fold live, not scrollback-only | FIX | route batch-tagged non-chat lines to `divertReplayEvent` only |
-| N12 | BATCH (89) | no unread bump on merge | KEEP | oracle merges never count live either |
-| N13 | BATCH (89) | search/quarantine, multiline, history-targets "narrowed" | STALE | rows 90, 92, 109 mark them done |
-| N14 | TARGETS (90) | no replay-JOIN roster divert | FIX | divert `@batch` JOINs away from `foldJoin` |
-| N15 | TARGETS (90) | self-identity is nick-only (no equivalent-identity map) | FIX | track account + nick aliases in `isSelf` |
-| N16 | TARGETS (90) | "no user-triggered rewind (no CHATHISTORY BEFORE surface)" | STALE | `ThreadShowEarlier` → `requestRewindHistory` (`App.elm:39196`, `39221`) |
-| N17 | TARGETS (90) | live inbound DMs file under the wire target, not per peer | FIX (verify) | `dmFileBucket` exists; confirm all DM folds key by peer |
-| N18 | TARGETS (90) | eviction ties break key-first vs insertion order | KEEP | cosmetic |
-| N19 | Unread core (91) | ASCII-only keyword/nick tokens (oracle `\p{L}\p{N}_`) | FIX | Unicode letter table in `NotifyCenter`/keyword matcher (elm/regex lacks `u`) |
-| N20 | Unread core (91) | no retained-row highlight re-projection | FIX | re-run classifier when highlight words change |
-| N21 | Unread core (91) | no topic-read reconciliation | STALE | `reconcileChannelTopicUnread` (`App.elm:11387`) |
-| N22 | Notifications (91) | no notification-center inbox rows / batching | STALE (part) | `View/Inbox.elm` inbox exists; batching still absent |
-| N23 | Notifications (91) | no calm tiers | FIX | port `calmMode.ts` presets into `NotifyCenter` + sheet |
-| N24 | Notifications (91) | no quiet-hours schedule (DND = manual + until) | FIX | port `quietHours.ts`; `notifyDndActive` reads a schedule |
-| N25 | Notifications (91) | no smart-mute rules | FIX | port `smartMute.ts` + `SmartMuteSection` |
-| N26 | Notifications (91) | plain (non-owner-suffixed) storage keys | FIX | owner-scoped keys like `deviceMemoryStorageKey` |
-| N27 | Notifications (91) | no permission-request UI trigger | STALE | `notifyPermissionRequest` port (`Main.elm:524`, `1347`) |
-| N28 | Ignore/mute (91) | no ignore-list / mute UI surface | STALE | Notifications sheet ignore list (COVERAGE:202), card Block |
-| N29 | Ignore/mute (91) | inbound DMs key by wire target | FIX (verify) | as N17 |
-| N30 | SEARCH (92) | no `?at=` time-travel fetch half for server results | FIX | issue `CHATHISTORY AROUND` on `ServerOpenResult` |
-| N31 | SEARCH (92) | provenance badge missing on advanced mode, pins, media, menu, prefs | FIX | reuse `View.Search` badge helper |
-| N32 | CTCP (93) | `+C` channel-mode gating of CTCP | FIX | refuse outbound CTCP into `+C` rooms |
-| N33 | CTCP (93) | DCC | KEEP | absent by design (§16) |
-| N34 | Thread paging (95) | no scroll/DOM coupling, aria-live muting, jump pill counts | STALE (part) | v3/transcript scroll bridge + pill (COVERAGE:204); aria-live muting + pill counts still absent |
-| N35 | Thread paging (95) | no time-travel landing anchor | FIX | map vault ids onto chat rows in `threadAnchorIndex` |
-| N36 | Thread paging (95) | no `forceUnread` one-shot | FIX | port `forceMarkFirstUnread` |
-| N37 | Unread divider (96) | no review-handoff clear | FIX | clear divider on scroll-to-bottom from `scrollState` |
-| N38 | Unread divider (96) | no conversation-brief detail line | FIX | port `MessageView` brief line |
-| N39 | MessageWindow (97) | "thread paging state, earlier-messages affordance stay ahead" | STALE | COVERAGE:95 + `ThreadShowEarlier` |
-| N40 | Boost/jump (98) | no TimeScrubber | STALE | v3/polish scrubber (COVERAGE:224) |
-| N41 | Boost/jump (98) | openers topbar-only (no More tools / Cmd-K / `g d`) | STALE (part) | tray + palette entries landed; `g d` chord still missing |
-| N42 | Boost/jump (98) | copy-moment feedback rides the toast; native date/time inputs | KEEP | acceptable |
-| N43 | Boost/jump (98) | no focus trap or motion | STALE | v3/frame sheet focus |
-| N44 | Timestamps (101) | unparseable tags fall back to receipt time | KEEP | fail-closed hardening (Elm better) |
-| N45 | Timestamps (101) | `±HH` accepted where V8 rejects | KEEP | harmless leniency |
-| N46 | Timestamps (101) | clock shows UTC, not local / 12h | STALE | `formatRowClock` + `Time.here` (COVERAGE:198 message clock) |
-| N47 | IRCX pins (108) | no ProvenanceBadge chrome | FIX | see N31 |
-| N48 | IRCX pins (108) | no per-row focus-move | FIX | `Browser.Dom.focus` on the landed row |
-| N49 | IRCX pins (108) | no `⋯`-menu pin entry | STALE | menu pin toggle (COVERAGE:198 "menu pin/ignore/collapse") |
-| N50 | IRCX pins (108) | no scroll effect for `historyLanding` | STALE (part) | scroll bridge lands dividers; verify pin landing scrolls |
-| N51 | Mesh (129) | no LINKS/MAP/MESH/NETSTAT/ROUTE/NETHEALTH surface | ORACLE-GAP | optional oper desk tab |
-| N52 | Netsplit (131) | no netsplit/netjoin BATCH render | ORACLE-GAP | collapse into one system row |
-| N53 | Group roster (168) | no conflict/unchanged gate ports-side | KEEP | provisions only arrive from verified welcomes |
-| N54 | Store seal (172) | "epoch-key provisioning still awaits the E2EEGROUP control plane" | STALE | Welcome open + install done (COVERAGE:166) |
-| N55 | Vault (184) | import does not revive reactions/replyTo/flags; strict-ISO subset; `exportedAt` fallback | FIX (Low) | extend `VaultImport.parseVaultExport` |
-| N56 | Vault (184) | no Ollama provider | KEEP | oracle library-only, zero callers |
-| N57 | Saved searches (188) | owner-scoped DBs narrowed to the default DB | FIX | owner suffix on `onyx-vault-searches` |
-| N58 | Saved searches (188) | locale case mapping, non-ISO → nowMs | KEEP | documented |
-| N59 | Home (196) | no vault catch-up, resume points, recaps, formation strip, recently-visited, invite tier | FIX | port `catchup/*`, `HomeFormationStrip`, `SinceDigestCard` |
-| N60 | Home (196) | coach shows for any guest session (not connect-handoff) | FIX | gate on first-hour handoff flag |
-| N61 | Home (196) | dismissal not persisted | STALE | `onyx:first-hour-seen` (COVERAGE:224) |
-| N62 | Home (196) | queued rows lack per-row Open/Remove | FIX | reuse `outboxReview` port (Prefs already discards) |
-| N63 | Home (196) | inbox rows omit relative time | FIX | `relativeTime` helper |
-| N64 | Home (196) | first-run notifications prompt not ported | STALE | v3/polish (COVERAGE:224) |
-| N65 | App core / WHOIS (198) | signed-on renders UTC ISO | FIX (Low) | use `model.zone` |
-| N66 | App core / card (198) | no Message/Report buttons, no moderation controls | STALE | roster slice (COVERAGE:206) + moderation controls |
-| N67 | App core / avatars (198) | service mark empty (no `elm/svg`) | BOUND | vendor `elm/svg` or CSS-mask glyph like `View.Icon` |
-| N68 | App core / avatars (198) | astral names hash by code point | FIX (Low) | UTF-16 unit hashing helper |
-| N69 | App core / facepile (198) | faces open the card, no popover; `toLower` tiebreak | FIX (Low) | popover via `View.Sheet` |
-| N70 | App core / thread panel (198) | replies listed only once the parent row is loaded | FIX | fetch parent via `requestPinnedMessage`-style AROUND |
-| N71 | App core / topics (198) | owner trim vs reject; no whole-device wipe port; msg/notice types only | FIX (Low) | add wipe port |
-| N72 | App core / moderation desk (198) | candidate order alphabetical; desk clock UTC | FIX (Low) | keep join order; use `model.zone` |
-| N73 | App core / identity overrides (198) | no soft-ignore enforcement, no nick-colour rendering, no management UI | ORACLE-GAP | Solid never rendered them either |
-| N74 | App core / identity overrides (198) | saves fire-and-forget (no round-trip verify) | FIX (Low) | ack port |
-| N75 | App core / export (198) | success toast assumes the download click | FIX (Low) | ack from `TranscriptDownload` |
-| N76 | App core / message menu (198) | flattened tiers; text buttons; msgid-less rows get no menu | STALE (part) | icon row toolbar (`View/Thread.elm:381`, `fea215e3`); msgid-less rows still have no menu |
-| N77 | App core / translation (198) | no caption-transcript row | STALE | caption translate (COVERAGE:219) |
-| N78 | App core / quote + edit (198) | no per-target drafts, no menu Edit, no Escape-to-cancel | STALE | per-target drafts + Escape cancel (COVERAGE:198 later text) |
-| N79 | App core / composer (198) | no caret/focus motion (insert at end) | FIX | `setSelectionRange` port |
-| N80 | App core / clock (198) | 12-hour shape fixed `h:MM AM/PM` | KEEP | acceptable |
-| N81 | App core / search (198) | "no mode toggle" | STALE | vault mode cycle (COVERAGE:184) |
-| N82 | Sidebar (199) | no folders / hidden rooms / closed conversations / Activity entry / roving arrows | FIX | port `channel/categories.ts`, `hiddenRooms`, `closedConversations` |
-| N83 | Sidebar (199) | no Rooms·Messages collection modes | STALE | collection pages (`a9bbac3a`) |
-| N84 | Sidebar (199) | activity from newest buffered row; DM time stamp shown; empty DM shell inserted | KEEP | deliberate |
-| N85 | Palette (200) | no recents, time grammar, people/extension/theme rows; no Alt+↑/↓, J/K, G-sequences | FIX | see section K |
-| N86 | Uploads (201) | compact recompression + EXIF file ops ports-side | KEEP | correct split |
-| N87 | Uploads (201) | media panel: no `partial` vault status; trigger is a toggle; id-less rows jump by stamp | FIX (Low) | — |
-| N88 | Uploads (201) | media panel has no CSS | STALE | pol-thread (`a5166772`) |
-| N89 | Notify UI (202) | no quiet hours, calm presets, smart mute, room folders | FIX | as N23–N25, N82 |
-| N90 | Notify UI (202) | no roving arrows on the strip; keyword sort codepoint | FIX (Low) | — |
-| N91 | Notify UI (202) | no focus trap | STALE | v3/frame |
-| N92 | Transcript (204) | instant jump; aria-live not muted on prepend; no spacer virtualisation; continuation timestamps inline | FIX (Low) | — |
-| N93 | Transcript (204) | compact density is Elm-only | KEEP | Elm addition |
-| N94 | Composer assist (205) | no caret tracking; single-line `input` | STALE (part) | the field is a growing `textarea` with Shift+Enter newline (`View/Composer.elm:98`, `629`); caret-position insert still missing (N79) |
-| N95 | Composer assist (205) | no recent/usage emoji counters, no focus restore after insert | FIX | port `emojiMemory.ts` |
-| N96 | Composer assist (205) | More tools tray not ported | STALE | v3/polish tray |
-| N97 | Roster (206) | no windowing, skeleton, "Refreshing members", mobile "Find someone"/"N here", header ledger link | FIX | `rosterSyncing` state + `memberWindow` port |
-| N98 | Ship (207) | no real browser (geometry, focus, screenshots, axe) | STALE (part) | `elm/tools/screens*.mjs` real Chromium screenshots (`1bec059d`); axe + Playwright journeys still absent |
-| N99 | Ship (207) | "Back online" after the very first connect | STALE | fixed in v3/polish (COVERAGE:224) |
-| N100 | Ship (207) | no minification / CSP | STALE (part) | esbuild minify (`8abb6b12`); CSP still pending |
-| N101 | Moddesk (209) | no prose spine-notice rows; feed not reset on reconnect; no review-authority snapshot | FIX | — |
-| N102 | Moddesk (209) | network name shown as "Onyx" | FIX | fold ISUPPORT `NETWORK` into the model |
-| N103 | Moddesk (209) | no focus trap | STALE | v3/frame |
-| N104 | DM safety (211) | accept re-pins the whole live device set (oracle pins the single pending key) | FIX (security) | pin only the presented key in `acceptKeys` |
-| N105 | DM safety (211) | key change detected only on seal/open, not directory update | FIX (security) | compare pins in the 761 `ocean.dm-key(s)` fold |
-| N106 | DM safety (211) | no `navigator.share` | FIX | share port with copy fallback |
-| N107 | DM safety (211) | "Not encrypted" chip | KEEP | Elm addition (better honesty) |
-| N108 | DM safety (211) | room Invite button in a thread header row | STALE | room header More menu (`View/RoomHeader.elm:265`) |
-| N109 | Prefs (213) | no App & tools tab (PWA / extensions / local language) | FIX | — |
-| N110 | Prefs (213) | width / reader / experience / reaction-density / scrubber / voice / topic / watch toggles not surfaced | FIX | — |
-| N111 | Prefs (213) | no local-history toggle; no clear history / reviewed anchors / saved searches / topic reads / followed | FIX | — |
-| N112 | Prefs (213) | no gzip / file-save / share export, no staged import review | FIX | port `portable*` |
-| N113 | Prefs (213) | no storage-persistence / estimate cards, no a11y audit ledger | FIX | `navigator.storage` port |
-| N114 | Prefs (213) | Hide join/part/quit hides only those three types | KEEP | arguably better |
-| N115 | Prefs (213) | "no command palette entry (no palette exists yet)" | STALE (reason) | palette exists; the Preferences row is still missing (K58) |
-| N116 | Calls C1 (215) | local health mute-only; no quality pip; no "local media unavailable"; More holds a disabled voice-settings stub; no `aria-keyshortcuts` | STALE | C4, C8/C9, C10, C12 (COVERAGE:218–226) |
-| N117 | Calls C1 (215) | chip lives in the topbar (no room header) | STALE | `View/RoomHeader.elm` |
-| N118 | Calls C1 (215) | `voiceEntry = off` fallback hides; stage docked in column; focus helper does not `inert` | FIX (Low) | — |
-| N119 | Calls C1/C6/C4/C8 | 375px verified by CSS review only | STALE (part) | screens.mjs can now shoot 375px |
-| N120 | Calls C1/C6/C8 provisional | join-muted default on; privacy-code slot empty; peer fingerprints via snapshot | BOUND | spec §7 product answers |
-| N121 | Calls C6 (216) | PiP position shape differs; no PiP video strip; phone dock top-right | FIX (Low) | — |
-| N122 | Calls C6 (216) | removed-by-op / capacity toasts | FIX | map MEDIA FAIL codes |
-| N123 | Calls C6 (216) | codec toasts need engine `errorKind`; post-RESUME window not "reconnecting" | BOUND | engine reporting |
-| N124 | Calls C4 (218) | `stopScreenShare` missing in the host engine | STALE | `elm/media/voice-core.ts:878` |
-| N125 | Calls C4 (218) | 200ms call clock granularity; native PiP label; no tile role badges; camera/share disabled while ringing | FIX (Low) | — |
-| N126 | Calls C4 (218) | no `aria-keyshortcuts`; reconnect dimming waits for C10 | STALE | C10, C12 |
-| N127 | Calls C4 (218) | remote screen peers force screenshare layout; deafen local-only | BOUND | §7.3 / §7.4, needs server DEAFEN |
-| N128 | Calls C8 (219) | caption dimming, captions dock in flow, translate-unavailable note dropped, glyph-only reaction chips | FIX (Low) | — |
-| N129 | Calls C8 (219) | DM calls have no reaction plane; VAD/noise only when engine exposes | BOUND | server/engine |
-| N130 | Frame (220) | no visual-regression baselines | STALE (part) | screens.mjs exists; no baseline diffing |
-| N131 | Frame (220) | no `Feature/X` registry blocks | FIX (arch) | — |
-| N132 | Frame (220) | facepile / notify strip / DM safety trigger in the transcript | STALE | moved to `View/RoomHeader.elm` (COVERAGE:223) |
-| N133 | Frame (220) | thread / pins / members are sheets, not right-rail panels; backdrop not `inert` | FIX | — |
-| N134 | Account2 (221) | portable residence: no folders / quiet hours; prefs not imported; `+` bookmarks not starred | FIX | tied to N82/N24 |
-| N135 | Account2 (221) | theme copy feedback no 1.6s reset; share field no select-on-focus | FIX (Low) | — |
-| N136 | Account2 (221) | custom-status expiry not timer-enforced | KEEP | oracle does not enforce either |
-| N137 | Room settings (223) | sheet lacks invite builder, transcript export, hide / leave, topic-draft durability | FIX | — |
-| N138 | Room settings (223) | webhooks only via Room care; group-control mark has no lifecycle; insights no error state | FIX (Low) | — |
-| N139 | Room settings (223) | no context rail (3.8 `ContextRail`) or heatline | FIX | Elm's right column is the roster only |
-| N140 | Polish (224) | `Insert /` prefixes the draft (no caret) | FIX | caret port (N79) |
-| N141 | Polish (224) | Elm build registers no service worker (update strip + push are inert without one) | FIX (High) | ship `sw.js` in `tools/build.sh` + register in `ports.js` |
-| N142 | Polish (224) | no zig-desktop surface | BOUND | desktop shell |
-| N143 | Calls C11 (226) | no stage verb on the server; Dismiss is local; only the starter hosts | BOUND | server |
-| N144 | Calls C11 (226) | "Hand chord drives only the stage hand; captions chord waits for C8" | STALE | C8 merged both chords (COVERAGE:219) |
-| N145 | Divergences (233–250) | u32 epochs; UTF-8 byte counting; 32-bit `truncate`; crypto behind ports | BOUND | Elm platform |
-| N146 | Security review (247) | reactions + typing remain plaintext metadata in E2EE DMs | BOUND | needs a sealed TAGMSG design server-side |
+| N1 | Connect gate | no remembered-identity picker / "Stay signed in" (no credential listing port) | RESOLVED | `View/Connect.elm:336` `rememberedPanel` + `Remembered`, metadata-only `credentialsListed` port (`Main.elm:742`, subscribed at `:2109` as `RememberedListed`), "Stay signed in" toggle — v3/rx-public |
+| N2 | Connect gate | passkey sign-in hidden "like the oracle" | RESOLVED | the premise was wrong (`app/Connect.tsx:1350` shows the passkey path whenever WebAuthn is supported); Elm now offers it: `View/AuthGate.elm:661` `signInLinks` (`conn-passkey`, hidden only when `passkeyBrowserSupported == Just False`) — v3/gap-auth. UX differs (oracle makes the passkey primary and collapses the password fields; Elm keeps the password path open) |
+| N3 | Connect gate | no invite-preview aside on `?join=` | RESOLVED | `View/Connect.elm:214` `context` renders the `conn-invite` preview (inviter, room, topic) for `?join=` / share cards — v3/rx-public |
+| N4 | Shell primary navigation | Appearance is the `/appearance` route, not an in-shell sheet | FIX | still `youHubGo` (`App.elm:48832`) → `PushUrl "/appearance"`; wrap `View/Appearance` body in `View.Sheet` from the You hub (Low) |
+| N5 | Shell primary navigation | You hub omits device toggles / language / Advanced and Notifications/Preferences links | FIX (part RESOLVED) | Notifications, Preferences, Appearance, Voice settings, Organize, People, Theme share, Activity links landed (`View/Nav.elm:236` `youHub`); still absent: inline device toggles, language picker and an Advanced group in the hub (privacy switches and `languageTools` live on `View/Appearance.elm`) (Low) |
+| N6 | Shell primary navigation | no focus trap / Escape (7.1) | RESOLVED | focus trap `ports.js:4730` `installOverlayFocus`; Escape closes one sheet via `App.escapeMsg` (`App.elm:49882`) over `overlayStack` (`:49754`, includes `you`) — v3/frame, v3/rx-sheets |
+| N7 | Shell primary navigation | Rooms/Messages drawer reuses the unsectioned rail | RESOLVED | `View/Rail.elm:59` `collection` renders the sectioned `Sidebar.sections` per collection in the drawer — v3/ui-mobile-shell, v3/rx-shell |
+| N8 | SASL mechanism select | "password entry UI still ahead" | RESOLVED | `View/Connect.elm` `conn-password` field → `submitConnect` → `SaslCredentialsProvided` (`App.elm:41779`) |
+| N9 | Sessions (`SESSION TOKEN/MTOKEN/RESUME`) | "bouncer rewind stays ahead" | RESOLVED | rewind dedup is the bouncer row's `isRepeatDelivery` (`App.elm:33621`) + `seenMsgids` filing; replay refresh `gapRefreshReplay` (`:55457`, v3/gap-convo) |
+| N10 | MODEX named modes | query-only; named modes not shown in the room header | FIX | `model.modexModes` (`App.elm:593`, committed by `foldModexEnd` `:22604`) is read by no view; render it in `View/RoomSettings.elm` Advanced or the header (Low; Elm-only feature, no oracle) |
+| N11 | BATCH playback | replayed non-chat events (QUIT/NICK/JOIN/MODE) fold live, not scrollback-only | RESOLVED | `divertReplayEvent` (`App.elm:35903`) is wired at the JOIN/PART/QUIT/NICK/MODE/KICK/TOPIC arms (`:5043`–`:5217`); `AppTest` "replayed JOIN collects instead of touching live state". The code predates the map (the row text was stale) |
+| N12 | BATCH playback | no unread bump on merge | KEEP | oracle merges never count live either |
+| N13 | BATCH playback | search/quarantine, multiline, history-targets "narrowed" | RESOLVED | landed in the SEARCH, multiline and TARGETS rows (`closeSearchBatch`, `MultilineHistory`, `TargetsHistory` collectors); row text now says so |
+| N14 | CHATHISTORY TARGETS | no replay-JOIN roster divert | RESOLVED | same as N11: a batch-tagged JOIN diverts via `divertReplayEvent` and never reaches `foldJoin` |
+| N15 | CHATHISTORY TARGETS | self-identity is nick-only (no equivalent-identity map) | FIX | `isSelfLine` (`App.elm:35649`) and the part/quit folds compare `ourNick` only; the oracle's session-restore also treats the connect nick and SASL account spelling as self (`store.ts:4624`, `_equivalentRemovalKeys` `:4692`). Track account + nick aliases (Low; not verified how often a resumed session hits it) |
+| N16 | CHATHISTORY TARGETS | "no user-triggered rewind (no CHATHISTORY BEFORE surface)" | RESOLVED | `ThreadShowEarlier` (`App.elm:43385`) → `requestRewindHistory` (`:26995`); button in `View/Thread.elm:162` |
+| N17 | CHATHISTORY TARGETS | live inbound DMs file under the wire target, not per peer | RESOLVED | `dmFileBucket` (`App.elm:38389`) files by sender; used by the chat, reply, edit and redact folds (`:7722`, `:38468`, `:38538`, `:48310`, `:55427`); `AppTest` "file bucket" vectors (`AppTest.elm:7090`) |
+| N18 | CHATHISTORY TARGETS | eviction ties break key-first vs insertion order | KEEP | cosmetic (`evictOldestReadInactiveDm` `App.elm:37667`) |
+| N19 | Unread core | ASCII-only keyword/nick tokens (oracle `\p{L}\p{N}_`) | FIX | `matchesKeyword` (`App.elm:34010`) tokenizes with `Char.isAlphaNum` (ASCII in Elm 0.19) and `mentionsMe` reuses it; needs a Unicode letter/digit table (elm/regex has no `u` flag) |
+| N20 | Unread core | no retained-row highlight re-projection | FIX | `AddHighlightWord`/`RemoveHighlightWord` (`App.elm:43487`) change `highlightWords` but no fold re-runs `classifyHighlight` (`:34075`) over retained rows |
+| N21 | Unread core | no topic-read reconciliation | RESOLVED | `reconcileChannelTopicUnread` (`App.elm:39210`, called at `:14044` and `:39372`); `TopicReadTest` — slice-76 |
+| N22 | Unread core (Notifications) | no notification-center inbox rows / batching | RESOLVED | inbox rows exist (`View/Inbox.elm`, `addNotification`, filters, mark-read); no notification batching/coalescing exists in the oracle's `src/lib/notifications` either (grep for "batch" finds only IRC BATCH), so nothing is owed — unverified against the running oracle |
+| N23 | Unread core (Notifications) | no calm tiers | RESOLVED | `Attention.Preset` Calm/Regular/Power; `View/Attention.elm:136` `presetSection` in the Notifications sheet (`View/Notify.elm`); gate `organizePresetKind` (`App.elm:53259`) — v3/gap-organize |
+| N24 | Unread core (Notifications) | no quiet-hours schedule (DND = manual + until) | RESOLVED | `Attention.quietActive`; `View/Attention.elm:62` `quietSection`; `organizeQuietNow` (`App.elm:53282`) — v3/gap-organize |
+| N25 | Unread core (Notifications) | no smart-mute rules | RESOLVED | `Attention.smartMuted`; `View/Attention.elm:208` `smartMuteSection`; applied at `App.elm:35431` — v3/gap-organize |
+| N26 | Unread core (Notifications) | plain (non-owner-suffixed) storage keys | FIX | ignore/mute/keyword/room-level lists moved to per-account scope (`ports.js` `SCOPED_LIST_SPECS`; the old `BlocklistsSave` intent writes nothing, `Main.elm:1442`) — v3/gap-account; still plain: the followed set (`onyx:followed`, `ports.js` `followedSave`) which the oracle owner-scopes (`lib/notifications/followed.ts:55`) |
+| N27 | Unread core (Notifications) | no permission-request UI trigger | RESOLVED | `RequestNotifyPermission` button (`View/Notify.elm:226`) → `NotifyPermissionRequest` → `notifyPermissionRequest` port (`Main.elm:604`, `:1588`) |
+| N28 | Unread core (Ignore/mute) | no ignore-list / mute UI surface | RESOLVED | Notifications sheet `ignoredSection` (`View/Notify.elm:477`), message menu Ignore/Unignore (`View/Thread.elm:1861`), member card Block/Unblock (`View/Profile.elm:610`), DM mute in `View/Rail.elm:940` / `View/Organize.elm` |
+| N29 | Unread core (Ignore/mute) | inbound DMs key by wire target | RESOLVED | as N17: mute/ignore matching uses the sender bucket |
+| N30 | SEARCH (`draft/search`) | no `?at=` time-travel fetch half for server results | FIX | `ServerOpenResult` (`App.elm:43906`) only calls `ChannelSelect` and closes the panel; issue `requestTravelTo` (`:39523`, `CHATHISTORY AROUND`) with the hit's stamp so the landing machinery (`gapSettleLanding`) can place it |
+| N31 | SEARCH (`draft/search`) | provenance badge missing on advanced mode, pins, media, menu, prefs | FIX (part RESOLVED) | media panel badge landed (`View/Media.elm:81`); still no badge on the pins drawer, message menu, Preferences, the Since-you-left digest card or the captions overlay (oracle: `PinnedMessages.tsx:194`, `MessageMenu.tsx:1012`, `PreferencesPanel.tsx`, `SinceDigestCard.tsx:28`, `CaptionsOverlay.tsx`); reuse `View/Search.elm:56` `provenanceBadge`; the advanced-mode section has no Elm counterpart |
+| N32 | CTCP policy | `+C` channel-mode gating of CTCP | ORACLE-GAP | the oracle has no `+C` path (no match in `src/lib`); onyx-server enforces it (`chanmode.zig` `no_ctcp`) |
+| N33 | CTCP policy | DCC | KEEP | absent by design (§16) |
+| N34 | Thread paging state | no scroll/DOM coupling, aria-live muting, jump pill counts | FIX (part RESOLVED) | scroll bridge (`TranscriptScroll`, `ports.js` scroller anchor, `TranscriptScrolled` `App.elm:43439`) and the count pill (`View/Thread.elm:703` `jumpLatestPill`) landed — v3/transcript; still missing: aria-live muting during window growth (`transcriptLog` keeps a constant `aria-live="polite"`, `View/Thread.elm:217`) (Low) |
+| N35 | Thread paging state | no time-travel landing anchor | RESOLVED | travel / pin / search-hit landings: `gapSettleLanding` (`App.elm:55984`) + vault-around landing (`:48759`) scroll, pulse and focus the nearest row (`ports.js:4297` `landOn`) — v3/gap-convo |
+| N36 | Thread paging state | no `forceUnread` one-shot | FIX | `threadAnchorIndex` (`App.elm:33468`) hard-codes `forceUnread = False`; `MessageWindow.planUnreadNavigation` has no caller. Port the reader New/Review handoff (`MessageView.tsx` `forceUnreadNav`, `:1377`) (Low) |
+| N37 | Unread divider | no review-handoff clear | FIX | the divider (`viewUnreadDividerId`, `captureUnreadDivider` `App.elm:34369`) is cleared only on re-open; `TranscriptScrolled` could clear it when the log reaches the bottom (Low) |
+| N38 | Unread divider | no conversation-brief detail line | FIX | the oracle's sr-only `shell-conversation-brief` region (`MessageView.tsx:1824`) has no Elm counterpart (no "Current conversation" string in `elm/src`) (Low, a11y) |
+| N39 | Message render windowing | "thread paging state, earlier-messages affordance stay ahead" | RESOLVED | Thread paging row + `ThreadShowEarlier` / `ThreadShowLatest` buttons (`View/Thread.elm:162`) |
+| N40 | Boost-bar / jump-to-date | no TimeScrubber | RESOLVED | `View/Polish.elm:277` `timeScrubber` + room-header More entry — v3/polish |
+| N41 | Boost-bar / jump-to-date | openers topbar-only (no More tools / Cmd-K / `g d`) | RESOLVED | composer More-tools "Jump to date" (`View/Polish.elm:146`), palette row (`Switcher.elm:307`) and the `G then D` chord (`Switcher.elm:1229`) — v3/polish, v3/gap-commands |
+| N42 | Boost-bar / jump-to-date | copy-moment feedback rides the toast; native date/time inputs | KEEP | accepted: the oracle also uses native `type="date"`/`"time"` inputs (`JumpToDateSheet.tsx:286`, `:299`); only the inline Copied/failed button state differs |
+| N43 | Boost-bar / jump-to-date | no focus trap or motion | RESOLVED | the sheet uses the shared `View.Sheet` focus trap (N6); sheet motion not checked (cosmetic) — v3/rx-sheets |
+| N44 | Message timestamps | unparseable tags fall back to receipt time | KEEP | fail-closed hardening (Elm better) |
+| N45 | Message timestamps | `±HH` accepted where V8 rejects | KEEP | harmless leniency |
+| N46 | Message timestamps | clock shows UTC, not local / 12h | RESOLVED | `formatRowClock` (`App.elm:2107`) with `Time.here` (`Main.elm:1273` → `ZoneReceived`) and the 12h/24h preference; used by `View/Thread.elm:534` — slice-30 |
+| N47 | IRCX / pins drawer | no ProvenanceBadge chrome | FIX | see N31 (`View/Pins.elm` has none) |
+| N48 | IRCX / pins drawer | no per-row focus-move | RESOLVED | `jumpToPinned` (`App.elm:16496`) → `gapLandOn` → `gapSettleLanding` asks the scroller to land and focus the row (`landing.focus = True`, `ports.js:4334`) — v3/gap-convo |
+| N49 | IRCX / pins drawer | no `⋯`-menu pin entry | RESOLVED | message menu Pin/Unpin entry gated by `menuCanPin` (`View/Thread.elm:1637`) |
+| N50 | IRCX / pins drawer | no scroll effect for `historyLanding` | RESOLVED | `historyLanding` stays an oracle-shaped pointer; the real landing is `gapConvo.landing`, consumed by `gapSettleLanding` → `TranscriptScroll` (pulse + scroll + focus) — v3/gap-convo |
+| N51 | Mesh | no LINKS/MAP/MESH/NETSTAT/ROUTE/NETHEALTH surface | ORACLE-GAP | optional oper desk tab |
+| N52 | Netsplit/netjoin BATCH render | no netsplit/netjoin BATCH render | ORACLE-GAP | collapse into one system row |
+| N53 | Trusted signer / group directory | no conflict/unchanged gate ports-side | KEEP | provisions only arrive from verified welcomes |
+| N54 | Store seal / open | "epoch-key provisioning still awaits the E2EEGROUP control plane" | RESOLVED | welcome open + install is wired (`GroupWelcome`, `ports.js` `createGroupWelcome`, `groupWelcome.smoke.mjs`); the Store seal row now points at it |
+| N54a | `ai-policy` prop | `AiPolicy` has no App fold or view (new finding) | FIX | `AiPolicy.elm` is imported by nothing but its test; read the room's `ai-policy` prop into `Channel` and show a badge like `AiPolicyBadge.tsx` on the room header (Low) |
+| N54b | E2EEGROUP routing codec | Elm never sends E2EEGROUP: `buildGroupControlLine` (`GroupControl.elm:439`) has no caller (new finding) | FIX | add the oracle's current-epoch welcome request (`sendCurrentEpochWelcomeRequest`, a `key-package` record, `client.ts:565`) for `RoomRecoveryRequired` rooms (`App.elm:25577`) so a locked room can ask peers to re-issue its epoch key (Med for encrypted rooms) |
+| N54c | Voice/video MEDIA | `MEDIA STATS` is forwarded to the host engine but `onRoomStats` is unwired, so no room-health readout (new finding) | FIX | wire `onRoomStats` in `elm/media/voice-core.ts` and show the oracle `VoiceBar` health (`src/shell/voice/VoiceBar.tsx:176`) in the docked call stage (Low) |
+| N55 | Vault export and import | import does not revive reactions/replyTo/flags; strict-ISO subset; `exportedAt` fallback | FIX (Low) | still true: `App.importVaultRow` (App.elm:1484) hard-codes `deleted/redacted = False, replyTo = Nothing`; the portable path (`historyImport.js addPortable` :768 sets `replyTo: null`, `HistoryImport.fromVaultSnapshot` HistoryImport.elm:617) carries text/type/time only; extend `VaultImport.parseVaultExport` (VaultImport.elm:387) and the staged decoder |
+| N56 | Exact-substring device recall | no Ollama provider | KEEP | verified: `OllamaEmbeddingProvider` (`src/lib/vault/embeddingIndex.ts:277`) has zero non-test callers; the hashing default is the whole parity surface |
+| N57 | Saved searches boundary and store | owner-scoped DBs narrowed to the default DB | FIX | still true and now visible: one device-wide `onyx-vault-searches` DB (ports.js:2214) and no `owner` on the `savedSearches*` ports, while everything else is per identity since v3/gap-account (a second account on the browser sees and clears the first one's searches). Also new: `SearchSaveCurrent` always saves mode `exact` (App.elm:43920) and `SearchRunSaved` (App.elm:43895) does not restore the mode, which the oracle does (`MessageSearch.tsx:324/360`). Add an owner suffix and carry the mode |
+| N58 | Saved searches boundary and store | locale case mapping, non-ISO → nowMs | KEEP | documented in `SavedSearches`; no oracle behaviour to mirror in a pure fold |
+| N59 | Home briefing | no vault catch-up, resume points, recaps, formation strip, recently-visited, invite tier | FIX | still true (View/Home.elm:13-19 header; `Home.elm` has none of them). The "Since you left" digest (`Attention.buildDigest`, v3/gap-organize) covers part of catch-up from the live buffers, not the vault; port `catchup/*`, `HomeFormationStrip`, an INVITE inbox projection |
+| N60 | Home briefing | coach shows for any guest session (not connect-handoff) | FIX (Low) | `View.Home.coach` (View/Home.elm:379) gates on `isGuest model` and the dismissed flag only (`Home.coachTip`); gate on the first-hour handoff flag |
+| N61 | Home briefing | dismissal not persisted | RESOLVED | `HomeCoachDismiss` (App.elm:43271) emits `PolishFlagSave` for `onyx:first-hour-seen` (`Polish.firstHourSeenKey` Polish.elm:81), boot flag read in Main.elm:1209 — v3/polish |
+| N62 | Home briefing | queued rows lack per-row Open/Remove | RESOLVED | `View.Organize.homeOutboxActions` (View/Organize.elm:1364): Open (`OutboxOpen`) and confirmed Remove (`PrefsOutboxRemove`) per queued row — v3/gap-organize |
+| N63 | Home briefing | inbox rows omit relative time | RESOLVED | each Mentions/Unread row carries a digest line (who · window · terms) via `View.Attention.digestLine` (View/Attention.elm:360) / `Attention.digestRowLine`; the time is a clock window in the preferred 12/24-hour format, not a relative stamp — v3/gap-organize |
+| N64 | Home briefing | first-run notifications prompt not ported | RESOLVED | `View.Polish.firstRunNotify` (View.elm:398) + `Polish.shouldOfferFirstRunNotify` — v3/polish |
+| N65 | WHOIS network-identity sheet + member profile card | signed-on renders UTC ISO | FIX (Low) | `signOnField` (View/Profile.elm:227) still prints the UTC instant; use `model.zone` / `App.formatRowClock` |
+| N66 | WHOIS network-identity sheet + member profile card | no Message/Report buttons, no moderation controls | RESOLVED | View/Profile.elm:591 `member-card-message`, :626 `member-card-report`, :807 `ModerationPropose` controls gated by `ModAuthority.cardKinds` — v3/roster + v3/gap-people |
+| N67 | Message rows: identity tint and avatars | service mark empty (no `elm/svg`) | FIX (Low) | Avatar.elm:219 still renders no mark; `elm/svg` is not in elm.json. A CSS-mask glyph like `View.Icon` needs no dependency, so this is not a platform bound |
+| N68 | Message rows: identity tint and avatars | astral names hash by code point | FIX (Low) | Avatar.elm:56 `String.foldl` over `Char.toCode` (code points); hash UTF-16 units (split astral characters into surrogates) |
+| N69 | Facepile | faces open the card, no popover; `toLower` tiebreak | FIX (Low) | View/RoomHeader.elm:510 `facepileRow`; popover via `View.Sheet` `Popover`; `Facepile` tiebreak still `toLower` + raw |
+| N70 | Thread replies panel | replies listed only once the parent row is loaded | FIX | `threadPanelDialog` (View/Thread.elm:766) finds the parent by buffer row id and the replies from the loaded buffer; `ThreadOpen` (App.elm:47022) does not fetch the parent; use a `requestPinnedMessage`-style AROUND |
+| N71 | Topics | owner trim vs reject; no whole-device wipe port; msg/notice types only | FIX (Low) | still true: nothing clears the topic read ledger (no Preferences control, `topicReadSave` port only saves); add a wipe port + the Preferences "Topic read positions" card |
+| N72 | Member moderation | candidate order alphabetical; desk clock UTC | FIX (Low) | clock RESOLVED: View/Bans.elm:764 uses `formatRowClock` (zone + clock pref, v3/gap-people); `deskCandidates` (View/Bans.elm:847) still `List.sort`s alphabetically where the oracle keeps join order (Elm members are a Dict) |
+| N73 | Identity overrides | no soft-ignore enforcement, no nick-colour rendering, no management UI | ORACLE-GAP | Solid never rendered them either; Elm row is core-only (read path + write folds, no UI) |
+| N74 | Identity overrides | saves fire-and-forget (no round-trip verify) | FIX (Low) | `IdentityOverridesSave` has no ack port; add one before committing state |
+| N75 | `/export [txt or json]` | success toast assumes the download click | FIX (Low) | `exportTranscriptFor` (App.elm:22490) toasts once `TranscriptDownload` (Main.elm:671, Cmd-only) is emitted; ack from the port |
+| N76 | Message menu, row quick actions and reaction picker | flattened tiers; text buttons; msgid-less rows get no menu | KEEP | icon quick-action toolbar landed (`rowActions` View/Thread.elm:420: React, Reply, Reply in thread + menu trigger, fea215e3); the menu itself stays one flattened list of text items by design, and rows without a server msgid get no actions because reactions/replies/edits need the msgid (server-bound) |
+| N77 | Translation | no caption-transcript row | RESOLVED | `CallCaptionTranslate` fold + per-line Translate in `View.CallOverlays` (caption ids pruned to visible lines) — v3/calls-c8 |
+| N78 | Reply, edit, quote and typing | no per-target drafts, no menu Edit, no Escape-to-cancel | RESOLVED | `swapComposerDraft` (App.elm:8134); menu "Edit" (View/Thread.elm:1800 `EditArm`); IME-guarded Escape order edit→reply (View/Composer.elm:234); drafts also persisted per owner (v3/gap-convo) |
+| N79 | Composer assist | no caret/focus motion (insert at end) | FIX | emoji insertion is caret-aware and returns focus (App.elm:42545 `GapConvo.insertAtCaret`, `gapCaretSet` ports.js:12775), reply/edit/quote hand focus to the composer (`gapSettleComposerFocus` App.elm:56137) — v3/gap-convo. Still at the end of the draft: nick completion (ComposerAssist.elm:458/539 pass `String.length` as the caret; its header note is stale for emoji), `Insert /`; add `CaretMoved` to the nick path |
+| N80 | Message clock | 12-hour shape fixed `h:MM AM/PM` | KEEP | acceptable |
+| N81 | Message search panel | "no mode toggle" | RESOLVED | `CycleVaultSearchMode` (App.elm:43872) from the panel button (View/Search.elm:256) + Preferences default `SetVaultSearchMode` (App.elm:43885). Other clauses of the old text stay: `:seq` loaded-dedupe, debounce resolved on the 1 s `Tick` |
+| N82 | Sectioned sidebar + row menu + New conversation sheet | no folders / hidden rooms / closed conversations / Activity entry / roving arrows | FIX (Low) | folders, hidden, closed: `View.Organize`/`Organizer` (v3/gap-organize); Activity door: `View.GapShell.railExtras` (View/Rail.elm:185, v3/gap-shell). Roving arrow-key focus in the lists is still absent (only `filterEscape` is a keydown, View/Rail.elm:342; the header comment at :11 is stale about folders/Activity) |
+| N83 | Sectioned sidebar + row menu + New conversation sheet | no Rooms·Messages collection modes | RESOLVED | View/Rail.elm:15 `data-collection` pages (a9bbac3a, v3/ui-mobile-shell) |
+| N84 | Sectioned sidebar + row menu + New conversation sheet | activity from newest buffered row; DM time stamp shown; empty DM shell inserted | KEEP | deliberate |
+| N85 | Ctrl/Cmd+K action palette | no recents, time grammar, people/extension/theme rows; no Alt+Up/Down, J/K, G-sequences | FIX (Low) | recents, People, theme rows, chords and Preferences/Theme Studio rows landed (Switcher.elm:358 `build`, :597 `globalActions`, `AppChord`) — v3/gap-commands. Still missing: `jump <time>` grammar, hide/close, translate, reader-mode, width and motion verbs, extension / background-switch / AI-policy rows |
+| N86 | Uploads (`file` POST), link previews | compact recompression + EXIF file ops ports-side | KEEP | correct split, and implemented: ports.js:11918 photo-privacy block (`gapStripJpeg`/`gapStripPng`/WebP/HEIF strip, fail-closed), :12335 canvas `gapCompact` — v3/gap-convo |
+| N87 | Uploads (`file` POST), link previews | media panel: no `partial` vault status; trigger is a toggle; id-less rows jump by stamp | FIX (Low) | unchanged (`MediaVaultState` has Loading/Ready/Failed only; trigger is a room More item, View/RoomHeader.elm:354) |
+| N88 | Uploads (`file` POST), link previews | media panel has no CSS | RESOLVED | `css/pol-thread.css` (a5166772) |
+| N89 | Notification settings UI | no quiet hours, calm presets, smart mute, room folders | RESOLVED | `View.Attention.quietSection/presetSection/smartMuteSection` in the Notifications sheet (View/Notify.elm:127-130); `organizeQuietNow` gates alerts (App.elm:53282); folders in `View.Organize` — v3/gap-organize |
+| N90 | Notification settings UI | no roving arrows on the strip; keyword sort codepoint | FIX (Low) | unchanged |
+| N91 | Notification settings UI | no focus trap | RESOLVED | the sheet is a `View.Sheet`; `installOverlayFocus` (ports.js:4730) traps Tab and restores focus — v3/frame |
+| N92 | Transcript engine + density | instant jump; aria-live not muted on prepend; no spacer virtualisation; continuation timestamps inline | FIX (Low) | continuation timestamps now reveal on hover/focus (css/pol-thread.css:144-156) — resolved; still true: instant `scrollTop = scrollHeight` (ports.js:4221), `aria-live` polite during prepends, no spacer-div virtualisation |
+| N93 | Transcript engine + density | compact density is Elm-only | KEEP | Elm addition (Appearance "Message layout" + palette toggle) |
+| N94 | Composer assist | no caret tracking; single-line `input` | RESOLVED | the field is a growing `textarea`, Shift+Enter newline (View/Composer.elm:104, 638-652); the remaining caret gap (nick completion) is N79 |
+| N95 | Composer assist | no recent/usage emoji counters, no focus restore after insert | FIX (Low) | focus restore RESOLVED (`gapCaretSet` ports.js:12775 focuses the field, v3/gap-convo); no recent/usage counters — port `emojiMemory.ts` |
+| N96 | Composer assist | More tools tray not ported | RESOLVED | `View.Polish` tray (Attach, Send later, Jump, Emoji, Room ledger, slash tip) — v3/polish |
+| N97 | Member list (roster) + profile-card actions | no windowing, skeleton, "Refreshing members", mobile "Find someone"/"N here", header ledger link | FIX (Low) | windowing RESOLVED (`RosterWindow`: 120 rows + Show more 300, View/Roster.elm:265-315, v3/gap-people); still missing: skeleton, `rosterSyncing` label, mobile copy, header ledger link |
+| N98 | Ship-bar flows, real-bundle smoke, static build and deploy path | no real browser (geometry, focus, screenshots, axe) | FIX (Low) | real Chromium harness exists (`elm/tools/screens*.mjs` 390x844 + 1440x900, `contrast-audit.mjs`, `call-e2e.mjs`, `1bec059d`) but none runs in the gates and there is no axe audit or Playwright journey |
+| N99 | Ship-bar flows, real-bundle smoke, static build and deploy path | "Back online" after the very first connect | RESOLVED | `Polish` `hasBeenLive` (Polish.elm:169/261): 001 stamps "Back online" only after an earlier live session, the first handshake shows no Connecting banner — v3/polish (`PolishTest`, `AppTest` reconnect-banner vectors) |
+| N100 | Ship-bar flows, real-bundle smoke, static build and deploy path | no minification / CSP | FIX (Med) | minification RESOLVED (`elm/tools/build.sh:45-67` esbuild over app/ports/historyImport/css, `8abb6b12`); CSP still absent: `ops/nginx/eshmaki-server.conf:13` sends only `frame-ancestors 'none'` — design a script/style policy for the Elm bundle |
+| N101 | Moderation cockpit sheet + operator desk | no prose spine-notice rows; feed not reset on reconnect; no review-authority snapshot | FIX (Low) | `operEventReplay` is reset only at init/blank (App.elm:3706/4337) and on request (:20574); server NOTICEs now land in the Activity sheet (v3/gap-shell) but not in the console; review still re-checks live op at confirm |
+| N102 | Moderation cockpit sheet + operator desk | network name shown as "Onyx" | FIX (Low) | View/ModDesk.elm:247 hard-codes "Onyx"; `Isupport.network` (Isupport.elm:316) already parses `NETWORK` |
+| N103 | Moderation cockpit sheet + operator desk | no focus trap | RESOLVED | both desks are `View.Sheet`s under `installOverlayFocus` — v3/frame |
+| N104 | DM E2EE safety + Invite friends sheet | accept re-pins the whole live device set (oracle pins the single pending key) | RESOLVED | `acceptKeys` (ports.js:9357): trusts only the reviewed pending keys that reproduce the shown number plus the existing pin; a device added after the review is never trusted by the click — v3/gap-pwa-safety (`dmSafety.smoke.mjs`, `DmSafetyTest`) |
+| N105 | DM E2EE safety + Invite friends sheet | key change detected only on seal/open, not directory update | RESOLVED | 761 reply / METADATA push asks ports for a pin verdict; `DmKeyChecked` (App.elm:45998) raises the review once with toast + Inbox row; `DmSafetyTest` "a pushed or replied device key asks ports for a pin verdict" — v3/gap-pwa-safety |
+| N106 | DM E2EE safety + Invite friends sheet | no `navigator.share` | FIX (Low) | no share call anywhere in ports.js; Invite friends is copy-only; add a share port with copy fallback |
+| N107 | DM E2EE safety + Invite friends sheet | "Not encrypted" chip | KEEP | Elm addition (better honesty) |
+| N108 | DM E2EE safety + Invite friends sheet | room Invite button in a thread header row | RESOLVED | "Invite friends" in the room header and its More menu (View/RoomHeader.elm:270-276, v3/roomsettings) |
+| N109 | Device Preferences sheet | no App & tools tab (PWA / extensions / local language) | FIX (Low) | six tabs only (PrefsPanel.elm:69-74); local language tools live in Appearance; no installed-app readiness card; no client-extension runtime exists in Elm (not planned) |
+| N110 | Device Preferences sheet | width / reader / experience / reaction-density / scrubber / voice / topic / watch toggles not surfaced | FIX (Low) | width, reader mode, reactions, Calls, Topics and Watch-together are surfaced (View/Prefs.elm:171-250, v3/gap-appearance/gap-organize/gap-watch); `experienceMode` and `timeScrubber` are stored (Prefs.elm:418-423) but have no control |
+| N111 | Device Preferences sheet | no local-history toggle; no clear history / reviewed anchors / saved searches / topic reads / followed | FIX (Low) | local-history toggle, verified Clear local history and Clear saved searches RESOLVED (`historyCards` View/GapAccount.elm:398, v3/gap-account); still no clear controls for reviewed anchors (no store), topic read positions, followed conversations, topic drafts |
+| N112 | Device Preferences sheet | no gzip / file-save / share export, no staged import review | FIX (Low) | staged import review RESOLVED (`HistoryImport`, v3/gap-import; `.json.gz` import via `DecompressionStream`); export is still an uncompressed JSON blob download (ports.js:8264) with no gzip, file-save or share |
+| N113 | Device Preferences sheet | no storage-persistence / estimate cards, no a11y audit ledger | FIX (Low) | still absent (no `navigator.storage` use in ports.js) |
+| N114 | Device Preferences sheet | Hide join/part/quit hides only those three types | KEEP | arguably better |
+| N115 | Device Preferences sheet | "no command palette entry (no palette exists yet)" | RESOLVED | palette row "Preferences — display & behaviour" (Switcher.elm:616) + Ctrl/Cmd+, — v3/gap-commands |
+| N116 | Calls C1–C3 | local health mute-only; no quality pip; no "local media unavailable"; More holds a disabled voice-settings stub; no `aria-keyshortcuts` | RESOLVED | quality pip/prompt (View/CallVideo.elm:536, C4), live voice settings (View/VoiceSettings, C8/C9), `aria-keyshortcuts` (View/CallStage.elm:446-469, C11/C12), local health arm in `CallMedia.roomStatus`, permission / no-device / capture-lost banners (`CallDock.failedSub`, rx-calls). The header comment View/CallStage.elm:25-26 is stale |
+| N117 | Calls C1–C3 | chip lives in the topbar (no room header) | RESOLVED | `View.CallPresence.headerVoice` (View/CallPresence.elm:105) in the room header (View/RoomHeader.elm:124) |
+| N118 | Calls C1–C3 | `voiceEntry = off` fallback hides; stage docked in column; focus helper does not `inert` | FIX (Low) | unchanged |
+| N119 | Calls C1–C3 | 375px verified by CSS review only | RESOLVED | `elm/tools/screens-calls.mjs` and `call-e2e.mjs` run real Chromium (390x844 phone, 1440x900); 375 px itself is not a scenario |
+| N120 | Calls C1–C3 | join-muted default on; privacy-code slot empty; peer fingerprints via snapshot | BOUND | spec §7 product answers: `muteOnJoin = True` (VoiceSettings.elm:102); "Privacy code" placeholder (View/CallStage.elm:843); fingerprints "Loading…" until the engine forwards them |
+| N121 | Calls C6/C7/C10 | PiP position shape differs; no PiP video strip; phone dock top-right | FIX (Low) | unchanged (no PiP video strip while video is off) |
+| N122 | Calls C6/C7/C10 | removed-by-op / capacity toasts | FIX (Low) | removal ("You were removed from the call") and lost-microphone toasts exist (`CallDock.mediaToast` CallDock.elm:672, engine `classifyMediaError` voice-core.ts:446-455, v3/rx-calls); no "room full" / capacity toast — map the MEDIA FAIL code |
+| N123 | Calls C6/C7/C10 | codec toasts need engine `errorKind`; post-RESUME window not "reconnecting" | FIX (Low) | the engine now classifies and reports `errorKind` (voice-core.ts:453-455, codec/encoder/decode/peer_key/removed/capture) — resolved; the post-`SESSION RESUME` provisional window is still not treated as reconnecting (`CallDock.reconnecting`) |
+| N124 | Calls C4–C5 | `stopScreenShare` missing in the host engine | RESOLVED | `elm/media/voice-core.ts:962` `stopScreenShare` |
+| N125 | Calls C4–C5 | 200ms call clock granularity; native PiP label; no tile role badges; camera/share disabled while ringing | FIX (Low) | unchanged |
+| N126 | Calls C4–C5 | no `aria-keyshortcuts`; reconnect dimming waits for C10 | RESOLVED | chords + `aria-keyshortcuts` (C11/C12), reconnect dimming/disabled toggles (C10, `View.CallStage` hooks) |
+| N127 | Calls C4–C5 | remote screen peers force screenshare layout; deafen local-only | BOUND | §7.3 / §7.4, needs server DEAFEN; also new: the camera itself is off in the shipped engine (`VIDEO_ENABLED = false`, media/voice-engine.ts:107) because `cadencevis` can exceed the stock SendQ — server/engine bound |
+| N128 | Calls C8–C9 | caption dimming, captions dock in flow, translate-unavailable note dropped, glyph-only reaction chips | FIX (Low) | unchanged |
+| N129 | Calls C8–C9 | DM calls have no reaction plane; VAD/noise only when engine exposes | BOUND | server/engine (no DM media target; DM ring overlays are core-only for the same reason) |
+| N130 | Shell frame, tokens, Sheet primitive, focus and Escape order | no visual-regression baselines | FIX (Low) | `screens*.mjs` take real screenshots but nothing diffs a baseline |
+| N131 | Shell frame, tokens, Sheet primitive, focus and Escape order | no `Feature/X` registry blocks | KEEP | Elm uses per-slice modules plus `settleSteps` (App.elm:39925); no registry needed |
+| N132 | Shell frame, tokens, Sheet primitive, focus and Escape order | facepile / notify strip / DM safety trigger in the transcript | RESOLVED | moved into the room header (`facepileRow` View/RoomHeader.elm:510, `DmSafety.convoHeader` View/DmSafety.elm:34) — v3/roomsettings |
+| N133 | Shell frame, tokens, Sheet primitive, focus and Escape order | thread / pins / members are sheets, not right-rail panels; backdrop not `inert` | FIX (Low) | members live in the context rail and the thread pane docks as a non-modal right pane on wide layouts (View/Thread.elm:808, v3/rx-convo); Pins and Media are still sheets and no backdrop makes the page `inert` |
+| N134 | Account completeness | portable residence: no folders / quiet hours; prefs not imported; `+` bookmarks not starred | FIX (Low) | `App.portableExport` (App.elm:50320) still writes empty `categories` and default `quietHours` although Elm now has folders and quiet hours (v3/gap-organize); its doc comment (:50317) is stale; import still applies favorites only |
+| N135 | Account completeness | theme copy feedback no 1.6s reset; share field no select-on-focus | FIX (Low) | unchanged |
+| N136 | Account completeness | custom-status expiry not timer-enforced | KEEP | oracle does not enforce either |
+| N137 | Room settings sheet | sheet lacks invite builder, transcript export, hide / leave, topic-draft durability | FIX (Low) | transcript export RESOLVED (`sectionWith "export"` View/RoomSettings.elm:116, v3/gap-people); still no invite builder in the sheet (footnote `notPorted` View/RoomSettings.elm:162), no hide/leave (Leave is in the row menu and Room care), topic drafts seed on open only |
+| N138 | Room settings sheet | webhooks only via Room care; group-control mark has no lifecycle; insights no error state | FIX (Low) | unchanged (webhooks are host-gated for ops by `webhookGate` App.elm:52570, v3/gap-people) |
+| N139 | Room settings sheet | no context rail (3.8 `ContextRail`) or heatline | FIX | Elm's right column is the roster only |
+| N140 | Composer More tools tray + time scrubber | `Insert /` prefixes the draft (no caret) | FIX | caret gap, see N79 (`PolishMsg ToolsSlash`) |
+| N141 | PWA: service worker, closed-tab Web Push, page restore | Elm build registers no service worker (update strip + push are inert without one) | RESOLVED | `registerServiceWorker` (ports.js:11478): https/loopback, after `load`, HEAD must say JavaScript, `updateViaCache: 'none'`, 30-min re-check; the deploy stamps and ships `public/sw.js` and the overlay leaves it untouched — v3/gap-pwa-safety (`pwaSafety.smoke.mjs` 16) |
+| N142 | Add to Home Screen, update strip, Back-online fix | no zig-desktop surface | BOUND | desktop shell |
+| N143 | Calls C11–C12 | no stage verb on the server; Dismiss is local; only the starter hosts | BOUND | server |
+| N144 | Calls C11–C12 | "Hand chord drives only the stage hand; captions chord waits for C8" | RESOLVED | C8 merged both chords: Ctrl/Cmd+Shift+H drives the voice hand outside a stage and Ctrl/Cmd+Shift+C toggles captions (`aria-keyshortcuts` View/CallOverlays.elm:70/114) |
+| N145 | Known Elm-representation divergences | u32 epochs; UTF-8 byte counting; 32-bit `truncate`; crypto behind ports | BOUND | Elm platform |
+| N146 | Security review fixes | reactions + typing remain plaintext metadata in E2EE DMs | BOUND | needs a sealed TAGMSG design server-side |
 
-**Tally:** 146 narrowings → FIX 72 (incl. Low and verify items) · STALE 45 (incl. 10 part-stale, where a remainder is still FIX) · KEEP 17 · ORACLE-GAP 3 · BOUND 9.
+**Tally:** 149 narrowings (146 recorded at map time plus 3 found while verifying) → FIX 62 · RESOLVED 58 · KEEP 18 · ORACLE-GAP 4 · BOUND 7 (at map time: FIX 72 · STALE 45 · KEEP 17 · ORACLE-GAP 3 · BOUND 9).
 
-#### Structural problems in COVERAGE.md itself
-- The "App core" row (line 198) is a single ~25 KB table cell with nested, unbalanced parentheses; several of its own narrowings are contradicted later in the same cell (per-target drafts, Escape-to-cancel, menu Edit).
-- Lines 246–247 (DM key hold, security review) sit after the "Known divergences" bullet list with no table header, so they do not render as table rows.
-- "All 13 routes resolve" (line 197) — `src/index.tsx` now has 13 app routes plus the PublicInfo/Trust/Install aliases; the count is no longer meaningful.
-- The doc's scope is "onyx-server feature coverage"; it never claims UI reachability, so "done" frequently means "fold + vectors", not "a user can reach it". Section B/E/F rows marked CORE-ONLY are the concrete cases.
-
-#### Structural problems in V3_ROADMAP.md
-- Phase 1 lists rows 1.1–1.7 twice and Phase 2 lists 2.4–2.6 twice and Phase 3 lists 3.4–3.7 twice with conflicting statuses (one copy "done", the other blank/size-only).
-- The C1–C12 summary is duplicated with contradicting flags (C4/C5 "**done**" in one line, plain in the other; C6/C7/C10 the reverse).
-- 1.3 says "in-shell sheet not built" (still true); 1.4a "Land on Home… absorbs the catch-up digest" has no status but catch-up (2.7) is not built.
-- Still-open rows with no Elm work at all: 0.3 remembered identities, 0.4 invite aside, 2.7 catch-up digest, 2.8 BlockKit, 3.9 Harbor confirm, 4.2 smart mute + folders, 4.5 history import, 6.7 Watch Together, 7.6 visual regression baselines.
+#### Structural problems found in the status docs (all fixed in the refresh)
+- `COVERAGE.md`'s "App core" row was one ~25 KB table cell with nested, unbalanced parentheses whose own text contradicted itself: split into topic rows.
+- The rows after the "Known Elm-representation divergences" list, and every row after a blank line, did not render as table rows: every table now has its header and no blank lines inside.
+- "All 13 routes resolve" was out of date: `Route.elm` has 19 routable paths, the `/install` alias and a 404.
+- "done" meant "fold plus vectors" in many rows; it now means a user can reach it, and `core` marks the rows that only have the fold.
+- `V3_ROADMAP.md` listed Phase 1 (1.1–1.7), Phase 2 (2.4–2.6) and Phase 3 (3.4–3.7) twice with conflicting statuses and the C1–C12 summary twice with contradicting flags; row 6.7 lumped Stage (done) with Watch Together (not started). One table per phase, one C1–C12 table, and 6.7 split.

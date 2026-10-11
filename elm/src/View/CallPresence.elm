@@ -19,7 +19,7 @@ navigates.
 
 Narrowings: icons are CSS-mask glyphs (`.onyx-ci`, no `elm/svg`);
 the oracle's More-menu "Join call" fallback for `voiceEntry = off`
-has no Elm More menu yet, so the idle join simply hides.
+has no entry in the Elm More menu, so the idle join simply hides.
 
 -}
 

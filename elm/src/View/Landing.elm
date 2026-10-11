@@ -7,7 +7,7 @@ no pills, hierarchy through weight and size only.
 
 The board tabs are honest entry choices, not presence: nothing here
 implies any room or person is live. Tab selection is local `Msg`
-state; no focus juggling (buttons stay natively keyboard-reachable).
+state; Arrow / Home / End rove the selection and DOM focus together.
 -}
 
 import App exposing (Msg(..))

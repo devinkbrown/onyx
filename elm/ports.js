@@ -2209,8 +2209,8 @@
      upsert-by-label, idempotent import merge, readback-verified writes,
      and metadata-only cross-tab invalidation (revision/reason/count —
      never labels or query text cross tabs). Owner-scoped databases and
-     the 8-handle LRU are narrowed to the single default database: the
-     Elm client has no device-memory-owner machinery. */
+     the 8-handle LRU are narrowed to the single default database: saved
+     searches are not owner-scoped (the vault, outbox and lists are). */
   var SEARCH_DB_NAME = "onyx-vault-searches";
   var SEARCH_DB_VERSION = 1;
   var SEARCH_STORE = "saved_searches";
@@ -5241,8 +5241,8 @@ function fetchPublicFeed(url) {
 
     /* v3/gap-import: third-party history import (historyImport.js, loaded
        before this file). The module reads the vault through this accessor
-       so owner scoping, when the vault gains it, changes one place. With
-       the module missing every pick fails closed with a visible reason. */
+       so the handle changes in one place; the owner scope rides each port's
+       `owner`. Missing module: every pick fails closed with a visible reason. */
     if (app.ports.historyImportPick) {
       var historyImport = global.OnyxHistoryImport;
       if (historyImport && typeof historyImport.wire === "function") {
@@ -5452,9 +5452,9 @@ function fetchPublicFeed(url) {
         } catch (err) { /* refresh is best-effort */ }
       });
     }
-    /* Voice engine lifecycle feed: snapshots flow one way into Elm via
-       voiceCallHub; Elm validates fail-closed and never commands the
-       engine (the hub renders no join/accept/start control). */
+    /* Voice engine lifecycle feed: snapshots flow into Elm via
+       voiceCallHub and are validated fail-closed there; Elm's commands
+       go back through the voice* ports below. */
     /* One shared feed for engine events and command outcomes, so
        startedAt/established tracking never diverges between them. */
     var voicePush = mountVoiceFeed(app);
@@ -5742,9 +5742,9 @@ function fetchPublicFeed(url) {
         if (req && typeof req.json === "string") writeSlot("onyx:preferences", req.json);
       });
     }
-    /* Ignore/mute blocklists: Elm normalizes fail-closed; the bridge only
-       persists the validated arrays (plain keys — the oracle's
-       owner-suffixed slots stay ahead until Elm carries an owner). */
+    /* Ignore/mute blocklists (legacy plain-key writer): Main.elm no longer
+       sends `blocklistsSave` — the lists persist per account scope through
+       `ScopedListsSave` — so this subscriber is idle. */
     if (app.ports.blocklistsSave) {
       app.ports.blocklistsSave.subscribe(function (req) {
         if (!req) return;

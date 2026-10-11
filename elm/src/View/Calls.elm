@@ -2,7 +2,7 @@ module View.Calls exposing (callsHub)
 
 {-| Calls hub — Elm port of `src/shell/CallsHub.tsx` (presentation copy
 and navigation-only behavior; the voice lifecycle arrives from the
-engine bridge, which lands with the engine itself).
+engine bridge, `voiceCallHub` → `CallHubSnapshot`).
 
 Hard rules, mirroring the oracle:
 

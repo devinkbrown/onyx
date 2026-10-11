@@ -9,8 +9,8 @@ Fold ownership: open/query/index/save-name state and the bounded live
 filter live in `App` (`searchResults`); this module renders the
 oracle's chrome and hooks.
 
-Documented narrowings: the history-off branch stays ahead — the
-panel covers the live conversation plus saved searches plus live-tier
+Documented narrowings: the history-off branch is a notice (`gapHistoryOff`)
+— the panel covers the live conversation plus saved searches plus live-tier
 recall chips plus mode-switched device-memory hits ("Saved on this
 device", open-via-travel; hybrid/exact/semantic toggle mirrors the
 in-search mode cycle) plus archived server results ("Archived

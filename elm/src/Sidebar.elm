@@ -33,9 +33,9 @@ tie-break). The filter is a case-insensitive substring over room names
 and DM nicks plus an optional unread-only attention gate; an empty
 query passes everything.
 
-Narrowings (recorded in COVERAGE): no channel folders, hidden rooms or
-closed conversations (Elm carries none of that navigation memory), so
-every joined room lands in Favorites or Rooms and every DM shell lists.
+Narrowings: this derivation knows no channel folders, hidden rooms or
+closed conversations (v3/gap-organize applies them in `View.Rail`), so
+every room it is given lands in Favorites or Rooms and every DM lists.
 Room activity reads the newest buffered row (the oracle keeps a
 separate `channelLastActivity` map).
 

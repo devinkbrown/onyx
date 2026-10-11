@@ -703,8 +703,8 @@ encodePreferences prefs =
         )
 
 
-{-| Set one appearance-page preference key (the page only edits
-`fontScale`, `density`, and `reduceMotion`; the rest rides along so a
+{-| Set one preference key (the appearance page and the Preferences
+sheet edit through `AppearanceSetPref`; the rest rides along so a
 save never drops fields).
 -}
 updatePreference : Preferences -> String -> String -> Preferences

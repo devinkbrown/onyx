@@ -1614,8 +1614,8 @@ menuInput model target m =
     }
 
 
-{-| Whether any menu item applies (translate stays a later
-slice). -}
+{-| Whether any menu item applies (the Translate item is not counted
+here). -}
 menuHasActions : Model -> String -> App.Capabilities -> Bool
 menuHasActions model target caps =
     caps.canReply
@@ -1643,7 +1643,7 @@ menuCanPin model target =
 copy: Reply, Copy, Quote, Moment, Ledger, Search, Topic, Edit,
 Pin, Ignore, Collapse, then Delete behind its inline confirm
 step; tiers are flattened into one menu with a light-dismiss
-backdrop, and translate stays a later slice). -}
+backdrop, and Translate shows when translation is available). -}
 messageMenuPanel : Model -> String -> App.ChatMessage -> Html Msg
 messageMenuPanel model target m =
     case m.msgid of

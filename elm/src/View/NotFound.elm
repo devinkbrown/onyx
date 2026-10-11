@@ -2,9 +2,9 @@ module View.NotFound exposing (notFound)
 
 {-| Route terminus page, mirroring `src/routes/NotFound.tsx`: the 404
 kicker, heading, sub-copy, and the app-miss-aware action. Rendered
-inside the public frame by `View`. Document metadata (title/meta
-dance in `setNotFoundPageMeta`) stays ports-side; the title is set
-through the Elm document head.
+inside the public frame by `View`. The title is set through the Elm
+document head; other document metadata is static head metadata stamped
+at deploy time by `tools/materialize-route-entrypoints.mjs`.
 -}
 
 import App exposing (Msg)

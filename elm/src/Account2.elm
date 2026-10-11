@@ -250,8 +250,8 @@ type alias PortableInput =
 
 
 {-| A parsed residence document. Folders and quiet hours are carried
-for the import report; this client has no folder or quiet-hours state
-to apply them to.
+for the import report; the import applies favorites only (the folders
+and quiet hours kept by `Organizer` are not touched).
 -}
 type alias Portable =
     { exportedAt : String
@@ -264,8 +264,8 @@ type alias Portable =
 
 {-| Serialize a residence document (mirroring
 `buildPortableIdentity` + `serializePortableIdentity`: 2-space JSON
-plus a trailing newline). This client keeps no room folders or quiet
-hours, so those fields carry the oracle's empty/default values.
+plus a trailing newline). The export does not read the folders or quiet
+hours kept by `Organizer`, so they carry the oracle's empty/default values.
 -}
 serializePortable : PortableInput -> String
 serializePortable input =

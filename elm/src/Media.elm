@@ -568,8 +568,8 @@ mediaBreakout chantypes channel target =
 {-| Voice-call lifecycle for the calls hub — Elm port of `CallState` in
 `src/lib/cadence-media/types.ts` (`idle | ringing_out | ringing_in |
 in_call`). The engine bridge (RTP/WebRTC legs, `handleMediaMessage`)
-lands with the engine itself; until then the hub rests at `Idle` and
-stays honest about it.
+is the voice engine (`elm/media/`) feeding `CallHubSnapshot`; the hub
+rests at `Idle` until it reports a lifecycle, and stays honest.
 -}
 type CallLifecycle
     = Idle

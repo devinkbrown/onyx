@@ -9,7 +9,7 @@ Fold ownership: plan progress, persistence, and the share round-trip
 live in `App` (`guidesCompleted`, `GuidesToggleStep`,
 `GuidesCopyPlan`, `guidesPlanExport`); the copy reuses the
 `ClipboardCopy` port. Step titles stay single-sourced in `Guides`.
-Document metadata beyond the title stays ports-side.
+Metadata beyond the title is static (`tools/materialize-route-entrypoints.mjs`).
 -}
 
 import App exposing (GuidesShare(..), Model, Msg(..), guidesPlanExport)

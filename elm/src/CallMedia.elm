@@ -310,7 +310,7 @@ decodeLocal lifecycle raw prev =
 
 
 {-| Room-header chip status with the full local-health arm of
-`buildVoiceRoomStatus` (captions excluded until C8): up to two visible
+`buildVoiceRoomStatus` (captions are still left out): up to two visible
 labels plus "+N", every part in the aria, only while in this call.
 -}
 roomStatus :
