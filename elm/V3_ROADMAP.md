@@ -49,8 +49,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
-| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; no recents / time grammar) |
-| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port, rows narrowed to handled chords) |
+| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; v3/gap-commands adds People, recents, the oracle action rows and the `#room` / `mute N` grammar; no time grammar) |
+| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port; v3/gap-commands adds the shell chords, J/K, `g h` / `g d`, the single-key switch; the overlay lists exactly the chords this client handles) |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home coach; v3/polish: dismissal persisted in `onyx:first-hour-seen`, quiet notify sheet after the first send) |
 | 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 

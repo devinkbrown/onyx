@@ -7,7 +7,9 @@ Scope: everything a person sees between "there is voice in this room" and
 "the call ended" — presence, join, the in-call stage and bar, DM ringing,
 PiP, captions, reactions, settings, privacy, degradation, errors, stage
 mode, and the 375px layouts for each. Not in scope: Watch Together (its own
-activity card, unchanged from the oracle), spatial audio pad (post-ship).
+activity card over the room property `ocean.watch`, specified in the module
+docs of `src/WatchTogether.elm` and built in v3/gap-watch), spatial audio pad
+(post-ship).
 
 Design-to-state rule: every surface below is designed against the state the
 Elm core actually has today (`elm/src/App.elm`, `elm/src/Media.elm`,
@@ -679,7 +681,12 @@ independently shippable, gates `elm make`, `elm-test`, smoke suites,
 | C11 | **Stage mode** — `StageState`, CTCP builders, speaker/audience rendering, raised-hands panel, invites, chip forced to "Stage broadcast" | L | whole `StageState` | Audience never tiles; host queue + invite alert; audience bar swap; offline hint; 375px bottom sheet |
 | C12 | **Shortcuts + a11y pass** — chord table, `aria-keyshortcuts`, `?` overlay group, Ctrl+Shift+S "who is speaking", focus order audit, 24px target audit, reduced-motion audit | S | none | Every chord listed in overlay; no single-key shortcut without PTT opt-in; all targets ≥24px with spacing; axe-style checks in e2e |
 
-Watch Together stays as roadmap 6.7b (unchanged activity card, S).
+Watch Together (roadmap 6.7b) is built outside this list as v3/gap-watch: a
+shared timeline and link carried by the room property `ocean.watch` (a title,
+an http(s) link, a play/pause clock and a participant list), never a media
+relay. Operators publish it; the card, start editor, host controls, handoff
+and roster live in `WatchTogether.elm`, `View/WatchTogether.elm` and
+`css/gap-watch.css`.
 
 ---
 

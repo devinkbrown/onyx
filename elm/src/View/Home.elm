@@ -26,6 +26,7 @@ import Html.Events exposing (onClick)
 import Outbox
 import Stats
 import View.GuestClaim exposing (guestClaimChip)
+import View.GapShell -- v3/gap-shell
 
 
 {-| Every open conversation, projected for Home. -}
@@ -110,6 +111,7 @@ home model =
             , -- v3/ui-mobile-shell: the guest "Keep the name" ask lives on
               -- Home (and in the You hub), never as a strip over a room.
               guestClaimChip model
+            , View.GapShell.motdCard model -- v3/gap-shell
             , coach model Home.HomeNext
             , outboxSection model connected
             , if Home.showInviteFriends { connected = connected, roomCount = List.length joined, dmCount = List.length dms } then
