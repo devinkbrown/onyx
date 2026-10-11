@@ -52,6 +52,7 @@ module Services exposing
     , saslInfo
     , seen
     , setName
+    , setPass
     , setUserProfileOn
     , sheetChannels
     , silenceEntry
@@ -907,6 +908,32 @@ accountSet account password field value =
     build "ACCOUNTSET" [ wireToken account, wireToken password, wireToken field, wireText value ]
 
 
+{-| v3/gap-auth — `SETPASS <current> :<new>` (`server.zig handleSetpass`;
+the server answers `NOTICE :SETPASS: your password has been changed` or
+`FAIL SETPASS <code>`). The current password rides a middle parameter,
+so one with a space or control character (or a leading colon) cannot
+be sent and yields `Nothing`; the new password is always the trailing
+parameter (spaces allowed, never CR/LF/NUL or other controls).
+-}
+setPass : String -> String -> Maybe String
+setPass current new =
+    let
+        control c =
+            Char.toCode c < 32 || Char.toCode c == 127
+    in
+    if String.isEmpty current || String.isEmpty new then
+        Nothing
+
+    else if String.startsWith ":" current || String.any (\c -> c == ' ' || control c) current then
+        Nothing
+
+    else if String.any control new then
+        Nothing
+
+    else
+        Just ("SETPASS " ++ current ++ " :" ++ new ++ "\r\n")
+
+
 saslInfo : String
 saslInfo =
     Wire.formatIrcLine "SASLINFO" []
@@ -976,11 +1003,16 @@ memo sub args =
                         "DEL" ->
                             buildSub "MEMO" "IGNORE" [ Just "DEL", wireToken account ]
 
-                        "LIST" ->
-                            buildSub "MEMO" "IGNORE" [ Just "LIST", wireToken account ]
-
                         _ ->
                             Nothing
+
+                -- v3/gap-usermodes: `MEMO IGNORE LIST` takes no account.
+                [ op ] ->
+                    if String.toUpper op == "LIST" then
+                        Just (Wire.formatIrcLine "MEMO" [ "IGNORE", "LIST" ])
+
+                    else
+                        Nothing
 
                 _ ->
                     Nothing
@@ -1008,8 +1040,10 @@ memo sub args =
                     Nothing
 
         "OFF" ->
+            -- v3/gap-usermodes: the server has no `MEMO OFF`; forwarding
+            -- stops with `MEMO FORWARD OFF` (`handleMemo`).
             if List.isEmpty args then
-                Just (Wire.formatIrcLine "MEMO" [ "OFF" ])
+                Just (Wire.formatIrcLine "MEMO" [ "FORWARD", "OFF" ])
 
             else
                 Nothing
@@ -1424,27 +1458,34 @@ guardEmpty args line =
         Nothing
 
 
+{-| `SILENCE +mask` / `SILENCE -mask` — v3/gap-usermodes: the sign is
+glued to the mask (`silence.zig` `parseOperationWith`); the old
+`SILENCE + mask` form was a 461 on the Onyx Server.
+-}
 silenceEntry : String -> String -> Maybe String
 silenceEntry op mask =
-    case String.toUpper op of
-        "+" ->
-            build "SILENCE" [ Just "+", wireText mask ]
+    case ( op, wireToken mask ) of
+        ( "+", Just m ) ->
+            Just (Wire.formatIrcLine "SILENCE" [ "+" ++ m ])
 
-        "-" ->
-            build "SILENCE" [ Just "-", wireText mask ]
+        ( "-", Just m ) ->
+            Just (Wire.formatIrcLine "SILENCE" [ "-" ++ m ])
 
         _ ->
             Nothing
 
 
+{-| `ACCEPT +nick` / `ACCEPT -nick` — v3/gap-usermodes: the sign is glued
+to the nick (`accept_list.zig` `parseOne`).
+-}
 acceptEntry : String -> String -> Maybe String
 acceptEntry op nick =
-    case String.toUpper op of
-        "+" ->
-            build "ACCEPT" [ Just "+", normalizeNick nick ]
+    case ( op, normalizeNick nick ) of
+        ( "+", Just n ) ->
+            Just (Wire.formatIrcLine "ACCEPT" [ "+" ++ n ])
 
-        "-" ->
-            build "ACCEPT" [ Just "-", normalizeNick nick ]
+        ( "-", Just n ) ->
+            Just (Wire.formatIrcLine "ACCEPT" [ "-" ++ n ])
 
         _ ->
             Nothing

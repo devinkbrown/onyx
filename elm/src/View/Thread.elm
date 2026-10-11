@@ -6,6 +6,7 @@ channel, newest last.
 
 import App exposing (Model, Msg(..))
 import Avatar
+import BlockKit -- v3/gap-import
 import Dict
 import Emoji
 import GapConvo
@@ -25,7 +26,9 @@ import Translate
 -- v3/transcript
 import TranscriptRows
 import Upload
+import View.BlockKit as BlockKitView -- v3/gap-import
 import View.DmSafety
+import View.GapCommands
 import View.Home
 import View.Icon exposing (icon)
 import View.MessageText exposing (messageText)
@@ -33,6 +36,9 @@ import View.MessageText exposing (messageText)
 import View.CallStage
 -- v3/calls-c11
 import View.StageMode
+import View.Organize -- v3/gap-organize
+-- v3/gap-watch
+import View.WatchTogether
 import View.Sheet as Sheet
 
 
@@ -51,6 +57,15 @@ thread model =
           case model.activeChannel of
             Just target ->
                 View.CallStage.roomCallSurface model target
+
+            Nothing ->
+                text ""
+        , -- v3/gap-watch: the room's watch-together card (self-gates on the
+          -- preference and the room's `ocean.watch` value); sticky above
+          -- the transcript
+          case model.activeChannel of
+            Just target ->
+                View.WatchTogether.card model target
 
             Nothing ->
                 text ""
@@ -294,9 +309,17 @@ rowNode model target rv m =
 
                 else
                     ""
+
+            -- v3/rx-convo: rows we edited on this device carry their
+            -- local revision trail (roadmap 2.9), so they render eagerly.
+            revisions =
+                editRevisions model m
         in
-        if TranscriptRows.needsRichRow { body = App.displayBody m, menuOpen = rowPopoverOpen model target m || gapRevisionsShown model m } then
-            richRow model target rv.flags title m
+        if
+            TranscriptRows.needsRichRow { body = App.displayBody m, menuOpen = rowPopoverOpen model target m }
+                || not (List.isEmpty revisions)
+        then
+            richRow model target rv.flags title revisions m
 
         else
             Html.Lazy.lazy7 quietRow target model.zone model.prefs model.ourNick title (TranscriptRows.flagsToBits rv.flags) m
@@ -340,7 +363,7 @@ type alias RowCtx =
     , editTitle : String
     , flags : TranscriptRows.RowFlags
     , active : Bool
-    , revisionsOpen : Bool -- v3/gap-convo
+    , revisions : List App.EditRevision
     }
 
 
@@ -356,7 +379,7 @@ quietRow target zone prefs ourNick title bits m =
             Upload.extractAttachmentPresentation (App.displayBody m)
     in
     rowShell
-        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags, active = False, revisionsOpen = False }
+        { target = target, zone = zone, prefs = prefs, ourNick = ourNick, editTitle = title, flags = flags, active = False, revisions = [] }
         ((case m.replyTo of
             Just ref ->
                 [ replyContext ref ]
@@ -373,15 +396,14 @@ quietRow target zone prefs ourNick title bits m =
 
 {-| Eager row (link previews, media, open menu / picker).
 -}
-richRow : Model -> String -> TranscriptRows.RowFlags -> String -> App.ChatMessage -> Html Msg
-richRow model target flags title m =
+richRow : Model -> String -> TranscriptRows.RowFlags -> String -> List App.EditRevision -> App.ChatMessage -> Html Msg
+richRow model target flags title revisions m =
     rowShell
-        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m, revisionsOpen = gapRevisionsShown model m }
-        (messageBody model m)
+        { target = target, zone = model.zone, prefs = model.prefs, ourNick = model.ourNick, editTitle = title, flags = flags, active = rowPopoverOpen model target m, revisions = revisions }
+        (messageBody model target m)
         (messageMenuButton model target m)
         [ messageMenuPanel model target m
         , reactionPickerPanel model target m
-        , gapRevisionsPanel model m -- v3/gap-convo
         ]
         m
 
@@ -498,6 +520,11 @@ rowShell ctx body menuButton panels m =
         withdrawn =
             m.deleted || m.redacted
 
+        -- v3/gap-commands: an action (`/me`) row reads `* nick waves`
+        -- on one line, with no avatar or name header of its own.
+        isAction =
+            App.messageAction m /= Nothing
+
         clock =
             if m.at <= 0 then
                 text ""
@@ -507,14 +534,14 @@ rowShell ctx body menuButton panels m =
                     [ text (App.formatRowClock ctx.zone ctx.prefs.clock m.at) ]
 
         sender =
-            if cont then
+            if cont || isAction then
                 text ""
 
             else
                 strong [ class "onyx-sender", style "color" (Avatar.nickTint m.from) ] [ text m.from ]
 
         audience =
-            if cont then
+            if cont || isAction then
                 text ""
 
             else
@@ -530,7 +557,7 @@ rowShell ctx body menuButton panels m =
                             [ text (App.audienceLabel m.audience) ]
 
         avatar =
-            if cont || flags.compact then
+            if cont || flags.compact || isAction then
                 text ""
 
             else
@@ -559,7 +586,8 @@ rowShell ctx body menuButton panels m =
         ([ classList
             [ ( "onyx-message", True )
             , ( "onyx-message--compact", flags.compact )
-            , ( "onyx-continuation", cont )
+            , ( "onyx-continuation", cont || isAction )
+            , ( "onyx-message--action", isAction ) -- v3/gap-commands
             , ( "onyx-whisper", m.whisper )
             , ( "onyx-locked", App.messageLocked m )
             , ( "onyx-pending", m.outboxId /= Nothing || m.pending )
@@ -583,7 +611,12 @@ rowShell ctx body menuButton panels m =
         )
         (lead
             ++ [ span [ class "onyx-body" ]
-                    (body
+                    ((if isAction then
+                        View.GapCommands.actionLead m.from :: body
+
+                      else
+                        body
+                     )
                         ++ [ if m.outboxId == Nothing && not m.pending then
                                 text ""
 
@@ -593,8 +626,7 @@ rowShell ctx body menuButton panels m =
                              else
                                 span [ class "onyx-pending-note" ] [ text " · queued" ]
                            , if m.edited && not withdrawn then
-                                -- v3/gap-convo: with earlier versions on file the marker discloses them
-                                gapEditedMarker ctx.editTitle ctx.revisionsOpen m
+                                editedMarker ctx m
 
                              else
                                 text ""
@@ -773,6 +805,11 @@ threadPanelDialog model =
                                 Nothing ->
                                     []
                     in
+                    -- v3/rx-convo: on wide layouts (css/pol-thread.css §14)
+                    -- the sheet docks as a right-hand pane in the context
+                    -- column, beside a transcript that stays live, so the
+                    -- dialog is never `aria-modal`; phones and tablets in
+                    -- portrait still get the sheet (bottom / side).
                     Sheet.view
                         { scope = "thread"
                         , label = Sheet.Labelled "Thread"
@@ -782,7 +819,7 @@ threadPanelDialog model =
                         , panelClass = "onyx-thread-sheet"
                         , backdropClass = "onyx-thread-backdrop"
                         , layerAttrs = []
-                        , modal = True
+                        , modal = False
                         , attrs = []
                         }
                             [ div [ class "onyx-thread-head" ]
@@ -824,7 +861,7 @@ threadPanelDialog model =
                                             , time [ datetime (App.millisToIso (toFloat par.at)), attribute "aria-hidden" "true" ]
                                                 [ text (App.formatRowClock model.zone model.prefs.clock par.at) ]
                                             ]
-                                        , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody par) ]
+                                        , threadMsgText model par
                                         ]
                             , if parent == Nothing then
                                 text ""
@@ -864,7 +901,7 @@ threadPanelDialog model =
                                                         , time [ datetime (App.millisToIso (toFloat msg.at)), attribute "aria-hidden" "true" ]
                                                             [ text (App.formatRowClock model.zone model.prefs.clock msg.at) ]
                                                         ]
-                                                    , p [ class "onyx-thread-msg-text" ] [ text (App.displayBody msg) ]
+                                                    , threadMsgText model msg
                                                     ]
                                             )
                                             (List.reverse replies)
@@ -893,6 +930,22 @@ threadPanelDialog model =
                                 Nothing ->
                                     text ""
                             ]
+
+
+{-| v3/rx-convo — a thread row's body: the same rich text the
+transcript paints (links, mentions, code), with `[file]` receipts as
+download chips (no inline media in the narrow pane).
+-}
+threadMsgText : Model -> App.ChatMessage -> Html Msg
+threadMsgText model msg =
+    let
+        presented =
+            Upload.extractAttachmentPresentation (App.displayBody msg)
+    in
+    div [ class "onyx-thread-msg-text" ]
+        (messageText model.ourNick presented.caption
+            :: List.map fileChip presented.attachments
+        )
 
 
 {-| A thread row's face (the transcript's small avatar, decorative —
@@ -1776,6 +1829,7 @@ messageMenuPanel model target m =
 
                                   else
                                     Nothing
+                                , View.Organize.bookmarkMenuItem model target m msgid -- v3/gap-organize
                                 , if caps.canIgnore then
                                     let
                                         nick =
@@ -2175,6 +2229,84 @@ editTitle model m =
                     "Edited (" ++ String.fromInt (List.length revs) ++ " revisions)"
 
 
+{-| v3/rx-convo — the local revision trail for an edited row (prior
+bodies of messages we edited on this device, `App.recordEdit`).
+Withdrawn rows never show one.
+-}
+editRevisions : Model -> App.ChatMessage -> List App.EditRevision
+editRevisions model m =
+    case ( m.edited && not (m.deleted || m.redacted), m.msgid ) of
+        ( True, Just msgid ) ->
+            App.revisionsFor model.editHistory msgid
+
+        _ ->
+            []
+
+
+{-| v3/rx-convo — the "edited" marker (roadmap 2.9, mirroring the
+oracle `EditedMarker`). Without local history it is a quiet label;
+with history it is a native disclosure (`details`: keyboard-operable,
+announced as expanded / collapsed, no model state) whose panel lists
+the earlier versions kept on this device, oldest first, each stamped
+with the time it was replaced.
+-}
+editedMarker : RowCtx -> App.ChatMessage -> Html Msg
+editedMarker ctx m =
+    case ctx.revisions of
+        [] ->
+            span [ class "onyx-edited", attribute "title" ctx.editTitle ] [ text " · edited" ]
+
+        revs ->
+            let
+                count =
+                    List.length revs
+
+                versions =
+                    if count == 1 then
+                        "1 earlier version"
+
+                    else
+                        String.fromInt count ++ " earlier versions"
+
+                panelId =
+                    "onyx-edit-history-" ++ Maybe.withDefault (String.fromInt m.id) m.msgid
+            in
+            Html.node "details"
+                [ class "onyx-edited onyx-edited--history" ]
+                [ Html.node "summary"
+                    [ class "onyx-edited-toggle"
+                    , attribute "aria-label" ("Edited. Show " ++ versions ++ " saved on this device")
+                    , attribute "aria-controls" panelId
+                    , attribute "title" "Show the earlier versions saved on this device"
+                    ]
+                    [ text "· edited" ]
+                , div
+                    [ class "onyx-edit-history"
+                    , id panelId
+                    , attribute "role" "region"
+                    , attribute "aria-label" "Local edit history"
+                    ]
+                    [ p [ class "onyx-edit-history-note" ]
+                        [ icon "clock", span [] [ text "Earlier versions, kept on this device only" ] ]
+                    , Html.ol [ class "onyx-edit-history-list" ]
+                        (List.map (revisionItem ctx) revs)
+                    ]
+                ]
+
+
+revisionItem : RowCtx -> App.EditRevision -> Html Msg
+revisionItem ctx rev =
+    li [ class "onyx-edit-history-item" ]
+        [ time
+            [ class "onyx-edit-history-ts"
+            , datetime (App.millisToIso (toFloat rev.editedAt))
+            , attribute "title" ("Replaced at " ++ App.formatRowClock ctx.zone ctx.prefs.clock rev.editedAt)
+            ]
+            [ text (App.formatRowClock ctx.zone ctx.prefs.clock rev.editedAt) ]
+        , span [ class "onyx-edit-history-body" ] [ text rev.body ]
+        ]
+
+
 boostBar : String -> Prefs.Preferences -> String -> App.ChatMessage -> Html Msg
 boostBar ourNick prefs target m =
     let
@@ -2268,11 +2400,26 @@ passes, everything else renders a `FileChip` link with
 `target=_blank`, so no `javascript:` href can reach the DOM),
 plus one inline-media unfurl per direct image/video/audio URL,
 plus the first-link OG preview card when fetched. -}
-messageBody : Model -> App.ChatMessage -> List (Html Msg)
-messageBody model m =
+messageBody : Model -> String -> App.ChatMessage -> List (Html Msg)
+messageBody model target m =
     let
-        presented =
+        shown =
             Upload.extractAttachmentPresentation (App.displayBody m)
+
+        -- v3/gap-import: strictly decoded `[onyx:block]` lines leave the
+        -- text and render as structured cards; anything else stays text.
+        kit =
+            BlockKit.extract shown.caption
+
+        presented =
+            { shown | caption = kit.text }
+
+        body =
+            if List.isEmpty kit.blocks then
+                App.displayBody m
+
+            else
+                kit.text
     in
     (case m.replyTo of
         Just ref ->
@@ -2281,10 +2428,16 @@ messageBody model m =
         Nothing ->
             []
     )
-        ++ [ messageText model.ourNick presented.caption ]
+        ++ (if List.isEmpty kit.blocks || not (String.isEmpty (String.trim kit.text)) then
+                [ messageText model.ourNick presented.caption ]
+
+            else
+                []
+           )
+        ++ BlockKitView.cards model { target = target, key = TranscriptRows.rowKey m } kit.blocks
         ++ List.map (attachmentCard model m) presented.attachments
         ++ mediaUnfurls model m presented
-        ++ [ previewCard model m (App.displayBody m) ]
+        ++ [ previewCard model m body ]
 
 
 {-| Reply context line (mirrors the oracle `shell-msg-reply` block:
@@ -2302,7 +2455,7 @@ clippedReplyPreview : String -> String
 clippedReplyPreview text =
     let
         safe =
-            App.sanitizePersistedReplyPreviewText text
+            App.sanitizePersistedReplyPreviewText (BlockKit.summary text)
     in
     if String.length safe > 80 then
         String.left 80 safe ++ "…"
@@ -2491,9 +2644,17 @@ mediaFallback kind url =
 
 {-| Image lightbox dialog (mirrors `MessageImageLightbox`: modal
 dialog with backdrop-click and Save/Close actions; Escape closes it
-via the top-level subscription; the ports bridge mirrors
-`createDialogFocus` (background isolation, scroll lock, Tab trap,
-focus-in on open, return-focus on close). -}
+from the dialog itself and via the top-level subscription; the ports
+bridge mirrors `createDialogFocus` (background isolation, scroll lock,
+Tab trap, focus-in on open, return-focus on close).
+
+v3/rx-convo: the picture zooms from "fit" to its full size (the Zoom
+toggle or a double click / double tap) and then pans inside the
+stage; on touch the layer is a scroll-snap sheet (`.shell-msg-lightbox`
+in css/pol-thread.css: a spacer above the stage), so a swipe down
+carries the picture away and `lightboxSwipeDecoder` closes it once it
+has left the screen. Native pinch-zoom is never blocked.
+-}
 mediaLightboxDialog : Model -> Html Msg
 mediaLightboxDialog model =
     case model.mediaLightbox of
@@ -2501,7 +2662,16 @@ mediaLightboxDialog model =
             text ""
 
         Just url ->
-            div [ class "shell-msg-lightbox", attribute "role" "presentation" ]
+            let
+                zoomed =
+                    model.mediaLightboxZoomed
+            in
+            div
+                [ class "shell-msg-lightbox"
+                , attribute "role" "presentation"
+                , attribute "data-zoomed" (boolToString zoomed)
+                , on "scroll" (lightboxSwipeDecoder App.MediaLightboxClose)
+                ]
                 [ div
                     [ class "shell-msg-lightbox-backdrop"
                     , attribute "aria-hidden" "true"
@@ -2514,31 +2684,117 @@ mediaLightboxDialog model =
                     , attribute "aria-modal" "true"
                     , attribute "aria-label" "Image"
                     , tabindex -1
+                    , Html.Events.preventDefaultOn "keydown" (Decode.map (\close -> ( close, True )) (lightboxEscapeDecoder App.MediaLightboxClose))
                     ]
-                    [ img
-                        [ src url
-                        , attribute "alt" ""
-                        , class "shell-msg-lightbox-img"
-                        , attribute "referrerpolicy" "no-referrer"
+                    [ div
+                        [ class "shell-msg-lightbox-stage"
+                        , onClick App.MediaLightboxClose
                         ]
-                        []
+                        [ img
+                            [ src url
+                            , attribute "alt" ""
+                            , class "shell-msg-lightbox-img"
+                            , attribute "referrerpolicy" "no-referrer"
+                            , attribute "draggable" "false"
+                            , Html.Events.stopPropagationOn "click" (Decode.succeed ( App.MediaLightboxZoom zoomed, True ))
+                            , Html.Events.on "dblclick" (Decode.succeed (App.MediaLightboxZoom (not zoomed)))
+                            ]
+                            []
+                        ]
                     , div [ class "shell-msg-lightbox-actions" ]
                         [ button
                             [ type_ "button"
+                            , class "shell-msg-lightbox-zoom"
+                            , attribute "aria-pressed" (boolToString zoomed)
+                            , attribute "aria-label"
+                                (if zoomed then
+                                    "Fit to screen"
+
+                                 else
+                                    "Show full size"
+                                )
+                            , attribute "title"
+                                (if zoomed then
+                                    "Fit to screen"
+
+                                 else
+                                    "Full size (double-click the picture)"
+                                )
+                            , onClick (App.MediaLightboxZoom (not zoomed))
+                            ]
+                            [ icon
+                                (if zoomed then
+                                    "zoom-out"
+
+                                 else
+                                    "zoom-in"
+                                )
+                            ]
+                        , button
+                            [ type_ "button"
                             , class "shell-msg-lightbox-save"
+                            , attribute "aria-label" "Save image"
+                            , attribute "title" "Save"
                             , onClick (App.MediaSave url)
                             ]
-                            [ text "Save" ]
+                            [ icon "download", span [ class "shell-msg-lightbox-save-label" ] [ text "Save" ] ]
                         , button
                             [ type_ "button"
                             , class "shell-msg-lightbox-close"
                             , attribute "aria-label" "Close"
+                            , attribute "title" "Close (Esc)"
                             , onClick App.MediaLightboxClose
                             ]
                             [ icon "x" ]
                         ]
                     ]
+                , div [ class "shell-msg-lightbox-spacer", attribute "aria-hidden" "true" ] []
                 ]
+
+
+{-| Escape inside the lightbox closes it (IME-claimed events yield). -}
+lightboxEscapeDecoder : Msg -> Decode.Decoder Msg
+lightboxEscapeDecoder close =
+    Decode.map2 Tuple.pair
+        (Decode.oneOf [ Decode.field "isComposing" Decode.bool, Decode.succeed False ])
+        (Decode.field "key" Decode.string)
+        |> Decode.andThen
+            (\( composing, key ) ->
+                if not composing && key == "Escape" then
+                    Decode.succeed close
+
+                else
+                    Decode.fail "not-escape"
+            )
+
+
+{-| Swipe-down-to-close, read from the touch layer's own `scroll`
+event (the `View.Sheet.swipeDismissDecoder` shape: the layer is a
+`column-reverse` scroller, `scrollTop` is 0 with the picture centred
+and reaches `-(scrollHeight - clientHeight)` once it has been dragged
+off screen; only that end position closes, and only the layer's own
+event qualifies).
+-}
+lightboxSwipeDecoder : Msg -> Decode.Decoder Msg
+lightboxSwipeDecoder close =
+    Decode.map4
+        (\cls top height client -> { cls = cls, top = top, height = height, client = client })
+        (Decode.oneOf [ Decode.at [ "target", "className" ] Decode.string, Decode.succeed "" ])
+        (Decode.at [ "target", "scrollTop" ] Decode.float)
+        (Decode.at [ "target", "scrollHeight" ] Decode.float)
+        (Decode.at [ "target", "clientHeight" ] Decode.float)
+        |> Decode.andThen
+            (\l ->
+                let
+                    travel =
+                        l.height - l.client
+                in
+                if l.cls == "shell-msg-lightbox" && travel > 48 && l.top < 0 && negate l.top >= travel - 2 then
+                    Decode.succeed close
+
+                else
+                    Decode.fail "lightbox still open"
+            )
 
 
 {-| First-link OG card (mirrors `LinkPreviewCard`: preference-gated,
@@ -2802,75 +3058,6 @@ gapCollapsedBanner model channel =
                     ]
                     [ text "Show all" ]
                 ]
-
-
-gapRevisionsShown : Model -> App.ChatMessage -> Bool
-gapRevisionsShown model m =
-    m.msgid /= Nothing && model.gapConvo.revisionsOpen == m.msgid
-
-
-{-| The edited marker: a disclosure when this device holds earlier
-versions (the revision count rides in the title), plain text otherwise. -}
-gapEditedMarker : String -> Bool -> App.ChatMessage -> Html Msg
-gapEditedMarker title open m =
-    case m.msgid of
-        Just msgid ->
-            if title /= "Edited" then
-                button
-                    [ type_ "button"
-                    , class "onyx-edited gap-edited-toggle"
-                    , attribute "title" title
-                    , attribute "aria-expanded"
-                        (if open then
-                            "true"
-
-                         else
-                            "false"
-                        )
-                    , attribute "aria-label" (title ++ " — show earlier versions")
-                    , tabindex -1
-                    , onClick (App.GapConvoMsg (GapConvo.RevisionsToggle msgid))
-                    ]
-                    [ text " · edited" ]
-
-            else
-                span [ class "onyx-edited", attribute "title" title ] [ text " · edited" ]
-
-        Nothing ->
-            span [ class "onyx-edited", attribute "title" title ] [ text " · edited" ]
-
-
-{-| Earlier versions of one message kept on this device (newest first). -}
-gapRevisionsPanel : Model -> App.ChatMessage -> Html Msg
-gapRevisionsPanel model m =
-    case m.msgid of
-        Just msgid ->
-            if model.gapConvo.revisionsOpen == Just msgid then
-                case List.reverse (App.revisionsFor model.editHistory msgid) of
-                    [] ->
-                        text ""
-
-                    revs ->
-                        div [ class "gap-revisions", attribute "role" "region", attribute "aria-label" "Earlier versions" ]
-                            [ p [ class "gap-revisions-title" ] [ text "Earlier versions · kept on this device" ]
-                            , ul [ class "gap-revisions-list" ]
-                                (List.map
-                                    (\rev ->
-                                        li [ class "gap-revision" ]
-                                            [ time [ class "gap-revision-time", datetime (App.millisToIso (toFloat rev.editedAt)) ]
-                                                [ text ("Before " ++ App.formatRowClock model.zone model.prefs.clock rev.editedAt) ]
-                                            , span [ class "gap-revision-body" ] [ text rev.body ]
-                                            ]
-                                    )
-                                    revs
-                                )
-                            ]
-
-            else
-                text ""
-
-        Nothing ->
-            text ""
 
 
 {-| An open conversation with no rows yet while CHATHISTORY is in

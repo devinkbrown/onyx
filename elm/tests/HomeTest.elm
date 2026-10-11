@@ -12,6 +12,7 @@ import App exposing (..)
 import Dict
 import Expect
 import Home exposing (Kind(..))
+import Organizer
 import Html
 import Html.Attributes
 import Test exposing (Test, describe, test)
@@ -303,15 +304,17 @@ suite =
                                 >> Event.simulate Event.click
                                 >> Event.expect (InviteShareOpen "")
                             ]
-            , test "busy Home lists mentions and unread, opening via ChannelSelect" <|
+            , test "busy Home lists mentions and unread, opening at the first unread line" <|
                 \_ ->
                     home busy
                         |> Expect.all
                             [ Query.has [ Selector.text "What did you miss?" ]
                             , Query.has [ Selector.text "Welcome to Onyx, kai" ]
-                            , Query.find [ Selector.attribute (Html.Attributes.attribute "aria-label" "Open #news, 4 unread") ]
+                            , -- v3/gap-organize: the row opens the room AND lands on its
+                              -- first unread line (`DigestJump` = ChannelSelect + focus)
+                              Query.find [ Selector.attribute (Html.Attributes.attribute "aria-label" "Open #news, 4 unread") ]
                                 >> Event.simulate Event.click
-                                >> Event.expect (ChannelSelect "#news")
+                                >> Event.expect (OrganizeMsg (Organizer.DigestJump "#news"))
                             , Query.has [ Selector.attribute (Html.Attributes.attribute "aria-label" "Open #lounge, 2 unread, 1 mention") ]
                             , Query.has [ Selector.attribute (Html.Attributes.attribute "aria-label" "Open mira, 3 unread") ]
                             , Query.find [ Selector.attribute (Html.Attributes.attribute "data-testid" "home-mark-caught-up") ]

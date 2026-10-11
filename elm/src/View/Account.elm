@@ -20,11 +20,15 @@ import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxl
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
+import AuthGate -- v3/gap-auth
 import Push
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
+import View.GapAccount
+import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
+import View.UserModes
 
 
 accountPanel : Model -> Html Msg
@@ -63,6 +67,8 @@ accountPanel model =
                         div [ class "onyx-account-body" ]
                             [ sectionNav
                             , overviewSection model
+                            , -- v3/gap-usermodes
+                              View.UserModes.autojoinSection model
                             , securitySection model
                             , certSection model
                             , keytransSection model
@@ -70,12 +76,16 @@ accountPanel model =
                             , personasSection model
                             , emailSection model
                             , passwordSection model
+                            , -- v3/gap-account
+                              View.GapAccount.protectionSection model
+                            , View.GapAccount.namesSection model
                             , recoverySection model
                             , passkeysSection model
                             , devicesSection model
                             , -- v3/account2
                               View.Account2.portableSection model
                             , sessionSection model
+                            , View.Chanserv.myRoomsSection model -- v3/gap-chanserv
                             , capsSection model
                             , retentionSection model
                             , dataSection model
@@ -86,7 +96,8 @@ accountPanel model =
 sectionNav : Html Msg
 sectionNav =
     nav [ class "onyx-account-nav", attribute "aria-label" "Account sections" ]
-        [ a [ class "onyx-account-nav__item", href "#acct-identity" ] [ text "Overview" ]
+        ([ a [ class "onyx-account-nav__item", href "#acct-identity" ] [ text "Overview" ]
+        , View.UserModes.autojoinNavItem -- v3/gap-usermodes
         , a [ class "onyx-account-nav__item", href "#acct-two-factor-authentication-title" ] [ text "Security" ]
         , a [ class "onyx-account-nav__item", href "#acct-certificates-title" ] [ text "Certificates" ]
         , a [ class "onyx-account-nav__item", href "#acct-transparency-title" ] [ text "Transparency" ]
@@ -94,7 +105,10 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-personas-title" ] [ text "Personas" ]
         , a [ class "onyx-account-nav__item", href "#acct-email-title" ] [ text "Email" ]
         , a [ class "onyx-account-nav__item", href "#acct-password-title" ] [ text "Password" ]
-        , a [ class "onyx-account-nav__item", href "#acct-recovery-title" ] [ text "Recovery" ]
+        ]
+            ++ -- v3/gap-account
+               View.GapAccount.accountNavLinks
+            ++ [ a [ class "onyx-account-nav__item", href "#acct-recovery-title" ] [ text "Recovery" ]
         , a [ class "onyx-account-nav__item", href "#acct-passkeys-title" ] [ text "Passkeys" ]
         , a [ class "onyx-account-nav__item", href "#acct-sessions-title" ] [ text "Devices" ]
         , a [ class "onyx-account-nav__item", href "#acct-portable-title" ] [ text "Residence" ]
@@ -102,7 +116,8 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-caps-title" ] [ text "Capabilities" ]
         , a [ class "onyx-account-nav__item", href "#acct-history-title" ] [ text "History" ]
         , a [ class "onyx-account-nav__item", href "#acct-download-store-title" ] [ text "Data" ]
-        ]
+               ]
+        )
 
 
 overviewSection : Model -> Html Msg
@@ -1027,10 +1042,20 @@ emailError model =
 
 passwordSection : Model -> Html Msg
 passwordSection model =
+    let
+        -- v3/gap-auth: SETPASS in flight / confirmed.
+        pending =
+            case model.authGate.setPass of
+                AuthGate.SetPassPending _ ->
+                    True
+
+                _ ->
+                    False
+    in
     section [ class "onyx-account-section", id "acct-password-title" ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Password" ]
          , p [ class "onyx-account-hint" ]
-            [ text "Choose a new password. You'll need your current one to confirm." ]
+            [ text "Choose a new password of 8 to 512 characters. You'll need your current one to confirm." ]
          , form
             [ class "onyx-account-password"
             , onSubmit AccountPasswordSubmitted
@@ -1045,6 +1070,7 @@ passwordSection model =
                 , value model.accountNewPassword
                 , onInput AccountNewPasswordInput
                 , placeholder "new password"
+                , attribute "autocomplete" "new-password"
                 , attribute "data-testid" "account-new-password"
                 ]
                 []
@@ -1057,6 +1083,7 @@ passwordSection model =
                 , value model.accountConfirmPassword
                 , onInput AccountConfirmPasswordInput
                 , placeholder "repeat new password"
+                , attribute "autocomplete" "new-password"
                 , attribute "data-testid" "account-confirm-password"
                 ]
                 []
@@ -1069,6 +1096,7 @@ passwordSection model =
                 , value model.accountCurrentPassword
                 , onInput AccountCurrentPasswordInput
                 , placeholder "current password"
+                , attribute "autocomplete" "current-password"
                 , attribute "data-testid" "account-current-password"
                 ]
                 []
@@ -1077,16 +1105,37 @@ passwordSection model =
                 , class "onyx-account-password-save"
                 , attribute "data-testid" "account-password-save"
                 , disabled
-                    (String.isEmpty model.accountNewPassword
+                    (pending
+                        || String.isEmpty model.accountNewPassword
                         || String.isEmpty model.accountConfirmPassword
                         || String.isEmpty model.accountCurrentPassword
                     )
                 ]
-                [ text "Change password" ]
+                [ text
+                    (if pending then
+                        "Changing…"
+
+                     else
+                        "Change password"
+                    )
+                ]
             ]
          ]
             ++ passwordError model
+            ++ passwordChanged model
         )
+
+
+{-| v3/gap-auth — the server confirmed the SETPASS. -}
+passwordChanged : Model -> List (Html Msg)
+passwordChanged model =
+    if model.authGate.setPass == AuthGate.SetPassDone then
+        [ p [ class "onyx-account-passkey-ok", attribute "role" "status", attribute "data-testid" "account-password-changed" ]
+            [ text "Password changed. Use your new password the next time you sign in." ]
+        ]
+
+    else
+        []
 
 
 passwordError : Model -> List (Html Msg)
@@ -1273,6 +1322,13 @@ passkeysSection model =
         [ h3 [ class "onyx-account-section__title" ] [ text "Passkeys" ]
         , p [ class "onyx-account-hint" ]
             [ text "Sign in without a password using a device passkey — Face ID, a fingerprint, or a security key." ]
+        , -- v3/gap-auth: WEBAUTHN STATUS
+          case model.passkey.statusText of
+            Just status ->
+                p [ class "onyx-account-hint", attribute "data-testid" "passkeys-status" ] [ text (AuthGate.passkeyStatusCopy status) ]
+
+            Nothing ->
+                text ""
         , passkeysBody model
         ]
 

@@ -1,0 +1,15 @@
+{
+  "guild": { "id": "900000000000000001", "name": "Synthetic Guild" },
+  "channel": { "id": "100000000000000001", "type": "GuildTextChat", "category": "Text", "name": "General Chat", "topic": null },
+  "messages": [
+    { "id": "300000000000000001", "type": "Default", "timestamp": "2024-01-02T10:00:00.000+00:00", "timestampEdited": null, "content": "Morning, synthetic world", "author": { "id": "1", "name": "ana_sample", "nickname": "Ana Sample" }, "attachments": [], "reactions": [] },
+    { "id": "300000000000000002", "type": "Reply", "timestamp": "2024-01-02T10:01:00.000+00:00", "content": "morning!", "author": { "id": "2", "name": "bo_test" }, "reference": { "messageId": "300000000000000001", "channelId": "100000000000000001" } },
+    { "id": "300000000000000003", "type": "ChannelPinnedMessage", "timestamp": "2024-01-02T10:02:00.000+00:00", "content": "pinned a message", "author": { "id": "2", "name": "bo_test" } },
+    { "id": "300000000000000004", "type": "Default", "timestamp": "2024-01-02T10:03:00.000+00:00", "content": "screenshot attached", "author": { "id": "1", "name": "ana_sample" }, "attachments": [ { "url": "https://cdn.example.test/a.png", "fileName": "a.png" }, { "url": "javascript:alert(1)" }, { "url": "https://user:pw@evil.example.test/x" } ] },
+    { "id": "300000000000000005", "type": "Default", "timestamp": "2024-01-02T10:04:00.000+00:00", "content": "", "author": { "id": "3", "name": "cy" }, "attachments": [] },
+    { "id": "300000000000000006", "type": "Default", "timestamp": "2024-01-02T10:05:00.000+00:00", "content": "ONYXDM1 not-really-ciphertext", "author": { "id": "3", "name": "cy" } },
+    { "id": "300000000000000007", "type": "Default", "timestamp": "not a date", "content": "bad time", "author": { "id": "3", "name": "cy" } },
+    { "id": "300000000000000008", "type": "Default", "timestamp": "2024-01-02T10:06:00.000+00:00", "content": "tab\tand bell\u0007 and ‮reversed", "author": { "id": "3", "name": "cy" } },
+    "not an object"
+  ]
+}

@@ -32,6 +32,8 @@ module CallUi exposing
     , levelWord
     , mediaPathCopy
     , nameList
+    , needsAccount -- v3/rx-calls
+    , guestTitle -- v3/rx-calls
     , peopleLabel
     , personAria
     , privacyTitle
@@ -359,11 +361,16 @@ chipTitle names status =
 type Banner
     = BannerInvite Int
     | BannerFailed
+      -- v3/rx-calls: a guest (no account) — calls need one
+    | BannerGuest Int
 
 
 {-| Pre-join banner (§2.3). At most one shows: the failed banner for
 the room whose last join failed, else the invite while you are idle
 and someone is in voice (unless hidden for this room this session).
+v3/rx-calls: a guest gets the sign-in variant instead of the invite,
+and also right after pressing Call / Join (the join itself never goes
+out without an account).
 -}
 bannerFor :
     { a
@@ -372,6 +379,7 @@ bannerFor :
         , callBannerDismissed : Set String
         , callJoinTarget : Maybe String
         , callRejoin : Maybe String
+        , accountName : Maybe String
     }
     -> String
     -> Maybe Banner
@@ -390,11 +398,39 @@ bannerFor model room =
         -- v3/calls-c6: a dropped call offers the same rejoin banner
         Just BannerFailed
 
-    else if count > 0 && not (Set.member (String.toLower room) model.callBannerDismissed) then
+    else if Set.member (String.toLower room) model.callBannerDismissed then
+        Nothing
+
+    else if model.accountName == Nothing then
+        -- v3/rx-calls
+        if count > 0 || sameTarget model.callJoinTarget room then
+            Just (BannerGuest count)
+
+        else
+            Nothing
+
+    else if count > 0 then
         Just (BannerInvite count)
 
     else
         Nothing
+
+
+{-| v3/rx-calls — calls are end-to-end encrypted and need an Onyx
+account; a guest is offered one instead of a join that would fail. -}
+needsAccount : { a | accountName : Maybe String } -> Bool
+needsAccount model =
+    model.accountName == Nothing
+
+
+{-| v3/rx-calls — the guest banner's title. -}
+guestTitle : Int -> String
+guestTitle count =
+    if count == 0 then
+        "Sign in to join calls"
+
+    else
+        inviteTitle count ++ " Sign in to join."
 
 
 {-| "{n} person is|people are in voice." (new copy). -}

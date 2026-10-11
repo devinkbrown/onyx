@@ -44,6 +44,9 @@ import Set
 import Stats
 import Stewardship
 import Time
+import View.Chanserv -- v3/gap-chanserv
+import View.RoomTools -- v3/gap-people
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -111,12 +114,18 @@ roomSettingsSheet model =
                 , contextLine ctx
                 , topicSection model ctx room
                 , notifySection model room
+                , View.Chanserv.paceSection model ctx room -- v3/gap-chanserv
+                -- v3/gap-people
+                , sectionWith "export" "Export transcript" [ View.RoomTools.transcriptExport model room.name ]
+                , View.Organize.roomSettingsSection model room.name -- v3/gap-organize
                 , details [ class "rset-advanced" ]
                     [ summary [] [ text "Advanced" ]
-                    , p [ class "rset-hint" ] [ text "Room rules, roles, insights, and integrations. Everyday alerts stay above." ]
+                    , p [ class "rset-hint" ] [ text "Room rules, roles, registration, insights, and integrations. Everyday alerts stay above." ]
                     , rulesSection model ctx room
+                    , View.Chanserv.listsSection model ctx room -- v3/gap-chanserv
                     , retentionSection model ctx room
                     , rolesSection model ctx room
+                    , View.Chanserv.registrationSection model ctx room -- v3/gap-chanserv
                     , encryptionSection model ctx room
                     , historySection model ctx room
                     , sectionWith "insights" "Public insights" [ insightsStrip model room.name ]
@@ -156,7 +165,7 @@ contextLine ctx =
 notPorted : Html Msg
 notPorted =
     p [ class "rset-hint rset-footnote", attribute "data-testid" "chset-not-ported" ]
-        [ text "Invite links live on the room header (Invite friends). Transcript export, hide and leave are not in this sheet yet." ]
+        [ text "Invite links live on the room header (Invite friends). Leave is not in this sheet yet." ]
 
 
 sectionWith : String -> String -> List (Html Msg) -> Html Msg
@@ -370,6 +379,7 @@ rulesSection model ctx room =
                 , p [ id "chset-limit-hint", class "rset-hint" ] [ text "Maximum people allowed. Leave blank to remove." ]
                 , applyButton "chset-limit-apply" "Apply limit" (not ctx.connected)
                 ]
+            , View.Chanserv.moreRules model ctx room -- v3/gap-chanserv
             ]
 
 
@@ -728,39 +738,27 @@ historySection model ctx room =
 
 
 
--- Integrations (bridge status + webhooks via Room care)
+-- Integrations (bridge status + webhooks)
 
 
 integrationsSection : Model -> RoomSettings.Ctx -> RoomSettings.Room -> Html Msg
 integrationsSection model ctx room =
-    let
-        careBand =
-            Stewardship.isConsumerStewardshipRoom (Stewardship.memberCount (App.stewardMembersOf model room.name))
-    in
     sectionWith "integrations" "Integrations" <|
         [ div [ class "rset-readonly" ]
             [ p [ class "rset-readonly-label" ] [ text "Bridge status" ]
             , bridgeBadgeFull (RoomSettings.bridgeStatusOf room.props)
             ]
-        , div [ class "rset-readonly", attribute "data-testid" "chset-webhooks" ]
-            ([ p [ class "rset-readonly-label" ] [ text "Incoming webhooks" ] ]
-                ++ (if ctx.isOp && careBand then
-                        [ p [ class "rset-hint" ] [ text "Discord-compatible webhook URLs are managed in Room care." ]
-                        , button
-                            [ type_ "button"
-                            , class "rset-btn"
-                            , attribute "data-testid" "chset-webhooks-open"
-                            , onClick (StewardOpen room.name)
-                            ]
-                            [ text "Open Room care" ]
-                        ]
+        , -- v3/gap-people: every room host manages webhooks here, in
+          -- any room size (the server gates WEBHOOK on channel op).
+          if ctx.isOp then
+            View.RoomTools.webhookManager model room.name
 
-                    else
-                        [ p [ class "rset-readonly-value" ] [ text "Managed by room hosts." ]
-                        , p [ class "rset-hint" ] [ text "Discord-compatible webhook URLs can post into this room." ]
-                        ]
-                   )
-            )
+          else
+            div [ class "rset-readonly", attribute "data-testid" "chset-webhooks" ]
+                [ p [ class "rset-readonly-label" ] [ text "Incoming webhooks" ]
+                , p [ class "rset-readonly-value" ] [ text "Managed by room hosts." ]
+                , p [ class "rset-hint" ] [ text "Discord-compatible webhook URLs can post into this room." ]
+                ]
         ]
 
 

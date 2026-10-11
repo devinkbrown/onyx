@@ -209,8 +209,8 @@ categoryVectors =
         [ test "shows one selected category pane, Display first, with the Appearance launcher" <|
             \_ ->
                 Expect.all
-                    [ \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tab") ] |> Query.count (Expect.equal 5)
-                    , \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tabpanel") ] |> Query.count (Expect.equal 5)
+                    [ \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tab") ] |> Query.count (Expect.equal 6)
+                    , \q -> q |> Query.findAll [ Selector.attribute (attr "role" "tabpanel") ] |> Query.count (Expect.equal 6)
                     , \q ->
                         q
                             |> Query.find [ Selector.id "pref-category-tab-display" ]
@@ -677,7 +677,7 @@ transferVectors =
                 in
                 Expect.equal ( out, pending.prefsTransferStatus, done.prefsTransferStatus )
                     ( [ VaultExportRequest ], Just "Preparing export…", Just "Exported 1 message from 2 conversations." )
-        , test "import opens the existing validated picker" <|
+        , test "import asks the history importer for a portable vault file (review follows)" <|
             \_ ->
-                Expect.equal (Tuple.second (update PrefsVaultImport opened)) [ VaultImportPick ]
+                Expect.equal (Tuple.second (update PrefsVaultImport opened)) [ HistoryImportPick { job = 1, kind = "portable" } ]
         ]

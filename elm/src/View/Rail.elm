@@ -1,4 +1,4 @@
-module View.Rail exposing (rail)
+module View.Rail exposing (rail, railMenu)
 
 {-| Sectioned conversation sidebar (mirroring `shell/ChannelSidebar.tsx`):
 a filter (query + unread-only + clear), Favorites (starred rooms with a
@@ -16,17 +16,30 @@ v3/ui-mobile-shell — Rooms and Messages are separate collections
 sections (Home shows both). Every section stays in the DOM; CSS hides
 the other collection. On desktop this is the 280px collection sidebar
 (dense single-line room rows, DM rows with their preview); under
-768px it is the full-screen Rooms / Messages page (64px rows with a
+600px (v3/rx-shell; was 768px) it is the full-screen Rooms / Messages page (64px rows with a
 room tile or a face, the topic / preview line, time and badge, a
 16px search field so iOS never zooms).
+
+v3/rx-shell — every row has an overflow control (`sidebar-row-more`:
+a quiet `…` on hover / focus with a fine pointer, always shown on
+touch) and answers a context menu (right-click, Android long-press)
+with the same row menu (`railMenu`, mounted with the overlays): for a
+room Favorite, Mark as read, Notifications and Leave (through the
+shared Leave confirm of `View.GapShell`); the organize entries of
+v3/gap-organize (Move to folder, Hide / Close) sit in the same menu;
+for a DM Mark as read and Mute. Pointer opens anchor the menu at the
+pointer on wide screens; keyboard opens and phones get a centred / bottom sheet. Empty
+Rooms / Messages collections say what they are for and offer the next
+step (Browse rooms / Start a room; New message).
 -}
 
 import App exposing (Channel, Model, Msg(..))
 import Avatar
 import Dict
+import GapShell
 import Html exposing (Html, button, div, h2, input, label, li, p, section, span, text, ul)
-import Html.Attributes exposing (attribute, class, classList, for, id, placeholder, style, tabindex, type_, value)
-import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, style, tabindex, type_, value)
+import Html.Events exposing (on, onClick, onInput, preventDefaultOn)
 import Json.Decode as Decode
 import Nav
 import Set
@@ -34,6 +47,12 @@ import Sidebar
 -- v3/calls-c1
 import View.Account2
 import View.CallPresence
+-- v3/rx-shell
+import View.Notify
+import View.Sheet as Sheet
+-- v3/gap-organize
+import View.Organize
+import View.GapShell -- v3/gap-shell
 
 
 {-| Which collection the sidebar shows. -}
@@ -60,7 +79,8 @@ rail model =
                 , query = model.sidebarFilter
                 , unreadOnly = model.sidebarUnreadOnly
                 }
-                (Dict.values model.channels)
+                -- v3/gap-organize: hidden rooms + closed DMs step out
+                (View.Organize.listed model (Dict.values model.channels))
 
         canStar =
             App.deviceMemoryOwner model /= Nothing
@@ -111,17 +131,18 @@ rail model =
                         ]
                     ]
                )
+            -- v3/gap-organize: room folders sit between Favorites and Rooms
+            ++ View.Organize.folderSections model (roomRow model canStar) derived.rooms
             ++ [ div [ class "onyx-rail-section onyx-rail-section--rooms", attribute "data-testid" "sidebar-channels" ]
                     [ p [ class "onyx-rail-label", id "sidebar-channels-label" ] [ text "Rooms" ]
                     , ul [ attribute "role" "list", attribute "aria-label" "Joined rooms" ]
                         (if List.isEmpty derived.rooms && derived.roomsJoined == 0 then
-                            [ li [ class "onyx-rail-zero" ]
-                                [ p [ class "onyx-rail-empty" ] [ text "No rooms yet. Browse rooms to join one." ] ]
-                            ]
+                            [ li [ class "onyx-rail-zero" ] [ emptyRooms (which == "rooms") ] ]
 
                          else
-                            List.map (roomRow model canStar) derived.rooms
+                            List.map (roomRow model canStar) (View.Organize.unfiledRooms model derived.rooms)
                         )
+                    , View.Organize.hiddenFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-section onyx-rail-section--dms", attribute "data-testid" "sidebar-dms" ]
                     [ div [ class "onyx-rail-section-heading" ]
@@ -134,11 +155,12 @@ rail model =
                             newConversation
                         ]
                     , if List.isEmpty derived.dms then
-                        p [ class "onyx-rail-empty" ] [ text "No messages yet. Open a person to start one." ]
+                        emptyMessages (which == "messages")
 
                       else
                         ul [ attribute "role" "list", attribute "aria-labelledby" "sidebar-dms-label" ]
                             (List.map (dmRow model) derived.dms)
+                    , View.Organize.closedFooter model -- v3/gap-organize
                     ]
                , div [ class "onyx-rail-foot", attribute "role" "group", attribute "aria-label" "Find or start a room" ]
                     [ button
@@ -160,8 +182,68 @@ rail model =
                         , text "Start a room"
                         ]
                     ]
+               , View.GapShell.railExtras model -- v3/gap-shell
                ]
         )
+
+
+{-| v3/rx-shell — the empty Rooms collection: what rooms are, and the
+two ways in. Home (both collections) already offers them, so there it
+is one quiet line. -}
+emptyRooms : Bool -> Html Msg
+emptyRooms full =
+    if not full then
+        p [ class "onyx-rail-empty", attribute "data-testid" "sidebar-rooms-empty" ] [ text "No rooms yet. Browse rooms to join one." ]
+
+    else
+        div [ class "onyx-rail-emptystate", attribute "data-kind" "rooms", attribute "data-testid" "sidebar-rooms-empty" ]
+            [ span [ class "onyx-rail-emptystate-mark", attribute "aria-hidden" "true" ]
+                [ span [ class "onyx-shi", attribute "data-icon" "compass" ] [] ]
+            , p [ class "onyx-rail-emptystate-title" ] [ text "No rooms yet" ]
+            , p [ class "onyx-rail-empty" ] [ text "Rooms are where your people talk. Browse the public ones or start your own." ]
+            , div [ class "onyx-rail-emptystate-actions" ]
+                [ button
+                    [ type_ "button"
+                    , class "onyx-rail-emptystate-go"
+                    , attribute "data-testid" "sidebar-empty-browse"
+                    , onClick App.BrowserOpen
+                    ]
+                    [ text "Browse rooms" ]
+                , button
+                    [ type_ "button"
+                    , class "onyx-rail-emptystate-alt"
+                    , attribute "data-testid" "sidebar-empty-start"
+                    , onClick App.CreateRoomOpen
+                    ]
+                    [ text "Start a room" ]
+                ]
+            ]
+
+
+{-| v3/rx-shell — the empty Messages collection. The full state (with
+its New message action) shows on the Messages page; elsewhere a quiet
+line, since the section heading already carries New. -}
+emptyMessages : Bool -> Html Msg
+emptyMessages full =
+    if full then
+        div [ class "onyx-rail-emptystate", attribute "data-kind" "messages", attribute "data-testid" "sidebar-dms-empty" ]
+            [ span [ class "onyx-rail-emptystate-mark", attribute "aria-hidden" "true" ]
+                [ span [ class "onyx-shi", attribute "data-icon" "compose" ] [] ]
+            , p [ class "onyx-rail-emptystate-title" ] [ text "No messages yet" ]
+            , p [ class "onyx-rail-empty" ] [ text "Private conversations with one person live here. Start one with anyone on Onyx." ]
+            , div [ class "onyx-rail-emptystate-actions" ]
+                [ button
+                    [ type_ "button"
+                    , class "onyx-rail-emptystate-go"
+                    , attribute "data-testid" "sidebar-empty-new"
+                    , onClick NewMessageOpen
+                    ]
+                    [ text "New message" ]
+                ]
+            ]
+
+    else
+        p [ class "onyx-rail-empty", attribute "data-testid" "sidebar-dms-empty" ] [ text "No messages yet. Start one with New." ]
 
 
 newConversation : Html Msg
@@ -200,7 +282,7 @@ filterBar model which derived =
                             "Find a room"
 
                         "messages" ->
-                            "Find a conversation"
+                            "Find a person"
 
                         _ ->
                             "Find a room or person"
@@ -349,7 +431,8 @@ roomRow model canStar channel =
     li []
         [ div
             [ class "onyx-rail-row"
-            , classList [ ( "onyx-rail-row--starred", starred ) ]
+            , classList [ ( "onyx-rail-row--starred", starred ), ( "onyx-rail-row--menu", menuOpenFor model channel.name ) ]
+            , rowContextMenu channel.name
             ]
             ([ button
                 [ type_ "button"
@@ -455,6 +538,7 @@ roomRow model canStar channel =
                     else
                         []
                    )
+                ++ [ rowMore model channel True ]
             )
         ]
 
@@ -480,7 +564,12 @@ dmRow model channel =
             Sidebar.activityStamp model.nowMs (Sidebar.dmActivityMs channel)
     in
     li []
-        [ button
+        [ div
+            [ class "onyx-rail-entry"
+            , classList [ ( "onyx-rail-row--menu", menuOpenFor model channel.name ) ]
+            , rowContextMenu channel.name
+            ]
+            [ button
             [ type_ "button"
             , class "onyx-rail-item onyx-rail-dm"
             , classList
@@ -491,6 +580,7 @@ dmRow model channel =
                 (Sidebar.dmAriaLabel channel { preview = preview, keyChanged = keyChanged, offline = offline }
                     -- v3/account2
                     ++ View.Account2.friendPresenceLabel model channel.name
+                    ++ View.Organize.mutedLabel model channel.name -- v3/gap-organize
                 )
             , attribute "aria-current"
                 (if active then
@@ -560,9 +650,296 @@ dmRow model channel =
 
                           else
                             text ""
+                        , View.Organize.mutedMark model channel.name -- v3/gap-organize
                         , badge channel
                         ]
                     ]
                 ]
             ]
+            , rowMore model channel False
+            ]
         ]
+
+
+{-| v3/rx-shell — is the row menu open on this conversation? -}
+menuOpenFor : Model -> String -> Bool
+menuOpenFor model name =
+    Maybe.map (.name >> String.toLower) model.railMenu == Just (String.toLower name)
+
+
+{-| v3/rx-shell — the row's overflow control. -}
+rowMore : Model -> Channel -> Bool -> Html Msg
+rowMore model channel isRoom =
+    button
+        [ type_ "button"
+        , class "onyx-rail-more"
+        , attribute "data-testid" "sidebar-row-more"
+        , attribute "aria-label"
+            ((if isRoom then
+                "Room options for "
+
+              else
+                "Conversation options for "
+             )
+                ++ channel.name
+            )
+        , attribute "aria-haspopup" "dialog"
+        , attribute "aria-expanded" (boolAttr (menuOpenFor model channel.name))
+        , attribute "title" "More options"
+        , on "click" (Decode.map RailMenuOpen (clickPoint channel.name))
+        ]
+        [ span [ class "onyx-shi", attribute "data-icon" "more", attribute "aria-hidden" "true" ] [] ]
+
+
+{-| A context menu on the row (right-click; Android reports a long
+press the same way) opens the row menu at the pointer. Fields keep the
+browser's own menu. -}
+rowContextMenu : String -> Html.Attribute Msg
+rowContextMenu name =
+    preventDefaultOn "contextmenu"
+        (Decode.oneOf [ Decode.at [ "target", "tagName" ] Decode.string, Decode.succeed "" ]
+            |> Decode.andThen
+                (\tag ->
+                    if List.member (String.toUpper tag) [ "INPUT", "TEXTAREA" ] then
+                        Decode.fail "native menu"
+
+                    else
+                        Decode.map (\menu -> ( RailMenuOpen menu, True )) (point name)
+                )
+        )
+
+
+{-| Where a pointer asked for the menu (with the viewport size, so the
+view can flip it near the bottom edge). -}
+point : String -> Decode.Decoder App.RailMenu
+point name =
+    Decode.map4 (\x y vw vh -> { name = name, x = x, y = y, vw = vw, vh = vh })
+        (Decode.oneOf [ Decode.field "clientX" Decode.float, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.field "clientY" Decode.float, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.at [ "view", "innerWidth" ] Decode.float, Decode.succeed 0 ])
+        (Decode.oneOf [ Decode.at [ "view", "innerHeight" ] Decode.float, Decode.succeed 0 ])
+
+
+{-| A click carries a pointer position unless a key pressed the
+button (`detail` 0): keyboard opens centre the menu. -}
+clickPoint : String -> Decode.Decoder App.RailMenu
+clickPoint name =
+    Decode.map2
+        (\detail menu ->
+            if detail == 0 then
+                { menu | x = 0, y = 0 }
+
+            else
+                menu
+        )
+        (Decode.oneOf [ Decode.field "detail" Decode.int, Decode.succeed 0 ])
+        (point name)
+
+
+{-| v3/rx-shell — the row menu: a context menu anchored at the pointer
+on wide screens, a centred dialog for keyboard opens, a bottom sheet on
+phones (all through `View.Sheet`, so focus, Escape and light dismiss
+behave like every other sheet).
+-}
+railMenu : Model -> Html Msg
+railMenu model =
+    case App.railMenuFor model of
+        Nothing ->
+            text ""
+
+        Just ( menu, channel ) ->
+            let
+                isRoom =
+                    App.isChannelName model channel.name
+
+                anchored =
+                    menu.vw >= 768 && (menu.x > 0 || menu.y > 0)
+
+                width =
+                    272
+
+                left =
+                    clamp 8 (max 8 (menu.vw - width - 8)) (menu.x - 4)
+
+                lowerHalf =
+                    menu.y > menu.vh * 0.58
+
+                px n =
+                    String.fromInt (round n) ++ "px"
+
+                anchor =
+                    if anchored then
+                        [ style "left" (px left)
+                        , if lowerHalf then
+                            style "bottom" (px (menu.vh - menu.y + 4))
+
+                          else
+                            style "top" (px (menu.y + 4))
+                        , style "max-height"
+                            (px
+                                (if lowerHalf then
+                                    menu.y - 12
+
+                                 else
+                                    menu.vh - menu.y - 12
+                                )
+                            )
+                        ]
+
+                    else
+                        []
+
+                starred =
+                    Sidebar.isStarred model.starredChannels channel.name
+
+                canStar =
+                    App.deviceMemoryOwner model /= Nothing
+
+                waiting =
+                    Sidebar.hasAttention channel
+
+                muted =
+                    Set.member (String.toLower channel.name) model.mutedDMs
+
+                status =
+                    if channel.highlights > 0 then
+                        String.fromInt channel.highlights
+                            ++ (if channel.highlights == 1 then
+                                    " mention"
+
+                                else
+                                    " mentions"
+                               )
+                            ++ (if channel.unread > 0 then
+                                    " · " ++ String.fromInt channel.unread ++ " unread"
+
+                                else
+                                    ""
+                               )
+
+                    else if channel.unread > 0 then
+                        String.fromInt channel.unread ++ " unread"
+
+                    else
+                        "No new messages"
+
+                item key label icon msg extra =
+                    button
+                        ([ type_ "button"
+                         , class "onyx-railmenu-item"
+                         , attribute "data-testid" ("rail-menu-" ++ key)
+                         , onClick msg
+                         ]
+                            ++ extra
+                        )
+                        [ span [ class "onyx-shi", attribute "data-icon" icon, attribute "aria-hidden" "true" ] []
+                        , span [ class "onyx-railmenu-label" ] [ text label ]
+                        ]
+
+                railMenuHead =
+                    div [ class "onyx-railmenu-head" ]
+                        [ if isRoom then
+                            span [ class "onyx-rail-tile onyx-railmenu-tile", attribute "aria-hidden" "true" ] [ text (tileLetter channel.name) ]
+
+                          else
+                            span [ class "onyx-face onyx-railmenu-face", attribute "aria-hidden" "true" ] [ text (Avatar.initials channel.name) ]
+                        , div [ class "onyx-railmenu-titles" ]
+                            [ h2 [ class "onyx-railmenu-title", id (Sheet.titleId "rail-menu") ] [ text channel.name ]
+                            , p [ class "onyx-railmenu-sub" ] [ text status ]
+                            ]
+                        , Sheet.closeButton { label = "Close options", onClose = RailMenuClose, testId = Nothing, extraClass = "onyx-railmenu-close" }
+                        ]
+            in
+            Sheet.view
+                { scope = "rail-menu"
+                , label = Sheet.LabelledBy (Sheet.titleId "rail-menu")
+                , onClose = RailMenuClose
+                , placement = Sheet.Center
+                , layerClass = "onyx-railmenu-layer"
+                , panelClass = "onyx-railmenu"
+                , backdropClass = ""
+                , layerAttrs = [ attribute "data-anchored" (boolAttr anchored) ]
+                , modal = True
+                , attrs = attribute "data-testid" "rail-menu" :: anchor
+                }
+                (railMenuHead
+                    :: ((if isRoom then
+                            [ item "favorite"
+                                (if starred then
+                                    "Remove from Favorites"
+
+                                 else
+                                    "Add to Favorites"
+                                )
+                                (if starred then
+                                    "star-on"
+
+                                 else
+                                    "star"
+                                )
+                                (SidebarStarToggle channel.name)
+                                ([ disabled (not canStar)
+                                 , attribute "aria-pressed" (boolAttr starred)
+                                 ]
+                                    ++ (if canStar then
+                                            [ Sheet.autofocus "rail-menu" ]
+
+                                        else
+                                            []
+                                       )
+                                )
+                            ]
+                                ++ (if canStar then
+                                        []
+
+                                    else
+                                        [ p [ class "onyx-railmenu-hint" ] [ text "Connect to keep favorites on this device." ] ]
+                                   )
+
+                        else
+                            []
+                       )
+                    ++ [ item "read"
+                            "Mark as read"
+                            "check"
+                            (RailMarkRead channel.name)
+                            ([ disabled (not waiting) ]
+                                ++ (if waiting && not (isRoom && canStar) then
+                                        [ Sheet.autofocus "rail-menu" ]
+
+                                    else
+                                        []
+                                   )
+                            )
+                       ]
+                    -- v3/gap-organize: Move to folder / Hide room; Close conversation
+                    ++ View.Organize.railMenuEntries model channel
+                    ++ (if isRoom then
+                            [ div [ class "onyx-railmenu-notify" ] [ View.Notify.roomNotifyStrip model channel.name ]
+                            , item "leave" "Leave room" "leave" (GapShellMsg (GapShell.LeaveAsk channel.name)) [ class "onyx-railmenu-item--danger" ]
+                            ]
+
+                        else
+                            [ item "mute"
+                                (if muted then
+                                    "Unmute conversation"
+
+                                 else
+                                    "Mute conversation"
+                                )
+                                (if muted then
+                                    "bell"
+
+                                 else
+                                    "bell-off"
+                                )
+                                (if muted then
+                                    UnmuteDm channel.name
+
+                                 else
+                                    MuteDm channel.name
+                                )
+                                [ attribute "aria-pressed" (boolAttr muted) ]
+                            ]
+                       ))
+                )

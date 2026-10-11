@@ -1,28 +1,40 @@
 module Switcher exposing
     ( Action(..)
+    , AppChord(..)
+    , Context
     , Entry
     , Matched
     , Palette
+    , Person
     , Section(..)
     , Shortcut(..)
     , ShortcutGroup
     , Target(..)
     , activeOptionId
+    , build
     , clampActive
     , closed
+    , conversationOrder
     , entries
     , fuzzyMatch
     , groupHeadingId
     , matches
+    , matchesWith
+    , maxRecents
     , move
     , optionId
     , rank
+    , recentId
+    , recordRecent
     , resultsAnnouncement
     , sectionIcon
     , sectionLabel
+    , sections
     , segments
     , shortcutFromString
     , shortcutGroups
+    , stepConversation
+    , stepUnread
     )
 
 {-| v3/switcher — the Ctrl/Cmd+K action palette and the `?` shortcuts
@@ -42,6 +54,7 @@ and Escape) and sends a short name decoded by `shortcutFromString`.
 -}
 
 import Dict exposing (Dict)
+import Set
 
 
 
@@ -67,19 +80,33 @@ closed =
 
 
 type Section
-    = Rooms
+    = Recent
+    | Rooms
     | DMs
+    | People
     | Actions
+
+
+{-| Display (= navigation) order of the sections. -}
+sections : List Section
+sections =
+    [ Recent, Rooms, DMs, People, Actions ]
 
 
 sectionLabel : Section -> String
 sectionLabel section =
     case section of
+        Recent ->
+            "Recent"
+
         Rooms ->
             "Rooms"
 
         DMs ->
             "DMs"
+
+        People ->
+            "People"
 
         Actions ->
             "Actions"
@@ -89,10 +116,16 @@ sectionLabel section =
 sectionIcon : Section -> String
 sectionIcon section =
     case section of
+        Recent ->
+            "↺"
+
         Rooms ->
             "#"
 
         DMs ->
+            "@"
+
+        People ->
             "@"
 
         Actions ->
@@ -102,14 +135,20 @@ sectionIcon section =
 sectionOrder : Section -> Int
 sectionOrder section =
     case section of
-        Rooms ->
+        Recent ->
             0
 
-        DMs ->
+        Rooms ->
             1
 
-        Actions ->
+        DMs ->
             2
+
+        People ->
+            3
+
+        Actions ->
+            4
 
 
 type Action
@@ -122,11 +161,37 @@ type Action
     | YouHub
     | KeyboardShortcuts
     | Leave
+      -- v3/gap-commands
+    | JoinTyped String
+    | Preferences
+    | ThemeStudio
+    | ScheduledMessages
+    | SlashCommands
+    | SearchMessages
+    | CopyRoomLink String
+    | CopyNodeAddress
+    | InvitePeople String
+    | StartVoice String
+    | ReturnToCall
+    | MarkAllRead
+    | MarkRead String
+    | CatchUp String
+    | LeaveRoom String
+    | ToggleStar String
+    | ToggleMute String
+    | ToggleDnd
+    | PauseAlerts Int
+    | ToggleAway
+    | ToggleDensity
+    | SwitchTheme String
 
 
 type Target
     = GoRoom String
     | GoDm String
+      -- v3/gap-commands
+    | GoPerson String
+    | ViewProfile String
     | Do Action
 
 
@@ -251,6 +316,537 @@ actionEntries active =
            , action "disconnect" "Disconnect" "Leave Onyx" [ "leave", "quit", "close", "server", "node", "sign out" ] Leave
            ]
 
+
+
+
+-- v3/gap-commands — palette breadth (People, recents, the oracle's
+-- action rows and a little query grammar)
+
+
+{-| What the palette knows about the shell beyond the conversation
+list. `call` is the room of the live call; `voice` says whether a
+voice call can start in the active room. -}
+type alias Context =
+    { active : Maybe String
+    , activeIsRoom : Bool
+    , live : Bool
+    , starred : Bool
+    , muted : Bool
+    , dnd : Bool
+    , away : Bool
+    , compact : Bool
+    , call : Maybe String
+    , voice : Bool
+    , node : String
+    , themes : List { id : String, label : String }
+    , theme : String
+    }
+
+
+{-| A person the palette can message: a member of the active room or
+a contact, never someone who already has a DM row. -}
+type alias Person =
+    { nick : String
+    , hint : String
+    }
+
+
+{-| Every palette row for the current shell and query: rooms, DMs,
+people, then actions (contextual room actions first, the query grammar
+rows — `#room` joins, `mute 30`, theme switching, profiles — only
+while typing). -}
+build :
+    (String -> Bool)
+    -> Context
+    -> String
+    -> List { a | name : String, topic : String, unread : Int, highlights : Int, members : Dict String m }
+    -> List Person
+    -> List Entry
+build isChannel ctx query conversations people =
+    let
+        ( conversationRows, shellActions ) =
+            List.partition (\e -> e.section /= Actions) (entries isChannel ctx.active conversations)
+
+        typing =
+            not (String.isEmpty (String.trim query))
+
+        joined =
+            Set.fromList (List.map (\c -> String.toLower c.name) conversations)
+
+        personRow person =
+            { id = "person:" ++ String.toLower person.nick
+            , section = People
+            , title = "Message " ++ person.nick
+            , hint = person.hint
+            , keywords = [ person.nick, "dm", "message", "people", "direct message" ]
+            , target = GoPerson person.nick
+            }
+
+        profileRow person =
+            { id = "profile:" ++ String.toLower person.nick
+            , section = People
+            , title = "View profile: " ++ person.nick
+            , hint = person.hint
+            , keywords = [ person.nick, "profile", "whois", "who is" ]
+            , target = ViewProfile person.nick
+            }
+
+        unreadRooms =
+            conversations
+                |> List.filter (\c -> c.unread > 0 && Maybe.map String.toLower ctx.active /= Just (String.toLower c.name))
+                |> List.sortBy (\c -> ( negate c.highlights, negate c.unread, String.toLower c.name ))
+                |> List.take 6
+
+        catchUpRow c =
+            action ("catch-up:" ++ String.toLower c.name)
+                ("Catch up: " ++ c.name)
+                (unreadHint c.unread c.highlights)
+                [ "catch up", "unread", "jump", "first unread", "new messages", c.name ]
+                (CatchUp c.name)
+
+        themeRow meta =
+            action ("theme:" ++ meta.id)
+                ("Switch theme: " ++ meta.label)
+                "Appearance"
+                [ "theme", "look", meta.id, meta.label ]
+                (SwitchTheme meta.id)
+    in
+    -- While typing, a person row matches on the person, never on the
+    -- shared "Message" / "View profile" wording (a query of "i" must not
+    -- list everyone); profiles join once two characters narrow it.
+    let
+        matchedPeople =
+            if typing then
+                List.filter (\person -> fuzzyMatch query person.nick [] /= Nothing) people
+
+            else
+                people
+    in
+    conversationRows
+        ++ List.map personRow matchedPeople
+        ++ (if String.length (String.trim query) >= 2 then
+                List.map profileRow matchedPeople
+
+            else
+                []
+           )
+        ++ typedActions ctx query joined
+        ++ roomActions ctx
+        ++ List.take 3 shellActions
+        ++ List.map catchUpRow unreadRooms
+        ++ (if List.any (\c -> c.unread > 0) conversations then
+                [ action "mark-all-read" "Mark all read" "Clear every unread badge on this device" [ "mark", "read", "all", "caught up", "clear", "unread" ] MarkAllRead ]
+
+            else
+                []
+           )
+        ++ List.filter (\e -> e.target /= Do Leave) (List.drop 3 shellActions)
+        ++ globalActions ctx
+        ++ (if typing then
+                List.map themeRow (List.filter (\meta -> meta.id /= ctx.theme) ctx.themes)
+
+            else
+                []
+           )
+        ++ List.filter (\e -> e.target == Do Leave) shellActions
+
+
+unreadHint : Int -> Int -> String
+unreadHint unread highlights =
+    String.fromInt unread
+        ++ " unread"
+        ++ (if highlights > 0 then
+                " · " ++ String.fromInt highlights ++ " for you"
+
+            else
+                ""
+           )
+
+
+{-| Rows the query itself proposes: `#room` (or `join room`) offers to
+join a room not yet joined; `mute 30` / `snooze 30` / `dnd 30` offers
+to pause alerts for that many minutes (1–1440). -}
+typedActions : Context -> String -> Set.Set String -> List Entry
+typedActions ctx query joined =
+    let
+        typed =
+            String.toLower (String.trim query)
+
+        words =
+            List.filter (not << String.isEmpty) (String.words typed)
+
+        roomName raw =
+            let
+                bare =
+                    if String.startsWith "#" raw then
+                        String.dropLeft 1 raw
+
+                    else
+                        raw
+            in
+            if String.length bare >= 1 && String.length bare <= 63 && String.all isRoomChar bare then
+                Just ("#" ++ bare)
+
+            else
+                Nothing
+
+        joinRow raw =
+            case roomName raw of
+                Just room ->
+                    if Set.member (String.toLower room) joined || not ctx.live then
+                        []
+
+                    else
+                        [ action ("join:" ++ room) ("Join " ++ room) "Open a room by name" [ typed, "join", "room", raw, room ] (JoinTyped room) ]
+
+                Nothing ->
+                    []
+
+        pauseRow raw =
+            case String.toInt raw of
+                Just minutes ->
+                    if minutes >= 1 && minutes <= 1440 then
+                        [ action ("pause:" ++ String.fromInt minutes)
+                            ("Pause alerts for " ++ String.fromInt minutes ++ (if minutes == 1 then " minute" else " minutes"))
+                            "Do not disturb, then resume"
+                            [ typed, "mute", "snooze", "dnd", "pause", raw ]
+                            (PauseAlerts minutes)
+                        ]
+
+                    else
+                        []
+
+                Nothing ->
+                    []
+    in
+    case words of
+        [ single ] ->
+            if String.startsWith "#" single then
+                joinRow single
+
+            else
+                []
+
+        [ verb, arg ] ->
+            if verb == "join" || verb == "/join" || verb == "/j" then
+                joinRow arg
+
+            else if List.member verb [ "mute", "snooze", "dnd", "pause" ] then
+                pauseRow arg
+
+            else
+                []
+
+        _ ->
+            []
+
+
+isRoomChar : Char -> Bool
+isRoomChar c =
+    Char.isAlphaNum c || List.member c [ '-', '_', '.', '+', '!', '~', '=', '^', '[', ']', '{', '}', '|', '\\', '`', '\'' ]
+        || Char.toCode c > 127
+
+
+{-| Actions about the open room (or DM). -}
+roomActions : Context -> List Entry
+roomActions ctx =
+    case ctx.active of
+        Nothing ->
+            []
+
+        Just name ->
+            if ctx.activeIsRoom then
+                [ action "copy-room-link" "Copy room link" name [ "copy", "link", "room", "share", "invite", "url", name ] (CopyRoomLink name)
+                , action "invite-people" ("Invite people to " ++ name) "Share an invite link" [ "invite", "share", "friends", "people", name ] (InvitePeople name)
+                ]
+                    ++ voiceActions ctx name
+                    ++ [ if ctx.starred then
+                            action "unstar-room" ("Unstar " ++ name) "Remove from Favorites" [ "star", "unstar", "favorite", "favourite", name ] (ToggleStar name)
+
+                         else
+                            action "star-room" ("Star " ++ name) "Pin to Favorites" [ "star", "favorite", "favourite", "pin", name ] (ToggleStar name)
+                       , if ctx.muted then
+                            action "unmute-room" ("Unmute " ++ name) "Notifications on for this room" [ "mute", "unmute", "notifications", "alerts", name ] (ToggleMute name)
+
+                         else
+                            action "mute-room" ("Mute " ++ name) "Silence this room on this device" [ "mute", "silence", "notifications", "alerts", name ] (ToggleMute name)
+                       , action "mark-read" ("Mark " ++ name ++ " read") "Ctrl+Shift+E" [ "mark", "read", "clear", "unread", name ] (MarkRead name)
+                       , action "leave-room" ("Leave " ++ name) "Part the room" [ "leave", "part", "exit", "close", "hide", name ] (LeaveRoom name)
+                       ]
+
+            else
+                voiceActions ctx name
+                    ++ [ action "mark-read" ("Mark " ++ name ++ " read") "Ctrl+Shift+E" [ "mark", "read", "clear", "unread", name ] (MarkRead name) ]
+
+
+voiceActions : Context -> String -> List Entry
+voiceActions ctx name =
+    case ctx.call of
+        Just room ->
+            [ action "return-to-call" "Return to call" room [ "voice", "call", "return", "back", room ] ReturnToCall ]
+
+        Nothing ->
+            if ctx.voice && ctx.live then
+                [ action "start-voice" "Start voice call" name [ "voice", "audio", "call", "join", "talk", name ] (StartVoice name) ]
+
+            else
+                []
+
+
+{-| Shell-wide actions after the oracle rows. -}
+globalActions : Context -> List Entry
+globalActions ctx =
+    [ action "search-messages" "Search messages" "Ctrl+F" [ "search", "find", "history", "messages" ] SearchMessages
+    , action "scheduled-messages" "Scheduled messages" "Open the send-later queue" [ "scheduled", "schedule", "send later", "queue", "remind", "pending", "later" ] ScheduledMessages
+    , if ctx.dnd then
+        action "dnd" "Turn off Do Not Disturb" "Ctrl+Shift+D" [ "dnd", "do not disturb", "alerts", "notifications", "quiet", "focus" ] ToggleDnd
+
+      else
+        action "dnd" "Turn on Do Not Disturb" "Ctrl+Shift+D" [ "dnd", "do not disturb", "alerts", "notifications", "quiet", "focus" ] ToggleDnd
+    , if ctx.away then
+        action "away" "Set yourself back" "Clear your away status" [ "away", "back", "status", "present", "online" ] ToggleAway
+
+      else
+        action "away" "Set yourself away" "Others see you are away" [ "away", "status", "afk", "brb" ] ToggleAway
+    , if ctx.compact then
+        action "density" "Comfortable message density" "Avatars and grouped messages" [ "density", "comfortable", "grouped", "avatars", "spacing", "compact" ] ToggleDensity
+
+      else
+        action "density" "Compact message density" "One line per message, IRC style" [ "density", "compact", "irc", "dense", "spacing" ] ToggleDensity
+    , action "preferences" "Preferences — display & behaviour" "Ctrl+," [ "preferences", "settings", "density", "font", "size", "width", "motion", "events", "display", "behaviour", "behavior" ] Preferences
+    , action "theme-studio" "Open Theme Studio" "/appearance" [ "theme", "studio", "custom", "tokens", "editor", "create theme" ] ThemeStudio
+    , action "slash-commands" "Slash commands" "/help" [ "commands", "slash", "help", "irc", "verbs" ] SlashCommands
+    ]
+        ++ (if String.isEmpty ctx.node then
+                []
+
+            else
+                [ action "copy-node-address" "Copy node address" ctx.node [ "copy", "server", "url", "address", "node" ] CopyNodeAddress ]
+           )
+
+
+{-| The id a run row leaves in the recents list (`Nothing` for rows
+the query made up). Messaging a person recalls as their DM. -}
+recentId : Entry -> Maybe String
+recentId entry =
+    case entry.target of
+        GoPerson nick ->
+            Just ("dm:" ++ String.toLower nick)
+
+        ViewProfile _ ->
+            Nothing
+
+        Do (JoinTyped _) ->
+            Nothing
+
+        Do (PauseAlerts _) ->
+            Nothing
+
+        Do (SwitchTheme _) ->
+            Nothing
+
+        Do (CatchUp _) ->
+            Nothing
+
+        Do Leave ->
+            Nothing
+
+        _ ->
+            Just entry.id
+
+
+{-| Most recent first, unique, bounded. -}
+recordRecent : String -> List String -> List String
+recordRecent id list =
+    List.take 8 (id :: List.filter (\kept -> kept /= id) list)
+
+
+{-| How many recents the quiet palette lifts into its Recent section. -}
+maxRecents : Int
+maxRecents =
+    5
+
+
+{-| `matches` with recents: with no query the recent rows (still
+present) lead in their own section; while typing they rank a little
+higher inside their own. People rows stay short (5 quiet, 12 typing).
+-}
+matchesWith : List String -> String -> List Entry -> List Matched
+matchesWith recents query items =
+    let
+        quiet =
+            String.isEmpty (String.trim query)
+
+        lookup id =
+            List.filter (\e -> e.id == id) items |> List.head
+
+        recentRows =
+            if quiet then
+                recents
+                    |> List.filterMap lookup
+                    |> List.take maxRecents
+                    |> List.map (\e -> { e | section = Recent })
+
+            else
+                []
+
+        lifted =
+            Set.fromList (List.map .id recentRows)
+
+        rest =
+            List.filter (\e -> not (Set.member e.id lifted)) items
+
+        boost m =
+            if not quiet && List.member m.entry.id recents then
+                { m | score = m.score + 25 }
+
+            else
+                m
+
+        peopleCap =
+            if quiet then
+                5
+
+            else
+                12
+
+        capPeople m ( kept, seen ) =
+            if m.entry.section == People then
+                if seen >= peopleCap then
+                    ( kept, seen )
+
+                else
+                    ( m :: kept, seen + 1 )
+
+            else
+                ( m :: kept, seen )
+    in
+    rank query (recentRows ++ rest)
+        |> List.map boost
+        |> List.sortBy (\m -> negate m.score)
+        |> List.indexedMap Tuple.pair
+        |> List.sortBy (\( i, m ) -> ( sectionOrder m.entry.section, i ))
+        |> List.map Tuple.second
+        |> List.foldl capPeople ( [], 0 )
+        |> Tuple.first
+        |> List.reverse
+
+
+{-| Sidebar order for Alt+↑/↓: Favorites then Rooms (alphabetical,
+case-insensitive), then DMs newest first (mirroring `Sidebar.sections`
+without its filter). -}
+conversationOrder :
+    (String -> Bool)
+    -> (String -> Bool)
+    -> List { a | name : String, lastSeen : Maybe Int, messages : List { b | at : Int } }
+    -> List String
+conversationOrder isChannel isStarred conversations =
+    let
+        ( rooms, dms ) =
+            List.partition (\c -> isChannel c.name) conversations
+
+        alpha =
+            List.sortWith
+                (\x y ->
+                    case compare (String.toLower x.name) (String.toLower y.name) of
+                        EQ ->
+                            compare x.name y.name
+
+                        other ->
+                            other
+                )
+
+        ( favorites, others ) =
+            List.partition (\c -> isStarred c.name) (alpha rooms)
+
+        activity c =
+            List.foldl (\m best -> max best m.at) (max 0 (Maybe.withDefault 0 c.lastSeen)) c.messages
+
+        recency x y =
+            case compare (activity y) (activity x) of
+                EQ ->
+                    compare (String.toLower x.name) (String.toLower y.name)
+
+                other ->
+                    other
+    in
+    List.map .name (favorites ++ others ++ List.sortWith recency dms)
+
+
+indexOfName : Maybe String -> List String -> Maybe Int
+indexOfName active order =
+    case active of
+        Nothing ->
+            Nothing
+
+        Just name ->
+            order
+                |> List.indexedMap Tuple.pair
+                |> List.filter (\( _, n ) -> String.toLower n == String.toLower name)
+                |> List.head
+                |> Maybe.map Tuple.first
+
+
+{-| Alt+↑ / Alt+↓: the previous / next conversation, wrapping; with
+none open, ↓ starts at the top and ↑ at the bottom. -}
+stepConversation : Int -> Maybe String -> List String -> Maybe String
+stepConversation delta active order =
+    let
+        count =
+            List.length order
+    in
+    if count == 0 then
+        Nothing
+
+    else
+        case indexOfName active order of
+            Just i ->
+                List.head (List.drop (modBy count (i + delta)) order)
+
+            Nothing ->
+                if delta >= 0 then
+                    List.head order
+
+                else
+                    List.head (List.reverse order)
+
+
+{-| Alt+Shift+↑ / ↓ (and N): the previous / next conversation with
+something unread, wrapping, never the open one. -}
+stepUnread : Int -> Maybe String -> List String -> (String -> Bool) -> Maybe String
+stepUnread delta active order isUnread =
+    let
+        indexed =
+            List.indexedMap Tuple.pair order
+
+        current =
+            Maybe.withDefault
+                (if delta >= 0 then
+                    -1
+
+                 else
+                    List.length order
+                )
+                (indexOfName active order)
+
+        candidates =
+            List.filter (\( i, name ) -> i /= current && isUnread name) indexed
+    in
+    if delta >= 0 then
+        case List.filter (\( i, _ ) -> i > current) candidates of
+            ( _, name ) :: _ ->
+                Just name
+
+            [] ->
+                List.head candidates |> Maybe.map Tuple.second
+
+    else
+        case List.reverse (List.filter (\( i, _ ) -> i < current) candidates) of
+            ( _, name ) :: _ ->
+                Just name
+
+            [] ->
+                List.head (List.reverse candidates) |> Maybe.map Tuple.second
 
 
 -- RANKING (port of `fuzzy.ts`)
@@ -568,7 +1164,31 @@ type Shortcut
     | Dismiss
       -- v3/calls-c11 (C12): `call-<name>` modifier chords
     | CallChord String
+      -- v3/gap-commands: the shell chords (oracle `shortcutsRegistry`)
+    | AppChord AppChord
+      -- the single-key shortcuts preference, as stored on this device
+    | SingleKeys Bool
     | UnknownShortcut
+
+
+{-| Shell chords that change Elm state. Pure-focus keys (J/K message
+focus, Enter / Alt+Enter composer focus, Alt+S sidebar focus, Alt+M
+member list) run inside `ports.js` and never reach Elm. -}
+type AppChord
+    = ConversationStep Int
+    | UnreadStep Int
+    | GoHome
+    | GoJumpToDate
+    | OpenPreferences
+    | OpenAccount
+    | MarkConversationRead
+    | ToggleDndChord
+    | ToggleRoomMute
+    | ToggleRoomStar
+    | AttachFiles
+    | ScheduleSend
+    | ExportTranscript
+    | FollowToggle
 
 
 shortcutFromString : String -> Shortcut
@@ -585,6 +1205,64 @@ shortcutFromString raw =
 
         "escape" ->
             Dismiss
+
+        -- v3/gap-commands
+        "conv-prev" ->
+            AppChord (ConversationStep -1)
+
+        "conv-next" ->
+            AppChord (ConversationStep 1)
+
+        "unread-prev" ->
+            AppChord (UnreadStep -1)
+
+        "unread-next" ->
+            AppChord (UnreadStep 1)
+
+        "next-unread" ->
+            AppChord (UnreadStep 1)
+
+        "go-home" ->
+            AppChord GoHome
+
+        "go-date" ->
+            AppChord GoJumpToDate
+
+        "prefs" ->
+            AppChord OpenPreferences
+
+        "account" ->
+            AppChord OpenAccount
+
+        "mark-read" ->
+            AppChord MarkConversationRead
+
+        "dnd" ->
+            AppChord ToggleDndChord
+
+        "room-mute" ->
+            AppChord ToggleRoomMute
+
+        "room-star" ->
+            AppChord ToggleRoomStar
+
+        "attach" ->
+            AppChord AttachFiles
+
+        "schedule" ->
+            AppChord ScheduleSend
+
+        "export" ->
+            AppChord ExportTranscript
+
+        "follow" ->
+            AppChord FollowToggle
+
+        "single-keys-on" ->
+            SingleKeys True
+
+        "single-keys-off" ->
+            SingleKeys False
 
         _ ->
             if String.startsWith "call-" raw then
@@ -604,8 +1282,11 @@ type alias ShortcutGroup =
     }
 
 
-{-| The help rows (oracle `SHORTCUTS`, narrowed to the chords this
-client actually handles so the sheet never advertises a dead key). -}
+{-| The help rows (oracle `SHORTCUTS`, every chord this client
+handles and nothing else, so the sheet never advertises a dead key).
+Single-character keys (`/`, `?`, J, K, N, U, G…) can be switched off
+on this device (WCAG 2.1.4); the overlay carries that switch.
+Ctrl+Shift+M / E / L belong to the call while one is live. -}
 shortcutGroups : List ShortcutGroup
 shortcutGroups =
     [ { group = "Palette"
@@ -616,9 +1297,42 @@ shortcutGroups =
             , { chords = [ "Esc" ], description = "Close palette / overlay" }
             ]
       }
+
+    -- v3/gap-commands: the oracle registry chords
+    , { group = "Navigation"
+      , rows =
+            [ { chords = [ "Alt+↑", "⌥↑" ], description = "Previous room / DM" }
+            , { chords = [ "Alt+↓", "⌥↓" ], description = "Next room / DM" }
+            , { chords = [ "Alt+Shift+↑", "⌥⇧↑" ], description = "Previous unread room / DM" }
+            , { chords = [ "Alt+Shift+↓", "⌥⇧↓" ], description = "Next unread room / DM" }
+            , { chords = [ "N" ], description = "Jump to next unread room / DM" }
+            , { chords = [ "G then H" ], description = "Go to Home" }
+            , { chords = [ "G then D" ], description = "Open jump-to-date" }
+            , { chords = [ "⌘⇧A", "Ctrl+Shift+A" ], description = "Open account" }
+            , { chords = [ "Alt+S", "⌥S" ], description = "Focus the room list" }
+            ]
+      }
     , { group = "Chat"
       , rows =
-            [ { chords = [ "⌘F", "Ctrl+F" ], description = "Search messages" } ]
+            [ { chords = [ "Enter", "Alt+Enter" ], description = "Focus message composer" }
+            , { chords = [ "J" ], description = "Move to next message" }
+            , { chords = [ "K" ], description = "Move to previous message" }
+            , { chords = [ "⌘F", "Ctrl+F" ], description = "Search messages" }
+            , { chords = [ "⌘⇧E", "Ctrl+Shift+E" ], description = "Mark conversation read (outside calls)" }
+            , { chords = [ "⌘B", "Ctrl+B" ], description = "Star / unstar room" }
+            , { chords = [ "⌘⇧M", "Ctrl+Shift+M" ], description = "Mute / unmute room (outside calls)" }
+            , { chords = [ "U" ], description = "Follow current room / DM" }
+            , { chords = [ "⌘⇧U", "Ctrl+Shift+U" ], description = "Attach a file" }
+            , { chords = [ "⌘⇧L", "Ctrl+Shift+L" ], description = "Schedule message to send later (outside calls)" }
+            , { chords = [ "⌘⌥E", "Ctrl+Alt+E" ], description = "Export local transcript" }
+            ]
+      }
+    , { group = "View"
+      , rows =
+            [ { chords = [ "⌘,", "Ctrl+," ], description = "Open preferences" }
+            , { chords = [ "⌘⇧D", "Ctrl+Shift+D" ], description = "Toggle do not disturb" }
+            , { chords = [ "Alt+M", "⌥M" ], description = "Show / hide member list" }
+            ]
       }
 
     -- v3/calls-c11 (C12): active only in a live call, never while typing

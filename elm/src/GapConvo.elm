@@ -514,7 +514,6 @@ type alias State staged =
     , draftStatus : DraftStatus
     , lastDraftSnapshot : List ( String, String )
     , dropActive : Bool
-    , revisionsOpen : Maybe String
     , composerCaret : Maybe Caret
     }
 
@@ -532,7 +531,6 @@ blank =
     , draftStatus = DraftUnknown
     , lastDraftSnapshot = []
     , dropActive = False
-    , revisionsOpen = Nothing
     , composerCaret = Nothing
     }
 
@@ -546,7 +544,6 @@ type Msg
     | DraftsSaved String
     | DropActive Bool
     | CollapsedShowAll
-    | RevisionsToggle String
     | OpenHistoryPrefs
     | CaretMoved Caret
 

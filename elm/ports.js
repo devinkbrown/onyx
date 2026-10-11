@@ -41,12 +41,28 @@
     return "q" + Date.now().toString(36) + outboxLabelCounter.toString(36);
   }
 
-  function openVault(onReady) {
+  /* v3/gap-account: the deprecated SolidJS client used the same
+     `onyx-vault` name at schema v6 (compound keys, different stores).
+     Opening it at v3 fails with VersionError, which left the whole
+     vault (history, outbox, schedule) unavailable for anyone who used
+     the old client on this origin. Fall back to a separate Elm-owned
+     database instead — Solid's rows are never read, migrated or
+     touched. */
+  var DB_FALLBACK_NAME = "onyx-elm-vault";
+
+  function openVault(onReady, nameOverride) {
     if (!("indexedDB" in global)) {
       onReady(null);
       return;
     }
-    var req = global.indexedDB.open(DB_NAME, DB_VERSION);
+    var name = nameOverride || DB_NAME;
+    var req;
+    try {
+      req = global.indexedDB.open(name, DB_VERSION);
+    } catch (err) {
+      onReady(null);
+      return;
+    }
     req.onupgradeneeded = function () {
       var db = req.result;
       if (!db.objectStoreNames.contains(STORE)) {
@@ -69,7 +85,15 @@
       }
     };
     req.onsuccess = function () { onReady(req.result); };
-    req.onerror = function () { onReady(null); };
+    req.onerror = function (event) {
+      var err = req.error;
+      if (!nameOverride && err && err.name === "VersionError") {
+        try { if (event && event.preventDefault) event.preventDefault(); } catch (e) {}
+        openVault(onReady, DB_FALLBACK_NAME);
+        return;
+      }
+      onReady(null);
+    };
   }
 
   var VAULT_EXPORT_MAX_TOTAL = 16 * 1024;
@@ -94,7 +118,7 @@
     var rowType = typeof row.rowType === "string" ? row.rowType : "";
     var reply = row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null;
     return {
-      id: String(row.id || ""),
+      id: String((typeof row.rid === "string" && row.rid) ? row.rid : (row.id || "")),
       target: String(row.target || ""),
       from: String(row.from || ""),
       body: String(row.body || ""),
@@ -117,6 +141,58 @@
      mirroring the `!r.deleted && !r.redacted` read filters. */
   function vaultTombstoned(row) {
     return !!(row && (row.deleted || row.redacted));
+  }
+
+  /* v3/gap-account — device-memory owner scope. Every vault and outbox
+     row written through a port carries the owner scope key Elm settled
+     (`["onyx","account","kai"]`, `["onyx","guest"]`, …) and every read
+     filters on it, so a second identity on this browser never sees the
+     first one's history, search recall or queued sends. Owned rows key
+     physically as `owner + "\0" + id` (two identities' ids can never
+     collide); `rid` keeps the logical id. Port payloads always carry
+     `owner` (a string, or null = no scope → reads answer empty, writes
+     refuse). Rows written before scoping have no owner and stay
+     quarantined: never shown, searched, exported, sent or claimed by
+     whoever opens the app next — only an explicit Clear (or retention
+     age) removes them. A direct call that omits `owner` entirely (the
+     node smokes) addresses only those ownerless rows. */
+  var VAULT_OWNER_MAX = 4096;
+
+  function ownerArg(req) {
+    if (!req || typeof req !== "object" || !Object.prototype.hasOwnProperty.call(req, "owner")) return undefined;
+    var o = req.owner;
+    return (typeof o === "string" && o.length > 0 && o.length <= VAULT_OWNER_MAX) ? o : null;
+  }
+
+  function portOwner(req) {
+    var o = ownerArg(req);
+    return o === undefined ? null : o;
+  }
+
+  function vaultRowOwner(raw) {
+    return (raw && typeof raw.owner === "string" && raw.owner) ? raw.owner : null;
+  }
+
+  function vaultRowOwned(raw, owner) {
+    var stamp = vaultRowOwner(raw);
+    if (owner === undefined) return stamp === null;
+    return owner !== null && stamp === owner;
+  }
+
+  /* Defense in depth for the local-history opt-out: Elm already stops
+     sending writes, and the bridge re-reads the stored preference so a
+     stale write can never land after the user turned history off. */
+  function localHistoryEnabled() {
+    try {
+      var store = (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+      if (!store) return true;
+      var raw = store.getItem("onyx:preferences");
+      if (!raw) return true;
+      var parsed = JSON.parse(raw);
+      return !(parsed && parsed.localHistory === false);
+    } catch (err) {
+      return true;
+    }
   }
 
   /* Vault retention policy — structurally-identical mirror of the pure
@@ -201,8 +277,12 @@
     return ordered.filter(function (entry) { return drop[entry.id]; }).map(function (entry) { return entry.id; });
   }
 
-  function vaultPut(db, rows, onDone) {
+  function vaultPut(db, rows, onDone, owner) {
     if (db === null) {
+      onDone(0);
+      return;
+    }
+    if (owner !== undefined && (owner === null || !localHistoryEnabled())) {
       onDone(0);
       return;
     }
@@ -215,6 +295,11 @@
       if (!row.at) row.at = now;
       row.deleted = !!row.deleted;
       row.redacted = !!row.redacted;
+      if (typeof owner === "string") {
+        row.rid = String(row.id || "");
+        row.owner = owner;
+        row.id = owner + "\u0000" + row.rid;
+      }
       store.put(row);
       // Any write voids the target's proof (mirroring
       // `invalidateVaultDmSearchPrivacy`): the proof is re-earned by a
@@ -243,22 +328,29 @@
     var index = store.index("by-target");
     var pending = names.length;
     names.forEach(function (target) {
-      var seen = [];
+      // Retention applies per owner scope (legacy ownerless rows are
+      // their own bucket, so their age cutoff still prunes them).
+      var seenByOwner = {};
       var cursor = index.openCursor(IDBKeyRange.only(target));
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c) {
           var plain = vaultPlainRow(c.value);
-          seen.push({ key: c.primaryKey, id: plain.id, at: plain.at });
+          var bucket = vaultRowOwner(c.value) || "";
+          if (!seenByOwner[bucket]) seenByOwner[bucket] = [];
+          seenByOwner[bucket].push({ key: c.primaryKey, id: plain.id, at: plain.at });
           c.continue();
         } else {
           var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
           if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
-          var prune = selectPruneIds(seen, channelPolicy, now);
-          var keyById = {};
-          seen.forEach(function (entry) { keyById[entry.id] = entry.key; });
-          prune.forEach(function (id) {
-            if (keyById[id] !== undefined) { try { store.delete(keyById[id]); } catch (err) {} }
+          Object.keys(seenByOwner).forEach(function (bucket) {
+            var seen = seenByOwner[bucket];
+            var prune = selectPruneIds(seen, channelPolicy, now);
+            var keyById = {};
+            seen.forEach(function (entry) { keyById[entry.id] = entry.key; });
+            prune.forEach(function (id) {
+              if (keyById[id] !== undefined) { try { store.delete(keyById[id]); } catch (err) {} }
+            });
           });
           pending -= 1;
         }
@@ -282,6 +374,22 @@
 
   function vaultDmPrivacyInvalidate(target) {
     delete vaultDmPrivacyCache[vaultDmPrivacyCacheKey(target)];
+  }
+
+  /* Per-target proofs are additionally per owner scope: one identity's
+     plain verdict never answers for another's rows. */
+  function vaultDmPrivacyCached(target, owner) {
+    var slot = vaultDmPrivacyCache[vaultDmPrivacyCacheKey(target)];
+    if (!slot || typeof slot !== "object") return null;
+    var verdict = slot[owner === undefined ? "" : String(owner)];
+    return (verdict === "plain" || verdict === "encrypted") ? verdict : null;
+  }
+
+  function vaultDmPrivacyRemember(target, owner, verdict) {
+    var key = vaultDmPrivacyCacheKey(target);
+    var slot = vaultDmPrivacyCache[key];
+    if (!slot || typeof slot !== "object") slot = vaultDmPrivacyCache[key] = {};
+    slot[owner === undefined ? "" : String(owner)] = verdict;
   }
 
   function vaultDmPrivacyTextEncrypted(text) {
@@ -311,17 +419,23 @@
     return "plain";
   }
 
-  function classifyVaultDm(db, target, onDone) {
-    var key = vaultDmPrivacyCacheKey(target);
-    if (vaultDmPrivacyCache[key]) {
-      onDone(vaultDmPrivacyCache[key]);
+  function classifyVaultDm(db, target, onDone, owner) {
+    var cached = vaultDmPrivacyCached(target, owner);
+    if (cached) {
+      onDone(cached);
       return;
     }
     if (db === null) {
       // No IndexedDB on this host: nothing retained, so nothing to
       // protect — mirroring the no-IDB `plain` commit.
-      vaultDmPrivacyCache[key] = "plain";
+      vaultDmPrivacyRemember(target, owner, "plain");
       onDone("plain");
+      return;
+    }
+    if (owner === null) {
+      // No owner scope: this identity has no rows to prove anything
+      // about, and another identity's rows must not answer for it.
+      onDone("unknown");
       return;
     }
     var collected = [];
@@ -338,6 +452,10 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (!c) return;
+        if (!vaultRowOwned(c.value, owner)) {
+          c.continue();
+          return;
+        }
         if (vaultDmPrivacyRowEncrypted(c.value)) {
           collected = [{ encrypted: true }];
           return;
@@ -355,16 +473,20 @@
         return;
       }
       var verdict = classifyVaultDmRows(collected);
-      vaultDmPrivacyCache[key] = verdict;
+      vaultDmPrivacyRemember(target, owner, verdict);
       onDone(verdict);
     };
     tx.onerror = function () { onDone("unknown"); };
     tx.onabort = function () { onDone("unknown"); };
   }
 
-  function vaultGet(db, target, limit, onRows) {
+  function vaultGet(db, target, limit, onRows, owner) {
     if (db === null) {
       onRows([], "unavailable");
+      return;
+    }
+    if (owner === null) {
+      onRows([], "ok");
       return;
     }
     var tx = db.transaction(STORE, "readonly");
@@ -374,7 +496,7 @@
     cursor.onsuccess = function () {
       var c = cursor.result;
       if (c && rows.length < limit) {
-        rows.push(vaultPlainRow(c.value));
+        if (vaultRowOwned(c.value, owner)) rows.push(vaultPlainRow(c.value));
         c.continue();
       } else {
         onRows(rows.reverse(), "ok");
@@ -653,6 +775,11 @@
       onRows([], "unavailable");
       return;
     }
+    var searchOwner = (opts && Object.prototype.hasOwnProperty.call(opts, "owner")) ? opts.owner : undefined;
+    if (searchOwner === null) {
+      onRows([], "ok");
+      return;
+    }
     var tx;
     try {
       tx = db.transaction(STORE, "readonly");
@@ -663,7 +790,7 @@
     var req = tx.objectStore(STORE).getAll();
     req.onsuccess = function () {
       try {
-        var rows = req.result || [];
+        var rows = (req.result || []).filter(function (raw) { return vaultRowOwned(raw, searchOwner); });
         var o = opts || {};
         if (mode === "semantic") onRows(vaultSearchRowsSemantic(rows, query, o.limit, o.minScore), "ok");
         else if (mode === "hybrid") onRows(vaultSearchRowsHybrid(rows, query, o), "ok");
@@ -697,9 +824,13 @@
     return ranked;
   }
 
-  function vaultGetAround(db, target, atMs, limit, onRows) {
+  function vaultGetAround(db, target, atMs, limit, onRows, owner) {
     if (db === null) {
       onRows([], "unavailable");
+      return;
+    }
+    if (owner === null) {
+      onRows([], "ok");
       return;
     }
     try {
@@ -710,7 +841,7 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c && collected.length < VAULT_EXPORT_MAX_TOTAL) {
-          collected.push(vaultPlainRow(c.value));
+          if (vaultRowOwned(c.value, owner)) collected.push(vaultPlainRow(c.value));
           c.continue();
         } else {
           onRows(vaultAroundWindow(collected, atMs, limit), "ok");
@@ -753,11 +884,11 @@
     return { kind: "onyx-vault", version: 1, exportedAt: exportedAt, targets: targets };
   }
 
-  function vaultExportAll(db, onSnapshot) {
+  function vaultExportAll(db, onSnapshot, owner) {
     var stamped = (typeof Date !== "undefined" && Date.prototype.toISOString)
       ? new Date().toISOString()
       : "";
-    if (db === null) {
+    if (db === null || owner === null) {
       onSnapshot(vaultExportSnapshot([], stamped));
       return;
     }
@@ -769,7 +900,7 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c && collected.length < VAULT_EXPORT_MAX_TOTAL) {
-          collected.push(c.value);
+          if (vaultRowOwned(c.value, owner)) collected.push(c.value);
           c.continue();
         } else {
           onSnapshot(vaultExportSnapshot(collected, stamped));
@@ -837,13 +968,16 @@
      rows a discard request deletes (only ids that exist) and which rows
      stay listed. Listed rows are the still-unsent ones: wire-admitted rows
      (on the wire, awaiting prune) and unaddressable rows never list. */
-  function outboxReviewPlan(rows, discard) {
+  function outboxReviewPlan(rows, discard, owner) {
     var wanted = {};
     (discard || []).forEach(function (id) {
       if (typeof id === "string" && id) wanted[id] = true;
     });
     var plan = { remove: [], keep: [] };
     (rows || []).forEach(function (raw) {
+      // v3/gap-account: another identity's (or an ownerless legacy)
+      // queued send is neither listed nor deletable from this scope.
+      if (!vaultRowOwned(raw, owner)) return;
       var row = outboxPlainEntry(raw);
       if (!row.id) return;
       if (wanted[row.id]) {
@@ -863,10 +997,12 @@
      verified delete, never an optimistic one. */
   function outboxReview(db, req, onReport) {
     var tag = req && typeof req.tag === "string" ? req.tag : "refresh";
+    var owner = ownerArg(req);
     function report(removed, rows, ok) {
       try { onReport({ removed: removed, rows: rows, ok: ok, tag: tag }); } catch (err) {}
     }
     if (db === null) { report([], [], false); return; }
+    if (owner === null) { report([], [], true); return; }
     var tx;
     try { tx = db.transaction(OUTBOX, "readwrite"); } catch (err) { report([], [], false); return; }
     var plan = { remove: [], keep: [] };
@@ -874,7 +1010,7 @@
       var store = tx.objectStore(OUTBOX);
       var all = store.getAll();
       all.onsuccess = function () {
-        plan = outboxReviewPlan(all.result || [], req && req.discard);
+        plan = outboxReviewPlan(all.result || [], req && req.discard, owner);
         plan.remove.forEach(function (id) {
           try { store.delete(id); } catch (err) {}
         });
@@ -894,8 +1030,9 @@
   function outboxQueue(db, req, onQueued, onFailed) {
     var target = req && req.target;
     var text = req && req.text;
+    var owner = ownerArg(req);
     function fail() { try { onFailed(String(target || "")); } catch (err) {} }
-    if (db === null || !isOutboxTarget(target) || typeof text !== "string" || text.length === 0) {
+    if (db === null || owner === null || !isOutboxTarget(target) || typeof text !== "string" || text.length === 0) {
       fail();
       return;
     }
@@ -907,6 +1044,7 @@
       text: text,
       queued_at: now
     };
+    if (typeof owner === "string") entry.owner = owner;
     var tx;
     try {
       tx = db.transaction(OUTBOX, "readwrite");
@@ -959,7 +1097,7 @@
      a minted `@label=` and the report maps row ids to labels under
      `sentLabels` so Elm can correlate the server's echo/ACK/FAIL —
      mirroring the oracle's outbox flush stamping. */
-  function outboxFlush(db, sock, onReport, labeled) {
+  function outboxFlush(db, sock, onReport, labeled, owner) {
     /* Rows still durable when the walk ends (`waiting`) and rows the walk
        could not prune after admission/expiry (`pruneFailed`) — the pure
        terminal decision (`decideOutboxFlushTerminal` oracle) consumes both.
@@ -993,7 +1131,7 @@
        the oracle's flush catch marks delivery failed instead. */
     function failed() { finish({ sent: [], uncertain: [], dropped: [], rows: [], walkOk: false }); }
     function ids(rows) { return rows.map(function (r) { return r.id; }); }
-    if (db === null) {
+    if (db === null || owner === null) {
       empty();
       return;
     }
@@ -1017,9 +1155,22 @@
       var cursor = event.target.result;
       if (!cursor) return;
       var row = outboxPlainEntry(cursor.value);
+      /* v3/gap-account: only this owner scope's rows are sent or
+         counted. Every expired/corrupt row is still pruned (hygiene),
+         but another identity's live rows — and ownerless legacy rows —
+         are never sent under this identity. */
+      var mine = vaultRowOwned(cursor.value, owner);
+      /* The owner stamp rides the walked row so the durable wire-admitted
+         mark below re-puts it still owned (an ownerless re-put would
+         orphan the row if its prune then failed). */
+      row.ownerStamp = vaultRowOwner(cursor.value);
       if (!row.id || !isOutboxTarget(row.target) || !row.text || row.queuedAt < cutoff) {
-        if (row.id) dropped.push(row.id);
-        try { cursor.delete(); } catch (err) { expiredPruneFailed += 1; pruneFailed += 1; unprunedDropped += 1; }
+        if (row.id && mine) dropped.push(row.id);
+        try { cursor.delete(); } catch (err) {
+          if (mine) { expiredPruneFailed += 1; pruneFailed += 1; unprunedDropped += 1; }
+        }
+      } else if (!mine) {
+        /* not this scope's: leave it untouched and uncounted */
       } else if (row.wireAdmitted || outboxWireAdmitted[row.id]) {
         /* Already on the wire in a prior walk: never re-admit, only retry
            the prune (silently — the placeholder already settled when the
@@ -1061,14 +1212,16 @@
       try {
         storeM = txM.objectStore(OUTBOX);
         rows.forEach(function (row) {
-          storeM.put({
+          var marked = {
             id: row.id,
             target_key: row.target.toLowerCase(),
             target: row.target,
             text: row.text,
             queued_at: row.queuedAt,
             wire_admitted: true
-          });
+          };
+          if (row.ownerStamp) marked.owner = row.ownerStamp;
+          storeM.put(marked);
         });
       } catch (err) {
         try { if (txM.abort) txM.abort(); } catch (abortErr) {}
@@ -1594,6 +1747,17 @@
 
   var saslCreds = { account: "", password: "", hasClientCert: false };
   var scramExchange = null;
+  var stagedPassword = null;
+
+  /* v3/gap-auth: a value that can ride an IRC middle parameter. */
+  function identifyParamSafe(value) {
+    if (!value || value.charAt(0) === ":") return false;
+    for (var i = 0; i < value.length; i++) {
+      var c = value.charCodeAt(i);
+      if (c <= 32 || c === 127) return false;
+    }
+    return true;
+  }
 
   async function scramHmac(keyData, data) {
     var subtle = globalThis.crypto.subtle;
@@ -1609,11 +1773,52 @@
         password: typeof password === "string" ? password : "",
         hasClientCert: Boolean(hasClientCert),
       };
+      stagedPassword = null;
       scramExchange = null;
     },
     clearCredentials: function () {
       saslCreds = { account: "", password: "", hasClientCert: false };
+      stagedPassword = null;
       scramExchange = null;
+    },
+    /* v3/gap-auth: `IDENTIFY <account> <password> <code>` for a two-factor
+       account (the server refuses PLAIN/SCRAM for it with a 904 and
+       accepts the code only on this command). The held password never
+       crosses into Elm: the line is composed here and written straight
+       to the socket. Every parameter rides as a middle parameter, so a
+       password with a space, a control character or a leading colon
+       (or a line past 510 bytes) is refused instead of being re-split
+       by the server. Returns `{ line }` or `{ refused: reason }`. */
+    identifyLine: function (account, code) {
+      var acct = String(account || "");
+      var digits = String(code || "");
+      var password = saslCreds.password;
+      if (!password || !acct) return { refused: "nopassword" };
+      if (saslCreds.account && saslCreds.account.toLowerCase() !== acct.toLowerCase()) return { refused: "nopassword" };
+      if (!identifyParamSafe(acct) || !identifyParamSafe(password) || !identifyParamSafe(digits)) return { refused: "unsafe" };
+      var line = "IDENTIFY " + acct + " " + password + " " + digits + "\r\n";
+      if (new TextEncoder().encode(line).length > 512) return { refused: "toolong" };
+      return { line: line };
+    },
+    /* SETPASS: hold the new password aside until the server confirms,
+       then make it the credential a reconnect signs in with. A failed or
+       interrupted change drops it and the old credential stays. */
+    stageNewPassword: function (account, password) {
+      stagedPassword = { account: String(account || ""), password: typeof password === "string" ? password : "" };
+    },
+    commitNewPassword: function (account) {
+      var staged = stagedPassword;
+      stagedPassword = null;
+      if (!staged || !staged.password) return false;
+      if (String(account || "").toLowerCase() !== staged.account.toLowerCase()) return false;
+      if (saslCreds.password && (!saslCreds.account || saslCreds.account.toLowerCase() === staged.account.toLowerCase())) {
+        saslCreds = { account: saslCreds.account, password: staged.password, hasClientCert: saslCreds.hasClientCert };
+        scramExchange = null;
+      }
+      return true;
+    },
+    dropNewPassword: function () {
+      stagedPassword = null;
     },
     /* RFC 4616 `\0authcid\0passwd`, UTF-8 encoded. Null when no password. */
     plainPayload: function (nick) {
@@ -1729,6 +1934,265 @@
         if (timer !== null) { clearTimeout(timer); timer = null; }
       },
     };
+  }
+
+  /* v3/gap-auth — BLAKE3 (unkeyed hash mode, any output length) for the
+     pre-001 CHALLENGE proof of work. A minimal transcription of the
+     BLAKE3 reference implementation (reference_impl.rs: compress, chunk
+     state, parent nodes, CV stack, root XOF). Pure, synchronous, no
+     dependencies; verified against the official BLAKE3 test vectors in
+     challenge.smoke.mjs. */
+  var B3_IV = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  var B3_PERM = [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8];
+  var B3_CHUNK_START = 1;
+  var B3_CHUNK_END = 2;
+  var B3_PARENT = 4;
+  var B3_ROOT = 8;
+  var B3_BLOCK_LEN = 64;
+  var B3_CHUNK_LEN = 1024;
+
+  function b3Compress(cv, m, counter, blockLen, flags) {
+    var s = [
+      cv[0], cv[1], cv[2], cv[3], cv[4], cv[5], cv[6], cv[7],
+      B3_IV[0], B3_IV[1], B3_IV[2], B3_IV[3],
+      counter >>> 0, Math.floor(counter / 0x100000000) >>> 0, blockLen, flags
+    ];
+    var w = m.slice(0, 16);
+    function g(a, b, c, d, x, y) {
+      s[a] = (s[a] + s[b] + x) | 0;
+      s[d] ^= s[a]; s[d] = (s[d] >>> 16) | (s[d] << 16);
+      s[c] = (s[c] + s[d]) | 0;
+      s[b] ^= s[c]; s[b] = (s[b] >>> 12) | (s[b] << 20);
+      s[a] = (s[a] + s[b] + y) | 0;
+      s[d] ^= s[a]; s[d] = (s[d] >>> 8) | (s[d] << 24);
+      s[c] = (s[c] + s[d]) | 0;
+      s[b] ^= s[c]; s[b] = (s[b] >>> 7) | (s[b] << 25);
+    }
+    for (var r = 0; r < 7; r++) {
+      g(0, 4, 8, 12, w[0], w[1]);
+      g(1, 5, 9, 13, w[2], w[3]);
+      g(2, 6, 10, 14, w[4], w[5]);
+      g(3, 7, 11, 15, w[6], w[7]);
+      g(0, 5, 10, 15, w[8], w[9]);
+      g(1, 6, 11, 12, w[10], w[11]);
+      g(2, 7, 8, 13, w[12], w[13]);
+      g(3, 4, 9, 14, w[14], w[15]);
+      if (r < 6) {
+        var p = new Array(16);
+        for (var i = 0; i < 16; i++) p[i] = w[B3_PERM[i]];
+        w = p;
+      }
+    }
+    for (var j = 0; j < 8; j++) {
+      s[j] = (s[j] ^ s[j + 8]) >>> 0;
+      s[j + 8] = (s[j + 8] ^ cv[j]) >>> 0;
+    }
+    return s;
+  }
+
+  function b3Words(bytes, offset, len) {
+    var out = new Array(16);
+    for (var i = 0; i < 16; i++) {
+      var v = 0;
+      for (var k = 3; k >= 0; k--) {
+        var at = i * 4 + k;
+        v = (v * 256) + (at < len ? bytes[offset + at] : 0);
+      }
+      out[i] = v >>> 0;
+    }
+    return out;
+  }
+
+  /* One chunk's state, mirroring the reference `ChunkState`. */
+  function b3Chunk(key, counter) {
+    return { cv: key.slice(0, 8), counter: counter, block: new Uint8Array(B3_BLOCK_LEN), blockLen: 0, compressed: 0 };
+  }
+
+  function b3ChunkLen(chunk) {
+    return B3_BLOCK_LEN * chunk.compressed + chunk.blockLen;
+  }
+
+  function b3ChunkUpdate(chunk, input, start, end) {
+    var at = start;
+    while (at < end) {
+      if (chunk.blockLen === B3_BLOCK_LEN) {
+        var flags = chunk.compressed === 0 ? B3_CHUNK_START : 0;
+        chunk.cv = b3Compress(chunk.cv, b3Words(chunk.block, 0, B3_BLOCK_LEN), chunk.counter, B3_BLOCK_LEN, flags).slice(0, 8);
+        chunk.compressed += 1;
+        chunk.block = new Uint8Array(B3_BLOCK_LEN);
+        chunk.blockLen = 0;
+      }
+      var take = Math.min(B3_BLOCK_LEN - chunk.blockLen, end - at);
+      for (var i = 0; i < take; i++) chunk.block[chunk.blockLen + i] = input[at + i];
+      chunk.blockLen += take;
+      at += take;
+    }
+  }
+
+  function b3ChunkOutput(chunk) {
+    return {
+      cv: chunk.cv,
+      words: b3Words(chunk.block, 0, chunk.blockLen),
+      counter: chunk.counter,
+      blockLen: chunk.blockLen,
+      flags: (chunk.compressed === 0 ? B3_CHUNK_START : 0) | B3_CHUNK_END
+    };
+  }
+
+  function b3OutputCv(out) {
+    return b3Compress(out.cv, out.words, out.counter, out.blockLen, out.flags).slice(0, 8);
+  }
+
+  function b3ParentOutput(left, right, key) {
+    return { cv: key, words: left.concat(right), counter: 0, blockLen: B3_BLOCK_LEN, flags: B3_PARENT };
+  }
+
+  /* BLAKE3 hash of `input` (Uint8Array or byte array) → `outLen` bytes
+     (default 32), the reference `Hasher::update` + `finalize_xof`. */
+  function blake3(input, outLen) {
+    var bytes = input instanceof Uint8Array ? input : Uint8Array.from(input || []);
+    var want = typeof outLen === "number" && outLen > 0 ? Math.floor(outLen) : 32;
+    var key = B3_IV.slice();
+    var chunk = b3Chunk(key, 0);
+    var stack = [];
+    var at = 0;
+    while (at < bytes.length) {
+      if (b3ChunkLen(chunk) === B3_CHUNK_LEN) {
+        var cv = b3OutputCv(b3ChunkOutput(chunk));
+        var total = chunk.counter + 1;
+        while ((total & 1) === 0) {
+          cv = b3OutputCv(b3ParentOutput(stack.pop(), cv, key));
+          total = total / 2;
+        }
+        stack.push(cv);
+        chunk = b3Chunk(key, chunk.counter + 1);
+      }
+      var take = Math.min(B3_CHUNK_LEN - b3ChunkLen(chunk), bytes.length - at);
+      b3ChunkUpdate(chunk, bytes, at, at + take);
+      at += take;
+    }
+    var output = b3ChunkOutput(chunk);
+    for (var n = stack.length - 1; n >= 0; n--) {
+      output = b3ParentOutput(stack[n], b3OutputCv(output), key);
+    }
+    var result = new Uint8Array(want);
+    var produced = 0;
+    var block = 0;
+    while (produced < want) {
+      var words = b3Compress(output.cv, output.words, block, output.blockLen, output.flags | B3_ROOT);
+      for (var wi = 0; wi < 16 && produced < want; wi++) {
+        for (var bi = 0; bi < 4 && produced < want; bi++) {
+          result[produced] = (words[wi] >>> (8 * bi)) & 0xff;
+          produced += 1;
+        }
+      }
+      block += 1;
+    }
+    return result;
+  }
+
+  /* CHALLENGE pow: the server admits `answer` when
+     BLAKE3(seed ‖ answer)[0] == 0 (onyx-server src/daemon/challenge.zig
+     `powOk`; seed = the raw bytes behind the NOTICE hex, at most 32;
+     answer = 1..64 printable bytes). Decimal nonces from `start` up,
+     `budget` tries; "" when the seed is malformed or the budget runs out. */
+  function challengeSeedBytes(hex) {
+    var text = String(hex || "");
+    if (text.length === 0 || text.length > 64 || text.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(text)) return null;
+    var out = new Uint8Array(text.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(text.substr(i * 2, 2), 16);
+    return out;
+  }
+
+  function solveChallengePow(seedHex, start, budget) {
+    var seed = challengeSeedBytes(seedHex);
+    if (!seed) return "";
+    var from = typeof start === "number" && start >= 0 ? Math.floor(start) : 0;
+    var tries = typeof budget === "number" && budget > 0 ? Math.floor(budget) : 1000000;
+    var msg = new Uint8Array(seed.length + 16);
+    msg.set(seed, 0);
+    for (var n = from; n < from + tries; n++) {
+      var digits = String(n);
+      for (var i = 0; i < digits.length; i++) msg[seed.length + i] = digits.charCodeAt(i);
+      var digest = blake3(msg.subarray(0, seed.length + digits.length), 1);
+      if (digest[0] === 0) return digits;
+    }
+    return "";
+  }
+
+  function challengePowOk(seedHex, answer) {
+    var seed = challengeSeedBytes(seedHex);
+    var text = String(answer || "");
+    if (!seed || text.length === 0 || text.length > 64 || /[\x00-\x1f\x7f]/.test(text)) return false;
+    var tail = new TextEncoder().encode(text);
+    var msg = new Uint8Array(seed.length + tail.length);
+    msg.set(seed, 0);
+    msg.set(tail, seed.length);
+    return blake3(msg, 1)[0] === 0;
+  }
+
+  /* v3/gap-auth: solve the pre-001 CHALLENGE off the main turn. About
+     one nonce in 256 passes, so this normally finishes in the first
+     slice; the slices and the cap only bound a hostile seed. `done`
+     gets the answer, or "" when none was found in budget. */
+  var CHALLENGE_POW_SLICE = 4000;
+  var CHALLENGE_POW_MAX_TRIES = 2000000;
+
+  function solveChallengeAsync(seedHex, done) {
+    var next = 0;
+    var cancelled = false;
+    function slice() {
+      if (cancelled) return;
+      var answer = solveChallengePow(seedHex, next, CHALLENGE_POW_SLICE);
+      if (answer) { done(answer); return; }
+      next += CHALLENGE_POW_SLICE;
+      if (!challengeSeedBytes(seedHex) || next >= CHALLENGE_POW_MAX_TRIES) { done(""); return; }
+      setTimeout(slice, 0);
+    }
+    slice();
+    return { cancel: function () { cancelled = true; } };
+  }
+
+  /* v3/gap-auth: the `authGateOut` / `authGateIn` ports.
+       { kind: "solve", seed }                  -> { kind: "solved", seed, answer }
+       { kind: "identify", account, code }      -> IDENTIFY line on the socket, or
+                                                   { kind: "identifyRefused", reason }
+       { kind: "stage", account, password }     hold a SETPASS password aside
+       { kind: "commit", account }              the server confirmed: it becomes the credential
+       { kind: "drop" }                         the change failed: forget it
+       { kind: "forget" }                       forget every held credential
+     Secrets stay in the SASL credential slot; nothing here logs or echoes
+     a password or code. */
+  function wireAuthGate(app, getSocket) {
+    if (!app.ports || !app.ports.authGateOut) return;
+    var solving = null;
+    app.ports.authGateOut.subscribe(function (req) {
+      var kind = req && req.kind;
+      if (kind === "solve") {
+        var seed = String(req.seed || "");
+        if (solving) solving.cancel();
+        solving = solveChallengeAsync(seed, function (answer) {
+          solving = null;
+          try { app.ports.authGateIn.send({ kind: "solved", seed: seed, answer: answer }); } catch (err) { /* port gone */ }
+        });
+      } else if (kind === "identify") {
+        var composed = sasl.identifyLine(req.account, req.code);
+        if (composed.refused) {
+          try { app.ports.authGateIn.send({ kind: "identifyRefused", reason: composed.refused }); } catch (err) { /* port gone */ }
+        } else {
+          var socket = getSocket();
+          if (socket && socket.isOpen()) socket.send(composed.line);
+        }
+      } else if (kind === "stage") {
+        sasl.stageNewPassword(req.account, req.password);
+      } else if (kind === "commit") {
+        sasl.commitNewPassword(req.account);
+      } else if (kind === "drop") {
+        sasl.dropNewPassword();
+      } else if (kind === "forget") {
+        sasl.clearCredentials();
+      }
+    });
   }
 
   /* Saved searches — local-first named vault queries in their own sibling
@@ -2490,7 +2954,10 @@
      `acceptFailed` (the engine's accept promise rejected) and
      `errorKind` (classified getUserMedia / codec failure) are
      validated fail-closed in Elm (CallDock). */
-  var VOICE_RING_FIELDS = ["acceptFailed", "errorKind"];
+  var VOICE_RING_FIELDS = ["acceptFailed", "errorKind",
+    /* v3/rx-calls: media failure detail (voice-core.ts onError /
+       onDecodeError / peerKeyChanged); Elm bounds and validates. */
+    "mediaError", "errorPeer", "errorMedia"];
 
   /* Map a getUserMedia / engine error to the spec §2.15 classes. */
   function voiceErrorKind(err) {
@@ -2534,9 +3001,15 @@
       if (ev.joinFailed) outcome = "failed";
       else if (ev.rejoinPending) outcome = "dropped";
       else if (feed.sawEstablished) outcome = "ended";
+      /* v3/rx-calls: the adapter's follow-up idle after a removal / a
+         failed capture rejoin keeps an honest outcome (the first idle
+         already reset the feed). */
+      else if (ev.errorKind === "removed") outcome = "ended";
+      else if (ev.errorKind === "capture") outcome = "failed";
       var idleSnapshot = { state: "idle", nick: "", channel: null, startedAt: null, outcome: outcome };
       /* v3/calls-c6 */
       if (typeof ev.errorKind === "string") idleSnapshot.errorKind = ev.errorKind;
+      if (typeof ev.mediaError === "string") idleSnapshot.mediaError = ev.mediaError.slice(0, 200);
       return {
         snapshot: idleSnapshot,
         feed: voiceFeedBlank()
@@ -2708,6 +3181,8 @@
       try {
         if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(snapshot);
       } catch (err) { /* port gone */ }
+      /* v3/rx-calls: keep the screen awake + OS call controls while live */
+      try { voiceSessionAssist(app).update(snapshot); } catch (err) { /* assist is best-effort */ }
     }
     /* Re-send the live call with confirmed local-media fields (command
        outcomes). Dropped while idle — nothing to confirm. */
@@ -2843,6 +3318,104 @@
       bindNow: bindNow,
       disconnect: function () { if (observer) observer.disconnect(); }
     };
+  }
+
+  /* v3/rx-calls — call session assist (oracle `screenWakeLock.ts` +
+     `callMediaSession.ts`): while a call is live, hold a screen wake
+     lock (re-acquired when the page is visible again; released on
+     idle) and register OS media-session call controls — the
+     microphone toggle and hang-up go through the SAME `shortcut` port
+     names as the Ctrl+Shift chords (`call-mute`, `call-leave`), so Elm
+     keeps every rule (leave confirmation included). Neutral metadata:
+     the room name, never message content. Everything feature-detected
+     and best-effort; created once per app. */
+  var voiceSessionAssists = (typeof WeakMap === "function") ? new WeakMap() : null;
+  function createVoiceSessionAssist(app, win) {
+    var nav = win && win.navigator;
+    var lock = null;
+    var pending = false;
+    var live = false;
+    var room = "";
+    function send(name) {
+      try { if (app.ports && app.ports.shortcut) app.ports.shortcut.send(name); } catch (err) { /* port gone */ }
+    }
+    function acquire() {
+      if (!live || lock || pending || !nav || !nav.wakeLock || typeof nav.wakeLock.request !== "function") return;
+      try { if (win.document && win.document.visibilityState === "hidden") return; } catch (err) { /* assume visible */ }
+      pending = true;
+      var req;
+      try { req = nav.wakeLock.request("screen"); } catch (err) { pending = false; return; }
+      Promise.resolve(req).then(function (sentinel) {
+        pending = false;
+        if (!sentinel) return;
+        if (!live) { try { sentinel.release(); } catch (err) { /* already released */ } return; }
+        lock = sentinel;
+        try { sentinel.addEventListener("release", function () { if (lock === sentinel) lock = null; }); } catch (err) { /* old API */ }
+      }, function () { pending = false; });
+    }
+    function release() {
+      var held = lock;
+      lock = null;
+      if (held) { try { held.release(); } catch (err) { /* already released */ } }
+    }
+    function sessionHandlers(on) {
+      var ms = nav && nav.mediaSession;
+      if (!ms || typeof ms.setActionHandler !== "function") return;
+      var set = function (action, fn) { try { ms.setActionHandler(action, fn); } catch (err) { /* unsupported action */ } };
+      set("togglemicrophone", on ? function () { send("call-mute"); } : null);
+      set("hangup", on ? function () { send("call-leave"); } : null);
+      try {
+        if (on && typeof win.MediaMetadata === "function") {
+          ms.metadata = new win.MediaMetadata({ title: room ? "Call in " + room : "Onyx call", artist: "Onyx" });
+        } else if (!on) {
+          ms.metadata = null;
+        }
+      } catch (err) { /* metadata is cosmetic */ }
+    }
+    try {
+      if (win.document && win.document.addEventListener) {
+        win.document.addEventListener("visibilitychange", function () {
+          if (win.document.visibilityState === "visible") acquire();
+        });
+      }
+    } catch (err) { /* no document events */ }
+    return {
+      update: function (snapshot) {
+        var state = snapshot && snapshot.state;
+        var nowLive = state === "in_call";
+        var nextRoom = (snapshot && typeof snapshot.channel === "string") ? snapshot.channel : "";
+        if (nowLive && (!live || nextRoom !== room)) {
+          live = true;
+          room = nextRoom;
+          sessionHandlers(true);
+          acquire();
+        } else if (!nowLive && live) {
+          live = false;
+          room = "";
+          sessionHandlers(false);
+          release();
+        }
+      },
+      setMicrophoneActive: function (active) {
+        var ms = nav && nav.mediaSession;
+        if (!live || !ms || typeof ms.setMicrophoneActive !== "function") return;
+        try { ms.setMicrophoneActive(!!active); } catch (err) { /* unsupported */ }
+      },
+      held: function () { return !!lock; }
+    };
+  }
+  function voiceSessionAssist(app) {
+    var win = (typeof window !== "undefined") ? window : null;
+    var noop = { update: function () {}, setMicrophoneActive: function () {}, held: function () { return false; } };
+    if (!win || !app) return noop;
+    if (voiceSessionAssists) {
+      var have = voiceSessionAssists.get(app);
+      if (have) return have;
+      var made = createVoiceSessionAssist(app, win);
+      voiceSessionAssists.set(app, made);
+      return made;
+    }
+    return noop;
   }
 
   function runVoiceEngine(call, ok, fail) {
@@ -3450,12 +4023,23 @@
         sendPort(batch);
       }
     });
+    /* v3/gap-shell: ONE wsClosed per socket. A failed socket fires
+       `error` and then `close` in the same task, which reached Elm as two
+       closes (two "Disconnected" rows, and a second close could undo a
+       redial). `close` reports (it carries the reason); `error` is only a
+       next-task fallback. */
+    var closeReported = false;
+    function reportClose(payload) {
+      if (closeReported) return;
+      closeReported = true;
+      app.ports.wsClosed.send(payload);
+    }
     socket.addEventListener("close", function (event) {
-      app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
+      reportClose({ clean: event.wasClean, reason: event.reason || "" });
       if (onClose) { try { onClose(); } catch (err) {} }
     });
     socket.addEventListener("error", function () {
-      app.ports.wsClosed.send({ clean: false, reason: "error" });
+      setTimeout(function () { reportClose({ clean: false, reason: "error" }); }, 0);
     });
     return {
       send: function (line) {
@@ -3658,8 +4242,15 @@ function fetchPublicFeed(url) {
     }
 
     function attach(found) {
+      var prev = pane;
       detach();
-      if (!found) return;
+      if (!found) {
+        /* v3/rx-shell: the pane is shared with Home (no transcript): a
+           reader who scrolled a conversation to its bottom must not
+           land on Home scrolled past its masthead. */
+        if (prev) prev.scrollTop = 0;
+        return;
+      }
       log = found;
       pane = paneOf(found);
       key = found.getAttribute("data-transcript-key") || "";
@@ -3759,6 +4350,63 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* v3/gap-organize — organize memory + attention prefs. Elm owns every
+     shape, bound and owner-scoped key name (`Organize`, `Attention`,
+     `Organizer`); the bridge only reads and writes whole localStorage
+     values for an allow-listed set of keys:
+       owner-scoped  onyx:{room-folders,hidden-rooms,closed-conversations,
+                     bookmarks,user-notes,smart-mute}:owner:<enc>
+       read-only     onyx:channel-navigation:owner:<enc> (the oracle's
+                     record, read once to bring its folders across)
+       device-wide   onyx:dnd-quiet-{start,end,enabled}, onyx:calm
+     A `null` value removes the key. Reads answer with `null` for a
+     missing key (never "") so Elm can tell "unset" from "empty". */
+  var ORGANIZE_OWNED = /^onyx:(room-folders|hidden-rooms|closed-conversations|bookmarks|user-notes|smart-mute|channel-navigation):owner:[A-Za-z0-9%._~!*'()-]{1,8192}$/;
+  var ORGANIZE_DEVICE = /^onyx:(dnd-quiet-start|dnd-quiet-end|dnd-quiet-enabled|calm)$/;
+  var ORGANIZE_MAX_VALUE = 2 * 1024 * 1024;
+  function organizeReadable(key) {
+    return typeof key === "string" && (ORGANIZE_OWNED.test(key) || ORGANIZE_DEVICE.test(key));
+  }
+  function organizeWritable(key) {
+    return organizeReadable(key) && key.indexOf("onyx:channel-navigation:") !== 0;
+  }
+  function wireOrganize(app, env) {
+    var storage = function () {
+      try {
+        var store = (env && env.storage) || (typeof window !== "undefined" ? window.localStorage : null);
+        return store && typeof store.getItem === "function" ? store : null;
+      } catch (err) { return null; }
+    };
+    if (app.ports.organizeStore) {
+      app.ports.organizeStore.subscribe(function (req) {
+        if (!req || !organizeWritable(req.key)) return;
+        var store = storage();
+        if (!store) return;
+        try {
+          if (req.value === null || req.value === undefined) {
+            store.removeItem(req.key);
+          } else if (typeof req.value === "string" && req.value.length <= ORGANIZE_MAX_VALUE) {
+            store.setItem(req.key, req.value);
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.organizeLoad && app.ports.organizeLoaded) {
+      app.ports.organizeLoad.subscribe(function (req) {
+        if (!req || typeof req.tag !== "string" || !Array.isArray(req.keys)) return;
+        var store = storage();
+        var values = {};
+        req.keys.slice(0, 32).forEach(function (key) {
+          if (!organizeReadable(key)) return;
+          var raw = null;
+          try { raw = store ? store.getItem(key) : null; } catch (err) { raw = null; }
+          values[key] = (typeof raw === "string" && raw.length <= ORGANIZE_MAX_VALUE) ? raw : null;
+        });
+        try { app.ports.organizeLoaded.send({ tag: req.tag, values: values }); } catch (err) { /* app gone */ }
+      });
+    }
+  }
+
   function wireTranscriptScroll(app, env) {
     if (!app.ports.scrollPolicy && !app.ports.scrollState) return null;
     var e = env || {};
@@ -3827,15 +4475,59 @@ function fetchPublicFeed(url) {
     } catch (err) { return false; }
   }
   var CALL_CHORDS = { m: "mute", e: "camera", h: "hand", l: "leave", g: "layout", f: "size", s: "speaker", c: "captions" /* v3/calls-c8 */ };
+  /* v3/gap-commands — the shell chords of the oracle `shortcutsRegistry`
+     (verified against src/lib/keyboard/shortcutsRegistry.ts and
+     useKeyboardShortcuts.ts). Ctrl/Cmd+Shift letters below are the
+     shell's outside a call; while a call is live the call chords above
+     own M / E / L (and the rest of CALL_CHORDS). */
+  var SHELL_SHIFT_CHORDS = { a: "account", e: "mark-read", d: "dnd", m: "room-mute", u: "attach", l: "schedule" };
+  /* Composer-local chords also fire from the message box itself
+     (oracle COMPOSER_EDITABLE_ALLOWED_IDS). */
+  var COMPOSER_CHORDS = { attach: true, schedule: true };
+  var COMPOSER_INPUT_ID = "shell-composer-input";
+  /* WCAG 2.1.4: the single-character keys (`?`, `/`, J, K, N, U, G…)
+     can be switched off on this device; the switch lives in the `?`
+     overlay and is stored here. */
+  var SINGLE_KEYS_STORAGE_KEY = "onyx:single-key-shortcuts";
+  var G_SEQUENCE_MS = 1200;
+  var shortcutSequence = { gAt: 0 };
   function callKeysLive(doc) {
     if (!doc || !doc.querySelector) return false;
     try { return !!doc.querySelector('[data-call-keys="on"]'); } catch (err) { return false; }
   }
-  function classifyShortcut(e, doc) {
+  function singleKeysEnabled() {
+    try {
+      if (typeof window === "undefined" || !window || !window.localStorage) return true;
+      return window.localStorage.getItem(SINGLE_KEYS_STORAGE_KEY) !== "off";
+    } catch (err) { return true; }
+  }
+  /* Letter of a key press, layout-safe for Alt/Option chords (macOS
+     Option+M types "µ"): `code` (`KeyM`) wins when present. */
+  function shortcutLetter(e) {
+    var code = typeof e.code === "string" ? e.code : "";
+    if (/^Key[A-Z]$/.test(code)) return code.charAt(3).toLowerCase();
+    var key = typeof e.key === "string" ? e.key : "";
+    return key.length === 1 ? key.toLowerCase() : "";
+  }
+  function shortcutComposerTarget(target) {
+    try { return !!target && target.id === COMPOSER_INPUT_ID; } catch (err) { return false; }
+  }
+  /* Controls that own Enter / J / K themselves (oracle isInteractiveTarget). */
+  function shortcutInteractiveTarget(target) {
+    if (!target || typeof target !== "object" || !target.closest) return false;
+    try {
+      return !!target.closest(
+        'button, a[href], summary, select, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="switch"], [aria-controls]'
+      );
+    } catch (err) { return false; }
+  }
+  function classifyShortcut(e, doc, opts) {
     if (!e || e.defaultPrevented) return null;
-    if (e.isComposing || e.keyCode === 229) return null;
+    if (e.isComposing || e.keyCode === 229) { shortcutSequence.gAt = 0; return null; }
     var key = typeof e.key === "string" ? e.key : "";
     var mod = !!(e.ctrlKey || e.metaKey);
+    var now = opts && typeof opts.now === "number" ? opts.now : Date.now();
+    var singleKeys = opts && typeof opts.singleKeys === "boolean" ? opts.singleKeys : singleKeysEnabled();
     if (key === "Escape") {
       if (mod || e.altKey || e.shiftKey) return null;
       return { name: "escape", prevent: false };
@@ -3844,24 +4536,151 @@ function fetchPublicFeed(url) {
       if (shortcutForeignModal(doc)) return null;
       return { name: "palette-toggle", prevent: true };
     }
+    var letter = shortcutLetter(e);
+    /* v3/gap-commands — Ctrl/Cmd+, opens preferences, even while typing
+       (oracle EDITABLE_ALLOWED_IDS). */
+    if (mod && !e.altKey && !e.shiftKey && (key === "," || e.code === "Comma")) {
+      if (shortcutForeignModal(doc)) return null;
+      return { name: "prefs", prevent: true };
+    }
     /* v3/calls-c11 (C12) — call chords: Ctrl/Cmd+Shift+<letter>, only
        while a call is live (the always-mounted announcer carries
        `data-call-keys="on"`), never while typing, never under a
        foreign modal. Push to talk (C9) is the separate user-bound
-       single-key runtime (`createPushToTalk`), on the same scope rules. */
+       single-key runtime (`createPushToTalk`), on the same scope rules.
+       v3/gap-commands: outside a call the same modifier pair carries
+       the shell chords (account, mark read, DND, mute room, attach,
+       schedule). */
     if (mod && e.shiftKey && !e.altKey) {
-      var chord = CALL_CHORDS[key.toLowerCase()];
-      if (!chord) return null;
+      var editable = shortcutEditableTarget(e.target);
+      var chord = CALL_CHORDS[letter];
+      if (chord && callKeysLive(doc)) {
+        if (editable) return null;
+        if (shortcutForeignModal(doc)) return null;
+        return { name: "call-" + chord, prevent: true };
+      }
+      var shell = SHELL_SHIFT_CHORDS[letter];
+      if (!shell) return null;
+      if (editable && !(COMPOSER_CHORDS[shell] && shortcutComposerTarget(e.target))) return null;
+      if (shortcutForeignModal(doc)) return null;
+      return { name: shell, prevent: true };
+    }
+    /* Ctrl/Cmd+B stars the room; Ctrl/Cmd+Alt+E exports the local
+       transcript — never while typing (Ctrl+Alt is AltGr on many
+       layouts, so typed text always wins). */
+    if (mod && !e.shiftKey && (letter === "b" && !e.altKey || letter === "e" && e.altKey)) {
       if (shortcutEditableTarget(e.target)) return null;
       if (shortcutForeignModal(doc)) return null;
-      if (!callKeysLive(doc)) return null;
-      return { name: "call-" + chord, prevent: true };
+      return { name: letter === "b" ? "room-star" : "export", prevent: true };
     }
-    if (mod || e.altKey) return null;
-    if (key !== "?" && key !== "/") return null;
-    if (shortcutEditableTarget(e.target)) return null;
-    if (shortcutForeignModal(doc)) return null;
-    return key === "?" ? { name: "shortcuts", prevent: true } : { name: "palette", prevent: true };
+    if (mod) return null;
+    /* Alt chords: conversation stepping, member list, room list focus,
+       composer focus. Never while typing. */
+    if (e.altKey) {
+      if (shortcutEditableTarget(e.target)) return null;
+      if (shortcutForeignModal(doc)) return null;
+      if (key === "ArrowUp" || key === "ArrowDown") {
+        return { name: (e.shiftKey ? "unread-" : "conv-") + (key === "ArrowUp" ? "prev" : "next"), prevent: true };
+      }
+      if (e.shiftKey) return null;
+      if (letter === "m") return { name: "members", prevent: true, local: true };
+      if (letter === "s") return { name: "sidebar-focus", prevent: true, local: true };
+      if (key === "Enter" && !shortcutInteractiveTarget(e.target)) return { name: "composer-focus", prevent: true, local: true };
+      return null;
+    }
+    if (shortcutEditableTarget(e.target)) { shortcutSequence.gAt = 0; return null; }
+    if (shortcutForeignModal(doc)) { shortcutSequence.gAt = 0; return null; }
+    /* Enter focuses the composer from anywhere that is not a control. */
+    if (key === "Enter") {
+      shortcutSequence.gAt = 0;
+      if (e.shiftKey || shortcutInteractiveTarget(e.target)) return null;
+      return { name: "composer-focus", prevent: true, local: true };
+    }
+    if (!singleKeys) { shortcutSequence.gAt = 0; return null; }
+    var armed = shortcutSequence.gAt && now - shortcutSequence.gAt <= G_SEQUENCE_MS;
+    shortcutSequence.gAt = 0;
+    if (armed && !e.shiftKey) {
+      if (key.toLowerCase() === "h") return { name: "go-home", prevent: true };
+      if (key.toLowerCase() === "d") return { name: "go-date", prevent: true };
+    }
+    if (key === "?") return { name: "shortcuts", prevent: true };
+    if (key === "/") return { name: "palette", prevent: true };
+    if (e.shiftKey || key.length !== 1) return null;
+    var lower = key.toLowerCase();
+    if (lower === "g") { shortcutSequence.gAt = now; return { name: "", prevent: true, local: true }; }
+    if (lower === "j" || lower === "k") {
+      if (shortcutInteractiveTarget(e.target)) return null;
+      return { name: lower === "j" ? "message-next" : "message-prev", prevent: true, local: true };
+    }
+    if (lower === "n") return { name: "next-unread", prevent: true };
+    if (lower === "u") return { name: "follow", prevent: true };
+    return null;
+  }
+  /* v3/gap-commands — the focus-only shortcuts run here (Elm holds no
+     DOM handles): J / K move through the transcript's message rows,
+     Enter / Alt+Enter focus the composer, Alt+S the room list, Alt+M
+     opens the member sheet (narrow) or moves into the member rail
+     (wide). Returns whether anything happened, so a key with nothing
+     to act on keeps its browser default. Never under the palette or
+     the shortcuts overlay (focus must stay inside a modal). */
+  function shortcutFocus(el) {
+    if (!el || !el.focus) return false;
+    try { el.focus({ preventScroll: true }); } catch (err) {
+      try { el.focus(); } catch (ignored) { return false; }
+    }
+    return true;
+  }
+  function shortcutVisible(el) {
+    try { return !!el && !el.hidden && el.getClientRects && el.getClientRects().length > 0; } catch (err) { return false; }
+  }
+  function runLocalShortcut(name, doc) {
+    if (!doc || !doc.querySelector) return false;
+    try {
+      if (doc.querySelector('[data-shortcut-scope="palette"], [data-shortcut-scope="shortcuts"]')) return false;
+    } catch (err) { return false; }
+    if (name === "") return true; /* the armed `g` prefix */
+    if (name === "composer-focus") {
+      var field = doc.getElementById ? doc.getElementById(COMPOSER_INPUT_ID) : null;
+      if (!field || field.disabled || !shortcutVisible(field)) return false;
+      return shortcutFocus(field);
+    }
+    if (name === "message-next" || name === "message-prev") {
+      var rows = [];
+      try {
+        rows = Array.prototype.filter.call(
+          doc.querySelectorAll('[data-transcript-key] li.onyx-message'),
+          shortcutVisible
+        );
+      } catch (err) { return false; }
+      if (rows.length === 0) return false;
+      var active = doc.activeElement;
+      var current = -1;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] === active || (rows[i].contains && active && rows[i].contains(active))) { current = i; break; }
+      }
+      var next = current === -1
+        ? rows.length - 1
+        : Math.max(0, Math.min(rows.length - 1, current + (name === "message-next" ? 1 : -1)));
+      var row = rows[next];
+      if (!shortcutFocus(row)) return false;
+      try { row.scrollIntoView({ block: "nearest" }); } catch (err) { /* best-effort */ }
+      return true;
+    }
+    if (name === "sidebar-focus") {
+      var item = doc.querySelector('.onyx-rail-item[aria-current="location"]') || doc.querySelector(".onyx-rail-item");
+      return shortcutVisible(item) && shortcutFocus(item);
+    }
+    if (name === "members") {
+      var toggle = doc.querySelector('[data-testid="members-toggle"]');
+      if (shortcutVisible(toggle)) {
+        try { toggle.click(); return true; } catch (err) { return false; }
+      }
+      var rail = doc.getElementById ? doc.getElementById("onyx-members") : null;
+      if (!shortcutVisible(rail)) return false;
+      var first = rail.querySelector('button, input, [tabindex]:not([tabindex="-1"])');
+      return shortcutFocus(first || rail);
+    }
+    return false;
   }
   /* v3/frame — the ONE overlay focus mechanism (APG dialog pattern).
      Every overlay the Elm view mounts carries a scope marker:
@@ -3967,12 +4786,24 @@ function fetchPublicFeed(url) {
         overlayFocus(restore);
       }
     }
+    /* v3/rx-convo — a docked overlay (one the layout shows as a pane
+       beside live content, e.g. the thread pane on wide screens; its
+       CSS sets `--overlay-docked: 1`) keeps focus-in and return-focus
+       but never traps Tab: the content beside it stays reachable. */
+    function docked(root) {
+      try {
+        var view = root.ownerDocument && root.ownerDocument.defaultView;
+        if (!view || !view.getComputedStyle) return false;
+        return String(view.getComputedStyle(root).getPropertyValue("--overlay-docked")).trim() === "1";
+      } catch (err) { return false; }
+    }
     function trapTab(e) {
       if (!e || e.key !== "Tab" || e.defaultPrevented) return;
       if (lightboxOpen()) return;
       var live = mounted();
       var root = live.length ? live[live.length - 1] : null;
       if (!root) return;
+      if (docked(root)) return;
       var items = overlayFocusables(root);
       if (items.length === 0) {
         try { e.preventDefault(); } catch (err) { /* best-effort */ }
@@ -4328,11 +5159,70 @@ function fetchPublicFeed(url) {
     window.addEventListener("keydown", function (e) {
       var hit = classifyShortcut(e, doc);
       if (!hit) return;
+      /* v3/gap-commands: focus-only keys act here and only claim the
+         key when they did something. */
+      if (hit.local) {
+        if (runLocalShortcut(hit.name, doc)) {
+          try { e.preventDefault(); } catch (err) { /* best-effort */ }
+        }
+        return;
+      }
       if (hit.prevent) {
         try { e.preventDefault(); } catch (err) { /* best-effort */ }
       }
       try { app.ports.shortcut.send(hit.name); } catch (err) { /* port gone */ }
     });
+    /* v3/gap-commands — palette recents and the single-key switch. */
+    wireGapPrefs(app, window);
+  }
+
+  /* v3/gap-commands — device storage for the palette recents (keyed by
+     device-memory owner, at most 8 owners x 8 ids) and the single-key
+     shortcuts switch; one boot snapshot goes back to Elm. */
+  var PALETTE_RECENTS_STORAGE_KEY = "onyx:palette-recents";
+  function gapReadRecents(storage) {
+    var out = {};
+    try {
+      var raw = storage ? storage.getItem(PALETTE_RECENTS_STORAGE_KEY) : null;
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return out;
+      var owners = Object.keys(parsed).slice(0, 8);
+      owners.forEach(function (owner) {
+        var ids = parsed[owner];
+        if (typeof owner !== "string" || owner.length > 600 || !Array.isArray(ids)) return;
+        out[owner] = ids.filter(function (id) { return typeof id === "string" && id.length > 0 && id.length <= 200; }).slice(0, 8);
+      });
+    } catch (err) { /* corrupt or blocked storage: start empty */ }
+    return out;
+  }
+  function wireGapPrefs(app, win) {
+    var storage = null;
+    try { storage = (win && win.localStorage) || null; } catch (err) { storage = null; }
+    if (app.ports.paletteRecentsSave) {
+      app.ports.paletteRecentsSave.subscribe(function (req) {
+        if (!req || typeof req.owner !== "string" || !req.owner || req.owner.length > 600 || !Array.isArray(req.ids)) return;
+        var all = gapReadRecents(storage);
+        delete all[req.owner];
+        var next = {};
+        next[req.owner] = req.ids.filter(function (id) { return typeof id === "string" && id.length > 0 && id.length <= 200; }).slice(0, 8);
+        Object.keys(all).slice(0, 7).forEach(function (owner) { next[owner] = all[owner]; });
+        try { if (storage) storage.setItem(PALETTE_RECENTS_STORAGE_KEY, JSON.stringify(next)); } catch (err) { /* session-only */ }
+      });
+    }
+    if (app.ports.singleKeysSave) {
+      app.ports.singleKeysSave.subscribe(function (req) {
+        try {
+          if (!storage) return;
+          if (req && req.enabled === false) storage.setItem(SINGLE_KEYS_STORAGE_KEY, "off");
+          else storage.removeItem(SINGLE_KEYS_STORAGE_KEY);
+        } catch (err) { /* session-only */ }
+      });
+    }
+    if (app.ports.gapPrefsLoaded) {
+      var singleKeys = true;
+      try { singleKeys = !storage || storage.getItem(SINGLE_KEYS_STORAGE_KEY) !== "off"; } catch (err) { singleKeys = true; }
+      try { app.ports.gapPrefsLoaded.send({ recents: gapReadRecents(storage), singleKeys: singleKeys }); } catch (err) { /* port gone */ }
+    }
   }
 
   function wire(app) {
@@ -4341,6 +5231,26 @@ function fetchPublicFeed(url) {
     var keepalive = null;
 
     openVault(function (db) { vault = db; });
+
+    /* v3/gap-import: third-party history import (historyImport.js, loaded
+       before this file). The module reads the vault through this accessor
+       so owner scoping, when the vault gains it, changes one place. With
+       the module missing every pick fails closed with a visible reason. */
+    if (app.ports.historyImportPick) {
+      var historyImport = global.OnyxHistoryImport;
+      if (historyImport && typeof historyImport.wire === "function") {
+        historyImport.wire(app, { vault: function () { return vault; } });
+      } else {
+        app.ports.historyImportPick.subscribe(function (req) {
+          try {
+            app.ports.historyImportFailed.send({
+              job: req && typeof req.job === "number" ? req.job : 0,
+              message: "History import is unavailable in this build."
+            });
+          } catch (err) { /* port gone */ }
+        });
+      }
+    }
 
     /* v3/calls-engine: the mounted voice engine shares this socket. */
     var voiceSeam = createVoiceSeam({
@@ -4568,7 +5478,13 @@ function fetchPublicFeed(url) {
         try {
           var done = engine.joinVoice(channel, { video: video });
           if (done && typeof done.then === "function") {
-            done.then(null, function (reason) { voiceFailed(channel, reason); });
+            done.then(null, function (reason) {
+              /* v3/rx-calls: Leave during the join cancels it — idle, not failed */
+              var cancelled;
+              try { cancelled = !!reason && reason.name === "AbortError"; } catch (err) { cancelled = false; }
+              if (cancelled) voicePush({ state: "idle", nick: "", channel: null });
+              else voiceFailed(channel, reason);
+            });
           }
         } catch (err) {
           voiceFailed(channel, err);
@@ -4586,6 +5502,8 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.voiceMute) {
       app.ports.voiceMute.subscribe(function (req) {
+        /* v3/rx-calls: the OS call controls show the microphone state */
+        try { voiceSessionAssist(app).setMicrophoneActive(!(req && req.muted)); } catch (err) { /* best-effort */ }
         var engine = voiceEngine();
         if (!engine || typeof engine.setMuted !== "function") return;
         try { engine.setMuted(!!(req && req.muted)); } catch (err) { /* mute is best-effort */ }
@@ -6019,6 +6937,61 @@ function fetchPublicFeed(url) {
         } catch (err) { /* Elm tore down — non-fatal */ }
       });
     }
+    /* v3/gap-usermodes: the owner-scoped `onyx:usermodes:owner:<owner>` slot.
+       Elm owns the shape and validates on load (unknown mode letters, bad
+       rows and oversize text all drop), so the bridge stores the verbatim
+       JSON string Elm hands back and returns the parsed object — capped at
+       64 KiB like the other owner slots. A missing, oversize or unparsable
+       slot resolves to null (Elm keeps its defaults). Only the latest
+       requested owner resolves, so a late load after an account or nick
+       switch can never apply the old owner's wishes. Nothing secret is ever
+       kept here: modes the browser re-applies, a server-ignore opt-in, the
+       real name and the (public) text of sends the server already holds. */
+    var USERMODES_BASE_KEY = "onyx:usermodes";
+    var USERMODES_MAX_CHARS = 64 * 1024;
+    var userModesPendingKey = null;
+    function userModesOwnerKey(serverUrl, identity) {
+      if (typeof serverUrl !== "string" || !serverUrl) return null;
+      if (typeof identity !== "string" || !identity) return null;
+      try {
+        return USERMODES_BASE_KEY + ":owner:" + encodeURIComponent(JSON.stringify([serverUrl, identity]));
+      } catch (err) { return null; }
+    }
+    if (app.ports.userModesRequest) {
+      app.ports.userModesRequest.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || !app.ports.userModesLoaded) return;
+        userModesPendingKey = key;
+        var raw = null;
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            raw = window.localStorage.getItem(key);
+          }
+        } catch (err) { raw = null; }
+        if (userModesPendingKey !== key) return;
+        userModesPendingKey = null;
+        var payload = null;
+        try {
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= USERMODES_MAX_CHARS) {
+            payload = JSON.parse(raw);
+          }
+        } catch (err) { payload = null; }
+        try {
+          app.ports.userModesLoaded.send(payload);
+        } catch (err) { /* Elm tore down — non-fatal */ }
+      });
+    }
+    if (app.ports.userModesSave) {
+      app.ports.userModesSave.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || typeof req.json !== "string") return;
+        try {
+          if (typeof window === "undefined" || !window.localStorage) return;
+          if (req.json.length > USERMODES_MAX_CHARS) return;
+          window.localStorage.setItem(key, req.json);
+        } catch (err) { /* storage unavailable or full — non-fatal */ }
+      });
+    }
     /* CTCP TIME query reply (mirroring the oracle's
        `new Date().toString()` body): the clock lives ports-side, so
        Elm hands over the validated target and the bridge sends the
@@ -6098,7 +7071,7 @@ function fetchPublicFeed(url) {
               app.ports.vaultDmPrivacyClassified.send({ target: target, privacy: privacy });
             }
           } catch (err) { /* port gone */ }
-        });
+        }, ownerArg(req));
       });
     }
     /* Desktop/sound alerts (mirroring browser.ts): the Notification
@@ -6152,6 +7125,12 @@ function fetchPublicFeed(url) {
           note.onclick = function () {
             try { window.focus(); } catch (e) {}
             try { note.close(); } catch (e) {}
+            /* v3/gap-account: open the conversation the alert is about.
+               Elm only navigates when the alert was raised for the
+               identity that is signed in now. */
+            try {
+              if (app.ports.gapNotifyClicked) app.ports.gapNotifyClicked.send({ tag: String(req.tag || "") });
+            } catch (e) { /* port gone */ }
           };
         } catch (e) { /* alert is best-effort */ }
       });
@@ -6398,65 +7377,6 @@ function fetchPublicFeed(url) {
       app.ports.retentionPolicyRequest.subscribe(function () { sendRetentionPolicy(); });
       sendRetentionPolicy();
     }
-    function pruneAllTargets(db, onDone) {
-      var seen = [];
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readonly");
-      } catch (err) { onDone(0); return; }
-      var cursor;
-      try {
-        cursor = tx.objectStore(STORE).openCursor();
-      } catch (err) { onDone(0); return; }
-      cursor.onsuccess = function () {
-        var c = cursor.result;
-        if (c) {
-          var plain = vaultPlainRow(c.value);
-          seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at });
-          c.continue();
-        } else {
-          pruneCollectedTargets(db, seen, onDone);
-        }
-      };
-      cursor.onerror = function () { onDone(0); };
-    }
-    function pruneCollectedTargets(db, seen, onDone) {
-      var policy = readRetentionPolicy();
-      var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
-      var byTarget = {};
-      seen.forEach(function (entry) {
-        if (!entry.target) return;
-        (byTarget[entry.target] = byTarget[entry.target] || []).push(entry);
-      });
-      var targets = Object.keys(byTarget);
-      if (targets.length === 0) { onDone(0); return; }
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readwrite");
-      } catch (err) { onDone(0); return; }
-      var store = tx.objectStore(STORE);
-      var deleted = 0;
-      var finished = false;
-      function finish(count) {
-        if (finished) return;
-        finished = true;
-        onDone(count);
-      }
-      tx.oncomplete = function () { finish(deleted); };
-      tx.onerror = function () { finish(deleted); };
-      targets.forEach(function (target) {
-        var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
-        if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
-        var prune = selectPruneIds(byTarget[target], channelPolicy, now);
-        var keyById = {};
-        byTarget[target].forEach(function (entry) { keyById[entry.id] = entry.key; });
-        prune.forEach(function (id) {
-          if (keyById[id] !== undefined) {
-            try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
-          }
-        });
-      });
-    }
     if (app.ports.retentionPolicySave) {
       app.ports.retentionPolicySave.subscribe(function (req) {
         var saved = false;
@@ -6701,6 +7621,8 @@ function fetchPublicFeed(url) {
        `queueMicrotask`; missing chips (stale emits) no-op. */
     /* v3/transcript — scroll anchoring bridge. */
     wireTranscriptScroll(app);
+    /* v3/gap-organize — organize memory + attention prefs. */
+    wireOrganize(app);
 
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
@@ -6993,6 +7915,8 @@ function fetchPublicFeed(url) {
         app.ports.saslFailed.send({ reason: "SASL authentication failed: unsupported mechanism" });
       });
     }
+    /* v3/gap-auth: challenge solver + held-password IDENTIFY + SETPASS staging. */
+    wireAuthGate(app, function () { return socket; });
     var saslGuard = createSaslGuard(app);
     if (app.ports.saslTimerStart) {
       app.ports.saslTimerStart.subscribe(function () {
@@ -7196,29 +8120,32 @@ function fetchPublicFeed(url) {
       socket.close();
     });
 
+    /* v3/gap-account: every vault/outbox port names its owner scope
+       (null = none → reads empty, writes refused). */
     app.ports.vaultPut.subscribe(function (req) {
-      vaultPut(vault, req.rows, function (stored) {
+      vaultPut(vault, (req && Array.isArray(req.rows)) ? req.rows : [], function (stored) {
         app.ports.vaultStored.send({ target: req.target, stored: stored });
-      });
+      }, portOwner(req));
     });
 
     app.ports.vaultGet.subscribe(function (req) {
       vaultGet(vault, req.target, req.limit, function (rows, status) {
         app.ports.vaultRows.send({ target: req.target, rows: rows, status: status });
-      });
+      }, portOwner(req));
     });
 
     if (app.ports.vaultGetAround) {
       app.ports.vaultGetAround.subscribe(function (req) {
         vaultGetAround(vault, req.target, req.at, req.limit, function (rows, status) {
           app.ports.vaultRowsAround.send({ target: req.target, at: req.at, rows: rows, status: status });
-        });
+        }, portOwner(req));
       });
     }
 
     if (app.ports.outboxQueue) {
       app.ports.outboxQueue.subscribe(function (req) {
-        outboxQueue(vault, req, function (entry) {
+        var scoped = { target: req && req.target, text: req && req.text, owner: portOwner(req) };
+        outboxQueue(vault, scoped, function (entry) {
           app.ports.outboxQueued.send(entry);
         }, function (target) {
           app.ports.outboxQueueFailed.send({ target: target });
@@ -7229,7 +8156,8 @@ function fetchPublicFeed(url) {
     /* v3/prefs — Preferences queued-send review/discard. */
     if (app.ports.outboxReview) {
       app.ports.outboxReview.subscribe(function (req) {
-        outboxReview(vault, req, function (report) {
+        var scoped = { discard: req && req.discard, tag: req && req.tag, owner: portOwner(req) };
+        outboxReview(vault, scoped, function (report) {
           if (app.ports.outboxReviewed) app.ports.outboxReviewed.send(report);
         });
       });
@@ -7240,7 +8168,7 @@ function fetchPublicFeed(url) {
         var labeled = !!(req && req.labeled);
         outboxFlush(vault, socket, function (report) {
           app.ports.outboxFlushed.send(report);
-        }, labeled);
+        }, labeled, portOwner(req));
       });
     }
 
@@ -7302,7 +8230,8 @@ function fetchPublicFeed(url) {
           limit: limit,
           activeTarget: req ? req.activeTarget : null,
           selfNick: req ? req.selfNick : null,
-          nowMs: req ? req.nowMs : undefined
+          nowMs: req ? req.nowMs : undefined,
+          owner: portOwner(req)
         };
         vaultSearchMode(vault, query, mode, scanOpts, function (rows, status) {
           try { app.ports.vaultSearched.send({ rows: rows, status: status, seq: seq, mode: mode }); } catch (err) { /* port gone */ }
@@ -7311,7 +8240,7 @@ function fetchPublicFeed(url) {
     }
 
     if (app.ports.vaultExportRequest) {
-      app.ports.vaultExportRequest.subscribe(function () {
+      app.ports.vaultExportRequest.subscribe(function (req) {
         vaultExportAll(vault, function (snapshot) {
           var targets = snapshot.targets.length;
           var messages = 0;
@@ -7330,7 +8259,7 @@ function fetchPublicFeed(url) {
             // Download unsupported here: counts are still reported.
           }
           app.ports.vaultExported.send({ targets: targets, messages: messages });
-        });
+        }, portOwner(req));
       });
     }
 
@@ -7341,6 +8270,7 @@ function fetchPublicFeed(url) {
     if (app.ports.deviceHistoryCopyRequest) {
       app.ports.deviceHistoryCopyRequest.subscribe(function (req) {
         var seq = (req && typeof req.seq === "number") ? req.seq : 0;
+        var copyOwner = portOwner(req);
         vaultExportAll(vault, function (snapshot) {
           try {
             var targets = (snapshot.targets || []).map(function (entry) {
@@ -7364,7 +8294,7 @@ function fetchPublicFeed(url) {
           } catch (err) {
             app.ports.deviceHistoryCopyRows.send({ seq: seq, exportedAt: "", json: "[]" });
           }
-        });
+        }, copyOwner);
       });
     }
 
@@ -7392,6 +8322,38 @@ function fetchPublicFeed(url) {
           picker.click();
         } catch (err) { /* no DOM file picker here */ }
       });
+    }
+
+    /* v3/gap-account — per-scope device lists, the verified vault
+       erase, the installed-app badge, and desktop-alert clicks. */
+    if (app.ports.gapScopedListsRequest) {
+      app.ports.gapScopedListsRequest.subscribe(function (req) {
+        var answer = loadScopedLists(scopedListsStorage(), req);
+        if (!answer) return;
+        try {
+          if (app.ports.gapScopedListsLoaded) app.ports.gapScopedListsLoaded.send(answer);
+        } catch (err) { /* port gone */ }
+      });
+    }
+    if (app.ports.gapScopedListsSave) {
+      app.ports.gapScopedListsSave.subscribe(function (req) {
+        saveScopedLists(scopedListsStorage(), req);
+      });
+    }
+    if (app.ports.gapVaultClear) {
+      app.ports.gapVaultClear.subscribe(function () {
+        clearVaultMessages(vault, function (ok) {
+          try {
+            if (app.ports.gapVaultCleared) app.ports.gapVaultCleared.send({ ok: !!ok });
+          } catch (err) { /* port gone */ }
+        });
+      });
+    }
+    var badge = createAppBadge(typeof navigator !== "undefined" ? navigator : null);
+    /* A stale OS badge from an earlier session never outlives a reload. */
+    badge.set(0);
+    if (app.ports.gapAppBadge) {
+      app.ports.gapAppBadge.subscribe(function (count) { badge.set(count); });
     }
 
     /* Upload picker + send wiring (bridge functions live at top
@@ -7570,6 +8532,7 @@ function fetchPublicFeed(url) {
 
     /* v3/polish */
     wirePolish(app, { registration: swRegistration });
+    wireGapShell(app); /* v3/gap-shell */
 
     /* v3/gap-pwa-safety: a bfcache restore / freeze resume probes the
        socket at once (a dead one closes into the reconnect path) and
@@ -7606,6 +8569,22 @@ function fetchPublicFeed(url) {
     );
   }
 
+  /* v3/gap-auth: a WebAuthn rejection in plain words. The browser's own
+     message ("This is an invalid domain.", "The operation either timed
+     out or was not allowed…") reads like a fault; the DOMException name
+     says what happened. Unknown names fall back to a calm line rather
+     than a raw engine string. */
+  function passkeyErrorCopy(err, ceremony) {
+    var name = err && err.name ? String(err.name) : "";
+    var verb = ceremony === "create" ? "Passkey creation" : "Passkey sign-in";
+    if (name === "NotAllowedError") return verb + " was cancelled or timed out. Try again when you're ready.";
+    if (name === "AbortError") return verb + " was cancelled.";
+    if (name === "SecurityError") return "This passkey can't be used from this site address. Open Onyx at its usual address and try again.";
+    if (name === "InvalidStateError") return "This device already has a passkey for that account.";
+    if (name === "NotSupportedError") return "This device can't use that kind of passkey.";
+    return "Couldn't use a passkey here. Try again, or use your password.";
+  }
+
   function runCreate(app, req) {
     if (!passkeySupported()) {
       app.ports.passkeyError.send({ message: "Passkeys are not available in this browser." });
@@ -7639,7 +8618,7 @@ function fetchPublicFeed(url) {
         authData: bytesToB64url(new Uint8Array(response.getAuthenticatorData()))
       });
     }).catch(function (err) {
-      app.ports.passkeyError.send({ message: String((err && err.message) || err) });
+      app.ports.passkeyError.send({ message: passkeyErrorCopy(err, "create") });
     });
   }
 
@@ -7674,7 +8653,7 @@ function fetchPublicFeed(url) {
         signature: bytesToB64url(new Uint8Array(response.signature))
       });
     }).catch(function (err) {
-      app.ports.passkeyError.send({ message: String((err && err.message) || err) });
+      app.ports.passkeyError.send({ message: passkeyErrorCopy(err, "get") });
     });
   }
 
@@ -8704,7 +9683,10 @@ function fetchPublicFeed(url) {
       req = req || {};
       if (typeof req.serverUrl !== "string" || !req.serverUrl) return Promise.resolve(null);
       if (!attributionAccountBytes(req.account, TextEnc)) return Promise.resolve(null);
-      if (!ATTRIBUTION_NODE_HEX_RE.test(req.nodeHex || "")) return Promise.resolve(null);
+      /* v3/rx-calls: "" = node-less enrollment (IDENTITY ADD only; the
+         enroll transcript never covers the node). Anything else must
+         be a 16-hex node. */
+      if (req.nodeHex !== "" && !ATTRIBUTION_NODE_HEX_RE.test(req.nodeHex || "")) return Promise.resolve(null);
       if (!validGen(req.gen)) return Promise.resolve(null);
       var serverUrl = req.serverUrl;
       var account = req.account;
@@ -11745,7 +12727,455 @@ function fetchPublicFeed(url) {
     try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
   }
 
+  /* ── v3/gap-shell: browser connectivity, one device value, roving keys ──
+     Mirrors the oracle's OS network listeners (`store.ts` `offline` /
+     `online`): each becomes one `shellEvent` for Elm, which owns the
+     policy (drop the socket while offline so sends queue, reconnect at
+     once when back). Page restore (bfcache / freeze) is v3/gap-pwa-safety's
+     `installPageLifecycle` + `pageRestored`. The boot event also carries
+     `navigator.onLine`, the stored MOTD dismissal and the Start-a-room
+     "next hang" label (next Saturday 4 pm, localized — the oracle
+     `formatHangLabel(nextSaturdayHang())`).
+
+     Roving keys (oracle `ChannelSidebar` / `PresenceRibbon` menus):
+     ArrowUp/ArrowDown/Home/End move focus between the sidebar's rows and
+     between the room More menu's items; a keyboard-opened More menu
+     focuses its first item. Tab order is untouched. */
+  var GAP_SHELL_STORE_KEYS = { "motd-dismissed-at": "onyx:motd-dismissed-at" };
+
+  function gapShellNextSaturdayHang(now) {
+    var c = new Date(now.getTime());
+    c.setDate(c.getDate() + ((6 - c.getDay() + 7) % 7));
+    c.setHours(16, 0, 0, 0);
+    if (c.getTime() <= now.getTime()) c.setDate(c.getDate() + 7);
+    return c;
+  }
+
+  function gapShellHangLabel(now) {
+    try {
+      return gapShellNextSaturdayHang(now || new Date())
+        .toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
+    } catch (e) { return ""; }
+  }
+
+  function gapShellReadMs(storage, key) {
+    try {
+      var n = Number(storage && storage.getItem(key));
+      return isFinite(n) && n > 0 ? n : null;
+    } catch (e) { return null; }
+  }
+
+  function gapShellLocalStorage(win) {
+    try { return (win && win.localStorage) || null; } catch (e) { return null; }
+  }
+
+  function gapShellOnline(nav) {
+    try { return !(nav && nav.onLine === false); } catch (e) { return true; }
+  }
+
+  function gapShellVisible(el) {
+    try { return !!(el && el.getClientRects && el.getClientRects().length); } catch (e) { return false; }
+  }
+
+  var GAP_SHELL_MENU_ITEMS = "#onyx-room-more-menu > button:not([disabled]), #onyx-room-more-menu > a[href]";
+
+  function gapShellRovingItems(target) {
+    if (!target || typeof target.closest !== "function") return null;
+    var root = null;
+    var selector = null;
+    if (target.closest("#onyx-room-more-menu")) {
+      root = target.ownerDocument || null;
+      selector = GAP_SHELL_MENU_ITEMS;
+    } else if (typeof target.matches === "function" && target.matches(".onyx-rail-item")) {
+      root = target.closest(".onyx-rail");
+      selector = ".onyx-rail-item";
+    }
+    if (!root || !selector) return null;
+    var list;
+    try { list = Array.prototype.slice.call(root.querySelectorAll(selector)); } catch (e) { return null; }
+    return list.filter(gapShellVisible);
+  }
+
+  /* Returns the element focused, or null when the key is not ours. */
+  function gapShellRovingKey(e) {
+    if (!e || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+    if (e.isComposing) return null;
+    var key = e.key;
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return null;
+    var target = e.target;
+    /* The More toggle: ArrowDown into an open menu. */
+    if (target && typeof target.closest === "function" && target.closest(".onyx-room-more-toggle")) {
+      if (key !== "ArrowDown" || target.getAttribute("aria-expanded") !== "true") return null;
+      var doc = target.ownerDocument;
+      var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+      if (!first) return null;
+      first.focus();
+      e.preventDefault();
+      return first;
+    }
+    var items = gapShellRovingItems(target);
+    if (!items || items.length === 0) return null;
+    var at = items.indexOf(target);
+    if (at < 0) return null;
+    var n = items.length;
+    var next = key === "Home" ? 0
+      : key === "End" ? n - 1
+      : key === "ArrowDown" ? (at + 1) % n
+      : (at - 1 + n) % n;
+    items[next].focus();
+    e.preventDefault();
+    return items[next];
+  }
+
+  /* A keyboard click (detail 0) on the More toggle that opens the menu
+     focuses its first item once Elm has painted it. */
+  function gapShellMenuOpenFocus(e, win) {
+    var target = e && e.target;
+    if (!target || typeof target.closest !== "function") return;
+    var toggle = target.closest(".onyx-room-more-toggle");
+    if (!toggle || e.detail !== 0) return;
+    var raf = (win && win.requestAnimationFrame) ? win.requestAnimationFrame.bind(win) : function (f) { return setTimeout(f, 16); };
+    raf(function () {
+      raf(function () {
+        if (toggle.getAttribute("aria-expanded") !== "true") return;
+        var doc = toggle.ownerDocument;
+        var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+        if (first) first.focus();
+      });
+    });
+  }
+
+  function wireGapShell(app, env) {
+    env = env || {};
+    if (!app || !app.ports) return null;
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var doc = env.document || (typeof document !== "undefined" ? document : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var local = gapShellLocalStorage(win);
+    function send(event) {
+      try { if (app.ports.shellEvent) app.ports.shellEvent.send(event); } catch (e) { /* port gone */ }
+    }
+    var online = gapShellOnline(nav);
+    send({
+      event: "boot",
+      online: online,
+      hangLabel: gapShellHangLabel(env.now ? new Date(env.now) : new Date()),
+      motdDismissedAt: gapShellReadMs(local, GAP_SHELL_STORE_KEYS["motd-dismissed-at"])
+    });
+    if (app.ports.shellStore) {
+      app.ports.shellStore.subscribe(function (req) {
+        var key = req && GAP_SHELL_STORE_KEYS[req.key];
+        if (!key) return;
+        try { if (local) local.setItem(key, String(req.value).slice(0, 32)); } catch (e) { /* private mode */ }
+      });
+    }
+    if (win && typeof win.addEventListener === "function") {
+      win.addEventListener("offline", function () { send({ event: "offline", online: false }); });
+      win.addEventListener("online", function () { send({ event: "online", online: true }); });
+    }
+    if (doc && typeof doc.addEventListener === "function") {
+      doc.addEventListener("keydown", function (e) { gapShellRovingKey(e); });
+      doc.addEventListener("click", function (e) { gapShellMenuOpenFocus(e, win); });
+    }
+    return { send: send };
+  }
+
+  /* v3/gap-account — scoped device lists. A scope's slot is
+     `<base>:scope:<encodeURIComponent(scope)>`. The first load of a
+     scope seeds it ONCE from the union of the old device-global plain
+     key and (accounts only) the SolidJS owner slots
+     `<base>:owner:<encodeURIComponent(JSON.stringify([endpoint,account]))>`.
+     Sources are copied, never deleted, so no identity loses a block it
+     had before the split; an emptied list is written as `[]`/`{}` so a
+     scope never re-seeds what its owner removed. Every value is
+     re-validated in Elm on load. */
+  var SCOPED_LIST_SPECS = [
+    { name: "ignored", base: "onyx:ignored-users", kind: "list", max: 512 },
+    { name: "muted", base: "onyx:muted-dms", kind: "list", max: 512 },
+    { name: "highlights", base: "onyx:highlight-words", kind: "list", max: 128 },
+    { name: "notify", base: "onyx:channel-notify", kind: "map", max: 256 }
+  ];
+  var SCOPED_LIST_MAX_CHARS = 128 * 1024;
+  var SCOPED_SCOPE_MAX = 4096;
+  var SCOPED_SOLID_OWNERS_MAX = 16;
+
+  function scopedListsStorage() {
+    try {
+      return (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+    } catch (err) { return null; }
+  }
+
+  function scopedListKey(base, scope) {
+    return base + ":scope:" + encodeURIComponent(scope);
+  }
+
+  function solidOwnerListKey(base, ownerJson) {
+    return base + ":owner:" + encodeURIComponent(ownerJson);
+  }
+
+  function readScopedRaw(store, key) {
+    try {
+      var raw = store.getItem(key);
+      if (typeof raw !== "string") return { present: false, value: null };
+      if (raw.length > SCOPED_LIST_MAX_CHARS) return { present: true, value: null };
+      return { present: true, value: JSON.parse(raw) };
+    } catch (err) {
+      return { present: true, value: null };
+    }
+  }
+
+  function scopedListValues(spec, value) {
+    var out = [];
+    if (spec.kind === "list") {
+      if (!Array.isArray(value)) return out;
+      for (var i = 0; i < value.length && out.length < spec.max * 4; i++) {
+        if (typeof value[i] === "string") out.push(value[i]);
+      }
+      return out;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+    var keys = Object.keys(value);
+    for (var j = 0; j < keys.length && out.length < spec.max * 4; j++) {
+      if (typeof value[keys[j]] === "string") out.push({ channel: keys[j], level: value[keys[j]] });
+    }
+    return out;
+  }
+
+  function scopedUnion(spec, lists) {
+    if (spec.kind === "list") {
+      var seen = {};
+      var merged = [];
+      lists.forEach(function (list) {
+        list.forEach(function (v) {
+          var k = String(v).trim().toLowerCase();
+          if (!k || seen[k]) return;
+          seen[k] = true;
+          merged.push(v);
+        });
+      });
+      return merged;
+    }
+    /* maps: later sources (the account-specific Solid slots) win */
+    var byChannel = {};
+    var order = [];
+    lists.forEach(function (list) {
+      list.forEach(function (entry) {
+        var k = String(entry.channel).trim().toLowerCase();
+        if (!k) return;
+        if (!Object.prototype.hasOwnProperty.call(byChannel, k)) order.push(k);
+        byChannel[k] = entry;
+      });
+    });
+    return order.map(function (k) { return byChannel[k]; });
+  }
+
+  function scopedSerialize(spec, values) {
+    if (spec.kind === "list") return JSON.stringify(values.filter(function (v) { return typeof v === "string"; }).slice(0, spec.max));
+    var obj = {};
+    values.slice(0, spec.max).forEach(function (entry) {
+      if (entry && typeof entry.channel === "string" && typeof entry.level === "string") obj[entry.channel] = entry.level;
+    });
+    return JSON.stringify(obj);
+  }
+
+  function loadScopedLists(store, req) {
+    var scope = req && typeof req.scope === "string" ? req.scope : "";
+    if (!scope || scope.length > SCOPED_SCOPE_MAX) return null;
+    var owners = (req && Array.isArray(req.solidOwners) ? req.solidOwners : [])
+      .filter(function (o) { return typeof o === "string" && o.length > 0 && o.length <= SCOPED_SCOPE_MAX; })
+      .slice(0, SCOPED_SOLID_OWNERS_MAX);
+    var answer = { scope: scope, seeded: [] };
+    SCOPED_LIST_SPECS.forEach(function (spec) {
+      if (!store) { answer[spec.name] = []; return; }
+      var key = scopedListKey(spec.base, scope);
+      var own = readScopedRaw(store, key);
+      if (own.present && own.value !== null) {
+        answer[spec.name] = scopedListValues(spec, own.value);
+        return;
+      }
+      /* Absent (never seeded) or unreadable: seed from the legacy
+         sources so nothing is lost, then write the scope's own slot. */
+      var sources = [scopedListValues(spec, readScopedRaw(store, spec.base).value)];
+      owners.forEach(function (ownerJson) {
+        sources.push(scopedListValues(spec, readScopedRaw(store, solidOwnerListKey(spec.base, ownerJson)).value));
+      });
+      var seeded = scopedUnion(spec, sources);
+      try { store.setItem(key, scopedSerialize(spec, seeded)); } catch (err) { /* quota: still answer */ }
+      answer.seeded.push(spec.name);
+      answer[spec.name] = seeded;
+    });
+    return answer;
+  }
+
+  function saveScopedLists(store, req) {
+    var scope = req && typeof req.scope === "string" ? req.scope : "";
+    var lists = req && req.lists;
+    if (!store || !scope || scope.length > SCOPED_SCOPE_MAX || !lists || typeof lists !== "object") return false;
+    var ok = true;
+    SCOPED_LIST_SPECS.forEach(function (spec) {
+      if (!Object.prototype.hasOwnProperty.call(lists, spec.name)) return;
+      var values = lists[spec.name];
+      if (!Array.isArray(values)) return;
+      var clean = spec.kind === "list"
+        ? values.filter(function (v) { return typeof v === "string"; })
+        : values.filter(function (e) { return e && typeof e.channel === "string" && typeof e.level === "string"; });
+      try { store.setItem(scopedListKey(spec.base, scope), scopedSerialize(spec, clean)); } catch (err) { ok = false; }
+    });
+    return ok;
+  }
+
+  /* Verified erase of the local history store (every scope, including
+     quarantined ownerless rows): clear, then re-count in a fresh
+     transaction; only a proven-empty store reports ok. The outbox and
+     the schedule are pending sends, not history — they keep their own
+     controls. */
+  function clearVaultMessages(db, onDone) {
+    function done(ok) { try { onDone(!!ok); } catch (err) {} }
+    if (db === null) {
+      /* No store: nothing persisted on a host without IndexedDB; a host
+         that has IndexedDB but failed to open cannot be verified. */
+      done(!(typeof global.indexedDB !== "undefined" && global.indexedDB));
+      return;
+    }
+    var tx;
+    try { tx = db.transaction(STORE, "readwrite"); } catch (err) { done(false); return; }
+    try { tx.objectStore(STORE).clear(); } catch (err) { done(false); return; }
+    tx.onerror = function () { done(false); };
+    tx.onabort = function () { done(false); };
+    tx.oncomplete = function () {
+      vaultDmPrivacyCache = {};
+      var verify;
+      try { verify = db.transaction(STORE, "readonly"); } catch (err) { done(false); return; }
+      var count = null;
+      try {
+        var req = verify.objectStore(STORE).count();
+        req.onsuccess = function () { count = req.result; };
+      } catch (err) { done(false); return; }
+      verify.oncomplete = function () { done(count === 0); };
+      verify.onerror = function () { done(false); };
+      verify.onabort = function () { done(false); };
+    };
+  }
+
+  /* Installed-app badge (navigator.setAppBadge where supported): writes
+     are serialized so a slow platform call can never overwrite a newer
+     count, and every failure is silent (ambient enhancement). */
+  function createAppBadge(nav) {
+    var requested = 0;
+    var applied = -1;
+    var busy = false;
+    function apply(count) {
+      try {
+        if (!nav) return Promise.resolve();
+        if (count > 0 && typeof nav.setAppBadge === "function") return Promise.resolve(nav.setAppBadge(count));
+        if (count === 0 && typeof nav.clearAppBadge === "function") return Promise.resolve(nav.clearAppBadge());
+        if (count === 0 && typeof nav.setAppBadge === "function") return Promise.resolve(nav.setAppBadge(0));
+      } catch (err) { /* unsupported */ }
+      return Promise.resolve();
+    }
+    function flush() {
+      if (busy || applied === requested) return;
+      busy = true;
+      var next = requested;
+      apply(next).then(null, function () {}).then(function () {
+        applied = next;
+        busy = false;
+        flush();
+      });
+    }
+    return {
+      set: function (count) {
+        var n = (typeof count === "number" && isFinite(count) && count > 0) ? Math.min(Math.floor(count), 99999) : 0;
+        requested = n;
+        flush();
+      },
+      state: function () { return { requested: requested, applied: applied, busy: busy }; }
+    };
+  }
+
+  /* Retention re-applied across every target at once (policy save). Moved
+     to module level so it can be smoke-tested; per target AND per owner
+     scope (see `pruneCollectedTargets`). */
+  function pruneAllTargets(db, onDone) {
+    var seen = [];
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readonly");
+    } catch (err) { onDone(0); return; }
+    var cursor;
+    try {
+      cursor = tx.objectStore(STORE).openCursor();
+    } catch (err) { onDone(0); return; }
+    cursor.onsuccess = function () {
+      var c = cursor.result;
+      if (c) {
+        var plain = vaultPlainRow(c.value);
+        seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at, bucket: vaultRowOwner(c.value) || "" });
+        c.continue();
+      } else {
+        pruneCollectedTargets(db, seen, onDone);
+      }
+    };
+    cursor.onerror = function () { onDone(0); };
+  }
+  function pruneCollectedTargets(db, seen, onDone) {
+    var policy = readRetentionPolicy();
+    var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
+    /* v3/gap-account: retention is per target AND per owner scope (two
+       identities' rows share logical ids and must never evict each
+       other); legacy ownerless rows are their own bucket. */
+    var byTarget = {};
+    seen.forEach(function (entry) {
+      if (!entry.target) return;
+      var group = entry.target + "\u0001" + entry.bucket;
+      (byTarget[group] = byTarget[group] || []).push(entry);
+    });
+    var targets = Object.keys(byTarget);
+    if (targets.length === 0) { onDone(0); return; }
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readwrite");
+    } catch (err) { onDone(0); return; }
+    var store = tx.objectStore(STORE);
+    var deleted = 0;
+    var finished = false;
+    function finish(count) {
+      if (finished) return;
+      finished = true;
+      onDone(count);
+    }
+    tx.oncomplete = function () { finish(deleted); };
+    tx.onerror = function () { finish(deleted); };
+    targets.forEach(function (group) {
+      var target = byTarget[group][0].target;
+      var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
+      if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
+      var prune = selectPruneIds(byTarget[group], channelPolicy, now);
+      var keyById = {};
+      byTarget[group].forEach(function (entry) { keyById[entry.id] = entry.key; });
+      prune.forEach(function (id) {
+        if (keyById[id] !== undefined) {
+          try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
+        }
+      });
+    });
+  }
+
   global.OnyxPorts = {
+    /* v3/gap-account */
+    gapAccount: {
+      loadScopedLists: loadScopedLists,
+      saveScopedLists: saveScopedLists,
+      scopedListKey: scopedListKey,
+      solidOwnerListKey: solidOwnerListKey,
+      clearVaultMessages: clearVaultMessages,
+      createAppBadge: createAppBadge,
+      ownerArg: ownerArg,
+      rowOwned: vaultRowOwned,
+      localHistoryEnabled: localHistoryEnabled,
+      openVault: openVault,
+      pruneAllTargets: pruneAllTargets
+    },
     vaultStore: {
       put: vaultPut,
       get: vaultGet,
@@ -11768,6 +13198,7 @@ function fetchPublicFeed(url) {
       exportAll: vaultExportAll,
       aroundWindow: vaultAroundWindow,
       classifyDmRows: classifyVaultDmRows,
+      classifyDm: classifyVaultDm,
       dmPrivacyRowEncrypted: vaultDmPrivacyRowEncrypted,
       dmPrivacyInvalidate: vaultDmPrivacyInvalidate,
       exportSnapshot: vaultExportSnapshot,
@@ -11786,6 +13217,7 @@ function fetchPublicFeed(url) {
       plainEntry: outboxPlainEntry,
       flushPlan: outboxFlushPlan,
       flush: outboxFlush,
+      queue: outboxQueue,
       reviewPlan: outboxReviewPlan,
       review: outboxReview,
       maxEntries: OUTBOX_MAX_ENTRIES,
@@ -11840,9 +13272,23 @@ function fetchPublicFeed(url) {
       key: CRED_KEY,
       maxTokenLength: MAX_RESUME_TOKEN_LENGTH
     },
+    /* v3/gap-auth */
+    challenge: {
+      blake3: blake3,
+      seedBytes: challengeSeedBytes,
+      solve: solveChallengePow,
+      solveAsync: solveChallengeAsync,
+      powOk: challengePowOk,
+      maxTries: CHALLENGE_POW_MAX_TRIES
+    },
+    wireAuthGate: wireAuthGate,
     sasl: {
       setCredentials: sasl.setCredentials,
       clearCredentials: sasl.clearCredentials,
+      identifyLine: sasl.identifyLine,
+      stageNewPassword: sasl.stageNewPassword,
+      commitNewPassword: sasl.commitNewPassword,
+      dropNewPassword: sasl.dropNewPassword,
       plainPayload: sasl.plainPayload,
       scramFirst: sasl.scramFirst,
       scramNext: sasl.scramNext,
@@ -11856,6 +13302,7 @@ function fetchPublicFeed(url) {
       blank: voiceFeedBlank,
       next: voiceFeedNext
     },
+    createVoiceSessionAssist: createVoiceSessionAssist, /* v3/rx-calls */
     voiceTiles: {
       createBinder: createVoiceTileBinder,
       resolve: voiceTileStream,
@@ -11866,6 +13313,7 @@ function fetchPublicFeed(url) {
     installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
+    wireOrganize: wireOrganize, /* v3/gap-organize */
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,
@@ -11889,6 +13337,8 @@ function fetchPublicFeed(url) {
     createGroupWelcome: createGroupWelcome,
     wireGroupWelcome: wireGroupWelcome,
     classifyShortcut: classifyShortcut,
+    runLocalShortcut: runLocalShortcut,
+    wireGapPrefs: wireGapPrefs,
     installShortcutFocus: installShortcutFocus,
     installOverlayFocus: installOverlayFocus,
     /* v3/calls-c6 */
@@ -11921,7 +13371,15 @@ function fetchPublicFeed(url) {
     registerServiceWorker: registerServiceWorker,
     installPageLifecycle: installPageLifecycle,
     swUrl: SW_URL,
-    memKV: memKV
+    memKV: memKV,
+    /* v3/gap-shell */
+    gapShell: {
+      wire: wireGapShell,
+      rovingKey: gapShellRovingKey,
+      hangLabel: gapShellHangLabel,
+      nextSaturdayHang: gapShellNextSaturdayHang,
+      storeKeys: GAP_SHELL_STORE_KEYS
+    }
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports.OnyxPorts = global.OnyxPorts;

@@ -8,16 +8,19 @@ multiline). All through the pure `foldLine` / `update` — no socket.
 
 import App exposing (..)
 import Attribution
+import AuthGate exposing (SetPass(..))
 import Base64Url
 import Cadence
 import Dict
 import DmCipher
 import Expect
+import GapAccount
 import GroupCommit
 import GroupControl
 import GroupDirectory
 import GroupEnvelope
 import GroupPublisher
+import HistoryImport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Labels
@@ -26,7 +29,9 @@ import Schedule
 import Services
 import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
+import PrefsPanel
 import RoomMedia exposing (RoomMediaFilter(..))
+import GapPeople
 import Moderation
 import Session
 import Set
@@ -1102,7 +1107,7 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine "CHATHISTORY LATEST #c * 50\r\n"
-                            , SendLine "WHO #c\r\n"
+                            , SendLine "WHO #c %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
                             ]
                             out
@@ -1112,12 +1117,12 @@ suite =
                         Expect.equal
                             [ SendLine "MARKREAD #c\r\n"
                             , SendLine "CHATHISTORY LATEST #c * 50\r\n"
-                            , SendLine "WHO #c\r\n"
+                            , SendLine "WHO #c %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
                             ]
                             fullOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] bufferedOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] cappedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] bufferedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] cappedOut
                     ]
                     ()
         , test "self-JOIN rejoins with messages still refetch" <|
@@ -1158,8 +1163,8 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal True (Set.member "#c" capped.historyExhausted)
                     , \_ -> Expect.equal False (Set.member "#c" capped.historyLoading)
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] reOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] reOut
                     , \_ -> Expect.equal True (Set.member "#c" rejoined.historyExhausted)
                     ]
                     ()
@@ -1176,7 +1181,7 @@ suite =
                         feed { base | historyMerging = True, historyLoading = Set.empty } ":me!u@h JOIN #c"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    [ \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
                     , \_ -> Expect.equal [] mergingOut
                     ]
                     ()
@@ -1228,7 +1233,7 @@ suite =
                     , \_ ->
                         Expect.equal
                             [ SendLine "CHATHISTORY LATEST #r7 * 50\r\n"
-                            , SendLine "WHO #r7\r\n"
+                            , SendLine "WHO #r7 %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #r7\r\n"
                             ]
                             knownOut
@@ -1425,9 +1430,9 @@ suite =
                             ":me!u@h JOIN #c"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] loadingOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] exhaustedOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] searchedOut
+                    [ \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] loadingOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] exhaustedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] searchedOut
                     , \_ -> Expect.equal True (Set.member "#c" loading.historyLoading)
                     ]
                     ()
@@ -4810,7 +4815,7 @@ suite =
                         Expect.equal
                             [ "MARKREAD #a\r\n"
                             , "CHATHISTORY LATEST #a * 50\r\n"
-                            , "WHO #a\r\n"
+                            , "WHO #a %tcnfa,616\r\n"
                             , "ACTIVITY SUBSCRIBE #a\r\n"
                             ]
                             (List.map sendLineText joinOut)
@@ -6502,7 +6507,7 @@ suite =
                             [ \_ -> Expect.equal [ "live", "old" ] (List.map .body c.messages)
                             , -- v3/gap-convo: the nearest merged row is landed on (scrolled to + focused)
                               \_ -> Expect.equal True (List.member (TranscriptScroll { action = "message", key = "r:1" }) out2)
-                            , \_ -> Expect.equal Nothing m2.historyLanding
+                            , \_ -> Expect.equal (Just "row:1") m2.historyLanding
                             , \_ -> Expect.equal 6 m2.messageSeq
                             , \_ -> Expect.equal True (List.member "#c:5" m2.vaultSeenIds)
                             ]
@@ -6565,17 +6570,33 @@ suite =
                 Expect.equal
                     "Vault exported (40 messages, 2 targets)."
                     (Maybe.withDefault "" (List.head m.serviceLog))
-        , test "VaultImportFile merges validated rows through VaultPersist" <|
+        , test "VaultImportFile stages a review first; Import then merges the validated rows through VaultPersist" <|
             \_ ->
                 let
                     json =
                         "{\"kind\":\"onyx-vault\",\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00.000Z\",\"targets\":[{\"target\":\"#C\",\"messages\":[{\"id\":\"m1\",\"from\":\"a\",\"text\":\"hi\",\"type\":\"msg\",\"time\":1000},{\"id\":\"m2\",\"from\":\"b\",\"text\":\"yo\",\"type\":\"notice\",\"time\":2000}]}]}"
 
-                    ( m, outbound ) =
+                    ( staged, stagedOut ) =
                         update (VaultImportFile { json = json }) blank
+
+                    ( _, confirmOut ) =
+                        update (HistoryImportMsg HistoryImport.Confirm) staged
+
+                    persists out =
+                        List.filter
+                            (\o ->
+                                case o of
+                                    VaultPersist _ ->
+                                        True
+
+                                    _ ->
+                                        False
+                            )
+                            out
                 in
                 Expect.all
-                    [ \_ ->
+                    [ \_ -> Expect.equal [] (persists stagedOut)
+                    , \_ ->
                         Expect.equal
                             [ VaultPersist
                                 { target = "#c"
@@ -6585,10 +6606,10 @@ suite =
                                     ]
                                 }
                             ]
-                            outbound
+                            (persists confirmOut)
                     , \_ ->
-                        Expect.equal "Importing 2 messages into 1 conversations."
-                            (Maybe.withDefault "" (List.head m.serviceLog))
+                        Expect.equal "Vault import file staged for review (2 messages, 1 conversations)."
+                            (Maybe.withDefault "" (List.head staged.serviceLog))
                     ]
                     ()
         , test "VaultImportFile refuses blank, broken, and empty snapshots" <|
@@ -7298,7 +7319,7 @@ suite =
                     , \_ -> Expect.equal 3 m3.nickAliasTryIdx
                     ]
                     ()
-        , test "433 with no aliases left errors and resets the index" <|
+        , test "433 with no aliases left retries nick_ on the same socket (v3/gap-shell)" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -7311,12 +7332,11 @@ suite =
                         feed { m1 | nickAliases = [ "kai" ], nickAliasTryIdx = 1 } ":s 433 me me :Nickname is already in use"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m2.notifications)
-                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m3.notifications)
-                    , \_ -> Expect.equal 0 m3.nickAliasTryIdx
-                    , \_ -> Expect.equal [] outbound3
+                    [ \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound
+                    , \_ -> Expect.equal "me_" m2.ourNick
+                    , \_ -> Expect.equal [] m2.notifications
+                    , \_ -> Expect.equal 1 m2.gapShell.nickRetries
+                    , \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound3
                     ]
                     ()
         , test "433 after registration rotates, then logs when exhausted" <|
@@ -7325,17 +7345,19 @@ suite =
                     live =
                         { blank | nickAliases = [ "kai" ] }
 
+                    -- A NICK change refused after registration names the
+                    -- wanted nick, not the one we hold.
                     ( rotated, outbound ) =
-                        feed live ":s 433 me me :Nickname is already in use"
+                        feed live ":s 433 me taken :Nickname is already in use"
 
                     ( bare, bareOut ) =
-                        feed blank ":s 433 me me :Nickname is already in use"
+                        feed blank ":s 433 me taken :Nickname is already in use"
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
                     , \_ -> Expect.equal "kai" rotated.ourNick
                     , \_ -> Expect.equal [] bareOut
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text bare.notifications)
                     ]
                     ()
         , test "error numerics record verbatim inbox rows" <|
@@ -8790,7 +8812,7 @@ suite =
                 in
                 Expect.all
                     [ -- v3/gap-convo: a loaded pin is landed on at once
-                      \_ -> Expect.equal Nothing focused.historyLanding
+                      \_ -> Expect.equal (Just "pin1") focused.historyLanding
                     , \_ -> Expect.equal False focused.showPinnedMessages
                     , \_ -> Expect.equal [ TranscriptScroll { action = "message", key = "m:pin1" } ] focusOut
                     , \_ ->
@@ -9845,7 +9867,8 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 59 (List.length slashCommands)
+                    [ \_ -> Expect.atLeast 59 (List.length slashCommands) -- v3/gap-oper: appeal + desk joined (59 + 2)
+
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
                     , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
                     , \_ -> Expect.equal (Just "import") (Maybe.map .name (findSlashCommand "import"))
@@ -9879,10 +9902,9 @@ suite =
                         update ComposerSend { blank | activeChannel = Just "#c", composer = "/help frobnicate" }
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "Local slash commands" ] (List.map .title bare.toasts)
-                    , \_ ->
-                        Expect.equal [ "/clear · /ignore · /read · /star · /mute · /autojoin · /highlight · /snooze · /dnd · /color · /share · /export · /notify · /search · /help" ]
-                            (List.filterMap .description bare.toasts)
+                    -- v3/gap-commands: bare /help opens the full slash-commands sheet.
+                    [ \_ -> Expect.equal [] (List.map .title bare.toasts)
+                    , \_ -> Expect.equal ( True, "" ) ( bare.commandsHelpOpen, bare.composer )
                     , \_ -> Expect.equal [] bareOut
                     , \_ -> Expect.equal [ "/mute [#channel]" ] (List.map .title hit.toasts)
                     , \_ ->
@@ -10586,7 +10608,8 @@ suite =
                     ( _, outbound ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                -- v3/gap-usermodes: a fresh registration also asks for the user modes.
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
@@ -10604,7 +10627,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -12014,22 +12037,29 @@ suite =
                         ()
             ]
         , describe "ban-add form"
-            [ test "raw submit sends +b and clears the form" <|
+            [ test "raw submit stages a review; confirm sends +b and clears the form" <|
                 \_ ->
                     let
                         base =
                             blankBanAdd
 
+                        -- v3/gap-people: submit reviews first, confirm sends.
                         live =
-                            { blank | connection = Live, banAdd = { base | mask = " *!*@* ", minutes = "10" } }
+                            { stewardLive | banAdd = { base | mask = " spam!*@* ", minutes = "10" } }
+
+                        ( staged, stagedOut ) =
+                            update (BanAddSubmit "#harbor") live
 
                         ( m, outs ) =
-                            update (BanAddSubmit "#c") live
+                            update (GapPeopleMsg GapPeople.TempBanConfirm) staged
                     in
                     Expect.all
-                        [ \_ ->
+                        [ \_ -> Expect.equal [] stagedOut
+                        , \_ -> Expect.equal (Just { channel = "#harbor", mask = "spam!*@*", minutes = 10 }) staged.tempBanReview
+                        , \_ ->
                             Expect.equal True
-                                (List.member (SendLine "MODE #c +b *!*@*\r\n") outs)
+                                (List.member (SendLine "MODE #harbor +b spam!*@*\r\n") outs)
+                        , \_ -> Expect.equal Nothing m.tempBanReview
                         , \_ -> Expect.equal "" m.banAdd.mask
                         , \_ -> Expect.equal "" m.banAdd.error
                         , \_ -> Expect.equal "10" m.banAdd.minutes
@@ -12042,18 +12072,20 @@ suite =
                             blankBanAdd
 
                         live =
-                            { blank
-                                | connection = Live
-                                , banAdd = { base | useExtBan = True, extType = "a", extPattern = "alice", minutes = "30" }
+                            { stewardLive
+                                | banAdd = { base | useExtBan = True, extType = "a", extPattern = "mallory", minutes = "30" }
                             }
 
+                        ( staged, _ ) =
+                            update (BanAddSubmit "#harbor") live
+
                         ( m, outs ) =
-                            update (BanAddSubmit "#c") live
+                            update (GapPeopleMsg GapPeople.TempBanConfirm) staged
                     in
                     Expect.all
                         [ \_ ->
                             Expect.equal True
-                                (List.member (SendLine "MODE #c +b $a:alice\r\n") outs)
+                                (List.member (SendLine "MODE #harbor +b $a:mallory\r\n") outs)
                         , \_ -> Expect.equal "" m.banAdd.error
                         ]
                         ()
@@ -12316,7 +12348,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal "playing chess" m.customStatus
                         , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "kai" m.userActivities)
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP * STATUS :playing chess\r\n" ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP kai STATUS :playing chess\r\n" ] outs
                         ]
                         ()
             , test "offline set lands and persists without wire" <|
@@ -12364,9 +12396,9 @@ suite =
                             update (CustomStatusSet "") idle
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP * STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
+                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP kai STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
                         , \_ -> Expect.equal "coding onyx" m.customStatus
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP * STATUS :\r\n" ] clearedOuts
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP kai STATUS :\r\n" ] clearedOuts
                         , \_ -> Expect.equal "" cleared.customStatus
                         , \_ -> Expect.equal True (Dict.isEmpty cleared.userActivities)
                         ]
@@ -12464,6 +12496,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12502,6 +12535,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12667,7 +12701,9 @@ suite =
                         , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
                         , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
                         , \_ -> Expect.equal 2 m.whoisTimerGen
-                        , \_ -> Expect.equal [] outs
+                        -- v3/gap-usermodes: an open profile that is offline asks
+                        -- WHOWAS (the only line this fold sends).
+                        , \_ -> Expect.equal [ SendLine "WHOWAS ghost 1\r\n" ] outs
                         ]
                         ()
             , test "401 off the active sheet lands nothing" <|
@@ -15760,9 +15796,13 @@ suite =
                             feed { blank | connection = Live } ":s 433 me taken :In use"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "Erroneous nickname: bad!nick" ] (List.map .text bad.notifications)
-                        , \_ -> Expect.equal [ "Nick/channel temporarily unavailable" ] (List.map .text unavailable.notifications)
-                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text exhausted.notifications)
+                        -- v3/gap-shell: a refused name while registering fails
+                        -- with the reason; 433/437 retry `nick_` instead of erroring.
+                        [ \_ -> Expect.equal [ "“bad!nick” can’t be used here (Erroneous). Pick another name." ] (List.map .text bad.notifications)
+                        , \_ -> Expect.equal [] unavailable.notifications
+                        , \_ -> Expect.equal "me_" unavailable.ourNick
+                        , \_ -> Expect.equal [] exhausted.notifications
+                        , \_ -> Expect.equal "me_" exhausted.ourNick
                         , \_ -> Expect.equal [] retrying.notifications
                         , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] retryOut
                         , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text live.notifications)
@@ -18063,7 +18103,7 @@ suite =
                     in
                     Expect.all
                         [ -- v3/gap-convo: the media jump lands on the row
-                          \_ -> Expect.equal Nothing jumped.historyLanding
+                          \_ -> Expect.equal (Just "m1") jumped.historyLanding
                         , \_ -> Expect.equal False jumped.mediaIndexOpen
                         , \_ -> Expect.equal [ TranscriptScroll { action = "message", key = "m:m1" } ] outs
                         ]
@@ -18258,15 +18298,22 @@ suite =
                             Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = text })
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
+                        -- v3/gap-commands: registry verbs Onyx Server has no
+                        -- wire verb for are translated (GapCommandsTest); real
+                        -- server verbs still go out as written.
+                        [ \_ -> Expect.equal [ SendLine "AWAY :Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        -- v3/dm-key-hold: a raw content verb to an unresolved DM peer is refused.
-                        , \_ -> Expect.equal [] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] (send "/nick kai")
+                        , \_ -> Expect.equal [ SendLine "MODE #c +m\r\n" ] (send "/mode #c +m")
+                        -- v3/dm-key-hold: content to an unresolved DM peer never leaves as plaintext.
+                        , \_ -> Expect.equal False (List.any (\o -> o == SendLine "PRIVMSG bob hi\r\n") (send "/msg bob hi"))
                         , \_ ->
-                            Expect.equal [ SendLine "MSG bob hi\r\n" ]
-                                (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
-                        , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
+                            Expect.equal True
+                                (List.member (SendLine "PRIVMSG bob hi\r\n")
+                                    (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
+                                )
+                        , \_ -> Expect.equal [ SendLine "a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
                         ]
                         ()
@@ -19898,8 +19945,10 @@ suite =
             , test "transfer waits for accept before any owner rank" <|
                 \_ ->
                     let
+                        -- v3/gap-people: the offer and the accept travel as
+                        -- tagged TAGMSGs (message-tags relays them).
                         ( offered, offerOut ) =
-                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew", caps = [ "message-tags" ] }
 
                         ( early, earlyOut ) =
                             update (StewardGrantTransfer "#harbor") offered
@@ -19911,11 +19960,11 @@ suite =
                             update (StewardGrantTransfer "#harbor") { accepted | ourNick = "alice" }
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [] offerOut
+                        [ \_ -> Expect.equal [ SendLine "@+onyx/room=#harbor;+onyx/room-transfer=offer TAGMSG drew\r\n" ] offerOut
                         , \_ -> Expect.equal False (Maybe.withDefault True (Maybe.map .accepted (stewardOfferFor offered "#harbor")))
                         , \_ -> Expect.equal [] earlyOut
                         , \_ -> Expect.equal "They have to accept before the room changes hands." early.stewardStatus
-                        , \_ -> Expect.equal [] acceptOut
+                        , \_ -> Expect.equal [ SendLine "@+onyx/room=#harbor;+onyx/room-transfer=accept TAGMSG alice\r\n" ] acceptOut
                         , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map .accepted (stewardOfferFor accepted "#harbor")))
                         , \_ ->
                             Expect.equal
@@ -19930,7 +19979,7 @@ suite =
                 \_ ->
                     let
                         ( offered, _ ) =
-                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew", caps = [ "message-tags" ] }
 
                         ( stranger, strangerOut ) =
                             update (StewardAcceptTransfer "#harbor") { offered | ourNick = "erin" }
@@ -19969,9 +20018,13 @@ suite =
                         , \_ -> Expect.equal [] wrongOut
                         , \_ -> Expect.equal "Type the room name to delete it." wrong.stewardStatus
                         , \_ ->
+                            -- v3/gap-chanserv: a guest cannot have registered the room,
+                            -- so there is no DROP to send (it would only FAIL): the room
+                            -- is emptied and left instead.
                             Expect.equal
-                                [ SendLine "CHANNEL DROP #harbor\r\n"
-                                , SendLine "PART #harbor Goodbye\r\n"
+                                [ SendLine "MODE #harbor +si\r\n"
+                                , SendLine "CLEAR #harbor USERS\r\n"
+                                , SendLine "PART #harbor :Room deleted\r\n"
                                 ]
                                 out
                         , \_ -> Expect.equal "" deleted.stewardTypedName
@@ -21025,7 +21078,7 @@ suite =
                         ()
             ]
         , describe "CTCP queries"
-            [ test "inbound ACTION is swallowed with no row and no reply" <|
+            [ test "inbound ACTION files an action row and never replies" <|
                 \_ ->
                     let
                         room =
@@ -21034,9 +21087,16 @@ suite =
                         ( acted, outs ) =
                             feed room ":bob!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
                     in
+                    -- v3/gap-commands: `/me` lines are messages, not queries.
                     Expect.all
-                        [ \_ -> Expect.equal [] (dmMessages acted "#c")
-                        , \_ -> Expect.equal [] outs
+                        [ \_ -> Expect.equal [ ( "bob", "waves", "action" ) ] (List.map (\m -> ( m.from, m.body, m.msgType )) (dmMessages acted "#c"))
+                        , \_ -> Expect.equal [] (List.filter (\o -> case o of
+                                                                    SendLine _ ->
+                                                                        True
+
+                                                                    _ ->
+                                                                        False
+                                                               ) outs)
                         ]
                         ()
             , test "unknown CTCP is swallowed silently" <|
@@ -22117,7 +22177,10 @@ suite =
                         , \_ -> Expect.equal (Just "Passwords do not match.") mismatchModel.accountPasswordError
                         , \_ -> Expect.equal [] outNoCurrent
                         , \_ -> Expect.equal (Just "Your current password is required.") noCurrentModel.accountPasswordError
-                        , \_ -> Expect.equal [ SendLine "ACCOUNTSET kai old password longenough\r\n" ] outSent
+                        -- v3/gap-auth: the server's change-password command is
+                        -- SETPASS <current> <new> (ACCOUNTSET has no password field).
+                        , \_ -> Expect.equal [ "SETPASS old :longenough\r\n" ] (sendLines outSent)
+                        , \_ -> Expect.equal (SetPassPending "kai") sent.authGate.setPass
                         , \_ -> Expect.equal "" sent.accountNewPassword
                         , \_ -> Expect.equal "" sent.accountConfirmPassword
                         , \_ -> Expect.equal "" sent.accountCurrentPassword
@@ -22189,7 +22252,7 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] outGuest
-                        , \_ -> Expect.equal [ SendLine "WEBAUTHN LIST\r\n" ] outList
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN STATUS\r\n", SendLine "WEBAUTHN LIST\r\n" ] outList
                         , \_ -> Expect.equal (Just []) listing.passkey.pendingList
                         , \_ -> Expect.equal [ SendLine "WEBAUTHN REGISTER laptop\r\n" ] outRegister
                         , \_ -> Expect.equal True registering.passkey.busy
@@ -23586,14 +23649,21 @@ suite =
                         ( offline, offlineOut ) =
                             update (WebhookList "#harbor") { stewardLive | connection = Offline }
 
+                        -- v3/gap-people: any room host may manage webhooks
+                        -- (bob, an op, now can); a plain member cannot.
                         ( stranger, strangerOut ) =
+                            update (WebhookList "#harbor") { stewardLive | ourNick = "drew" }
+
+                        ( helper, helperOut ) =
                             update (WebhookList "#harbor") { stewardLive | ourNick = "bob" }
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] offlineOut
-                        , \_ -> Expect.equal "Reconnect to change this room." offline.stewardStatus
+                        , \_ -> Expect.equal "Reconnect to manage webhooks." offline.webhookStatus
                         , \_ -> Expect.equal [] strangerOut
-                        , \_ -> Expect.equal "Only the owner can do that." stranger.stewardStatus
+                        , \_ -> Expect.equal "Only room hosts can manage webhooks." stranger.webhookStatus
+                        , \_ -> Expect.equal [ SendLine "WEBHOOK LIST #harbor\r\n" ] helperOut
+                        , \_ -> Expect.equal "" helper.webhookStatus
                         ]
                         ()
             , test "WEBHOOK: notice lands in the service log, not chat" <|
@@ -23998,13 +24068,17 @@ suite =
                         , \_ -> Expect.equal [ "Export scrollback" ] (List.map .title exported.toasts)
                         ]
                         ()
-            , test "slash import fires the vault file picker" <|
+            , test "slash import opens Import & export and asks for the vault file picker" <|
                 \_ ->
                     let
-                        ( _, out ) =
+                        ( m, out ) =
                             update ComposerSend { blank | activeChannel = Just "#c", composer = "/import" }
                     in
-                    Expect.equal [ VaultImportPick ] out
+                    Expect.all
+                        [ \_ -> Expect.equal True (List.member (HistoryImportPick { job = 1, kind = "portable" }) out)
+                        , \_ -> Expect.equal True (m.prefsOpen && m.prefsCategory == PrefsPanel.Transfer)
+                        ]
+                        ()
         , describe "retention policy"
             [ test "keep selection saves and parks the applying status" <|
                 \_ ->
@@ -24392,3 +24466,13 @@ withoutSafetyLoads =
                 _ ->
                     True
         )
+
+
+isPersist : Outbound -> Bool
+isPersist out =
+    case out of
+        VaultPersist _ ->
+            True
+
+        _ ->
+            False

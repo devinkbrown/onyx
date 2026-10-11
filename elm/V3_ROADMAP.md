@@ -49,8 +49,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
-| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; no recents / time grammar) |
-| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port, rows narrowed to handled chords) |
+| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; v3/gap-commands adds People, recents, the oracle action rows and the `#room` / `mute N` grammar; no time grammar) |
+| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port; v3/gap-commands adds the shell chords, J/K, `g h` / `g d`, the single-key switch; the overlay lists exactly the chords this client handles) |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home coach; v3/polish: dismissal persisted in `onyx:first-hour-seen`, quiet notify sheet after the first send) |
 | 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 
@@ -68,7 +68,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 2.5 | "Add a boost" on the boost bar | `BoostBar` | **done** (`boost` slice: ＋ opener per row into the existing reaction picker) |
 | 2.6 | Jump to date sheet + time scrubber | `JumpToDateSheet`, `TimeScrubber` | **done** (`boost` slice: sheet + topbar entry over `requestTravelTo`; v3/polish: 24h UTC scrubber from the room More menu over the same fold) |
 | 2.7 | Catch-up: "Since you left" digest, mark caught up | `CatchUpSummary`, `SinceDigestCard` | M |
-| 2.8 | BlockKit structured-action modal + send review | `message/BlockKitModal` | M |
+| 2.8 | BlockKit structured-action modal + send review | `message/BlockKitModal` | M · **done** (v3/gap-import: strict `[onyx:block]` decoder, inline cards, URL/copy buttons, origin-scoped send review, "Inspect structured data" dialog) |
 | 2.9 | Local edit-history view, context trail | `MessageView` | M |
 
 ## Phase 3 — Rooms and people
@@ -76,7 +76,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | # | Surface | Oracle | Size |
 |---|---|---|---|
 | 3.1 | Room header: privacy, facepile, heatline, voice chip, overflow menu (settings, invite, export, jump, mark read, room care) | `PresenceRibbon`, `PresenceHeatline` | **done** (v3/frame + v3/roomsettings: privacy glyph, expandable topic, facepile, notify strip + invite / DM safety trigger in the header, Room settings in More; heatline, export, mark read and room care in More still todo) |
-| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | **done** (v3/roomsettings; invite builder, export, hide/leave and topic-draft durability not in the sheet; webhooks linked to Room care) |
+| 3.2 | Room settings sheet: topic, notifications, rules, history policy, roles, encryption, visibility, integrations, bridge status | `ChannelSettings` | **done** (v3/roomsettings; invite builder, export, hide/leave and topic-draft durability not in the sheet; webhooks linked to Room care; v3/gap-chanserv adds welcome message + slow mode, "More rules" (every channel flag, forward, join throttle, timed rules), mutes/exceptions/invite passes, and registered-room services: register, info, locked rules, account access, auto-kick, successor, "Your rooms") |
 | 3.3 | Per-room notify level, quiet hours, calm mode | `ChannelNotifyControl`, `NotificationControls`, `CalmModeControl` | **done** (`v3/notify`: room All/@/Mute strip in the thread header + Notifications sheet with desktop/sound/DND; quiet-hours schedule + calm presets narrowed out — no `App` state) |
 | 3.4 | Invite friends share sheet | `RoomInviteShare` | S |
 | 3.5 | Member list: filter, avatars, presence/away, DM action | `MemberList` | M · **done** (v3/roster: Filter members field + Escape clear, header count, avatar + presence dot, role/away in words, per-row Message + double-click DM; no windowing, loading skeleton, or modal/mobile copy) |
@@ -97,7 +97,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 4.2 | Mention keywords, ignored users, smart mute, room folders | `KeywordListControl`, `IgnoredUsersControl`, `SmartMuteSection`, `ChannelOrganizationSection` | **partial** (`v3/notify`: keywords + ignored users done in the Notifications sheet; smart mute + room folders todo) |
 | 4.3 | Revoke other devices | `SessionsDevicesSection` | S · **done** (v3/account2: bulk revoke with inline confirm; per-row drop already ported) |
 | 4.4 | Portable identity export/import | `PortableIdentitySection` | S · **done** (v3/account2: non-secret residence file — favorites only; no folders / quiet hours state, see COVERAGE) |
-| 4.5 | History import (Discord / bot / vault) | `HistoryImportControls` | M |
+| 4.5 | History import (Discord / bot / vault) | `HistoryImportControls` | M · **done** except the Discord bot-token route (v3/gap-import: Discord export + data package, Slack export, IRC logs, portable vault; worker-parsed, reviewed before any write, retention-aware, removable) |
 | 4.6 | Theme share/import by code or link dialog | `ThemeImportDialog` | S · **done** (v3/account2: sheet from the You hub and `/appearance`) |
 | 4.7 | Friends / watch list, custom status, DND UI (logic already in `App`) | `App` folds | M · **done** (v3/account2: People sheet, You hub status/presence/DND block, friend presence on sidebar DM rows; expiry shown, not timer-enforced) |
 
@@ -107,6 +107,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 5.1 | Moderation cockpit: room desk, invite form, current-room header (move bans out of the main column) | `ModerationCockpit` | S · **done** (v3/moddesk) |
 | 5.2 | Oper desk (broadcast / kill / rehash) + event console with filters | `OperDesk`, `OperEventConsole` | M · **done** (v3/moddesk) |
+| 5.3 | Operator console: live Event Spine feed (filter/pause/clear, rate-limited), network bans (WARD/K/D/X-lines + tests), silencing (SHUN/GAG/QUARANTINE), abuse insight (ABUSE/CLONES/SESSIONS), appeals (user + oper side), content controls (FILTER/SPAMTRAP/HOLD/POLICY/CHALLENGE), accounts admin, node controls + read-only mesh reports + audit trail | server `oper_cmd.zig` / `server.zig` (no oracle) | L · **done** (v3/gap-oper); remaining: force actions, integrations, GRANT/REVOKE, AUDIT PROOF, VHOST approvals |
 
 ## Phase 6 — Voice and video
 
@@ -166,7 +167,7 @@ keyboard-only and at 375px, with elm-program-test flows + Playwright + screensho
 | 2.0 | Transcript engine: `Html.Keyed` + `Html.Lazy` rows, scroll anchoring port, unread divider, jump-to-latest, windowing past ~300 rows | new | L · **done** (v3/transcript: keyed + lazy rows, `role=log`, `scrollPolicy`/`scrollState` bridge, Jump to latest pill; windowing stays the existing `threadWindowFor` + Show earlier, no spacer divs) |
 | 2.0b | Density modes (Default / Compact) + grouping as view-model | new | S · **done** (v3/transcript: `TranscriptRows` view-model, Appearance → Message layout) |
 | 3.1/3.5/3.6 | Room header, members, profile card come **before** 2.4–2.9 | reorder | — |
-| 8.x | Long tail: BlockKit (2.8), edit history (2.9), history import (4.5), Stage/Watch Together (6.7) | deferred | — |
+| 8.x | Long tail: edit history (2.9), Stage/Watch Together (6.7), Discord bot-token import (4.5) | deferred | — |
 
 **Architecture rules adopted:** keep effects-as-data (`List Outbound`); new UI goes in
 `Feature/X.elm` modules (own `Model`/`Msg`/`update`/`view`) wired into `App` through

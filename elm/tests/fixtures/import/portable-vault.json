@@ -1,0 +1,15 @@
+{
+  "kind": "onyx-vault",
+  "version": 1,
+  "exportedAt": "2024-05-01T12:00:00.000Z",
+  "targets": [
+    { "target": "#Lounge", "messages": [
+      { "id": "#lounge:1", "from": "ana", "text": "from an older device", "type": "msg", "time": 1714550400000, "target": "#lounge" },
+      { "id": "#lounge:2", "from": "bo", "text": "second", "type": "notice", "time": "2024-05-01T08:01:00.000Z" },
+      { "id": "#lounge:3", "from": "bo", "text": "bad type", "type": "script", "time": 1714550500000 },
+      { "id": 4, "from": "bo", "text": "bad id", "type": "msg", "time": 1714550600000 }
+    ] },
+    { "target": "bo", "messages": [ { "id": "bo:1", "from": "bo", "text": "ONYXDM1 AAAA", "type": "msg", "time": 1714550700000 } ] },
+    { "target": "has space", "messages": [ { "id": "x", "from": "a", "text": "t", "type": "msg", "time": 1 } ] }
+  ]
+}

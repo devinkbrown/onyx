@@ -248,6 +248,8 @@ grid model t =
             [ class "onyx-call-grid"
             , attribute "data-columns" (String.fromInt (CallMedia.gridColumns count))
             , attribute "data-count" (String.fromInt (List.length visible))
+            -- v3/rx-calls: rows let CSS size tiles to the stage height
+            , attribute "data-rows" (String.fromInt (ceilDiv (List.length visible) (CallMedia.gridColumns count)))
             , attribute "data-testid" "video-grid"
             ]
             (List.map (\tile -> ( tile.id, tileView model { primary = False, listItem = False } tile )) visible)
@@ -276,6 +278,15 @@ grid model t =
           else
             text ""
         ]
+
+
+ceilDiv : Int -> Int -> Int
+ceilDiv n d =
+    if d <= 0 then
+        n
+
+    else
+        (n + d - 1) // d
 
 
 speakerLayout : Model -> Tile -> List Tile -> Html Msg

@@ -12,8 +12,10 @@ module View.CallDock exposing
 
   - C6 incoming / outgoing DM ring dialogs through `View.Sheet`
     (`viewPinned`: the backdrop is a no-op, Escape declines / cancels
-    via `App.overlayStack`, initial focus on Decline / Cancel), plus
-    the DM "Call" entry in the room header's More menu;
+    via `App.overlayStack`, initial focus on Decline / Cancel); the
+    DM entry in the room header's More menu now says "Direct calls
+    aren't available yet" (v3/rx-calls — the server has no DM media
+    target);
   - C7 the mini voice view (PiP) shown while viewing another target:
     corner cycle, arrow / drag nudges, Return / Mute / Leave;
   - C10 the "Connection lost." stage banner and the polite
@@ -31,7 +33,7 @@ import CallDock
 import CallUi
 import Dict
 import Html exposing (Html, button, div, h2, p, section, span, strong, text)
-import Html.Attributes exposing (attribute, class, disabled, id, style, title, type_)
+import Html.Attributes exposing (attribute, class, disabled, id, title, type_)
 import Html.Events exposing (on, onClick, preventDefaultOn)
 import Json.Decode as Decode
 import View.CallPresence exposing (callIcon)
@@ -177,30 +179,27 @@ outgoing callee =
         ]
 
 
-{-| Room-header More menu entry for a DM target: start a voice call
-(single verb, idle only — "drop-in, never dragged in").
+{-| Room-header More menu entry for a DM target. v3/rx-calls: the
+server routes MEDIA to channels only (no 1:1 media target yet), so a
+DM says so plainly instead of offering a ring that cannot connect.
+The C6 ring dialogs stay for when direct calls arrive.
 -}
 dmCallItem : Model -> Html Msg
 dmCallItem model =
     case model.activeChannel of
         Just target ->
-            if
-                not (App.isChannelName model target)
-                    && CallDock.ringStartable
-                        { live = model.connection == App.Live
-                        , hub = model.calls
-                        , ourNick = model.ourNick
-                        , peer = target
-                        }
-            then
-                button
-                    [ type_ "button"
-                    , class "onyx-call-dm-start"
-                    , attribute "data-testid" "ribbon-dm-call"
-                    , attribute "aria-label" ("Start voice call with " ++ target)
-                    , onClick (CallStart target)
+            if not (App.isChannelName model target) && String.toLower target /= String.toLower model.ourNick then
+                div
+                    [ class "onyx-call-dm-unavailable"
+                    , attribute "role" "note"
+                    , attribute "data-testid" "ribbon-dm-call-unavailable"
                     ]
-                    [ callIcon "phone", text "Call" ]
+                    [ callIcon "phone"
+                    , span [ class "onyx-call-dm-unavailable-copy" ]
+                        [ strong [] [ text "Direct calls aren\u{2019}t available yet" ]
+                        , span [] [ text "Voice calls happen in rooms for now." ]
+                        ]
+                    ]
 
             else
                 text ""
@@ -335,8 +334,10 @@ pip model =
                 , attribute "data-voice-pip" "region"
                 , attribute "data-corner" (CallDock.cornerWord pos.corner)
                 , attribute "data-reconnecting" (boolAttr reconnecting)
-                , style "--pip-ix" (String.fromInt (12 + pos.x) ++ "px")
-                , style "--pip-iy" (String.fromInt (12 + pos.y) ++ "px")
+                -- v3/rx-calls: custom properties need the style ATTRIBUTE
+                -- (Elm's `style` assigns `el.style[name]`, which ignores
+                -- `--*` names, so the dragged offset never applied).
+                , attribute "style" ("--pip-ix:" ++ String.fromInt (12 + pos.x) ++ "px;--pip-iy:" ++ String.fromInt (12 + pos.y) ++ "px")
                 , preventDefaultOn "keydown" (pipKeyDecoder target)
                 ]
                 [ div

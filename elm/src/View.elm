@@ -10,11 +10,16 @@ weight and size only. No gradients, no glow, no glass, no emoji icons.
 
 Layout (v3/frame): one CSS grid — nav rail | collection sidebar |
 conversation column (room header, transcript, composer) | context
-rail — under a global top bar; one column + bottom nav under 768px.
+rail — under a global top bar; one column + bottom nav under 600px
+(v3/rx-shell; was 768px — from 600px the frame keeps the list beside
+the conversation).
 
 -}
 
+import AccountScope
 import App exposing (Model, Msg, inviteCard)
+import Dict
+import Sidebar
 import Invite exposing (inviteTitle)
 import Browser
 import Html exposing (Html, div, main_, text)
@@ -43,11 +48,12 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
+import View.Appeal
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
 import View.Trust exposing (trustPageForRoute)
-import View.Rail exposing (rail)
+import View.Rail exposing (rail, railMenu)
 import View.NewMessage exposing (newMessageSheet)
 import View.Roadmap
 import View.Roster exposing (roster)
@@ -60,20 +66,30 @@ import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
 import View.Prefs exposing (prefsSheet)
+import View.BlockKit -- v3/gap-import
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
 import View.Account2
+import View.UserModes -- v3/gap-usermodes
 import View.Toast exposing (toaster)
 import View.Nav
 import View.Inbox
 import View.Switcher
+import View.GapCommands
 import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.AuthGate -- v3/gap-auth
+-- v3/gap-organize
+import View.Attention
+import View.Organize
+import View.WatchTogether -- v3/gap-watch
+import View.GapShell -- v3/gap-shell
 
 
 view : Model -> Browser.Document Msg
@@ -128,7 +144,13 @@ view model =
                                 View.Roadmap.route model
 
                             _ ->
-                                if App.connectGateVisible model then
+                                -- v3/gap-auth: an auth step (two-step code,
+                                -- challenge question, passkey, password
+                                -- reset) takes over the gate.
+                                if View.AuthGate.takesOver model then
+                                    [ View.AuthGate.gate model ]
+
+                                else if App.connectGateVisible model then
                                     [ connectGate model ]
 
                                 else
@@ -192,12 +214,15 @@ documentTitle model =
                             "Onyx roadmap — rooms, calls, catch-up"
 
                         _ ->
-                            case model.activeChannel of
-                                Just name ->
-                                    name ++ " — Onyx"
+                            -- v3/gap-account: "(N) …" while mentions / DMs wait
+                            AccountScope.attentionTitle model.gapAccount.badge
+                                (case model.activeChannel of
+                                    Just name ->
+                                        name ++ " — Onyx"
 
-                                Nothing ->
-                                    "Onyx"
+                                    Nothing ->
+                                        "Onyx"
+                                )
 
 
 {-| v3/frame — the ONE app frame grid (see `.onyx-frame` in app.css):
@@ -205,10 +230,10 @@ documentTitle model =
     nav rail | topbar (global)                                  |
              | notices (reconnect banner, search, guest chip)   |
              | collection sidebar | conversation | context rail |
-    mobile bottom nav (under 768px only)
+    mobile bottom nav (under 600px only)
 
 The conversation column stacks the room header, the transcript pane
-and the composer. Under 768px the grid collapses to one column: the
+and the composer. Under 600px the grid collapses to one column: the
 sidebar replaces the conversation while the Rooms / Messages drawer is
 open (`data-nav-drawer`), the context rail hides, and the bottom nav
 takes the last row —
@@ -216,6 +241,13 @@ except inside a conversation (`data-convo`), which is a pushed page:
 the global bar and the bottom nav step aside and the room header's
 back control returns to the list. Every overlay (sheets, palette, toasts, the You
 hub) mounts in `.onyx-overlays`, outside the grid flow.
+
+v3/rx-shell — the same grid on every aspect ratio (css/rx-shell.css):
+600–767px is a compact two-pane (foldables open, 200% zoom); windows
+under 520px tall fold the global bar into the sidebar head so it
+shares one row with the room header; wide screens keep the transcript
+at a ~72ch measure and, past 1960px, the frame stops growing inside a
+calm surround.
 -}
 appFrame : Model -> Html Msg
 appFrame model =
@@ -236,6 +268,7 @@ appFrame model =
              else
                 "false"
             )
+        , View.Attention.readerAttr model -- v3/gap-organize: reader mode
         , -- v3/ui-mobile-shell: a conversation is showing (phones push it
           -- as its own page: no global bar, no bottom nav, a back control)
           attribute "data-convo"
@@ -257,15 +290,10 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
-                ++ (if model.searchOpen then
-                        [ panel model ]
-
-                    else
-                        []
-                   )
             )
          ]
             ++ (if model.callsOpen then
@@ -276,11 +304,22 @@ appFrame model =
                 else
                     [ rail model
                     , main_ [ class "onyx-main" ]
-                        [ roomHeader model
-                        , View.Polish.timeScrubber model -- v3/polish
-                        , thread model
-                        , composer model
-                        ]
+                        ([ roomHeader model ]
+                            -- v3/rx-convo: message search belongs to the conversation it
+                            -- searches: it opens under the room header, in the main column
+                            -- (it used to sit in the full-width notices row and pushed the
+                            -- room list and the roster down with it).
+                            ++ (if model.searchOpen then
+                                    [ panel model ]
+
+                                else
+                                    []
+                               )
+                            ++ [ View.Polish.timeScrubber model -- v3/polish
+                               , thread model
+                               , composer model
+                               ]
+                        )
                     , roster model
                     ]
                )
@@ -323,6 +362,7 @@ overlays model =
         -- v3/roomsettings
         , View.RoomSettings.roomSettingsSheet model
         , operSheet model
+        , View.Appeal.appealSheet model -- v3/gap-oper
         , personSafetySheet model
         , newMessageSheet model
         , inviteShareSheet model -- v3/dmsafety
@@ -333,12 +373,24 @@ overlays model =
         -- v3/calls-c11
         , View.StageMode.handsSheet model
         , View.StageMode.leaveConfirm model
+        -- v3/gap-watch
+        , View.WatchTogether.startSheet model
         , reclaimDialog model
+        -- v3/gap-shell
+        , View.GapShell.activitySheet model
+        , View.GapShell.leaveConfirm model
         , View.Nav.youHub model
         , View.Inbox.inboxSheet model -- v3/ui-sheets
+        , railMenu model -- v3/rx-shell: the sidebar row menu
+        -- v3/gap-organize: folder picker, saved messages; reader exit
+        , View.Organize.sheets model
+        , View.Attention.readerPill model
+        , View.UserModes.memoSheet model -- v3/gap-usermodes
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        , View.BlockKit.overlay model -- v3/gap-import
+        , View.GapCommands.commandsHelp model -- v3/gap-commands
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model
         -- v3/polish: the quiet asks + the update strip

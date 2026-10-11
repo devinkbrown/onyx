@@ -218,67 +218,6 @@
   .gap-collapsed-show { margin-left: auto; }
 }
 
-/* ── Earlier versions ─────────────────────────────────────────────────
-   The "· edited" marker becomes a disclosure only when this device holds
-   earlier text. It reads as the same dim marker, with a dotted underline
-   on hover / focus to say it opens. */
-button.gap-edited-toggle {
-  display: inline;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 2px;
-  font: inherit;
-  font-size: var(--text-xs);
-  line-height: inherit;
-  cursor: pointer;
-}
-button.gap-edited-toggle:hover,
-button.gap-edited-toggle[aria-expanded='true'] {
-  color: var(--onyx-text);
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-}
-button.gap-edited-toggle:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
-@media (pointer: coarse) {
-  button.gap-edited-toggle { position: relative; }
-  button.gap-edited-toggle::after { content: ""; position: absolute; inset: -14px -8px; }
-}
-
-.gap-revisions {
-  display: grid;
-  gap: var(--space-1);
-  max-width: min(36rem, 100%);
-  max-height: 14rem;
-  margin: var(--space-1) 0 var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border: 1px solid var(--onyx-line);
-  border-left: 2px solid var(--onyx-line);
-  border-radius: var(--radius);
-  background: var(--onyx-bg);
-}
-.gap-revisions-title {
-  margin: 0;
-  color: var(--onyx-faint);
-  font-size: var(--text-xs);
-  font-weight: 650;
-  letter-spacing: var(--tracking-kicker);
-  text-transform: uppercase;
-}
-.gap-revisions-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.gap-revision { display: grid; gap: 1px; min-width: 0; }
-.gap-revision-time { color: var(--onyx-dim); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
-.gap-revision-body {
-  color: var(--onyx-text);
-  font-size: var(--text-sm);
-  line-height: var(--leading-snug);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 /* ── Search: nothing found ───────────────────────────────────────────── */
 .onyx-message-search__empty {
   display: grid;

@@ -12,10 +12,11 @@ otherwise the management view. Copy is verbatim with
 `STEWARDSHIP_COPY`.
 -}
 
-import App exposing (ConnectionState(..), Model, Msg(..), StewardView, stewardMembersOf, stewardViewFor, webhookNotices)
+import App exposing (ConnectionState(..), Model, Msg(..), StewardView, stewardMembersOf, stewardViewFor)
+import GapPeople
 import Dict
 import Html exposing (Html, button, div, h2, h3, input, label, li, option, p, section, select, span, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, value)
+import Html.Attributes exposing (attribute, class, disabled, for, id, placeholder, selected, value)
 import Html.Events exposing (onClick, onInput)
 import Stewardship
 import View.Sheet as Sheet
@@ -30,7 +31,18 @@ roomCareButton model channel =
             div [] []
 
         Just room ->
-            if Stewardship.isConsumerStewardshipRoom (Stewardship.memberCount (stewardMembersOf model channel)) then
+            -- v3/gap-people: a room offered to us opens Room care at
+            -- any size, so the take view is always reachable.
+            if (stewardViewFor model room.name).offeredToUs then
+                button
+                    [ class "onyx-roster-care onyx-roster-care--offer"
+                    , attribute "aria-label" ("Review the offer to take " ++ room.name)
+                    , attribute "data-testid" "steward-open"
+                    , onClick (StewardOpen room.name)
+                    ]
+                    [ text "Room offer" ]
+
+            else if Stewardship.isConsumerStewardshipRoom (Stewardship.memberCount (stewardMembersOf model channel)) then
                 button
                     [ class "onyx-roster-care"
                     , attribute "aria-label" ("Room care for " ++ room.name)
@@ -120,24 +132,36 @@ takeView model view =
     panelShell model
         view
         ("Take " ++ view.channel ++ "?")
-        [ p [ class "onyx-steward-body" ]
+        ([ p [ class "onyx-steward-body" ]
             [ text (from ++ " wants you to take this room. Nothing changes until you accept.") ]
-        , div [ class "onyx-steward-actions" ]
-            [ button
-                [ class "onyx-steward-btn"
-                , attribute "data-testid" "steward-decline"
-                , onClick (StewardDeclineAndClose view.channel)
-                ]
-                [ text "Not now" ]
-            , button
-                [ class "onyx-steward-btn onyx-steward-btn-primary"
-                , attribute "data-testid" "steward-accept"
-                , disabled (not view.live)
-                , onClick (StewardAcceptTransfer view.channel)
-                ]
-                [ text "Accept" ]
-            ]
-        ]
+         , p [ class "onyx-steward-body onyx-steward-note" ]
+            [ text ("Accepting tells " ++ from ++ "; they then hand the room over and you become an owner.") ]
+         ]
+            ++ statusLine model
+            ++ [ div [ class "onyx-steward-actions" ]
+                    [ button
+                        [ class "onyx-steward-btn"
+                        , attribute "data-testid" "steward-decline"
+                        , onClick (StewardDeclineAndClose view.channel)
+                        ]
+                        [ text "Not now" ]
+                    , button
+                        [ class "onyx-steward-btn onyx-steward-btn-primary"
+                        , attribute "data-testid" "steward-accept"
+                        , disabled (not view.live || offerAccepted view)
+                        , onClick (StewardAcceptTransfer view.channel)
+                        ]
+                        [ text
+                            (if offerAccepted view then
+                                "Accepted"
+
+                             else
+                                "Accept"
+                            )
+                        ]
+                    ]
+               ]
+        )
 
 
 manageView : Model -> StewardView -> Html Msg
@@ -151,11 +175,13 @@ manageView model view =
          ]
             ++ statusLine model
             ++ helperSection model view
-            ++ inviteHint view
+            ++ inviteSection view
             ++ transferSection model view
             ++ closeSection model view
             ++ deleteSection model view
-            ++ webhookSection model view
+            -- v3/gap-people: webhooks moved to Room settings (any host,
+            -- any room size); Room care gains Invite and Leave.
+            ++ leaveSection model view
             ++ lastMemberHint view
             ++ mismatchHint model view
             ++ [ div [ class "onyx-steward-actions" ]
@@ -220,15 +246,88 @@ helperRow model view helper =
         ]
 
 
-inviteHint : StewardView -> List (Html Msg)
-inviteHint view =
-    if Stewardship.membersCanInvite view.count then
+{-| v3/gap-people — Invite friends from Room care (the hint plus the
+invite sheet the room header opens). -}
+inviteSection : StewardView -> List (Html Msg)
+inviteSection view =
+    [ section [ class "onyx-steward-section" ]
+        ([ h3 [ class "onyx-steward-label" ] [ text "Invite friends" ] ]
+            ++ (if Stewardship.membersCanInvite view.count then
+                    [ p [ class "onyx-steward-body" ] [ text Stewardship.stewardshipCopy.inviteHint ] ]
+
+                else
+                    []
+               )
+            ++ [ div [ class "onyx-steward-actions" ]
+                    [ button
+                        [ class "onyx-steward-btn"
+                        , attribute "data-testid" "steward-invite"
+                        , onClick (GapPeopleMsg (GapPeople.StewardInvite view.channel))
+                        ]
+                        [ text "Invite friends" ]
+                    ]
+               ]
+        )
+    ]
+
+
+{-| v3/gap-people — Leave, with a confirm step. Leaving as the last
+person dissolves the room; leaving as the owner leaves it without one
+unless someone else already owns it. -}
+leaveSection : Model -> StewardView -> List (Html Msg)
+leaveSection model view =
+    let
+        consequence =
+            if Stewardship.lastMemberLeaveDissolves view.count then
+                Stewardship.stewardshipCopy.lastMember
+
+            else if view.isOwner && List.length view.owners <= 1 then
+                "You are the only owner. Hand the room to someone first, or it stays without an owner."
+
+            else
+                "You can come back unless the room is invite-only or closed."
+    in
+    if model.stewardLeaving then
         [ section [ class "onyx-steward-section" ]
-            [ p [ class "onyx-steward-body" ] [ text Stewardship.stewardshipCopy.inviteHint ] ]
+            [ p [ class "onyx-steward-body", attribute "id" "steward-leave-title" ] [ text ("Leave " ++ view.channel ++ "?") ]
+            , p [ class "onyx-steward-status", attribute "role" "alert" ] [ text consequence ]
+            , div [ class "onyx-steward-actions" ]
+                [ button
+                    [ class "onyx-steward-btn"
+                    , attribute "data-testid" "steward-leave-cancel"
+                    , onClick (GapPeopleMsg GapPeople.StewardCancelLeave)
+                    ]
+                    [ text "Stay" ]
+                , button
+                    [ class "onyx-steward-btn onyx-steward-btn-danger"
+                    , attribute "data-testid" "steward-leave-confirm"
+                    , disabled (not view.live)
+                    , onClick (GapPeopleMsg (GapPeople.StewardConfirmLeave view.channel))
+                    ]
+                    [ text "Leave room" ]
+                ]
+            ]
         ]
 
     else
-        []
+        [ section [ class "onyx-steward-section" ]
+            [ h3 [ class "onyx-steward-label" ] [ text "Leave this room" ]
+            , div [ class "onyx-steward-actions" ]
+                [ button
+                    [ class "onyx-steward-btn"
+                    , attribute "data-testid" "steward-leave"
+                    , disabled (not view.live)
+                    , onClick (GapPeopleMsg GapPeople.StewardAskLeave)
+                    ]
+                    [ text "Leave room" ]
+                ]
+            ]
+        ]
+
+
+offerAccepted : StewardView -> Bool
+offerAccepted view =
+    Maybe.map .accepted view.offer |> Maybe.withDefault False
 
 
 transferSection : Model -> StewardView -> List (Html Msg)
@@ -251,9 +350,9 @@ transferSection model view =
                                 , value model.stewardSuccessor
                                 , onInput StewardSuccessorInput
                                 ]
-                                (option [ value "" ] [ text "Choose a person" ]
+                                (option [ attribute "value" "", selected (model.stewardSuccessor == "") ] [ text "Choose a person" ]
                                     :: List.map
-                                        (\member -> option [ value member.nick ] [ text member.nick ])
+                                        (\member -> option [ value member.nick, selected (model.stewardSuccessor == member.nick) ] [ text member.nick ])
                                         (transferCandidates model view)
                                 )
                             , div [ class "onyx-steward-actions" ]
@@ -268,7 +367,7 @@ transferSection model view =
                             ]
 
                         Just offer ->
-                            [ p [ class "onyx-steward-status", attribute "data-testid" "steward-transfer-wait" ]
+                            [ p [ class "onyx-steward-status", attribute "data-testid" "steward-transfer-wait", attribute "role" "status" ]
                                 [ text
                                     (if offer.accepted then
                                         Stewardship.stewardshipCopy.transferGrant
@@ -277,7 +376,22 @@ transferSection model view =
                                         Stewardship.stewardshipCopy.transferWait ++ " Waiting for " ++ offer.to ++ "."
                                     )
                                 ]
-                            , div [ class "onyx-steward-actions" ]
+                            ]
+                                ++ (if offer.accepted then
+                                        -- v3/gap-people: what "Hand it over" moves.
+                                        case App.transferHandoverPlan model view.channel of
+                                            Just plan ->
+                                                [ p [ class "onyx-steward-body onyx-steward-note", attribute "data-testid" "steward-handover-note" ] [ text plan.note ] ]
+
+                                            Nothing ->
+                                                []
+
+                                    else
+                                        [ p [ class "onyx-steward-body onyx-steward-note" ]
+                                            [ text ("The offer reaches " ++ offer.to ++ " in Onyx while you are both online. If they use another app, cancel and ask them in a message.") ]
+                                        ]
+                                   )
+                                ++ [ div [ class "onyx-steward-actions" ]
                                 [ button
                                     [ class "onyx-steward-btn onyx-steward-btn-primary"
                                     , attribute "data-testid" "steward-grant"
@@ -292,7 +406,7 @@ transferSection model view =
                                     ]
                                     [ text "Cancel" ]
                                 ]
-                            ]
+                               ]
                    )
             )
         ]
@@ -412,97 +526,6 @@ deleteSection model view =
                    ]
             )
         ]
-
-
-{-| Incoming webhooks (mirroring the settings sheet's Integrations
-section): owners manage Discord-compatible webhook URLs with the
-create/list/delete verbs; everyone else sees the hosts-managed
-readonly hint. Recent server notices surface the created URLs,
-which the server shows once.
--}
-webhookSection : Model -> StewardView -> List (Html Msg)
-webhookSection model view =
-    if not view.isOwner then
-        [ section [ class "onyx-steward-section" ]
-            [ h3 [ class "onyx-steward-label" ] [ text "Incoming webhooks" ]
-            , p [ class "onyx-steward-body", attribute "data-testid" "steward-webhook-readonly" ]
-                [ text "Managed by room hosts. Discord-compatible webhook URLs can post into this room." ]
-            ]
-        ]
-
-    else
-        [ section [ class "onyx-steward-section" ]
-            ([ h3 [ class "onyx-steward-label" ] [ text "Incoming webhooks" ]
-             , p [ class "onyx-steward-body" ]
-                [ text "Discord-compatible webhook URLs can post into this room. The created URL is shown once in server notices." ]
-             , label [ class "onyx-steward-label", for "steward-webhook-name" ] [ text "Webhook name" ]
-             , input
-                [ id "steward-webhook-name"
-                , class "onyx-steward-field"
-                , attribute "data-testid" "steward-webhook-name"
-                , attribute "maxlength" "32"
-                , attribute "autocomplete" "off"
-                , value model.webhookName
-                , onInput WebhookNameInput
-                ]
-                []
-             , div [ class "onyx-steward-actions" ]
-                [ button
-                    [ class "onyx-steward-btn onyx-steward-btn-primary"
-                    , attribute "data-testid" "steward-webhook-create"
-                    , disabled (not view.live)
-                    , onClick (WebhookCreate view.channel)
-                    ]
-                    [ text "Create webhook" ]
-                , button
-                    [ class "onyx-steward-btn"
-                    , attribute "data-testid" "steward-webhook-list"
-                    , disabled (not view.live)
-                    , onClick (WebhookList view.channel)
-                    ]
-                    [ text "List webhooks" ]
-                ]
-             , label [ class "onyx-steward-label", for "steward-webhook-delete" ] [ text "Delete webhook id" ]
-             , input
-                [ id "steward-webhook-delete"
-                , class "onyx-steward-field"
-                , attribute "data-testid" "steward-webhook-delete-id"
-                , attribute "autocomplete" "off"
-                , value model.webhookDeleteId
-                , onInput WebhookDeleteIdInput
-                ]
-                []
-             , div [ class "onyx-steward-actions" ]
-                [ button
-                    [ class "onyx-steward-btn onyx-steward-btn-danger"
-                    , attribute "data-testid" "steward-webhook-delete"
-                    , disabled (not view.live || String.isEmpty (String.trim model.webhookDeleteId))
-                    , onClick (WebhookDelete view.channel)
-                    ]
-                    [ text "Delete webhook" ]
-                ]
-             ]
-                ++ webhookNoticeRows model
-            )
-        ]
-
-
-webhookNoticeRows : Model -> List (Html Msg)
-webhookNoticeRows model =
-    case webhookNotices model of
-        [] ->
-            []
-
-        notices ->
-            [ div [ class "onyx-steward-notices", attribute "aria-live" "polite" ]
-                (List.map
-                    (\notice ->
-                        p [ class "onyx-steward-notice", attribute "data-testid" "steward-webhook-notice" ]
-                            [ text notice ]
-                    )
-                    notices
-                )
-            ]
 
 
 lastMemberHint : StewardView -> List (Html Msg)

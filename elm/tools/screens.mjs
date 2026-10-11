@@ -168,6 +168,23 @@ async function joinRoom(page, nick = 'kn', room = '#lounge') {
   await settle(page, 900);
 }
 const tryClick = async (page, sel) => { const el = await page.$(sel); if (el) { await el.click().catch(() => {}); await settle(page); return true; } return false; };
+// Click the first VISIBLE match of the first selector that has one: the
+// shell renders both nav forms (rail + bottom nav) and hides one per
+// viewport, so "first DOM match" is often an invisible control.
+const clickVisible = async (page, selectors) => {
+  for (const sel of selectors) {
+    for (const el of await page.$$(sel)) {
+      if (await el.isVisible()) { await el.click().catch(() => {}); await settle(page); return true; }
+    }
+  }
+  return false;
+};
+// Phones push a conversation as its own page (no global bar, no bottom
+// nav): step back to the list first wherever a back control shows.
+const toShell = async (page) => {
+  for (let i = 0; i < 3 && (await page.$('[role="dialog"]')); i += 1) { await page.keyboard.press('Escape'); await settle(page, 250); }
+  await clickVisible(page, ['[data-testid="room-back"]']);
+};
 
 const SCENARIOS = {
   'landing': async (p) => { await p.goto(`${base}/`); await settle(p, 800); },
@@ -177,12 +194,12 @@ const SCENARIOS = {
   'home': async (p) => { await joinRoom(p, 'kn', ''); },
   'room': async (p) => { await joinRoom(p); },
   'room-composer': async (p) => { await joinRoom(p); await p.fill('.onyx-composer input, .onyx-composer textarea', '/'); await settle(p); },
-  'you-hub': async (p) => { await joinRoom(p); await tryClick(p, '[data-testid="you-open"]'); },
-  'inbox': async (p) => { await joinRoom(p); await tryClick(p, '.shell-ribbon-bell, [data-testid="inbox-open"]'); },
+  'you-hub': async (p) => { await joinRoom(p); await toShell(p); await clickVisible(p, ['[data-testid="you-open"]', '.onyx-mobile-nav [data-testid="nav-you"]', '.onyx-primary-nav [data-testid="nav-you"]']); },
+  'inbox': async (p) => { await joinRoom(p); await toShell(p); await clickVisible(p, ['.shell-ribbon-bell', '[data-testid="inbox-open"]']); },
   'palette': async (p) => { await joinRoom(p); await p.keyboard.press('Control+k'); await settle(p); },
   'room-more': async (p) => { await joinRoom(p); await tryClick(p, '[data-testid="room-more"], .onyx-room-more'); },
-  'browse': async (p) => { await joinRoom(p); await tryClick(p, '[data-testid="browse-rooms"], button:has-text("Browse rooms")'); await settle(p, 600); },
-  'calls': async (p) => { await joinRoom(p); await tryClick(p, '.onyx-calls-toggle, [data-testid="nav-calls"]'); },
+  'browse': async (p) => { await joinRoom(p); await toShell(p); await clickVisible(p, ['[data-testid="sidebar-browse-rooms"]', '[data-testid="browse-rooms"]', 'button:has-text("Browse rooms")']); await settle(p, 600); },
+  'calls': async (p) => { await joinRoom(p); await toShell(p); await clickVisible(p, ['.onyx-mobile-nav [data-testid="nav-calls"]', '.onyx-primary-nav [data-testid="nav-calls"]', '.onyx-calls-toggle']); },
 };
 // --extra path/to/scenarios.mjs : default-export { name: async (page, h) => … }
 // where h = { base, pin, joinRoom, tryClick, settle }.

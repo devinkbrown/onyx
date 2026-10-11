@@ -1,5 +1,6 @@
 module View.CallPresence exposing
     ( callIcon
+    , guestCard
     , headerVoice
     , joinBanner
     , railAriaSuffix
@@ -270,7 +271,7 @@ joinBanner model room =
                 , attribute "data-variant" "invite"
                 , attribute "role" "status"
                 ]
-                [ faces (List.take 1 names)
+                [ faces (List.take 3 names)
                 , div [ class "onyx-join-banner-copy" ]
                     [ strong [] [ text (CallUi.inviteTitle count) ]
                     , span [] [ text "Join to listen; your microphone starts off until you unmute." ]
@@ -307,6 +308,24 @@ joinBanner model room =
                     [ callIcon "x" ]
                 ]
 
+        -- v3/rx-calls: guests are offered an account, not a join that fails
+        Just (CallUi.BannerGuest count) ->
+            let
+                members =
+                    Dict.get (String.toLower room) model.channels
+                        |> Maybe.map .members
+                        |> Maybe.withDefault Dict.empty
+
+                names =
+                    CallUi.voiceRoster members (CallUi.rosterFor model.media room)
+            in
+            guestCard model
+                { title = CallUi.guestTitle count
+                , faces = List.take 3 names
+                , testid = "call-join-banner"
+                , dismiss = Just (CallBannerDismiss room)
+                }
+
         Just CallUi.BannerFailed ->
             div
                 [ class "onyx-join-banner onyx-join-banner-failed"
@@ -316,7 +335,16 @@ joinBanner model room =
                 ]
                 [ span [ class "onyx-join-banner-warn" ] [ callIcon "warn" ]
                 , div [ class "onyx-join-banner-copy" ]
-                    [ strong [] [ text "Couldn't join. Try again." ]
+                    [ strong []
+                        [ text
+                            (if model.callJoinError == Just CallDock.CaptureLost then
+                                -- v3/rx-calls: the call ended under us
+                                "Your microphone stopped."
+
+                             else
+                                "Couldn't join. Try again."
+                            )
+                        ]
                     , span [ attribute "data-testid" "call-join-failed-sub" ] [ text (CallDock.failedSub model.callJoinError room) ] -- v3/calls-c6
                     ]
                 , div [ class "onyx-join-banner-actions" ]
@@ -332,6 +360,81 @@ joinBanner model room =
 
         Nothing ->
             text ""
+
+
+{-| v3/rx-calls — "Sign in to join calls": calls are end-to-end
+encrypted, so they need an Onyx account. Keeping the guest name
+registers it in place (no reconnect); "Sign in" leaves for the
+sign-in form. Used by the room banner and the Calls hub.
+-}
+guestCard :
+    Model
+    -> { title : String, faces : List String, testid : String, dismiss : Maybe Msg }
+    -> Html Msg
+guestCard model cfg =
+    let
+        nick =
+            String.trim model.ourNick
+    in
+    div
+        [ class "onyx-join-banner onyx-call-guest"
+        , attribute "data-testid" cfg.testid
+        , attribute "data-variant" "guest"
+        , attribute "role" "status"
+        ]
+        [ if List.isEmpty cfg.faces then
+            span [ class "onyx-call-guest-icon", attribute "aria-hidden" "true" ] [ callIcon "lock" ]
+
+          else
+            faces cfg.faces
+        , div [ class "onyx-join-banner-copy" ]
+            [ strong [] [ text cfg.title ]
+            , span [] [ text "Calls are end-to-end encrypted and need an Onyx account. Keep your name in a moment \u{2014} you stay connected." ]
+            ]
+        , div [ class "onyx-join-banner-actions" ]
+            [ button
+                [ type_ "button"
+                , class "onyx-call-btn onyx-call-btn-ghost"
+                , attribute "data-testid" "call-guest-signin"
+                , attribute "aria-label" "Sign in with an existing account (you will reconnect)"
+                , onClick CallGuestSignIn
+                ]
+                [ text "Sign in" ]
+            , button
+                [ type_ "button"
+                , class "onyx-call-btn onyx-call-btn-primary"
+                , attribute "data-testid" "call-guest-claim"
+                , onClick GuestClaimOpen
+                ]
+                [ callIcon "key"
+                , span [ class "onyx-call-btn-label" ]
+                    (if String.isEmpty nick then
+                        [ text "Create an account" ]
+
+                     else
+                        -- "Keep the name kn"; narrow banners drop "the name "
+                        -- visually (it stays in the accessible name).
+                        [ text "Keep "
+                        , span [ class "onyx-call-btn-long" ] [ text "the name " ]
+                        , text nick
+                        ]
+                    )
+                ]
+            ]
+        , case cfg.dismiss of
+            Just msg ->
+                button
+                    [ type_ "button"
+                    , class "onyx-join-banner-hide"
+                    , attribute "data-testid" "call-join-banner-hide"
+                    , attribute "aria-label" "Hide voice banner"
+                    , onClick msg
+                    ]
+                    [ callIcon "x" ]
+
+            Nothing ->
+                text ""
+        ]
 
 
 {-| Hub "Rooms with voice" (§2.17): navigation-only rows reusing the

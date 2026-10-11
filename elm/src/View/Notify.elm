@@ -19,7 +19,9 @@ import Notify exposing (Permission(..))
 import NotifyCenter exposing (NotifyMode(..))
 import Push
 import Set
+import View.Attention -- v3/gap-organize
 import View.Sheet as Sheet
+import View.UserModes
 
 
 {-| Topbar entry point for the Notifications sheet. -}
@@ -121,7 +123,11 @@ notifySheet model =
                     )
                 , desktopSection model
                 , dndSection model
+                -- v3/gap-organize
+                , View.Attention.quietSection model
+                , View.Attention.presetSection model
                 , keywordsSection model
+                , View.Attention.smartMuteSection model -- v3/gap-organize
                 , ignoredSection model
                 ]
 
@@ -351,6 +357,7 @@ dndSection model =
                         "false"
                     )
                 , attribute "data-testid" "notify-dnd-toggle"
+                , attribute "aria-keyshortcuts" "Control+Shift+D Meta+Shift+D" -- v3/gap-commands
                 , onClick NotifyDndToggle
                 ]
                 [ text
@@ -531,6 +538,8 @@ ignoredSection model =
                 [ text "Mute name" ]
             ]
         , p [ id "pref-ignore-help", class "notify-hint" ] [ text "Only you see this setting. Press Enter to add." ]
+        , -- v3/gap-usermodes: also block on the server (signed in)
+          View.UserModes.serverBlocks model
         , case model.notifyIgnoreError of
             Just message ->
                 p [ class "notify-status", attribute "role" "alert", attribute "data-testid" "pref-ignore-error" ] [ text message ]
@@ -543,14 +552,15 @@ ignoredSection model =
 
           else
             ul [ class "notify-list", attribute "aria-label" "Muted names on this device", attribute "data-testid" "pref-ignored-users-list" ]
-                (List.map ignoredRow nicks)
+                (List.map (ignoredRow model) nicks)
         ]
 
 
-ignoredRow : String -> Html Msg
-ignoredRow nick =
+ignoredRow : Model -> String -> Html Msg
+ignoredRow model nick =
     li [ class "notify-item" ]
         [ span [ class "notify-word", title nick ] [ text nick ]
+        , View.UserModes.serverBadge model nick
         , button
             [ attribute "type" "button"
             , class "notify-remove"

@@ -1,0 +1,5 @@
+**** BEGIN LOGGING AT Tue Apr  2 10:00:00 2024
+
+Apr 02 10:00:01 <ana>	hexchat hello
+Apr 02 10:00:02 *	ana hexes
+Apr 02 10:00:03 -->	bo (~b@host.test) has joined #hex

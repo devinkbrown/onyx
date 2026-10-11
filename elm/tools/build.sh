@@ -2,12 +2,13 @@
 # Build the static Elm bundle into elm/dist-elm/ (roadmap 7.5, partial).
 #
 #   elm make --optimize src/Main.elm → dist-elm/app.js
-#   + index.html, app.css, css/*.css, ports.js copied alongside
+#   + index.html, app.css, css/*.css, ports.js, historyImport.js copied alongside
 #   + voice engine: elm/media/build-voice.mjs bundles the Cadence media
 #     engine + window.OnyxVoiceEngine adapter (voice.js), its hashed video
 #     worker (voice-worker.<sha>.js) and the opcodec codec files
 #   + content hashes: every local <script src> / <link href> asset that
-#     index.html references (app.js, voice.js, ports.js, app.css, css/*.css) is
+#     index.html references (app.js, voice.js, historyImport.js, ports.js,
+#     app.css, css/*.css) is
 #     renamed to name.<sha256:12>.ext and the tag rewritten, so a deploy
 #     can cache assets immutably while index.html stays revalidated.
 #
@@ -31,7 +32,7 @@ mkdir -p "$OUT"
 
 (cd "$ELM_DIR" && "$ELM_BIN" make --optimize src/Main.elm --output "$OUT/app.js")
 
-cp "$ELM_DIR/index.html" "$ELM_DIR/app.css" "$ELM_DIR/ports.js" "$OUT/"
+cp "$ELM_DIR/index.html" "$ELM_DIR/app.css" "$ELM_DIR/ports.js" "$ELM_DIR/historyImport.js" "$OUT/"
 if compgen -G "$ELM_DIR/css/*.css" >/dev/null; then
   mkdir -p "$OUT/css"
   cp "$ELM_DIR"/css/*.css "$OUT/css/"
@@ -58,7 +59,7 @@ if [ -n "$ESBUILD_BIN" ]; then
     if (at < 0) { console.error("app.js: expected trailing }(this)); wrapper"); process.exit(1); }
     fs.writeFileSync(f, src.slice(0, at) + "}(globalThis));" + src.slice(at + 9));
   ' "$OUT/app.js"
-  for f in "$OUT/app.js" "$OUT/ports.js"; do
+  for f in "$OUT/app.js" "$OUT/ports.js" "$OUT/historyImport.js"; do
     "$ESBUILD_BIN" "$f" --minify --target=es2017 --log-level=warning --outfile="$f" --allow-overwrite
   done
   for f in "$OUT/app.css" "$OUT"/css/*.css; do
@@ -98,7 +99,7 @@ html = html.replace(ref, (whole, lead, rel) => {
   return `${lead}="${hashed.get(rel)}"`;
 });
 
-for (const required of ["app.js", "voice.js", "ports.js", "app.css"]) {
+for (const required of ["app.js", "voice.js", "historyImport.js", "ports.js", "app.css"]) {
   if (!hashed.has(required)) throw new Error(`index.html no longer references ${required}`);
 }
 fs.writeFileSync(indexPath, html);

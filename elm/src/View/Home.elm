@@ -20,12 +20,17 @@ Open / Remove controls (the durable queue stays ports-side).
 import App exposing (Channel, Model, Msg(..))
 import Dict
 import Home
-import Html exposing (Html, button, dd, div, dl, dt, h1, h2, h3, li, p, section, span, strong, text, ul)
+import Html exposing (Html, button, div, h1, h2, h3, li, p, section, span, text, ul)
 import Html.Attributes exposing (attribute, class, classList, id, tabindex, type_)
 import Html.Events exposing (onClick)
 import Outbox
 import Stats
 import View.GuestClaim exposing (guestClaimChip)
+-- v3/gap-organize
+import Organizer
+import View.Attention
+import View.Organize
+import View.GapShell -- v3/gap-shell
 
 
 {-| Every open conversation, projected for Home. -}
@@ -73,16 +78,15 @@ home model =
             [ div [ class "onyx-home-masthead" ]
                 [ p [ class "onyx-home-welcome" ] [ text (Home.welcomeLine model.ourNick) ]
                 , h1 [ class "onyx-home-title" ] [ text (Home.title inbox) ]
-                , if plan.rooms > 0 then
-                    signalStrip plan
-
-                  else
-                    text ""
-                , if caughtUpEmpty then
+                , -- v3/rx-shell: no separate "Needs your attention" strip —
+                  -- the catch-up card below says it (heading, counts, Mark
+                  -- all caught up), so the numbers show once, above the fold.
+                  if caughtUpEmpty then
                     p [ class "onyx-home-caught-up", attribute "role" "status" ] [ text "Caught up in the rooms you joined." ]
 
                   else
                     text ""
+                , View.Attention.homeMemoryNote model -- v3/gap-organize
                 , p
                     [ class "onyx-home-announce"
                     , attribute "role" "status"
@@ -106,11 +110,13 @@ home model =
                     }
 
               else
-                inboxSection plan inbox
+                inboxSection model plan inbox
             , -- v3/ui-mobile-shell: the guest "Keep the name" ask lives on
               -- Home (and in the You hub), never as a strip over a room.
               guestClaimChip model
+            , View.GapShell.motdCard model -- v3/gap-shell
             , coach model Home.HomeNext
+            , View.Organize.homeSaved model -- v3/gap-organize
             , outboxSection model connected
             , if Home.showInviteFriends { connected = connected, roomCount = List.length joined, dmCount = List.length dms } then
                 inviteSection model
@@ -122,28 +128,19 @@ home model =
         ]
 
 
-signalStrip : Home.CaughtUpPlan -> Html Msg
-signalStrip plan =
-    section [ class "onyx-home-signal", attribute "aria-label" "Catch-up summary" ]
-        [ p [ class "onyx-home-signal-lead" ]
-            [ strong [] [ text "Needs your attention" ]
-            , text " "
-            , span [] [ text (Home.signalMessage plan) ]
-            ]
-        , dl [ class "onyx-home-signal-metrics" ]
-            [ div [] [ dt [] [ text "Unread" ], dd [] [ text (String.fromInt plan.unread) ] ]
-            , div [] [ dt [] [ text "Mentions" ], dd [] [ text (String.fromInt plan.mentions) ] ]
-            ]
-        ]
-
-
-inboxSection : Home.CaughtUpPlan -> Home.Inbox -> Html Msg
-inboxSection plan inbox =
+inboxSection : Model -> Home.CaughtUpPlan -> Home.Inbox -> Html Msg
+inboxSection model plan inbox =
+    let
+        -- v3/gap-organize: "Since you left" — who, when, what about
+        digest =
+            View.Attention.digest model
+    in
     section [ class "onyx-home-inbox", attribute "aria-label" "Catch up on what you missed" ]
         [ div [ class "onyx-home-head" ]
             [ div []
                 [ h2 [ class "onyx-home-label" ] [ text "Needs your attention" ]
                 , p [ class "onyx-home-summary" ] [ text (Home.catchUpSummary plan) ]
+                , View.Attention.digestHead model digest
                 ]
             , if plan.rooms > 0 then
                 button
@@ -160,20 +157,20 @@ inboxSection plan inbox =
               else
                 text ""
             ]
-        , tier "Mentions" "Mentions" inbox.mentions
-        , tier "Unread" "Unread rooms and messages" inbox.missed
+        , tier (View.Attention.digestLine model digest) "Mentions" "Mentions" inbox.mentions
+        , tier (View.Attention.digestLine model digest) "Unread" "Unread rooms and messages" inbox.missed
         ]
 
 
-tier : String -> String -> List Home.Room -> Html Msg
-tier heading groupLabel rows =
+tier : (String -> Html Msg) -> String -> String -> List Home.Room -> Html Msg
+tier detail heading groupLabel rows =
     if List.isEmpty rows then
         text ""
 
     else
         div [ class "onyx-home-tier", attribute "role" "group", attribute "aria-label" groupLabel ]
             [ h3 [ class "onyx-home-label" ] [ text heading ]
-            , ul [ class "onyx-home-list" ] (List.map inboxRow rows)
+            , ul [ class "onyx-home-list" ] (List.map (inboxRow detail) rows)
             ]
 
 
@@ -187,15 +184,16 @@ avatar kind name =
         [ text (Home.initials name) ]
 
 
-inboxRow : Home.Room -> Html Msg
-inboxRow row =
+inboxRow : (String -> Html Msg) -> Home.Room -> Html Msg
+inboxRow detail row =
     li []
         [ button
             [ type_ "button"
             , class "onyx-home-row"
             , classList [ ( "is-unread", row.unread > 0 || row.highlights > 0 ), ( "is-mention", row.highlights > 0 ) ]
             , attribute "aria-label" (Home.inboxAria row)
-            , onClick (ChannelSelect row.name)
+            , -- v3/gap-organize: land on the first unread line
+              onClick (OrganizeMsg (Organizer.DigestJump row.name))
             ]
             [ avatar row.kind row.name
             , span [ class "onyx-home-row-copy" ]
@@ -213,6 +211,7 @@ inboxRow row =
 
                   else
                     text ""
+                , detail row.name -- v3/gap-organize
                 ]
             , if row.unread > 0 then
                 span [ class "onyx-home-unread" ] [ text (String.fromInt row.unread) ]
@@ -268,10 +267,13 @@ outboxSection model connected =
                                             ++ Stats.relTime (entry.queuedAt / 1000) model.nowMs
                                         )
                                     ]
+                                , View.Organize.homeOutboxActions model entry -- v3/gap-organize
                                 ]
                         )
                         model.outbox
                     )
+                , -- v3/gap-organize
+                  p [ class "onyx-home-privacy" ] [ text "Remove deletes this device's queued copy; it cannot recall a message the connection already took." ]
                 ]
 
 

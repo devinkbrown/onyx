@@ -14,7 +14,7 @@ the fold — the view carries no timers.
 -}
 
 import App exposing (Model, Msg(..), Toast, toastIntent)
-import Html exposing (Html, button, div, li, ol, p, strong, text)
+import Html exposing (Html, button, div, li, ol, p, span, strong, text)
 import Html.Attributes exposing (attribute, class)
 import Html.Events exposing (onClick)
 
@@ -72,5 +72,6 @@ toastRow toast =
             , attribute "aria-label" ("Dismiss " ++ toast.title)
             , onClick (ToastDismiss toast.id)
             ]
-            [ text "×" ]
+            -- v3/rx-shell: a mask glyph, never a font character
+            [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
         ]

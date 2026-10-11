@@ -5,7 +5,7 @@ module View.Nav exposing (mobileNav, navItems, primaryNav, youHub)
 `primaryNav` / `mobileNav` mirror `src/shell/PrimaryNavigation.tsx`:
 one `Nav.items` model rendered as a slim desktop rail (`Primary`
 landmark, `Quick switch to …` tooltips) and a bottom tab bar under
-768px (`Mobile navigation`, `Open …` names). Both always render; CSS
+600px (v3/rx-shell; was 768px) (`Mobile navigation`, `Open …` names). Both always render; CSS
 picks one per width. Collections carry `aria-pressed`/`aria-expanded`,
 the current location `aria-current="page"`, You `aria-haspopup="dialog"`.
 
@@ -28,6 +28,8 @@ import Html.Events exposing (onClick)
 import Nav
 import Sidebar
 import View.Account2
+import View.Organize -- v3/gap-organize
+import View.GapShell -- v3/gap-shell
 import View.Sheet as Sheet
 -- v3/calls-c8
 import View.VoiceSettings
@@ -219,8 +221,10 @@ navButton model variant item =
             ]
         , span [ class "onyx-nav-label" ]
             [ text item.label
-            , if not mobile && att.count > 0 then
-                span [ class "sr-only" ] [ text (unreadSuffix item.id att) ]
+            , -- v3/rx-shell: the rail's hover / focus label spells the
+              -- total out ("Rooms, 3 unread"), so it reads beyond the badge
+              if not mobile && att.count > 0 then
+                span [ class "onyx-nav-label-count" ] [ text (unreadSuffix item.id att) ]
 
               else
                 text ""
@@ -350,12 +354,15 @@ youHub model =
 
                         -- v3/calls-c8
                         , View.VoiceSettings.youEntry
+                        -- v3/gap-organize
+                        , View.Organize.youEntry model
                         -- v3/account2
                         , (View.Account2.youEntries model).people
                         , (View.Account2.youEntries model).themeShare
                         ]
                     , group "help" "Help" Nothing
-                        [ entry
+                        [ View.GapShell.youEntry model -- v3/gap-shell
+                        , entry
                             { testId = "you-open-guides"
                             , label = "Guides"
                             , hint = "How Onyx works, step by step"
