@@ -72,11 +72,85 @@
   mask: var(--onyx-i-close) center / contain no-repeat;
 }
 
+/* 0. The sheet primitive (View.Sheet): layer, backdrop, panel, head. The rest
+   of this file (and every sheet body) builds on it. Moved here from app.css. */
+
+.onyx-sheet-layer {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+}
+
+.onyx-sheet-layer[data-placement="side"] {
+  place-items: stretch end;
+}
+
+.onyx-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+/* Zero-specificity base so each sheet's own class keeps its width,
+   padding and layout. */
+:where(.onyx-sheet) {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--pad-panel);
+  color: var(--onyx-text);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+:where(.onyx-sheet-layer[data-placement="side"]) > :where(.onyx-sheet) {
+  width: min(420px, 100%);
+}
+
+.onyx-sheet-layer > .onyx-sheet {
+  position: relative;
+  margin: 0;
+}
+
+.onyx-sheet:focus:not(:focus-visible) { outline: none; }
+
+.onyx-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.onyx-sheet-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: var(--leading-snug);
+}
+
+.onyx-sheet-close {
+  font: inherit;
+}
+
+.onyx-sheet-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+/* Under 768px a sheet is as wide as its layer (its own width / max-width
+   rule narrows it again); the bottom-sheet look itself is section 4. */
+@media (max-width: 767.98px) {
+  .onyx-sheet-layer > .onyx-sheet,
+  .onyx-sheet-layer[data-placement="side"] > .onyx-sheet { width: 100%; }
+}
+
 /* ===================================================================
    1. Layer, veil, panel (desktop first)
    =================================================================== */
 
-.onyx-sheet-layer { z-index: 60; padding: var(--space-6) var(--space-4); }
+.onyx-sheet-layer { z-index: var(--z-sheet); padding: var(--space-6) var(--space-4); }
 
 .onyx-sheet-backdrop {
   background: var(--sheet-veil);
@@ -173,7 +247,7 @@
 .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head) {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: calc(var(--z-raised) + 3);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
@@ -246,10 +320,7 @@
 .onyx-sheet .onyx-sheet-close,
 .onyx-sheet .jump-to-date-close,
 .onyx-sheet-close,
-.onyx-you-close,
-.notif-center__close,
-.onyx-spotlight-close,
-.onyx-shortcuts-close {
+.onyx-spotlight-close {
   flex: none;
   display: inline-grid;
   place-items: center;
@@ -268,9 +339,7 @@
   cursor: pointer;
 }
 .onyx-sheet-close:focus-visible,
-.onyx-you-close:focus-visible,
-.onyx-spotlight-close:focus-visible,
-.onyx-shortcuts-close:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-spotlight-close:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 /* Glyph-based closes elsewhere (✕ / ×): hide the glyph, draw the mask. */
 :is(.onyx-you-close, .onyx-shortcuts-close, .jump-to-date-close) > span { display: none; }
@@ -339,7 +408,6 @@
     max-height: var(--sheet-max-h);
     border-width: 1px 0 0;
     border-radius: 12px 12px 0 0;
-    padding-bottom: calc(var(--sheet-pad) + env(safe-area-inset-bottom, 0px));
     animation: ui-sheet-rise var(--dur-base) var(--ease);
   }
 
@@ -431,7 +499,7 @@
    5. Command palette (Ctrl+K) + keyboard shortcuts
    =================================================================== */
 
-.onyx-spotlight { z-index: 80; padding-top: min(14vh, 120px); }
+.onyx-spotlight { z-index: var(--z-dialog); padding-top: min(14vh, 120px); }
 .onyx-spotlight-backdrop { background: var(--sheet-veil); animation: ui-sheet-veil-in var(--dur-fast) var(--ease); }
 
 .onyx-spotlight-panel {
@@ -795,7 +863,7 @@
    =================================================================== */
 
 .onyx-toaster {
-  z-index: 90;
+  z-index: var(--z-toast);
   right: var(--space-5);
   bottom: calc(var(--composer-h) + var(--space-6));
   max-width: min(380px, calc(100vw - 2 * var(--space-4)));
@@ -819,7 +887,6 @@
   .onyx-toaster {
     left: var(--space-3);
     right: var(--space-3);
-    bottom: calc(var(--mobile-nav-h) + var(--composer-h) + env(safe-area-inset-bottom, 0px) + var(--space-3));
     max-width: none;
     align-items: stretch;
   }
@@ -880,7 +947,7 @@
 /* Preferences: on phones, narrow dialogs (≤ 640px, where app.css turns
    the tabs into a row) and short windows the category rail becomes a
    scrolling chip row under the head. */
-@media (max-width: 640px), (max-height: 520px) {
+@media (max-width: 640.98px), (max-height: 520px) {
   .onyx-sheet-layer > .onyx-prefs,
   .onyx-sheet-layer > .onyx-prefs:has(> .onyx-sheet-head) { height: var(--sheet-max-h); padding-bottom: 0; }
   .onyx-prefs .onyx-prefs-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
@@ -910,7 +977,7 @@
   }
 }
 .pref-reset-all__short { display: none; }
-@media (max-width: 640px) {
+@media (max-width: 640.98px) {
   .pref-reset-all__full { display: none; }
   .pref-reset-all__short { display: inline; }
 }
@@ -925,7 +992,7 @@
   .onyx-account-body > .onyx-account-nav {
     position: sticky;
     top: var(--account-head-h, 74px);
-    z-index: 3;
+    z-index: calc(var(--z-raised) + 2);
     flex-direction: row;
     gap: var(--space-1);
     margin: 0 calc(-1 * var(--sheet-pad)) var(--space-3);
@@ -981,7 +1048,6 @@
 }
 @media (max-width: 599.98px) {
   .onyx-room-more-scrim {
-    z-index: 60;
     background: var(--sheet-veil);
     animation: ui-sheet-veil-in var(--dur-base) var(--ease);
   }
@@ -990,8 +1056,6 @@
     top: auto;
     left: 0;
     right: 0;
-    bottom: 0;
-    z-index: 61;
     min-width: 0;
     padding: var(--sheet-grip-zone) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     border-width: 1px 0 0;
@@ -1024,10 +1088,7 @@
   .onyx-sheet .onyx-sheet-close:hover,
   .onyx-sheet .jump-to-date-close:hover,
   .onyx-sheet-close:hover,
-  .onyx-you-close:hover,
-  .notif-center__close:hover,
-  .onyx-spotlight-close:hover,
-  .onyx-shortcuts-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+  .onyx-spotlight-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
   .onyx-you .onyx-you-link:hover { background: color-mix(in oklab, var(--onyx-panel-2) 70%, var(--onyx-line)); border-color: var(--onyx-line); }
   .onyx-you .onyx-you-leave:hover { background: color-mix(in oklab, var(--onyx-bad) 10%, transparent); }
   .onyx-account .onyx-account-nav__item:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
@@ -1086,7 +1147,7 @@
    card family on desktop, a bottom sheet with a grip under 600px.
    =================================================================== */
 
-.onyx-profile-pop:not(.onyx-sheet-layer) { z-index: 60; }
+.onyx-profile-pop:not(.onyx-sheet-layer) { z-index: var(--z-sheet); }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-profile-backdrop { background: var(--sheet-veil); animation: ui-sheet-veil-in var(--dur-base) var(--ease); }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card {
   width: min(380px, 100%);
@@ -1133,8 +1194,8 @@
 
 /* ===================================================================
    14. Medium (600–767px: fold-open, small tablets, split screen).
-   app.css turns every sheet into a full-width bottom sheet under
-   768px; here overlays stay centred dialogs, right-hand side panels
+   every sheet is a full-width layer under 768px (section 0); here
+   overlays stay centred dialogs, right-hand side panels
    and the top-right inbox popover, each at its own width.
    =================================================================== */
 
@@ -1154,7 +1215,7 @@
     place-items: start end;
     padding: 60px max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-4) var(--space-4);
   }
-  /* app.css pins width: 100%; the cap is each sheet's own width. */
+  /* Under 768px a sheet is width: 100% (section 0); the cap is each sheet's own width. */
   .onyx-sheet-layer > .onyx-sheet { max-width: min(var(--sheet-w, var(--sheet-w-md)), 100%); }
   .onyx-sheet-layer[data-placement="side"] > .onyx-sheet { max-width: min(var(--sheet-w, var(--sheet-w-side)), 100%); }
 
@@ -1415,8 +1476,7 @@
   background: color-mix(in oklab, var(--onyx-bad) 5%, transparent);
 }
 .onyx-sheet .onyx-danger-zone + .onyx-danger-zone { margin-top: var(--space-3); }
-.onyx-sheet .onyx-danger-zone > :is(h3, .onyx-steward-label:first-child),
-.onyx-sheet .onyx-moddesk-form--danger > label:first-of-type { color: var(--onyx-bad); }
+.onyx-sheet .onyx-danger-zone > :is(h3, .onyx-steward-label:first-child) { color: var(--onyx-bad); }
 .onyx-sheet .onyx-danger-zone > .onyx-account-section__title { color: var(--onyx-bad); }
 
 .onyx-sheet :is(.onyx-account-drop-arm, .onyx-account-drop-go, .onyx-steward-btn-danger, .onyx-moddesk-danger, .pref-reset--danger) {
@@ -1474,7 +1534,7 @@
   top: 8px;
   right: 8px;
   margin: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 .onyx-member-card > .onyx-member-identity { padding-inline: calc(var(--sheet-close) + 4px); }
 @media (max-width: 599.98px) {
@@ -1565,7 +1625,7 @@ html:has(.onyx-overlays [data-shortcut-scope]) .onyx-roster:popover-open { visib
     /* A long menu scrolls; Cancel stays pinned at the sheet's foot. */
     position: sticky;
     bottom: 0;
-    z-index: 2;
+    z-index: calc(var(--z-raised) + 1);
     background: var(--onyx-panel);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

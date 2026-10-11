@@ -22,7 +22,7 @@
 
 /* C8 · React menu: one row of 8, anchored above the bar centre */
 .onyx-call-react-menu {
-  position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%); z-index: 21;
+  position: absolute; bottom: calc(100% + var(--space-2)); left: 50%; transform: translateX(-50%); z-index: calc(var(--z-header) + 1);
   display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-1); max-width: calc(100vw - 32px);
   padding: var(--space-1); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel);
 }
@@ -35,7 +35,7 @@
 .onyx-call-react-item:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 /* C8 · reaction chips: bottom-right of the stage body, above the bar */
-.onyx-call-reactions { position: relative; height: 0; z-index: 3; }
+.onyx-call-reactions { position: relative; height: 0; z-index: calc(var(--z-raised) + 2); }
 .onyx-call-reactions-stack {
   position: absolute; right: var(--space-3); bottom: var(--space-2);
   display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none;
@@ -69,7 +69,7 @@
 .onyx-call-captions-source { color: var(--onyx-dim); }
 .onyx-call-captions-source[data-live="false"] { color: var(--onyx-warn); }
 .onyx-call-captions-copy, .onyx-call-caption-translate {
-  min-height: var(--target-floor); padding: 0 var(--space-2); margin-left: auto;
+  padding: 0 var(--space-2); margin-left: auto;
   border: 1px solid var(--onyx-line); border-radius: var(--radius); background: transparent;
   color: var(--onyx-text); font: inherit; font-size: var(--text-2xs); font-weight: 600; cursor: pointer;
 }
@@ -115,12 +115,11 @@
   border: 1px solid var(--onyx-line); border-radius: var(--radius); font-family: var(--font-mono);
 }
 .onyx-vs-key[data-capturing="true"] { border-color: var(--onyx-text); }
-.onyx-vs-btn { min-height: 36px; }
 .onyx-call-sheet-layer .onyx-voice-settings .onyx-call-sheet-head h2 { font-size: var(--text-lg); }
 
 /* 375px: React moves into More, captions show one line, the sheet's
    key row stacks. Breakpoint 768px. */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-cbtn-react { display: none; }
   .onyx-call-more-react { display: block; }
   .onyx-call-caption[data-old="true"] { display: none; }
@@ -129,5 +128,5 @@
   .onyx-call-ptt { display: none; }
   .onyx-vs-key-row { align-items: stretch; }
   .onyx-vs-key-display { flex: 1 1 100%; }
-  .onyx-vs-btn { flex: 1 1 0; min-height: var(--target-min); }
+  .onyx-vs-btn { flex: 1 1 0; }
 }

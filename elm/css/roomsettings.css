@@ -127,8 +127,6 @@
 .rset { display: flex; flex-direction: column; gap: var(--space-3); }
 .rset > .onyx-sheet-head { margin-bottom: 0; }
 
-.rset-room { margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
-
 .rset-context {
   display: flex;
   justify-content: space-between;
@@ -344,7 +342,7 @@
 
 .rset-rhythm-peak { background: var(--onyx-text); }
 
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-room-header-actions .onyx-facepile { display: none; }
   .rset-access-row { flex-direction: column; align-items: stretch; }
 }

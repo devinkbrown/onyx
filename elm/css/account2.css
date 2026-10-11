@@ -110,7 +110,6 @@
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
   background: transparent;
-  color: var(--onyx-text);
   font: inherit;
   cursor: pointer;
 }

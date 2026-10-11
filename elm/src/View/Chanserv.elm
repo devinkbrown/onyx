@@ -933,7 +933,7 @@ myRoomsSection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-refresh"
+                , class "onyx-button"
                 , attribute "data-testid" "account-rooms-load"
                 , disabled (not (live model) || mine.loading)
                 , onClick (cs Chanserv.MyRoomsLoad)

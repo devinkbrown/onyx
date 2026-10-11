@@ -199,7 +199,7 @@ devicesSection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-refresh"
+                , class "onyx-button"
                 , attribute "data-testid" "account-sessions-refresh"
                 , disabled model.accountSessionsPending
                 , onClick SessionListRequested
@@ -274,7 +274,7 @@ sessionSection model =
         , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-logout"
+                , class "onyx-button"
                 , attribute "data-testid" "account-logout"
                 , onClick SessionLogoutRequested
                 ]
@@ -581,7 +581,7 @@ enrollButton model =
     div [ class "onyx-account-actions" ]
         [ button
             [ type_ "button"
-            , class "onyx-account-totp-enroll"
+            , class "onyx-button onyx-account-totp-enroll"
             , attribute "data-testid" "account-totp-enroll"
             , disabled model.totp.busy
             , onClick TotpEnrollRequested
@@ -611,7 +611,7 @@ secretBlock model =
                     ([ code [ class "onyx-account-totp-secret" ] [ text secret ]
                      , button
                         [ type_ "button"
-                        , class "onyx-account-totp-copy"
+                        , class "onyx-button"
                         , attribute "data-testid" "account-totp-copy-secret"
                         , disabled (model.totpSecretCopy == TotpCopyBusy)
                         , onClick TotpSecretCopyRequested
@@ -636,7 +636,7 @@ otpauthButton model =
         Just _ ->
             [ button
                 [ type_ "button"
-                , class "onyx-account-totp-copy"
+                , class "onyx-button"
                 , attribute "data-testid" "account-totp-copy-otpauth"
                 , disabled (model.totpOtpauthCopy == TotpCopyBusy)
                 , onClick TotpOtpauthCopyRequested
@@ -698,7 +698,7 @@ confirmForm model =
                     []
                 , button
                     [ type_ "submit"
-                    , class "onyx-account-totp-confirm-go"
+                    , class "onyx-button"
                     , attribute "data-testid" "account-totp-confirm"
                     , disabled (model.totp.busy || not (isTotpCode model.totpCodeInput))
                     ]
@@ -717,7 +717,7 @@ disableRow model =
             [ div [ class "onyx-account-actions" ]
                 [ button
                     [ type_ "button"
-                    , class "onyx-account-totp-disable"
+                    , class "onyx-button"
                     , attribute "data-testid" "account-totp-disable"
                     , disabled model.totp.busy
                     , onClick TotpDisableRequested
@@ -749,7 +749,7 @@ certSection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-cert-bind"
+                , class "onyx-button"
                 , attribute "data-testid" "account-cert-bind"
                 , onClick CertBindRequested
                 ]
@@ -776,7 +776,7 @@ certSection model =
                         []
                     , button
                         [ type_ "submit"
-                        , class "onyx-account-cert-remove-go"
+                        , class "onyx-button"
                         , attribute "data-testid" "account-cert-remove"
                         , disabled (String.isEmpty (String.trim model.certFingerprint))
                         ]
@@ -807,7 +807,7 @@ keytransSection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-keytrans-refresh"
+                , class "onyx-button"
                 , attribute "data-testid" "account-keytrans-refresh"
                 , onClick KeytransStatusRequested
                 ]
@@ -838,7 +838,7 @@ deviceKeysSection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-device-publish"
+                , class "onyx-button"
                 , attribute "data-testid" "account-device-publish"
                 , disabled model.e2eePublishBusy
                 , onClick E2eeKeyPublishRequested
@@ -853,14 +853,14 @@ deviceKeysSection model =
                 ]
             , button
                 [ type_ "button"
-                , class "onyx-account-device-list"
+                , class "onyx-button"
                 , attribute "data-testid" "account-device-list"
                 , onClick E2eeKeyListRequested
                 ]
                 [ text "List device keys" ]
             , button
                 [ type_ "button"
-                , class "onyx-account-device-remove-legacy"
+                , class "onyx-button"
                 , attribute "data-testid" "account-device-remove-legacy"
                 , onClick E2eeKeyDeleteLegacyRequested
                 ]
@@ -1019,7 +1019,7 @@ emailSection model =
                 []
             , button
                 [ type_ "submit"
-                , class "onyx-account-email-save"
+                , class "onyx-button"
                 , attribute "data-testid" "account-email-save"
                 , disabled (String.isEmpty (String.trim model.accountEmail) || String.isEmpty model.accountEmailPassword)
                 ]
@@ -1102,7 +1102,7 @@ passwordSection model =
                 []
             , button
                 [ type_ "submit"
-                , class "onyx-account-password-save"
+                , class "onyx-button"
                 , attribute "data-testid" "account-password-save"
                 , disabled
                     (pending
@@ -1182,7 +1182,7 @@ recoverySection model =
          , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-recovery-generate"
+                , class "onyx-button"
                 , attribute "data-testid" "recovery-generate"
                 , disabled model.recoveryCodes.busy
                 , onClick RecoveryCodesGenerateRequested
@@ -1200,7 +1200,7 @@ recoverySection model =
                 ]
             , button
                 [ type_ "button"
-                , class "onyx-account-recovery-refresh"
+                , class "onyx-button"
                 , attribute "data-testid" "recovery-refresh"
                 , disabled model.recoveryCodes.busy
                 , onClick RecoveryCodesStatusRequested
@@ -1208,7 +1208,7 @@ recoverySection model =
                 [ text "Refresh count" ]
             , button
                 [ type_ "button"
-                , class "onyx-account-recovery-clear"
+                , class "onyx-button"
                 , attribute "data-testid" "recovery-clear"
                 , disabled (model.recoveryCodes.busy || model.recoveryCodes.remaining == Just 0)
                 , onClick RecoveryCodesClearRequested
@@ -1299,14 +1299,14 @@ freshCodesBlock model =
                 , div [ class "onyx-account-actions" ]
                     [ button
                         [ type_ "button"
-                        , class "onyx-account-recovery-copy"
+                        , class "onyx-button"
                         , attribute "data-testid" "recovery-copy-all"
                         , onClick RecoveryCodesCopyAllRequested
                         ]
                         [ text "Copy all" ]
                     , button
                         [ type_ "button"
-                        , class "onyx-account-recovery-done"
+                        , class "onyx-button"
                         , attribute "data-testid" "recovery-dismiss-fresh"
                         , onClick RecoveryCodesDismissFresh
                         ]
@@ -1374,7 +1374,7 @@ passkeyRegisterForm model =
             []
         , button
             [ type_ "submit"
-            , class "onyx-account-passkey-add"
+            , class "onyx-button"
             , attribute "data-testid" "account-passkey-add"
             , disabled model.passkey.busy
             ]
@@ -1423,7 +1423,7 @@ passkeyListWrap model =
             [ h4 [ class "onyx-account-passkey-list-title" ] [ text "Your passkeys" ]
             , button
                 [ type_ "button"
-                , class "onyx-account-passkey-refresh"
+                , class "onyx-button"
                 , attribute "data-testid" "account-passkey-refresh"
                 , disabled listing
                 , onClick PasskeyListRequested
@@ -1482,7 +1482,7 @@ passkeyRow model cred =
                        else
                         button
                             [ type_ "button"
-                            , class "onyx-account-passkey-rename"
+                            , class "onyx-button onyx-account-passkey-rename"
                             , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
                             , onClick (PasskeyRenameStarted { id = cred.id, label = cred.label })
                             ]
@@ -1523,14 +1523,14 @@ passkeyRemoveControl model cred =
         [ span [ class "onyx-account-passkey-confirm", attribute "role" "group", attribute "aria-label" "Confirm removal" ]
             [ button
                 [ type_ "button"
-                , class "onyx-account-passkey-remove-go"
+                , class "onyx-button"
                 , disabled model.passkey.busy
                 , onClick PasskeyRemoveConfirmed
                 ]
                 [ text "Remove?" ]
             , button
                 [ type_ "button"
-                , class "onyx-account-passkey-cancel"
+                , class "onyx-button"
                 , onClick PasskeyRemoveCancelled
                 ]
                 [ text "Cancel" ]
@@ -1540,7 +1540,7 @@ passkeyRemoveControl model cred =
     else
         [ button
             [ type_ "button"
-            , class "onyx-account-passkey-remove"
+            , class "onyx-button"
             , attribute "aria-label" ("Remove " ++ passkeyDisplayName cred)
             , onClick (PasskeyRemoveArmed cred.id)
             ]
@@ -1551,7 +1551,7 @@ passkeyRemoveControl model cred =
 passkeyRenameForm : Model -> PasskeyCredential -> Html Msg
 passkeyRenameForm model cred =
     form
-        [ class "onyx-account-passkey-rename"
+        [ class "onyx-button onyx-account-passkey-rename"
         , onSubmit PasskeyRenameSubmitted
         , attribute "aria-label" ("Rename " ++ passkeyDisplayName cred)
         ]
@@ -1570,14 +1570,14 @@ passkeyRenameForm model cred =
         , div [ class "onyx-account-actions" ]
             [ button
                 [ type_ "submit"
-                , class "onyx-account-passkey-save"
+                , class "onyx-button"
                 , attribute "data-testid" "account-passkey-save"
                 , disabled (model.passkey.busy || String.isEmpty (String.trim model.passkeyRenameValue))
                 ]
                 [ text "Save" ]
             , button
                 [ type_ "button"
-                , class "onyx-account-passkey-cancel"
+                , class "onyx-button"
                 , onClick PasskeyRenameCancelled
                 ]
                 [ text "Cancel" ]
@@ -1595,7 +1595,7 @@ dataSection model =
             , div [ class "onyx-account-actions" ]
                 [ button
                     [ type_ "button"
-                    , class "onyx-account-data-download"
+                    , class "onyx-button"
                     , attribute "data-testid" "account-download-store"
                     , disabled (model.accountVerbsBusy /= Nothing)
                     , onClick DownloadAccountRecord
@@ -1610,7 +1610,7 @@ dataSection model =
             , div [ class "onyx-account-actions" ]
                 [ button
                     [ type_ "button"
-                    , class "onyx-account-data-history"
+                    , class "onyx-button"
                     , attribute "data-testid" "account-save-device-history"
                     , disabled (model.accountVerbsBusy /= Nothing)
                     , onClick DownloadDeviceHistory
@@ -1625,7 +1625,7 @@ dataSection model =
              , div [ class "onyx-account-actions" ]
                 [ button
                     [ type_ "button"
-                    , class "onyx-account-drop-arm"
+                    , class "onyx-button onyx-account-drop-arm"
                     , attribute "data-testid" "account-drop-arm"
                     , onClick DropArmed
                     ]
@@ -1686,14 +1686,14 @@ dropConfirmBlock model =
             , div [ class "onyx-account-actions" ]
                 [ button
                     [ type_ "submit"
-                    , class "onyx-account-drop-go"
+                    , class "onyx-button onyx-account-drop-go"
                     , attribute "data-testid" "account-drop-confirm"
                     , disabled (not (dropReady model))
                     ]
                     [ text "Permanently delete" ]
                 , button
                     [ type_ "button"
-                    , class "onyx-account-drop-cancel"
+                    , class "onyx-button"
                     , onClick DropCancelled
                     ]
                     [ text "Cancel" ]

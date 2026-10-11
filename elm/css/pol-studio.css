@@ -31,7 +31,7 @@
 .ap-background-host {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: var(--z-under);
   pointer-events: none;
   background: var(--onyx-bg);
 }
@@ -39,7 +39,7 @@
 .ap-bar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-bar);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -74,9 +74,8 @@
 
 .ap-wrap {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   width: 100%;
-  max-width: 1040px;
   margin: 0 auto;
   padding: clamp(28px, 6vw, 72px) clamp(16px, 5vw, 48px) 14vh;
 }
@@ -91,11 +90,7 @@
 }
 
 .ap-lede {
-  margin: var(--space-3) 0 0;
   max-width: 52ch;
-  font-size: var(--text-lg);
-  line-height: var(--leading-body);
-  color: var(--onyx-dim);
 }
 
 /* "This device" label + reassurance, set off by a neutral seam. */
@@ -406,7 +401,6 @@
 
 .ap-studio {
   margin-top: clamp(32px, 5vw, 56px);
-  min-width: 0;
   background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
@@ -607,7 +601,7 @@
 
 .ap-action:disabled { opacity: 0.45; cursor: default; }
 
-.ap-action--apply:focus-visible { outline-offset: 2px; }
+.ap-action--apply:focus-visible { outline-offset: var(--focus-offset-out); }
 
 /* ── 7. Theme Studio shell ─────────────────────────────────────────── */
 
@@ -787,7 +781,7 @@
   cursor: default;
 }
 
-.ts-studio .onyx-button--primary:focus-visible { outline-offset: 2px; }
+.ts-studio .onyx-button--primary:focus-visible { outline-offset: var(--focus-offset-out); }
 
 /* ── 9. Palette tools (advanced editor) ────────────────────────────── */
 
@@ -1672,7 +1666,7 @@
 
 /* ── 15. Responsive ────────────────────────────────────────────────── */
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .ap-bar { gap: var(--space-2); padding: 0 var(--space-4); }
   .ap-wrap { padding: var(--space-6) var(--space-4) 18vh; }
   .ap-lede { font-size: var(--text-md); }
@@ -1773,7 +1767,7 @@
   .ts-studio .onyx-tabs__trigger, .ts-audit__fix):active { background: var(--onyx-panel-2); }
 .ap .ap-bar a:active { color: var(--onyx-text); }
 
-@media (max-width: 768px), (pointer: coarse) {
+@media (max-width: 767.98px), (pointer: coarse) {
   /* 16px inputs: iOS Safari never zooms on focus; the shell's
      --kb-inset keeps a focused field above the keyboard. */
   .ap :is(select, input:not([type='range']):not([type='color'])),
@@ -1807,7 +1801,7 @@
   .ap-wrap > .ap-group { align-self: start; }
 }
 
-@media (min-width: 769px) and (min-height: 521px) {
+@media (min-width: 768px) and (min-height: 521px) {
   .ts-preview-pane {
     position: sticky;
     top: calc(max(56px, 3.5rem) + var(--space-3));

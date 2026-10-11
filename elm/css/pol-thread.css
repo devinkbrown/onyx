@@ -205,7 +205,7 @@
   position: absolute;
   top: -14px;
   right: var(--space-3);
-  z-index: 4;
+  z-index: calc(var(--z-raised) + 3);
   display: flex;
   gap: 2px;
   padding: 2px;
@@ -263,8 +263,8 @@
 }
 
 /* Reaction picker light-dismiss layer (mirrors .onyx-msg-menu-backdrop). */
-.onyx-react-backdrop { position: fixed; inset: 0; z-index: 40; }
-.onyx-react-pop .onyx-react-picker { position: relative; z-index: 41; }
+.onyx-react-backdrop { position: fixed; inset: 0; z-index: var(--z-popover); }
+.onyx-react-pop .onyx-react-picker { position: relative; z-index: calc(var(--z-popover) + 1); }
 
 /* Not a class: the Keyed-node key "unread" in Thread.rowEntries. */
 .unread { /* state hook: keyed entry id, styled via .onyx-unread-divider */ }
@@ -342,7 +342,7 @@
     position: absolute;
     top: 20px;
     right: var(--space-3);
-    z-index: 41;
+    z-index: calc(var(--z-popover) + 1);
   }
 
   .onyx-msg-menu-pop .onyx-msg-menu { width: 232px; }
@@ -351,7 +351,7 @@
 
 @media (max-width: 767.98px) {
   .onyx-msg-menu-backdrop,
-  .onyx-react-backdrop { background: color-mix(in srgb, #000 55%, transparent); z-index: 70; }
+  .onyx-react-backdrop { background: color-mix(in srgb, #000 55%, transparent); z-index: var(--z-notice); }
 
   .onyx-msg-menu-pop .onyx-msg-menu,
   .onyx-react-pop .onyx-react-picker {
@@ -359,14 +359,14 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 71;
+    z-index: calc(var(--z-notice) + 1);
     max-height: 78dvh;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--space-2) var(--space-2) calc(var(--space-3) + var(--safe-bottom));
     border-width: 1px 0 0;
     border-radius: 12px 12px 0 0;
-    animation: onyx-sheet-in var(--dur-base) var(--ease);
+    animation: ui-sheet-pop var(--dur-base) var(--ease);
   }
   .onyx-msg-menu-pop .onyx-msg-menu::before,
   .onyx-react-pop .onyx-react-picker::before {
@@ -482,7 +482,7 @@
   height: 1px;
   background: color-mix(in oklab, var(--onyx-bad) 70%, transparent);
 }
-.onyx-unread-divider:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.onyx-unread-divider:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
 .onyx-unread-divider-label {
   flex: none;
   font-size: var(--text-xs);
@@ -492,7 +492,6 @@
 }
 
 .onyx-system { padding: 2px var(--space-2) 2px var(--pt-gutter); line-height: var(--leading-snug); }
-.onyx-transcript--compact .onyx-system { padding-left: 0; }
 
 .onyx-intro {
   display: grid;
@@ -579,7 +578,6 @@
   -webkit-mask: var(--pt-i-more) center / contain no-repeat;
   mask: var(--pt-i-more) center / contain no-repeat;
 }
-.onyx-transcript--compact ~ .onyx-typing { padding-left: 0; }
 
 /* Jump to latest: a floating pill at the bottom centre of the log. */
 .onyx-frame .onyx-jump-latest {
@@ -829,7 +827,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .shell-msg-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-top);
   display: grid;
 }
 /* Both layers mount inside the transcript pane; neither takes the
@@ -843,10 +841,10 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .shell-msg-lightbox-spacer { display: none; }
 .shell-msg-lightbox-dialog {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   min-width: 0;
   min-height: 0;
-  animation: onyx-sheet-in var(--dur-fast) var(--ease);
+  animation: ui-sheet-pop var(--dur-fast) var(--ease);
 }
 .shell-msg-lightbox-dialog:focus { outline: none; }
 .shell-msg-lightbox-stage {
@@ -888,7 +886,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 
 .shell-msg-lightbox-actions {
   position: absolute;
-  z-index: 2;
+  z-index: calc(var(--z-raised) + 1);
   top: calc(var(--space-3) + var(--safe-top));
   right: calc(var(--space-3) + var(--safe-right));
   display: flex;
@@ -983,7 +981,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .onyx-thread-sheet .onyx-thread-head {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -998,8 +996,6 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
   min-height: 0;
   padding: 0;
   background: transparent;
@@ -2112,7 +2108,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
     --overlay-docked: 1;
     position: absolute;
     inset: 0 auto 0 100%;
-    z-index: 6;
+    z-index: var(--z-stage);
     display: block;
     width: var(--pt-thread-w);
     padding: 0;
@@ -2386,7 +2382,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
     .onyx-msg-menu-pop .onyx-msg-menu,
     .onyx-react-pop .onyx-react-picker {
       position: fixed;
-      z-index: 41;
+      z-index: calc(var(--z-popover) + 1);
       position-anchor: --pt-row-actions;
       top: anchor(bottom);
       right: anchor(right);

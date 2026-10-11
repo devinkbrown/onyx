@@ -613,6 +613,23 @@ Each step is one commit. Every step must pass the same gate:
 
 ---
 
+### 5.4 Status — what the v3/css refactor did, and how it was proved
+
+Everything below was shot with `elm/tools/css-regress.mjs` (735 PNGs: the app shell at all 15 viewports, every sheet / call / gap surface at phone, phone-land and desktop, the public and connect pages at full page height and five widths, plus keyboard-focus tours and hover states) and diffed pixel-by-pixel against the previous accepted state. Two baseline runs of the same build give a noise mask (pixels that differ between them are ignored), so a non-zero diff is a CSS change. The 767/768/769 seam has its own opt-in tier (`--tier seam`). `elm/tools/css-inert.mjs` asks Chromium which declarations are never used, and `cssGuard.smoke.mjs` / `cssRegress.smoke.mjs` pin the results.
+
+Net: `app.css` 4,123 -> 3,466 lines (-16%, 170 -> 144 KB) and all CSS 23,129 -> 22,436 lines. Against the live build 264 of the 735 shots differ, every one an intentional "a size the CSS already declared now applies" fix (below), plus the public site at exactly 768px; the touch topbar is unchanged. Everything else — the dead / shadowed / inert deletions, the z-index ladder, the focus tokens, the sheet-system merge, the Button primitive — is pixel-identical in the matrix and computed-style-identical in 466 scenarios (`css-inert.mjs verify`).
+
+| plan step | state | what changed |
+|---|---|---|
+| 0 baseline | done | `css-regress.mjs` + `screens-css-regress.mjs` (the matrix); `screens.mjs` gained `--freeze`, `--port`, `--dpr`, `--full`, `--stable`, `--vp wWxH` so shots are deterministic |
+| 1 / 2 (this doc) dead CSS, shadowed CSS | done | 92 dead rules, 9 dead selector-list members, 51 fully shadowed rules and 193 shadowed declarations removed from the generator lists (G13 / G16 now show 5 dead rules, all `data-scene` false positives written by `media/backdrop.ts`, 1 shadowed rule, 91 shadowed declarations: the ones shadowed for only some members of a selector list). A hardened pruner did it: a declaration in a selector list is dropped only when it is shadowed for every member |
+| root cause: the 24px floor | done | `app.css` floors frame buttons with `:where(.onyx-frame button:not(.onyx-avatar):not(.onyx-facepile-face))` — zero specificity — so a control's own `min-height` always wins. The `:not(#_)` hacks in `calls-engine.css` (20) and the doubled-selector workaround in `gap-claim.css` are gone. 341 of 735 shots changed, all of them "a declared size now applies": desktop nav rail 24 -> 40px, bell 24 -> 36, room-header Search / More 24 -> 36, room settings buttons 24 -> 32, phone bottom nav 51 -> 56, Keep name / Invite friends / Browse rooms 24 -> 44, rail rows 64 -> 68 on phones. `rxShellCss.smoke.mjs` now pins the zero-specificity floor and the absence of `:not(#_)`. The doubled `.onyx-frame` prefixes in `rx-shell.css` §10 are NOT redundant — they out-rank (0,3,0) desktop rules above them — and stay |
+| 3 z-index | done | one `--z-*` ladder in `app.css :root` (15 rungs, the values the shell already rendered with); every z-index in every file is a rung or a rung +/- a `calc()` offset; the dead toaster 60 (shadowed by 90) and the room-more 60/61 (beaten by specificity) are deleted. No pixel change |
+| 4 breakpoints | done for the seam | one 768px seam: `max-width: 767.98px` / `min-width: 768px` for the app and the public site (the public site used the inclusive `max-width: 768px`, so at exactly 768px it showed the phone header over a desktop layout). Whole-pixel N / N+1 pairs (640/641, 520/521, 767/768) became N.98 / N+1 so no fractional width falls in a gap. The 24-value vocabulary is documented in `app.css`; collapsing it is left. `ports.js` closes the public phone menu at `>= 768` |
+| 5 merge app.css v1 | partly | the sheet primitive (layer, backdrop, panel, head) moved from `app.css` into `ui-sheets.css`, the app.css phone-sheet block and the `onyx-sheet-in` / `onyx-sheet-side-in` keyframes are gone (`ui-sheet-pop` / `ui-sheet-side` serve them). Then `elm/tools/css-inert.mjs` asked Chromium, on 2,225 pages (466 scenarios x 5 viewports), which `app.css` declarations are never used because a later rule always wins with a different value: 443 declarations (35 whole rules, -253 lines) are gone. A second batch of 104 declarations in the older slices was probed, applied and **reverted**: a v1 declaration and its re-cut in another file are each inert next to the other, so deleting both removed the nav icons' background (the pixel suite saw it only at the end; `css-inert.mjs verify`, a computed-style fingerprint of every element in every scenario, found it at once). The probe now says: one batch at a time, rebuild, `verify`. Relocating the rest of the v1 layer is left |
+| 6 primitives | partly | focus: every outline is `outline: var(--focus-ring)` + `--focus-offset` / `--focus-offset-out` (the 12 hard-coded 2px accent rings and `outline-offset: 2px` literals are tokens now, so they follow high contrast and the theme). buttons: `.onyx-button` (the quiet outlined default, `app.css`) replaced 30 per-instance `.onyx-account-*` classes. There was no second family of byte-identical button rules to migrate: the other ~110 implementations differ in size, state or variant on purpose, so merging them is a design decision (step 9) |
+| 7 load order, `@layer` | order documented, `@layer` not attempted | `index.html` lists every stylesheet with its role and says the order is the cascade. 40 fights flip under layers (G14.1), which no pixel suite can vouch for |
+
 ## 6. Reproducing the Chromium checks
 
 The (C) findings came from the scenario file below, run against the current build. To reproduce:
@@ -737,33 +754,49 @@ Everything below is regenerated by `elm/tools/style-map.mjs`. Section index:
 
 | bytes | lines | rules | selectors | declarations | !important | custom props defined | custom props referenced | classes styled | classes in Elm class attrs |
 |---|---|---|---|---|---|---|---|---|---|
-| 595966 | 15328 | 4183 | 4738 | 14364 | 12 | 160 | 157 | 2155 | 2031 |
+| 916340 | 22468 | 6266 | 7099 | 19839 | 11 | 219 | 245 | 2856 | 2739 |
 
 ## G1. Stylesheets in cascade order (index.html)
 
 | # | file | KiB | lines | rules | selectors | decls | !imp | @media | @container | tokens defined | key classes | dead rules (decls) | decls shadowed by a later identical selector | rules fully shadowed | top class prefixes | views emitting its classes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | `app.css` | 153.0 | 3943 | 1229 | 1367 | 4533 | 10 | 15 | 0 | 113 | 907 | 59 (205) | 286 | 53 | onyx-account 85, onyx-home 46, onyx-call 46, onyx-member 32, onyx-rail 30, onyx-moddesk 24, onyx-land 22, onyx-dmsafe 20, onyx-spotlight 19, onyx-calls 18 | View/Account.elm 82, View/Thread.elm 76, View/Profile.elm 51, View/DmSafety.elm 50, View/Home.elm 50, View/Prefs.elm 37, View/CallStage.elm 36, View/Composer.elm 31 |
-| 2 | `css/pol-stats.css` | 46.1 | 1080 | 301 | 333 | 1059 | 1 | 7 | 0 | 11 | 124 | 0 (0) | 2 | 0 | public-room 19, stats-feed 8, stats-inspector 6, data-room 6, status-observation 4, stats-window 4, stats-chart 3, stats-heatmap 3, channel-spark 3, status-check 2 | View/Stats.elm 91, View/Status.elm 12, View/Roadmap.elm 11, View/About.elm 6, View/Download.elm 3, View/NotFound.elm 1 |
-| 3 | `css/pol-studio.css` | 45.1 | 1785 | 287 | 326 | 1144 | 0 | 8 | 0 | 0 | 183 | 0 (0) | 2 | 0 | ts-pv 39, ts-audit 17, background-picker 9, ts-token 9, ts-factory 7, ts-theme 7, ts-preview 6, ap-theme 5, ap-background 4, ap-readiness 4 | View/Studio.elm 126, View/Appearance.elm 50, App.elm 1 |
-| 4 | `css/pol-shell.css` | 62.8 | 1469 | 463 | 518 | 1383 | 0 | 10 | 0 | 24 | 269 | 4 (15) | 18 | 1 | onyx-rail 42, onyx-room 28, notif-center 19, onyx-account 18, onyx-home 13, guest-claim 9, onyx-nav 8, onyx-calls 7, moderation-desk 5, onyx-call 5 | View/Rail.elm 42, View/RoomHeader.elm 35, View/Inbox.elm 20, View/Account.elm 18, View/Home.elm 17, View/Nav.elm 16, View/Topbar.elm 16, View/Bans.elm 10 |
-| 5 | `css/pol-thread.css` | 76.3 | 1920 | 462 | 557 | 1713 | 0 | 9 | 0 | 61 | 260 | 0 (0) | 5 | 0 | onyx-message 44, room-media 31, shell-msg 30, onyx-thread 19, shell-composer 11, pins-item 11, onyx-msg 9, onyx-composer 9, onyx-topic 7, onyx-react 6 | View/Thread.elm 110, View/Composer.elm 44, View/Search.elm 41, View/Media.elm 31, View/Pins.elm 24, View/Home.elm 3, View/MessageText.elm 2, View/Polish.elm 2 |
-| 6 | `css/pol-roster.css` | 13.7 | 417 | 84 | 98 | 300 | 0 | 8 | 0 | 0 | 32 | 0 (0) | 1 | 0 | onyx-mlist 12, onyx-roster 8, onyx-member 6, onyx-avatar 2, onyx-members 2, pt-ico 1, onyx-away 1 | View/Roster.elm 28, Avatar.elm 2, View/Icon.elm 1, View/Stewardship.elm 1 |
-| 7 | `css/pol-public.css` | 68.1 | 1681 | 555 | 642 | 1778 | 0 | 17 | 0 | 14 | 294 | 1 (1) | 9 | 0 | onyx-land 53, public-frame 31, ab-scene 9, guides-route 8, guides-progress 7, guides-card 5, public-info 5, guides-index 4, guides-share 4, not-found 4 | View/About.elm 54, View/Landing.elm 47, View/Download.elm 45, View/Guides.elm 44, View/PublicFrame.elm 30, View/Onyxos.elm 27, View/Invite.elm 23, View/Trust.elm 6 |
-| 8 | `css/calls-c8.css` | 8.9 | 134 | 69 | 72 | 226 | 0 | 2 | 0 | 2 | 45 | 0 (0) | 1 | 0 | onyx-call 23, onyx-vs 18, onyx-cbtn 2, onyx-ci 1, onyx-voice 1 | View/CallOverlays.elm 23, View/VoiceSettings.elm 20, View/CallPresence.elm 1, View/CallStage.elm 1 |
-| 9 | `css/calls-c11.css` | 5.5 | 192 | 36 | 43 | 109 | 0 | 3 | 0 | 0 | 24 | 0 (0) | 3 | 0 | onyx-stage 13, onyx-call 5, onyx-cbtn 2, onyx-tile 2, onyx-ci 1, onyx-sheet 1 | View/StageMode.elm 15, View/CallDock.elm 2, View/CallVideo.elm 2, View/CallStage.elm 2, View/CallPresence.elm 1, View/CallOverlays.elm 1, View/Sheet.elm 1 |
-| 10 | `css/polish.css` | 10.7 | 387 | 67 | 85 | 238 | 0 | 3 | 0 | 6 | 34 | 0 (0) | 0 | 0 | time-scrubber 13, shell-composer 9, a2hs-sheet 4, first-run 3, update-available 2, onyx-sheet 1, polish-primary 1, polish-ghost 1 | View/Polish.elm 34 |
-| 11 | `css/account2.css` | 6.3 | 168 | 57 | 67 | 193 | 0 | 2 | 0 | 0 | 44 | 0 (0) | 5 | 0 | a2-reclaim 8, a2-status 4, a2-row 3, a2-btn 3, a2-ready 3, a2-confirm 2, a2-person 2, a2-dot 2, a2-sheet 1, a2-body 1 | View/Account2.elm 41, View/Rail.elm 2, View/Appearance.elm 1 |
-| 12 | `css/roomsettings.css` | 9.7 | 355 | 88 | 92 | 291 | 0 | 2 | 0 | 0 | 68 | 0 (0) | 0 | 0 | onyx-room 5, rset-bridge 5, rset-toggle 5, rset-event 4, rset-roles 4, rset-access 4, rset-rhythm 4, rset-group 3, rset-readonly 3, rset-insights 3 | View/RoomSettings.elm 56, View/RoomHeader.elm 6, View/DmSafety.elm 3, View/Notify.elm 1, View/CallPresence.elm 1, View/Sheet.elm 1 |
-| 13 | `css/calls-c6.css` | 8.3 | 275 | 62 | 67 | 188 | 0 | 4 | 0 | 1 | 35 | 0 (0) | 0 | 0 | onyx-call 31, onyx-sheet 2, onyx-ci 1, onyx-cbtn 1 | View/CallDock.elm 29, View/Sheet.elm 2, View/CallStage.elm 2, View/CallPresence.elm 1, View/CallOverlays.elm 1 |
-| 14 | `css/calls-c4.css` | 11.3 | 165 | 96 | 101 | 231 | 0 | 2 | 0 | 9 | 36 | 0 (0) | 1 | 0 | onyx-call 13, onyx-tile 13, onyx-cq 6, onyx-cbtn 3, onyx-ci 1 | View/CallVideo.elm 25, View/CallStage.elm 6, View/CallOverlays.elm 3, View/CallPresence.elm 1, View/CallDock.elm 1 |
-| 15 | `css/ui-sheets.css` | 45.4 | 1101 | 267 | 301 | 829 | 0 | 10 | 0 | 30 | 131 | 0 (0) | 6 | 0 | onyx-spotlight 15, onyx-you 14, onyx-sheet 13, notif-center 10, onyx-member 8, pref-category 6, onyx-account 5, onyx-profile 5, onyx-toast 5, onyx-moddesk 4 | View/Switcher.elm 18, View/Browser.elm 14, View/Nav.elm 13, View/Profile.elm 13, View/Sheet.elm 12, View/Inbox.elm 10, View/Prefs.elm 10, View/DmSafety.elm 6 |
-| 16 | `css/pol-ios.css` | 5.0 | 132 | 18 | 21 | 30 | 1 | 6 | 0 | 0 | 5 | 0 (0) | 0 | 0 | onyx-frame 1, onyx-mobile 1, onyx-composer 1, onyx-sheet 1, a2hs-sheet 1 | View.elm 1, View/Nav.elm 1, View/Composer.elm 1, View/Sheet.elm 1, View/Polish.elm 1 |
-| 17 | `css/calls-engine.css` | 5.8 | 124 | 42 | 48 | 119 | 0 | 3 | 2 | 0 | 15 | 0 (0) | 1 | 0 | onyx-call 12, onyx-cbtn 2, onyx-sec 1 | View/CallStage.elm 12, View/CallOverlays.elm 2, View/CallVideo.elm 1 |
+| 1 | `app.css` | 140.7 | 3468 | 1125 | 1237 | 3816 | 9 | 20 | 0 | 126 | 812 | 0 (0) | 43 | 0 | onyx-account 52, onyx-home 43, onyx-call 42, onyx-member 27, onyx-rail 26, onyx-moddesk 22, onyx-dmsafe 20, onyx-spotlight 18, onyx-msg 17, onyx-keychange 17 | View/Thread.elm 67, View/Account.elm 53, View/DmSafety.elm 50, View/Profile.elm 50, View/Home.elm 47, View/Connect.elm 46, View/CallStage.elm 32, View/Composer.elm 30 |
+| 2 | `css/gap-appearance.css` | 15.0 | 315 | 61 | 66 | 141 | 0 | 7 | 0 | 61 | 19 | 5 (5) | 1 | 0 | shell-msg 2, onyx-message 2, onyx-day 1, onyx-avatar 1, onyx-rail 1, onyx-mlist 1, onyx-member 1, onyx-home 1, onyx-frame 1, onyx-thread 1 | View/Thread.elm 5, View/MessageText.elm 2, View/Roster.elm 2, View/Composer.elm 2, View/Appearance.elm 2, Avatar.elm 1, View/Rail.elm 1, View/Home.elm 1 |
+| 3 | `css/pol-stats.css` | 46.2 | 1080 | 301 | 333 | 1059 | 1 | 7 | 0 | 11 | 124 | 0 (0) | 2 | 0 | public-room 19, stats-feed 8, stats-inspector 6, data-room 6, status-observation 4, stats-window 4, stats-chart 3, stats-heatmap 3, channel-spark 3, status-check 2 | View/Stats.elm 91, View/Status.elm 12, View/Roadmap.elm 11, View/About.elm 6, View/Download.elm 3, View/NotFound.elm 1 |
+| 4 | `css/pol-studio.css` | 47.6 | 1840 | 303 | 342 | 1169 | 0 | 12 | 2 | 0 | 183 | 0 (0) | 1 | 0 | ts-pv 39, ts-audit 17, background-picker 9, ts-token 9, ts-factory 7, ts-theme 7, ts-preview 6, ap-theme 5, ap-background 4, ap-readiness 4 | View/Studio.elm 125, View/Appearance.elm 49, View/Appeal.elm 1, App.elm 1, View/Account.elm 1 |
+| 5 | `css/pol-shell.css` | 61.7 | 1437 | 454 | 509 | 1338 | 0 | 10 | 0 | 24 | 261 | 0 (0) | 5 | 0 | onyx-rail 42, onyx-room 28, onyx-account 18, notif-center 16, onyx-home 13, guest-claim 9, onyx-nav 8, onyx-calls 7, moderation-desk 5, onyx-call 5 | View/Rail.elm 40, View/RoomHeader.elm 35, View/Inbox.elm 20, View/Account.elm 18, View/Home.elm 17, View/Nav.elm 16, View/Topbar.elm 16, View/Bans.elm 10 |
+| 6 | `css/pol-thread.css` | 109.0 | 2600 | 662 | 812 | 2207 | 0 | 30 | 0 | 74 | 308 | 0 (0) | 5 | 0 | onyx-message 45, shell-msg 39, room-media 31, onyx-thread 23, shell-composer 13, shell-topic 13, pins-item 12, onyx-msg 9, onyx-composer 9, onyx-topic 7 | View/Thread.elm 140, View/Composer.elm 44, View/Search.elm 41, View/Media.elm 31, View/Pins.elm 25, View/MessageText.elm 7, View/Home.elm 4, View/Polish.elm 4 |
+| 7 | `css/pol-roster.css` | 15.9 | 472 | 97 | 114 | 327 | 0 | 9 | 0 | 5 | 32 | 0 (0) | 1 | 0 | onyx-mlist 12, onyx-roster 8, onyx-member 6, onyx-avatar 2, onyx-members 2, pt-ico 1, onyx-away 1 | View/Roster.elm 28, Avatar.elm 2, View/Icon.elm 1, View/Stewardship.elm 1 |
+| 8 | `css/pol-public.css` | 74.6 | 1828 | 601 | 696 | 1876 | 0 | 22 | 0 | 18 | 296 | 0 (0) | 9 | 0 | onyx-land 53, public-frame 31, ab-scene 9, guides-route 8, guides-progress 7, guides-card 5, public-info 5, guides-index 4, guides-share 4, not-found 4 | View/About.elm 54, View/Landing.elm 47, View/Download.elm 45, View/Guides.elm 44, View/PublicFrame.elm 33, View/Onyxos.elm 27, View/Invite.elm 23, View/Trust.elm 6 |
+| 9 | `css/calls-c8.css` | 8.8 | 133 | 68 | 71 | 223 | 0 | 2 | 0 | 2 | 45 | 0 (0) | 1 | 0 | onyx-call 23, onyx-vs 18, onyx-cbtn 2, onyx-ci 1, onyx-voice 1 | View/CallOverlays.elm 23, View/VoiceSettings.elm 20, View/CallPresence.elm 1, View/CallStage.elm 1 |
+| 10 | `css/calls-c11.css` | 5.5 | 192 | 36 | 43 | 108 | 0 | 3 | 0 | 0 | 24 | 0 (0) | 5 | 1 | onyx-stage 13, onyx-call 5, onyx-cbtn 2, onyx-tile 2, onyx-ci 1, onyx-sheet 1 | View/StageMode.elm 15, View/CallDock.elm 2, View/CallVideo.elm 2, View/CallStage.elm 2, View/CallPresence.elm 1, View/CallOverlays.elm 1, View/Sheet.elm 1 |
+| 11 | `css/polish.css` | 11.7 | 409 | 73 | 91 | 247 | 0 | 5 | 0 | 6 | 34 | 0 (0) | 0 | 0 | time-scrubber 13, shell-composer 9, a2hs-sheet 4, first-run 3, update-available 2, onyx-sheet 1, polish-primary 1, polish-ghost 1 | View/Polish.elm 34 |
+| 12 | `css/account2.css` | 6.5 | 167 | 57 | 67 | 192 | 0 | 2 | 0 | 0 | 44 | 0 (0) | 3 | 0 | a2-reclaim 8, a2-status 4, a2-row 3, a2-btn 3, a2-ready 3, a2-confirm 2, a2-person 2, a2-dot 2, a2-sheet 1, a2-body 1 | View/Account2.elm 41, View/Rail.elm 2, View/Appearance.elm 1 |
+| 13 | `css/roomsettings.css` | 9.6 | 353 | 87 | 91 | 288 | 0 | 2 | 0 | 0 | 67 | 0 (0) | 0 | 0 | onyx-room 5, rset-bridge 5, rset-toggle 5, rset-event 4, rset-roles 4, rset-access 4, rset-rhythm 4, rset-group 3, rset-readonly 3, rset-insights 3 | View/RoomSettings.elm 29, View/Chanserv.elm 26, View/RoomHeader.elm 6, View/DmSafety.elm 3, View/Notify.elm 1, View/CallPresence.elm 1, View/Sheet.elm 1 |
+| 14 | `css/calls-c6.css` | 7.8 | 262 | 58 | 62 | 172 | 0 | 4 | 0 | 1 | 34 | 0 (0) | 0 | 0 | onyx-call 30, onyx-sheet 2, onyx-ci 1, onyx-cbtn 1 | View/CallDock.elm 28, View/Sheet.elm 2, View/CallStage.elm 2, View/CallPresence.elm 1, View/CallOverlays.elm 1 |
+| 15 | `css/calls-c4.css` | 10.9 | 159 | 92 | 95 | 221 | 0 | 2 | 0 | 9 | 36 | 0 (0) | 1 | 0 | onyx-call 13, onyx-tile 13, onyx-cq 6, onyx-cbtn 3, onyx-ci 1 | View/CallVideo.elm 25, View/CallStage.elm 6, View/CallOverlays.elm 3, View/CallPresence.elm 1, View/CallDock.elm 1 |
+| 16 | `css/gap-convo.css` | 13.4 | 327 | 80 | 91 | 234 | 0 | 11 | 0 | 0 | 38 | 0 (0) | 1 | 0 | gap-attach 7, gap-skeleton 7, gap-drop 5, onyx-message 5, onyx-attach 4, gap-collapsed 3, gap-draft 1, pt-ico 1, shell-attachment 1, gap-search 1 | View/Composer.elm 19, View/Thread.elm 12, View/Search.elm 5, View/Icon.elm 1 |
+| 17 | `css/gap-account.css` | 5.5 | 152 | 48 | 51 | 125 | 0 | 3 | 2 | 0 | 30 | 0 (0) | 0 | 0 | gap-list 4, gap-status 3, gap-btn 3, gap-review 3, gap-subhead 2, gap-inline 2, pref-status 1, pref-reset 1, gap-acct 1, onyx-account 1 | View/GapAccount.elm 29, View/Account.elm 1 |
+| 18 | `css/gap-oper.css` | 22.5 | 446 | 180 | 203 | 598 | 0 | 9 | 1 | 4 | 107 | 0 (0) | 2 | 0 | oc-event 7, onyx-moddesk 6, oc-btn 6, oc-item 6, oc-bar 5, oc-more 4, oc-replies 4, oc-row 3, oc-review 3, oc-reply 3 | View/ModDesk.elm 26, View/OperTabs.elm 26, View/OperFeedPanel.elm 22, View/OperKit.elm 21, View/Appeal.elm 12 |
+| 19 | `css/rx-shell.css` | 32.8 | 698 | 224 | 264 | 493 | 0 | 27 | 0 | 15 | 111 | 0 (0) | 1 | 0 | onyx-rail 30, onyx-railmenu 14, onyx-room 12, onyx-nav 6, onyx-topbar 5, onyx-mlist 4, onyx-sheet 3, room-notify 3, onyx-roster 3, onyx-palette 3 | View/Rail.elm 42, View/RoomHeader.elm 15, View/Topbar.elm 9, View/Roster.elm 8, View/Nav.elm 7, View/Organize.elm 4, View/Sheet.elm 3, View/Notify.elm 3 |
+| 20 | `css/gap-chanserv.css` | 9.1 | 288 | 63 | 69 | 221 | 0 | 4 | 0 | 0 | 38 | 0 (0) | 0 | 0 | cs-join 8, cs-slow 4, cs-mlock 3, cs-my 3, cs-pair 2, cs-knock 2, cs-disclosure 1, rset-flags 1, cs-subhead 1, cs-rule 1 | View/Chanserv.elm 37, View/Account2.elm 1 |
+| 21 | `css/gap-import.css` | 20.6 | 479 | 168 | 182 | 564 | 0 | 3 | 1 | 4 | 93 | 0 (0) | 0 | 0 | hi-review 7, hi-tally 5, hi-conv 5, hi-batch 5, hi-btn 4, bk-btn 4, bk-select 4, hi-activity 4, bk-dialog 4, bk-detail 4 | View/HistoryImport.elm 51, View/BlockKit.elm 41, View/GapAccount.elm 1 |
+| 22 | `css/gap-people.css` | 6.0 | 177 | 34 | 36 | 89 | 0 | 7 | 0 | 0 | 23 | 0 (0) | 0 | 0 | onyx-member 6, onyx-roster 5, onyx-steward 1, chb-check 1, moderation-desk 1, onyx-moddesk 1, gp-webhooks 1, gp-export 1, gp-actions 1, rset-btn 1 | View/RoomTools.elm 7, View/Roster.elm 5, View/Profile.elm 4, View/Chanserv.elm 2, View/Stewardship.elm 2, View/Bans.elm 2, View/ModDesk.elm 1 |
+| 23 | `css/gap-organize.css` | 36.7 | 777 | 247 | 273 | 762 | 0 | 5 | 0 | 27 | 134 | 0 (0) | 1 | 0 | gorg-menu 14, gorg-saved 11, gorg-folder 10, gorg-tucked 9, gorg-note 9, gorg-more 8, gorg-preset 5, gorg-choice 4, gorg-rset 4, gorg-digest 4 | View/Organize.elm 97, View/Attention.elm 24, View/Thread.elm 5, View/Rail.elm 2, View.elm 2, View/Chanserv.elm 1, View/Home.elm 1, View/RoomHeader.elm 1 |
+| 24 | `css/gap-usermodes.css` | 15.3 | 409 | 124 | 144 | 388 | 0 | 4 | 0 | 0 | 86 | 0 (0) | 0 | 0 | um-memo 13, um-requests 6, um-selfname 6, um-btn 5, um-request 5, um-choice 4, um-inbox 4, um-offline 4, onyx-schedule 4, um-held 4 | View/UserModes.elm 78, View/Composer.elm 4, View/GapAccount.elm 2, View/Scheduled.elm 2 |
+| 25 | `css/gap-commands.css` | 5.8 | 175 | 37 | 37 | 126 | 0 | 4 | 1 | 1 | 23 | 0 (0) | 0 | 0 | gap-help 10, gap-keys 5, onyx-action 3, onyx-message 2, onyx-body 1, onyx-sheet 1, onyx-spotlight 1 | View/GapCommands.elm 18, View/Thread.elm 3, View/Sheet.elm 1, View/Switcher.elm 1 |
+| 26 | `css/gap-watch.css` | 19.4 | 754 | 135 | 144 | 450 | 0 | 8 | 3 | 10 | 75 | 0 (0) | 2 | 0 | onyx-watch 72, onyx-room 2, pt-ico 1 | View/WatchTogether.elm 74, View/Icon.elm 1 |
+| 27 | `css/gap-shell.css` | 16.7 | 390 | 110 | 115 | 392 | 0 | 4 | 0 | 10 | 53 | 0 (0) | 2 | 0 | gs-motd 11, gs-activity 7, gs-join 6, gs-door 4, gs-act 4, gs-more 4, gs-leave 4, gs-seg 3, gs-btn 3, gs-rail 2 | View/GapShell.elm 49, View/Topbar.elm 2, View/Sheet.elm 1, View/Account2.elm 1 |
+| 28 | `css/gap-auth.css` | 3.8 | 103 | 23 | 25 | 57 | 0 | 4 | 0 | 0 | 15 | 0 (0) | 0 | 0 | ga-question 3, ga-alt 2, ga-signin 2, conn-title 1, ga-code 1, ga-otp 1, ga-actions 1, ga-problem 1, conn-link 1, ga-note 1 | View/AuthGate.elm 15 |
+| 29 | `css/gap-claim.css` | 6.0 | 188 | 46 | 48 | 130 | 0 | 3 | 3 | 0 | 24 | 0 (0) | 0 | 0 | gc-btn 4, gc-facts 3, gc-note 3, gc-card 2, pref-group 2, gc-lead 2, gc-bar 2, pref-label 1, gc-kicker 1, gc-ask 1 | View/GapClaim.elm 21, View/GapAccount.elm 3 |
+| 30 | `css/ui-sheets.css` | 70.4 | 1675 | 398 | 445 | 1146 | 0 | 28 | 0 | 57 | 157 | 0 (0) | 2 | 0 | onyx-spotlight 15, onyx-sheet 13, onyx-you 13, onyx-member 11, notif-center 9, onyx-account 8, pref-category 7, onyx-profile 5, onyx-toast 5, rset-toggle 4 | View/Switcher.elm 18, View/Profile.elm 16, View/Browser.elm 14, View/Prefs.elm 13, View/Sheet.elm 12, View/Nav.elm 12, View/Inbox.elm 10, View/Account.elm 9 |
+| 31 | `css/pol-ios.css` | 5.0 | 132 | 18 | 21 | 30 | 1 | 6 | 0 | 0 | 5 | 0 (0) | 0 | 0 | onyx-frame 1, onyx-mobile 1, onyx-composer 1, onyx-sheet 1, a2hs-sheet 1 | View.elm 1, View/Nav.elm 1, View/Composer.elm 1, View/Sheet.elm 1, View/Polish.elm 1 |
+| 32 | `css/calls-engine.css` | 34.1 | 583 | 256 | 322 | 650 | 0 | 25 | 5 | 13 | 84 | 0 (0) | 0 | 0 | onyx-call 56, onyx-tile 6, onyx-cbtn 5, onyx-join 4, onyx-vs 4, onyx-voice 3, onyx-calls 2, onyx-ci 1, onyx-header 1, onyx-sec 1 | View/CallStage.elm 29, View/CallDock.elm 16, View/CallPresence.elm 14, View/CallOverlays.elm 9, View/CallVideo.elm 9, View/VoiceSettings.elm 4, View/Calls.elm 2, View/Sheet.elm 1 |
 
 Each file's own header comment (its declared ownership):
 
 - **app.css** — Onyx Elm shell — abyssal monochrome + single sea-glass accent. System stack, 6px radii, hierarchy via weight/size. No gradients.
+- **css/gap-appearance.css** — v3/gap-appearance — themes, text size, density, width, contrast and the background scene, for every surface. Loaded right after app.css.  1. Theme bridge. The shell paints with --onyx-*; the active theme (built- in, custom, or a Theme Studio session) arrives as palette tokens. The ONE derivation is Elm's ShellPalette (AA-guarded, Ocean anchored to the house cut), committed inline on &lt;html> as --onyx-theme-&lt;slot> (base) and --onyx-theme-hc-&lt;slot> (high contrast). This file only selects a set; the fallbacks are the house values, so first paint is unchanged. 2. High contrast follows the Raise-contrast switch AND prefers-contrast. 3. One focus ring (--focus-ring), thicker under high contrast. 4.
 - **css/pol-stats.css** — elm polish/pol-stats — public /stats, /status and /roadmap pages. Ported from src/routes/{stats,status,roadmap,public-room-comparison, data-pages,landing}.css and re-cut to the Elm language: near-black surfaces, warm off-white text, 1px seams, 6px radii, no gradients or glow. The accent marks one thing here: the live/current answer (fresh feed pip, selected control, primary action, focus). Every rule is scoped to a page root so the shared `r-*` / `data-*` names cannot leak into other public pages.
 - **css/pol-studio.css** — v3 polish / pol-studio — the /appearance page and the Theme Studio (View.Appearance, View.Studio). Ported from src/app/appearance.css, src/backgrounds/picker/background-picker.css and the STUDIO_CSS block in src/theme/ThemeStudio.tsx, re-cut for the Elm language: near-black steps (bg / panel / panel-2) split by the 1px seam, warm off-white text, 6px radii, hierarchy by weight and size, no gradients or glow. The accent marks only the current location (bar tag), primary actions (apply / generate / bake / save) and focus. Selection is neutral: panel-2 ground + a text-coloured hairline.  The live preview mock (.ts-pv-*) deliberately paints from the THEME tokens (--ink / --stone / --paper / --lap
 - **css/pol-shell.css** — v3/pol-shell — production polish for the shell views (inbox, account, moderation desk, browser/formation, calls hub, rail, room header, prefs, profile, topbar identity, stewardship, switcher, notify). Ported from the Solid reference (src/shell/**, src/app/*.css) onto the Elm tokens in app.css :root. One sea-glass accent: current location, primary action, focus ring, mention glyph. 6px radii, no glow.
@@ -777,91 +810,164 @@ Each file's own header comment (its declared ownership):
 - **css/roomsettings.css** — v3/roomsettings — room header completion (privacy glyph, expandable topic, facepile, second row) and the Room settings sheet + 3.8 room surfaces (scheduled event, bridge badge, group-control mark, insights). Tokens only; accent reserved for the primary action and the focus ring.
 - **css/calls-c6.css** — v3/calls-c6 — DM ring dialogs (C6), mini voice view (C7) and reconnecting / error states (C10). Spec: design/calls/CALLS_DESIGN.md §2.8, §2.9, §2.14, §2.18. Tokens come from app.css :root. Accent is used only for the live pip and the speaking outline.
 - **css/calls-c4.css** — v3/calls-c4 — calls C4 + C5 (CALLS_DESIGN.md §2.4, §2.6, §2.7, §2.13, §2.18): camera / share / deafen controls, the connection pip and turn-off-camera prompt, the video grid, participant tiles, spotlight + screenshare layouts and stage sizes. Tokens only from app.css :root. The accent means live audio now: tile speaking border and talk bars — nothing else.
-- **css/ui-sheets.css** — v3/ui-sheets — every overlay, sheet and popover in the shell. Loaded LAST so it wins the cascade over app.css + the pol-* files.  One family: near-black panel, 1px seam, 6px radii, the short cool sheet shadow (--elev-3), a sticky head (kicker / title / subtitle, trailing actions, icon close), and on phones a true bottom sheet — grab handle, internal scroll, safe-area padding, swipe-down to dismiss (pure CSS scroll-snap, see View.Sheet). Desktop keeps centred dialogs in three widths, right-hand side panels, and a top-right popover for the inbox.  Icons are CSS masks over data-URI SVGs (never font glyphs).
+- **css/gap-convo.css** — v3/gap-convo — conversation gaps: the quiet "Saved here" draft line, the file drop target, staged-photo privacy + quality, hidden-sender banner, earlier-versions disclosure, search empty state, and the pulse a row gets when a jump lands on it. Linked after pol-thread.css and before ui-sheets.css. Tokens only; flat surfaces; one accent for "this is the thing you jumped to / the choice you made".
+- **css/gap-account.css** — v3/gap-account — Account protection / names, Preferences data controls (local history, saved searches, portable-vault review). Linked before ui-sheets.css so sheet-level polish still wins. Uses only the shared tokens: near-black surfaces, one accent for the primary action and focus, 6px radii, 44px targets on touch.
+- **css/gap-oper.css** — v3/gap-oper — the operator desk: Live feed, Bans, Silence, Abuse, Appeals, Content, Network.  One calm surface: a wide side panel on desktop, a bottom sheet on phones (the shared sheet rules), seven tabs, and inside each tab small bordered cards. The accent means one thing here — the current tab, the pressed chip, the primary action. Danger is the existing red border, never a fill. Text stays >= 14px; inputs are 16px on touch so iOS does not zoom; every control is 44px on coarse pointers.  Linked before ui-sheets.css, so every rule that has to beat a sheet rule carries its own specificity.
+- **css/rx-shell.css** — v3/rx-shell — the app frame on every aspect ratio.  Loaded after the pol-* files and before ui-sheets.css. Owns the frame geometry across the viewport matrix plus the shell pieces this pass added (row menu, empty collections, the topbar compose glyph):  0. tokens + extra shell glyphs 1. sidebar rows: the overflow control, touch rows, row menu 2. empty Rooms / Messages collections 3. topbar compose; nav totals that read on every nav form 4. compact two-pane (600–767px: foldables open, small tablets, 200% zoom) — nav rail · list · conversation, not a stretched phone 5. touch at tablet / desktop widths (hover: none): 44px targets, 16px fields 6. short windows (≤520px tall: landscape phones, sho
+- **css/gap-chanserv.css** — v3/gap-chanserv — registered-room services and the channel-operator tools: nested disclosures in Room settings, the mask-list tabs, the join-refusal card with "Ask to join", the hosts' Invite action in the inbox, the composer's slow-mode line.  Tokens only. The accent stays on the one primary action per surface and on focus; danger is the existing --onyx-bad. Linked before ui-sheets.css so the shared sheet rules (44px touch targets under 768px, 16px fields) still win where they overlap.
+- **css/gap-import.css** — v3/gap-import — history import (Preferences → Import & export) and BlockKit-lite structured messages (inline cards + their dialogs).  Linked before ui-sheets.css; every selector is namespaced (.hi-* for the import pane, .bk-* for structured messages) so nothing here can reach another surface. Calm, near-black, 1px seams, 6px radii; the one accent marks the primary action, focus and "copied". Touch targets are 44px wherever the pointer is coarse (any width).
+- **css/gap-people.css** — v3/gap-people — moderation, people and room-care surfaces.  Owned by the gap-people slice; linked before css/ui-sheets.css so the sheet family keeps the last word on sheet geometry. Tokens come from app.css :root. Covers: 1. the windowed member list ("Show more", content-visibility) 2. the member card's role-gated moderation group 3. Room care (offer entry, notes) 4. the room desk (timed-block review, read-only facts) 5. Room settings tools (webhooks, transcript export)
+- **css/gap-organize.css** — v3/gap-organize — room folders, hidden rooms, closed conversations, saved messages, private notes, quiet hours / notification mode / smart mute, the "Since you left" digest, reader mode.  Loaded after the pol-* files and before ui-sheets.css (which owns the sheet frame: layer, veil, head, bottom-sheet behaviour). Every rule here is scoped to a gorg-* class, or to a [data-reader] / [data-testid] hook of this slice, so nothing else moves.  0. glyphs 1. Rooms / Messages lists: folders, the hidden / closed footers, the row overflow control 2. sheets: row menu, folder picker, saved messages 3. shared controls (buttons, inputs, switch) 4. member-card note, room settings, Preferences group 5. Notif
+- **css/gap-usermodes.css** — v3/gap-usermodes — privacy switches, message requests, offline messages, server blocks, account rooms, the self name, an offline person's last-seen, and the send-later "where" choice.  Loaded before ui-sheets.css (which still wins the sheet chrome). The shared `pref-*` switch/row classes are reused wherever the look is the same; everything new is `um-*`. Tokens come from :root in app.css.
+- **css/gap-commands.css** — =================================================================== v3/gap-commands — action rows (`/me`), the slash-commands sheet (`/help`), the single-key shortcuts switch in the `?` overlay, and the palette's Recent / People icons. Linked before ui-sheets.css: the shared sheet chrome stays theirs; only the classes below are owned here. ===================================================================
+- **css/gap-watch.css** — v3/gap-watch — Watch Together (View.WatchTogether): the room activity card, its details disclosure, the start editor sheet and the room More-menu entry. Linked before ui-sheets.css so the shared sheet family keeps the last word on layer, head and phone bottom sheets.  Calm by design: the card is one compact sticky bar above the transcript (panel surface, 1px seam, 6px radius); its details overlay the transcript instead of pushing it, so the reading position never jumps. The accent marks only the host's primary action (play/pause, Join / Accept / Start) and the focus ring. Icons are CSS masks over data-URI SVGs — never font glyphs. Tokens from app.css :root only.
+- **css/gap-shell.css** — v3/gap-shell — Activity, join-by-name, room More additions, Leave confirm, the Home network message and the connect gate's "Sign in as" action (views: src/View/GapShell.elm).  Same language as the shell: near-black panels, 1px seams, 6px radii, one accent (focus only here), kinds told by a small dot, not colour floods. Linked before ui-sheets.css, so the shared sheet frame (head, phone bottom sheet, swipe) still wins where it should; rules here are scoped to gs-* classes. Icons are CSS masks (never font glyphs).
+- **css/gap-auth.css** — v3/gap-auth — the sign-in steps the connect gate was missing: two-step code entry, the pre-001 CHALLENGE question and its stop screens, passkey sign-in, forgot password, and the small links the sign-in form carries. They reuse the connect card's own classes (`.conn-*`, app.css / pol-public.css); only what those do not cover is here. Linked before ui-sheets.css.
+- **css/gap-claim.css** — v3/gap-claim — the prompt about history from before this update (rows with no owner stamp): a Home card and a Preferences → History & data card, one decision (Attach / Not now / Delete it).  Linked before ui-sheets.css; every selector is namespaced .gc-*. Calm, near-black, a 1px seam, 6px radii; the one accent marks the primary action and focus. The card sits in the Home column (&lt;= 720px) or the Preferences panel, so it responds to its own width (container query), not the viewport. 44px targets wherever the pointer is coarse.
+- **css/ui-sheets.css** — v3/ui-sheets — every overlay, sheet and popover in the shell. Loaded LAST so it wins the cascade over app.css + the pol-* files.  One family: near-black panel, 1px seam, 6px radii, the short cool sheet shadow (--elev-3), a sticky head (kicker / title / subtitle, trailing actions, icon close), and on phones a true bottom sheet — grab handle, internal scroll, safe-area padding, swipe-down to dismiss (pure CSS scroll-snap, see View.Sheet). Desktop keeps centred dialogs in three widths, right-hand side panels, and a top-right popover for the inbox.  Icons are CSS masks over data-URI SVGs (never font glyphs).  v3/rx-sheets — one placement per viewport class, whatever the shell underneath does: co
 - **css/pol-ios.css** — v3/ios — the shared iOS / touch plumbing for the app frame.  Loaded last so it can lay device geometry over every surface without restyling them. Reads the geometry tokens from app.css :root: --safe-top/right/bottom/left (env(safe-area-inset-*)), --vvh (visual viewport height, published by ports.js installViewportInsets; 100dvh or 100vh without it) and --kb-inset / --vv-top / &lt;html data-kb>.  1. document feel — no tap flash, no text inflation, no double-tap zoom on controls, press states for touch, chrome not selectable; 2. the app shell — fixed to the visual viewport (so the composer rides above the on-screen keyboard), no rubber-banding, lists scroll inside themselves; 3. safe areas — top 
-- **css/calls-engine.css** — v3/calls-engine — call surface polish once real calls run (elm/media voice engine). Loaded last; overrides only call classes.  - The bar reflows by the STAGE's width (container queries), not the viewport: the stage lives in the message column, whose width depends on the rails. Wide: info \| controls \| chip. Narrow: info + chip on one row, every control on one even row of >= 44px targets. - Person cells top-align (a role line no longer pushes a neighbour down). - Phone: the More menu is a bottom sheet; an expanded/fullscreen stage is a full-screen call screen sized by 100dvh with safe-area insets (iOS Safari, installed PWA); the docked bar drops the bottom inset it only needs at the screen edg
+- **css/calls-engine.css** — v3/calls-engine + v3/rx-calls — the call surfaces at every aspect ratio. Loaded last; overrides only call classes (tokens from app.css).  Anatomy (View.CallStage): the stage is a head row (live status left; timer, people, connection and the security chip right), the people row or the video grid, then a controls-only toolbar. More opens as a row of tools under the controls on roomy stages and as a bottom sheet on phones and short screens; tap or click outside closes it.  Docking: in a conversation the stage (and the pre-join banner) stick to the top of the transcript scroller, so the call controls never scroll away; the transcript moves under them.  Sizing classes: - roomy stage (container >=
 
 ## G2. Custom properties — every definition, theme value, runtime writer and use
 
-Status counts: **theme-only, unused** 10 · **ok** 126 · **theme-overridden, unused** 1 · **theme-overridden** 16 · **unused** 11 · **runtime-written** 11 · **theme-only** 4.
+Status counts: **ok** 184 · **theme-only, unused** 7 · **theme-overridden** 17 · **unused** 12 · **undefined-with-fallback** 28 · **runtime-written** 9 · **theme-only** 7.
 
 Status legend: `ok` defined in CSS and used; `theme-overridden` defined in CSS **and** re-written inline on `<html>` by every theme commit (the inline value wins); `theme-only` used but defined only by the theme maps (undefined until the first appearanceApply); `runtime-written` set by Elm inline style or ports.js; `unused` defined, never read; `UNDEFINED` read without a fallback and defined nowhere; `undefined-with-fallback` read only with a fallback.
 
 | token | status | defined at | first value | theme values (inline on <html>) | runtime writer | uses | used at |
 |---|---|---|---|---|---|---|---|
+| `--account-head-h` | ok | 4 definitions: ui-sheets.css:990,1277,1650,1653 (selectors in style-map.json) | `71px` |  |  | 1 | ui-sheets.css:994 |
+| `--app-max` | ok | rx-shell.css:30<br>rx-shell.css:632 @@media (min-width: 1960px) | `100vw` |  |  | 4 | rx-shell.css:635,641,642,643 |
 | `--brand-action` | theme-only, unused |  |  | `#ff987d` ocean |  | 0 |  |
-| `--ci` | ok | 27 definitions: app.css:3168,3169,3170,3171,3172,3173,3174,3175,3176,3177,3178,3179,3180,3181,3182 · calls-c8.css:9,10 · calls-c6.css:13 · calls-c4.css:9,10,11,12,13,14,15,16,17 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | app.css:3165,3166 |
-| `--claim-i` | ok | 5 definitions: pol-public.css:632,640,641,642,643 (selectors in style-map.json) | `var(--pub-i-chevron)` |  |  | 2 | pol-public.css:637,638 |
-| `--composer-h` | ok | app.css:96 | `64px` |  |  | 4 | app.css:3894 · ui-sheets.css:790,812,1049 |
-| `--context-w` | ok | app.css:94 | `240px` |  |  | 1 | app.css:3427 |
+| `--ci` | ok | 29 definitions: app.css:2873,2874,2875,2876,2877,2878,2879,2880,2881,2882,2883,2884,2885,2886,2887 · calls-c8.css:9,10 · calls-c6.css:13 · calls-c4.css:9,10,11,12,13,14,15,16,17 · calls-engine.css:30,32 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | app.css:2870,2871 |
+| `--claim-i` | ok | 5 definitions: pol-public.css:633,641,642,643,644 (selectors in style-map.json) | `var(--pub-i-chevron)` |  |  | 2 | pol-public.css:638,639 |
+| `--cols` | ok | 4 definitions: calls-engine.css:334,335,336,337 (selectors in style-map.json) | `1` |  |  | 2 | calls-engine.css:346,346 |
+| `--composer-h` | ok | app.css:143 | `64px` |  |  | 8 | app.css:3436 · pol-thread.css:2365,2366 · polish.css:393 · ui-sheets.css:868,1142,1664 · calls-engine.css:493 |
+| `--conn-i` | ok | app.css:1536 `.conn-point-icon--guest`<br>app.css:1537 `.conn-point-icon--claim`<br>app.css:1538 `.conn-point-icon--device` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | app.css:1533,1534 |
+| `--context-w` | ok | app.css:141<br>rx-shell.css:624 @@media (min-width: 1600px) | `16rem` |  |  | 1 | app.css:3107 |
+| `--convo-measure` | ok | gap-appearance.css:219 `:root[data-width='full']`<br>rx-shell.css:29 | `none` |  |  | 2 | rx-shell.css:612,617 |
 | `--danger` | theme-only, unused |  |  | `var(--shu)` all |  | 0 |  |
-| `--dur` | theme-overridden, unused | app.css:79<br>app.css:3921 @@media (prefers-reduced-motion: reduce)<br>app.css:3937 `:root[data-reduce-motion='true']` | `var(--dur-base)` | `220ms` ocean,obsidian,frost<br>`260ms` tide,reef,teal<br>`240ms` abyss,onyx,shu,hisui,kohaku,terracotta,vermillion,sapphire,slate<br>`200ms` pearl<br>`180ms` ink<br>`250ms` pine |  | 0 |  |
-| `--dur-base` | ok | app.css:78<br>app.css:3920 @@media (prefers-reduced-motion: reduce)<br>app.css:3936 `:root[data-reduce-motion='true']` | `220ms` |  |  | 13 | app.css:79,2884 · pol-thread.css:363 · pol-roster.css:353 · polish.css:347 · ui-sheets.css:61,73,311,801,958,972,1058,1067 |
-| `--dur-fast` | ok | app.css:77<br>app.css:3919 @@media (prefers-reduced-motion: reduce)<br>app.css:3935 `:root[data-reduce-motion='true']` | `160ms` |  |  | 61 | app.css×9 · pol-stats.css×9 · pol-studio.css×25 · pol-shell.css×2 · pol-thread.css×2 · pol-roster.css×1 · pol-public.css×4 · calls-c8.css×1 · polish.css×1 · account2.css×2 · roomsettings.css×1 · calls-c6.css×1 · ui-sheets.css×3 |
-| `--dur-micro` | ok | app.css:76<br>app.css:3918 @@media (prefers-reduced-motion: reduce)<br>app.css:3934 `:root[data-reduce-motion='true']` | `100ms` |  |  | 7 | pol-thread.css:148,214,419,1017 · pol-roster.css:174 · ui-sheets.css:445,627 |
-| `--ease` | theme-overridden | app.css:75 | `cubic-bezier(0.16, 1, 0.3, 1)` | `cubic-bezier(0.16, 1, 0.3, 1)` all |  | 73 | app.css×6 · pol-stats.css×9 · pol-studio.css×25 · pol-shell.css×2 · pol-thread.css×7 · pol-roster.css×3 · pol-public.css×4 · calls-c8.css×1 · polish.css×2 · account2.css×2 · roomsettings.css×1 · calls-c6.css×1 · ui-sheets.css×10 |
-| `--elev-0` | unused | app.css:84 | `none` |  |  | 0 |  |
-| `--elev-1` | unused | app.css:85 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, t…` |  |  | 0 |  |
-| `--elev-2` | ok | app.css:86 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-b…` |  |  | 6 | app.css:1906,3613,3695 · pol-thread.css:211 · pol-public.css:555,835 |
-| `--elev-3` | ok | app.css:87 | `0 28px 56px -32px color-mix(in oklab, #000 90%, tr…` |  |  | 16 | app.css:3764 · pol-shell.css:432,1292 · pol-thread.css:277,586,1251 · pol-roster.css:352 · polish.css:47 · calls-c6.css:104 · ui-sheets.css:69,413,800,803,804,805,971 |
-| `--focus-offset` | ok | app.css:72 | `-1px` |  |  | 11 | app.css:3822 · pol-stats.css:342 · pol-shell.css:758 · pol-thread.css:192,243 · pol-roster.css:153,217 · calls-c8.css:35 · polish.css:101,239 · ui-sheets.css:241 |
-| `--focus-ring` | ok | app.css:71 | `1px solid var(--onyx-accent)` |  |  | 19 | app.css:3821 · pol-stats.css:62,342,750 · pol-shell.css:758 · pol-thread.css:192,243,479 · pol-roster.css:153,217 · calls-c8.css:35 · calls-c11.css:157 · polish.css:100,238 · account2.css:37,57,120 · calls-c6.css:81 · ui-sheets.css:241 |
-| `--font-mono` | ok | app.css:35 | `'JetBrains Mono Variable', ui-monospace, 'SFMono-R…` |  |  | 42 | app.css×10 · pol-stats.css×4 · pol-studio.css×5 · pol-shell.css×3 · pol-thread.css×3 · pol-public.css×12 · calls-c8.css×1 · polish.css×2 · account2.css×1 · ui-sheets.css×1 |
-| `--gap-row` | unused | app.css:50 | `var(--space-3)` |  |  | 0 |  |
-| `--gap-section` | ok | app.css:51 | `var(--space-6)` |  |  | 1 | account2.css:6 |
-| `--gap-tight` | unused | app.css:49 | `var(--space-2)` |  |  | 0 |  |
-| `--gold` | theme-overridden | app.css:26 | `#c9a24a` | `#b4bfca` ocean<br>`#5dcbd1` tide<br>`#51a0ad` abyss<br>`#f19173` reef<br>`#c9a24a` onyx<br>`#7fa5b8` obsidian<br>`#896100` pearl<br>`#bbb7b1` ink<br>`#f4733c` shu<br>`#70c5a0` hisui<br>`#a5a51a` pine<br>`#eea563` kohaku<br>`#e8777a` terracotta<br>`#ef7179` vermillion<br>`#00aaf3` sapphire<br>`#72ccab` teal<br>`#ae7853` slate<br>`#00768a` frost |  | 8 | app.css:136 · pol-studio.css:553 · pol-thread.css:169,170,176,1129 · pol-public.css:582 · src/View/Studio.elm:1000 |
-| `--gold-bright` | theme-overridden | app.css:27 | `#f1d489` | `#f5f7f8` ocean<br>`#92f1f6` tide<br>`#88cedb` abyss<br>`#ffc0ac` reef<br>`#f1d489` onyx<br>`#add1e3` obsidian<br>`#ad7c0a` pearl<br>`#dedad5` ink<br>`#ffb294` shu<br>`#a5e9c9` hisui<br>`#cdcf62` pine<br>`#ffcca1` kohaku<br>`#ffafae` terracotta<br>`#ffafb0` vermillion<br>`#8ad1ff` sapphire<br>`#9feacd` teal<br>`#d8a582` slate<br>`#0096af` frost |  | 3 | pol-shell.css:129 · pol-thread.css:1131 · src/View/Studio.elm:1040 |
+| `--dur` | theme-overridden | app.css:3446 @@media (prefers-reduced-motion: reduce)<br>app.css:3462 `:root[data-reduce-motion='true']` | `0ms` | `220ms` ocean,obsidian,frost<br>`260ms` tide,reef,teal<br>`240ms` abyss,onyx,shu,hisui,kohaku,terracotta,vermillion,sapphire,slate<br>`200ms` pearl<br>`180ms` ink<br>`250ms` pine |  | 3 | gap-appearance.css:109,110,111 |
+| `--dur-base` | ok | 6 definitions: app.css:119,3445,3461 · gap-appearance.css:109,133,140 (selectors in style-map.json) | `220ms` |  |  | 12 | pol-thread.css:369 · pol-roster.css:349 · polish.css:347 · ui-sheets.css:157,169,411,879,1052,1064,1151,1160 · calls-engine.css:256 |
+| `--dur-fast` | ok | 6 definitions: app.css:118,3444,3460 · gap-appearance.css:110,132,139 (selectors in style-map.json) | `160ms` |  |  | 86 | app.css×9 · pol-stats.css×9 · pol-studio.css×25 · pol-shell.css×2 · pol-thread.css×2 · pol-roster.css×1 · pol-public.css×4 · calls-c8.css×1 · polish.css×1 · account2.css×2 · roomsettings.css×1 · calls-c6.css×1 · gap-oper.css×1 · rx-shell.css×1 · gap-chanserv.css×1 · gap-import.css×2 · gap-organize.css×4 · gap-usermodes.css×3 · gap-commands.css×1 · gap-watch.css×2 · gap-auth.css×1 · gap-claim.css×1 · ui-sheets.css×10 · calls-engine.css×1 |
+| `--dur-micro` | ok | 6 definitions: app.css:117,3443,3459 · gap-appearance.css:111,131,138 (selectors in style-map.json) | `100ms` |  |  | 8 | pol-thread.css:152,218,425,1119 · pol-roster.css:170 · rx-shell.css:95 · ui-sheets.css:541,715 |
+| `--ease` | theme-overridden | app.css:116 | `cubic-bezier(0.16, 1, 0.3, 1)` | `cubic-bezier(0.16, 1, 0.3, 1)` all |  | 97 | app.css×7 · pol-stats.css×9 · pol-studio.css×25 · pol-shell.css×2 · pol-thread.css×7 · pol-roster.css×3 · pol-public.css×4 · calls-c8.css×1 · polish.css×2 · account2.css×2 · roomsettings.css×1 · calls-c6.css×1 · gap-convo.css×1 · gap-oper.css×1 · rx-shell.css×2 · gap-chanserv.css×1 · gap-import.css×2 · gap-organize.css×4 · gap-usermodes.css×3 · gap-commands.css×1 · gap-watch.css×2 · gap-auth.css×1 · gap-claim.css×1 · ui-sheets.css×13 · calls-engine.css×1 |
+| `--elev-0` | unused | app.css:128 | `none` |  |  | 0 |  |
+| `--elev-1` | unused | app.css:129 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, t…` |  |  | 0 |  |
+| `--elev-2` | ok | app.css:130 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-b…` |  |  | 7 | app.css:1448,1848,3339 · pol-thread.css:215 · pol-public.css:556,836 · gap-watch.css:227 |
+| `--elev-3` | ok | app.css:131 | `0 28px 56px -32px color-mix(in oklab, #000 90%, tr…` |  |  | 16 | pol-shell.css:407,1260 · pol-thread.css:283,590,1353 · pol-roster.css:348 · polish.css:47 · calls-c6.css:97 · ui-sheets.css:165,509,878,881,882,883,1063 · calls-engine.css:255 |
+| `--focus-offset` | ok | app.css:91<br>gap-appearance.css:82 | `-1px` |  |  | 49 | app.css×8 · gap-appearance.css×1 · pol-stats.css×1 · pol-studio.css×1 · pol-shell.css×1 · pol-thread.css×3 · pol-roster.css×2 · pol-public.css×1 · calls-c8.css×1 · polish.css×2 · account2.css×1 · gap-convo.css×2 · gap-oper.css×6 · gap-import.css×3 · gap-people.css×1 · gap-organize.css×1 · gap-usermodes.css×2 · gap-commands.css×1 · gap-watch.css×3 · gap-shell.css×6 · gap-claim.css×1 · ui-sheets.css×1 |
+| `--focus-offset-out` | ok | gap-appearance.css:83 | `2px` |  |  | 30 | app.css:1713,1747,1776,1804,2705 · pol-stats.css:63,123 · pol-studio.css:604,784 · pol-thread.css:485 · pol-public.css:46 · calls-c11.css:158 · polish.css:322 · account2.css:57,119 · calls-c6.css:81 · gap-account.css:41 · gap-oper.css:98,415,428 · gap-import.css:54,126,202 · gap-shell.css:161,257,319 · gap-claim.css:132 · calls-engine.css:39,176,192 |
+| `--focus-ring` | ok | app.css:90<br>gap-appearance.css:81 | `1px solid var(--onyx-accent)` |  |  | 78 | app.css×13 · gap-appearance.css×1 · pol-stats.css×4 · pol-studio.css×1 · pol-shell.css×1 · pol-thread.css×5 · pol-roster.css×2 · pol-public.css×2 · calls-c8.css×1 · calls-c11.css×1 · polish.css×3 · account2.css×3 · calls-c6.css×1 · gap-convo.css×2 · gap-account.css×1 · gap-oper.css×9 · gap-import.css×5 · gap-people.css×1 · gap-organize.css×1 · gap-usermodes.css×2 · gap-commands.css×2 · gap-watch.css×3 · gap-shell.css×9 · gap-claim.css×1 · ui-sheets.css×1 · calls-engine.css×3 |
+| `--focus-width` | ok | 4 definitions: gap-appearance.css:54,69,80,86 (selectors in style-map.json) | `3px` |  |  | 2 | gap-appearance.css:81,82 |
+| `--font-display` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:119 |
+| `--font-mono` | ok | app.css:54 | `'JetBrains Mono Variable', ui-monospace, 'SFMono-R…` |  |  | 61 | app.css×9 · pol-stats.css×4 · pol-studio.css×5 · pol-shell.css×3 · pol-thread.css×6 · pol-public.css×12 · calls-c8.css×1 · polish.css×2 · account2.css×1 · gap-account.css×1 · gap-oper.css×5 · gap-import.css×3 · gap-people.css×1 · gap-commands.css×1 · gap-watch.css×3 · gap-shell.css×2 · gap-auth.css×1 · ui-sheets.css×1 |
+| `--font-sans` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:115,119 |
+| `--font-serif` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:124 |
+| `--gap-i-clock` | ok | gap-commands.css:10 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | gap-commands.css:174,174 |
+| `--gap-row` | unused | app.css:69 | `var(--space-3)` |  |  | 0 |  |
+| `--gap-section` | ok | app.css:70 | `var(--space-6)` |  |  | 1 | account2.css:6 |
+| `--gap-tight` | unused | app.css:68 | `var(--space-2)` |  |  | 0 |  |
+| `--gi-chev` | ok | gap-import.css:13 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | gap-import.css:161,162 |
+| `--gi-ext` | ok | gap-import.css:14 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | gap-import.css:372,373 |
+| `--gi-field` | ok | gap-import.css:12 | `color-mix(in oklab, var(--onyx-bg) 55%, var(--onyx…` |  |  | 6 | gap-import.css:94,135,214,267,414,422 |
+| `--gi-seam` | ok | gap-import.css:11 | `color-mix(in oklab, var(--onyx-line) 55%, var(--on…` |  |  | 1 | gap-import.css:282 |
+| `--gold` | theme-overridden | app.css:45 | `#c9a24a` | `#b4bfca` ocean<br>`#5dcbd1` tide<br>`#51a0ad` abyss<br>`#f19173` reef<br>`#c9a24a` onyx<br>`#7fa5b8` obsidian<br>`#896100` pearl<br>`#bbb7b1` ink<br>`#f4733c` shu<br>`#70c5a0` hisui<br>`#a5a51a` pine<br>`#eea563` kohaku<br>`#e8777a` terracotta<br>`#ef7179` vermillion<br>`#00aaf3` sapphire<br>`#72ccab` teal<br>`#ae7853` slate<br>`#00768a` frost |  | 11 | app.css:183 · gap-appearance.css:243,245 · pol-studio.css:547 · pol-thread.css:173,174,180,1231,2273 · pol-public.css:583 · src/View/Studio.elm:1000 |
+| `--gold-bright` | theme-overridden | app.css:46 | `#f1d489` | `#f5f7f8` ocean<br>`#92f1f6` tide<br>`#88cedb` abyss<br>`#ffc0ac` reef<br>`#f1d489` onyx<br>`#add1e3` obsidian<br>`#ad7c0a` pearl<br>`#dedad5` ink<br>`#ffb294` shu<br>`#a5e9c9` hisui<br>`#cdcf62` pine<br>`#ffcca1` kohaku<br>`#ffafae` terracotta<br>`#ffafb0` vermillion<br>`#8ad1ff` sapphire<br>`#9feacd` teal<br>`#d8a582` slate<br>`#0096af` frost |  | 3 | pol-shell.css:116 · pol-thread.css:1233 · src/View/Studio.elm:1040 |
 | `--gold-deep` | theme-only, unused |  |  | `#71808e` ocean<br>`#3e999d` tide<br>`#236671` abyss<br>`#a9573d` reef<br>`#8c6c2c` onyx<br>`#516f7e` obsidian<br>`#5f4200` pearl<br>`#908c88` ink<br>`#a43e08` shu<br>`#3e8165` hisui<br>`#686800` pine<br>`#a46c36` kohaku<br>`#9c4346` terracotta<br>`#a13d46` vermillion<br>`#006b9b` sapphire<br>`#42876e` teal<br>`#73492b` slate<br>`#00515f` frost |  | 0 |  |
+| `--gorg-gutter` | ok | gap-organize.css:651 `.onyx-frame[data-reader="true"]` | `max(var(--space-4), calc((100% - var(--gorg-measur…` |  |  | 2 | gap-organize.css:653,653 |
+| `--gorg-measure` | ok | gap-organize.css:650 `.onyx-frame[data-reader="true"]` | `42rem` |  |  | 3 | gap-organize.css:651,660,664 |
+| `--grid-h` | ok | calls-engine.css:342 `.onyx-call-video`<br>calls-engine.css:396 `.onyx-call-stage[data-size="expanded"] > .onyx-cal` @@media (min-width: 641px)<br>calls-engine.css:401 `.onyx-call-stage[data-size="fullscreen"] .onyx-cal` @@media (min-width: 641px) | `min(44vh, 30rem)` |  |  | 2 | calls-engine.css:346,349 |
+| `--gs-i-activity` | ok | gap-shell.css:12 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | gap-shell.css:101 |
+| `--gs-i-check` | ok | gap-shell.css:13 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | gap-shell.css:195 |
+| `--gs-i-export` | ok | gap-shell.css:14 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | gap-shell.css:196 |
+| `--gs-i-leave` | ok | gap-shell.css:16 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | gap-shell.css:197 |
+| `--gs-i-ledger` | ok | gap-shell.css:15 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | gap-shell.css:198 |
+| `--gw-bar-h` | ok | gap-watch.css:17<br>gap-watch.css:585 @@media (max-height: 520px) | `56px` |  |  | 1 | gap-watch.css:66 |
+| `--gw-control` | ok | gap-watch.css:18<br>gap-watch.css:27 @@media (hover: none), (pointer: coarse) | `36px` |  |  | 7 | gap-watch.css:78,79,254,358,375,417,518 |
+| `--gw-i-open` | ok | gap-watch.css:16 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 1 | gap-watch.css:23 |
+| `--gw-i-pause` | ok | gap-watch.css:15 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 1 | gap-watch.css:22 |
+| `--gw-i-play` | ok | gap-watch.css:14 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 1 | gap-watch.css:21 |
 | `--h` | runtime-written |  |  |  | Elm inline style View/Stats.elm:326<br>Elm inline style View/Stats.elm:539<br>Elm inline style View/Stats.elm:573<br>Elm inline style View/Stats.elm:1033 | 2 | pol-stats.css:716,810 |
 | `--heat` | runtime-written |  |  |  | Elm inline style View/Stats.elm:633 | 1 | pol-stats.css:831 |
-| `--ink` | theme-overridden | app.css:18 | `#000101` | `#202429` ocean<br>`#00060b` tide<br>`#000102` abyss<br>`#000407` reef<br>`#000101` onyx<br>`#000001` obsidian,ink<br>`#f5f0e5` pearl<br>`#080100` shu<br>`#000401` hisui<br>`#000300` pine<br>`#050200` kohaku<br>`#060100` terracotta,vermillion<br>`#000208` sapphire<br>`#000302` teal<br>`#040301` slate<br>`#e3f7fe` frost |  | 3 | pol-studio.css:1227,1390,1448 |
+| `--ink` | theme-overridden | app.css:37 | `#000101` | `#202429` ocean<br>`#00060b` tide<br>`#000102` abyss<br>`#000407` reef<br>`#000101` onyx<br>`#000001` obsidian,ink<br>`#f5f0e5` pearl<br>`#080100` shu<br>`#000401` hisui<br>`#000300` pine<br>`#050200` kohaku<br>`#060100` terracotta,vermillion<br>`#000208` sapphire<br>`#000302` teal<br>`#040301` slate<br>`#e3f7fe` frost |  | 3 | pol-studio.css:1221,1384,1442 |
 | `--ink-2` | theme-only, unused |  |  | `#262c32` ocean<br>`#000a11` tide<br>`#000103` abyss<br>`#00060a` reef<br>`#010203` onyx<br>`#000101` obsidian<br>`#f1ebe1` pearl<br>`#010102` ink<br>`#0b0201` shu<br>`#000601` hisui<br>`#010501` pine<br>`#080300` kohaku<br>`#0a0200` terracotta<br>`#0a0101` vermillion<br>`#00040d` sapphire<br>`#000603` teal<br>`#060503` slate<br>`#def2f8` frost |  | 0 |  |
-| `--kb-inset` | runtime-written | app.css:111 | `0px` |  | ports.js setProperty ports.js:9978 | 10 | app.css:2038,2039 · pol-stats.css:1056 · pol-studio.css:1782 · pol-public.css:1666 · ui-sheets.css:1042,1045,1047,1049,1078 |
-| `--lapis` | theme-overridden | app.css:30 | `#6996c5` | `#65adf5` ocean<br>`#00b8ed` tide<br>`#0091cb` abyss<br>`#0094bc` reef<br>`#6996c5` onyx<br>`#6a9eca` obsidian<br>`#0065b0` pearl<br>`#c9c3bc` ink<br>`#e74142` shu<br>`#00a149` hisui<br>`#3b9f32` pine<br>`#d98b09` kohaku<br>`#d55c27` terracotta<br>`#de5034` vermillion<br>`#0089ea` sapphire<br>`#009d82` teal<br>`#949d7b` slate<br>`#036884` frost |  | 4 | app.css:1860 · pol-studio.css:552,1449 · pol-public.css:581 |
-| `--lapis-bright` | theme-overridden | app.css:22 | `#9cc2ea` | `#65adf5` ocean<br>`#9ae0ff` tide<br>`#58c4ff` abyss<br>`#0bc9ff` reef<br>`#9cc2ea` onyx<br>`#9ecdf6` obsidian<br>`#086fbe` pearl<br>`#ece7e0` ink<br>`#ff958d` shu<br>`#5bd47d` hisui<br>`#79d070` pine<br>`#ffb75d` kohaku<br>`#ff9970` terracotta<br>`#ff9781` vermillion<br>`#7cbdff` sapphire<br>`#00d5b2` teal<br>`#bdc6a5` slate<br>`#2f7791` frost |  | 9 | app.css:1858,1861,2061,3148 · pol-studio.css:1291,1325,1385,1386,1422 |
-| `--lapis-deep` | theme-overridden | app.css:23 | `#385b7e` | `#397db8` ocean<br>`#007093` tide<br>`#005477` abyss<br>`#00556e` reef<br>`#385b7e` onyx<br>`#3c6588` obsidian<br>`#003e70` pearl<br>`#9d9892` ink<br>`#940014` shu<br>`#005e28` hisui<br>`#065f00` pine<br>`#8a5600` kohaku<br>`#832e00` terracotta<br>`#8e1900` vermillion<br>`#004f8b` sapphire<br>`#005b4b` teal<br>`#656c51` slate<br>`#003c4d` frost |  | 2 | pol-studio.css:556,1322 |
-| `--leading-body` | ok | app.css:65 | `1.5` |  |  | 39 | app.css×2 · pol-stats.css×19 · pol-studio.css×6 · pol-thread.css×7 · pol-public.css×3 · polish.css×1 · ui-sheets.css×1 |
-| `--leading-snug` | ok | app.css:64 | `1.35` |  |  | 41 | app.css×4 · pol-stats.css×10 · pol-studio.css×7 · pol-shell.css×3 · pol-thread.css×7 · pol-roster.css×2 · pol-public.css×3 · calls-c8.css×1 · calls-c11.css×1 · account2.css×1 · ui-sheets.css×2 |
-| `--leading-tight` | ok | app.css:63 | `1.15` |  |  | 23 | pol-stats.css:82,108,148,239,281,365,380,413,507,580,642,643,681 · pol-studio.css:88,564,572,993,998 · pol-shell.css:1052 · pol-thread.css:515,618,889 · pol-public.css:35 |
-| `--line` | theme-overridden | app.css:33 | `color-mix(in oklab, var(--paper) 40%, transparent)` | `color-mix(in oklab, var(--paper) 40%…` ocean<br>`color-mix(in oklab, var(--paper) 16%…` tide<br>`color-mix(in oklab, var(--paper) 11%…` abyss<br>`color-mix(in oklab, var(--paper) 14%…` reef,pine,terracotta,vermillion,sapphire,teal<br>`color-mix(in oklab, var(--paper) 13%…` onyx,slate<br>`color-mix(in oklab, var(--paper) 12%…` obsidian<br>`color-mix(in oklab, var(--lapis) 28%…` pearl,kohaku<br>`color-mix(in oklab, var(--lapis) 25%…` ink<br>`color-mix(in oklab, var(--shu) 18%, …` shu<br>`color-mix(in oklab, var(--lapis) 22%…` hisui<br>`color-mix(in oklab, var(--paper) 18%…` frost |  | 3 | app.css:1858,1871,1877 |
+| `--kb-inset` | runtime-written | app.css:158 | `0px` |  | ports.js setProperty ports.js:11889 | 12 | app.css:1854,1855,1882,1904 · pol-stats.css:1056 · pol-studio.css:1776 · pol-public.css:1666 · ui-sheets.css:1128,1136,1138,1142,1171 |
+| `--lapis` | theme-overridden | app.css:49 | `#6996c5` | `#65adf5` ocean<br>`#00b8ed` tide<br>`#0091cb` abyss<br>`#0094bc` reef<br>`#6996c5` onyx<br>`#6a9eca` obsidian<br>`#005fa7` pearl<br>`#c9c3bc` ink<br>`#e74142` shu<br>`#00a149` hisui<br>`#3b9f32` pine<br>`#d98b09` kohaku<br>`#d55c27` terracotta<br>`#de5034` vermillion<br>`#0089ea` sapphire<br>`#009d82` teal<br>`#949d7b` slate<br>`#036884` frost |  | 4 | app.css:1393 · pol-studio.css:546,1443 · pol-public.css:582 |
+| `--lapis-bright` | theme-overridden | app.css:41 | `#9cc2ea` | `#65adf5` ocean<br>`#9ae0ff` tide<br>`#58c4ff` abyss<br>`#0bc9ff` reef<br>`#9cc2ea` onyx<br>`#9ecdf6` obsidian<br>`#086fbe` pearl<br>`#ece7e0` ink<br>`#ff958d` shu<br>`#5bd47d` hisui<br>`#79d070` pine<br>`#ffb75d` kohaku<br>`#ff9970` terracotta<br>`#ff9781` vermillion<br>`#7cbdff` sapphire<br>`#00d5b2` teal<br>`#bdc6a5` slate<br>`#2f7791` frost |  | 7 | app.css:1391,1394 · pol-studio.css:1285,1319,1379,1380,1416 |
+| `--lapis-deep` | theme-overridden | app.css:42 | `#385b7e` | `#397db8` ocean<br>`#007093` tide<br>`#005477` abyss<br>`#00556e` reef<br>`#385b7e` onyx<br>`#3c6588` obsidian<br>`#003e70` pearl<br>`#9d9892` ink<br>`#940014` shu<br>`#005e28` hisui<br>`#065f00` pine<br>`#8a5600` kohaku<br>`#832e00` terracotta<br>`#8e1900` vermillion<br>`#004f8b` sapphire<br>`#005b4b` teal<br>`#656c51` slate<br>`#003c4d` frost |  | 2 | pol-studio.css:550,1316 |
+| `--leading-body` | ok | app.css:84 | `1.5` |  |  | 51 | app.css×2 · pol-stats.css×19 · pol-studio.css×5 · pol-thread.css×7 · pol-public.css×3 · polish.css×1 · gap-convo.css×1 · gap-oper.css×1 · gap-import.css×5 · gap-usermodes.css×1 · gap-shell.css×3 · gap-claim.css×2 · ui-sheets.css×1 |
+| `--leading-snug` | ok | app.css:83 | `1.35` |  |  | 100 | app.css×9 · pol-stats.css×10 · pol-studio.css×7 · pol-shell.css×3 · pol-thread.css×12 · pol-roster.css×2 · pol-public.css×3 · calls-c8.css×1 · calls-c11.css×1 · account2.css×1 · gap-convo.css×2 · gap-oper.css×9 · rx-shell.css×2 · gap-import.css×9 · gap-people.css×1 · gap-organize.css×2 · gap-usermodes.css×4 · gap-watch.css×9 · gap-shell.css×2 · gap-auth.css×1 · gap-claim.css×2 · ui-sheets.css×6 · calls-engine.css×2 |
+| `--leading-tight` | ok | app.css:82 | `1.15` |  |  | 25 | app.css:1547 · pol-stats.css:82,108,148,239,281,365,380,413,507,580,642,643,681 · pol-studio.css:87,558,566,987,992 · pol-shell.css:1019 · pol-thread.css:520,622,993 · pol-public.css:35 · gap-import.css:140 |
+| `--line` | theme-overridden | app.css:52 | `color-mix(in oklab, var(--paper) 40%, transparent)` | `color-mix(in oklab, var(--paper) 40%…` ocean<br>`color-mix(in oklab, var(--paper) 16%…` tide<br>`color-mix(in oklab, var(--paper) 11%…` abyss<br>`color-mix(in oklab, var(--paper) 14%…` reef,pine,terracotta,vermillion,sapphire,teal<br>`color-mix(in oklab, var(--paper) 13%…` onyx,slate<br>`color-mix(in oklab, var(--paper) 12%…` obsidian<br>`color-mix(in oklab, var(--lapis) 28%…` pearl,kohaku<br>`color-mix(in oklab, var(--lapis) 25%…` ink<br>`color-mix(in oklab, var(--shu) 18%, …` shu<br>`color-mix(in oklab, var(--lapis) 22%…` hisui<br>`color-mix(in oklab, var(--paper) 18%…` frost |  | 3 | app.css:1391,1404,1410 |
 | `--line-faint` | theme-only, unused |  |  | `color-mix(in oklab, var(--paper) 6%,…` ocean,onyx<br>`color-mix(in oklab, var(--paper) 8%,…` tide<br>`color-mix(in oklab, var(--paper) 5%,…` abyss,obsidian<br>`color-mix(in oklab, var(--gold) 12%,…` reef,terracotta,vermillion,sapphire<br>`color-mix(in oklab, var(--lapis) 12%…` pearl,kohaku<br>`color-mix(in oklab, var(--lapis) 10%…` ink,slate<br>`color-mix(in oklab, var(--shu) 8%, t…` shu<br>`color-mix(in oklab, var(--lapis) 9%,…` hisui<br>`color-mix(in oklab, var(--gold) 11%,…` pine,teal<br>`color-mix(in oklab, var(--gold) 14%,…` frost |  | 0 |  |
-| `--mobile-nav-h` | ok | app.css:95<br>pol-shell.css:1205 `.onyx-frame:not([data-convo="false"]):not([data-na` @@media (max-width: 767.98px) | `56px` |  |  | 8 | app.css:3879,3894 · pol-shell.css:1410,1416 · polish.css:371 · calls-c6.css:200 · ui-sheets.css:812,1049 |
-| `--nav-rail-w` | ok | app.css:92 | `56px` |  |  | 3 | app.css:3427,3522 · pol-shell.css:1141 |
-| `--nick-tint` | runtime-written | pol-thread.css:12 | `var(--onyx-line)` |  | Elm inline style View/Thread.elm:532<br>Elm inline style View/Thread.elm:890 | 2 | app.css:141 · pol-thread.css:926 |
-| `--ok` | theme-only |  |  | `#5bc78e` ocean,tide,abyss,reef,onyx,obsidian,ink,shu,hisui,pine,kohaku,terracotta,vermillion,sapphire,teal,slate<br>`#15915c` pearl,frost |  | 2 | pol-studio.css:1317 · src/View/Studio.elm:1001 |
-| `--onyx-accent` | ok | app.css:12 | `#46c08a` |  |  | 209 | app.css×114 · pol-stats.css×12 · pol-studio.css×13 · pol-shell.css×13 · pol-thread.css×12 · pol-public.css×26 · polish.css×4 · account2.css×4 · roomsettings.css×3 · calls-c6.css×1 · calls-c4.css×2 · ui-sheets.css×4 · calls-engine.css×1 |
-| `--onyx-accent-ink` | ok | app.css:13 | `#06281a` |  |  | 39 | app.css×17 · pol-stats.css×1 · pol-studio.css×3 · pol-shell.css×5 · pol-thread.css×4 · pol-public.css×4 · polish.css×1 · account2.css×2 · roomsettings.css×1 · ui-sheets.css×1 |
-| `--onyx-avatar-bg` | runtime-written | pol-thread.css:13 | `var(--onyx-panel-2)` |  | Elm inline style Avatar.elm:213 | 1 | app.css:127 |
-| `--onyx-avatar-fg` | runtime-written | pol-thread.css:14 | `var(--onyx-text)` |  | Elm inline style Avatar.elm:214 | 1 | app.css:126 |
-| `--onyx-bad` | ok | app.css:15 | `#e5484d` |  |  | 87 | app.css×33 · pol-stats.css×2 · pol-studio.css×9 · pol-shell.css×8 · pol-thread.css×11 · pol-public.css×4 · calls-c8.css×1 · account2.css×4 · roomsettings.css×2 · calls-c6.css×5 · calls-c4.css×4 · ui-sheets.css×4 |
-| `--onyx-bg` | ok | app.css:5 | `#0b0e12` |  |  | 98 | app.css×28 · pol-stats.css×4 · pol-studio.css×16 · pol-shell.css×13 · pol-thread.css×11 · pol-roster.css×1 · pol-public.css×10 · calls-c8.css×3 · calls-c11.css×1 · polish.css×2 · roomsettings.css×2 · calls-c4.css×4 · ui-sheets.css×3 |
-| `--onyx-dim` | ok | app.css:10<br>app.css:3145 `:root[data-high-contrast='true']` | `#9aa3ad` |  |  | 550 | app.css×189 · pol-stats.css×12 · pol-studio.css×39 · pol-shell.css×60 · pol-thread.css×75 · pol-roster.css×8 · pol-public.css×86 · calls-c8.css×9 · calls-c11.css×4 · polish.css×10 · account2.css×9 · roomsettings.css×13 · calls-c6.css×7 · calls-c4.css×8 · ui-sheets.css×21 |
-| `--onyx-faint` | ok | app.css:11<br>app.css:3146 `:root[data-high-contrast='true']` | `#5d6670` |  |  | 166 | app.css×60 · pol-stats.css×2 · pol-studio.css×23 · pol-shell.css×19 · pol-thread.css×7 · pol-roster.css×8 · pol-public.css×23 · calls-c8.css×3 · polish.css×3 · account2.css×1 · roomsettings.css×3 · calls-c6.css×2 · calls-c4.css×1 · ui-sheets.css×11 |
-| `--onyx-i-alert` | ok | ui-sheets.css:36 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:937,937 |
-| `--onyx-i-bell` | ok | ui-sheets.css:34 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 4 | ui-sheets.css:557,558,570,571 |
-| `--onyx-i-bolt` | ok | ui-sheets.css:31 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:455,456 |
-| `--onyx-i-check` | unused | ui-sheets.css:33 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
-| `--onyx-i-chevron` | ok | ui-sheets.css:32 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:641,642 |
-| `--onyx-i-close` | ok | ui-sheets.css:27 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 4 | ui-sheets.css:49,50,250,251 |
-| `--onyx-i-contrast` | ok | ui-sheets.css:37 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:945,946 |
-| `--onyx-i-hash` | ok | ui-sheets.css:29 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:458,458 |
-| `--onyx-i-link` | unused | ui-sheets.css:35 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
-| `--onyx-i-mail` | unused | ui-sheets.css:38 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
-| `--onyx-i-person` | ok | ui-sheets.css:30 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:459,459 |
-| `--onyx-i-search` | ok | ui-sheets.css:28 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:428,429 |
-| `--onyx-line` | ok | app.css:8<br>app.css:3144 `:root[data-high-contrast='true']` | `#232b36` |  |  | 498 | app.css×182 · pol-stats.css×8 · pol-studio.css×47 · pol-shell.css×41 · pol-thread.css×61 · pol-roster.css×6 · pol-public.css×76 · calls-c8.css×7 · calls-c11.css×4 · polish.css×11 · account2.css×8 · roomsettings.css×9 · calls-c6.css×2 · calls-c4.css×6 · ui-sheets.css×29 · calls-engine.css×1 |
-| `--onyx-nav-glyph` | ok | 5 definitions: app.css:2198,2199,2200,2201,2202 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | app.css:2194,2195 |
-| `--onyx-panel` | ok | app.css:6 | `#12161c` |  |  | 136 | app.css×46 · pol-stats.css×4 · pol-studio.css×14 · pol-shell.css×11 · pol-thread.css×18 · pol-roster.css×4 · pol-public.css×23 · calls-c8.css×2 · calls-c11.css×1 · polish.css×2 · account2.css×2 · calls-c6.css×1 · ui-sheets.css×7 · pol-ios.css×1 |
-| `--onyx-panel-2` | ok | app.css:7 | `#181e27` |  |  | 211 | app.css×61 · pol-stats.css×5 · pol-studio.css×18 · pol-shell.css×33 · pol-thread.css×40 · pol-roster.css×6 · pol-public.css×14 · calls-c8.css×2 · polish.css×4 · account2.css×2 · roomsettings.css×6 · calls-c6.css×1 · calls-c4.css×3 · ui-sheets.css×16 |
-| `--onyx-text` | ok | app.css:9 | `#e8e6e1` |  |  | 438 | app.css×152 · pol-stats.css×9 · pol-studio.css×52 · pol-shell.css×52 · pol-thread.css×56 · pol-roster.css×7 · pol-public.css×49 · calls-c8.css×10 · polish.css×10 · account2.css×8 · roomsettings.css×9 · calls-c6.css×1 · calls-c4.css×4 · ui-sheets.css×19 |
-| `--onyx-warn` | ok | app.css:14 | `#d9a13b` |  |  | 91 | app.css×40 · pol-stats.css×3 · pol-studio.css×11 · pol-shell.css×7 · pol-thread.css×6 · pol-public.css×4 · calls-c8.css×4 · calls-c11.css×6 · account2.css×3 · roomsettings.css×1 · calls-c4.css×5 · ui-sheets.css×1 |
-| `--pad-control` | unused | app.css:52 | `var(--space-3)` |  |  | 0 |  |
-| `--pad-panel` | ok | app.css:53 | `var(--space-4)` |  |  | 2 | app.css:3750 · account2.css:6 |
-| `--pad-panel-lg` | unused | app.css:54 | `var(--space-5)` |  |  | 0 |  |
-| `--paper` | theme-overridden | app.css:24 | `#eae8e0` | `#f5f7f8` ocean<br>`#d1e1e9` tide<br>`#d4e0e8` abyss<br>`#d2e1e8` reef<br>`#eae8e0` onyx<br>`#d6dfe7` obsidian<br>`#251e15` pearl<br>`#f0eae2` ink<br>`#ebdad5` shu<br>`#d6e2d8` hisui<br>`#d8e1d6` pine<br>`#e4ddd0` kohaku<br>`#e8dbd4` terracotta<br>`#eadad6` vermillion<br>`#d4e0eb` sapphire<br>`#d3e2dc` teal<br>`#eae7e2` slate<br>`#202b2e` frost |  | 9 | app.css:33 · pol-studio.css:1226,1287,1321,1334,1343,1362,1418,1481 |
-| `--paper-dim` | theme-overridden | app.css:25 | `#a4a19a` | `#b4bfca` ocean<br>`#8c9ba2` tide<br>`#8f9aa1` abyss<br>`#8d9ba2` reef<br>`#a4a19a` onyx<br>`#9199a1` obsidian<br>`#494136` pearl<br>`#a9a49c` ink<br>`#a49490` shu<br>`#919c92` hisui<br>`#939b91` pine<br>`#9e988b` kohaku<br>`#a1968f` terracotta<br>`#a39591` vermillion<br>`#8f9aa5` sapphire<br>`#8e9c97` teal<br>`#a7a49e` slate<br>`#546063` frost |  | 5 | app.css:1871,1873 · pol-studio.css:1312,1469,1491 |
-| `--paper-mute` | theme-only |  |  | `#b4bfca` ocean<br>`#536770` tide<br>`#56666f` abyss<br>`#54676f` reef<br>`#6e6c63` onyx<br>`#5a656e` obsidian<br>`#71675a` pearl<br>`#706b63` ink<br>`#725e59` shu<br>`#5a685b` hisui<br>`#5c675a` pine<br>`#6a6252` kohaku<br>`#6f6057` terracotta<br>`#715e5a` vermillion<br>`#576573` sapphire<br>`#556861` teal<br>`#716e68` slate<br>`#7a8d92` frost |  | 9 | pol-studio.css:1256,1300,1316,1326,1370,1413,1419,1477,1494 |
+| `--mobile-nav-h` | ok | 4 definitions: app.css:142 · pol-shell.css:1172 · rx-shell.css:391,576 (selectors in style-map.json) | `56px` |  |  | 5 | app.css:3436 · pol-shell.css:1378,1384 · polish.css:371 · ui-sheets.css:1142 |
+| `--nav-rail-w` | ok | app.css:136<br>rx-shell.css:650 @@media (min-width: 2400px) and (min-heig | `56px` |  |  | 5 | app.css:3107,3196 · pol-shell.css:1108 · pol-thread.css:2102 · rx-shell.css:542 |
+| `--nick-tint` | runtime-written | pol-thread.css:12 | `var(--onyx-line)` |  | Elm inline style View/Thread.elm:567<br>Elm inline style View/Thread.elm:955 | 2 | app.css:188 · pol-thread.css:1028 |
+| `--oc-fs` | ok | gap-oper.css:25 `.oper-desk` | `14px` |  |  | 25 | gap-oper.css:28,38,85,108,112,115,165,176,183,196,212,247,263,281,329,353,360,361,367,374,391,393,400,401,403 |
+| `--oc-fs-meta` | ok | gap-oper.css:26 `.oper-desk`<br>gap-oper.css:31 `.oper-desk` @@media (max-width: 400px) | `13px` |  |  | 16 | gap-oper.css:36,109,110,166,261,267,324,325,328,330,331,352,354,369,377,392 |
+| `--oc-gap` | ok | gap-oper.css:24 `.oper-desk` | `var(--space-3)` |  |  | 3 | gap-oper.css:103,122,172 |
+| `--ok` | theme-only |  |  | `#5bc78e` ocean,tide,abyss,reef,onyx,obsidian,ink,shu,hisui,pine,kohaku,terracotta,vermillion,sapphire,teal,slate<br>`#007347` pearl,frost |  | 2 | pol-studio.css:1311 · src/View/Studio.elm:1001 |
+| `--onyx-accent` | ok | 4 definitions: app.css:31 · gap-appearance.css:30,48,63 (selectors in style-map.json) | `#46c08a` |  |  | 227 | app.css×59 · gap-appearance.css×1 · pol-stats.css×12 · pol-studio.css×12 · pol-shell.css×13 · pol-thread.css×14 · pol-public.css×24 · polish.css×3 · account2.css×4 · roomsettings.css×3 · calls-c6.css×1 · calls-c4.css×2 · gap-convo.css×8 · gap-account.css×2 · gap-oper.css×13 · rx-shell.css×3 · gap-import.css×11 · gap-people.css×1 · gap-organize.css×11 · gap-usermodes.css×8 · gap-commands.css×2 · gap-watch.css×8 · gap-shell.css×1 · gap-auth.css×1 · gap-claim.css×4 · ui-sheets.css×4 · calls-engine.css×2 |
+| `--onyx-accent-ink` | ok | 4 definitions: app.css:32 · gap-appearance.css:31,49,64 (selectors in style-map.json) | `#06281a` |  |  | 49 | app.css×13 · pol-stats.css×1 · pol-studio.css×3 · pol-shell.css×5 · pol-thread.css×4 · pol-public.css×4 · polish.css×1 · account2.css×2 · roomsettings.css×1 · gap-account.css×1 · gap-oper.css×2 · rx-shell.css×1 · gap-import.css×1 · gap-organize.css×3 · gap-usermodes.css×2 · gap-watch.css×3 · gap-claim.css×1 · ui-sheets.css×1 |
+| `--onyx-avatar-bg` | runtime-written | pol-thread.css:13 | `var(--onyx-panel-2)` |  | Elm inline style Avatar.elm:213 | 1 | app.css:174 |
+| `--onyx-avatar-fg` | runtime-written | pol-thread.css:14 | `var(--onyx-text)` |  | Elm inline style Avatar.elm:214 | 1 | app.css:173 |
+| `--onyx-bad` | ok | 4 definitions: app.css:34 · gap-appearance.css:33,51,66 (selectors in style-map.json) | `#e5484d` |  |  | 149 | app.css×30 · pol-stats.css×2 · pol-studio.css×9 · pol-shell.css×6 · pol-thread.css×11 · pol-public.css×4 · calls-c8.css×1 · account2.css×4 · roomsettings.css×2 · calls-c6.css×5 · calls-c4.css×4 · gap-account.css×2 · gap-oper.css×12 · rx-shell.css×3 · gap-chanserv.css×4 · gap-import.css×4 · gap-people.css×5 · gap-organize.css×3 · gap-usermodes.css×2 · gap-watch.css×8 · gap-shell.css×6 · gap-claim.css×5 · ui-sheets.css×17 |
+| `--onyx-bad-ink` | ok | gap-appearance.css:34<br>gap-appearance.css:52 `:root[data-high-contrast='true']`<br>gap-appearance.css:67 @@media (prefers-contrast: more) | `var(--onyx-theme-bad-ink, #0b0e12)` |  |  | 2 | app.css:3006 · calls-c6.css:9 |
+| `--onyx-bg` | ok | app.css:24<br>gap-appearance.css:23 | `#0b0e12` |  |  | 132 | app.css×28 · gap-appearance.css×2 · pol-stats.css×4 · pol-studio.css×16 · pol-shell.css×11 · pol-thread.css×11 · pol-roster.css×1 · pol-public.css×10 · calls-c8.css×3 · calls-c11.css×1 · polish.css×2 · roomsettings.css×2 · calls-c4.css×4 · gap-convo.css×2 · gap-account.css×1 · gap-oper.css×4 · rx-shell.css×4 · gap-chanserv.css×1 · gap-import.css×1 · gap-people.css×1 · gap-organize.css×3 · gap-usermodes.css×1 · gap-commands.css×1 · gap-watch.css×2 · gap-shell.css×2 · gap-claim.css×1 · ui-sheets.css×7 · calls-engine.css×6 |
+| `--onyx-dim` | ok | 4 definitions: app.css:29 · gap-appearance.css:28,46,61 (selectors in style-map.json) | `#9aa3ad` |  |  | 680 | app.css×158 · gap-appearance.css×1 · pol-stats.css×12 · pol-studio.css×38 · pol-shell.css×57 · pol-thread.css×83 · pol-roster.css×8 · pol-public.css×88 · calls-c8.css×9 · calls-c11.css×4 · polish.css×10 · account2.css×9 · roomsettings.css×12 · calls-c6.css×7 · calls-c4.css×8 · gap-convo.css×7 · gap-account.css×5 · gap-oper.css×18 · rx-shell.css×12 · gap-chanserv.css×8 · gap-import.css×18 · gap-people.css×3 · gap-organize.css×22 · gap-usermodes.css×18 · gap-commands.css×3 · gap-watch.css×16 · gap-shell.css×11 · gap-claim.css×4 · ui-sheets.css×25 · calls-engine.css×6 |
+| `--onyx-faint` | ok | 4 definitions: app.css:30 · gap-appearance.css:29,47,62 (selectors in style-map.json) | `#606973` |  |  | 242 | app.css×48 · gap-appearance.css×2 · pol-stats.css×2 · pol-studio.css×23 · pol-shell.css×18 · pol-thread.css×12 · pol-roster.css×8 · pol-public.css×25 · calls-c8.css×3 · polish.css×3 · account2.css×1 · roomsettings.css×3 · calls-c6.css×2 · calls-c4.css×1 · gap-convo.css×1 · gap-account.css×2 · gap-oper.css×11 · rx-shell.css×5 · gap-chanserv.css×1 · gap-import.css×10 · gap-people.css×2 · gap-organize.css×20 · gap-usermodes.css×6 · gap-commands.css×3 · gap-watch.css×5 · gap-shell.css×10 · gap-auth.css×1 · gap-claim.css×3 · ui-sheets.css×11 |
+| `--onyx-focus` | ok | gap-appearance.css:38 | `var(--onyx-accent)` |  |  | 4 | app.css:1669 · gap-appearance.css:81,310 · pol-public.css:1408 |
+| `--onyx-i-alert` | ok | ui-sheets.css:50 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:1027,1027 |
+| `--onyx-i-bell` | ok | ui-sheets.css:48 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 4 | ui-sheets.css:653,654,666,667 |
+| `--onyx-i-bolt` | ok | ui-sheets.css:45 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:551,552 |
+| `--onyx-i-check` | unused | ui-sheets.css:47 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
+| `--onyx-i-chevron` | ok | ui-sheets.css:46 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 10 | gap-oper.css:159,160 · gap-usermodes.css:141,142,259,260 · ui-sheets.css:729,730,1607,1608 |
+| `--onyx-i-close` | ok | ui-sheets.css:41 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 4 | ui-sheets.css:71,72,351,352 |
+| `--onyx-i-contrast` | ok | ui-sheets.css:51 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:1035,1036 |
+| `--onyx-i-hash` | ok | ui-sheets.css:43 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:554,554 |
+| `--onyx-i-link` | unused | ui-sheets.css:49 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
+| `--onyx-i-mail` | unused | ui-sheets.css:52 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 0 |  |
+| `--onyx-i-person` | ok | ui-sheets.css:44 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 4 | gap-commands.css:173,173 · ui-sheets.css:555,555 |
+| `--onyx-i-search` | ok | ui-sheets.css:42 | `url("data:image/svg+xml;utf8,<svg xmlns='http://ww…` |  |  | 2 | ui-sheets.css:524,525 |
+| `--onyx-line` | ok | 4 definitions: app.css:27 · gap-appearance.css:26,44,59 (selectors in style-map.json) | `#232b36` |  |  | 627 | app.css×150 · gap-appearance.css×1 · pol-stats.css×8 · pol-studio.css×47 · pol-shell.css×38 · pol-thread.css×66 · pol-roster.css×6 · pol-public.css×79 · calls-c8.css×7 · calls-c11.css×4 · polish.css×11 · account2.css×8 · roomsettings.css×9 · calls-c6.css×2 · calls-c4.css×6 · gap-convo.css×7 · gap-account.css×6 · gap-oper.css×19 · rx-shell.css×6 · gap-chanserv.css×4 · gap-import.css×25 · gap-people.css×6 · gap-organize.css×17 · gap-usermodes.css×17 · gap-commands.css×2 · gap-watch.css×12 · gap-shell.css×13 · gap-auth.css×1 · gap-claim.css×6 · ui-sheets.css×37 · calls-engine.css×7 |
+| `--onyx-nav-glyph` | ok | 5 definitions: app.css:2043,2044,2045,2046 · rx-shell.css:37 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | app.css:2039,2040 |
+| `--onyx-panel` | ok | app.css:25<br>gap-appearance.css:24 | `#12161c` |  |  | 173 | app.css×41 · pol-stats.css×4 · pol-studio.css×14 · pol-shell.css×10 · pol-thread.css×23 · pol-roster.css×9 · pol-public.css×24 · calls-c8.css×2 · calls-c11.css×1 · polish.css×2 · account2.css×2 · calls-c6.css×1 · gap-convo.css×2 · gap-oper.css×8 · rx-shell.css×1 · gap-chanserv.css×1 · gap-import.css×6 · gap-organize.css×2 · gap-watch.css×2 · gap-shell.css×2 · gap-claim.css×1 · ui-sheets.css×10 · pol-ios.css×1 · calls-engine.css×4 |
+| `--onyx-panel-2` | ok | app.css:26<br>gap-appearance.css:25 | `#181e27` |  |  | 277 | app.css×54 · pol-stats.css×5 · pol-studio.css×18 · pol-shell.css×33 · pol-thread.css×42 · pol-roster.css×6 · pol-public.css×15 · calls-c8.css×2 · polish.css×4 · account2.css×2 · roomsettings.css×6 · calls-c6.css×1 · calls-c4.css×3 · gap-convo.css×6 · gap-oper.css×5 · rx-shell.css×8 · gap-chanserv.css×3 · gap-import.css×5 · gap-people.css×1 · gap-organize.css×15 · gap-usermodes.css×7 · gap-commands.css×3 · gap-watch.css×5 · gap-shell.css×6 · gap-auth.css×1 · gap-claim.css×2 · ui-sheets.css×17 · calls-engine.css×2 |
+| `--onyx-scene-alpha` | ok | 5 definitions: gap-appearance.css:271,274,278,280,282 (selectors in style-map.json) | `0.7` |  |  | 1 | gap-appearance.css:267 |
+| `--onyx-success` | ok | gap-appearance.css:36<br>gap-appearance.css:53 `:root[data-high-contrast='true']`<br>gap-appearance.css:68 @@media (prefers-contrast: more) | `var(--onyx-theme-success, #46c08a)` |  |  | 2 | app.css:1131 · ui-sheets.css:881 |
+| `--onyx-text` | ok | 4 definitions: app.css:28 · gap-appearance.css:27,45,60 (selectors in style-map.json) | `#e8e6e1` |  |  | 538 | app.css×132 · gap-appearance.css×2 · pol-stats.css×8 · pol-studio.css×52 · pol-shell.css×51 · pol-thread.css×62 · pol-roster.css×7 · pol-public.css×52 · calls-c8.css×10 · polish.css×10 · account2.css×7 · roomsettings.css×9 · calls-c6.css×1 · calls-c4.css×4 · gap-convo.css×5 · gap-account.css×1 · gap-oper.css×8 · rx-shell.css×7 · gap-chanserv.css×5 · gap-import.css×9 · gap-people.css×1 · gap-organize.css×20 · gap-usermodes.css×7 · gap-commands.css×4 · gap-watch.css×14 · gap-shell.css×14 · gap-auth.css×2 · gap-claim.css×5 · ui-sheets.css×25 · calls-engine.css×4 |
+| `--onyx-theme-accent` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:30 |
+| `--onyx-theme-accent-ink` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:31 |
+| `--onyx-theme-bad` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:33 |
+| `--onyx-theme-bad-ink` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:34 |
+| `--onyx-theme-bg` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:23 |
+| `--onyx-theme-dim` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:28 |
+| `--onyx-theme-faint` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:29 |
+| `--onyx-theme-hc-accent` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:48,63 |
+| `--onyx-theme-hc-accent-ink` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:49,64 |
+| `--onyx-theme-hc-bad` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:51,66 |
+| `--onyx-theme-hc-bad-ink` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:52,67 |
+| `--onyx-theme-hc-dim` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:46,61 |
+| `--onyx-theme-hc-faint` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:47,62 |
+| `--onyx-theme-hc-line` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:44,59 |
+| `--onyx-theme-hc-success` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:53,68 |
+| `--onyx-theme-hc-text` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:45,60 |
+| `--onyx-theme-hc-warn` | undefined-with-fallback |  |  |  |  | 2 | gap-appearance.css:50,65 |
+| `--onyx-theme-line` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:26 |
+| `--onyx-theme-panel` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:24 |
+| `--onyx-theme-panel-2` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:25 |
+| `--onyx-theme-success` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:36 |
+| `--onyx-theme-text` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:27 |
+| `--onyx-theme-warn` | undefined-with-fallback |  |  |  |  | 1 | gap-appearance.css:32 |
+| `--onyx-warn` | ok | 4 definitions: app.css:33 · gap-appearance.css:32,50,65 (selectors in style-map.json) | `#d9a13b` |  |  | 122 | app.css×40 · pol-stats.css×3 · pol-studio.css×11 · pol-shell.css×7 · pol-thread.css×6 · pol-public.css×4 · calls-c8.css×4 · calls-c11.css×6 · account2.css×3 · roomsettings.css×1 · calls-c4.css×5 · gap-convo.css×3 · gap-oper.css×4 · gap-chanserv.css×1 · gap-import.css×7 · gap-people.css×2 · gap-organize.css×3 · gap-usermodes.css×1 · gap-watch.css×2 · gap-shell.css×5 · gap-claim.css×2 · ui-sheets.css×1 · calls-engine.css×1 |
+| `--overlay-docked` | unused | pol-thread.css:2108 `.onyx-sheet-layer.onyx-thread-pop` @@media (min-width: 1100px) | `1` |  |  | 0 |  |
+| `--pad-control` | unused | app.css:71 | `var(--space-3)` |  |  | 0 |  |
+| `--pad-panel` | ok | app.css:72 | `var(--space-4)` |  |  | 2 | account2.css:6 · ui-sheets.css:103 |
+| `--pad-panel-lg` | unused | app.css:73 | `var(--space-5)` |  |  | 0 |  |
+| `--paper` | theme-overridden | app.css:43 | `#eae8e0` | `#f5f7f8` ocean<br>`#d1e1e9` tide<br>`#d4e0e8` abyss<br>`#d2e1e8` reef<br>`#eae8e0` onyx<br>`#d6dfe7` obsidian<br>`#251e15` pearl<br>`#f0eae2` ink<br>`#ebdad5` shu<br>`#d6e2d8` hisui<br>`#d8e1d6` pine<br>`#e4ddd0` kohaku<br>`#e8dbd4` terracotta<br>`#eadad6` vermillion<br>`#d4e0eb` sapphire<br>`#d3e2dc` teal<br>`#eae7e2` slate<br>`#202b2e` frost |  | 9 | app.css:52 · pol-studio.css:1220,1281,1315,1328,1337,1356,1412,1475 |
+| `--paper-dim` | theme-overridden | app.css:44 | `#a4a19a` | `#b4bfca` ocean<br>`#8c9ba2` tide<br>`#8f9aa1` abyss<br>`#8d9ba2` reef<br>`#a4a19a` onyx<br>`#9199a1` obsidian<br>`#494136` pearl<br>`#a9a49c` ink<br>`#a49490` shu<br>`#919c92` hisui<br>`#939b91` pine<br>`#9e988b` kohaku<br>`#a1968f` terracotta<br>`#a39591` vermillion<br>`#8f9aa5` sapphire<br>`#8e9c97` teal<br>`#a7a49e` slate<br>`#4c575a` frost |  | 5 | app.css:1404,1406 · pol-studio.css:1306,1463,1485 |
+| `--paper-mute` | theme-only |  |  | `#b4bfca` ocean<br>`#5b7079` tide<br>`#56666f` abyss<br>`#54676f` reef<br>`#6e6c63` onyx<br>`#5a656e` obsidian<br>`#71675a` pearl<br>`#706b63` ink<br>`#725e59` shu<br>`#5a685b` hisui<br>`#5c675a` pine<br>`#6d6555` kohaku<br>`#6f6057` terracotta<br>`#715e5a` vermillion<br>`#576573` sapphire<br>`#556861` teal<br>`#716e68` slate<br>`#65787d` frost |  | 9 | pol-studio.css:1250,1294,1310,1320,1364,1407,1413,1471,1488 |
 | `--pg-bad` | ok | pol-stats.css:22 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `var(--onyx-bad)` |  |  | 1 | pol-stats.css:460 |
 | `--pg-bar` | ok | pol-stats.css:23 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `color-mix(in oklab, var(--onyx-text) 58%, var(--on…` |  |  | 3 | pol-stats.css:718,812,911 |
 | `--pg-dim` | ok | pol-stats.css:18 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `var(--onyx-dim)` |  |  | 29 | pol-stats.css:70,422,463,470,484,514,538,591,601,605,621,644,676,769,792,819,839,841,852,858,881,891,900,907,916,926,960,961,976 |
@@ -873,103 +979,129 @@ Status legend: `ok` defined in CSS and used; `theme-overridden` defined in CSS *
 | `--pg-select` | ok | pol-stats.css:24 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `color-mix(in oklab, var(--onyx-accent) 10%, transp…` |  |  | 2 | pol-stats.css:689,974 |
 | `--pg-text` | ok | pol-stats.css:17 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `var(--onyx-text)` |  |  | 24 | pol-stats.css:27,57,104,489,502,545,600,626,685,688,720,729,768,794,820,831,880,883,905,908,912,933,959,969 |
 | `--pg-warn` | ok | pol-stats.css:21 `.ui-root.r:is(.stats-page, .status-route, .roadmap` | `var(--onyx-warn)` |  |  | 5 | pol-stats.css:458,603,699,770,842 |
-| `--pip-ix` | runtime-written |  |  |  | Elm inline style View/CallDock.elm:338 | 4 | calls-c6.css:109,114,119,124 |
-| `--pip-iy` | runtime-written |  |  |  | Elm inline style View/CallDock.elm:339 | 4 | calls-c6.css:110,115,120,125 |
-| `--pt-glyph` | ok | 27 definitions: pol-thread.css:66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92 (selectors in style-map.json) | `var(--pt-i-react)` |  |  | 2 | pol-thread.css:33,34 |
-| `--pt-gutter` | ok | pol-thread.css:17<br>pol-thread.css:1891 @@media (max-width: 767.98px) | `calc(2rem + var(--space-2) + var(--space-3))` |  |  | 4 | pol-thread.css:100,144,488,559 |
-| `--pt-hover` | ok | pol-thread.css:15 | `color-mix(in oklab, var(--onyx-panel) 72%, transpa…` |  |  | 2 | pol-thread.css:114,193 |
-| `--pt-i-arrow-down` | ok | pol-thread.css:48 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:76 |
-| `--pt-i-attach` | ok | pol-thread.css:44 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:72 · polish.css:83 |
-| `--pt-i-calendar` | ok | pol-thread.css:54 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:82 · polish.css:85 |
-| `--pt-i-chart` | ok | pol-thread.css:55 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:83 · polish.css:87 |
-| `--pt-i-check` | ok | pol-thread.css:46 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:74 |
-| `--pt-i-chevron-down` | ok | pol-thread.css:50 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:78 |
-| `--pt-i-chevron-up` | ok | pol-thread.css:49 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:77 |
-| `--pt-i-clock` | ok | pol-thread.css:53 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:81 · polish.css:84 |
-| `--pt-i-download` | ok | pol-thread.css:59 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:87 |
-| `--pt-i-emoji` | ok | pol-thread.css:39 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:67 · polish.css:86 |
-| `--pt-i-file` | ok | pol-thread.css:52 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:80 |
-| `--pt-i-hash` | ok | pol-thread.css:61 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:89 |
-| `--pt-i-image` | ok | pol-thread.css:57 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:85 |
-| `--pt-i-link` | ok | pol-thread.css:58 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:86 |
-| `--pt-i-lock` | ok | pol-thread.css:64 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:92 |
-| `--pt-i-message` | ok | pol-thread.css:63 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:91 |
-| `--pt-i-more` | ok | pol-thread.css:42 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 3 | pol-thread.css:70,573,574 |
-| `--pt-i-people` | ok | pol-thread.css:62 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:90 |
-| `--pt-i-pin` | ok | pol-thread.css:60 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:88 |
-| `--pt-i-plus` | ok | pol-thread.css:43 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 5 | pol-thread.css:71,1096,1097 · polish.css:78,79 |
-| `--pt-i-react` | ok | pol-thread.css:38 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:66 |
-| `--pt-i-reply` | ok | pol-thread.css:40 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:68 |
-| `--pt-i-search` | ok | pol-thread.css:51 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:79 |
-| `--pt-i-send` | ok | pol-thread.css:45 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:73 |
-| `--pt-i-slash` | ok | pol-thread.css:56 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:84 |
-| `--pt-i-thread` | ok | pol-thread.css:41 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:69 |
-| `--pt-i-x` | ok | pol-thread.css:47 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:75 |
-| `--pt-seam` | ok | pol-thread.css:16 | `color-mix(in oklab, var(--onyx-line) 55%, var(--on…` |  |  | 3 | pol-thread.css:704,741,760 |
-| `--pub-gutter` | ok | pol-public.css:15 `.public-frame`<br>pol-public.css:257 `.public-frame` @@media (max-width: 768px)<br>pol-public.css:343 `.public-frame` @@media (max-width: 359px) | `var(--space-6, 24px)` |  |  | 10 | pol-public.css:87,87,174,174,194,194,210,283,1302,1303 |
-| `--pub-header-h` | ok | pol-public.css:16 `.public-frame`<br>pol-public.css:257 `.public-frame` @@media (max-width: 768px) | `64px` |  |  | 9 | pol-public.css:85,271,906,995,1050,1051,1177,1262,1455 |
-| `--pub-i-arrow` | ok | pol-public.css:19 `.public-frame` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 6 | pol-public.css:464,465,614,615,711,712 |
-| `--pub-i-chevron` | ok | pol-public.css:18 `.public-frame` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 7 | pol-public.css:329,330,632,734,735,1146,1147 |
+| `--pip-ix` | undefined-with-fallback |  |  |  |  | 4 | calls-c6.css:102,107,112,117 |
+| `--pip-iy` | undefined-with-fallback |  |  |  |  | 5 | calls-c6.css:103,108,113,118 · calls-engine.css:493 |
+| `--pt-compact-ts` | ok | pol-thread.css:2052 | `3.25rem` |  |  | 5 | pol-thread.css:2235,2236,2243,2276,2277 |
+| `--pt-glyph` | ok | 32 definitions: pol-thread.css:68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96 · gap-watch.css:21,22,23 (selectors in style-map.json) | `var(--pt-i-react)` |  |  | 2 | pol-thread.css:33,34 |
+| `--pt-gutter` | ok | 4 definitions: gap-appearance.css:185,189 · pol-thread.css:17,2011 (selectors in style-map.json) | `calc(1.5rem + var(--space-2) + var(--space-2))` |  |  | 4 | pol-thread.css:104,148,494,564 |
+| `--pt-hover` | ok | pol-thread.css:15 | `color-mix(in oklab, var(--onyx-panel) 72%, transpa…` |  |  | 3 | pol-thread.css:118,197 · gap-convo.css:255 |
+| `--pt-i-arrow-down` | ok | pol-thread.css:48 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:78 |
+| `--pt-i-attach` | ok | pol-thread.css:44 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:74 · polish.css:83 |
+| `--pt-i-calendar` | ok | pol-thread.css:54 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:84 · polish.css:85 |
+| `--pt-i-chart` | ok | pol-thread.css:55 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:85 · polish.css:87 |
+| `--pt-i-check` | ok | pol-thread.css:46 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:76 |
+| `--pt-i-chevron-down` | ok | pol-thread.css:50 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:80 |
+| `--pt-i-chevron-up` | ok | pol-thread.css:49 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:79 |
+| `--pt-i-clock` | ok | pol-thread.css:53 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:83 · polish.css:84 |
+| `--pt-i-download` | ok | pol-thread.css:59 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 3 | pol-thread.css:89,751,752 |
+| `--pt-i-emoji` | ok | pol-thread.css:39 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-thread.css:69 · polish.css:86 |
+| `--pt-i-file` | ok | pol-thread.css:52 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:82 |
+| `--pt-i-hash` | ok | pol-thread.css:61 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:91 |
+| `--pt-i-image` | ok | pol-thread.css:57 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:87 |
+| `--pt-i-link` | ok | pol-thread.css:58 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:88 |
+| `--pt-i-lock` | ok | pol-thread.css:66 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:94 |
+| `--pt-i-message` | ok | pol-thread.css:63 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:93 |
+| `--pt-i-more` | ok | pol-thread.css:42 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 3 | pol-thread.css:72,578,579 |
+| `--pt-i-people` | ok | pol-thread.css:62 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:92 |
+| `--pt-i-pin` | ok | pol-thread.css:60 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:90 |
+| `--pt-i-plus` | ok | pol-thread.css:43 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 5 | pol-thread.css:73,1198,1199 · polish.css:78,79 |
+| `--pt-i-react` | ok | pol-thread.css:38 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:68 |
+| `--pt-i-reply` | ok | pol-thread.css:40 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:70 |
+| `--pt-i-search` | ok | pol-thread.css:51 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:81 |
+| `--pt-i-send` | ok | pol-thread.css:45 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:75 |
+| `--pt-i-slash` | ok | pol-thread.css:56 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:86 |
+| `--pt-i-thread` | ok | pol-thread.css:41 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:71 |
+| `--pt-i-x` | ok | pol-thread.css:47 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:77 |
+| `--pt-i-zoom-in` | ok | pol-thread.css:64 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:95 |
+| `--pt-i-zoom-out` | ok | pol-thread.css:65 | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 1 | pol-thread.css:96 |
+| `--pt-measure` | ok | gap-appearance.css:218 `:root[data-width='full']`<br>pol-thread.css:2050<br>pol-thread.css:2079 @@media (min-width: 2200px) and (min-heig | `none` |  |  | 5 | pol-thread.css:1430,2058,2063,2065,2066 |
+| `--pt-seam` | ok | pol-thread.css:16 | `color-mix(in oklab, var(--onyx-line) 55%, var(--on…` |  |  | 5 | pol-thread.css:708,754,773,2181,2561 |
+| `--pt-thread-w` | ok | pol-thread.css:2051 | `clamp(320px, 28vw, 420px)` |  |  | 2 | pol-thread.css:2102,2113 |
+| `--pub-gutter` | ok | pol-public.css:15 `.public-frame`<br>pol-public.css:257 `.public-frame` @@media (max-width: 767.98px)<br>pol-public.css:343 `.public-frame` @@media (max-width: 359px) | `var(--space-6, 24px)` |  |  | 12 | pol-public.css:87,87,174,174,194,194,210,283,1303,1304,1811,1812 |
+| `--pub-header-h` | ok | 4 definitions: pol-public.css:16,257,1692,1780 (selectors in style-map.json) | `64px` |  |  | 11 | pol-public.css:85,271,907,996,1051,1052,1178,1263,1455,1771,1817 |
+| `--pub-i-arrow` | ok | pol-public.css:19 `.public-frame` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 6 | pol-public.css:464,465,615,616,712,713 |
+| `--pub-i-chevron` | ok | pol-public.css:18 `.public-frame` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 9 | pol-public.css:329,330,633,735,736,1147,1148,1748,1749 |
 | `--pub-i-refresh` | ok | pol-public.css:468 `.pub-refresh` | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 2 | pol-public.css:469,470 |
-| `--pub-measure` | ok | pol-public.css:14 `.public-frame` | `var(--shell-measure, 1180px)` |  |  | 4 | pol-public.css:84,174,191,208 |
-| `--r-0` | theme-only, unused |  |  | `0px` all |  | 0 |  |
-| `--r-md` | theme-only, unused |  |  | `8px` ocean,abyss<br>`12px` tide<br>`11px` reef<br>`4px` onyx,pearl,shu,hisui,kohaku<br>`3px` obsidian<br>`2px` ink<br>`7px` pine<br>`9px` terracotta,slate<br>`6px` vermillion<br>`5px` sapphire<br>`13px` teal<br>`10px` frost |  | 0 |  |
-| `--r-pill` | theme-overridden | app.css:34 | `999px` | `999px` all |  | 35 | app.css×2 · pol-stats.css×5 · pol-studio.css×9 · pol-shell.css×9 · pol-thread.css×8 · pol-roster.css×1 · account2.css×1 |
-| `--r-sm` | theme-only, unused |  |  | `4px` ocean,terracotta,slate<br>`6px` tide,teal<br>`3px` abyss,pine,vermillion<br>`5px` reef,frost<br>`2px` onyx,pearl,shu,hisui,kohaku,sapphire<br>`1px` obsidian<br>`0px` ink |  | 0 |  |
-| `--radius` | ok | app.css:83 | `6px` |  |  | 293 | app.css×83 · pol-stats.css×16 · pol-studio.css×25 · pol-shell.css×25 · pol-thread.css×44 · pol-roster.css×5 · pol-public.css×41 · calls-c8.css×8 · calls-c11.css×3 · account2.css×5 · roomsettings.css×9 · calls-c6.css×3 · calls-c4.css×4 · ui-sheets.css×20 · calls-engine.css×2 |
-| `--room-heat` | runtime-written |  |  |  | Elm inline style View/RoomSettings.elm:1177 | 1 | roomsettings.css:340 |
-| `--safe-bottom` | ok | app.css:109 | `env(safe-area-inset-bottom, 0px)` |  |  | 9 | pol-shell.css:1206,1289,1411 · pol-thread.css:360,952 · pol-roster.css:349,367 · pol-ios.css:92,100 |
-| `--safe-left` | ok | app.css:110 | `env(safe-area-inset-left, 0px)` |  |  | 1 | pol-ios.css:84 |
-| `--safe-right` | ok | app.css:108 | `env(safe-area-inset-right, 0px)` |  |  | 1 | pol-ios.css:85 |
-| `--safe-top` | ok | app.css:107 | `env(safe-area-inset-top, 0px)` |  |  | 6 | pol-roster.css:349,365,366 · pol-ios.css:83,86,121 |
+| `--pub-measure` | ok | pol-public.css:14 `.public-frame`<br>pol-public.css:1692 `.public-frame` @@media (min-width: 1700px)<br>pol-public.css:1698 `.public-frame` @@media (min-width: 2400px) | `var(--shell-measure, 1180px)` |  |  | 4 | pol-public.css:84,174,191,208 |
+| `--r-0` | theme-only |  |  | `0px` all |  | 1 | gap-appearance.css:108 |
+| `--r-md` | theme-only |  |  | `8px` ocean,abyss<br>`12px` tide<br>`11px` reef<br>`4px` onyx,pearl,shu,hisui,kohaku<br>`3px` obsidian<br>`2px` ink<br>`7px` pine<br>`9px` terracotta,slate<br>`6px` vermillion<br>`5px` sapphire<br>`13px` teal<br>`10px` frost |  | 1 | gap-appearance.css:108 |
+| `--r-pill` | theme-overridden | app.css:53 | `999px` | `999px` all |  | 39 | app.css×2 · pol-stats.css×5 · pol-studio.css×9 · pol-shell.css×9 · pol-thread.css×9 · pol-roster.css×1 · account2.css×1 · gap-organize.css×3 |
+| `--r-sm` | theme-only |  |  | `4px` ocean,terracotta,slate<br>`6px` tide,teal<br>`3px` abyss,pine,vermillion<br>`5px` reef,frost<br>`2px` onyx,pearl,shu,hisui,kohaku,sapphire<br>`1px` obsidian<br>`0px` ink |  | 1 | gap-appearance.css:108 |
+| `--radius` | ok | app.css:127<br>gap-appearance.css:108 | `6px` |  |  | 397 | app.css×74 · gap-appearance.css×1 · pol-stats.css×16 · pol-studio.css×25 · pol-shell.css×24 · pol-thread.css×50 · pol-roster.css×5 · pol-public.css×41 · calls-c8.css×8 · calls-c11.css×3 · account2.css×5 · roomsettings.css×9 · calls-c6.css×3 · calls-c4.css×4 · gap-convo.css×6 · gap-account.css×2 · gap-oper.css×16 · rx-shell.css×9 · gap-chanserv.css×7 · gap-import.css×11 · gap-people.css×2 · gap-organize.css×15 · gap-usermodes.css×7 · gap-commands.css×2 · gap-watch.css×11 · gap-shell.css×11 · gap-auth.css×1 · gap-claim.css×3 · ui-sheets.css×24 · calls-engine.css×2 |
+| `--room-heat` | runtime-written |  |  |  | Elm inline style View/RoomSettings.elm:1172 | 1 | roomsettings.css:338 |
+| `--rows` | ok | 4 definitions: calls-engine.css:338,339,340,341 (selectors in style-map.json) | `1` |  |  | 2 | calls-engine.css:346,346 |
+| `--rs-filter` | ok | pol-roster.css:411 `.onyx-roster`<br>pol-roster.css:414 `.onyx-roster:has(.onyx-roster-filter--open), .onyx`<br>pol-roster.css:455 `.onyx-roster:has(.onyx-roster-filter--open), .onyx` @@media (hover: none), (max-width: 599.98 | `0px` |  |  | 1 | pol-roster.css:440 |
+| `--rs-head` | ok | pol-roster.css:410 `.onyx-roster`<br>pol-roster.css:453 `.onyx-roster` @@media (hover: none), (max-width: 599.98 | `36px` |  |  | 3 | pol-roster.css:421,427,440 |
+| `--rx-surround` | ok | rx-shell.css:31 | `color-mix(in oklab, var(--onyx-bg) 72%, #000)` |  |  | 1 | rx-shell.css:633 |
+| `--safe-bottom` | ok | app.css:156 | `env(safe-area-inset-bottom, 0px)` |  |  | 16 | pol-shell.css:1173,1257,1379 · pol-thread.css:366,857,1054,2362 · pol-roster.css:345,363 · rx-shell.css:380,381,382,510,527 · pol-ios.css:92,100 |
+| `--safe-left` | ok | app.css:157 | `env(safe-area-inset-left, 0px)` |  |  | 3 | pol-thread.css:857 · rx-shell.css:542 · pol-ios.css:84 |
+| `--safe-right` | ok | app.css:155 | `env(safe-area-inset-right, 0px)` |  |  | 3 | pol-thread.css:857,891 · pol-ios.css:85 |
+| `--safe-top` | ok | app.css:154 | `env(safe-area-inset-top, 0px)` |  |  | 8 | pol-thread.css:857,890 · pol-roster.css:345,361,362 · pol-ios.css:83,86,121 |
 | `--scrub-heat` | ok | polish.css:208 `.time-scrubber__bar` | `0` |  |  | 1 | polish.css:224 |
-| `--seam` | theme-only |  |  | `color-mix(in oklab, var(--lapis) 28%…` ocean,slate<br>`color-mix(in oklab, var(--lapis) 50%…` tide<br>`color-mix(in oklab, var(--lapis) 36%…` abyss,kohaku,teal<br>`color-mix(in oklab, var(--lapis) 40%…` reef,shu,terracotta,vermillion,sapphire<br>`color-mix(in oklab, var(--gold) 40%,…` onyx<br>`color-mix(in oklab, var(--lapis) 30%…` obsidian<br>`color-mix(in oklab, var(--gold) 55%,…` pearl<br>`color-mix(in oklab, var(--paper) 16%…` ink<br>`color-mix(in oklab, var(--lapis) 38%…` hisui,pine<br>`color-mix(in oklab, var(--lapis) 34%…` frost |  | 1 | pol-studio.css:1228 |
-| `--seam-faint` | theme-only |  |  | `color-mix(in oklab, var(--lapis) 12%…` ocean,obsidian,slate<br>`color-mix(in oklab, var(--lapis) 20%…` tide<br>`color-mix(in oklab, var(--lapis) 13%…` abyss<br>`color-mix(in oklab, var(--lapis) 16%…` reef,shu,terracotta,vermillion,sapphire<br>`color-mix(in oklab, var(--gold) 15%,…` onyx<br>`color-mix(in oklab, var(--gold) 24%,…` pearl<br>`color-mix(in oklab, var(--paper) 7%,…` ink<br>`color-mix(in oklab, var(--lapis) 15%…` hisui,pine,kohaku,teal<br>`color-mix(in oklab, var(--lapis) 14%…` frost |  | 6 | pol-studio.css:1238,1277,1278,1288,1359,1465 |
-| `--sheet-close` | ok | 4 definitions: ui-sheets.css:23,292,433,841 (selectors in style-map.json) | `36px` |  |  | 4 | ui-sheets.css:224,225,226,227 |
-| `--sheet-grip-zone` | ok | ui-sheets.css:24 | `22px` |  |  | 9 | ui-sheets.css:315,325,343,855,911,912,912,968,1082 |
-| `--sheet-head-pad` | ok | ui-sheets.css:17 | `14px` |  |  | 4 | ui-sheets.css:158,586,591,721 |
-| `--sheet-max-h` | ok | 4 definitions: ui-sheets.css:22,293,399,1037 (selectors in style-map.json) | `min(calc(100dvh - 64px), 860px)` |  |  | 5 | ui-sheets.css:65,307,667,872,1081 |
-| `--sheet-pad` | ok | ui-sheets.css:15<br>ui-sheets.css:291 @@media (max-width: 767.98px) | `20px` |  |  | 31 | pol-shell.css×1 · ui-sheets.css×30 |
-| `--sheet-top` | unused | ui-sheets.css:16 | `var(--sheet-pad)` |  |  | 0 |  |
-| `--sheet-veil` | ok | ui-sheets.css:25 | `color-mix(in srgb, #000 58%, transparent)` |  |  | 5 | ui-sheets.css:60,407,849,957,1058 |
-| `--sheet-w-lg` | ok | ui-sheets.css:20 | `760px` |  |  | 2 | ui-sheets.css:111,679 |
-| `--sheet-w-md` | ok | ui-sheets.css:19 | `560px` |  |  | 1 | ui-sheets.css:104 |
-| `--sheet-w-side` | ok | ui-sheets.css:21 | `440px` |  |  | 1 | ui-sheets.css:114 |
-| `--sheet-w-sm` | ok | ui-sheets.css:18 | `440px` |  |  | 1 | ui-sheets.css:109 |
-| `--shell-measure` | ok | app.css:91 | `1180px` |  |  | 2 | app.css:3480 · pol-public.css:14 |
-| `--shi` | ok | 23 definitions: pol-shell.css:527,528,529,530,531,532,533,534,535,536,537,538,554,555,556,557,558,559,560,561,562,563,982 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 4 | pol-shell.css:524,525,551,552 |
-| `--shu` | theme-overridden | app.css:31 | `#e95145` | `#ff6f61` ocean<br>`#ff7a6c` tide<br>`#f0594b` abyss<br>`#ff6f5e` reef<br>`#e95145` onyx<br>`#e95047` obsidian,pine,sapphire<br>`#c83319` pearl<br>`#d8412c` ink<br>`#e9523b` shu<br>`#e95146` hisui<br>`#e85336` kohaku<br>`#e8523b` terracotta<br>`#e95144` vermillion<br>`#e95049` teal<br>`#e9523c` slate<br>`#c92f34` frost |  | 6 | app.css:1878 · pol-studio.css:554,1391,1455 · pol-public.css:583 · src/View/Studio.elm:999 |
-| `--shu-bright` | theme-overridden | app.css:32 | `#ff7f71` | `#ff9484` ocean<br>`#ffa193` tide<br>`#ff7c6e` abyss<br>`#ff9a86` reef<br>`#ff7f71` onyx,hisui<br>`#ff7f72` obsidian,pine,sapphire<br>`#e5462b` pearl<br>`#ff5d44` ink<br>`#ff806a` shu,slate<br>`#ff8066` kohaku<br>`#ff8069` terracotta<br>`#ff7f70` vermillion<br>`#ff7f74` teal<br>`#e64344` frost |  | 3 | app.css:1877,1879 · pol-studio.css:1453 |
-| `--sidebar-w` | ok | app.css:93<br>app.css:3527 @@media (max-width: 959.98px) | `280px` |  |  | 3 | app.css:3427,3522 · pol-shell.css:1141 |
-| `--space-0` | unused | app.css:40 | `0` |  |  | 0 |  |
-| `--space-1` | ok | app.css:41 | `0.25rem` |  |  | 242 | app.css×59 · pol-stats.css×12 · pol-studio.css×11 · pol-shell.css×31 · pol-thread.css×48 · pol-roster.css×7 · pol-public.css×19 · calls-c8.css×7 · calls-c11.css×2 · polish.css×7 · account2.css×6 · roomsettings.css×11 · calls-c6.css×4 · calls-c4.css×8 · ui-sheets.css×7 · calls-engine.css×3 |
-| `--space-2` | ok | app.css:42 | `0.5rem` |  |  | 576 | app.css×106 · pol-stats.css×41 · pol-studio.css×43 · pol-shell.css×79 · pol-thread.css×86 · pol-roster.css×18 · pol-public.css×56 · calls-c8.css×13 · calls-c11.css×10 · polish.css×15 · account2.css×16 · roomsettings.css×23 · calls-c6.css×14 · calls-c4.css×9 · ui-sheets.css×34 · pol-ios.css×1 · calls-engine.css×12 |
-| `--space-3` | ok | app.css:43 | `0.75rem` |  |  | 411 | app.css×81 · pol-stats.css×50 · pol-studio.css×35 · pol-shell.css×43 · pol-thread.css×55 · pol-roster.css×5 · pol-public.css×63 · calls-c8.css×5 · calls-c11.css×7 · polish.css×16 · account2.css×3 · roomsettings.css×8 · calls-c6.css×11 · calls-c4.css×2 · ui-sheets.css×26 · pol-ios.css×1 |
-| `--space-4` | ok | app.css:44 | `1rem` |  |  | 259 | app.css×31 · pol-stats.css×37 · pol-studio.css×33 · pol-shell.css×19 · pol-thread.css×18 · pol-roster.css×4 · pol-public.css×78 · calls-c11.css×5 · polish.css×5 · calls-c6.css×3 · ui-sheets.css×26 |
-| `--space-5` | ok | app.css:45 | `1.25rem` |  |  | 86 | app.css×9 · pol-stats.css×9 · pol-studio.css×13 · pol-shell.css×2 · pol-thread.css×2 · pol-public.css×42 · calls-c8.css×1 · calls-c6.css×2 · ui-sheets.css×6 |
-| `--space-6` | ok | app.css:46 | `1.5rem` |  |  | 66 | app.css×9 · pol-stats.css×5 · pol-studio.css×1 · pol-shell.css×2 · pol-thread.css×2 · pol-roster.css×2 · pol-public.css×36 · calls-c6.css×2 · ui-sheets.css×7 |
-| `--space-7` | ok | app.css:47 | `2rem` |  |  | 30 | app.css:2295 · pol-stats.css:49,138,232,271,402,404,404 · pol-studio.css:617 · pol-thread.css:495 · pol-public.css:206,337,356,357,526,626,656,683,748,826,962,978,978,989,1419,1445,1457,1581,1622 · ui-sheets.css:546 |
-| `--space-8` | ok | app.css:48 | `2.5rem` |  |  | 24 | app.css:1896,2042,2369,2892 · pol-stats.css:334 · pol-shell.css:1050,1050,1070,1434 · pol-public.css:283,503,769,819,821,979,1176,1511,1541,1561,1566,1611,1614,1620 · calls-c6.css:242 |
-| `--stone` | theme-overridden | app.css:19 | `#050709` | `#2d333a` ocean<br>`#051820` tide<br>`#010508` abyss<br>`#010f16` reef<br>`#050709` onyx<br>`#020304` obsidian<br>`#e5e0d6` pearl<br>`#030405` ink<br>`#160705` shu<br>`#040f06` hisui<br>`#060e05` pine<br>`#130b01` kohaku<br>`#140904` terracotta<br>`#140604` vermillion<br>`#020b16` sapphire<br>`#010f0a` teal<br>`#110e0a` slate<br>`#d0e4ea` frost |  | 3 | pol-studio.css:1237,1274,1464 |
-| `--stone-2` | theme-overridden | app.css:20 | `#0d0f12` | `#343b43` ocean<br>`#12262e` tide<br>`#050c10` abyss<br>`#081a21` reef<br>`#0d0f12` onyx<br>`#07090a` obsidian<br>`#dbd6cc` pearl<br>`#08090c` ink<br>`#21100d` shu<br>`#0c190f` hisui<br>`#0e170d` pine<br>`#1d1507` kohaku<br>`#1f130c` terracotta<br>`#1d0f0b` vermillion<br>`#071420` sapphire<br>`#071914` teal<br>`#1c1a15` slate<br>`#c3d7dd` frost |  | 1 | app.css:1872 |
-| `--stone-3` | theme-overridden | app.css:21 | `#16191c` | `#3a424b` ocean<br>`#21343d` tide<br>`#0c1418` abyss<br>`#13252c` reef<br>`#16191c` onyx<br>`#0f1112` obsidian<br>`#d0cbc1` pearl<br>`#0f1113` ink<br>`#2c1a17` shu<br>`#162319` hisui<br>`#182116` pine<br>`#281f11` kohaku<br>`#2a1d16` terracotta<br>`#281814` vermillion<br>`#111e2b` sapphire<br>`#11241e` teal<br>`#282521` slate<br>`#b6cad0` frost |  | 1 | pol-studio.css:1344 |
+| `--seam` | theme-only |  |  | `color-mix(in oklab, var(--lapis) 28%…` ocean,slate<br>`color-mix(in oklab, var(--lapis) 50%…` tide<br>`color-mix(in oklab, var(--lapis) 36%…` abyss,kohaku,teal<br>`color-mix(in oklab, var(--lapis) 40%…` reef,shu,terracotta,vermillion,sapphire<br>`color-mix(in oklab, var(--gold) 40%,…` onyx<br>`color-mix(in oklab, var(--lapis) 30%…` obsidian<br>`color-mix(in oklab, var(--gold) 55%,…` pearl<br>`color-mix(in oklab, var(--paper) 16%…` ink<br>`color-mix(in oklab, var(--lapis) 38%…` hisui,pine<br>`color-mix(in oklab, var(--lapis) 34%…` frost |  | 1 | pol-studio.css:1222 |
+| `--seam-faint` | theme-only |  |  | `color-mix(in oklab, var(--lapis) 12%…` ocean,obsidian,slate<br>`color-mix(in oklab, var(--lapis) 20%…` tide<br>`color-mix(in oklab, var(--lapis) 13%…` abyss<br>`color-mix(in oklab, var(--lapis) 16%…` reef,shu,terracotta,vermillion,sapphire<br>`color-mix(in oklab, var(--gold) 15%,…` onyx<br>`color-mix(in oklab, var(--gold) 24%,…` pearl<br>`color-mix(in oklab, var(--paper) 7%,…` ink<br>`color-mix(in oklab, var(--lapis) 15%…` hisui,pine,kohaku,teal<br>`color-mix(in oklab, var(--lapis) 14%…` frost |  | 6 | pol-studio.css:1232,1271,1272,1282,1353,1459 |
+| `--sheet-close` | ok | 5 definitions: ui-sheets.css:37,393,529,910,1566 (selectors in style-map.json) | `36px` |  |  | 6 | ui-sheets.css:265,327,328,329,330,1539 |
+| `--sheet-grip-zone` | ok | ui-sheets.css:38<br>ui-sheets.css:1239 @@media (max-height: 520px) | `22px` |  |  | 8 | gap-oper.css:408 · gap-organize.css:745 · ui-sheets.css:415,425,443,1060,1175,1541 |
+| `--sheet-head-pad` | ok | ui-sheets.css:30<br>ui-sheets.css:1239 @@media (max-height: 520px)<br>ui-sheets.css:1316 @@media (min-width: 1920px) and (min-heig | `14px` |  |  | 1 | ui-sheets.css:255 |
+| `--sheet-max-h` | ok | 5 definitions: ui-sheets.css:36,394,1132,1259,1322 (selectors in style-map.json) | `min(calc(var(--vvh, 100dvh) - 64px), 860px)` |  |  | 8 | ui-sheets.css:161,408,755,952,1174,1275,1276,1327 |
+| `--sheet-pad` | ok | 5 definitions: ui-sheets.css:28,392,1203,1258,1315 (selectors in style-map.json) | `20px` |  |  | 32 | pol-shell.css×1 · gap-oper.css×3 · gap-people.css×1 · gap-shell.css×1 · ui-sheets.css×26 |
+| `--sheet-top` | unused | ui-sheets.css:29 | `var(--sheet-pad)` |  |  | 0 |  |
+| `--sheet-veil` | ok | ui-sheets.css:39 | `color-mix(in srgb, #000 58%, transparent)` |  |  | 5 | ui-sheets.css:156,503,937,1051,1151 |
+| `--sheet-w` | ok | 9 definitions: ui-sheets.css:205,207,218,230,582,675,1284,1324,1325 (selectors in style-map.json) | `var(--sheet-w-sm)` |  |  | 2 | ui-sheets.css:1219,1220 |
+| `--sheet-w-desk` | ok | ui-sheets.css:35<br>ui-sheets.css:1321 @@media (min-width: 1920px) and (min-heig | `500px` |  |  | 2 | ui-sheets.css:218,218 |
+| `--sheet-w-lg` | ok | ui-sheets.css:33<br>ui-sheets.css:1319 @@media (min-width: 1920px) and (min-heig | `760px` |  |  | 3 | ui-sheets.css:207,207,767 |
+| `--sheet-w-md` | ok | ui-sheets.css:32<br>ui-sheets.css:1318 @@media (min-width: 1920px) and (min-heig | `560px` |  |  | 3 | gap-import.css:406 · ui-sheets.css:200,1219 |
+| `--sheet-w-side` | ok | ui-sheets.css:34<br>ui-sheets.css:1320 @@media (min-width: 1920px) and (min-heig | `440px` |  |  | 2 | ui-sheets.css:210,1220 |
+| `--sheet-w-sm` | ok | ui-sheets.css:31<br>ui-sheets.css:1317 @@media (min-width: 1920px) and (min-heig | `440px` |  |  | 5 | gap-oper.css:431 · gap-import.css:405 · gap-watch.css:624 · ui-sheets.css:205,205 |
+| `--shell-measure` | ok | app.css:135<br>gap-appearance.css:209 `:root[data-width='full'] .onyx-frame` | `1180px` |  |  | 7 | app.css:3156 · pol-public.css:14 · calls-engine.css:61,66,66,66,66 |
+| `--shi` | ok | 56 definitions: pol-shell.css:494,495,496,497,498,499,500,501,502,503,504,505,521,522,523,524,525,526,527,528,529,530,949 · rx-shell.css:39,40,41 · gap-organize.css:25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,44,45,46,47,48,49,50,51,52 · gap-shell.css:101,195,196,197,198 (selectors in style-map.json) | `url("data:image/svg+xml,%3Csvg xmlns='http://www.w…` |  |  | 6 | pol-shell.css:491,492,518,519 · gap-shell.css:222,223 |
+| `--shu` | theme-overridden | app.css:50 | `#e95145` | `#ff6f61` ocean<br>`#ff7a6c` tide<br>`#f0594b` abyss<br>`#ff6f5e` reef<br>`#e95145` onyx<br>`#e95047` obsidian,pine,sapphire<br>`#bd270a` pearl<br>`#d8412c` ink<br>`#e9523b` shu<br>`#e95146` hisui<br>`#e85336` kohaku<br>`#e8523b` terracotta<br>`#e95144` vermillion<br>`#e95049` teal<br>`#e9523c` slate<br>`#be222b` frost |  | 6 | app.css:1411 · pol-studio.css:548,1385,1449 · pol-public.css:584 · src/View/Studio.elm:999 |
+| `--shu-bright` | theme-overridden | app.css:51 | `#ff7f71` | `#ff9484` ocean<br>`#ffa193` tide<br>`#ff7c6e` abyss<br>`#ff9a86` reef<br>`#ff7f71` onyx,hisui<br>`#ff7f72` obsidian,pine,sapphire<br>`#e5462b` pearl<br>`#ff5d44` ink<br>`#ff806a` shu,slate<br>`#ff8066` kohaku<br>`#ff8069` terracotta<br>`#ff7f70` vermillion<br>`#ff7f74` teal<br>`#e64344` frost |  | 3 | app.css:1410,1412 · pol-studio.css:1447 |
+| `--sidebar-w` | ok | 5 definitions: app.css:140,3201 · rx-shell.css:389,475,623 (selectors in style-map.json) | `18.5rem` |  |  | 4 | app.css:3107,3196 · pol-shell.css:1108 · pol-thread.css:2102 |
+| `--space-0` | unused | app.css:59 | `0` |  |  | 0 |  |
+| `--space-1` | ok | app.css:60 | `0.25rem` |  |  | 393 | app.css×31 · gap-appearance.css×3 · pol-stats.css×12 · pol-studio.css×11 · pol-shell.css×31 · pol-thread.css×67 · pol-roster.css×8 · pol-public.css×19 · calls-c8.css×7 · calls-c11.css×2 · polish.css×8 · account2.css×6 · roomsettings.css×11 · calls-c6.css×3 · calls-c4.css×8 · gap-convo.css×5 · gap-account.css×8 · gap-oper.css×12 · rx-shell.css×18 · gap-chanserv.css×10 · gap-import.css×9 · gap-people.css×4 · gap-organize.css×34 · gap-usermodes.css×16 · gap-commands.css×3 · gap-watch.css×7 · gap-shell.css×3 · gap-auth.css×4 · gap-claim.css×4 · ui-sheets.css×9 · calls-engine.css×20 |
+| `--space-2` | ok | app.css:61 | `0.5rem` |  |  | 900 | app.css×78 · gap-appearance.css×9 · pol-stats.css×41 · pol-studio.css×43 · pol-shell.css×75 · pol-thread.css×106 · pol-roster.css×20 · pol-public.css×57 · calls-c8.css×13 · calls-c11.css×10 · polish.css×15 · account2.css×16 · roomsettings.css×23 · calls-c6.css×10 · calls-c4.css×9 · gap-convo.css×12 · gap-account.css×13 · gap-oper.css×35 · rx-shell.css×27 · gap-chanserv.css×24 · gap-import.css×28 · gap-people.css×7 · gap-organize.css×37 · gap-usermodes.css×38 · gap-commands.css×3 · gap-watch.css×30 · gap-shell.css×17 · gap-auth.css×2 · gap-claim.css×5 · ui-sheets.css×43 · pol-ios.css×1 · calls-engine.css×53 |
+| `--space-3` | ok | app.css:62 | `0.75rem` |  |  | 658 | app.css×72 · gap-appearance.css×2 · pol-stats.css×50 · pol-studio.css×35 · pol-shell.css×42 · pol-thread.css×69 · pol-roster.css×6 · pol-public.css×70 · calls-c8.css×5 · calls-c11.css×7 · polish.css×16 · account2.css×3 · roomsettings.css×8 · calls-c6.css×10 · calls-c4.css×2 · gap-convo.css×10 · gap-account.css×3 · gap-oper.css×25 · rx-shell.css×16 · gap-chanserv.css×17 · gap-import.css×34 · gap-people.css×2 · gap-organize.css×25 · gap-usermodes.css×18 · gap-commands.css×3 · gap-watch.css×21 · gap-shell.css×13 · gap-auth.css×4 · gap-claim.css×5 · ui-sheets.css×37 · pol-ios.css×1 · calls-engine.css×27 |
+| `--space-4` | ok | app.css:63 | `1rem` |  |  | 354 | app.css×27 · gap-appearance.css×4 · pol-stats.css×37 · pol-studio.css×35 · pol-shell.css×19 · pol-thread.css×26 · pol-roster.css×4 · pol-public.css×82 · calls-c11.css×5 · polish.css×6 · calls-c6.css×3 · gap-convo.css×7 · gap-account.css×1 · gap-oper.css×4 · rx-shell.css×11 · gap-import.css×6 · gap-organize.css×11 · gap-usermodes.css×2 · gap-commands.css×2 · gap-watch.css×6 · gap-shell.css×5 · gap-auth.css×3 · gap-claim.css×3 · ui-sheets.css×39 · calls-engine.css×6 |
+| `--space-5` | ok | app.css:64 | `1.25rem` |  |  | 123 | app.css×14 · gap-appearance.css×1 · pol-stats.css×9 · pol-studio.css×16 · pol-shell.css×2 · pol-thread.css×2 · pol-public.css×44 · calls-c8.css×1 · calls-c6.css×2 · gap-convo.css×3 · rx-shell.css×1 · gap-import.css×1 · gap-organize.css×1 · gap-commands.css×1 · gap-shell.css×3 · gap-auth.css×4 · ui-sheets.css×14 · calls-engine.css×4 |
+| `--space-6` | ok | app.css:65 | `1.5rem` |  |  | 84 | app.css×10 · gap-appearance.css×1 · pol-stats.css×5 · pol-studio.css×4 · pol-shell.css×2 · pol-thread.css×2 · pol-roster.css×2 · pol-public.css×39 · polish.css×1 · calls-c6.css×2 · rx-shell.css×1 · gap-watch.css×1 · ui-sheets.css×12 · calls-engine.css×2 |
+| `--space-7` | ok | app.css:66 | `2rem` |  |  | 38 | app.css×2 · pol-stats.css×7 · pol-studio.css×1 · pol-thread.css×1 · pol-public.css×23 · gap-convo.css×1 · gap-organize.css×1 · ui-sheets.css×1 · calls-engine.css×1 |
+| `--space-8` | ok | app.css:67 | `2.5rem` |  |  | 26 | app.css:1438,1838,1858,2178 · pol-stats.css:334 · pol-studio.css:1823 · pol-shell.css:1017,1017,1037,1402 · pol-public.css:283,504,770,820,822,980,1177,1511,1541,1561,1566,1611,1614,1620,1792 · calls-c6.css:229 |
+| `--stone` | theme-overridden | app.css:38 | `#050709` | `#2d333a` ocean<br>`#051820` tide<br>`#010508` abyss<br>`#010f16` reef<br>`#050709` onyx<br>`#020304` obsidian<br>`#e5e0d6` pearl<br>`#030405` ink<br>`#160705` shu<br>`#040f06` hisui<br>`#060e05` pine<br>`#130b01` kohaku<br>`#140904` terracotta<br>`#140604` vermillion<br>`#020b16` sapphire<br>`#010f0a` teal<br>`#110e0a` slate<br>`#d0e4ea` frost |  | 3 | pol-studio.css:1231,1268,1458 |
+| `--stone-2` | theme-overridden | app.css:39 | `#0d0f12` | `#343b43` ocean<br>`#12262e` tide<br>`#050c10` abyss<br>`#081a21` reef<br>`#0d0f12` onyx<br>`#07090a` obsidian<br>`#dbd6cc` pearl<br>`#08090c` ink<br>`#21100d` shu<br>`#0c190f` hisui<br>`#0e170d` pine<br>`#1d1507` kohaku<br>`#1f130c` terracotta<br>`#1d0f0b` vermillion<br>`#071420` sapphire<br>`#071914` teal<br>`#1c1a15` slate<br>`#c3d7dd` frost |  | 1 | app.css:1405 |
+| `--stone-3` | theme-overridden | app.css:40 | `#16191c` | `#3a424b` ocean<br>`#21343d` tide<br>`#0c1418` abyss<br>`#13252c` reef<br>`#16191c` onyx<br>`#0f1112` obsidian<br>`#d0cbc1` pearl<br>`#0f1113` ink<br>`#2c1a17` shu<br>`#162319` hisui<br>`#182116` pine<br>`#281f11` kohaku<br>`#2a1d16` terracotta<br>`#281814` vermillion<br>`#111e2b` sapphire<br>`#11241e` teal<br>`#282521` slate<br>`#b6cad0` frost |  | 1 | pol-studio.css:1338 |
 | `--stone-line` | theme-only, unused |  |  | `#49535e` ocean<br>`#254350` tide<br>`#101c22` abyss<br>`#142f3b` reef<br>`#1e2226` onyx<br>`#15181b` obsidian<br>`#c9c2b5` pearl<br>`#15181c` ink<br>`#3a211c` shu<br>`#1b2e1f` hisui<br>`#1e2c1b` pine<br>`#342812` kohaku<br>`#37241a` terracotta<br>`#351e19` vermillion<br>`#132739` sapphire<br>`#122f26` teal<br>`#343029` slate<br>`#a4c0c8` frost |  | 0 |  |
-| `--target-floor` | ok | app.css:70 | `24px` |  |  | 36 | app.css×2 · pol-stats.css×3 · pol-studio.css×3 · pol-thread.css×12 · calls-c8.css×1 · calls-c11.css×3 · polish.css×4 · account2.css×4 · roomsettings.css×2 · calls-c6.css×2 |
-| `--target-min` | ok | app.css:69 | `44px` |  |  | 80 | app.css×5 · pol-stats.css×11 · pol-studio.css×9 · pol-thread.css×15 · pol-roster.css×3 · pol-public.css×22 · calls-c8.css×1 · calls-c11.css×3 · polish.css×2 · calls-c6.css×2 · calls-engine.css×7 |
-| `--text-2xl` | ok | app.css:62 | `1.5rem` |  |  | 5 | app.css:2298 · pol-stats.css:642 · pol-thread.css:508,513,618 |
-| `--text-2xs` | ok | app.css:56 | `0.75rem` |  |  | 124 | app.css×44 · pol-stats.css×14 · pol-studio.css×6 · pol-shell.css×8 · pol-thread.css×14 · pol-roster.css×2 · pol-public.css×15 · calls-c8.css×4 · calls-c11.css×1 · polish.css×5 · account2.css×2 · roomsettings.css×2 · calls-c6.css×4 · calls-c4.css×1 · ui-sheets.css×2 |
-| `--text-lg` | ok | app.css:60 | `1.0625rem` |  |  | 56 | app.css×16 · pol-stats.css×7 · pol-studio.css×3 · pol-shell.css×4 · pol-thread.css×3 · pol-roster.css×1 · pol-public.css×14 · calls-c8.css×1 · calls-c11.css×1 · calls-c6.css×1 · ui-sheets.css×5 |
-| `--text-md` | ok | app.css:59 | `0.9375rem` |  |  | 87 | app.css×19 · pol-stats.css×4 · pol-studio.css×7 · pol-shell.css×14 · pol-thread.css×13 · pol-roster.css×1 · pol-public.css×15 · calls-c8.css×1 · polish.css×3 · roomsettings.css×3 · calls-c6.css×1 · calls-c4.css×1 · ui-sheets.css×4 · calls-engine.css×1 |
-| `--text-sm` | ok | app.css:58 | `0.8125rem` |  |  | 318 | app.css×75 · pol-stats.css×20 · pol-studio.css×25 · pol-shell.css×32 · pol-thread.css×53 · pol-roster.css×5 · pol-public.css×57 · calls-c8.css×5 · calls-c11.css×3 · polish.css×2 · account2.css×4 · roomsettings.css×12 · calls-c6.css×5 · calls-c4.css×1 · ui-sheets.css×17 · calls-engine.css×2 |
-| `--text-xl` | ok | app.css:61 | `1.25rem` |  |  | 24 | app.css:2465 · pol-stats.css:237,363,378,580,643,742,794 · pol-shell.css:1164,1174 · pol-thread.css:861,1390,1895 · pol-public.css:691,824,963,988,1195,1264,1505,1588,1598 · calls-c6.css:36 · ui-sheets.css:604 |
-| `--text-xs` | ok | app.css:57 | `0.6875rem` |  |  | 111 | app.css×25 · pol-stats.css×7 · pol-studio.css×18 · pol-shell.css×16 · pol-thread.css×14 · pol-roster.css×3 · pol-public.css×8 · calls-c11.css×1 · polish.css×1 · account2.css×7 · roomsettings.css×4 · calls-c6.css×1 · calls-c4.css×3 · ui-sheets.css×3 |
+| `--target-floor` | ok | app.css:89 | `24px` |  |  | 37 | app.css×2 · pol-stats.css×3 · pol-studio.css×3 · pol-thread.css×12 · calls-c11.css×2 · polish.css×4 · account2.css×4 · roomsettings.css×2 · calls-c6.css×2 · gap-convo.css×3 |
+| `--target-min` | ok | app.css:88 | `44px` |  |  | 179 | app.css×6 · gap-appearance.css×1 · pol-stats.css×11 · pol-studio.css×9 · pol-thread.css×47 · pol-roster.css×3 · pol-public.css×24 · calls-c11.css×3 · polish.css×3 · gap-convo.css×4 · gap-account.css×5 · gap-oper.css×1 · gap-import.css×4 · gap-people.css×5 · gap-organize.css×14 · gap-usermodes.css×2 · gap-commands.css×2 · gap-watch.css×3 · gap-auth.css×1 · gap-claim.css×1 · calls-engine.css×30 |
+| `--text-2xl` | ok | app.css:81 | `1.5rem` |  |  | 4 | pol-stats.css:642 · pol-thread.css:513,518,622 |
+| `--text-2xs` | ok | app.css:75<br>pol-thread.css:2086 `.onyx-main > .onyx-thread-pane, .onyx-main > .onyx` @@media (min-width: 2200px) and (min-heig | `0.75rem` |  |  | 150 | app.css×28 · pol-stats.css×14 · pol-studio.css×6 · pol-shell.css×8 · pol-thread.css×18 · pol-roster.css×2 · pol-public.css×15 · calls-c8.css×4 · calls-c11.css×1 · polish.css×5 · account2.css×2 · roomsettings.css×2 · calls-c6.css×3 · calls-c4.css×1 · gap-convo.css×3 · gap-account.css×1 · gap-import.css×9 · gap-organize.css×3 · gap-usermodes.css×16 · gap-watch.css×3 · gap-shell.css×2 · gap-auth.css×1 · ui-sheets.css×2 · calls-engine.css×1 |
+| `--text-lg` | ok | app.css:79 | `1.0625rem` |  |  | 54 | app.css×7 · pol-stats.css×7 · pol-studio.css×2 · pol-shell.css×3 · pol-thread.css×3 · pol-roster.css×1 · pol-public.css×14 · calls-c8.css×1 · calls-c11.css×1 · calls-c6.css×1 · gap-convo.css×1 · rx-shell.css×3 · gap-import.css×2 · gap-shell.css×1 · gap-auth.css×1 · ui-sheets.css×6 |
+| `--text-md` | ok | app.css:78<br>pol-thread.css:2083 `.onyx-main > .onyx-thread-pane, .onyx-main > .onyx` @@media (min-width: 2200px) and (min-heig | `0.9375rem` |  |  | 134 | app.css×19 · pol-stats.css×4 · pol-studio.css×7 · pol-shell.css×13 · pol-thread.css×20 · pol-roster.css×1 · pol-public.css×16 · calls-c8.css×1 · polish.css×3 · roomsettings.css×3 · calls-c6.css×1 · calls-c4.css×1 · gap-oper.css×2 · rx-shell.css×14 · gap-chanserv.css×3 · gap-import.css×3 · gap-organize.css×2 · gap-watch.css×2 · gap-shell.css×5 · gap-claim.css×2 · ui-sheets.css×8 · calls-engine.css×4 |
+| `--text-sm` | ok | app.css:77<br>pol-thread.css:2084 `.onyx-main > .onyx-thread-pane, .onyx-main > .onyx` @@media (min-width: 2200px) and (min-heig | `0.8125rem` |  |  | 454 | app.css×79 · gap-appearance.css×1 · pol-stats.css×20 · pol-studio.css×25 · pol-shell.css×31 · pol-thread.css×60 · pol-roster.css×5 · pol-public.css×58 · calls-c8.css×5 · calls-c11.css×3 · polish.css×2 · account2.css×4 · roomsettings.css×11 · calls-c6.css×5 · calls-c4.css×1 · gap-convo.css×6 · gap-account.css×5 · gap-oper.css×1 · rx-shell.css×6 · gap-chanserv.css×4 · gap-import.css×19 · gap-people.css×2 · gap-organize.css×19 · gap-usermodes.css×15 · gap-commands.css×3 · gap-watch.css×15 · gap-shell.css×16 · gap-claim.css×3 · ui-sheets.css×20 · calls-engine.css×10 |
+| `--text-xl` | ok | app.css:80 | `1.25rem` |  |  | 24 | app.css:2267 · pol-stats.css:237,363,378,580,643,742,794 · pol-shell.css:1131,1141 · pol-thread.css:1498,2015 · pol-public.css:692,825,964,989,1196,1265,1505,1588,1598 · calls-c6.css:36 · gap-import.css:140 · ui-sheets.css:692 |
+| `--text-xs` | ok | app.css:76<br>pol-thread.css:2085 `.onyx-main > .onyx-thread-pane, .onyx-main > .onyx` @@media (min-width: 2200px) and (min-heig | `0.6875rem` |  |  | 155 | app.css×21 · pol-stats.css×7 · pol-studio.css×18 · pol-shell.css×16 · pol-thread.css×16 · pol-roster.css×3 · pol-public.css×9 · calls-c11.css×1 · polish.css×1 · account2.css×7 · roomsettings.css×4 · calls-c6.css×1 · calls-c4.css×2 · gap-account.css×2 · rx-shell.css×3 · gap-chanserv.css×1 · gap-import.css×6 · gap-people.css×3 · gap-organize.css×19 · gap-commands.css×3 · gap-watch.css×4 · gap-shell.css×4 · gap-claim.css×1 · ui-sheets.css×3 |
 | `--tool-glyph` | ok | 5 definitions: polish.css:83,84,85,86,87 (selectors in style-map.json) | `var(--pt-i-attach)` |  |  | 2 | polish.css:78,79 |
-| `--tracking-kicker` | ok | app.css:66 | `0.06em` |  |  | 49 | pol-stats.css×8 · pol-studio.css×12 · pol-shell.css×4 · pol-thread.css×7 · pol-roster.css×2 · pol-public.css×8 · calls-c8.css×2 · calls-c11.css×1 · polish.css×1 · account2.css×1 · ui-sheets.css×3 |
-| `--vv-top` | runtime-written | app.css:112 | `0px` |  | ports.js setProperty ports.js:9981 | 1 | pol-ios.css:111 |
-| `--vvh` | runtime-written | app.css:113<br>app.css:117 @@supports (height: 100dvh) | `100vh` |  | ports.js setProperty ports.js:9975 | 7 | pol-roster.css:346,347,365,366 · ui-sheets.css:1037 · pol-ios.css:65,66 |
-| `--warn` | theme-only, unused |  |  | `#e6d08c` ocean,tide,abyss,reef,onyx,obsidian,ink,shu,hisui,pine,kohaku,terracotta,vermillion,sapphire,teal,slate<br>`var(--gold)` pearl<br>`#8a6e1f` frost |  | 0 |  |
+| `--tracking-kicker` | ok | app.css:85 | `0.06em` |  |  | 69 | app.css×1 · pol-stats.css×8 · pol-studio.css×12 · pol-shell.css×4 · pol-thread.css×7 · pol-roster.css×2 · pol-public.css×9 · calls-c8.css×2 · calls-c11.css×1 · polish.css×1 · account2.css×1 · gap-oper.css×2 · gap-chanserv.css×1 · gap-import.css×6 · gap-people.css×1 · gap-organize.css×4 · gap-watch.css×2 · gap-shell.css×1 · gap-claim.css×1 · ui-sheets.css×3 |
+| `--vv-top` | runtime-written | app.css:159 | `0px` |  | ports.js setProperty ports.js:11892 | 1 | pol-ios.css:111 |
+| `--vvh` | runtime-written | app.css:160<br>app.css:164 @@supports (height: 100dvh) | `100vh` |  | ports.js setProperty ports.js:11886 | 20 | pol-thread.css:2365,2366,2429 · pol-roster.css:342,343,361,362 · polish.css:393 · ui-sheets.css:36,232,1132,1227,1259,1298,1302,1305,1322,1325 · pol-ios.css:65,66 |
+| `--warn` | theme-only, unused |  |  | `#e6d08c` ocean,tide,abyss,reef,onyx,obsidian,ink,shu,hisui,pine,kohaku,terracotta,vermillion,sapphire,teal,slate<br>`#825c00` pearl<br>`#7b5f07` frost |  | 0 |  |
+| `--z-bar` | ok | app.css:103 | `10` |  |  | 1 | pol-studio.css:42 |
+| `--z-call` | ok | app.css:107 | `50` |  |  | 4 | calls-c6.css:90 · calls-c4.css:64 · calls-engine.css:403,411 |
+| `--z-dialog` | ok | app.css:111 | `80` |  |  | 2 | calls-c6.css:18 · ui-sheets.css:502 |
+| `--z-header` | ok | app.css:104 | `20` |  |  | 3 | pol-public.css:73,275 · calls-c8.css:25 |
+| `--z-menu-sheet` | ok | app.css:108 | `58` |  |  | 2 | pol-shell.css:1247,1254 |
+| `--z-notice` | ok | app.css:110 | `70` |  |  | 4 | pol-thread.css:354,362 · polish.css:329 · gap-convo.css:44 |
+| `--z-panel` | ok | app.css:106 | `45` |  |  | 1 | app.css:3263 |
+| `--z-popover` | ok | app.css:105 | `40` |  |  | 12 | app.css:965,1372,1373,2206,3326,3332 · pol-thread.css:266,267,345,2385 · polish.css:38 · gap-organize.css:682 |
+| `--z-raised` | ok | app.css:100 | `1` |  |  | 18 | pol-stats.css:826 · pol-studio.css:77 · pol-thread.css:208,844,889,984 · pol-roster.css:419,428,441 · calls-c8.css:38 · calls-c4.css:95 · gap-oper.css:46 · gap-import.css:231 · ui-sheets.css:250,995,1537,1628 · calls-engine.css:155 |
+| `--z-sheet` | ok | app.css:109 | `60` |  |  | 6 | app.css:3166 · ui-sheets.css:153,1150 · calls-engine.css:181,183,250 |
+| `--z-stage` | ok | app.css:102 | `6` |  |  | 3 | pol-thread.css:2111 · gap-watch.css:35 · calls-engine.css:57 |
+| `--z-sticky` | ok | app.css:101 | `5` |  |  | 2 | app.css:2694,3123 |
+| `--z-toast` | ok | app.css:112 | `90` |  |  | 1 | ui-sheets.css:866 |
+| `--z-top` | ok | app.css:113 | `100` |  |  | 2 | pol-thread.css:830 · pol-public.css:55 |
+| `--z-under` | ok | app.css:99 | `-1` |  |  | 2 | gap-appearance.css:264 · pol-studio.css:34 |
 
-Root data-* attributes written by ports.js on <html>: `data-bound`, `data-density`, `data-experience-mode`, `data-font-scale`, `data-hide-events`, `data-high-contrast`, `data-kb`, `data-reader`, `data-reduce-motion`, `data-reduce-transparency`, `data-theme`, `data-width`, `data-yield`.
+Root data-* attributes written by ports.js on <html>: `data-bound`, `data-density`, `data-experience-mode`, `data-font-scale`, `data-hide-events`, `data-high-contrast`, `data-kb`, `data-reader`, `data-reduce-motion`, `data-reduce-transparency`, `data-shell-scheme`, `data-theme`, `data-width`, `data-yield`.
 
 Theme Studio-editable tokens (src/Studio.elm): `--ink`, `--ink-2`, `--stone`, `--stone-2`, `--stone-3`, `--lapis`, `--lapis-bright`, `--lapis-deep`, `--gold`, `--gold-bright`, `--gold-deep`, `--shu`, `--shu-bright`, `--paper`, `--paper-dim`, `--paper-mute`, `--ok`, `--stone-line`, `--r-0`, `--r-sm`, `--r-md`, `--dur`, `--ease`, `--font-mono`, `--font-display`, `--font-sans`, `--font-serif`.
 
@@ -983,20 +1115,20 @@ Theme Studio-editable tokens (src/Studio.elm): `--ink`, `--ink-2`, `--stone`, `-
 | `--stone-2` | #343b43 | #12262e | #050c10 | #081a21 | #0d0f12 | #07090a | #dbd6cc | #08090c | #21100d | #0c190f | #0e170d | #1d1507 | #1f130c | #1d0f0b | #071420 | #071914 | #1c1a15 | #c3d7dd |
 | `--stone-3` | #3a424b | #21343d | #0c1418 | #13252c | #16191c | #0f1112 | #d0cbc1 | #0f1113 | #2c1a17 | #162319 | #182116 | #281f11 | #2a1d16 | #281814 | #111e2b | #11241e | #282521 | #b6cad0 |
 | `--stone-line` | #49535e | #254350 | #101c22 | #142f3b | #1e2226 | #15181b | #c9c2b5 | #15181c | #3a211c | #1b2e1f | #1e2c1b | #342812 | #37241a | #351e19 | #132739 | #122f26 | #343029 | #a4c0c8 |
-| `--lapis` | #65adf5 | #00b8ed | #0091cb | #0094bc | #6996c5 | #6a9eca | #0065b0 | #c9c3bc | #e74142 | #00a149 | #3b9f32 | #d98b09 | #d55c27 | #de5034 | #0089ea | #009d82 | #949d7b | #036884 |
+| `--lapis` | #65adf5 | #00b8ed | #0091cb | #0094bc | #6996c5 | #6a9eca | #005fa7 | #c9c3bc | #e74142 | #00a149 | #3b9f32 | #d98b09 | #d55c27 | #de5034 | #0089ea | #009d82 | #949d7b | #036884 |
 | `--lapis-bright` | #65adf5 | #9ae0ff | #58c4ff | #0bc9ff | #9cc2ea | #9ecdf6 | #086fbe | #ece7e0 | #ff958d | #5bd47d | #79d070 | #ffb75d | #ff9970 | #ff9781 | #7cbdff | #00d5b2 | #bdc6a5 | #2f7791 |
 | `--lapis-deep` | #397db8 | #007093 | #005477 | #00556e | #385b7e | #3c6588 | #003e70 | #9d9892 | #940014 | #005e28 | #065f00 | #8a5600 | #832e00 | #8e1900 | #004f8b | #005b4b | #656c51 | #003c4d |
 | `--gold` | #b4bfca | #5dcbd1 | #51a0ad | #f19173 | #c9a24a | #7fa5b8 | #896100 | #bbb7b1 | #f4733c | #70c5a0 | #a5a51a | #eea563 | #e8777a | #ef7179 | #00aaf3 | #72ccab | #ae7853 | #00768a |
 | `--gold-bright` | #f5f7f8 | #92f1f6 | #88cedb | #ffc0ac | #f1d489 | #add1e3 | #ad7c0a | #dedad5 | #ffb294 | #a5e9c9 | #cdcf62 | #ffcca1 | #ffafae | #ffafb0 | #8ad1ff | #9feacd | #d8a582 | #0096af |
 | `--gold-deep` | #71808e | #3e999d | #236671 | #a9573d | #8c6c2c | #516f7e | #5f4200 | #908c88 | #a43e08 | #3e8165 | #686800 | #a46c36 | #9c4346 | #a13d46 | #006b9b | #42876e | #73492b | #00515f |
 | `--brand-action` | #ff987d | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| `--shu` | #ff6f61 | #ff7a6c | #f0594b | #ff6f5e | #e95145 | #e95047 | #c83319 | #d8412c | #e9523b | #e95146 | #e95047 | #e85336 | #e8523b | #e95144 | #e95047 | #e95049 | #e9523c | #c92f34 |
+| `--shu` | #ff6f61 | #ff7a6c | #f0594b | #ff6f5e | #e95145 | #e95047 | #bd270a | #d8412c | #e9523b | #e95146 | #e95047 | #e85336 | #e8523b | #e95144 | #e95047 | #e95049 | #e9523c | #be222b |
 | `--shu-bright` | #ff9484 | #ffa193 | #ff7c6e | #ff9a86 | #ff7f71 | #ff7f72 | #e5462b | #ff5d44 | #ff806a | #ff7f71 | #ff7f72 | #ff8066 | #ff8069 | #ff7f70 | #ff7f72 | #ff7f74 | #ff806a | #e64344 |
 | `--paper` | #f5f7f8 | #d1e1e9 | #d4e0e8 | #d2e1e8 | #eae8e0 | #d6dfe7 | #251e15 | #f0eae2 | #ebdad5 | #d6e2d8 | #d8e1d6 | #e4ddd0 | #e8dbd4 | #eadad6 | #d4e0eb | #d3e2dc | #eae7e2 | #202b2e |
-| `--paper-dim` | #b4bfca | #8c9ba2 | #8f9aa1 | #8d9ba2 | #a4a19a | #9199a1 | #494136 | #a9a49c | #a49490 | #919c92 | #939b91 | #9e988b | #a1968f | #a39591 | #8f9aa5 | #8e9c97 | #a7a49e | #546063 |
-| `--paper-mute` | #b4bfca | #536770 | #56666f | #54676f | #6e6c63 | #5a656e | #71675a | #706b63 | #725e59 | #5a685b | #5c675a | #6a6252 | #6f6057 | #715e5a | #576573 | #556861 | #716e68 | #7a8d92 |
-| `--ok` | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #15915c | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #15915c |
-| `--warn` | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | var(--gold) | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #8a6e1f |
+| `--paper-dim` | #b4bfca | #8c9ba2 | #8f9aa1 | #8d9ba2 | #a4a19a | #9199a1 | #494136 | #a9a49c | #a49490 | #919c92 | #939b91 | #9e988b | #a1968f | #a39591 | #8f9aa5 | #8e9c97 | #a7a49e | #4c575a |
+| `--paper-mute` | #b4bfca | #5b7079 | #56666f | #54676f | #6e6c63 | #5a656e | #71675a | #706b63 | #725e59 | #5a685b | #5c675a | #6d6555 | #6f6057 | #715e5a | #576573 | #556861 | #716e68 | #65787d |
+| `--ok` | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #007347 | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #5bc78e | #007347 |
+| `--warn` | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #825c00 | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #e6d08c | #7b5f07 |
 | `--danger` | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) | var(--shu) |
 | `--seam` | mix(var(--lapis) 28%) | mix(var(--lapis) 50%) | mix(var(--lapis) 36%) | mix(var(--lapis) 40%) | mix(var(--gold) 40%) | mix(var(--lapis) 30%) | mix(var(--gold) 55%) | mix(var(--paper) 16%) | mix(var(--lapis) 40%) | mix(var(--lapis) 38%) | mix(var(--lapis) 38%) | mix(var(--lapis) 36%) | mix(var(--lapis) 40%) | mix(var(--lapis) 40%) | mix(var(--lapis) 40%) | mix(var(--lapis) 36%) | mix(var(--lapis) 28%) | mix(var(--lapis) 34%) |
 | `--seam-faint` | mix(var(--lapis) 12%) | mix(var(--lapis) 20%) | mix(var(--lapis) 13%) | mix(var(--lapis) 16%) | mix(var(--gold) 15%) | mix(var(--lapis) 12%) | mix(var(--gold) 24%) | mix(var(--paper) 7%) | mix(var(--lapis) 16%) | mix(var(--lapis) 15%) | mix(var(--lapis) 15%) | mix(var(--lapis) 15%) | mix(var(--lapis) 16%) | mix(var(--lapis) 16%) | mix(var(--lapis) 16%) | mix(var(--lapis) 15%) | mix(var(--lapis) 12%) | mix(var(--lapis) 14%) |
@@ -1012,114 +1144,150 @@ Theme Studio-editable tokens (src/Studio.elm): `--ink`, `--ink-2`, `--stone`, `-
 ## G3. Hard-coded values that bypass tokens (every one, file:line)
 
 
-### G3.1 Colour literals in component rules and component-scoped custom properties (43)
+### G3.1 Colour literals in component rules and component-scoped custom properties (44)
 
 | colour | count | where |
 |---|---|---|
-| `#000` | 9 | app.css:3739 · pol-studio.css:230,321 · pol-shell.css:422,1279 · pol-thread.css:348,819 · pol-roster.css:355 · ui-sheets.css:131 |
-| `highlight` | 9 | pol-stats.css:1073,1077 · pol-studio.css:331,1738 · pol-shell.css:177 · pol-thread.css:1916,1918 · pol-public.css:1678 · polish.css:385 |
-| `canvastext` | 8 | pol-stats.css:1070,1071,1078 · pol-roster.css:413,414 · pol-public.css:1679 · polish.css:383,384 |
-| `buttontext` | 4 | pol-studio.css:329,330,1740 · pol-public.css:1676 |
-| `canvas` | 3 | pol-stats.css:1071 · pol-roster.css:413,414 |
-| `rgba(0, 0, 0, 0.35)` | 2 | app.css:3074,3337 |
-| `#fff` | 2 | app.css:3308 · calls-c6.css:9 |
-| `rgb(0 0 0 / 55%)` | 1 | app.css:2654 |
-| `rgb(0 8 16 / 45%)` | 1 | app.css:2667 |
-| `rgb(0 0 0 / 35%)` | 1 | app.css:2882 |
-| `highlighttext` | 1 | pol-studio.css:332 |
+| `highlight` | 12 | app.css:1914,1916 · pol-stats.css:1073,1077 · pol-studio.css:326,1732 · pol-shell.css:160 · pol-thread.css:2036,2038 · pol-public.css:1678 · polish.css:385 · gap-commands.css:168 |
+| `canvastext` | 9 | pol-stats.css:1070,1071,1078 · pol-roster.css:468,469 · pol-public.css:1679 · polish.css:383,384 · rx-shell.css:696 |
+| `#000` | 9 | pol-studio.css:225,316 · pol-shell.css:400,1247 · pol-thread.css:354,839 · pol-roster.css:351 · ui-sheets.css:227 · calls-engine.css:248 |
+| `buttontext` | 8 | app.css:1915 · pol-studio.css:324,325,1734 · pol-public.css:1676 · rx-shell.css:694 · gap-people.css:175 · gap-commands.css:167 |
+| `canvas` | 3 | pol-stats.css:1071 · pol-roster.css:468,469 |
+| `highlighttext` | 1 | pol-studio.css:327 |
 | `rgb(0 0 0 / 0.35)` | 1 | polish.css:344 |
-| `rgba(0, 0, 0, 0.45)` | 1 | calls-engine.css:94 |
+| `graytext` | 1 | rx-shell.css:695 |
 
-### G3.2 Colour literals that are :root token definitions (29)
+### G3.2 Colour literals that are :root token definitions (27)
 
-`--onyx-bg` `#0b0e12` app.css:5 · `--onyx-panel` `#12161c` app.css:6 · `--onyx-panel-2` `#181e27` app.css:7 · `--onyx-line` `#232b36` app.css:8 · `--onyx-text` `#e8e6e1` app.css:9 · `--onyx-dim` `#9aa3ad` app.css:10 · `--onyx-faint` `#5d6670` app.css:11 · `--onyx-accent` `#46c08a` app.css:12 · `--onyx-accent-ink` `#06281a` app.css:13 · `--onyx-warn` `#d9a13b` app.css:14 · `--onyx-bad` `#e5484d` app.css:15 · `--ink` `#000101` app.css:18 · `--stone` `#050709` app.css:19 · `--stone-2` `#0d0f12` app.css:20 · `--stone-3` `#16191c` app.css:21 · `--lapis-bright` `#9cc2ea` app.css:22 · `--lapis-deep` `#385b7e` app.css:23 · `--paper` `#eae8e0` app.css:24 · `--paper-dim` `#a4a19a` app.css:25 · `--gold` `#c9a24a` app.css:26 · `--gold-bright` `#f1d489` app.css:27 · `--lapis` `#6996c5` app.css:30 · `--shu` `#e95145` app.css:31 · `--shu-bright` `#ff7f71` app.css:32 · `--elev-3` `#000` app.css:87 · `--onyx-line` `#5a6675` app.css:3144 · `--onyx-dim` `#c9d0d7` app.css:3145 · `--onyx-faint` `#9aa3ad` app.css:3146 · `--sheet-veil` `#000` ui-sheets.css:25
+`--onyx-bg` `#0b0e12` app.css:24 · `--onyx-panel` `#12161c` app.css:25 · `--onyx-panel-2` `#181e27` app.css:26 · `--onyx-line` `#232b36` app.css:27 · `--onyx-text` `#e8e6e1` app.css:28 · `--onyx-dim` `#9aa3ad` app.css:29 · `--onyx-faint` `#606973` app.css:30 · `--onyx-accent` `#46c08a` app.css:31 · `--onyx-accent-ink` `#06281a` app.css:32 · `--onyx-warn` `#d9a13b` app.css:33 · `--onyx-bad` `#e5484d` app.css:34 · `--ink` `#000101` app.css:37 · `--stone` `#050709` app.css:38 · `--stone-2` `#0d0f12` app.css:39 · `--stone-3` `#16191c` app.css:40 · `--lapis-bright` `#9cc2ea` app.css:41 · `--lapis-deep` `#385b7e` app.css:42 · `--paper` `#eae8e0` app.css:43 · `--paper-dim` `#a4a19a` app.css:44 · `--gold` `#c9a24a` app.css:45 · `--gold-bright` `#f1d489` app.css:46 · `--lapis` `#6996c5` app.css:49 · `--shu` `#e95145` app.css:50 · `--shu-bright` `#ff7f71` app.css:51 · `--elev-3` `#000` app.css:131 · `--rx-surround` `#000` rx-shell.css:31 · `--sheet-veil` `#000` ui-sheets.css:39
 
-### G3.3 Colour literals inside var() fallbacks (0)
+### G3.3 Colour literals inside var() fallbacks (33)
 
 | token → fallback | count | where |
 |---|---|---|
+| `--onyx-theme-hc-line → #5a6675` | 2 | gap-appearance.css:44,59 |
+| `--onyx-theme-hc-text → #e8e6e1` | 2 | gap-appearance.css:45,60 |
+| `--onyx-theme-hc-dim → #c9d0d7` | 2 | gap-appearance.css:46,61 |
+| `--onyx-theme-hc-faint → #9aa3ad` | 2 | gap-appearance.css:47,62 |
+| `--onyx-theme-hc-accent → #46c08a` | 2 | gap-appearance.css:48,63 |
+| `--onyx-theme-hc-accent-ink → #06281a` | 2 | gap-appearance.css:49,64 |
+| `--onyx-theme-hc-warn → #d9a13b` | 2 | gap-appearance.css:50,65 |
+| `--onyx-theme-hc-bad → #e5484d` | 2 | gap-appearance.css:51,66 |
+| `--onyx-theme-hc-bad-ink → #0b0e12` | 2 | gap-appearance.css:52,67 |
+| `--onyx-theme-hc-success → #46c08a` | 2 | gap-appearance.css:53,68 |
+| `--onyx-theme-bg → #0b0e12` | 1 | gap-appearance.css:23 |
+| `--onyx-theme-panel → #12161c` | 1 | gap-appearance.css:24 |
+| `--onyx-theme-panel-2 → #181e27` | 1 | gap-appearance.css:25 |
+| `--onyx-theme-line → #232b36` | 1 | gap-appearance.css:26 |
+| `--onyx-theme-text → #e8e6e1` | 1 | gap-appearance.css:27 |
+| `--onyx-theme-dim → #9aa3ad` | 1 | gap-appearance.css:28 |
+| `--onyx-theme-faint → #606973` | 1 | gap-appearance.css:29 |
+| `--onyx-theme-accent → #46c08a` | 1 | gap-appearance.css:30 |
+| `--onyx-theme-accent-ink → #06281a` | 1 | gap-appearance.css:31 |
+| `--onyx-theme-warn → #d9a13b` | 1 | gap-appearance.css:32 |
+| `--onyx-theme-bad → #e5484d` | 1 | gap-appearance.css:33 |
+| `--onyx-theme-bad-ink → #0b0e12` | 1 | gap-appearance.css:34 |
+| `--onyx-theme-success → #46c08a` | 1 | gap-appearance.css:36 |
 
-### G3.3b Ad-hoc tints: every color-mix() (89 uses, 65 distinct)
+### G3.3b Ad-hoc tints: every color-mix() (118 uses, 76 distinct)
 
 | color-mix expression | count | where |
 |---|---|---|
-| `color-mix(in oklab, var(--onyx-accent) 88%, var(--onyx-text))` | 6 | app.css:1996 · pol-stats.css:119 · pol-studio.css:781 · pol-public.css:148,450,541 |
-| `color-mix(in srgb, #000 55%, transparent)` | 5 | app.css:3739 · pol-shell.css:422,1279 · pol-thread.css:348 · pol-roster.css:355 |
-| `color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line))` | 4 | pol-shell.css:282,329 · pol-thread.css:1670,1821 |
-| `color-mix(in oklab, var(--onyx-text) 26%, transparent)` | 4 | ui-sheets.css:338,867,983,1096 |
-| `color-mix(in oklab, var(--onyx-warn) 45%, transparent)` | 3 | pol-studio.css:670,1542,1625 |
-| `color-mix(in oklab, var(--onyx-dim) 45%, var(--onyx-line))` | 2 | app.css:1947 · pol-shell.css:596 |
-| `color-mix(in oklab, var(--onyx-accent) 80%, var(--onyx-bg))` | 2 | app.css:2032 · pol-public.css:1650 |
-| `color-mix(in oklab, var(--onyx-panel-2) 60%, transparent)` | 2 | pol-studio.css:281 · ui-sheets.css:743 |
-| `color-mix(in oklab, var(--onyx-warn) 40%, transparent)` | 2 | pol-studio.css:1179,1601 |
-| `color-mix(in oklab, var(--onyx-warn) 12%, transparent)` | 2 | pol-studio.css:1184 · pol-thread.css:1163 |
-| `color-mix(in oklab, var(--onyx-accent) 70%, var(--onyx-line))` | 2 | pol-thread.css:1019,1338 |
-| `color-mix(in srgb, var(--onyx-bg) 78%, transparent)` | 2 | calls-c4.css:105,121 |
-| `color-mix(in oklab, var(--paper) 40%, transparent)` | 1 | app.css:33 |
-| `color-mix(in oklab, var(--onyx-text) 5%, transparent)` | 1 | app.css:85 |
-| `color-mix(in oklab, var(--onyx-bg) 88%, transparent)` | 1 | app.css:86 |
-| `color-mix(in oklab, #000 90%, transparent)` | 1 | app.css:87 |
-| `color-mix(in oklab, var(--onyx-text) 6%, transparent)` | 1 | app.css:87 |
-| `color-mix(in srgb, var(--onyx-warn) 12%, transparent)` | 1 | app.css:292 |
-| `color-mix(in oklab, var(--lapis-bright) 32%, var(--line))` | 1 | app.css:1858 |
-| `color-mix(in oklab, var(--lapis) 10%, transparent)` | 1 | app.css:1860 |
-| `color-mix(in oklab, var(--paper-dim) 36%, var(--line))` | 1 | app.css:1871 |
-| `color-mix(in oklab, var(--stone-2) 42%, transparent)` | 1 | app.css:1872 |
-| `color-mix(in oklab, var(--shu-bright) 34%, var(--line))` | 1 | app.css:1877 |
-| `color-mix(in oklab, var(--shu) 10%, transparent)` | 1 | app.css:1878 |
-| `color-mix(in oklab, var(--onyx-text) 50%, transparent)` | 1 | app.css:1999 |
-| `color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2))` | 1 | app.css:2000 |
+| `color-mix(in oklab, var(--onyx-accent) 88%, var(--onyx-text))` | 7 | app.css:1625,1775 · pol-stats.css:119 · pol-studio.css:775 · pol-public.css:148,450,542 |
+| `color-mix(in oklab, var(--onyx-bad) 12%, transparent)` | 6 | pol-shell.css:309 · gap-oper.css:223 · rx-shell.css:199 · gap-shell.css:259 · gap-claim.css:136 · ui-sheets.css:1517 |
+| `color-mix(in oklab, var(--onyx-bad) 45%, var(--onyx-line))` | 5 | pol-shell.css:117 · gap-people.css:93,149 · ui-sheets.css:1474,1504 |
+| `color-mix(in srgb, #000 55%, transparent)` | 5 | pol-shell.css:400,1247 · pol-thread.css:354 · pol-roster.css:351 · calls-engine.css:248 |
+| `color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line))` | 4 | pol-shell.css:308 · pol-thread.css:1779,1934 · gap-shell.css:258 |
+| `color-mix(in oklab, var(--onyx-panel-2) 60%, transparent)` | 3 | app.css:1821 · pol-studio.css:276 · ui-sheets.css:819 |
+| `color-mix(in oklab, var(--onyx-accent) 10%, transparent)` | 3 | pol-stats.css:24 · gap-convo.css:257,259 |
+| `color-mix(in oklab, var(--onyx-warn) 45%, transparent)` | 3 | pol-studio.css:664,1536,1619 |
+| `color-mix(in oklab, var(--onyx-text) 26%, transparent)` | 3 | ui-sheets.css:438,1075,1189 |
+| `color-mix(in oklab, var(--onyx-text) 50%, transparent)` | 2 | app.css:1626,1778 |
+| `color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2))` | 2 | app.css:1626,1779 |
+| `color-mix(in oklab, var(--onyx-dim) 45%, var(--onyx-line))` | 2 | app.css:1668 · pol-shell.css:563 |
+| `color-mix(in oklab, var(--onyx-accent) 80%, var(--onyx-bg))` | 2 | app.css:1818 · pol-public.css:1650 |
+| `color-mix(in oklab, var(--gold) 9%, transparent)` | 2 | gap-appearance.css:245 · pol-thread.css:173 |
+| `color-mix(in oklab, var(--onyx-bad) 14%, transparent)` | 2 | pol-studio.css:1030 · gap-chanserv.css:115 |
+| `color-mix(in oklab, var(--onyx-warn) 40%, transparent)` | 2 | pol-studio.css:1173,1595 |
+| `color-mix(in oklab, var(--onyx-warn) 12%, transparent)` | 2 | pol-studio.css:1178 · pol-thread.css:1265 |
+| `color-mix(in oklab, var(--onyx-line) 55%, var(--onyx-dim))` | 2 | pol-thread.css:16 · gap-import.css:11 |
+| `color-mix(in oklab, var(--onyx-accent) 70%, var(--onyx-line))` | 2 | pol-thread.css:1121,1444 |
+| `color-mix(in srgb, var(--onyx-bg) 78%, transparent)` | 2 | calls-c4.css:104,120 |
+| `color-mix(in oklab, var(--onyx-bad) 10%, transparent)` | 2 | gap-people.css:96 · ui-sheets.css:1093 |
+| `color-mix(in oklab, var(--paper) 40%, transparent)` | 1 | app.css:52 |
+| `color-mix(in oklab, var(--onyx-text) 5%, transparent)` | 1 | app.css:129 |
+| `color-mix(in oklab, var(--onyx-bg) 88%, transparent)` | 1 | app.css:130 |
+| `color-mix(in oklab, #000 90%, transparent)` | 1 | app.css:131 |
+| `color-mix(in oklab, var(--onyx-text) 6%, transparent)` | 1 | app.css:131 |
+| `color-mix(in srgb, var(--onyx-warn) 12%, transparent)` | 1 | app.css:315 |
+| `color-mix(in oklab, var(--lapis-bright) 32%, var(--line))` | 1 | app.css:1391 |
+| `color-mix(in oklab, var(--lapis) 10%, transparent)` | 1 | app.css:1393 |
+| `color-mix(in oklab, var(--paper-dim) 36%, var(--line))` | 1 | app.css:1404 |
+| `color-mix(in oklab, var(--stone-2) 42%, transparent)` | 1 | app.css:1405 |
+| `color-mix(in oklab, var(--shu-bright) 34%, var(--line))` | 1 | app.css:1410 |
+| `color-mix(in oklab, var(--shu) 10%, transparent)` | 1 | app.css:1411 |
+| `color-mix(in oklab, var(--gold) 6%, transparent)` | 1 | gap-appearance.css:243 |
 | `color-mix(in oklab, var(--onyx-text) 58%, var(--onyx-bg))` | 1 | pol-stats.css:23 |
-| `color-mix(in oklab, var(--onyx-accent) 10%, transparent)` | 1 | pol-stats.css:24 |
 | `color-mix(in oklab, var(--pg-text) var(--heat, 4%), var(--onyx-bg))` | 1 | pol-stats.css:831 |
-| `color-mix(in oklab, #000 25%, transparent)` | 1 | pol-studio.css:230 |
-| `color-mix(in oklab, #000 40%, transparent)` | 1 | pol-studio.css:321 |
-| `color-mix(in oklab, var(--onyx-bad) 14%, transparent)` | 1 | pol-studio.css:1036 |
-| `color-mix(in oklab, var(--lapis-deep, var(--onyx-panel-2)) 40%, transparent)` | 1 | pol-studio.css:1322 |
-| `color-mix(in oklab, var(--lapis-bright, var(--onyx-accent)) 45%, transparent)` | 1 | pol-studio.css:1386 |
-| `color-mix(in oklab, var(--shu, var(--onyx-bad)) 55%, transparent)` | 1 | pol-studio.css:1455 |
-| `color-mix(in oklab, var(--onyx-bad) 30%, var(--onyx-bg))` | 1 | pol-studio.css:1602 |
-| `color-mix(in oklab, var(--onyx-panel-2) 55%, transparent)` | 1 | pol-shell.css:99 |
-| `color-mix(in oklab, var(--onyx-bad) 45%, var(--onyx-line))` | 1 | pol-shell.css:130 |
-| `color-mix(in oklab, var(--onyx-warn) 40%, var(--onyx-line))` | 1 | pol-shell.css:277 |
-| `color-mix(in oklab, var(--onyx-bad) 12%, transparent)` | 1 | pol-shell.css:330 |
-| `color-mix(in oklab, var(--onyx-warn) 10%, transparent)` | 1 | pol-shell.css:623 |
+| `color-mix(in oklab, #000 25%, transparent)` | 1 | pol-studio.css:225 |
+| `color-mix(in oklab, #000 40%, transparent)` | 1 | pol-studio.css:316 |
+| `color-mix(in oklab, var(--lapis-deep, var(--onyx-panel-2)) 40%, transparent)` | 1 | pol-studio.css:1316 |
+| `color-mix(in oklab, var(--lapis-bright, var(--onyx-accent)) 45%, transparent)` | 1 | pol-studio.css:1380 |
+| `color-mix(in oklab, var(--shu, var(--onyx-bad)) 55%, transparent)` | 1 | pol-studio.css:1449 |
+| `color-mix(in oklab, var(--onyx-bad) 30%, var(--onyx-bg))` | 1 | pol-studio.css:1596 |
+| `color-mix(in oklab, var(--onyx-panel-2) 55%, transparent)` | 1 | pol-shell.css:89 |
+| `color-mix(in oklab, var(--onyx-warn) 40%, var(--onyx-line))` | 1 | pol-shell.css:260 |
+| `color-mix(in oklab, var(--onyx-warn) 10%, transparent)` | 1 | pol-shell.css:590 |
 | `color-mix(in oklab, var(--onyx-panel) 72%, transparent)` | 1 | pol-thread.css:15 |
-| `color-mix(in oklab, var(--onyx-line) 55%, var(--onyx-dim))` | 1 | pol-thread.css:16 |
-| `color-mix(in oklab, var(--gold) 9%, transparent)` | 1 | pol-thread.css:169 |
-| `color-mix(in oklab, var(--gold) 13%, transparent)` | 1 | pol-thread.css:176 |
-| `color-mix(in oklab, var(--onyx-text) 9%, var(--onyx-panel))` | 1 | pol-thread.css:410 |
-| `color-mix(in oklab, var(--onyx-text) 34%, var(--onyx-line))` | 1 | pol-thread.css:411 |
-| `color-mix(in oklab, var(--onyx-bad) 70%, transparent)` | 1 | pol-thread.css:477 |
-| `color-mix(in srgb, #000 82%, transparent)` | 1 | pol-thread.css:819 |
-| `color-mix(in oklab, var(--onyx-bg) 86%, transparent)` | 1 | pol-thread.css:853 |
-| `color-mix(in oklab, var(--onyx-bad) 8%, var(--onyx-panel))` | 1 | pol-thread.css:1823 |
-| `color-mix(in oklab, var(--lapis) 38%, var(--onyx-panel-2))` | 1 | pol-public.css:581 |
-| `color-mix(in oklab, var(--gold) 46%, var(--onyx-panel-2))` | 1 | pol-public.css:582 |
-| `color-mix(in oklab, var(--shu) 30%, var(--onyx-panel-2))` | 1 | pol-public.css:583 |
-| `color-mix(in oklab, var(--onyx-warn) 50%, transparent)` | 1 | pol-public.css:1077 |
-| `color-mix(in oklab, var(--onyx-bad) 60%, transparent)` | 1 | pol-public.css:1123 |
+| `color-mix(in oklab, var(--gold) 13%, transparent)` | 1 | pol-thread.css:180 |
+| `color-mix(in oklab, var(--onyx-text) 9%, var(--onyx-panel))` | 1 | pol-thread.css:416 |
+| `color-mix(in oklab, var(--onyx-text) 34%, var(--onyx-line))` | 1 | pol-thread.css:417 |
+| `color-mix(in oklab, var(--onyx-bad) 70%, transparent)` | 1 | pol-thread.css:483 |
+| `color-mix(in srgb, #000 88%, transparent)` | 1 | pol-thread.css:839 |
+| `color-mix(in oklab, var(--onyx-bg) 80%, transparent)` | 1 | pol-thread.css:895 |
+| `color-mix(in oklab, var(--onyx-bad) 8%, var(--onyx-panel))` | 1 | pol-thread.css:1936 |
+| `color-mix(in oklab, var(--lapis) 38%, var(--onyx-panel-2))` | 1 | pol-public.css:582 |
+| `color-mix(in oklab, var(--gold) 46%, var(--onyx-panel-2))` | 1 | pol-public.css:583 |
+| `color-mix(in oklab, var(--shu) 30%, var(--onyx-panel-2))` | 1 | pol-public.css:584 |
+| `color-mix(in oklab, var(--onyx-warn) 50%, transparent)` | 1 | pol-public.css:1078 |
+| `color-mix(in oklab, var(--onyx-bad) 60%, transparent)` | 1 | pol-public.css:1124 |
 | `color-mix(in srgb, var(--onyx-bg) 94%, transparent)` | 1 | calls-c8.css:64 |
 | `color-mix(in srgb, var(--onyx-text) 75%, var(--onyx-bg))` | 1 | calls-c8.css:82 |
-| `color-mix(in srgb, #000 58%, transparent)` | 1 | ui-sheets.css:25 |
-| `color-mix(in srgb, #000 22%, transparent)` | 1 | ui-sheets.css:131 |
-| `color-mix(in oklab, var(--onyx-bad) 40%, var(--onyx-line))` | 1 | ui-sheets.css:653 |
-| `color-mix(in oklab, var(--onyx-bg) 40%, var(--onyx-panel))` | 1 | ui-sheets.css:673 |
-| `color-mix(in oklab, var(--onyx-panel-2) 70%, var(--onyx-line))` | 1 | ui-sheets.css:1003 |
-| `color-mix(in oklab, var(--onyx-bad) 10%, transparent)` | 1 | ui-sheets.css:1004 |
-| `color-mix(in oklab, var(--onyx-panel-2) 60%, var(--onyx-line))` | 1 | ui-sheets.css:1032 |
+| `color-mix(in oklab, var(--onyx-bg) 78%, transparent)` | 1 | gap-convo.css:48 |
+| `color-mix(in oklab, var(--onyx-accent) 14%, transparent)` | 1 | gap-oper.css:289 |
+| `color-mix(in oklab, var(--onyx-bg) 72%, #000)` | 1 | rx-shell.css:31 |
+| `color-mix(in oklab, var(--onyx-bg) 55%, var(--onyx-panel))` | 1 | gap-import.css:12 |
+| `color-mix(in oklab, var(--onyx-warn) 60%, var(--onyx-line))` | 1 | gap-import.css:103 |
+| `color-mix(in oklab, var(--onyx-accent) 55%, var(--onyx-line))` | 1 | gap-import.css:375 |
+| `color-mix(in oklab, var(--onyx-line) 55%, transparent)` | 1 | gap-shell.css:168 |
+| `color-mix(in srgb, #000 58%, transparent)` | 1 | ui-sheets.css:39 |
+| `color-mix(in srgb, #000 22%, transparent)` | 1 | ui-sheets.css:227 |
+| `color-mix(in oklab, var(--onyx-bad) 40%, var(--onyx-line))` | 1 | ui-sheets.css:741 |
+| `color-mix(in oklab, var(--onyx-bg) 40%, var(--onyx-panel))` | 1 | ui-sheets.css:761 |
+| `color-mix(in oklab, var(--onyx-panel-2) 70%, var(--onyx-line))` | 1 | ui-sheets.css:1092 |
+| `color-mix(in oklab, var(--onyx-panel-2) 60%, var(--onyx-line))` | 1 | ui-sheets.css:1121 |
+| `color-mix(in oklab, var(--onyx-bad) 5%, transparent)` | 1 | ui-sheets.css:1476 |
+| `color-mix(in oklab, var(--onyx-bad) 70%, var(--onyx-line))` | 1 | ui-sheets.css:1485 |
+| `color-mix(in oklab, var(--onyx-bad) 30%, var(--onyx-line))` | 1 | ui-sheets.css:1511 |
 
-### G3.4 Elm inline styles (bypass every stylesheet) (36)
+### G3.4 Elm inline styles (bypass every stylesheet) (42)
 
 | file:line | property | value expression | literal colours |
 |---|---|---|---|
-| src/View/Appearance.elm:327 | `min-height` | `"44px"` |  |
-| src/View/Appearance.elm:328 | `touch-action` | `"manipulation"` |  |
-| src/View/Appearance.elm:333 | `background` | `color` |  |
-| src/View/Appearance.elm:432 | `background` | `color` |  |
-| src/View/Appearance.elm:488 | `min-height` | `"44px"` |  |
-| src/View/Appearance.elm:489 | `touch-action` | `"manipulation"` |  |
-| src/View/Rail.elm:382 | `background-color` | `c` |  |
+| src/View/Appearance.elm:329 | `min-height` | `"44px"` |  |
+| src/View/Appearance.elm:330 | `touch-action` | `"manipulation"` |  |
+| src/View/Appearance.elm:335 | `background` | `color` |  |
+| src/View/Appearance.elm:434 | `background` | `color` |  |
+| src/View/Appearance.elm:490 | `min-height` | `"44px"` |  |
+| src/View/Appearance.elm:491 | `touch-action` | `"manipulation"` |  |
+| src/View/GapClaim.elm:322 | `width` | `(String.fromInt pct ++ "%")` |  |
+| src/View/GapCommands.elm:145 | `color` | `(Avatar.nickTint nick)` |  |
+| src/View/HistoryImport.elm:98 | `width` | `(String.fromInt pct ++ "%")` |  |
+| src/View/Rail.elm:465 | `background-color` | `c` |  |
+| src/View/Rail.elm:772 | `left` | `(px left)` |  |
+| src/View/Rail.elm:774 | `bottom` | `(px (menu.vh - menu.y + 4))` |  |
+| src/View/Rail.elm:777 | `top` | `(px (menu.y + 4))` |  |
+| src/View/Rail.elm:778 | `max-height` | `` |  |
 | src/View/Stats.elm:865 | `width` | `(String.fromInt (round (toFloat (max 0 room.messages) / toFloat maxMessages * 100)) ++ "%"` |  |
 | src/View/Studio.elm:242 | `touch-action` | `"manipulation"` |  |
 | src/View/Studio.elm:262 | `min-height` | `"44px"` |  |
@@ -1134,442 +1302,526 @@ Theme Studio-editable tokens (src/Studio.elm): `--ink`, `--ink-2`, `--stone`, `-
 | src/View/Studio.elm:1085 | `background` | `dot` |  |
 | src/View/Studio.elm:1140 | `background` | `("var(" ++ row.bg ++ ")")` |  |
 | src/View/Studio.elm:1141 | `color` | `("var(" ++ row.fg ++ ")")` |  |
-| src/View/Thread.elm:506 | `color` | `(Avatar.nickTint m.from)` |  |
-| src/View/Thread.elm:811 | `color` | `(Avatar.nickTint par.from)` |  |
-| src/View/Thread.elm:851 | `color` | `(Avatar.nickTint msg.from)` |  |
+| src/View/Thread.elm:541 | `color` | `(Avatar.nickTint m.from)` |  |
+| src/View/Thread.elm:860 | `color` | `(Avatar.nickTint par.from)` |  |
+| src/View/Thread.elm:900 | `color` | `(Avatar.nickTint msg.from)` |  |
+| src/View/WatchTogether.elm:444 | `width` | `(String.fromFloat (toFloat (round (toFloat (clamp 0 d p) / toFloat d * 1000)) / 10) ++ "%"` |  |
 | src/Avatar.elm:213 | `--onyx-avatar-bg` | `bg` |  |
 | src/Avatar.elm:214 | `--onyx-avatar-fg` | `fg` |  |
-| src/View/CallDock.elm:338 | `--pip-ix` | `(String.fromInt (12 + pos.x) ++ "px")` |  |
-| src/View/CallDock.elm:339 | `--pip-iy` | `(String.fromInt (12 + pos.y) ++ "px")` |  |
-| src/View/RoomSettings.elm:1177 | `--room-heat` | `(String.fromFloat (toFloat (round (toFloat (safe count) / toFloat peak * 1000)) / 1000))` |  |
+| src/View/RoomSettings.elm:1172 | `--room-heat` | `(String.fromFloat (toFloat (round (toFloat (safe count) / toFloat peak * 1000)) / 1000))` |  |
 | src/View/Stats.elm:326 | `--h` | `(Stats.barHeight day.messages peak)` |  |
 | src/View/Stats.elm:539 | `--h` | `(String.fromInt (max 3 (round (toFloat messages / toFloat (max 1 hourPeak) * 100))))` |  |
 | src/View/Stats.elm:573 | `--h` | `(String.fromInt (max 3 (round (toFloat day.messages / toFloat dayPeak * 100))))` |  |
 | src/View/Stats.elm:633 | `--heat` | `(heatOf messages)` |  |
 | src/View/Stats.elm:1033 | `--h` | `(sparkHeight n)` |  |
-| src/View/Thread.elm:532 | `--nick-tint` | `(Avatar.nickTint m.from)` |  |
-| src/View/Thread.elm:890 | `--nick-tint` | `(Avatar.nickTint msg.from)` |  |
+| src/View/Thread.elm:567 | `--nick-tint` | `(Avatar.nickTint m.from)` |  |
+| src/View/Thread.elm:955 | `--nick-tint` | `(Avatar.nickTint msg.from)` |  |
 
-### G3.5 Font sizes off the --text-* ladder (256 of 978)
+### G3.5 Font sizes off the --text-* ladder (309 of 1283)
 
 | value | count | where |
 |---|---|---|
-| `12px` | 65 | app.css:145,149,157,158,162,172,173,180,181,184,186,193,354,465,471,773,1165,1167,1226,1232,1239,1241,1242,1248,1256,1257,1259,1298,1315,1338,1373,1376,1388,1418,1420,1426,1476,1486,1487,1492,1495,1497,1510,1517,1518,1582,1660,1672,1690,1707,1718,1790,1815,1828,1842,1845,1847,1848,3201,3214,3253,3284,3288,3326,3354 |
-| `13px` | 65 | app.css:348,731,823,900,954,1032,1043,1050,1309,1345,1365,1367,1377,1385,1414,1422,1427,1470,1473,1483,1491,1506,1509,1511,1544,1546,1547,1548,1549,1551,1558,1562,1570,1593,1620,1641,1698,1702,1711,1712,1713,1716,1726,1756,1759,1768,1772,1776,1792,1793,1794,1795,1811,1812,1814,1821,1827,1834,1843,3210,3219,3350,3361,3365,3369 |
-| `11px` | 15 | app.css:196,415,677,688,1225,1236,1493,1715,2076,3193,3304 · pol-studio.css:1263 · pol-shell.css:840,1256,1421 |
-| `16px` | 13 | app.css:1115,1299,3408 · pol-shell.css:1038,1319 · pol-thread.css:387,1289,1308,1569 · pol-roster.css:396,401 · calls-c8.css:52 · ui-sheets.css:825 |
-| `18px` | 12 | app.css:719,1205,1207,1237,1363,1364,1543,1545,1654,1749,3287,3359 |
-| `15px` | 9 | app.css:156,859,1689,1755,1789,1810,3194 · pol-shell.css:1389 · pol-thread.css:406 |
-| `9px` | 6 | pol-studio.css:1296,1317,1341,1376,1412,1481 |
-| `10px` | 5 | pol-studio.css:1439 · pol-shell.css:647,707,1029,1238 |
-| `17px` | 4 | app.css:925,1020,1403,3341 |
-| `14px` | 4 | app.css:1148,1251,1417,1701 |
-| `20px` | 3 | app.css:961 · pol-thread.css:327 · calls-c8.css:32 |
-| `1rem` | 3 | app.css:1938 · pol-public.css:912,1404 |
-| `24px` | 3 | app.css:3195 · pol-thread.css:389,1310 |
+| `0.8125rem` | 59 | app.css:706,783,982,1015,1031,1041,1049,1063,1070,1075,1095,1098,1108,1116,1131,1134,1136,1164,1165,1166,1167,1169,1176,1180,1188,1204,1222,1236,1265,1274,1275,1276,1279,1289,1292,1301,1305,1309,1325,1326,1327,1328,1344,1345,1347,1354,1360,1367,1376,2914,2923,3041,3052,3056,3060 · gap-appearance.css:190 · gap-oper.css:198,253,419 |
+| `0.75rem` | 51 | app.css:192,196,207,227,365,451,677,866,868,917,925,927,928,934,942,943,945,971,988,1008,1037,1040,1052,1068,1074,1101,1111,1112,1117,1120,1122,1135,1142,1143,1252,1270,1281,1323,1348,1361,1375,1378,1380,1381,2905,2918,2990,3019,3045 · pol-roster.css:400 · rx-shell.css:163 |
+| `16px` | 26 | gap-appearance.css:313 · pol-shell.css:1287 · pol-thread.css:393,1391,1410,1678,2330,2407,2475,2581 · pol-roster.css:392 · gap-account.css:141,145 · gap-oper.css:230,231,397,423 · rx-shell.css:435,459 · gap-import.css:454 · gap-organize.css:741 · gap-usermodes.css:399 · gap-watch.css:665 · gap-shell.css:345,362 · ui-sheets.css:903 |
+| `var(--oc-fs)` | 25 | gap-oper.css:28,38,85,108,112,115,165,176,183,196,212,247,263,281,329,353,360,361,367,374,391,393,400,401,403 |
+| `0.6875rem` | 15 | app.css:602,613,916,1118,1278,2898,3003 · pol-studio.css:1257 · pol-shell.css:807,1206,1224,1389 · rx-shell.css:364,374 · gap-organize.css:114 |
+| `var(--oc-fs-meta)` | 13 | gap-oper.css:36,109,110,166,261,325,328,331,352,354,369,377,392 |
+| `1rem` | 10 | app.css:831,972,1902,3088 · pol-shell.css:1005 · pol-roster.css:399 · pol-public.css:913,1404 · calls-c8.css:52 · rx-shell.css:258 |
+| `1.5rem` | 9 | app.css:1865 · pol-thread.css:395,1412,2331,2477 · pol-public.css:1357 · gap-auth.css:29 · calls-engine.css:431,469 |
+| `0.875rem` | 8 | app.css:849,937 · gap-oper.css:418,420,422,426 · gap-auth.css:26 · calls-engine.css:535 |
+| `0.9375rem` | 7 | app.css:742,1322,1343,2899 · pol-shell.css:1357 · pol-thread.css:412 · gap-people.css:60 |
+| `1.25rem` | 6 | app.css:1499 · pol-thread.css:333 · pol-public.css:956,1421 · calls-c8.css:32 · gap-auth.css:95 |
+| `9px` | 6 | pol-studio.css:1290,1311,1335,1370,1406,1475 |
+| `1.125rem` | 5 | app.css:1465,2989,3050 · pol-public.css:110 · calls-engine.css:227 |
+| `max(1rem, 16px)` | 4 | app.css:1659 · pol-stats.css:1056 · pol-studio.css:1776 · pol-public.css:1665 |
+| `0.625rem` | 4 | gap-appearance.css:186 · pol-shell.css:614,674,996 |
+| `1.75rem` | 3 | app.css:734,1468 · pol-shell.css:1019 |
+| `2rem` | 3 | app.css:1859 · pol-public.css:1787 · calls-engine.css:395 |
+| `1.0625rem` | 3 | app.css:3032 · gap-organize.css:672 · calls-engine.css:293 |
 | `clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem)` | 3 | pol-stats.css:146,279,411 |
-| `max(1rem, 16px)` | 3 | pol-stats.css:1056 · pol-studio.css:1782 · pol-public.css:1665 |
-| `0.72rem` | 2 | app.css:134,205 |
-| `1.125rem` | 2 | app.css:1921 · pol-public.css:110 |
-| `1.75rem` | 2 | app.css:1924 · pol-shell.css:1052 |
-| `1.5rem` | 2 | app.css:2048 · pol-public.css:1356 |
+| `0.72rem` | 2 | app.css:181,246 |
 | `font: var(--text-2xs) / 1.2 var(--font-mono)` | 2 | pol-stats.css:814,824 |
-| `0` | 2 | pol-studio.css:307 · ui-sheets.css:230 |
-| `font: 600 var(--text-2xs) / 1 var(--font-mono)` | 2 | pol-shell.css:122 · ui-sheets.css:478 |
-| `1.25rem` | 2 | pol-public.css:955,1421 |
-| `0.86rem` | 1 | app.css:135 |
-| `28px` | 1 | app.css:851 |
-| `44px` | 1 | app.css:914 |
-| `0.62rem` | 1 | app.css:1863 |
-| `2rem` | 1 | app.css:2043 |
-| `0.92em` | 1 | app.css:2068 |
-| `0.85em` | 1 | app.css:2081 |
-| `1.1em` | 1 | app.css:2085 |
+| `0` | 2 | pol-studio.css:302 · ui-sheets.css:333 |
+| `font: 600 var(--text-2xs) / 1 var(--font-mono)` | 2 | pol-shell.css:109 · ui-sheets.css:574 |
+| `font: var(--oc-fs-meta) / 1.4 var(--font-mono)` | 2 | gap-oper.css:267,330 |
+| `0.86rem` | 1 | app.css:182 |
+| `0.62rem` | 1 | app.css:1396 |
+| `clamp(2.25rem, 1.1rem + 2.2vw, 3.25rem)` | 1 | app.css:1839 |
+| `1.625rem` | 1 | app.css:1899 |
+| `0.92em` | 1 | app.css:1930 |
+| `0.85em` | 1 | app.css:1942 |
+| `1.1em` | 1 | app.css:1946 |
+| `93.75%` | 1 | gap-appearance.css:151 |
+| `112.5%` | 1 | gap-appearance.css:152 |
 | `clamp(1.5rem, 1.15rem + 1.4vw, 2.25rem)` | 1 | pol-stats.css:80 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)` | 1 | pol-stats.css:546 |
 | `font: var(--text-sm) / 1.2 var(--font-mono)` | 1 | pol-stats.css:969 |
-| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | 1 | pol-studio.css:86 |
-| `10.5px` | 1 | pol-thread.css:146 |
-| `1.1rem` | 1 | pol-thread.css:616 |
-| `0.78rem` | 1 | pol-roster.css:402 |
+| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | 1 | pol-studio.css:85 |
+| `10px` | 1 | pol-studio.css:1433 |
+| `0.65625rem` | 1 | pol-thread.css:150 |
+| `1.1rem` | 1 | pol-thread.css:620 |
+| `0.6rem` | 1 | pol-thread.css:1964 |
 | `0.9em` | 1 | pol-public.css:39 |
 | `clamp(2rem, 1.4rem + 2.6vw, 2.75rem)` | 1 | pol-public.css:385 |
-| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | 1 | pol-public.css:514 |
-| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | 1 | pol-public.css:523 |
-| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | 1 | pol-public.css:621 |
-| `clamp(2.375rem, 9.6vw, 2.75rem)` | 1 | pol-public.css:778 |
-| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | 1 | pol-public.css:909 |
-| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | 1 | pol-public.css:992 |
-| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | 1 | pol-public.css:1360 |
+| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | 1 | pol-public.css:515 |
+| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | 1 | pol-public.css:524 |
+| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | 1 | pol-public.css:622 |
+| `clamp(2.375rem, 9.6vw, 2.75rem)` | 1 | pol-public.css:779 |
+| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | 1 | pol-public.css:910 |
+| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | 1 | pol-public.css:993 |
+| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | 1 | pol-public.css:1361 |
 | `clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem)` | 1 | pol-public.css:1442 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2rem)` | 1 | pol-public.css:1461 |
 | `clamp(1.75rem, 1.3rem + 2vw, 2.5rem)` | 1 | pol-public.css:1557 |
+| `clamp(100%, calc(62.5% + 0.35vw), 125%)` | 1 | pol-public.css:1691 |
+| `2.375rem` | 1 | pol-public.css:1795 |
+| `clamp(2.5rem, 1rem + 3.6vw, 3rem)` | 1 | pol-public.css:1826 |
+| `font: var(--oc-fs-meta) / 1.5 var(--font-mono)` | 1 | gap-oper.css:324 |
+| `font: 13px / 1.5 var(--font-mono)` | 1 | gap-oper.css:384 |
+| `0.66rem` | 1 | rx-shell.css:47 |
+| `106.25%` | 1 | rx-shell.css:649 |
+| `1.375rem` | 1 | calls-engine.css:162 |
+| `2.25rem` | 1 | calls-engine.css:399 |
+| `1.1875rem` | 1 | calls-engine.css:455 |
 
-### G3.6 Line heights off --leading-* (31 of 162)
+### G3.6 Line heights off --leading-* (61 of 262)
 
 | value | count | where |
 |---|---|---|
-| `16px` | 3 | pol-shell.css:648,709,1240 |
-| `20px` | 3 | pol-shell.css:1388 · pol-thread.css:1043,1289 |
-| `0` | 3 | pol-thread.css:120,925 · ui-sheets.css:231 |
-| `1.6` | 3 | pol-public.css:1026,1536,1589 |
-| `1.05` | 2 | app.css:917 · pol-public.css:1442 |
-| `1.1` | 2 | app.css:2204 · pol-stats.css:909 |
-| `1.2` | 2 | app.css:2748 · pol-public.css:426 |
-| `18px` | 2 | app.css:3592 · pol-shell.css:841 |
-| `1.65` | 2 | pol-public.css:912,1595 |
-| `1.15` | 1 | app.css:1927 |
-| `1.45` | 1 | app.css:2990 |
-| `1.4` | 1 | pol-studio.css:1264 |
-| `1.25` | 1 | pol-shell.css:1250 |
-| `1.3` | 1 | pol-shell.css:1251 |
+| `1.2` | 8 | app.css:2498 · pol-public.css:426 · gap-import.css:35,81,336 · gap-usermodes.css:55 · gap-claim.css:116 · calls-engine.css:469 |
+| `1.6` | 8 | gap-appearance.css:178 · pol-thread.css:2262 · pol-public.css:1027,1536,1589 · gap-oper.css:325,328,354 |
+| `1.3` | 5 | pol-shell.css:1219 · gap-convo.css:16 · rx-shell.css:203,408 · gap-shell.css:337 |
+| `1.4` | 4 | gap-appearance.css:165 · pol-studio.css:1258 · pol-thread.css:2318 · gap-usermodes.css:180 |
+| `16px` | 4 | pol-shell.css:615,676 · pol-thread.css:2542 · gap-organize.css:115 |
+| `20px` | 4 | pol-shell.css:1208,1356 · pol-thread.css:1145,1391 |
+| `0` | 4 | pol-thread.css:124,1027,1963 · ui-sheets.css:334 |
+| `18px` | 3 | pol-shell.css:808 · rx-shell.css:365,374 |
+| `1.25` | 3 | pol-shell.css:1218 · gap-convo.css:126 · rx-shell.css:407 |
+| `1.05` | 2 | app.css:1839 · pol-public.css:1442 |
+| `1.1` | 2 | app.css:2048 · pol-stats.css:909 |
+| `1.35` | 2 | gap-appearance.css:170 · gap-convo.css:147 |
+| `1.5` | 2 | pol-public.css:525 · gap-account.css:131 |
+| `1.65` | 2 | pol-public.css:913,1595 |
+| `1.45` | 2 | gap-commands.css:96,138 |
+| `1.15` | 1 | app.css:1471 |
+| `1.62` | 1 | gap-appearance.css:173 |
 | `1.08` | 1 | pol-public.css:388 |
-| `1.02` | 1 | pol-public.css:517 |
-| `1.5` | 1 | pol-public.css:524 |
+| `1.02` | 1 | pol-public.css:518 |
 | `1.9` | 1 | pol-public.css:1608 |
+| `1.72` | 1 | gap-organize.css:673 |
 
-### G3.7 Font weights (no weight tokens exist) (449)
+### G3.7 Font weights (no weight tokens exist) (547)
 
 | value | count | where |
 |---|---|---|
-| `650` | 163 | app.css:160,182,235,454,556,634,655,674,782,824,848,892,941,972,1028,1051,1224,1247,1333,1372,1933,2016,2231,2274,2433,2721,2903,2924,2940,3047,3066,3210,3214,3219,3241,3282,3304,3326,3354,3369,3617,3659,3797 · pol-stats.css:72,81,107,218,311,439,506,623,680,912 · pol-studio.css:87,118,130,197,357,452,458,490,504,649,658,691,809,821,1091,1297,1320,1377,1440,1533,1567 · pol-shell.css:48,182,201,216,228,297,386,480,815,1014 · pol-thread.css:384,407,461,621,668,781,889,928,939,966,1108,1130,1258,1445,1547,1552,1589,1763,1849 · pol-roster.css:56,162,228 · pol-public.css:63,144,185,231,240,301,377,425,511,537,586,629,672,703,751,864,865,924,930,950,966,1007,1012,1072,1080,1083,1090,1104,1134,1154,1233,1242,1372,1394,1469,1497,1515 · calls-c8.css:50,68,83,92,95,110 · calls-c11.css:36,104 · polish.css:107,299 · calls-c6.css:28 · calls-c4.css:106 · ui-sheets.css:165,170,179,264,436,599,780,1070 |
-| `600` | 142 | app.css:205,264,314,355,378,678,689,949,1140,1165,1180,1217,1426,1495,1516,1548,1964,2012,2014,2027,2061,2107,2129,2174,2298,2312,2318,2319,2330,2335,2339,2347,2354,2365,2371,2378,2519,2528,2845,2977,3085,3093,3101,3201,3253 · pol-stats.css:729 · pol-studio.css:154,260,373,563,591,713,757,904,992,1118,1176,1190,1612,1745,1754 · pol-shell.css:72,188,319,334,374,447,485,608,765,784,1061,1119,1382,1401,1422 · pol-thread.css:438,628,644,710,748,770,801,857,1183,1199,1230,1245,1266,1462,1499,1651,1690,1799,1811 · pol-roster.css:64,166,338 · pol-public.css:123,186,251,313,545,645,725,740,759,824,874,895,938,988,1118,1235,1285,1317,1414,1436,1516,1597,1629 · calls-c8.css:19,74 · account2.css:8,102 · roomsettings.css:77,110,123,143,164,209,222,276,284,298,304 · calls-c4.css:33 · ui-sheets.css:644,655,751,885,1074 |
-| `700` | 102 | app.css:179,183,196,416,525,562,584,737,753,962,1021,1297,1363,1543,1551,1574,1701,1717,1750,1755,1827,1921,1988,2250,2814,3190,3231,3591 · pol-stats.css:147,184,238,280,353,364,379,412,540,547,580,600,601,642,643,792,794,819,905,907,909,926,959 · pol-studio.css:72,1286,1342,1362,1416,1469,1499,1591 · pol-shell.css:144,336,351,582,708,730,817,921,1030,1052,1175,1239,1303,1371,1383 · pol-thread.css:483,509,514,618,1751 · pol-public.css:110,219,565,621,691,909,963,965,992,1014,1178,1195,1215,1264,1357,1461,1505,1588,1598 · roomsettings.css:156 · calls-c6.css:151 · ui-sheets.css:461,604 |
-| `400` | 17 | app.css:2427,2478,2571 · pol-stats.css:824,937 · pol-studio.css:291,1125 · pol-shell.css:271 · pol-thread.css:719,861,1068,1210,1241 · pol-public.css:955 · polish.css:16,65,144 |
-| `750` | 14 | app.css:852,915,1925,3296,3341 · pol-shell.css:349 · pol-thread.css:593 · pol-public.css:386,515,579,1442,1557 · calls-c11.css:138 · calls-c6.css:37 |
-| `500` | 7 | app.css:2724,3213,3283 · pol-studio.css:1079 · pol-shell.css:491 · pol-thread.css:669 · pol-roster.css:224 |
-| `800` | 3 | app.css:129,1864 · pol-stats.css:417 |
+| `650` | 199 | app.css:206,225,440,559,580,599,683,707,731,775,915,933,1003,1036,1539,1546,1593,1654,1707,1718,1799,2628,2649,2665,2762,2781,2914,2918,2923,2944,2984,3003,3019,3045,3060 · pol-stats.css:72,81,107,218,311,439,506,623,680,912 · pol-studio.css:86,113,125,192,352,446,452,484,498,643,652,685,803,815,1085,1291,1314,1371,1434,1527,1561 · pol-shell.css:165,184,199,211,278,365,445,782,981 · pol-thread.css:390,413,467,625,672,794,993,1030,1041,1068,1210,1232,1360,1554,1656,1661,1698,1876,1966 · pol-roster.css:54,158,224 · pol-public.css:63,144,185,231,240,301,377,425,512,538,587,630,673,704,752,865,866,925,931,951,967,1008,1013,1073,1081,1084,1091,1105,1135,1155,1234,1243,1394,1469,1497,1515,1725 · calls-c8.css:50,68,83,92,95,110 · calls-c11.css:36,104 · polish.css:107,299 · calls-c6.css:28 · calls-c4.css:105 · gap-convo.css:69,137,237 · gap-oper.css:165,176,328,360,364,422,426 · rx-shell.css:241,295 · gap-chanserv.css:168 · gap-import.css:119,124,139,140,180,207,287,298,304,412,433 · gap-people.css:74,107 · gap-organize.css:240,360 · gap-commands.css:32 · gap-watch.css:125,136,280,384,494,525,643,716,717 · gap-shell.css:240,248,277,321 · gap-claim.css:37 · ui-sheets.css:132,271,276,285,365,532,858,1163,1343 · calls-engine.css:481 |
+| `600` | 194 | app.css:246,294,335,366,603,614,842,866,881,909,1074,1120,1141,1166,1607,1636,1647,1685,1795,1797,1813,1923,1962,2022,2127,2128,2139,2144,2148,2156,2163,2174,2180,2316,2325,2577,2699,2795,2803,2811,2905,2956 · pol-stats.css:729 · pol-studio.css:149,255,368,557,585,707,751,898,986,1112,1170,1184,1606,1739,1748 · pol-shell.css:62,171,298,313,353,422,450,575,732,751,1028,1086,1350,1369,1390 · pol-thread.css:444,632,648,714,761,783,814,915,1285,1301,1332,1347,1368,1571,1608,1760,1799,1912,1924,2193,2527 · pol-roster.css:62,162,334 · pol-public.css:123,186,251,313,546,646,726,741,760,825,875,896,939,989,1119,1236,1286,1318,1414,1436,1516,1597,1629,1739 · calls-c8.css:19,74 · account2.css:8,102 · roomsettings.css:77,110,123,141,162,207,220,274,282,296,302 · calls-c4.css:33 · gap-convo.css:211 · gap-account.css:37,57,99 · gap-oper.css:86,213,282,413 · rx-shell.css:307 · gap-chanserv.css:27,144,287 · gap-import.css:34,97,151,204,265,335,441 · gap-people.css:42 · gap-organize.css:164,268,297,300,333,375,413,497,526,541,689 · gap-usermodes.css:68,127,195,241,273,304,359,373 · gap-commands.css:58,137 · gap-watch.css:312 · gap-shell.css:68,103,141,309 · gap-claim.css:46,74,115 · ui-sheets.css:732,743,827,965,1167,1353,1486,1623 |
+| `700` | 107 | app.css:222,226,239,495,524,541,658,970,1169,1192,1280,1360,1465,1505,1547,1622,1767,2077,2895,2934,3256 · pol-stats.css:147,184,238,280,353,364,379,412,540,547,580,600,601,642,643,792,794,819,905,907,909,926,959 · pol-studio.css:72,1280,1336,1356,1410,1463,1493,1585 · pol-shell.css:131,315,330,549,675,697,784,888,997,1019,1142,1207,1271,1339,1351 · pol-thread.css:489,514,519,622,1864 · pol-public.css:110,219,566,622,692,910,964,966,993,1015,1179,1196,1216,1265,1358,1461,1505,1588,1598 · roomsettings.css:154 · calls-c6.css:144 · rx-shell.css:158,171 · gap-chanserv.css:59 · gap-organize.css:84,116,230,529,595,695 · gap-usermodes.css:251 · gap-commands.css:28 · gap-auth.css:51 · ui-sheets.css:557,692 |
+| `400` | 20 | app.css:2233,2278 · pol-stats.css:824,937 · pol-studio.css:286,1119 · pol-shell.css:254 · pol-thread.css:723,1170,1312,1343 · pol-public.css:956 · polish.css:16,65,144 · rx-shell.css:202 · gap-import.css:352 · gap-organize.css:542 · gap-usermodes.css:148 · gap-shell.css:143 |
+| `750` | 15 | app.css:735,1469,1500,1589,2997,3032 · pol-shell.css:328 · pol-thread.css:597 · pol-public.css:386,516,580,1442,1557 · calls-c11.css:138 · calls-c6.css:37 |
+| `500` | 8 | app.css:2474,2917,2985 · pol-studio.css:1073 · pol-shell.css:456 · pol-thread.css:673 · pol-roster.css:220 · rx-shell.css:369 |
+| `800` | 3 | app.css:176,1397 · pol-stats.css:417 |
 | `inherit` | 1 | calls-c4.css:27 |
 
-### G3.8 Radii off a token (208 of 549)
+### G3.8 Radii off a token (221 of 669)
 
 | value | count | where |
 |---|---|---|
-| `6px` | 71 | app.css:159,172,342,366,382,397,440,681,693,761,778,797,866,887,939,995,1103,1137,1177,1187,1225,1271,1287,1305,1319,1329,1370,1381,1408,1465,1481,1515,1522,1556,1567,1579,1590,1606,1617,1628,1639,1652,1669,1695,1705,1723,1765,1819,1832,1845,2073,3209,3218,3226,3235,3240,3249,3303,3314,3318,3325,3336,3345,3348,3358,3373 · polish.css:46,190,255,297,343 |
-| `50%` | 38 | app.css:128,201,275,299,836,1746,1760,2332,2563,3104,3184,3189,3263,3267,3278 · pol-stats.css:176,448,564,890 · pol-studio.css:229,319,1245,1333,1509 · pol-shell.css:440,853,1035,1044 · pol-thread.css:504,610,1175 · pol-public.css:575,1043 · account2.css:151 · roomsettings.css:102,268 · ui-sheets.css:521,525 |
-| `4px` | 23 | app.css:2069,2640 · pol-stats.css:675 · pol-studio.css:910,1083,1151,1152,1313,1381,1442,1466 · pol-thread.css:236,289,1066,1148,1263,1281,1647 · pol-public.css:41 · polish.css:62,134 · ui-sheets.css:482,505 |
-| `2px` | 15 | app.css:1973,3406 · pol-stats.css:830 · pol-shell.css:583,819,1302,1377 · pol-thread.css:869 · polish.css:217,226 · ui-sheets.css:337,866,982,1095 · calls-engine.css:98 |
-| `999px` | 14 | app.css:173,184,186,193,196,205,267,318,332,3103 · roomsettings.css:258 · ui-sheets.css:728,884,907 |
-| `10px` | 11 | app.css:1156,1197,1354,1395,1534,1905 · pol-studio.css:246 · pol-public.css:293,553,1353,1389 |
-| `8px` | 10 | app.css:177,1087,1124,1216,1221,1243,1680,1734,1781,1802 |
-| `12px 12px 0 0` | 7 | pol-thread.css:362,1303 · pol-roster.css:370 · polish.css:367 · ui-sheets.css:309,970,1084 |
-| `3px` | 5 | app.css:245,569,2062,2081 · pol-public.css:1202 |
-| `2px 2px 0 0` | 3 | pol-stats.css:717,811 · roomsettings.css:342 |
-| `0 3px 3px 0` | 2 | pol-shell.css:692,812 |
-| `1px` | 2 | pol-public.css:168,861 |
-| `0 0 6px 6px` | 1 | app.css:3293 |
-| `6px 6px 0 0` | 1 | app.css:3404 |
-| `calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0` | 1 | pol-shell.css:1291 |
-| `calc(var(--radius) * 1.5)` | 1 | pol-shell.css:1322 |
-| `calc(var(--radius) * 2)` | 1 | pol-shell.css:1374 |
-| `0 0 4px 4px` | 1 | pol-thread.css:306 |
-| `calc(var(--radius) + 3px)` | 1 | pol-public.css:659 |
+| `6px` | 58 | app.css:356,377,388,401,429,606,618,666,680,749,770,819,840,878,888,916,960,978,992,1001,1034,1045,1090,1106,1140,1147,1174,1185,1196,1213,1228,1234,1246,1268,1298,1352,1365,1378,1935,2913,2922,2930,2938,2943,2952,3002,3011,3018,3028,3036,3039,3049,3064 · polish.css:46,190,255,297,343 |
+| `50%` | 51 | app.css:175,244,301,322,719,1293,1585,1740,2141,2352,2814,2889,2894,2965,2969,2980 · pol-stats.css:176,448,564,890 · pol-studio.css:224,314,1239,1327,1503 · pol-shell.css:415,820,1002,1011 · pol-thread.css:509,614,1277 · pol-public.css:576,1044 · account2.css:150 · roomsettings.css:102,266 · gap-convo.css:28,278 · gap-chanserv.css:237 · gap-organize.css:235,469,581 · gap-commands.css:155 · gap-shell.css:105,146,177 · ui-sheets.css:617,621,1452 · calls-engine.css:88 |
+| `4px` | 26 | app.css:1931,2414 · pol-stats.css:675 · pol-studio.css:904,1077,1145,1146,1307,1375,1436,1460 · pol-thread.css:240,295,911,1168,1250,1365,1383,1756,2259 · pol-public.css:41 · polish.css:62,134 · gap-chanserv.css:136 · ui-sheets.css:578,601 |
+| `999px` | 22 | app.css:218,227,229,236,239,246,339,348,2813 · roomsettings.css:256 · gap-account.css:102 · gap-oper.css:277,331,354,379 · gap-usermodes.css:178,247 · gap-commands.css:145 · ui-sheets.css:964,1006,1387,1440 |
+| `2px` | 16 | app.css:1752,3086 · pol-stats.css:830 · pol-shell.css:550,786,1270,1345 · pol-thread.css:973 · polish.css:217,226 · gap-import.css:99 · gap-claim.css:154 · ui-sheets.css:437,1074,1188 · calls-engine.css:260 |
+| `10px` | 8 | app.css:857,1447,1847 · pol-studio.css:241 · pol-public.css:293,554,1354,1389 |
+| `12px 12px 0 0` | 7 | pol-thread.css:368,1405 · pol-roster.css:366 · polish.css:367 · ui-sheets.css:410,1062,1177 |
+| `3px` | 6 | app.css:530,1924,1942 · pol-thread.css:2157 · pol-public.css:1203 · gap-convo.css:281 |
+| `8px` | 5 | app.css:908,929,1314,1335,1496 |
+| `calc(var(--radius) * 1.5)` | 4 | pol-shell.css:1290 · rx-shell.css:162,292 · gap-organize.css:233 |
+| `2px 2px 0 0` | 3 | pol-stats.css:717,811 · roomsettings.css:340 |
+| `1px` | 3 | pol-public.css:168,862 · gap-watch.css:182 |
+| `0 3px 3px 0` | 2 | pol-shell.css:659,779 |
+| `calc(var(--radius) * 2)` | 2 | pol-shell.css:1342 · rx-shell.css:326 |
+| `calc(var(--radius) - 2px)` | 2 | gap-shell.css:72,137 |
+| `13px` | 1 | app.css:1729 |
+| `0 0 6px 6px` | 1 | app.css:2995 |
+| `6px 6px 0 0` | 1 | app.css:3084 |
+| `calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0` | 1 | pol-shell.css:1259 |
+| `0 0 4px 4px` | 1 | pol-thread.css:312 |
+| `calc(var(--radius) + 3px)` | 1 | pol-public.css:660 |
 
-### G3.9 Shadows off --elev-* (47 of 71)
+### G3.9 Shadows off --elev-* (53 of 82)
 
 | file:line | selector | property | value |
 |---|---|---|---|
-| app.css:85 | `:root` | --elev-1 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, transparent) inset` |
-| app.css:86 | `:root` | --elev-2 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-bg) 88%, transparent)` |
-| app.css:87 | `:root` | --elev-3 | `0 28px 56px -32px color-mix(in oklab, #000 90%, transparent), 0 1px 0 color-mix(in oklab, var(--onyx-text) 6%, transpare` |
-| app.css:136 | `.onyx-avatar--owner` | box-shadow | `0 0 0 2px var(--gold)` |
-| app.css:141 | `.onyx-row-avatar .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
-| app.css:203 | `.onyx-facepile-face .onyx-avatar` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| app.css:2570 | `.onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 2px var(--onyx-faint)` |
-| app.css:2667 | `.onyx-spotlight-panel, .onyx-shortcuts-sheet` | box-shadow | `0 12px 32px rgb(0 8 16 / 45%)` |
-| app.css:2882 | `.onyx-moddesk-sheet` | box-shadow | `-8px 0 24px rgb(0 0 0 / 35%)` |
-| app.css:3074 | `.onyx-prefs` | box-shadow | `0 8px 24px rgba(0, 0, 0, 0.35)` |
-| app.css:3084 | `.pref-category-tab[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| app.css:3337 | `.onyx-call-sheet` | box-shadow | `0 12px 32px rgba(0, 0, 0, 0.35)` |
+| app.css:129 | `:root` | --elev-1 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, transparent) inset` |
+| app.css:130 | `:root` | --elev-2 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-bg) 88%, transparent)` |
+| app.css:131 | `:root` | --elev-3 | `0 28px 56px -32px color-mix(in oklab, #000 90%, transparent), 0 1px 0 color-mix(in oklab, var(--onyx-text) 6%, transpare` |
+| app.css:183 | `.onyx-avatar--owner` | box-shadow | `0 0 0 2px var(--gold)` |
+| app.css:188 | `.onyx-row-avatar .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
+| app.css:1563 | `.conn-identity[data-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| app.css:1785 | `.conn-submit--quiet, .conn-submit--quiet:hover:not(:disabled)` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| app.css:2794 | `.pref-category-tab[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-stats.css:321 | `.roadmap-legend a[aria-current='location']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
 | pol-stats.css:340 | `.roadmap-card:is(:target, [data-current='true'])` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-stats.css:956 | `.stats-page .data-room-row[data-selected='true']` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-studio.css:230 | `.ap-swatch > span, .ap-theme-swatch > span` | box-shadow | `inset 0 0 0 1px color-mix(in oklab, #000 25%, transparent)` |
-| pol-studio.css:321 | `.ap-choice-toggle > b::after` | box-shadow | `0 1px 3px color-mix(in oklab, #000 40%, transparent)` |
-| pol-studio.css:538 | `.background-picker__card--selected` | box-shadow | `inset 0 0 0 1px var(--onyx-text)` |
-| pol-shell.css:652 | `.onyx-topbar .shell-ribbon-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-shell.css:714 | `.onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-shell.css:1245 | `.onyx-room-back-count` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| pol-shell.css:1377 | `.onyx-rail .onyx-rail-color` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| pol-shell.css:1431 | `.onyx-mobile-nav .onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-thread.css:170 | `.onyx-mention` | box-shadow | `inset 2px 0 0 var(--gold)` |
-| pol-thread.css:181 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-thread.css:926 | `.onyx-thread-msg-face .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
-| pol-thread.css:1265 | `.onyx-composer .shell-command-item--active` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-thread.css:1655 | `.room-media-index-filter[aria-selected='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
-| pol-roster.css:243 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px var(--onyx-faint)` |
-| pol-roster.css:414 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px CanvasText` |
+| pol-studio.css:225 | `.ap-swatch > span, .ap-theme-swatch > span` | box-shadow | `inset 0 0 0 1px color-mix(in oklab, #000 25%, transparent)` |
+| pol-studio.css:316 | `.ap-choice-toggle > b::after` | box-shadow | `0 1px 3px color-mix(in oklab, #000 40%, transparent)` |
+| pol-studio.css:532 | `.background-picker__card--selected` | box-shadow | `inset 0 0 0 1px var(--onyx-text)` |
+| pol-shell.css:619 | `.onyx-topbar .shell-ribbon-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-shell.css:681 | `.onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-shell.css:1345 | `.onyx-rail .onyx-rail-color` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
+| pol-shell.css:1399 | `.onyx-mobile-nav .onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-thread.css:174 | `.onyx-mention` | box-shadow | `inset 2px 0 0 var(--gold)` |
+| pol-thread.css:185 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-thread.css:1028 | `.onyx-thread-msg-face .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
+| pol-thread.css:1367 | `.onyx-composer .shell-command-item--active` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-thread.css:1764 | `.room-media-index-filter[aria-selected='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| pol-thread.css:2273 | `.onyx-message--compact.onyx-mention, .onyx-message--compact.onyx-messa` | box-shadow | `inset 2px 0 0 var(--gold)` |
+| pol-thread.css:2274 | `.onyx-message--compact.onyx-message-search-current` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-roster.css:239 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px var(--onyx-faint)` |
+| pol-roster.css:423 | `.onyx-roster .onyx-roster-head` | box-shadow | `0 calc(-1 * var(--space-3)) 0 var(--onyx-panel)` |
+| pol-roster.css:434 | `.onyx-roster .onyx-roster-filter` | box-shadow | `0 0 0 var(--space-1) var(--onyx-panel), 0 var(--space-2) 0 var(--space-1) var(--onyx-panel)` |
+| pol-roster.css:469 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px CanvasText` |
 | pol-public.css:127 | `.public-frame__nav a[aria-current="page"]` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
 | pol-public.css:333 | `.public-frame__nav a[aria-current="page"]` | box-shadow | `inset 3px 0 0 var(--onyx-accent)` |
-| pol-public.css:677 | `.onyx-land-tabs button[aria-selected="true"]` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
-| pol-public.css:1327 | `.guides-route__item[data-state="current"] .guides-route__card` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-public.css:678 | `.onyx-land-tabs button[aria-selected="true"]` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| pol-public.css:1328 | `.guides-route__item[data-state="current"] .guides-route__card` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-public.css:1499 | `.onyxos-console__tabs button[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-public.css:1570 | `.onyxos-console__tabs button[aria-selected="true"]` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| pol-public.css:1707 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-o` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| pol-public.css:1711 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-o` | box-shadow | `inset 0 0 0 1px var(--onyx-dim)` |
+| pol-public.css:1752 | `.public-related__list a[aria-current="page"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | polish.css:344 | `.update-available` | box-shadow | `0 8px 24px rgb(0 0 0 / 0.35)` |
-| account2.css:37 | `.a2-input:focus-visible, .a2-select:focus-visible, .a2-textarea:focus-` | box-shadow | `var(--focus-ring)` |
-| account2.css:57 | `.a2-btn:focus-visible, .a2-link:focus-visible` | box-shadow | `var(--focus-ring)` |
-| account2.css:120 | `.a2-reclaim__signin:focus-visible, .a2-reclaim__dismiss:focus-visible` | box-shadow | `var(--focus-ring)` |
-| account2.css:157 | `.a2-dot--avatar` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| ui-sheets.css:449 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| ui-sheets.css:803 | `.onyx-toast--success` | box-shadow | `inset 3px 0 0 var(--onyx-accent), var(--elev-3)` |
-| ui-sheets.css:804 | `.onyx-toast--danger` | box-shadow | `inset 3px 0 0 var(--onyx-bad), var(--elev-3)` |
-| ui-sheets.css:805 | `.onyx-toast--warning` | box-shadow | `inset 3px 0 0 var(--onyx-warn), var(--elev-3)` |
+| account2.css:156 | `.a2-dot--avatar` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| gap-convo.css:136 | `.onyx-composer .gap-attach-quality-opt[aria-checked='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| gap-convo.css:251 | `.onyx-message.gap-landed` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| gap-oper.css:408 | `.oc-tabs` | box-shadow | `0 calc(-1 * var(--sheet-grip-zone)) 0 0 var(--onyx-panel)` |
+| rx-shell.css:47 | `.onyx-facepile-face .onyx-avatar` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
+| gap-import.css:245 | `.hi-review-foot` | box-shadow | `0 28px 0 0 var(--onyx-panel), 0 56px 0 0 var(--onyx-panel), 0 84px 0 0 var(--onyx-panel)` |
+| gap-shell.css:232 | `.onyx-frame .onyx-room-more-menu > button.gs-more-leave` | box-shadow | `0 -1px 0 var(--onyx-line)` |
+| ui-sheets.css:545 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| ui-sheets.css:881 | `.onyx-toast--success` | box-shadow | `inset 3px 0 0 var(--onyx-success), var(--elev-3)` |
+| ui-sheets.css:882 | `.onyx-toast--danger` | box-shadow | `inset 3px 0 0 var(--onyx-bad), var(--elev-3)` |
+| ui-sheets.css:883 | `.onyx-toast--warning` | box-shadow | `inset 3px 0 0 var(--onyx-warn), var(--elev-3)` |
 | pol-ios.css:86 | `.onyx-frame` | box-shadow | `inset 0 var(--safe-top) 0 0 var(--onyx-panel)` |
-| calls-engine.css:94 | `.onyx-call-more` | box-shadow | `0 -12px 32px rgba(0, 0, 0, 0.45)` |
+| calls-engine.css:66 | `.onyx-thread-pane > .onyx-call-stage, .onyx-thread-pane > .onyx-join-b` | box-shadow | `calc(-1 * var(--shell-measure)) 0 0 0 var(--onyx-bg), var(--shell-measure) 0 0 0 var(--onyx-bg), calc(-2 * var(--shell-m` |
+| calls-engine.css:155 | `.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"]` | box-shadow | `0 0 0 1px var(--onyx-accent)` |
 
-### G3.10 Hard-coded durations in transition / animation (6 of 88 declarations)
-
-| value | count | where |
-|---|---|---|
-| `0.001ms` | 2 | app.css:3138,3140 |
-| `1.6s` | 2 | app.css:3270 · pol-thread.css:1677 |
-| `0ms` | 2 | app.css:3928 · pol-ios.css:39 |
-
-### G3.11 Easing keywords / curves written literally (7)
+### G3.10 Hard-coded durations in transition / animation (8 of 131 declarations)
 
 | value | count | where |
 |---|---|---|
-| `linear` | 3 | ui-sheets.css:386,445,627 |
-| `ease-out` | 2 | app.css:2668,2884 |
-| `ease-in-out` | 2 | app.css:3270 · pol-thread.css:1677 |
+| `1.6s` | 4 | app.css:2972 · pol-thread.css:1786 · gap-convo.css:252,290 |
+| `0.001ms` | 2 | app.css:2846,2848 |
+| `0ms` | 2 | app.css:3453 · pol-ios.css:39 |
 
-### G3.12 Spacing (padding / margin / gap / inset / scroll-padding) with raw lengths (814 of 2551 declarations)
+### G3.11 Easing keywords / curves written literally (9)
 
 | value | count | where |
 |---|---|---|
-| `2px` | 173 | app.css:158,172,173,184,186,193,193,319,431,533,617,668,694,973,1097,1104,1113,1138,1298,1299,1508,1584,1609,1647,1674,1709,1716,1719,1727,1756,1845,2077,2077,2128,2166,2232,2273,2318,2320,2368,2457,2490,2586,2722,2758,2834,2849,2894,2939,3001,3083,3102,3302,3342,3355,3505,3878 · pol-stats.css:348,563,588,664,665,738,863,964,969 · pol-studio.css:289,355,367,419,488,576,814,893,1066,1067,1141,1271,1295,1309 · pol-shell.css:62,88,132,201,670,895,934,991,1158,1192,1247,1378 · pol-thread.css:100,100,206,207,378,430,447,488,488,559,659,700,766,888,911,925,1011,1157,1178,1193,1205,1235,1287,1332,1332,1332,1455,1476,1521,1528,1635,1683,1755,1792,1847,1848 · pol-roster.css:181 · pol-public.css:588,654,797,869,923,1067,1153,1232,1303,1484,1516 · calls-c8.css:78,79,108,109 · calls-c11.css:55 · polish.css:120,203,245 · roomsettings.css:69,92,214,256,275,297,319,335 · calls-c4.css:35,114,126,138 · ui-sheets.css:168,186,198,511,604,605,610,693,728,736,736,749 · calls-engine.css:37 |
-| `8px` | 136 | app.css:149,150,155,159,160,170,172,176,178,180,181,184,205,367,372,420,466,472,672,674,683,694,720,764,783,831,901,982,988,999,1022,1058,1073,1083,1088,1104,1122,1171,1171,1204,1209,1219,1221,1231,1243,1244,1249,1250,1253,1254,1258,1260,1262,1275,1295,1323,1362,1365,1371,1375,1417,1418,1429,1429,1470,1471,1472,1472,1474,1474,1475,1475,1482,1485,1487,1488,1489,1490,1497,1498,1504,1504,1505,1512,1514,1514,1515,1542,1546,1547,1548,1549,1561,1562,1563,1583,1663,1673,1674,1684,1684,1709,1714,1738,1738,1761,1777,1785,1785,1791,1796,1806,1806,1814,1825,1829,1841,1844,3206,3208,3233,3239,3252,3292,3300,3361,3362,3363,3369,3372,3372,3406 · pol-thread.css:1036 · pol-public.css:612 · ui-sheets.css:728,907 |
-| `6px` | 128 | app.css:171,175,192,196,289,357,383,398,479,553,590,652,682,729,801,1125,1131,1163,1167,1222,1225,1301,1310,1314,1323,1374,1388,1488,1494,1551,1559,1561,1595,1596,1612,1621,1631,1634,1642,1727,1759,1774,1775,1813,1823,1826,1841,1932,2072,2117,2118,2122,2126,2126,2144,2262,2284,2296,2310,2319,2322,2338,2343,2356,2357,2397,2428,2467,2516,2519,2524,2575,2695,2774,2784,2788,2791,2802,2842,2855,2860,2902,2907,2935,2944,2997,3025,3038,3045,3083,3093,3115,3217,3262,3299,3308,3314,3324,3372 · pol-studio.css:1235,1273,1285,1295,1357,1358,1430,1431,1589 · pol-shell.css:483,1043 · pol-thread.css:399,428,431,545,580,637,657,1175,1492 · pol-roster.css:158 · pol-public.css:595,595,595,1393 · calls-c8.css:44 · ui-sheets.css:674,700,938 |
-| `10px` | 99 | app.css:173,178,184,184,186,193,226,231,268,288,367,444,606,609,641,745,746,894,942,1037,1088,1125,1138,1221,1243,1291,1310,1369,1370,1375,1494,1507,1515,1559,1563,1584,1621,1642,1683,1737,1742,1784,1805,1823,1841,1845,1847,1912,2055,2072,2077,2090,2117,2128,2144,2263,2305,2314,2322,2359,2369,2369,2421,2508,2522,2603,2618,2683,2714,2800,2836,2837,2875,2907,3018,3024,3050,3061,3083,3099,3118,3119,3208,3217,3252,3295,3317,3317,3348,3358,3363,3398 · pol-shell.css:591 · pol-thread.css:1289 · pol-roster.css:199 · pol-public.css:100 · ui-sheets.css:346,431,718 |
-| `4px` | 76 | app.css:158,161,170,176,178,192,200,200,200,205,333,869,1178,1188,1211,1215,1217,1229,1237,1240,1255,1315,1366,1386,1409,1413,1424,1466,1476,1482,1485,1496,1525,1571,1610,1610,1632,1632,1655,1688,1699,1708,1769,1826,1835,1841,1841,1847,1915,2069,2077,2081,3201,3263,3361 · pol-studio.css:1283,1284,1285,1295,1309,1340,1375,1397,1463,1463,1463 · pol-shell.css:236,646,705,777,799,826,1236 · pol-roster.css:203 · pol-public.css:95 · ui-sheets.css:468 |
-| `12px` | 66 | app.css:154,333,347,408,423,665,764,832,854,860,871,933,1029,1052,1161,1178,1188,1209,1216,1234,1235,1250,1288,1366,1369,1370,1386,1402,1409,1413,1413,1419,1424,1466,1515,1525,1550,1571,1686,1699,1740,1769,1787,1808,1835,2072,3225,3225,3248,3260,3292,3292,3340,3340,3348,3353,3358,3388,3395,3396,3398 · pol-shell.css:236 · pol-public.css:856 · ui-sheets.css:158,674,721 |
-| `16px` | 32 | app.css:154,665,746,871,902,926,955,963,968,975,999,1157,1198,1215,1356,1396,1416,1536,1550,1610,1632,1684,1738,1785,1806,3087,3285,3340,3340,3347,3348,3396 |
-| `14px` | 23 | app.css:373,383,398,514,801,1275,1334,1943,2284,2529,2534,2840,3225,3225,3225,3239,3248,3252,3365 · pol-shell.css:1042 · pol-public.css:264,1398 · ui-sheets.css:907 |
-| `1px` | 19 | app.css:564,2338,2641,2990 · pol-studio.css:354,558,656,711,968,1531,1589 · pol-shell.css:791,820,874,972 · pol-roster.css:181 · pol-public.css:40,800 · polish.css:56 |
-| `calc(-1 * VAR)` | 15 | app.css:1958,1971,1977 · pol-thread.css:1611 · pol-public.css:1212,1302 · calls-c8.css:93 · ui-sheets.css:157,511,585,720,760,760,899,912 |
-| `3px` | 13 | app.css:506,590,670,730,1972,2062 · pol-studio.css:218,219,1308,1488 · pol-shell.css:1415 · pol-thread.css:1013 · pol-public.css:657 |
-| `20px` | 12 | app.css:343,870,878,933,989,1012,1013,3285,3368,3377,3396,3396 |
-| `5px` | 12 | app.css:493,564,2641 · pol-studio.css:1405,1461 · pol-shell.css:838 · pol-public.css:40,156,852 · ui-sheets.css:163,477,597 |
-| `56px` | 11 | pol-public.css:336,358,681,769,819,821,903,904,1441,1453,1580 |
-| `calc(VAR + env(safe-area-inset-bottom, 0px))` | 9 | app.css:3880 · calls-c6.css:233 · ui-sheets.css:310,842,889,968,1082 · calls-engine.css:92,117 |
-| `64px` | 8 | app.css:910,958,978,1046 · pol-public.css:206,503,1335,1441 |
-| `48px` | 7 | app.css:817,1011 · pol-public.css:210,589,769,776,792 |
-| `24px` | 7 | app.css:817,893,910,1011,1058,3258,3258 |
-| `28px` | 5 | app.css:934,3258,3258 · pol-shell.css:754 · ui-sheets.css:845 |
-| `40px` | 5 | app.css:1907 · pol-public.css:337,776,776 · ui-sheets.css:622 |
-| `-18px` | 5 | pol-studio.css:1703 · ui-sheets.css:336,865,981,1094 |
-| `-1px` | 4 | app.css:166,1979 · pol-thread.css:999 · pol-roster.css:261 |
-| `7px` | 4 | app.css:444,1334 · pol-shell.css:1388 · pol-thread.css:733 |
-| `96px` | 4 | app.css:910,1944 · pol-public.css:504,1405 |
-| `36px` | 4 | app.css:1907,3258 · pol-studio.css:1010 · pol-shell.css:1318 |
-| `-4px` | 4 | app.css:1914,2042,3284 · pol-public.css:94 |
-| `-6px` | 4 | app.css:3197,3267 · pol-public.css:159 · ui-sheets.css:228 |
-| `18px` | 3 | app.css:783,1794,2898 |
+| `ease-in-out` | 3 | app.css:2972 · pol-thread.css:1786 · gap-convo.css:290 |
+| `linear` | 3 | ui-sheets.css:486,541,715 |
+| `linear, linear` | 2 | ui-sheets.css:1389,1442 |
+| `ease` | 1 | calls-engine.css:360 |
+
+### G3.12 Spacing (padding / margin / gap / inset / scroll-padding) with raw lengths (824 of 3390 declarations)
+
+| value | count | where |
+|---|---|---|
+| `2px` | 227 | app.css:227,340,502,593,619,813,820,829,971,972,1133,1241,1272,1279,1282,1289,1378,1525,1546,1719,1939,1939,2014,2071,2094,2127,2129,2177,2261,2472,2508,2569,2581,2664,2716,2793,2812,3001,3033,3046,3179 · gap-appearance.css:168,194 · pol-stats.css:348,563,588,664,665,738,863,964,969 · pol-studio.css:284,350,362,413,482,570,808,887,1060,1061,1135,1265,1289,1303 · pol-shell.css:52,78,119,184,637,862,901,958,1125,1159,1215,1346 · pol-thread.css:104,104,210,211,384,436,453,494,494,564,663,704,779,894,992,1013,1027,1113,1259,1280,1295,1307,1337,1389,1438,1438,1438,1524,1564,1585,1630,1637,1744,1792,1868,1905,1960,1963,1965,2155,2206,2265,2265,2269,2269,2271 · pol-roster.css:177 · pol-public.css:589,655,798,870,924,1068,1154,1233,1304,1484,1516,1782 · calls-c8.css:78,79,108,109 · calls-c11.css:55 · polish.css:120,203,245 · roomsettings.css:69,92,212,254,273,295,317,333 · calls-c4.css:35,113,125,136 · gap-convo.css:154,204,228,279 · gap-account.css:80,80 · gap-oper.css:129,262,263,263,350,367,369 · rx-shell.css:217,490,506 · gap-chanserv.css:122,167,227 · gap-import.css:117,168,198,203,206,399,414,440 · gap-people.css:29 · gap-organize.css:143,150,245,246,275,317,410,525,578,584,594 · gap-usermodes.css:162,329,345 · gap-commands.css:108,138 · gap-watch.css:292,486,589,589,709,741 · gap-shell.css:35,38,120,121,299,346 · ui-sheets.css:274,292,304,607,692,693,698,781,812,812,825 · calls-engine.css:113,479,480 |
+| `8px` | 108 | app.css:196,197,221,223,224,227,246,378,383,452,597,599,608,619,714,784,795,820,872,872,902,921,930,935,936,939,940,944,946,968,996,1035,1039,1065,1066,1077,1077,1095,1096,1097,1097,1099,1099,1100,1100,1107,1110,1112,1113,1114,1115,1122,1123,1129,1129,1130,1137,1139,1139,1140,1164,1165,1166,1167,1179,1180,1181,1255,1272,1277,1294,1310,1318,1318,1324,1329,1339,1339,1347,1358,1362,1374,1377,2910,2912,2936,2942,2955,3052,3053,3054,3060,3063,3063,3086 · pol-thread.css:1138,2223 · pol-public.css:613 · ui-sheets.css:1242,1264,1264,1273,1273,1291,1291,1304,1304,1581 |
+| `6px` | 105 | app.css:312,368,402,577,607,864,868,913,916,974,983,987,996,1038,1052,1113,1119,1169,1177,1179,1292,1307,1308,1346,1356,1359,1374,1653,1934,1971,1972,1976,2103,2128,2131,2147,2152,2165,2166,2205,2234,2313,2316,2321,2521,2574,2587,2592,2632,2660,2669,2740,2753,2760,2803,2824,2921,3017,3063 · pol-studio.css:1229,1267,1279,1289,1351,1352,1424,1425,1583 · pol-shell.css:448,1010,1204 · pol-thread.css:405,434,437,550,584,641,661,1277,1601,2189,2203,2258 · pol-roster.css:154 · pol-public.css:596,596,596,1393 · calls-c8.css:44 · gap-convo.css:27 · gap-account.css:96 · gap-oper.css:190,331 · gap-import.css:361,414 · gap-usermodes.css:176,246 · gap-watch.css:637 · gap-shell.css:129,145 · ui-sheets.css:762,788,1028,1582 · calls-engine.css:357 |
+| `4px` | 65 | app.css:221,235,246,752,879,889,907,909,926,941,988,1030,1050,1072,1091,1101,1107,1110,1121,1150,1189,1271,1302,1359,1368,1374,1374,1380,1459,1931,1939,1942,2905,2965,3052 · gap-appearance.css:178,197 · pol-studio.css:1277,1278,1279,1289,1303,1334,1369,1391,1457,1457,1457 · pol-shell.css:219,613,672,744,766,793 · pol-thread.css:2258,2389 · pol-roster.css:199 · pol-public.css:95 · gap-convo.css:119 · gap-account.css:21 · gap-import.css:303 · gap-organize.css:553 · gap-shell.css:31 · ui-sheets.css:564,1279 |
+| `10px` | 62 | app.css:221,227,227,311,378,566,777,964,983,1033,1034,1039,1119,1132,1140,1177,1181,1261,1317,1338,1356,1374,1378,1380,1456,1934,1939,1951,1971,2123,2131,2168,2178,2178,2228,2319,2379,2571,2632,2733,2739,2765,2776,2809,2827,2828,2912,2921,3010,3039,3049,3054 · pol-shell.css:558 · pol-thread.css:1391,2223 · pol-roster.css:195 · pol-public.css:100 · gap-oper.css:190 · gap-organize.css:620 · gap-auth.css:26 · ui-sheets.css:446,527 |
+| `12px` | 40 | app.css:590,715,737,743,754,862,879,889,908,923,936,961,1030,1033,1034,1050,1067,1072,1091,1140,1150,1168,1189,1302,1320,1341,1368,1934,2962,3031,3031,3039,3044,3049 · pol-shell.css:219 · pol-thread.css:2466 · pol-public.css:857 · gap-account.css:21 · ui-sheets.css:255,762 |
+| `1px` | 32 | app.css:1531,2147,2415 · pol-studio.css:349,552,650,705,962,1525,1583 · pol-shell.css:758,787,841,939,1189 · pol-thread.css:2235,2235,2465 · pol-roster.css:177 · pol-public.css:40,801 · polish.css:56 · gap-oper.css:316 · gap-import.css:137,264,299,359 · gap-usermodes.css:176,205,240,316 · gap-commands.css:62 |
+| `calc(-1 * VAR)` | 22 | app.css:1484,1679,1750,1756 · pol-thread.css:1720,2140,2140,2140 · pol-public.css:1213,1303 · calls-c8.css:93 · gap-oper.css:48 · gap-import.css:458 · gap-watch.css:281,539 · gap-auth.css:78 · ui-sheets.css:254,607,687,838,838,998 |
+| `14px` | 16 | app.css:384,402,1004,1664,2103,2326,2331,2942,3056 · pol-public.css:264,1398 · gap-watch.css:377,443,519 · ui-sheets.css:686,1006 |
+| `3px` | 15 | app.css:1751,1924 · gap-appearance.css:173 · pol-studio.css:213,214,1302,1482 · pol-shell.css:1383 · pol-thread.css:1115,2155,2532 · pol-public.css:658 · gap-import.css:413 · calls-engine.css:228,294 |
+| `16px` | 14 | app.css:590,754,785,858,907,1168,1318,1339,2797,2987,3031,3031,3038,3039 |
+| `5px` | 12 | app.css:2415 · pol-studio.css:1399,1455 · pol-shell.css:805 · pol-thread.css:2542 · pol-public.css:40,156,853 · rx-shell.css:363,374 · gap-organize.css:112 · ui-sheets.css:573 |
+| `56px` | 12 | pol-public.css:336,358,682,770,820,822,904,905,1441,1453,1580,1772 |
+| `-8px` | 11 | app.css:1458 · pol-thread.css:2223,2458,2460,2461,2472 · gap-oper.css:157 · gap-shell.css:353,353,353 · ui-sheets.css:727 |
+| `-4px` | 11 | app.css:1458,1858,1897 · pol-thread.css:2459,2498,2589 · pol-public.css:94 · gap-shell.css:288,288,288 · calls-engine.css:153 |
+| `-2px` | 9 | pol-thread.css:2156,2314,2457,2458,2470,2498,2589 · calls-engine.css:164,573 |
+| `-6px` | 8 | app.css:1897,2901,2969 · pol-thread.css:2457,2598 · pol-public.css:159 · gap-organize.css:477 · ui-sheets.css:331 |
+| `calc(VAR + env(safe-area-inset-bottom, 0px))` | 8 | calls-c6.css:220 · gap-shell.css:375 · ui-sheets.css:931,972,1060,1175 · calls-engine.css:253,445 |
+| `max(VAR, env(safe-area-inset-right, 0px))` | 8 | gap-watch.css:614 · ui-sheets.css:1207,1216,1264,1273,1291,1304 · calls-engine.css:253 |
+| `48px` | 7 | app.css:700 · pol-public.css:210,590,770,777,793,1783 |
+| `40px` | 7 | app.css:1449 · pol-public.css:337,777,777,1804,1823 · ui-sheets.css:710 |
+| `36px` | 6 | app.css:1449,1849 · pol-studio.css:1004 · pol-shell.css:1286 · gap-oper.css:144 · calls-engine.css:94 |
+| `64px` | 6 | pol-public.css:206,504,1336,1441,1761,1823 |
+| `max(VAR, env(safe-area-inset-left, 0px))` | 6 | gap-watch.css:614 · ui-sheets.css:1207,1264,1291,1304 · calls-engine.css:253 |
+| `72px` | 5 | app.css:1829 · pol-public.css:199,621,649,1823 |
+| `-1px` | 4 | app.css:211,1758 · pol-thread.css:1101 · pol-roster.css:257 |
+| `20px` | 4 | app.css:753,761,2987,3059 |
+| `7px` | 4 | app.css:1004 · pol-shell.css:1356 · pol-thread.css:737 · gap-shell.css:167 |
+| `32px` | 4 | app.css:1449,1849,3081 · pol-public.css:1784 |
+| `28px` | 4 | app.css:1849 · pol-shell.css:721 · gap-oper.css:61 · ui-sheets.css:934 |
+| `-18px` | 4 | pol-studio.css:1697 · ui-sheets.css:436,1073,1187 |
+| `18px` | 3 | app.css:1327,2623 · gap-oper.css:115 |
+| `96px` | 3 | app.css:1665 · pol-public.css:505,1405 |
 | `clamp(VAR, 5vw, 4.5rem)` | 3 | pol-stats.css:49,232,402 |
 | `clamp(VAR, 6vw, 5rem)` | 3 | pol-stats.css:138,271,404 |
-| `72px` | 3 | pol-public.css:199,620,648 |
-| `calc(VAR + 2px)` | 3 | ui-sheets.css:343,855,912 |
-| `22px` | 2 | app.css:894,942 |
-| `32px` | 2 | app.css:1907,3394 |
-| `-8px` | 2 | app.css:1914 · ui-sheets.css:639 |
+| `-12px` | 3 | pol-studio.css:433 · pol-thread.css:2461 · ui-sheets.css:1438 |
+| `env(safe-area-inset-bottom, 0px)` | 3 | pol-shell.css:339 · gap-commands.css:51 · ui-sheets.css:1630 |
+| `-10px` | 3 | pol-thread.css:2223 · gap-organize.css:477 · ui-sheets.css:448 |
+| `calc(VAR * -1)` | 3 | pol-thread.css:2573 · gap-account.css:114,118 |
+| `env(safe-area-inset-right, 0px)` | 3 | ui-sheets.css:400,1270 · calls-engine.css:414 |
+| `24px` | 2 | app.css:700,776 |
 | `clamp(VAR, 4vw, 4rem)` | 2 | pol-stats.css:328,632 |
-| `calc(120px + VAR)` | 2 | pol-stats.css:1056 · pol-studio.css:1782 |
-| `clamp(16px, 5vw, 48px)` | 2 | pol-studio.css:48,81 |
-| `44px` | 2 | pol-studio.css:1704 · pol-public.css:789 |
-| `1.15em` | 2 | pol-public.css:973,1243 |
-| `env(safe-area-inset-top, 0px)` | 2 | ui-sheets.css:837 · calls-engine.css:107 |
-| `-0.55rem` | 1 | app.css:202 |
-| `0.12rem` | 1 | app.css:1857 |
-| `0.45rem` | 1 | app.css:1857 |
-| `168px` | 1 | app.css:1944 |
-| `calc(168px + VAR)` | 1 | app.css:2039 |
-| `12vh` | 1 | app.css:2651 |
-| `9px` | 1 | app.css:3324 |
-| `calc(10px + env(safe-area-inset-bottom, 0px))` | 1 | app.css:3398 |
+| `0.4em` | 2 | pol-stats.css:452 · gap-commands.css:26 |
+| `calc(120px + VAR)` | 2 | pol-stats.css:1056 · pol-studio.css:1776 |
+| `clamp(16px, 5vw, 48px)` | 2 | pol-studio.css:48,80 |
+| `44px` | 2 | pol-studio.css:1698 · pol-public.css:790 |
+| `max(VAR, calc((100% - VAR) / 2))` | 2 | pol-thread.css:2063 · rx-shell.css:612 |
+| `-3px` | 2 | pol-thread.css:2156 · calls-engine.css:50 |
+| `-9px` | 2 | pol-thread.css:2470 · ui-sheets.css:1451 |
+| `1.15em` | 2 | pol-public.css:974,1244 |
+| `1.1em` | 2 | gap-account.css:128 · gap-shell.css:322 |
+| `calc(VAR + 40px)` | 2 | gap-chanserv.css:253 · gap-organize.css:737 |
+| `env(safe-area-inset-left, 0px)` | 2 | ui-sheets.css:400 · calls-engine.css:414 |
+| `env(safe-area-inset-top, 0px)` | 2 | ui-sheets.css:927 · calls-engine.css:414 |
+| `22px` | 1 | app.css:777 |
+| `0.12rem` | 1 | app.css:1390 |
+| `0.45rem` | 1 | app.css:1390 |
+| `168px` | 1 | app.css:1665 |
+| `9px` | 1 | app.css:1727 |
+| `calc(168px + VAR)` | 1 | app.css:1855 |
+| `calc(72px + VAR)` | 1 | app.css:1904 |
+| `12vh` | 1 | app.css:2424 |
 | `clamp(16px, 4vw, 48px)` | 1 | pol-stats.css:40 |
-| `0.4em` | 1 | pol-stats.css:452 |
 | `clamp(2px, 0.6vw, 8px)` | 1 | pol-stats.css:708 |
 | `clamp(1px, 0.3vw, 4px)` | 1 | pol-stats.css:802 |
-| `clamp(28px, 6vw, 72px)` | 1 | pol-studio.css:81 |
-| `14vh` | 1 | pol-studio.css:81 |
-| `clamp(28px, 4vw, 44px)` | 1 | pol-studio.css:124 |
-| `clamp(32px, 5vw, 56px)` | 1 | pol-studio.css:408 |
-| `calc(VAR + 32px)` | 1 | pol-studio.css:421 |
-| `-12px` | 1 | pol-studio.css:439 |
-| `-14px` | 1 | pol-studio.css:1021 |
-| `18vh` | 1 | pol-studio.css:1677 |
-| `env(safe-area-inset-bottom, 0px)` | 1 | pol-shell.css:360 |
-| `calc(VAR + 36px)` | 1 | pol-shell.css:1042 |
-| `0.35em` | 1 | pol-thread.css:1768 |
+| `clamp(28px, 6vw, 72px)` | 1 | pol-studio.css:80 |
+| `14vh` | 1 | pol-studio.css:80 |
+| `clamp(28px, 4vw, 44px)` | 1 | pol-studio.css:119 |
+| `clamp(32px, 5vw, 56px)` | 1 | pol-studio.css:403 |
+| `calc(VAR + 32px)` | 1 | pol-studio.css:415 |
+| `-14px` | 1 | pol-studio.css:1015 |
+| `18vh` | 1 | pol-studio.css:1671 |
+| `clamp(40px, 4vw, 72px)` | 1 | pol-studio.css:1796 |
+| `calc(VAR + 36px)` | 1 | pol-shell.css:1009 |
+| `0.35em` | 1 | pol-thread.css:1881 |
+| `100%` | 1 | pol-thread.css:2110 |
 | `max(VAR, calc((100% - VAR) / 2 + VAR))` | 1 | pol-public.css:174 |
 | `calc(48px + env(safe-area-inset-bottom))` | 1 | pol-public.css:210 |
-| `88px` | 1 | pol-public.css:504 |
-| `1.4em` | 1 | pol-public.css:1179 |
+| `88px` | 1 | pol-public.css:505 |
+| `1.4em` | 1 | pol-public.css:1180 |
 | `140px` | 1 | pol-public.css:1405 |
 | `calc(140px + VAR)` | 1 | pol-public.css:1666 |
-| `194px` | 1 | calls-c6.css:191 |
-| `52px` | 1 | ui-sheets.css:128 |
-| `-10px` | 1 | ui-sheets.css:348 |
-| `min(14vh, 120px)` | 1 | ui-sheets.css:406 |
-| `84px` | 1 | ui-sheets.css:706 |
-| `calc(VAR + 44px)` | 1 | ui-sheets.css:721 |
-| `136px` | 1 | ui-sheets.css:908 |
-| `calc(VAR - 4px)` | 1 | ui-sheets.css:911 |
-| `calc(VAR + max(0px, env(safe-area-inset-bottom, 0px) - VAR))` | 1 | ui-sheets.css:1045 |
-| `calc(VAR + 6px)` | 1 | ui-sheets.css:1082 |
+| `calc(32px + env(safe-area-inset-bottom))` | 1 | pol-public.css:1784 |
+| `194px` | 1 | calls-c6.css:184 |
+| `calc(VAR + 44px)` | 1 | gap-oper.css:49 |
+| `-0.3rem` | 1 | rx-shell.css:46 |
+| `50px` | 1 | rx-shell.css:131 |
+| `calc(VAR * 2 + 18px)` | 1 | rx-shell.css:206 |
+| `46px` | 1 | rx-shell.css:542 |
+| `calc((100vw - VAR) / 2)` | 1 | rx-shell.css:642 |
+| `calc((100vw - VAR) / 2 + VAR)` | 1 | rx-shell.css:643 |
+| `calc(VAR + 28px)` | 1 | gap-chanserv.css:160 |
+| `calc(32px + VAR + VAR)` | 1 | gap-chanserv.css:216 |
+| `calc(VAR + 56px)` | 1 | gap-people.css:134 |
+| `calc(VAR + 112px)` | 1 | gap-organize.css:653 |
+| `calc(VAR + 64px)` | 1 | gap-organize.css:753 |
+| `calc(14px + 0.32em)` | 1 | gap-auth.css:33 |
+| `52px` | 1 | ui-sheets.css:224 |
+| `calc(VAR + 2px)` | 1 | ui-sheets.css:443 |
+| `min(14vh, 120px)` | 1 | ui-sheets.css:502 |
+| `84px` | 1 | ui-sheets.css:794 |
+| `136px` | 1 | ui-sheets.css:1007 |
+| `calc(VAR + max(0px, env(safe-area-inset-bottom, 0px) - VAR))` | 1 | ui-sheets.css:1136 |
+| `calc(VAR + 6px)` | 1 | ui-sheets.css:1175 |
+| `max(VAR, env(safe-area-inset-top, 0px))` | 1 | ui-sheets.css:1207 |
+| `60px` | 1 | ui-sheets.css:1216 |
+| `min(10vh, 96px)` | 1 | ui-sheets.css:1226 |
+| `calc(VAR + 4px)` | 1 | ui-sheets.css:1539 |
 | `max(8px, calc(VAR + 4px))` | 1 | pol-ios.css:92 |
-| `env(safe-area-inset-left, 0px)` | 1 | calls-engine.css:108 |
-| `env(safe-area-inset-right, 0px)` | 1 | calls-engine.css:108 |
+| `-7px` | 1 | calls-engine.css:50 |
+| `-5px` | 1 | calls-engine.css:573 |
 
-### G3.13 Raw dimensions — width / height / min / max / offsets / border widths / tracking (1012 declarations)
+### G3.13 Raw dimensions — width / height / min / max / offsets / border widths / tracking (1475 declarations)
 
 | value | count | where |
 |---|---|---|
-| `32px` | 96 | app.css:1920,1920,1957,2374,2374,2501,2551,2617,2700,2701,2890,2890,3044,3097,3108,3335,3344,3344,3557,3805,3806 · pol-stats.css:887,888 · pol-studio.css:545,752,1075,1140,1558,1607,1660 · pol-shell.css:15,33,50,51,162,163,303,472,590,603,665,798,880,937,1115,1129,1130,1274 · pol-thread.css:285,311,325,581,895,896,1263,1271,1375,1376,1377,1509,1531,1554,1595,1596,1643,1873,1874 · pol-roster.css:48 · pol-public.css:603,604,788,788,1110,1180,1277 · calls-c8.css:26 · polish.css:204 · roomsettings.css:191,219,254 · ui-sheets.css:201,505,524,525,525,529,530,531,532,756,806,806,925,926 · calls-engine.css:33,64 |
-| `1px` | 55 | app.css:166,166,1979,1979,2152,2153,2179,2631,2921,2921,3148,3387,3387,3401,3401,3771,3908 · pol-studio.css:315,316 · pol-shell.css:614,615,1290,1355,1455,1456 · pol-thread.css:361,456,476,943,997,998,1082,1083,1302 · pol-roster.css:259,260 · pol-public.css:271,825 · calls-c8.css:66,66 · polish.css:366 · account2.css:13,13 · calls-c6.css:215,216 · ui-sheets.css:118,308,629,969,1083 · calls-engine.css:35,35,66,66,93 |
-| `16px` | 53 | app.css:1068,1069,2391,2392,2812,2866,3221,3221 · pol-shell.css:597,597,644,645,703,704,1081,1081,1136,1136,1234,1235 · pol-thread.css:415,415,441,441,570,571,589,589,973,973,1151,1151,1337,1337,1609,1609 · pol-roster.css:84,84,300,300 · pol-public.css:708,709,731,732,1142,1143 · calls-c8.css:127 · calls-c6.css:185,185 · ui-sheets.css:452,453,637,638 |
-| `28px` | 53 | app.css:2329,2329,2602,2769,2770,2911,3235,3235,3324 · pol-studio.css:546,1019,1020,1555,1564,1565,1722 · pol-shell.css:68,103,120,121,205,235,853,853,858,859,1027,1028,1198,1425 · pol-thread.css:617,617,638,1124,1142,1143,1292,1493 · pol-roster.css:72,73,143,289,290 · pol-public.css:261,261 · calls-c6.css:212 · calls-c4.css:55,57,57,119,119 · ui-sheets.css:553,554 |
-| `36px` | 51 | app.css:2343,2456,2557,2801,3239,3317,3372,3406,3703 · pol-studio.css:1196,1703,1703 · pol-shell.css:315,631,632,658,942,943,956,1199,1302,1333 · pol-thread.css:370,962,1033,1059,1060,1281,1351 · pol-roster.css:377,397 · pol-public.css:248,573,574,1087,1249,1292 · calls-c8.css:114,118 · roomsettings.css:175 · ui-sheets.css:334,488,726,735,851,863,950,979,1074,1092 · calls-engine.css:97 |
-| `14px` | 49 | app.css:241,242,3104,3104,3280,3280,3328,3328 · pol-shell.css:745,746,787,787,819,851,851,1363,1363 · pol-thread.css:648,648,666,666,1503,1503 · pol-roster.css:101,101,169,170 · calls-c8.css:49,49 · calls-c11.css:42,42 · roomsettings.css:39,39 · calls-c6.css:170,170 · calls-c4.css:35,40,53,53,108,108,123,123 · ui-sheets.css:541,541,934,934,937,937 |
-| `18px` | 39 | app.css:563,3162,3163,3588 · pol-studio.css:1748,1749 · pol-shell.css:548,549,836,837,886,886,1324,1324,1334,1334 · pol-thread.css:29,30,1339,1339 · pol-roster.css:337,337 · pol-public.css:168,326,327,861 · calls-c8.css:108,108 · roomsettings.css:255 · ui-sheets.css:46,47,247,248,425,426,567,568,942,943 |
-| `40px` | 39 | app.css:1751,1753,3194,3194 · pol-shell.css:675,676,1061,1220,1307,1317,1326,1335,1335,1440,1441,1441 · pol-thread.css:252,1289,1291,1308 · pol-roster.css:191,202,396 · pol-public.css:138,225,664,1312 · calls-c8.css:30,30,99 · polish.css:374 · roomsettings.css:237,336 · calls-c4.css:140,140 · ui-sheets.css:260,441,884,1075 |
-| `44px` | 39 | app.css:2167,2322,2359,2741,2742,3079,3079,3083,3099,3119,3303,3391 · pol-studio.css:1139,1702,1702 · pol-shell.css:108,1182,1183,1195,1195,1221,1259,1259,1261,1266,1267,1398,1436 · pol-thread.css:252,388,1309 · pol-public.css:854,855 · ui-sheets.css:650,826,827,852,852,1098 |
-| `8px` | 33 | app.css:273,274,297,298,838,839,1282,1760,1760,2076,2565,2568,2967,3184,3184,3393,3393 · pol-studio.css:1243,1244 · pol-shell.css:743 · pol-public.css:1043,1043 · account2.css:149,150 · roomsettings.css:100,101 · calls-c4.css:38,117,128 · ui-sheets.css:332,861,977,1090 |
-| `20px` | 29 | app.css:2191,2192,3103 · pol-studio.css:1436 · pol-shell.css:521,522,639,639,1109,1109,1306,1306,1336,1336,1377 · pol-thread.css:254,254,337,1077,1077,1093,1094 · pol-roster.css:395,395 · polish.css:53,75,76 · ui-sheets.css:475,476 |
-| `48px` | 28 | app.css:1936,1985,2012,3400,3400,3642 · pol-shell.css:576,1305,1368,1369,1389,1389 · pol-public.css:532,722,825,1397,1411,1421,1421 · calls-c8.css:44 · calls-c11.css:190,190 · ui-sheets.css:674,796,985,1099 · calls-engine.css:58,80 |
-| `24px` | 25 | app.css:578,579,1284,2222,2585,2875,3118,3118,3193,3193,3277,3277 · pol-studio.css:437,438 · pol-shell.css:778,1229,1229,1255 · pol-public.css:109,109,262,262 · calls-c8.css:62 · calls-c6.css:98 · calls-c4.css:103 |
-| `2px` | 25 | app.css:1997,2019,2327,2985,3104,3104 · pol-stats.css:63,123,810 · pol-studio.css:610,790 · pol-shell.css:643 · pol-thread.css:119,218,479,1893 · pol-public.css:46,168,861 · calls-c11.css:158 · polish.css:322 · roomsettings.css:264,265 · calls-c6.css:82 · calls-engine.css:28 |
-| `4px` | 19 | app.css:572,1973,2076,3406 · pol-stats.css:750,910 · pol-shell.css:1232,1302,1377 · pol-thread.css:371,1216 · pol-roster.css:378 · calls-c4.css:127 · ui-sheets.css:335,591,864,980,1093 · calls-engine.css:97 |
-| `22px` | 17 | app.css:2338 · pol-shell.css:1189,1189,1196,1196,1260,1260,1388,1388,1426,1426 · pol-thread.css:558 · pol-public.css:634,635,796 · calls-c8.css:17 · ui-sheets.css:518 |
-| `6px` | 17 | app.css:2374,2374,2393,3202,3202,3255,3255,3313 · pol-stats.css:561,562 · pol-shell.css:1197,1431 · pol-thread.css:1674 · pol-public.css:1200 · ui-sheets.css:519,520,592 |
-| `-2px` | 17 | app.css:2555,3277,3277 · pol-stats.css:317,1077 · pol-studio.css:283,1738 · pol-shell.css:1233,1431 · pol-roster.css:233,234 · pol-public.css:1501,1503,1538,1678 · account2.css:157,157 |
-| `52px` | 15 | app.css:3535 · pol-studio.css:256 · pol-shell.css:896,1038,1038,1159,1425 · pol-roster.css:400 · pol-public.css:308 · polish.css:369 · calls-c6.css:243 · ui-sheets.css:420,524,843 · calls-engine.css:38 |
-| `30px` | 14 | app.css:3208,3217 · pol-shell.css:753,762,788,1006 · pol-thread.css:228,229,414 · pol-roster.css:105 · pol-public.css:105,106 · calls-c6.css:184 · ui-sheets.css:737 |
-| `56px` | 14 | app.css:3287,3287,3292,3303 · pol-studio.css:47,729 · pol-shell.css:1212,1377 · pol-thread.css:1897,1897 · pol-public.css:1350,1351 · calls-c11.css:126 · ui-sheets.css:620 |
-| `10px` | 11 | app.css:571 · pol-stats.css:173,174,445,446 · pol-studio.css:227,228 · pol-shell.css:689,690 · pol-roster.css:235,236 |
-| `560px` | 10 | app.css:1199,1357,1397,1537,2094,2658,2659 · pol-shell.css:969 · pol-thread.css:1252 · ui-sheets.css:411 |
-| `12px` | 10 | app.css:2888,2888 · pol-shell.css:1165,1165,1324 · roomsettings.css:266,267 · calls-c4.css:114,126,129 |
-| `72px` | 9 | app.css:2139,3195,3195,3286 · pol-thread.css:787,788 · pol-public.css:981 · ui-sheets.css:135,751 |
-| `3px` | 8 | pol-stats.css:716 · pol-shell.css:642,691,811,819 · calls-c4.css:36,115,127 |
-| `5px` | 8 | pol-studio.css:1330,1331,1506,1507 · pol-shell.css:1197 · pol-thread.css:143 · calls-c4.css:37,115 |
-| `420px` | 7 | app.css:154,598,1158,3758 · pol-thread.css:687,701 · ui-sheets.css:134 |
-| `200px` | 7 | app.css:1038,2458,3080,3230,3690 · pol-shell.css:573 · pol-thread.css:1898 |
-| `360px` | 7 | app.css:1077,1786,1807,3605 · pol-shell.css:426 · pol-thread.css:696 · pol-roster.css:345 |
-| `7px` | 7 | pol-shell.css:702,809,810,1044,1044 · pol-thread.css:1175,1175 |
-| `2rem` | 6 | app.css:134,134,205 · pol-stats.css:964 · pol-thread.css:108,909 |
-| `6rem` | 6 | pol-stats.css:327,534,785,963,964 · pol-studio.css:1765 |
-| `26px` | 6 | pol-shell.css:1037,1037 · pol-thread.css:397,429,1104,1110 |
-| `280px` | 5 | app.css:1284,1611,1633,2413 · calls-c8.css:44 |
-| `64px` | 5 | app.css:1822,2109,3008 · pol-studio.css:420 · calls-engine.css:29 |
-| `-1px` | 5 | app.css:1948,2564,2567 · pol-stats.css:941 · pol-public.css:1408 |
-| `220px` | 5 | app.css:3050,3314 · pol-shell.css:471 · pol-thread.css:1034,1280 |
-| `11px` | 5 | pol-shell.css:583,583 · pol-public.css:862 · calls-c4.css:39,116 |
-| `312px` | 5 | pol-thread.css:343 · calls-c6.css:109,114,119,124 |
-| `320px` | 4 | app.css:2445 · pol-thread.css:695,731 · polish.css:39 |
-| `34px` | 4 | app.css:3103 · pol-studio.css:518 · pol-shell.css:1256,1256 |
-| `96px` | 4 | app.css:3397 · pol-public.css:934 · calls-c8.css:114 · calls-c4.css:160 |
-| `2.75rem` | 4 | pol-stats.css:826 · pol-thread.css:1705,1743,1744 |
-| `21px` | 4 | pol-shell.css:1262,1262,1272,1272 |
-| `4rem` | 4 | pol-thread.css:607,608,616,616 |
-| `46rem` | 4 | pol-thread.css:1325 · pol-public.css:1580,1592,1593 |
-| `380px` | 4 | calls-c11.css:136 · calls-c6.css:21 · ui-sheets.css:791,1060 |
-| `182px` | 4 | calls-c6.css:110,115,120,125 |
-| `640px` | 3 | app.css:816 · pol-shell.css:1050 · ui-sheets.css:135 |
-| `340px` | 3 | app.css:1685,1739 · pol-thread.css:1269 |
-| `440px` | 3 | app.css:1902,2222,3335 |
-| `160px` | 3 | app.css:2356 · calls-c6.css:204 · calls-c4.css:139 |
-| `40rem` | 3 | pol-stats.css:823 · pol-studio.css:345 · pol-public.css:649 |
-| `28rem` | 3 | pol-studio.css:387 · pol-thread.css:1399 · pol-public.css:1530 |
-| `15rem` | 3 | pol-studio.css:1262 · pol-public.css:1176,1474 |
-| `520px` | 3 | pol-shell.css:573 · calls-c8.css:89 · account2.css:5 |
-| `36rem` | 3 | pol-thread.css:658 · pol-public.css:506,1620 |
-| `2.25rem` | 3 | pol-roster.css:402,402 · pol-public.css:1602 |
-| `2.65rem` | 2 | app.css:135,135 |
-| `400px` | 2 | app.css:339,2501 |
-| `140px` | 2 | app.css:1210 · pol-shell.css:494 |
-| `120px` | 2 | app.css:2117,2899 |
-| `720px` | 2 | app.css:2295 · ui-sheets.css:667 |
-| `480px` | 2 | app.css:2879 · pol-thread.css:756 |
-| `16rem` | 2 | pol-stats.css:266,631 |
-| `8rem` | 2 | pol-stats.css:803,816 |
+| `44px` | 130 | app.css:1725,2015,2131,2168,2491,2492,2793,2809,2828,3078 · gap-appearance.css:200 · pol-studio.css:1133,1696,1696 · pol-shell.css:1149,1150,1162,1162,1192,1227,1227,1229,1234,1235,1285,1294,1303,1303,1366,1404 · pol-thread.css:256,394,1411,2453,2453,2453,2468,2468,2468,2476 · pol-roster.css:456 · pol-public.css:855,856 · gap-oper.css:143,229,230,397,398,426 · rx-shell.css:114,114,260,262,262,332,433,435,438,439,440,442,445,448,448,449,451,451,452,454,458,459,461,461,465,466,491,514,549,551,561,562,578,579,592,592,597,663,664,665,670,671,671,673,674,675,676 · gap-chanserv.css:246,250,251,252,252 · gap-shell.css:344,348,349,352,353,353,354,355 · ui-sheets.css:738,834,904,907,911,912,912,912,912,964,1047,1191,1279,1375,1564,1567,1597 · calls-engine.css:293,293,297,305 |
+| `32px` | 113 | app.css:1464,1464,1583,1584,1678,1902,1902,2183,2183,2393,2759,2807,2817,3035,3035 · gap-appearance.css:196 · pol-stats.css:887,888 · pol-studio.css:539,746,1069,1134,1552,1601,1654 · pol-shell.css:15,33,437,557,570,632,765,847,904,1082,1096,1097,1242 · pol-thread.css:291,317,331,585,1365,1373,1481,1482,1483,1618,1640,1663,1704,1705,1752,1993,1994,2339,2519,2551 · pol-public.css:604,605,789,789,1111,1181,1278 · calls-c8.css:26 · polish.css:204 · roomsettings.css:189,217,252 · gap-account.css:20 · gap-oper.css:225 · rx-shell.css:231,304,424,453,502,507 · gap-chanserv.css:129,177,178 · gap-import.css:148 · gap-organize.css:371,395,396,509 · gap-usermodes.css:47 · gap-shell.css:37,286,287 · ui-sheets.css:307,601,620,621,621,625,626,627,628,833,884,884,1006,1015,1016 · calls-engine.css:36,40,85,85,87,87,144,144 |
+| `36px` | 89 | app.css:2152,2260,3010,3063,3086,3346 · gap-appearance.css:197,299 · pol-studio.css:1190,1697,1697 · pol-shell.css:294,598,599,625,909,910,923,1166,1270,1301 · pol-thread.css:376,1064,1135,1161,1162,1383,1457,2338,2344,2497,2585 · pol-roster.css:373,393 · pol-public.css:248,574,575,1088,1250,1293 · calls-c8.css:114 · roomsettings.css:173 · gap-account.css:46 · gap-oper.css:189,205,274,393 · rx-shell.css:155,156,341,342,462,505,505,506,550 · gap-import.css:26,210,308,327 · gap-people.css:34,122 · gap-organize.css:435,436 · gap-usermodes.css:80,124 · gap-shell.css:89,206 · gap-claim.css:121 · ui-sheets.css:434,584,803,811,1040,1071,1167,1185,1418,1419 · calls-engine.css:84,189,210,259,280,509,525,542,546,572 |
+| `16px` | 81 | app.css:2199,2200,2925,2925 · pol-shell.css:564,564,611,612,670,671,1048,1048,1103,1103 · pol-thread.css:421,421,447,447,575,576,593,593,748,749,1075,1075,1253,1253,1443,1443,1718,1718 · pol-roster.css:82,82,296,296 · pol-public.css:709,710,732,733,1143,1144 · calls-c8.css:126 · calls-c6.css:178,178 · gap-oper.css:155,156 · rx-shell.css:81,81,354,354 · gap-organize.css:190,190,406,406,467,468,576,577 · gap-usermodes.css:256,257 · gap-watch.css:102,102,430,430 · gap-shell.css:296,296 · ui-sheets.css:548,549,725,726,1298,1305,1603,1604 · calls-engine.css:90,90,91,91,193,193 |
+| `28px` | 75 | app.css:1898,1898,2138,2138,2378,2636,3017 · gap-appearance.css:194 · pol-studio.css:540,1013,1014,1549,1558,1559,1716 · pol-shell.css:58,107,108,188,218,820,820,825,826,994,995,1165,1393 · pol-thread.css:621,621,642,1226,1244,1245,1394,1602,2347,2348 · pol-roster.css:70,71,139,285,286 · pol-public.css:261,261,1803,1803 · calls-c4.css:57,57,118,118 · gap-convo.css:64,64 · rx-shell.css:73,74,327,327 · gap-import.css:384 · gap-organize.css:80,135,181,182,359,359,691,718 · gap-watch.css:303 · gap-shell.css:130,305 · ui-sheets.css:649,650 · calls-engine.css:543,547,548,550 |
+| `1px` | 70 | app.css:211,211,1758,1758,2000,2001,2646,2646,3076,3076 · pol-studio.css:310,311 · pol-shell.css:581,582,1258,1323,1423,1424 · pol-thread.css:367,462,482,932,933,1045,1099,1100,1184,1185,1404,2124,2169 · pol-roster.css:255,256 · pol-public.css:271,826 · calls-c8.css:66,66 · polish.css:366 · account2.css:13,13 · calls-c6.css:202,203 · rx-shell.css:271,271,426,426,577,577 · gap-usermodes.css:11,12 · gap-watch.css:211 · ui-sheets.css:214,409,717,1061,1176 · calls-engine.css:103,103,148,148,202,202,242,242,311,311,322,322,524,524 |
+| `14px` | 69 | app.css:2814,2814,2982,2982,3021,3021 · pol-shell.css:712,713,754,754,786,818,818,1331,1331 · pol-thread.css:652,652,670,670,1612,1612,2196,2196 · pol-roster.css:98,98,165,166 · pol-public.css:1745,1746 · calls-c8.css:49,49 · calls-c11.css:42,42 · roomsettings.css:39,39 · calls-c6.css:163,163 · calls-c4.css:35,40,53,53,107,107,122,122 · gap-chanserv.css:38,39,188,188 · gap-import.css:158,159,369,370 · gap-organize.css:95,96,173,173,500,500 · gap-usermodes.css:138,139 · gap-commands.css:153,154 · ui-sheets.css:637,637,1024,1024,1027,1027 |
+| `18px` | 65 | app.css:525,1738,1739,2867,2868 · pol-studio.css:1742,1743 · pol-shell.css:515,516,803,804,853,853,1292,1292,1302,1302 · pol-thread.css:29,30,1445,1445,2542 · pol-roster.css:333,333 · pol-public.css:168,326,327,862 · calls-c8.css:108,108 · roomsettings.css:253 · rx-shell.css:193,193,361,362,374,374,425,425 · gap-import.css:196,197 · gap-organize.css:54,54,110,111 · gap-shell.css:101,101,219,220 · ui-sheets.css:68,69,348,349,521,522,663,664,1032,1033,1395,1396,1449,1450 · calls-engine.css:508,508 |
+| `40px` | 63 | app.css:1494,1495,2899,2899 · pol-shell.css:642,643,1028,1191,1275,1408,1409,1409 · pol-thread.css:256,1391,1393,1410,2340,2341 · pol-roster.css:187,198,392 · pol-public.css:138,225,665,1313,1781 · calls-c8.css:30,30,99 · polish.css:374 · roomsettings.css:235,334 · calls-c4.css:138,138 · gap-account.css:79 · gap-oper.css:77 · rx-shell.css:287,288,414,446,455,511,530,549 · gap-chanserv.css:24 · gap-import.css:73 · gap-organize.css:228,229,453,708,708,723 · gap-usermodes.css:161 · gap-commands.css:70 · gap-watch.css:691 · gap-shell.css:244,347 · ui-sheets.css:361,537,1168,1383,1436 · calls-engine.css:132 |
+| `20px` | 52 | app.css:1529,1530,2037,2038 · pol-studio.css:1430 · pol-shell.css:488,489,606,606,1076,1076,1202,1203,1274,1274,1304,1304,1345 · pol-thread.css:258,258,343,921,921,1179,1179,1195,1196,2141,2141 · pol-roster.css:391,391 · polish.css:53,75,76 · rx-shell.css:115,115,259,259 · gap-organize.css:719,719 · gap-usermodes.css:245 · gap-commands.css:143 · gap-shell.css:373,373 · ui-sheets.css:571,572 · calls-engine.css:229,229,265,265,479,479 |
+| `48px` | 47 | app.css:1614,1629,1657,1764,1795,3082 · gap-appearance.css:202 · pol-studio.css:1822 · pol-shell.css:543,1273,1336,1337,1357,1357 · pol-roster.css:398 · pol-public.css:533,723,826,1397,1411,1421,1421 · calls-c8.css:44 · calls-c11.css:190,190 · rx-shell.css:258,445 · gap-organize.css:718,746 · gap-usermodes.css:228 · gap-shell.css:363,369,377 · gap-auth.css:95 · ui-sheets.css:762,874,913,1077,1192,1299,1406 · calls-engine.css:175,201,227,227,241,263 |
+| `8px` | 33 | app.css:299,300,320,321,721,722,956,1293,1293,2692,2889,2889,3080,3080 · pol-studio.css:1237,1238 · pol-shell.css:710 · pol-public.css:1044,1044 · account2.css:148,149 · roomsettings.css:100,101 · calls-c4.css:38,116,127 · gap-chanserv.css:235,236 · ui-sheets.css:432,1069,1183,1534,1535 |
+| `22px` | 26 | app.css:1525,2147 · pol-shell.css:1156,1156,1163,1163,1228,1228,1356,1356,1394,1394 · pol-thread.css:563,2266 · pol-public.css:635,636,797 · calls-c8.css:17 · rx-shell.css:294,294,568,568 · gap-import.css:456,456 · ui-sheets.css:614 · calls-engine.css:357 |
+| `6px` | 25 | app.css:2183,2183,2201,2906,2906,2958,2958 · pol-stats.css:561,562 · pol-shell.css:1164,1399 · pol-thread.css:1783 · pol-public.css:1201 · gap-convo.css:25,26 · gap-oper.css:379 · gap-shell.css:164,177,177 · ui-sheets.css:615,616,1250,1435,1541,1541 |
+| `24px` | 25 | app.css:2827,2827,2898,2898,2979,2979 · pol-studio.css:431,432 · pol-shell.css:745,1200,1200,1223 · pol-thread.css:2392 · pol-public.css:109,109,262,262 · calls-c8.css:62 · calls-c6.css:91 · calls-c4.css:102 · gap-organize.css:454 · gap-usermodes.css:364 · ui-sheets.css:1384,1437,1560 |
+| `4px` | 21 | app.css:533,1752,3086 · pol-stats.css:750,910 · pol-shell.css:1270,1345 · pol-thread.css:377,1318 · pol-roster.css:374 · calls-c4.css:126 · rx-shell.css:98 · gap-import.css:99 · gap-organize.css:202,721 · gap-claim.css:154 · ui-sheets.css:435,1072,1186 · calls-engine.css:259,375 |
+| `56px` | 21 | app.css:1570,2989,2989 · pol-studio.css:47,723,1807,1809,1810 · pol-shell.css:1179,1345 · pol-thread.css:2017,2017 · pol-public.css:1351,1352 · calls-c11.css:126 · rx-shell.css:326,326 · gap-shell.css:347 · gap-auth.css:30 · ui-sheets.css:708 · calls-engine.css:319 |
+| `52px` | 21 | app.css:3207 · gap-appearance.css:203 · pol-studio.css:251 · pol-shell.css:863,1005,1005,1126,1393 · pol-public.css:308 · polish.css:369,400 · rx-shell.css:434 · gap-usermodes.css:346 · ui-sheets.css:516,620,932,1416,1417 · calls-engine.css:455,455,551 |
+| `2px` | 18 | app.css:2814,2814 · pol-stats.css:810 · pol-shell.css:610 · pol-thread.css:123,222,2013 · pol-public.css:168,862 · roomsettings.css:262,263 · gap-commands.css:151,152 · gap-watch.css:179 · ui-sheets.css:1393,1394 · calls-engine.css:97,97 |
+| `12px` | 16 | app.css:2615,2615 · pol-shell.css:1132,1132,1292 · roomsettings.css:264,265 · calls-c4.css:113,125,128 · gap-oper.css:153 · rx-shell.css:443,443 · gap-organize.css:680 · calls-engine.css:230,230 |
+| `-2px` | 15 | app.css:1914,2979,2979 · pol-stats.css:317,1077 · pol-studio.css:1732 · pol-shell.css:1399 · pol-roster.css:229,230 · pol-public.css:1501,1503,1538,1678 · account2.css:156,156 |
+| `30px` | 14 | pol-shell.css:720,729,755,973 · pol-thread.css:232,233,420 · pol-public.css:105,106 · gap-organize.css:149,630 · gap-shell.css:48 · ui-sheets.css:813 · calls-engine.css:545 |
+| `2rem` | 13 | app.css:181,181,246 · pol-stats.css:964 · pol-thread.css:112,1011 · pol-roster.css:400,400 · pol-public.css:1693,1693 · gap-convo.css:274,278,278 |
+| `3px` | 13 | app.css:1736,1737 · pol-stats.css:716 · pol-shell.css:609,658,778,786 · calls-c4.css:36,114,126 · rx-shell.css:360 · gap-organize.css:465,466 |
+| `560px` | 12 | app.css:898,1025,1160,1954,2431 · pol-shell.css:936 · pol-thread.css:1354 · gap-watch.css:218,219 · ui-sheets.css:507,1227 · calls-engine.css:251 |
+| `10px` | 11 | app.css:532 · pol-stats.css:173,174,445,446 · pol-studio.css:222,223 · pol-shell.css:656,657 · pol-roster.css:231,232 |
+| `72px` | 11 | app.css:2988 · pol-thread.css:800,801 · pol-public.css:982 · ui-sheets.css:232,827 · calls-engine.css:199,239,328,431,431 |
+| `7px` | 11 | pol-shell.css:669,776,777,1011,1011 · pol-thread.css:1277,1277 · gap-shell.css:105,105,146,146 |
+| `26px` | 9 | app.css:1726 · pol-shell.css:1004,1004 · pol-thread.css:403,435,1206,1212 · gap-organize.css:161 · gap-shell.css:64 |
+| `96px` | 9 | pol-public.css:935 · calls-c8.css:114 · calls-c4.css:154 · gap-oper.css:232,423 · ui-sheets.css:1325 · calls-engine.css:161,395,395 |
+| `5px` | 8 | pol-studio.css:1324,1325,1500,1501 · pol-shell.css:1164 · pol-thread.css:147 · calls-c4.css:37,114 |
+| `640px` | 7 | app.css:699 · pol-shell.css:1017 · gap-oper.css:304 · ui-sheets.css:232,1284,1326 · calls-engine.css:271 |
+| `6rem` | 7 | pol-stats.css:327,534,785,963,964 · pol-studio.css:1759 · pol-thread.css:2366 |
+| `34px` | 7 | pol-studio.css:512 · pol-shell.css:1224,1224 · pol-roster.css:431 · rx-shell.css:99,182 · gap-commands.css:142 |
+| `3.5rem` | 7 | pol-studio.css:1807,1809,1810,1817 · pol-thread.css:507,508,2429 |
+| `68px` | 7 | pol-shell.css:1311 · rx-shell.css:594 · calls-engine.css:177,225,231,289,291 |
+| `420px` | 6 | app.css:859 · pol-thread.css:691,705 · rx-shell.css:271 · ui-sheets.css:111,231 |
+| `64px` | 6 | app.css:1355,2723 · pol-studio.css:414 · calls-engine.css:162,162,501 |
+| `15px` | 6 | pol-shell.css:833,833 · gap-organize.css:142,142,520,520 |
+| `320px` | 6 | pol-thread.css:699,735 · polish.css:39 · rx-shell.css:138 · gap-usermodes.css:364 · calls-engine.css:503 |
+| `360px` | 5 | app.css:1319,1340 · pol-thread.css:700 · pol-roster.css:341 · polish.css:401 |
+| `21px` | 5 | app.css:1746 · pol-shell.css:1230,1230,1240,1240 |
+| `2.75rem` | 5 | pol-stats.css:826 · pol-thread.css:1814,1856,1857 · pol-public.css:1695 |
+| `28rem` | 5 | pol-studio.css:382 · pol-thread.css:1509,2354 · pol-public.css:1530 · gap-watch.css:579 |
+| `15rem` | 5 | pol-studio.css:1256 · pol-public.css:1177,1474 · gap-import.css:186 · gap-commands.css:66 |
+| `11px` | 5 | pol-shell.css:550,550 · pol-public.css:863 · calls-c4.css:39,115 |
+| `312px` | 5 | pol-thread.css:349 · calls-c6.css:102,107,112,117 |
+| `182px` | 5 | calls-c6.css:103,108,113,118 · calls-engine.css:493 |
+| `30rem` | 4 | app.css:1843 · pol-stats.css:896 · pol-studio.css:1818 · pol-public.css:772 |
+| `220px` | 4 | app.css:2765 · pol-shell.css:436 · pol-thread.css:1136,1382 |
+| `760px` | 4 | app.css:2789 · gap-commands.css:39 · ui-sheets.css:1325,1674 |
+| `-1px` | 4 | pol-stats.css:941 · gap-commands.css:84 · gap-watch.css:212,213 |
+| `22rem` | 4 | pol-studio.css:934 · pol-thread.css:2256 · pol-public.css:1049 · rx-shell.css:322 |
+| `520px` | 4 | pol-shell.css:540 · calls-c8.css:89 · account2.css:5 · calls-engine.css:459 |
+| `76px` | 4 | pol-shell.css:1320 · gap-oper.css:201 · gap-usermodes.css:91 · calls-engine.css:453 |
+| `4rem` | 4 | pol-thread.css:611,612,620,620 |
+| `36rem` | 4 | pol-thread.css:662,2175 · pol-public.css:507,1620 |
+| `46rem` | 4 | pol-public.css:1580,1592,1593,1759 |
+| `380px` | 4 | calls-c11.css:136 · calls-c6.css:21 · ui-sheets.css:869,1153 |
+| `460px` | 4 | gap-organize.css:211 · ui-sheets.css:676,1325 · calls-engine.css:252 |
+| `120px` | 3 | app.css:1971,2624 · calls-engine.css:330 |
+| `280px` | 3 | app.css:2221 · calls-c8.css:44 · gap-oper.css:384 |
+| `200px` | 3 | app.css:2790 · pol-shell.css:540 · pol-thread.css:2018 |
+| `1.5rem` | 3 | gap-appearance.css:186,186,187 |
+| `2.5rem` | 3 | gap-appearance.css:190,190,191 |
+| `18rem` | 3 | pol-stats.css:132 · pol-thread.css:2413 · calls-engine.css:392 |
+| `16rem` | 3 | pol-stats.css:266,631 · pol-public.css:1759 |
+| `10rem` | 3 | pol-stats.css:709 · gap-import.css:186 · gap-watch.css:291 |
+| `8rem` | 3 | pol-stats.css:803,816 · gap-oper.css:335 |
+| `40rem` | 3 | pol-stats.css:823 · pol-studio.css:340 · pol-public.css:650 |
+| `9.5rem` | 3 | pol-studio.css:716 · pol-public.css:1217 · gap-people.css:82 |
+| `1.75rem` | 3 | pol-thread.css:1960,1964,1964 |
+| `14rem` | 3 | pol-thread.css:2283 · pol-public.css:1466 · calls-engine.css:143 |
+| `680px` | 3 | gap-oper.css:15 · ui-sheets.css:582,1326 |
+| `600px` | 3 | rx-shell.css:626 · ui-sheets.css:506,1227 |
+| `2.65rem` | 2 | app.css:182,182 |
+| `140px` | 2 | app.css:903 · pol-shell.css:459 |
+| `340px` | 2 | app.css:1262 · pol-thread.css:1371 |
+| `27.5rem` | 2 | app.css:1444,1827 |
+| `52rem` | 2 | app.css:1889 · pol-public.css:1441 |
+| `160px` | 2 | app.css:2165 · calls-c4.css:137 |
+| `76rem` | 2 | pol-stats.css:38 · pol-studio.css:1798 |
 | `1.25rem` | 2 | pol-stats.css:828,829 |
-| `30rem` | 2 | pol-stats.css:896 · pol-public.css:771 |
-| `34rem` | 2 | pol-studio.css:241 · pol-public.css:1341 |
-| `27px` | 2 | pol-studio.css:317,318 |
-| `168px` | 2 | pol-studio.css:512 · ui-sheets.css:682 |
-| `9.5rem` | 2 | pol-studio.css:722 · pol-public.css:1216 |
-| `22rem` | 2 | pol-studio.css:940 · pol-public.css:1048 |
-| `13rem` | 2 | pol-studio.css:1100 · pol-public.css:928 |
-| `6.5rem` | 2 | pol-studio.css:1757 · pol-public.css:1329 |
-| `-8px` | 2 | pol-shell.css:688,808 |
-| `-6px` | 2 | pol-shell.css:701 · ui-sheets.css:517 |
-| `15px` | 2 | pol-shell.css:866,866 |
-| `3.5rem` | 2 | pol-thread.css:502,503 |
-| `260px` | 2 | pol-thread.css:694 · calls-c4.css:137 |
-| `60px` | 2 | ui-sheets.css:840 · calls-engine.css:41 |
-| `880px` | 1 | app.css:909 |
-| `1.35rem` | 1 | app.css:1856 |
-| `110px` | 1 | app.css:2941 |
-| `760px` | 1 | app.css:3074 |
-| `112px` | 1 | app.css:3262 |
-| `76rem` | 1 | pol-stats.css:38 |
-| `18rem` | 1 | pol-stats.css:132 |
+| `3rem` | 2 | pol-stats.css:967 · gap-oper.css:377 |
+| `34rem` | 2 | pol-studio.css:236 · pol-public.css:1342 |
+| `27px` | 2 | pol-studio.css:312,313 |
+| `168px` | 2 | pol-studio.css:506 · ui-sheets.css:770 |
+| `26rem` | 2 | pol-studio.css:1037 · gap-convo.css:55 |
+| `13rem` | 2 | pol-studio.css:1094 · pol-public.css:929 |
+| `5.5rem` | 2 | pol-studio.css:1266 · gap-chanserv.css:204 |
+| `12rem` | 2 | pol-studio.css:1653 · pol-public.css:1759 |
+| `6.5rem` | 2 | pol-studio.css:1751 · pol-public.css:1330 |
+| `-8px` | 2 | pol-shell.css:655,775 |
+| `-6px` | 2 | pol-shell.css:668 · ui-sheets.css:613 |
+| `216px` | 2 | pol-thread.css:326,2355 |
+| `480px` | 2 | pol-thread.css:769 · gap-import.css:278 |
+| `240px` | 2 | pol-thread.css:1369 · rx-shell.css:626 |
+| `42px` | 2 | pol-thread.css:1393 · gap-shell.css:345 |
+| `24rem` | 2 | pol-thread.css:1782 · calls-engine.css:36 |
+| `9rem` | 2 | pol-public.css:1569 · gap-import.css:293 |
+| `8.5rem` | 2 | roomsettings.css:310 · gap-chanserv.css:93 |
+| `300px` | 2 | calls-c6.css:91 · gap-watch.css:609 |
+| `11rem` | 2 | gap-oper.css:340 · gap-chanserv.css:93 |
+| `7.5rem` | 2 | gap-oper.css:377 · calls-engine.css:392 |
+| `19px` | 2 | rx-shell.css:351,351 |
+| `400px` | 2 | gap-organize.css:210 · gap-shell.css:239 |
+| `60px` | 2 | ui-sheets.css:930 · calls-engine.css:175 |
+| `112px` | 2 | calls-engine.css:399,399 |
+| `1.35rem` | 1 | app.css:1389 |
+| `57px` | 1 | app.css:1557 |
+| `66rem` | 1 | app.css:1830 |
+| `32rem` | 1 | app.css:1837 |
+| `110px` | 1 | app.css:2666 |
 | `1rem` | 1 | pol-stats.css:253 |
 | `20rem` | 1 | pol-stats.css:395 |
-| `10rem` | 1 | pol-stats.css:709 |
 | `1.4rem` | 1 | pol-stats.css:824 |
-| `3rem` | 1 | pol-stats.css:967 |
-| `1040px` | 1 | pol-studio.css:79 |
-| `51px` | 1 | pol-studio.css:303 |
-| `31px` | 1 | pol-studio.css:304 |
-| `26rem` | 1 | pol-studio.css:1043 |
-| `5.5rem` | 1 | pol-studio.css:1272 |
-| `0.6rem` | 1 | pol-studio.css:1498 |
-| `3.25rem` | 1 | pol-studio.css:1588 |
-| `12rem` | 1 | pol-studio.css:1659 |
-| `248px` | 1 | pol-shell.css:968 |
-| `68px` | 1 | pol-shell.css:1343 |
-| `76px` | 1 | pol-shell.css:1352 |
-| `-14px` | 1 | pol-thread.css:202 |
-| `-22px` | 1 | pol-thread.css:250 |
-| `216px` | 1 | pol-thread.css:320 |
-| `232px` | 1 | pol-thread.css:342 |
-| `1100px` | 1 | pol-thread.css:825 |
-| `240px` | 1 | pol-thread.css:1267 |
-| `38px` | 1 | pol-thread.css:1280 |
-| `42px` | 1 | pol-thread.css:1291 |
-| `24rem` | 1 | pol-thread.css:1673 |
-| `17rem` | 1 | pol-public.css:902 |
-| `52rem` | 1 | pol-public.css:1441 |
-| `14rem` | 1 | pol-public.css:1466 |
-| `9rem` | 1 | pol-public.css:1569 |
+| `51px` | 1 | pol-studio.css:298 |
+| `31px` | 1 | pol-studio.css:299 |
+| `0.6rem` | 1 | pol-studio.css:1492 |
+| `3.25rem` | 1 | pol-studio.css:1582 |
+| `65rem` | 1 | pol-studio.css:1790 |
+| `248px` | 1 | pol-shell.css:935 |
+| `-14px` | 1 | pol-thread.css:206 |
+| `-22px` | 1 | pol-thread.css:254 |
+| `232px` | 1 | pol-thread.css:348 |
+| `260px` | 1 | pol-thread.css:698 |
+| `38px` | 1 | pol-thread.css:1382 |
+| `180px` | 1 | pol-thread.css:2270 |
+| `-18px` | 1 | pol-thread.css:2275 |
+| `264px` | 1 | pol-thread.css:2328 |
+| `352px` | 1 | pol-thread.css:2329 |
+| `-24px` | 1 | pol-thread.css:2451 |
+| `17rem` | 1 | pol-public.css:903 |
+| `2.25rem` | 1 | pol-public.css:1602 |
 | `620px` | 1 | calls-c8.css:62 |
 | `42rem` | 1 | polish.css:338 |
-| `8.5rem` | 1 | roomsettings.css:312 |
-| `300px` | 1 | calls-c6.css:98 |
-| `56rem` | 1 | calls-c4.css:72 |
-| `500px` | 1 | ui-sheets.css:122 |
-| `600px` | 1 | ui-sheets.css:410 |
-| `680px` | 1 | ui-sheets.css:486 |
-| `460px` | 1 | ui-sheets.css:579 |
-| `212px` | 1 | ui-sheets.css:672 |
-| `84px` | 1 | ui-sheets.css:690 |
-| `74px` | 1 | ui-sheets.css:895 |
+| `0.75rem` | 1 | gap-convo.css:281 |
+| `7rem` | 1 | gap-convo.css:282 |
+| `780px` | 1 | gap-oper.css:19 |
+| `4.6rem` | 1 | gap-oper.css:335 |
+| `4.4rem` | 1 | gap-oper.css:335 |
+| `272px` | 1 | rx-shell.css:248 |
+| `-9px` | 1 | rx-shell.css:359 |
+| `50px` | 1 | rx-shell.css:595 |
+| `44rem` | 1 | gap-chanserv.css:158 |
+| `8.25rem` | 1 | gap-import.css:69 |
+| `720px` | 1 | ui-sheets.css:755 |
+| `212px` | 1 | ui-sheets.css:760 |
+| `84px` | 1 | ui-sheets.css:778 |
+| `104px` | 1 | ui-sheets.css:1302 |
+| `500px` | 1 | ui-sheets.css:1324 |
+| `800px` | 1 | ui-sheets.css:1327 |
+| `236px` | 1 | ui-sheets.css:1328 |
+| `188px` | 1 | ui-sheets.css:1329 |
+| `9px` | 1 | ui-sheets.css:1448 |
+| `128px` | 1 | calls-engine.css:394 |
+| `144px` | 1 | calls-engine.css:400 |
+| `88px` | 1 | calls-engine.css:429 |
+| `330px` | 1 | calls-engine.css:521 |
 
-### G3.14 Opacity values (78)
+### G3.14 Opacity values (111)
 
 | value | count | where |
 |---|---|---|
-| `1` | 17 | app.css:1946,2558,3518 · pol-shell.css:868,1017 · pol-thread.css:152,222,421,1917 · pol-roster.css:178,253,306,398,415 · pol-public.css:1407 · ui-sheets.css:543,561 |
-| `0.5` | 15 | app.css:174,656,1798,2018,3048,3572,3716 · pol-shell.css:28,57,250 · pol-thread.css:1471 · account2.css:58 · roomsettings.css:203,249 · calls-c6.css:186 |
-| `0.45` | 11 | app.css:388,1573,1846,2531,2913 · pol-studio.css:608,786 · calls-c6.css:266 · calls-c4.css:20,125 · ui-sheets.css:211 |
-| `0` | 11 | app.css:3268,3512 · pol-shell.css:863 · pol-thread.css:147,212,256,419 · pol-roster.css:122,173,304 · ui-sheets.css:539 |
-| `0.6` | 8 | app.css:1950,3271,3274 · pol-stats.css:691 · pol-shell.css:1357 · pol-public.css:453 · polish.css:310 · calls-c6.css:65 |
-| `0.55` | 6 | app.css:204,704 · pol-stats.css:516 · pol-roster.css:252 · calls-c6.css:187,265 |
-| `0.7` | 3 | app.css:195 · pol-stats.css:225 · pol-studio.css:1481 |
-| `0.8` | 2 | app.css:3123 · pol-thread.css:156 |
-| `0.4` | 2 | pol-thread.css:1389 · calls-c6.css:130 |
-| `0.62` | 1 | pol-thread.css:155 |
+| `0.5` | 25 | app.css:219,581,1331,1748,1801,2763,3240,3359 · pol-shell.css:28,47,233 · pol-thread.css:1580 · account2.css:58 · roomsettings.css:201,247 · calls-c6.css:179 · gap-convo.css:139,165 · gap-oper.css:291 · gap-import.css:219,318 · gap-organize.css:264,293,384,475 |
+| `1` | 23 | app.css:1667,3192 · gap-appearance.css:98 · pol-shell.css:835,984 · pol-thread.css:156,226,427,2037 · pol-roster.css:174,249,302,394,470 · pol-public.css:1407 · rx-shell.css:101,463 · gap-organize.css:192,195,708 · ui-sheets.css:639,657 · calls-engine.css:363 |
+| `0` | 15 | app.css:2970,3186 · pol-shell.css:830 · pol-thread.css:151,216,260,262,425 · pol-roster.css:118,169,300 · rx-shell.css:94 · gap-organize.css:187 · ui-sheets.css:635 · calls-engine.css:360 |
+| `0.45` | 14 | app.css:392,1191,1379,2328,2638 · pol-studio.css:602,780 · calls-c6.css:253 · calls-c4.css:20,124 · gap-oper.css:218,427 · ui-sheets.css:317,1458 |
+| `0.55` | 9 | app.css:245 · pol-stats.css:516 · pol-roster.css:248 · calls-c6.css:180,252 · gap-import.css:192 · gap-organize.css:675 · gap-usermodes.css:116 · gap-watch.css:433 |
+| `0.6` | 9 | app.css:1671,2973,2976 · pol-stats.css:691 · pol-shell.css:1325 · pol-public.css:453 · polish.css:310 · calls-c6.css:65 · gap-usermodes.css:117 |
+| `0.7` | 6 | app.css:238 · pol-stats.css:225 · pol-studio.css:1475 · gap-account.css:49,123 · gap-commands.css:34 |
+| `0.4` | 3 | pol-thread.css:1495 · calls-c6.css:123 · gap-convo.css:89 |
+| `var(--onyx-scene-alpha, 0.3)` | 1 | gap-appearance.css:267 |
+| `0.62` | 1 | pol-thread.css:159 |
+| `0.8` | 1 | pol-thread.css:160 |
+| `0.85` | 1 | gap-oper.css:373 |
+| `0.35` | 1 | gap-organize.css:405 |
 | `0.66` | 1 | pol-ios.css:38 |
 | `0.72` | 1 | pol-ios.css:41 |
 
@@ -1577,122 +1829,192 @@ Theme Studio-editable tokens (src/Studio.elm): `--ink`, `--ink-2`, `--stone`, `-
 
 | z | count | where (file:line selector) |
 |---|---|---|
-| `-1` | 1 | pol-studio.css:34 `.ap-background-host` |
-| `1` | 5 | pol-stats.css:826 `.stats-page .stats-heatmap tbody th, .stats-page .stats-heat`<br>pol-studio.css:77 `.ap-wrap`<br>pol-thread.css:824 `.shell-msg-lightbox-dialog`<br>pol-thread.css:880 `.onyx-thread-sheet .onyx-thread-head`<br>calls-c4.css:96 `.onyx-tile-top, .onyx-tile-bottom` |
-| `3` | 2 | calls-c8.css:38 `.onyx-call-reactions`<br>ui-sheets.css:896 `.onyx-account-body > .onyx-account-nav` @@media (max-width: 767.98px) |
-| `4` | 2 | pol-thread.css:204 `.onyx-row-actions`<br>ui-sheets.css:153 `.onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)` |
-| `5` | 3 | app.css:2969 `.onyx-jump-latest`<br>app.css:3447 `.onyx-frame > .onyx-primary-nav`<br>ui-sheets.css:713 `.onyx-moddesk-bar` |
-| `10` | 1 | pol-studio.css:42 `.ap-bar` |
-| `19` | 1 | pol-public.css:275 `.public-frame__nav` @@media (max-width: 768px) |
-| `20` | 2 | app.css:3313 `.onyx-call-more`<br>pol-public.css:73 `.public-frame__header` |
-| `21` | 1 | calls-c8.css:25 `.onyx-call-react-menu` |
-| `40` | 6 | app.css:1292 `.onyx-schedule-pop`<br>app.css:1839 `.onyx-msg-menu-backdrop`<br>app.css:2398 `.shell-composer-popovers`<br>app.css:3681 `.onyx-room-more-scrim`<br>pol-thread.css:260 `.onyx-react-backdrop`<br>polish.css:38 `.shell-composer-tools` |
-| `41` | 4 | app.css:1840 `.onyx-msg-menu`<br>app.css:3687 `.onyx-room-more-menu`<br>pol-thread.css:261 `.onyx-react-pop .onyx-react-picker`<br>pol-thread.css:339 `.onyx-msg-menu-pop, .onyx-react-pop` @@media (min-width: 768px) |
-| `45` | 1 | app.css:3604 `.notif-center` |
-| `50` | 3 | calls-c6.css:97 `.onyx-call-pip-card`<br>calls-c4.css:64 `.onyx-call-stage[data-size="fullscreen"]`<br>calls-engine.css:105 `.onyx-call-stage[data-size="expanded"], .onyx-call-stage[dat` @@media (max-width: 640px) |
-| `58` | 1 | pol-shell.css:1279 `.onyx-frame .onyx-room-more-scrim` @@media (max-width: 767.98px) |
-| `59` | 1 | pol-shell.css:1286 `.onyx-frame .onyx-room-more-menu` @@media (max-width: 767.98px) |
-| `60` | 8 | app.css:1070 `.onyx-toaster`<br>app.css:3490 `.onyx-overlays`<br>app.css:3724 `.onyx-sheet-layer`<br>pol-shell.css:414 `.onyx-profile-pop:not(.onyx-sheet-layer)`<br>ui-sheets.css:57 `.onyx-sheet-layer`<br>ui-sheets.css:956 `.onyx-room-more-scrim` @@media (max-width: 767.98px)<br>ui-sheets.css:1057 `.onyx-profile-pop:not(.onyx-sheet-layer)`<br>calls-engine.css:90 `.onyx-call-more` @@media (max-width: 640px) |
-| `61` | 1 | ui-sheets.css:966 `.onyx-room-more-menu` @@media (max-width: 767.98px) |
-| `70` | 2 | pol-thread.css:348 `.onyx-msg-menu-backdrop, .onyx-react-backdrop` @@media (max-width: 767.98px)<br>polish.css:329 `.update-available` |
-| `71` | 1 | pol-thread.css:356 `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-rea` @@media (max-width: 767.98px) |
-| `80` | 3 | app.css:2647 `.onyx-spotlight`<br>calls-c6.css:18 `.onyx-sheet-layer.onyx-call-ring-layer`<br>ui-sheets.css:406 `.onyx-spotlight` |
-| `90` | 1 | ui-sheets.css:788 `.onyx-toaster` |
-| `100` | 2 | pol-thread.css:811 `.shell-msg-lightbox`<br>pol-public.css:55 `.public-frame__skip` |
+| `var(--z-popover)` | 7 | app.css:965 `.onyx-schedule-pop`<br>app.css:1372 `.onyx-msg-menu-backdrop`<br>app.css:2206 `.shell-composer-popovers`<br>app.css:3326 `.onyx-room-more-scrim`<br>pol-thread.css:266 `.onyx-react-backdrop`<br>polish.css:38 `.shell-composer-tools`<br>gap-organize.css:682 `.gorg-reader-bar` |
+| `calc(var(--z-popover) + 1)` | 5 | app.css:1373 `.onyx-msg-menu`<br>app.css:3332 `.onyx-room-more-menu`<br>pol-thread.css:267 `.onyx-react-pop .onyx-react-picker`<br>pol-thread.css:345 `.onyx-msg-menu-pop, .onyx-react-pop` @@media (min-width: 768px)<br>pol-thread.css:2385 `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-rea` @@supports (anchor-name: --pt-r |
+| `var(--z-sticky)` | 2 | app.css:2694 `.onyx-jump-latest`<br>app.css:3123 `.onyx-frame > .onyx-primary-nav` |
+| `var(--z-sheet)` | 4 | app.css:3166 `.onyx-overlays`<br>ui-sheets.css:153 `.onyx-sheet-layer`<br>ui-sheets.css:1150 `.onyx-profile-pop:not(.onyx-sheet-layer)`<br>calls-engine.css:181 `.onyx-call-more-scrim` |
+| `var(--z-panel)` | 1 | app.css:3263 `.notif-center` |
+| `var(--z-under)` | 2 | gap-appearance.css:264 `#onyx-scene`<br>pol-studio.css:34 `.ap-background-host` |
+| `var(--z-raised)` | 7 | pol-stats.css:826 `.stats-page .stats-heatmap tbody th, .stats-page .stats-heat`<br>pol-studio.css:77 `.ap-wrap`<br>pol-thread.css:844 `.shell-msg-lightbox-dialog`<br>pol-thread.css:984 `.onyx-thread-sheet .onyx-thread-head`<br>calls-c4.css:95 `.onyx-tile-top, .onyx-tile-bottom`<br>ui-sheets.css:1537 `.onyx-member-card > .onyx-member-card-close`<br>calls-engine.css:155 `.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"` |
+| `var(--z-bar)` | 1 | pol-studio.css:42 `.ap-bar` |
+| `var(--z-menu-sheet)` | 1 | pol-shell.css:1247 `.onyx-frame .onyx-room-more-scrim` @@media (max-width: 599.98px) |
+| `calc(var(--z-menu-sheet) + 1)` | 1 | pol-shell.css:1254 `.onyx-frame .onyx-room-more-menu` @@media (max-width: 599.98px) |
+| `calc(var(--z-raised) + 3)` | 3 | pol-thread.css:208 `.onyx-row-actions`<br>gap-oper.css:46 `.oc-tabs`<br>ui-sheets.css:250 `.onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)` |
+| `var(--z-notice)` | 3 | pol-thread.css:354 `.onyx-msg-menu-backdrop, .onyx-react-backdrop` @@media (max-width: 767.98px)<br>polish.css:329 `.update-available`<br>gap-convo.css:44 `.gap-drop` |
+| `calc(var(--z-notice) + 1)` | 1 | pol-thread.css:362 `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-rea` @@media (max-width: 767.98px) |
+| `var(--z-top)` | 2 | pol-thread.css:830 `.shell-msg-lightbox`<br>pol-public.css:55 `.public-frame__skip` |
+| `calc(var(--z-raised) + 1)` | 4 | pol-thread.css:889 `.shell-msg-lightbox-actions`<br>pol-roster.css:441 `.onyx-roster .onyx-mlist-group-head`<br>gap-import.css:231 `.hi-review-foot`<br>ui-sheets.css:1628 `.onyx-frame .onyx-room-more .onyx-room-more-menu > .onyx-roo` @@media (max-width: 599.98px) |
+| `var(--z-stage)` | 3 | pol-thread.css:2111 `.onyx-sheet-layer.onyx-thread-pop` @@media (min-width: 1100px)<br>gap-watch.css:35 `.onyx-watch`<br>calls-engine.css:57 `.onyx-thread-pane > .onyx-call-stage, .onyx-thread-pane > .o` |
+| `calc(var(--z-raised) + 2)` | 4 | pol-roster.css:419 `.onyx-roster .onyx-roster-head`<br>pol-roster.css:428 `.onyx-roster .onyx-roster-filter`<br>calls-c8.css:38 `.onyx-call-reactions`<br>ui-sheets.css:995 `.onyx-account-body > .onyx-account-nav` @@media (max-width: 599.98px),  |
+| `var(--z-header)` | 1 | pol-public.css:73 `.public-frame__header` |
+| `calc(var(--z-header) - 1)` | 1 | pol-public.css:275 `.public-frame__nav` @@media (max-width: 767.98px) |
+| `calc(var(--z-header) + 1)` | 1 | calls-c8.css:25 `.onyx-call-react-menu` |
+| `var(--z-dialog)` | 2 | calls-c6.css:18 `.onyx-sheet-layer.onyx-call-ring-layer`<br>ui-sheets.css:502 `.onyx-spotlight` |
+| `var(--z-call)` | 4 | calls-c6.css:90 `.onyx-call-pip-card`<br>calls-c4.css:64 `.onyx-call-stage[data-size="fullscreen"]`<br>calls-engine.css:403 `.onyx-thread-pane > .onyx-call-stage[data-size="fullscreen"]`<br>calls-engine.css:411 `.onyx-call-stage[data-size="expanded"], .onyx-call-stage[dat` @@media (max-width: 640.98px),  |
+| `var(--z-toast)` | 1 | ui-sheets.css:866 `.onyx-toaster` |
+| `calc(var(--z-sheet) + 1)` | 2 | calls-engine.css:183 `.onyx-call-more`<br>calls-engine.css:250 `.onyx-call-more` @@media (max-width: 640.98px),  |
 
 ## G5. Breakpoints and conditional blocks (every @media / @container / @supports)
 
 | condition | blocks | where (file:line (rules inside)) |
 |---|---|---|
-| `@media (max-width: 359px)` | 2 | pol-public.css:342 (3) · pol-public.css:808 (1) |
-| `@media (max-width: 360px)` | 1 | pol-shell.css:173 (1) |
-| `@media (max-width: 400px)` | 1 | pol-stats.css:1039 (4) |
-| `@media (max-width: 480px)` | 3 | app.css:2380 (2) · pol-studio.css:1708 (13) · pol-studio.css:1764 (2) |
-| `@media (max-width: 520px)` | 1 | app.css:2035 (7) |
-| `@media (max-width: 520px) and (max-height: 600px)` | 1 | app.css:2046 (4) |
-| `@media (max-height: 520px) and (max-width: 1024px)` | 1 | ui-sheets.css:398 (1) |
-| `@media (max-width: 600px)` | 2 | pol-public.css:775 (23) · pol-public.css:1157 (1) |
-| `@media (max-width: 640px)` | 4 | app.css:3124 (26) · app.css:3386 (20) · calls-c11.css:189 (1) · calls-engine.css:63 (19) |
-| `@media (min-width: 641px)` | 1 | calls-engine.css:17 (1) |
-| `@container onyx-call (max-width: 760px)` | 1 | calls-engine.css:45 (7) |
-| `@media (max-width: 767px) and (max-height: 480px)` | 1 | pol-stats.css:251 (1) |
-| `@media (max-width: 767px)` | 6 | pol-stats.css:992 (33) · calls-c8.css:123 (9) · roomsettings.css:347 (2) · calls-c6.css:197 (16) · calls-c6.css:268 (1) · calls-c4.css:149 (12) |
-| `@media (max-width: 767.98px)` | 22 | app.css:2863 (17) · app.css:2952 (13) · app.css:3855 (12) · pol-shell.css:493 (120) · pol-shell.css:1152 (118) · pol-shell.css:1466 (1) · pol-thread.css:346 (41) · pol-thread.css:1285 (31) · pol-thread.css:1566 (15) · pol-thread.css:1890 (8) · pol-roster.css:359 (13) · calls-c11.css:181 (5) · polish.css:357 (8) · account2.css:159 (2) · ui-sheets.css:289 (74) · ui-sheets.css:808 (57) · ui-sheets.css:822 (56) · ui-sheets.css:954 (15) · ui-sheets.css:1035 (11) · ui-sheets.css:1077 (5) · pol-ios.css:89 (4) · pol-ios.css:109 (3) |
-| `@media (max-width: 768px), (pointer: coarse)` | 3 | pol-stats.css:1054 (1) · pol-studio.css:1776 (2) · pol-public.css:1657 (4) |
-| `@media (max-width: 768px)` | 8 | pol-studio.css:1675 (12) · pol-public.css:256 (61) · pol-public.css:976 (39) · pol-public.css:1162 (34) · pol-public.css:1294 (31) · pol-public.css:1418 (16) · pol-public.css:1560 (12) · pol-public.css:1610 (3) |
-| `@media (min-width: 768px)` | 4 | pol-shell.css:1140 (2) · pol-thread.css:333 (3) · calls-c6.css:190 (1) · pol-ios.css:99 (1) |
-| `@media (max-width: 860px)` | 1 | pol-public.css:768 (4) |
-| `@media (max-width: 880px)` | 1 | app.css:3379 (2) |
-| `@media (max-width: 959.98px)` | 2 | app.css:3526 (1) · pol-shell.css:1146 (2) |
-| `@container onyx-call (max-width: 1000px)` | 1 | calls-engine.css:32 (6) |
-| `@media (max-width: 1024px)` | 2 | pol-stats.css:980 (9) · pol-public.css:764 (1) |
-| `@media (max-width: 1099.98px)` | 2 | app.css:3521 (2) · pol-roster.css:330 (6) |
-| `@media (min-width: 1100px)` | 1 | pol-roster.css:36 (1) |
+| `@container onyx-tile (max-width: 240px)` | 1 | calls-engine.css:354 (3) |
+| `@container ts-preview (max-width: 17rem)` | 1 | pol-studio.css:1836 (2) |
+| `@container gap-acct (max-width: 300px)` | 1 | gap-account.css:116 (2) |
+| `@container gc (max-width: 300px)` | 1 | gap-claim.css:169 (1) |
+| `@container onyx-banner (max-width: 300px)` | 1 | calls-engine.css:105 (2) |
+| `@media (max-width: 344px)` | 1 | calls-engine.css:532 (1) |
+| `@media (max-width: 359px)` | 5 | app.css:1869 (3) · pol-public.css:342 (3) · pol-public.css:809 (1) · gap-usermodes.css:386 (3) · gap-auth.css:25 (1) |
+| `@media (max-width: 359.98px)` | 2 | gap-organize.css:760 (3) · gap-watch.css:740 (2) |
+| `@media (max-width: 360px)` | 2 | pol-shell.css:156 (1) · rx-shell.css:585 (12) |
+| `@container ts-preview (max-width: 24rem)` | 1 | pol-studio.css:1832 (2) |
+| `@media (max-width: 399.98px)` | 1 | pol-thread.css:2426 (1) |
+| `@media (max-width: 400px)` | 5 | pol-stats.css:1039 (4) · gap-convo.css:176 (8) · gap-convo.css:220 (2) · gap-oper.css:30 (2) · gap-oper.css:420 (1) |
+| `@container gc (max-width: 400px)` | 1 | gap-claim.css:159 (5) |
+| `@container gap-acct (max-width: 420px)` | 1 | gap-account.css:108 (4) |
+| `@media (max-width: 420px)` | 2 | gap-chanserv.css:258 (2) · gap-usermodes.css:379 (4) |
+| `@container onyx-banner (max-width: 420px)` | 1 | calls-engine.css:99 (2) |
+| `@media (max-height: 460px) and (orientation: landscape)` | 1 | gap-chanserv.css:264 (2) |
+| `@media (max-width: 479.98px)` | 2 | pol-thread.css:928 (6) · pol-thread.css:2280 (4) |
+| `@container watch (max-width: 479.98px)` | 1 | gap-watch.css:552 (4) |
+| `@media (max-width: 480px)` | 3 | app.css:2189 (1) · pol-studio.css:1702 (13) · pol-studio.css:1758 (2) |
+| `@media (max-height: 480px) and (orientation: landscape)` | 3 | gap-convo.css:33 (3) · gap-convo.css:299 (2) · gap-shell.css:381 (1) |
+| `@media (max-height: 480px)` | 1 | gap-convo.css:74 (1) |
+| `@container hi-review (max-width: 30rem)` | 1 | gap-import.css:248 (6) |
+| `@container watch (min-width: 480px)` | 1 | gap-watch.css:565 (1) |
+| `@media (max-height: 500px) and (orientation: landscape)` | 1 | pol-thread.css:2361 (8) |
+| `@media (max-height: 500px)` | 6 | pol-thread.css:2419 (2) · polish.css:404 (3) · calls-engine.css:116 (32) · calls-engine.css:267 (30) · calls-engine.css:302 (27) · calls-engine.css:450 (5) |
+| `@media (hover: none) and (max-height: 500px)` | 1 | gap-organize.css:768 (1) |
+| `@media (max-height: 500px) and (min-width: 768px)` | 1 | calls-engine.css:513 (7) |
+| `@media (max-height: 500px) and (min-width: 768px) and (hover: none)` | 1 | calls-engine.css:527 (1) |
+| `@media (max-height: 520px) and (min-width: 521px)` | 4 | app.css:1877 (13) · pol-studio.css:1821 (4) · pol-public.css:1779 (20) · gap-auth.css:93 (4) |
+| `@media (max-height: 520px)` | 7 | gap-convo.css:308 (2) · gap-oper.css:440 (3) · gap-import.css:463 (8) · gap-watch.css:584 (15) · gap-watch.css:726 (4) · gap-claim.css:180 (2) · ui-sheets.css:1238 (10) |
+| `@media (max-height: 520px) and (orientation: landscape)` | 1 | gap-watch.css:613 (1) |
+| `@media (max-height: 520px) and (min-width: 600px)` | 1 | ui-sheets.css:1256 (19) |
+| `@media (max-width: 520.98px)` | 1 | app.css:1853 (8) |
+| `@media (max-width: 520.98px) and (max-height: 600px)` | 1 | app.css:1863 (4) |
+| `@container (max-width: 520.98px)` | 1 | gap-commands.css:107 (2) |
+| `@container gc (max-width: 520.98px)` | 1 | gap-claim.css:65 (2) |
+| `@container oc (min-width: 560px)` | 1 | gap-oper.css:333 (2) |
+| `@media (max-width: 599.98px)` | 17 | app.css:3400 (10) · pol-shell.css:1119 (118) · pol-shell.css:1434 (1) · pol-roster.css:355 (13) · rx-shell.css:127 (12) · rx-shell.css:318 (10) · rx-shell.css:371 (2) · ui-sheets.css:390 (47) · ui-sheets.css:918 (30) · ui-sheets.css:1049 (18) · ui-sheets.css:1130 (14) · ui-sheets.css:1170 (10) · ui-sheets.css:1540 (5) · ui-sheets.css:1616 (4) · ui-sheets.css:1649 (1) · pol-ios.css:89 (4) · pol-ios.css:109 (3) |
+| `@media (hover: none), (max-width: 599.98px)` | 2 | pol-roster.css:452 (4) · rx-shell.css:660 (9) |
+| `@media (max-width: 599.98px) and (max-height: 520px)` | 2 | rx-shell.css:575 (5) · ui-sheets.css:1652 (1) |
+| `@media (max-width: 599.98px), (pointer: coarse)` | 1 | ui-sheets.css:901 (8) |
+| `@media (max-width: 599.98px), (max-height: 520px), (pointer: coarse)` | 1 | ui-sheets.css:989 (6) |
+| `@media (min-width: 600px)` | 6 | gap-appearance.css:222 (1) · pol-shell.css:1107 (2) · gap-convo.css:324 (1) · rx-shell.css:379 (5) · rx-shell.css:610 (2) · pol-ios.css:99 (1) |
+| `@media (max-width: 600px)` | 2 | pol-public.css:776 (23) · pol-public.css:1158 (1) |
+| `@media (min-width: 600px) and (hover: none)` | 2 | rx-shell.css:122 (25) · rx-shell.css:432 (24) |
+| `@media (min-width: 600px) and (max-width: 767.98px)` | 3 | rx-shell.css:268 (19) · rx-shell.css:387 (17) · ui-sheets.css:1202 (10) |
+| `@media (min-width: 600px) and (max-width: 767.98px), (min-width: 600px) and (max-height: 520px)` | 1 | rx-shell.css:423 (4) |
+| `@media (min-width: 600px) and (max-height: 520px)` | 1 | rx-shell.css:474 (29) |
+| `@media (min-width: 600px) and (max-height: 520px) and (hover: none)` | 1 | rx-shell.css:547 (3) |
+| `@media (min-width: 600px) and (max-width: 959.98px) and (max-height: 520px) and (hover: none)` | 1 | rx-shell.css:557 (4) |
+| `@container onyx-banner (max-width: 600px)` | 1 | calls-engine.css:93 (4) |
+| `@container onyx-call (max-width: 600px)` | 1 | calls-engine.css:196 (6) |
+| `@media (max-height: 620px) and (min-width: 641px)` | 1 | calls-engine.css:279 (12) |
+| `@media (max-width: 640.98px)` | 8 | app.css:2832 (17) · app.css:3075 (11) · calls-c11.css:189 (1) · ui-sheets.css:980 (2) · calls-engine.css:109 (30) · calls-engine.css:208 (25) · calls-engine.css:466 (3) · calls-engine.css:485 (1) |
+| `@media (max-width: 640.98px), (max-height: 520px)` | 1 | ui-sheets.css:950 (14) |
+| `@media (max-width: 640.98px), (max-height: 500px)` | 2 | calls-engine.css:247 (19) · calls-engine.css:406 (14) |
+| `@media (min-width: 641px) and (min-height: 501px)` | 1 | calls-engine.css:126 (1) |
+| `@media (min-width: 641px)` | 1 | calls-engine.css:391 (10) |
+| `@media (min-width: 720px)` | 1 | gap-oper.css:71 (1) |
+| `@media (min-width: 721px) and (max-width: 860px)` | 1 | pol-public.css:1822 (4) |
+| `@container watch (min-width: 760px)` | 1 | gap-watch.css:570 (3) |
+| `@media (max-width: 767.98px)` | 41 | app.css:2595 (4) · app.css:2677 (1) · pol-stats.css:992 (33) · pol-studio.css:1669 (12) · pol-shell.css:458 (2) · pol-thread.css:352 (48) · pol-thread.css:1387 (38) · pol-thread.css:1675 (22) · pol-thread.css:2010 (15) · pol-thread.css:2412 (7) · pol-thread.css:2572 (3) · pol-public.css:256 (61) · pol-public.css:977 (39) · pol-public.css:1163 (34) · pol-public.css:1295 (31) · pol-public.css:1418 (16) · pol-public.css:1560 (12) · pol-public.css:1610 (3) · calls-c8.css:122 (9) · calls-c11.css:181 (5) · polish.css:357 (8) · account2.css:158 (2) · roomsettings.css:345 (2) · calls-c6.css:190 (13) · calls-c6.css:255 (1) · calls-c4.css:147 (10) · gap-account.css:144 (2) · gap-oper.css:407 (2) · gap-oper.css:434 (1) · rx-shell.css:257 (5) · gap-organize.css:728 (22) · gap-watch.css:53 (2) · gap-watch.css:719 (1) · gap-shell.css:360 (11) · ui-sheets.css:144 (5) · ui-sheets.css:886 (4) · ui-sheets.css:1141 (3) · ui-sheets.css:1662 (2) · calls-engine.css:366 (18) · calls-engine.css:498 (11) · calls-engine.css:549 (5) |
+| `@media (max-width: 767.98px) and (max-height: 480px)` | 1 | pol-stats.css:251 (1) |
+| `@media (max-width: 767.98px), (pointer: coarse)` | 3 | pol-stats.css:1054 (1) · pol-studio.css:1770 (2) · pol-public.css:1657 (4) |
+| `@media (hover: none), (max-width: 767.98px)` | 1 | gap-chanserv.css:245 (6) |
+| `@media (min-width: 768px)` | 6 | gap-appearance.css:226 (2) · pol-thread.css:339 (10) · pol-thread.css:2062 (7) · pol-thread.css:2353 (5) · pol-thread.css:2378 (3) · calls-c6.css:183 (1) |
+| `@media (min-width: 768px) and (min-height: 521px)` | 1 | pol-studio.css:1804 (1) |
+| `@media (hover: none) and (min-width: 768px)` | 1 | pol-thread.css:2326 (6) |
+| `@media (pointer: coarse) and (min-width: 768px)` | 1 | polish.css:399 (2) |
+| `@media (min-width: 768px) and (max-height: 520px)` | 1 | rx-shell.css:539 (1) |
+| `@media (min-width: 768px) and (min-height: 501px)` | 1 | calls-engine.css:490 (1) |
+| `@media (max-width: 860px)` | 1 | pol-public.css:769 (4) |
+| `@media (max-width: 880px)` | 1 | app.css:3069 (1) |
+| `@media (max-width: 959.98px)` | 2 | app.css:3200 (1) · pol-shell.css:1113 (2) |
+| `@media (min-width: 960px) and (min-height: 521px)` | 1 | app.css:1824 (9) |
+| `@media (max-width: 1024px)` | 2 | pol-stats.css:980 (9) · pol-public.css:765 (1) |
+| `@media (max-width: 1099.98px)` | 2 | app.css:3195 (2) · pol-roster.css:326 (6) |
+| `@media (min-width: 1100px)` | 3 | pol-thread.css:2100 (7) · pol-roster.css:36 (1) · pol-public.css:1754 (3) |
+| `@media (min-width: 1180px)` | 1 | pol-studio.css:1792 (3) |
+| `@media (max-width: 1180px)` | 1 | calls-engine.css:41 (2) |
+| `@media (max-width: 74em)` | 1 | rx-shell.css:57 (1) |
+| `@media (min-width: 1200px)` | 1 | pol-thread.css:2072 (1) |
+| `@media (min-width: 1600px)` | 1 | rx-shell.css:621 (2) |
+| `@media (min-width: 1700px)` | 3 | pol-studio.css:1816 (2) · pol-public.css:1688 (4) · gap-oper.css:17 (1) |
+| `@media (min-width: 1920px) and (min-height: 1000px)` | 1 | ui-sheets.css:1313 (7) |
+| `@media (min-width: 1960px)` | 1 | rx-shell.css:631 (6) |
+| `@media (min-width: 2200px) and (min-height: 1200px)` | 1 | pol-thread.css:2078 (2) |
+| `@media (min-width: 2400px)` | 1 | pol-public.css:1697 (1) |
+| `@media (min-width: 2400px) and (min-height: 1300px)` | 1 | rx-shell.css:648 (2) |
 
 Non-width conditions:
 
 | condition | where |
 |---|---|
-| `@supports (height: 100dvh)` | app.css:116 (1) |
-| `@media (prefers-reduced-motion: no-preference)` | app.css:2052 (1) · pol-studio.css:334 (1) · pol-public.css:473 (1) |
-| `@media (prefers-reduced-motion: reduce)` | app.css:2676 (4) · app.css:3273 (3) · app.css:3916 (2) · pol-stats.css:1061 (1) · pol-shell.css:499 (2) · pol-shell.css:1446 (1) · pol-thread.css:1907 (2) · pol-roster.css:407 (2) · calls-c8.css:55 (1) · calls-c11.css:169 (1) · polish.css:377 (1) · account2.css:164 (1) · roomsettings.css:352 (1) · calls-c6.css:272 (1) · calls-c4.css:143 (1) · pol-ios.css:129 (1) · calls-engine.css:121 (1) |
-| `@media (forced-colors: active)` | pol-stats.css:1065 (5) · pol-studio.css:328 (6) · pol-studio.css:1732 (2) · pol-shell.css:176 (1) · pol-thread.css:1914 (3) · pol-roster.css:412 (3) · pol-public.css:1671 (3) · polish.css:382 (3) |
-| `@media (hover: hover)` | pol-studio.css:281 (1) · pol-roster.css:214 (2) · pol-roster.css:246 (1) · pol-public.css:167 (1) · ui-sheets.css:994 (7) |
-| `@media (hover: none)` | pol-shell.css:1016 (1) · pol-thread.css:249 (5) · ui-sheets.css:560 (1) · pol-ios.css:36 (2) |
-| `@media (hover: hover) and (pointer: fine)` | pol-thread.css:418 (2) · pol-roster.css:303 (3) |
-| `@media (pointer: coarse)` | ui-sheets.css:378 (1) |
-| `@supports (animation-timeline: scroll())` | ui-sheets.css:383 (2) |
+| `@supports (height: 100dvh)` | app.css:163 (1) |
+| `@media (hover: hover)` | app.css:1821 (1) · pol-studio.css:276 (1) · pol-roster.css:210 (2) · pol-roster.css:242 (1) · pol-public.css:167 (1) · rx-shell.css:87 (8) · gap-people.css:46 (2) · gap-people.css:95 (1) · gap-commands.css:81 (1) · ui-sheets.css:1086 (8) · ui-sheets.css:1515 (1) · calls-engine.css:359 (2) |
+| `@media (prefers-reduced-motion: no-preference)` | app.css:1909 (2) · pol-studio.css:329 (1) · pol-public.css:473 (1) · gap-auth.css:100 (1) |
+| `@media (forced-colors: active)` | app.css:1913 (3) · pol-stats.css:1065 (5) · pol-studio.css:323 (6) · pol-studio.css:1726 (2) · pol-shell.css:159 (1) · pol-thread.css:2034 (3) · pol-roster.css:467 (3) · pol-public.css:1671 (3) · polish.css:382 (3) · rx-shell.css:692 (3) · gap-people.css:173 (1) · gap-commands.css:166 (2) |
+| `@media (prefers-reduced-motion: reduce)` | app.css:2446 (4) · app.css:2975 (3) · app.css:3441 (2) · gap-appearance.css:129 (1) · pol-stats.css:1061 (1) · pol-shell.css:464 (2) · pol-shell.css:1414 (1) · pol-thread.css:2027 (2) · pol-roster.css:462 (2) · calls-c8.css:55 (1) · calls-c11.css:169 (1) · polish.css:377 (1) · account2.css:163 (1) · roomsettings.css:350 (1) · calls-c6.css:259 (1) · calls-c4.css:141 (1) · gap-convo.css:256 (2) · gap-convo.css:291 (1) · gap-account.css:149 (1) · rx-shell.css:686 (2) · gap-chanserv.css:269 (1) · gap-import.css:475 (1) · gap-organize.css:772 (1) · gap-usermodes.css:404 (1) · gap-commands.css:162 (1) · gap-watch.css:617 (2) · gap-shell.css:385 (1) · gap-claim.css:185 (1) · pol-ios.css:129 (1) · calls-engine.css:579 (2) |
+| `@media (prefers-contrast: more)` | gap-appearance.css:57 (2) · gap-appearance.css:281 (1) |
+| `@media (hover: hover) and (pointer: fine)` | gap-appearance.css:193 (3) · pol-thread.css:424 (2) · pol-roster.css:299 (3) |
+| `@media (hover: none), (pointer: coarse)` | gap-appearance.css:311 (1) · gap-account.css:137 (3) · gap-import.css:447 (6) · gap-usermodes.css:392 (4) · gap-watch.css:26 (1) · gap-claim.css:175 (1) |
+| `@media (hover: none)` | pol-shell.css:983 (1) · pol-thread.css:253 (10) · pol-thread.css:2222 (4) · pol-thread.css:2433 (3) · rx-shell.css:112 (5) · rx-shell.css:678 (1) · gap-people.css:57 (4) · gap-people.css:98 (3) · gap-people.css:126 (2) · gap-people.css:169 (1) · gap-organize.css:707 (12) · gap-commands.css:112 (1) · gap-auth.css:85 (1) · ui-sheets.css:656 (1) · pol-ios.css:36 (2) · calls-engine.css:46 (13) · calls-engine.css:558 (10) |
+| `@media (pointer: coarse)` | pol-thread.css:940 (13) · pol-thread.css:2337 (9) · pol-thread.css:2401 (1) · gap-convo.css:167 (5) · gap-convo.css:217 (1) · gap-oper.css:228 (6) · gap-oper.css:396 (2) · ui-sheets.css:478 (6) · ui-sheets.css:834 (5) · ui-sheets.css:1045 (4) · ui-sheets.css:1562 (3) |
+| `@supports (anchor-name: --pt-row-actions)` | pol-thread.css:2377 (0) |
+| `@media (pointer: coarse), (hover: none)` | pol-thread.css:2449 (41) · pol-thread.css:2578 (9) |
+| `@media (hover: none) and (pointer: coarse)` | gap-shell.css:343 (10) |
+| `@supports (animation-timeline: scroll())` | ui-sheets.css:483 (2) |
 | `@media (display-mode: standalone)` | pol-ios.css:117 (2) |
 
-Distinct width thresholds (feature value × blocks): `max-width 359px`×2 · `max-width 360px`×1 · `max-width 400px`×1 · `max-width 480px`×3 · `max-height 480px`×1 · `max-width 520px`×2 · `max-height 520px`×1 · `max-height 600px`×1 · `max-width 600px`×2 · `max-width 640px`×4 · `min-width 641px`×1 · `max-width 760px`×1 · `max-width 767px`×7 · `max-width 767.98px`×22 · `max-width 768px`×11 · `min-width 768px`×4 · `max-width 860px`×1 · `max-width 880px`×1 · `max-width 959.98px`×2 · `max-width 1000px`×1 · `max-width 1024px`×3 · `max-width 1099.98px`×2 · `min-width 1100px`×1
+Distinct width thresholds (feature value × blocks): `max-width 240px`×1 · `max-width 272px`×1 · `max-width 300px`×3 · `max-width 344px`×1 · `max-width 359px`×5 · `max-width 359.98px`×2 · `max-width 360px`×2 · `max-width 384px`×1 · `max-width 399.98px`×1 · `max-width 400px`×6 · `max-width 420px`×4 · `max-height 460px`×1 · `max-width 479.98px`×3 · `max-width 480px`×4 · `max-height 480px`×5 · `min-width 480px`×1 · `max-height 500px`×12 · `min-height 501px`×2 · `max-height 520px`×22 · `max-width 520.98px`×4 · `min-height 521px`×2 · `min-width 521px`×4 · `min-width 560px`×1 · `max-width 599.98px`×23 · `max-height 600px`×1 · `min-width 600px`×17 · `max-width 600px`×4 · `max-height 620px`×1 · `max-width 640.98px`×11 · `min-width 641px`×3 · `min-width 720px`×1 · `min-width 721px`×1 · `min-width 760px`×1 · `max-width 767.98px`×50 · `min-width 768px`×13 · `max-width 860px`×2 · `max-width 880px`×1 · `max-width 959.98px`×3 · `min-width 960px`×1 · `min-height 1000px`×1 · `max-width 1024px`×2 · `max-width 1099.98px`×2 · `min-width 1100px`×3 · `min-width 1180px`×1 · `max-width 1180px`×1 · `max-width 1184px`×1 · `min-width 1200px`×1 · `min-height 1200px`×1 · `min-height 1300px`×1 · `min-width 1600px`×1 · `min-width 1700px`×3 · `min-width 1920px`×1 · `min-width 1960px`×1 · `min-width 2200px`×1 · `min-width 2400px`×2
 
 ## G6. Motion inventory
 
-Global reduced-motion kill switches (`*` with !important): app.css:3924; `data-reduce-motion` rules: app.css:3135 {animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important} · app.css:3933 {--dur-micro: 0ms; --dur-fast: 0ms; --dur-base: 0ms; --dur: 0ms} · app.css:3940 {animation: none !important}.
+Global reduced-motion kill switches (`*` with !important): app.css:3449; `data-reduce-motion` rules: app.css:2843 {animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important} · app.css:3458 {--dur-micro: 0ms; --dur-fast: 0ms; --dur-base: 0ms; --dur: 0ms} · app.css:3465 {animation: none !important} · gap-appearance.css:137 {--dur-micro: 0ms; --dur-fast: 0ms; --dur-base: 0ms} · gap-convo.css:259 {animation: none; background: color-mix(in oklab, var(--onyx-accent) 10%, transparent)} · gap-convo.css:296 {animation: none}.
 
-Every prefers-reduced-motion block: app.css:2052 ((prefers-reduced-motion: no-preference), 1 rules) · app.css:2676 ((prefers-reduced-motion: reduce), 4 rules) · app.css:3273 ((prefers-reduced-motion: reduce), 3 rules) · app.css:3916 ((prefers-reduced-motion: reduce), 2 rules) · pol-stats.css:1061 ((prefers-reduced-motion: reduce), 1 rules) · pol-studio.css:334 ((prefers-reduced-motion: no-preference), 1 rules) · pol-shell.css:499 ((prefers-reduced-motion: reduce), 2 rules) · pol-shell.css:1446 ((prefers-reduced-motion: reduce), 1 rules) · pol-thread.css:1907 ((prefers-reduced-motion: reduce), 2 rules) · pol-roster.css:407 ((prefers-reduced-motion: reduce), 2 rules) · pol-public.css:473 ((prefers-reduced-motion: no-preference), 1 rules) · calls-c8.css:55 ((prefers-reduced-motion: reduce), 1 rules) · calls-c11.css:169 ((prefers-reduced-motion: reduce), 1 rules) · polish.css:377 ((prefers-reduced-motion: reduce), 1 rules) · account2.css:164 ((prefers-reduced-motion: reduce), 1 rules) · roomsettings.css:352 ((prefers-reduced-motion: reduce), 1 rules) · calls-c6.css:272 ((prefers-reduced-motion: reduce), 1 rules) · calls-c4.css:143 ((prefers-reduced-motion: reduce), 1 rules) · pol-ios.css:129 ((prefers-reduced-motion: reduce), 1 rules) · calls-engine.css:121 ((prefers-reduced-motion: reduce), 1 rules).
+Every prefers-reduced-motion block: app.css:1909 ((prefers-reduced-motion: no-preference), 2 rules) · app.css:2446 ((prefers-reduced-motion: reduce), 4 rules) · app.css:2975 ((prefers-reduced-motion: reduce), 3 rules) · app.css:3441 ((prefers-reduced-motion: reduce), 2 rules) · gap-appearance.css:129 ((prefers-reduced-motion: reduce), 1 rules) · pol-stats.css:1061 ((prefers-reduced-motion: reduce), 1 rules) · pol-studio.css:329 ((prefers-reduced-motion: no-preference), 1 rules) · pol-shell.css:464 ((prefers-reduced-motion: reduce), 2 rules) · pol-shell.css:1414 ((prefers-reduced-motion: reduce), 1 rules) · pol-thread.css:2027 ((prefers-reduced-motion: reduce), 2 rules) · pol-roster.css:462 ((prefers-reduced-motion: reduce), 2 rules) · pol-public.css:473 ((prefers-reduced-motion: no-preference), 1 rules) · calls-c8.css:55 ((prefers-reduced-motion: reduce), 1 rules) · calls-c11.css:169 ((prefers-reduced-motion: reduce), 1 rules) · polish.css:377 ((prefers-reduced-motion: reduce), 1 rules) · account2.css:163 ((prefers-reduced-motion: reduce), 1 rules) · roomsettings.css:350 ((prefers-reduced-motion: reduce), 1 rules) · calls-c6.css:259 ((prefers-reduced-motion: reduce), 1 rules) · calls-c4.css:141 ((prefers-reduced-motion: reduce), 1 rules) · gap-convo.css:256 ((prefers-reduced-motion: reduce), 2 rules) · gap-convo.css:291 ((prefers-reduced-motion: reduce), 1 rules) · gap-account.css:149 ((prefers-reduced-motion: reduce), 1 rules) · rx-shell.css:686 ((prefers-reduced-motion: reduce), 2 rules) · gap-chanserv.css:269 ((prefers-reduced-motion: reduce), 1 rules) · gap-import.css:475 ((prefers-reduced-motion: reduce), 1 rules) · gap-organize.css:772 ((prefers-reduced-motion: reduce), 1 rules) · gap-usermodes.css:404 ((prefers-reduced-motion: reduce), 1 rules) · gap-commands.css:162 ((prefers-reduced-motion: reduce), 1 rules) · gap-watch.css:617 ((prefers-reduced-motion: reduce), 2 rules) · gap-shell.css:385 ((prefers-reduced-motion: reduce), 1 rules) · gap-auth.css:100 ((prefers-reduced-motion: no-preference), 1 rules) · gap-claim.css:185 ((prefers-reduced-motion: reduce), 1 rules) · pol-ios.css:129 ((prefers-reduced-motion: reduce), 1 rules) · calls-engine.css:579 ((prefers-reduced-motion: reduce), 2 rules).
 
 | @keyframes | defined | used by | loops? |
 |---|---|---|---|
-| `onyx-switcher-in` | app.css:2672 | app.css:2668 |  |
-| `onyx-moddesk-in` | app.css:2886 | app.css:2884 |  |
-| `onyx-call-breathe` | app.css:3272 | app.css:3270 | **infinite** |
-| `onyx-sheet-in` | app.css:3778 | app.css:3696, app.css:3765, app.css:3910, pol-shell.css:1293, pol-thread.css:363, pol-thread.css:827, pol-roster.css:353 |  |
-| `onyx-sheet-side-in` | app.css:3782 | app.css:3773 |  |
-| `pt-pulse` | pol-thread.css:1679 | pol-thread.css:1677 | **infinite** |
+| `onyx-switcher-in` | app.css:2442 | **unused** |  |
+| `onyx-moddesk-in` | app.css:2613 | **unused** |  |
+| `onyx-call-breathe` | app.css:2974 | app.css:2972 | **infinite** |
+| `pt-pulse` | pol-thread.css:1788 | pol-thread.css:1786 | **infinite** |
 | `onyx-call-react-in` | calls-c8.css:53 | calls-c8.css:47 |  |
 | `polish-rise` | polish.css:352 | polish.css:48, polish.css:347 |  |
-| `ui-sheet-pop` | ui-sheets.css:85 | ui-sheets.css:73, ui-sheets.css:801, ui-sheets.css:1067 |  |
-| `ui-sheet-veil-in` | ui-sheets.css:88 | ui-sheets.css:61, ui-sheets.css:407, ui-sheets.css:838, ui-sheets.css:958, ui-sheets.css:1058 |  |
-| `ui-sheet-side` | ui-sheets.css:91 | ui-sheets.css:120 |  |
-| `ui-sheet-drop` | ui-sheets.css:94 | ui-sheets.css:136, ui-sheets.css:415 |  |
-| `ui-sheet-rise` | ui-sheets.css:97 | ui-sheets.css:311, ui-sheets.css:972, ui-sheets.css:1085 |  |
-| `ui-sheet-veil-track` | ui-sheets.css:392 | ui-sheets.css:386 |  |
+| `gap-landed` | gap-convo.css:246 | gap-convo.css:252 |  |
+| `gap-pulse` | gap-convo.css:287 | gap-convo.css:290 | **infinite** |
+| `gw-drop` | gap-watch.css:233 | gap-watch.css:230 |  |
+| `ui-sheet-pop` | ui-sheets.css:181 | pol-shell.css:1261, pol-thread.css:369, pol-thread.css:847, pol-roster.css:349, rx-shell.css:251, ui-sheets.css:169, ui-sheets.css:879, ui-sheets.css:1160 |  |
+| `ui-sheet-veil-in` | ui-sheets.css:184 | ui-sheets.css:157, ui-sheets.css:503, ui-sheets.css:928, ui-sheets.css:1052, ui-sheets.css:1151 |  |
+| `ui-sheet-side` | ui-sheets.css:187 | ui-sheets.css:216 |  |
+| `ui-sheet-drop` | ui-sheets.css:190 | ui-sheets.css:233, ui-sheets.css:511 |  |
+| `ui-sheet-rise` | ui-sheets.css:193 | ui-sheets.css:411, ui-sheets.css:1064, ui-sheets.css:1178 |  |
+| `ui-sheet-veil-track` | ui-sheets.css:492 | ui-sheets.css:486 |  |
+| `onyx-call-sheet-in` | calls-engine.css:276 | calls-engine.css:256 |  |
 
-Every animation declaration (43):
+Every animation declaration (52):
 
 | file:line | selector | value | context |
 |---|---|---|---|
-| app.css:2668 | `.onyx-spotlight-panel, .onyx-shortcuts-sheet` | `onyx-switcher-in var(--dur-fast) ease-out` |  |
-| app.css:2677 | `.onyx-spotlight-panel, .onyx-shortcuts-sheet` | `none` | @media (prefers-reduced-motion: reduce) |
-| app.css:2884 | `.onyx-moddesk-sheet` | `onyx-moddesk-in var(--dur-base) ease-out` |  |
-| app.css:3270 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | `onyx-call-breathe 1.6s ease-in-out infinite` |  |
-| app.css:3271 | `.onyx-call-stage[data-motion="still"] .onyx-call-person[data-speaking=` | `none` |  |
-| app.css:3274 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | `none` | @media (prefers-reduced-motion: reduce) |
-| app.css:3696 | `.onyx-room-more-menu` | `onyx-sheet-in var(--dur-fast) var(--ease)` |  |
-| app.css:3765 | `.onyx-sheet-layer > .onyx-sheet` | `onyx-sheet-in var(--dur-fast) var(--ease)` |  |
-| app.css:3773 | `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` | `onyx-sheet-side-in` |  |
-| app.css:3910 | `.onyx-sheet-layer > .onyx-sheet, .onyx-sheet-layer[data-placement="sid` | `onyx-sheet-in` | @media (max-width: 767.98px) |
-| app.css:3927 | `*, *::before, *::after` | `none` !important | @media (prefers-reduced-motion: reduce) |
-| app.css:3942 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *` | `none` !important |  |
-| pol-shell.css:502 | `.notif-center *, .onyx-account-chip, .onyx-ident` | `none` | @media (prefers-reduced-motion: reduce) |
-| pol-shell.css:1293 | `.onyx-frame .onyx-room-more-menu` | `onyx-sheet-in var(--dur-fast) var(--ease)` | @media (max-width: 767.98px) |
-| pol-thread.css:363 | `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-react-picker` | `onyx-sheet-in var(--dur-base) var(--ease)` | @media (max-width: 767.98px) |
-| pol-thread.css:827 | `.shell-msg-lightbox-dialog` | `onyx-sheet-in var(--dur-fast) var(--ease)` |  |
-| pol-thread.css:1677 | `.room-media-index-skeleton` | `pt-pulse 1.6s ease-in-out infinite` |  |
-| pol-thread.css:1911 | `.shell-msg-lightbox-dialog, .room-media-index-skeleton` | `none` | @media (prefers-reduced-motion: reduce) |
-| pol-roster.css:353 | `.onyx-frame > .onyx-roster:popover-open, .onyx-roster:popover-open` | `onyx-sheet-in var(--dur-base) var(--ease)` | @media (max-width: 1099.98px) |
-| pol-roster.css:408 | `.onyx-roster:popover-open` | `none` | @media (prefers-reduced-motion: reduce) |
+| app.css:2447 | `.onyx-spotlight-panel, .onyx-shortcuts-sheet` | `none` | @media (prefers-reduced-motion: reduce) |
+| app.css:2972 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | `onyx-call-breathe 1.6s ease-in-out infinite` |  |
+| app.css:2973 | `.onyx-call-stage[data-motion="still"] .onyx-call-person[data-speaking=` | `none` |  |
+| app.css:2976 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | `none` | @media (prefers-reduced-motion: reduce) |
+| app.css:3452 | `*, *::before, *::after` | `none` !important | @media (prefers-reduced-motion: reduce) |
+| app.css:3467 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *` | `none` !important |  |
+| pol-shell.css:467 | `.notif-center *, .onyx-account-chip, .onyx-ident` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-shell.css:1261 | `.onyx-frame .onyx-room-more-menu` | `ui-sheet-pop var(--dur-fast) var(--ease)` | @media (max-width: 599.98px) |
+| pol-thread.css:369 | `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-react-picker` | `ui-sheet-pop var(--dur-base) var(--ease)` | @media (max-width: 767.98px) |
+| pol-thread.css:847 | `.shell-msg-lightbox-dialog` | `ui-sheet-pop var(--dur-fast) var(--ease)` |  |
+| pol-thread.css:1786 | `.room-media-index-skeleton` | `pt-pulse 1.6s ease-in-out infinite` |  |
+| pol-thread.css:2031 | `.shell-msg-lightbox-dialog, .room-media-index-skeleton` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-thread.css:2128 | `.onyx-sheet-layer.onyx-thread-pop > .onyx-sheet.onyx-thread-sheet` | `none` | @media (min-width: 1100px) |
+| pol-roster.css:349 | `.onyx-frame > .onyx-roster:popover-open, .onyx-roster:popover-open` | `ui-sheet-pop var(--dur-base) var(--ease)` | @media (max-width: 1099.98px) |
+| pol-roster.css:463 | `.onyx-roster:popover-open` | `none` | @media (prefers-reduced-motion: reduce) |
 | calls-c8.css:47 | `.onyx-call-reaction` | `onyx-call-react-in var(--dur-fast) var(--ease) both` |  |
 | calls-c8.css:54 | `.onyx-call-stage[data-motion="still"] .onyx-call-reaction` | `none` |  |
 | calls-c8.css:56 | `.onyx-call-reaction` | `none` | @media (prefers-reduced-motion: reduce) |
@@ -1701,31 +2023,46 @@ Every animation declaration (43):
 | polish.css:48 | `.shell-composer-tools` | `polish-rise var(--dur-fast) var(--ease)` |  |
 | polish.css:347 | `.update-available` | `polish-rise var(--dur-base) var(--ease)` |  |
 | polish.css:379 | `.shell-composer-tools, .update-available` | `none` | @media (prefers-reduced-motion: reduce) |
-| ui-sheets.css:61 | `.onyx-sheet-backdrop` | `ui-sheet-veil-in var(--dur-base) var(--ease)` |  |
-| ui-sheets.css:73 | `.onyx-sheet-layer > .onyx-sheet` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
-| ui-sheets.css:120 | `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` | `ui-sheet-side` |  |
-| ui-sheets.css:136 | `.onyx-sheet-layer[data-placement="popover"] > .onyx-sheet` | `ui-sheet-drop` |  |
-| ui-sheets.css:311 | `.onyx-sheet-layer > .onyx-sheet, .onyx-sheet-layer[data-placement] > .` | `ui-sheet-rise var(--dur-base) var(--ease)` | @media (max-width: 767.98px) |
-| ui-sheets.css:386 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet-backdrop` | `ui-sheet-veil-track linear both` | @media (max-width: 767.98px) && @supports (animati |
-| ui-sheets.css:407 | `.onyx-spotlight-backdrop` | `ui-sheet-veil-in var(--dur-fast) var(--ease)` |  |
-| ui-sheets.css:415 | `.onyx-spotlight-panel` | `ui-sheet-drop var(--dur-fast) var(--ease)` |  |
-| ui-sheets.css:801 | `.onyx-toast` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
-| ui-sheets.css:838 | `.onyx-spotlight-panel` | `ui-sheet-veil-in` | @media (max-width: 767.98px) |
-| ui-sheets.css:958 | `.onyx-room-more-scrim` | `ui-sheet-veil-in var(--dur-base) var(--ease)` | @media (max-width: 767.98px) |
-| ui-sheets.css:972 | `.onyx-room-more-menu` | `ui-sheet-rise var(--dur-base) var(--ease)` | @media (max-width: 767.98px) |
-| ui-sheets.css:1058 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-profile-backdrop` | `ui-sheet-veil-in var(--dur-base) var(--ease)` |  |
-| ui-sheets.css:1067 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
-| ui-sheets.css:1085 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | `ui-sheet-rise` | @media (max-width: 767.98px) |
+| gap-convo.css:252 | `.onyx-message.gap-landed` | `gap-landed 1.6s var(--ease) 1` |  |
+| gap-convo.css:255 | `.onyx-message.gap-landed:hover, .onyx-message.gap-landed:focus-within` | `none` |  |
+| gap-convo.css:257 | `.onyx-message.gap-landed` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-convo.css:259 | `:root[data-reduce-motion='true'] .onyx-message.gap-landed` | `none` |  |
+| gap-convo.css:290 | `.gap-skeleton-avatar, .gap-skeleton-name, .gap-skeleton-line` | `gap-pulse 1.6s ease-in-out infinite` |  |
+| gap-convo.css:294 | `.gap-skeleton-avatar, .gap-skeleton-name, .gap-skeleton-line` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-convo.css:298 | `:root[data-reduce-motion='true'] .gap-skeleton-avatar, :root[data-redu` | `none` |  |
+| rx-shell.css:245 | `.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet-backdrop` | `none` |  |
+| rx-shell.css:251 | `.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu` | `ui-sheet-pop var(--dur-fast) var(--ease)` |  |
+| rx-shell.css:689 | `.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-watch.css:230 | `.onyx-watch-details` | `gw-drop var(--dur-fast) var(--ease)` |  |
+| gap-watch.css:618 | `.onyx-watch-details` | `none` | @media (prefers-reduced-motion: reduce) |
+| ui-sheets.css:157 | `.onyx-sheet-backdrop` | `ui-sheet-veil-in var(--dur-base) var(--ease)` |  |
+| ui-sheets.css:169 | `.onyx-sheet-layer > .onyx-sheet` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
+| ui-sheets.css:216 | `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` | `ui-sheet-side` |  |
+| ui-sheets.css:233 | `.onyx-sheet-layer[data-placement="popover"] > .onyx-sheet` | `ui-sheet-drop` |  |
+| ui-sheets.css:411 | `.onyx-sheet-layer > .onyx-sheet, .onyx-sheet-layer[data-placement] > .` | `ui-sheet-rise var(--dur-base) var(--ease)` | @media (max-width: 599.98px) |
+| ui-sheets.css:486 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet-backdrop` | `ui-sheet-veil-track linear both` | @media (max-width: 599.98px) && @supports (animati |
+| ui-sheets.css:503 | `.onyx-spotlight-backdrop` | `ui-sheet-veil-in var(--dur-fast) var(--ease)` |  |
+| ui-sheets.css:511 | `.onyx-spotlight-panel` | `ui-sheet-drop var(--dur-fast) var(--ease)` |  |
+| ui-sheets.css:879 | `.onyx-toast` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
+| ui-sheets.css:928 | `.onyx-spotlight-panel` | `ui-sheet-veil-in` | @media (max-width: 599.98px) |
+| ui-sheets.css:1052 | `.onyx-room-more-scrim` | `ui-sheet-veil-in var(--dur-base) var(--ease)` | @media (max-width: 599.98px) |
+| ui-sheets.css:1064 | `.onyx-room-more-menu` | `ui-sheet-rise var(--dur-base) var(--ease)` | @media (max-width: 599.98px) |
+| ui-sheets.css:1151 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-profile-backdrop` | `ui-sheet-veil-in var(--dur-base) var(--ease)` |  |
+| ui-sheets.css:1160 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | `ui-sheet-pop var(--dur-base) var(--ease)` |  |
+| ui-sheets.css:1178 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | `ui-sheet-rise` | @media (max-width: 599.98px) |
+| calls-engine.css:256 | `.onyx-call-more` | `onyx-call-sheet-in var(--dur-base, 220ms) var(--ease, ease-out) both` | @media (max-width: 640.98px), (max-height: 500px) |
+| calls-engine.css:580 | `.onyx-call-more` | `none` | @media (prefers-reduced-motion: reduce) |
 
-Every transition declaration (49):
+Every transition declaration (81):
 
 | file:line | selector | value | context |
 |---|---|---|---|
-| app.css:2053 | `.conn-input, .conn-submit, .conn-alt-btn, .conn-foot a` | `border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--` | @media (prefers-reduced-motion: no-preference) |
-| app.css:3104 | `.pref-switch::after` | `transform var(--dur-fast, var(--dur-fast))` |  |
-| app.css:3140 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *` | `transition-duration: 0.001ms` !important |  |
-| app.css:3514 | `.onyx-primary-nav .onyx-nav-label` | `opacity var(--dur-fast) var(--ease)` |  |
-| app.css:3928 | `*, *::before, *::after` | `transition-duration: 0ms` !important | @media (prefers-reduced-motion: reduce) |
+| app.css:1910 | `.conn-input, .conn-submit, .conn-alt-btn, .conn-foot a, .conn-identity` | `border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--` | @media (prefers-reduced-motion: no-preference) |
+| app.css:1911 | `.conn-switch, .conn-switch::before` | `left var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--d` | @media (prefers-reduced-motion: no-preference) |
+| app.css:2814 | `.pref-switch::after` | `transform var(--dur-fast, var(--dur-fast))` |  |
+| app.css:2848 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *` | `transition-duration: 0.001ms` !important |  |
+| app.css:3188 | `.onyx-primary-nav .onyx-nav-label` | `opacity var(--dur-fast) var(--ease)` |  |
+| app.css:3453 | `*, *::before, *::after` | `transition-duration: 0ms` !important | @media (prefers-reduced-motion: reduce) |
 | pol-stats.css:111 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn` | `border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease)` |  |
 | pol-stats.css:221 | `.status-check__button, .status-quiet-link` | `border-color var(--dur-fast) var(--ease)` |  |
 | pol-stats.css:313 | `.roadmap-legend a` | `background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
@@ -1733,142 +2070,161 @@ Every transition declaration (49):
 | pol-stats.css:683 | `.stats-page :is(.stats-window-options, .stats-control-group) button` | `background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
 | pol-stats.css:1062 | `:is(.stats-page, .status-route, .roadmap-page) *` | `none` !important | @media (prefers-reduced-motion: reduce) |
 | pol-studio.css:63 | `.ap-bar a` | `color var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:184 | `.ap-chip, .ap-theme-chip` | `color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fa` |  |
-| pol-studio.css:269 | `.ap-choice-toggle` | `background var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:336 | `.ap-choice-toggle > b, .ap-choice-toggle > b::after` | `transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease)` | @media (prefers-reduced-motion: no-preference) |
-| pol-studio.css:531 | `.background-picker__card` | `border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:595 | `.ap-action` | `background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:765 | `.ts-studio .onyx-button` | `background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fa` |  |
-| pol-studio.css:912 | `.ts-scheme-toggle__btn` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:978 | `.ts-theme-chip` | `color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fa` |  |
-| pol-studio.css:1031 | `.ts-theme-chip-del` | `color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:1085 | `.ts-studio .onyx-tabs__trigger` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
-| pol-studio.css:1618 | `.ts-audit__fix` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
-| pol-shell.css:502 | `.notif-center *, .onyx-account-chip, .onyx-ident` | `none` | @media (prefers-reduced-motion: reduce) |
-| pol-shell.css:864 | `.onyx-rail .onyx-rail-star` | `opacity var(--dur-fast) var(--ease)` |  |
-| pol-shell.css:1447 | `.onyx-rail .onyx-rail-star` | `none` | @media (prefers-reduced-motion: reduce) |
-| pol-thread.css:148 | `.onyx-continuation:not(.onyx-message--compact) > .onyx-ts` | `opacity var(--dur-micro) var(--ease)` |  |
-| pol-thread.css:214 | `.onyx-row-actions` | `opacity var(--dur-micro) var(--ease)` |  |
-| pol-thread.css:419 | `.onyx-message .boost-add` | `opacity var(--dur-micro) var(--ease)` | @media (hover: hover) and (pointer: fine) |
-| pol-thread.css:1017 | `.onyx-composer-bar` | `border-color var(--dur-micro) var(--ease)` |  |
-| pol-thread.css:1098 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell` | `transform var(--dur-fast) var(--ease)` |  |
-| pol-thread.css:1909 | `.onyx-continuation > .onyx-ts, .onyx-message > .onyx-msg-menu-trigger` | `none` | @media (prefers-reduced-motion: reduce) |
-| pol-roster.css:174 | `.onyx-mlist-group-head > .pt-ico` | `transform var(--dur-fast) var(--ease), opacity var(--dur-micro) var(--ease)` |  |
-| pol-roster.css:409 | `.onyx-mlist-group-head > .pt-ico` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-studio.css:179 | `.ap-chip, .ap-theme-chip` | `color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fa` |  |
+| pol-studio.css:264 | `.ap-choice-toggle` | `background var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:331 | `.ap-choice-toggle > b, .ap-choice-toggle > b::after` | `transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease)` | @media (prefers-reduced-motion: no-preference) |
+| pol-studio.css:525 | `.background-picker__card` | `border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:589 | `.ap-action` | `background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:759 | `.ts-studio .onyx-button` | `background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fa` |  |
+| pol-studio.css:906 | `.ts-scheme-toggle__btn` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:972 | `.ts-theme-chip` | `color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fa` |  |
+| pol-studio.css:1025 | `.ts-theme-chip-del` | `color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:1079 | `.ts-studio .onyx-tabs__trigger` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
+| pol-studio.css:1612 | `.ts-audit__fix` | `background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)` |  |
+| pol-shell.css:467 | `.notif-center *, .onyx-account-chip, .onyx-ident` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-shell.css:831 | `.onyx-rail .onyx-rail-star` | `opacity var(--dur-fast) var(--ease)` |  |
+| pol-shell.css:1415 | `.onyx-rail .onyx-rail-star` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-thread.css:152 | `.onyx-continuation:not(.onyx-message--compact) > .onyx-ts` | `opacity var(--dur-micro) var(--ease)` |  |
+| pol-thread.css:218 | `.onyx-row-actions` | `opacity var(--dur-micro) var(--ease)` |  |
+| pol-thread.css:425 | `.onyx-message .boost-add` | `opacity var(--dur-micro) var(--ease)` | @media (hover: hover) and (pointer: fine) |
+| pol-thread.css:1119 | `.onyx-composer-bar` | `border-color var(--dur-micro) var(--ease)` |  |
+| pol-thread.css:1200 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell` | `transform var(--dur-fast) var(--ease)` |  |
+| pol-thread.css:2029 | `.onyx-continuation > .onyx-ts, .onyx-message > .onyx-msg-menu-trigger` | `none` | @media (prefers-reduced-motion: reduce) |
+| pol-roster.css:170 | `.onyx-mlist-group-head > .pt-ico` | `transform var(--dur-fast) var(--ease), opacity var(--dur-micro) var(--ease)` |  |
+| pol-roster.css:464 | `.onyx-mlist-group-head > .pt-ico` | `none` | @media (prefers-reduced-motion: reduce) |
 | pol-public.css:488 | `.public-frame__nav a, .public-frame__open, .public-frame__menu-toggle ` | `color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--` | @media (prefers-reduced-motion: no-preference) |
 | calls-c11.css:165 | `.onyx-call-stage[data-motion="still"] .onyx-tile, .onyx-call-stage[dat` | `none` |  |
 | calls-c11.css:176 | `.onyx-call-ring::after, .onyx-tile, .onyx-tile-video, .onyx-call-pip-c` | `none` | @media (prefers-reduced-motion: reduce) |
 | account2.css:51 | `.a2-btn, .a2-link` | `border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
-| account2.css:166 | `.a2-btn, .a2-link` | `none` | @media (prefers-reduced-motion: reduce) |
-| roomsettings.css:270 | `.rset-toggle-thumb` | `transform var(--dur-fast) var(--ease)` |  |
-| roomsettings.css:353 | `.rset-toggle-thumb` | `none` | @media (prefers-reduced-motion: reduce) |
-| calls-c6.css:105 | `.onyx-call-pip-card` | `opacity var(--dur-fast) var(--ease)` |  |
-| calls-c6.css:273 | `.onyx-call-pip-card` | `none` | @media (prefers-reduced-motion: reduce) |
-| calls-c4.css:144 | `.onyx-tile, .onyx-tile-video` | `none` | @media (prefers-reduced-motion: reduce) |
-| ui-sheets.css:445 | `.onyx-spotlight-option` | `background-color var(--dur-micro) linear` |  |
-| ui-sheets.css:627 | `.onyx-you .onyx-you-link` | `background-color var(--dur-micro) linear` |  |
+| account2.css:165 | `.a2-btn, .a2-link` | `none` | @media (prefers-reduced-motion: reduce) |
+| roomsettings.css:268 | `.rset-toggle-thumb` | `transform var(--dur-fast) var(--ease)` |  |
+| roomsettings.css:351 | `.rset-toggle-thumb` | `none` | @media (prefers-reduced-motion: reduce) |
+| calls-c6.css:98 | `.onyx-call-pip-card` | `opacity var(--dur-fast) var(--ease)` |  |
+| calls-c6.css:260 | `.onyx-call-pip-card` | `none` | @media (prefers-reduced-motion: reduce) |
+| calls-c4.css:142 | `.onyx-tile, .onyx-tile-video` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-account.css:150 | `.gap-switch .pref-switch::after` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-oper.css:161 | `.oc-more > summary::before` | `transform var(--dur-fast) var(--ease)` |  |
+| rx-shell.css:95 | `.onyx-rail .onyx-rail-row > .onyx-rail-star, .onyx-rail .onyx-rail-row` | `opacity var(--dur-micro) var(--ease)` | @media (hover: hover) |
+| rx-shell.css:688 | `.onyx-rail .onyx-rail-row > :is(.onyx-rail-star, .onyx-rail-more), .on` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-chanserv.css:44 | `.cs-disclosure > summary::after` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-chanserv.css:270 | `.cs-disclosure > summary::after` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-import.css:100 | `.hi-bar-fill` | `width var(--dur-fast) var(--ease)` |  |
+| gap-import.css:163 | `.hi-left-out > summary::before` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-import.css:477 | `.hi-bar-fill, .hi-left-out > summary::before` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-organize.css:97 | `.gorg-folder-head .gorg-i` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-organize.css:188 | `.onyx-rail .gorg-row-more` | `opacity var(--dur-fast) var(--ease)` |  |
+| gap-organize.css:471 | `.gorg-switch-knob` | `transform var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease)` |  |
+| gap-organize.css:775 | `.gorg-folder-head .gorg-i, .gorg-switch-knob, .onyx-rail .gorg-row-mor` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-usermodes.css:57 | `button.um-btn` | `border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease)` |  |
+| gap-usermodes.css:144 | `.um-more__toggle::after, .um-fold__toggle::after` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-usermodes.css:407 | `.um-btn, .um-more__toggle::after, .um-fold__toggle::after` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-commands.css:157 | `.gap-keys-pref-switch::after` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-commands.css:163 | `.gap-keys-pref-switch::after` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-watch.css:113 | `.onyx-watch-more .pt-ico` | `transform var(--dur-fast) var(--ease)` |  |
+| gap-watch.css:619 | `.onyx-watch-more .pt-ico` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-shell.css:388 | `.onyx-frame .onyx-rail button.gs-rail-activity, .onyx-frame .gs-seg bu` | `none` | @media (prefers-reduced-motion: reduce) |
+| gap-auth.css:101 | `.ga-otp` | `border-color var(--dur-fast) var(--ease)` | @media (prefers-reduced-motion: no-preference) |
+| gap-claim.css:155 | `.gc-bar-fill` | `width var(--dur-fast) var(--ease)` |  |
+| gap-claim.css:186 | `.gc-bar-fill` | `none` | @media (prefers-reduced-motion: reduce) |
+| ui-sheets.css:541 | `.onyx-spotlight-option` | `background-color var(--dur-micro) linear` |  |
+| ui-sheets.css:715 | `.onyx-you .onyx-you-link` | `background-color var(--dur-micro) linear` |  |
+| ui-sheets.css:1389 | `.onyx-sheet .pref-switch, .onyx-sheet .rset-toggle-track` | `background-color var(--dur-fast) linear, border-color var(--dur-fast) linear` |  |
+| ui-sheets.css:1398 | `.onyx-sheet .pref-switch::after, .onyx-sheet .rset-toggle-thumb` | `transform var(--dur-fast) var(--ease)` |  |
+| ui-sheets.css:1442 | `.onyx-sheet .notify-toggle::before` | `background-color var(--dur-fast) linear, border-color var(--dur-fast) linear` |  |
+| ui-sheets.css:1454 | `.onyx-sheet .notify-toggle::after` | `transform var(--dur-fast) var(--ease)` |  |
+| ui-sheets.css:1610 | `.onyx-sheet .rset-advanced > summary::after` | `transform var(--dur-fast) var(--ease)` |  |
 | pol-ios.css:39 | `.onyx-frame :where(button, summary, [role="button"], [role="menuitem"]` | `opacity 0ms` | @media (hover: none) |
 | pol-ios.css:130 | `.onyx-frame :where(button, summary, [role="button"]):active` | `none` | @media (prefers-reduced-motion: reduce) |
-| calls-engine.css:122 | `.onyx-call-more` | `none` | @media (prefers-reduced-motion: reduce) |
+| calls-engine.css:360 | `.onyx-tile .onyx-tile-btn` | `opacity var(--dur-fast, 160ms) ease` | @media (hover: hover) |
+| calls-engine.css:580 | `.onyx-call-more` | `none` | @media (prefers-reduced-motion: reduce) |
+| calls-engine.css:581 | `.onyx-tile .onyx-tile-btn` | `none` | @media (prefers-reduced-motion: reduce) |
 
-scroll-behavior declarations: app.css:3141 auto · app.css:3929 auto @@media (prefers-reduced-motion: reduce)
+scroll-behavior declarations: app.css:2849 auto · app.css:3454 auto @@media (prefers-reduced-motion: reduce)
 
-Script-driven motion in ports.js: 3423 `requestAnimationFrame(` · 9962 `requestAnimationFrame(`
+Script-driven motion in ports.js: 4429 `requestAnimationFrame(` · 11873 `requestAnimationFrame(`
 
 ## G7. Accent audit (every declaration painting with the accent or an alias of it)
 
-Accent tokens and their derived aliases: `--onyx-accent`, `--onyx-accent-ink`, `--lapis`, `--lapis-bright`, `--lapis-deep`, `--brand-action`, `--accent`, `--seam`, `--seam-faint`, `--pg-live`, `--pg-select`. `--focus-ring` uses are listed as focus.
+Accent tokens and their derived aliases: `--onyx-accent`, `--onyx-accent-ink`, `--lapis`, `--lapis-bright`, `--lapis-deep`, `--brand-action`, `--accent`, `--seam`, `--seam-faint`, `--onyx-focus`, `--pg-live`, `--pg-select`. `--focus-ring` uses are listed as focus.
 
 | category (classified from selector + property) | declarations |
 |---|---|
-| primary action | 99 |
-| selection / toggle state | 47 |
-| focus | 41 |
-| unread / count / badge / pill | 20 |
-| current location | 17 |
-| mention | 14 |
+| primary action | 115 |
+| focus | 91 |
+| selection / toggle state | 44 |
+| other (outside the budget) | 35 |
+| unread / count / badge / pill | 18 |
+| current location | 18 |
+| mention | 16 |
 | theme preview (intended theme accent) | 13 |
-| other (outside the budget) | 12 |
-| status (success / online) | 10 |
-| live-audio (calls) | 7 |
+| control fill / data-viz | 10 |
+| live-audio (calls) | 9 |
 | link / nav text | 6 |
-| control fill / data-viz | 5 |
-| token alias | 3 |
+| token alias | 5 |
+| status (success / online) | 2 |
 
-### G7 · primary action (99)
+### G7 · primary action (115)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:379 | `.onyx-reclaim-submit` | color | --onyx-accent-ink |
-| app.css:380 | `.onyx-reclaim-submit` | background | --onyx-accent |
-| app.css:381 | `.onyx-reclaim-submit` | border | --onyx-accent |
-| app.css:655 | `.onyx-newmsg-primary` | background | --onyx-accent |
-| app.css:655 | `.onyx-newmsg-primary` | border | --onyx-accent |
-| app.css:655 | `.onyx-newmsg-primary` | color | --onyx-accent-ink |
-| app.css:776 | `.onyx-composer button` | background | --onyx-accent |
-| app.css:779 | `.onyx-composer button` | color | --onyx-accent-ink |
-| app.css:885 | `.onyx-calls-primary` | background | --onyx-accent |
-| app.css:888 | `.onyx-calls-primary` | color | --onyx-accent-ink |
-| app.css:938 | `.onyx-land-open` | background | --onyx-accent |
-| app.css:940 | `.onyx-land-open` | color | --onyx-accent-ink |
-| app.css:1100 | `.onyx-toast__undo` | color | --onyx-accent |
-| app.css:1102 | `.onyx-toast__undo` | border | --onyx-accent |
-| app.css:1134 | `.guest-claim-chip__keep` | color | --onyx-accent-ink |
-| app.css:1135 | `.guest-claim-chip__keep` | background | --onyx-accent |
-| app.css:1136 | `.guest-claim-chip__keep` | border | --onyx-accent |
-| app.css:1174 | `.guest-claim-sheet__submit` | color | --onyx-accent-ink |
-| app.css:1175 | `.guest-claim-sheet__submit` | background | --onyx-accent |
-| app.css:1176 | `.guest-claim-sheet__submit` | border | --onyx-accent |
-| app.css:1327 | `.onyx-composer .onyx-schedule-confirm` | background | --onyx-accent |
-| app.css:1330 | `.onyx-composer .onyx-schedule-confirm` | color | --onyx-accent-ink |
-| app.css:1574 | `.onyx-steward-btn-primary` | background | --onyx-accent |
-| app.css:1574 | `.onyx-steward-btn-primary` | border-color | --onyx-accent |
-| app.css:1574 | `.onyx-steward-btn-primary` | color | --onyx-accent-ink |
-| app.css:1989 | `.conn-submit` | color | --onyx-accent-ink |
-| app.css:1990 | `.conn-submit` | background | --onyx-accent |
-| app.css:1996 | `.conn-submit:hover:not(:disabled)` | background | --onyx-accent |
-| app.css:2000 | `.conn-submit:disabled` | background | --onyx-accent |
-| app.css:2032 | `.conn-submit:active:not(:disabled)` | background | --onyx-accent |
-| app.css:2528 | `.jump-to-date__jump` | color | --onyx-accent-ink |
-| app.css:2529 | `.jump-to-date__jump` | background | --onyx-accent |
-| app.css:2606 | `.onyx-member-action--primary` | background | --onyx-accent |
-| app.css:2606 | `.onyx-member-action--primary` | border-color | --onyx-accent |
-| app.css:2606 | `.onyx-member-action--primary` | color | --onyx-accent-ink |
-| app.css:2607 | `.onyx-member-action--primary:hover` | background | --onyx-accent |
-| app.css:3047 | `.onyx-keychange-accept` | background | --onyx-accent |
-| app.css:3047 | `.onyx-keychange-accept` | border | --onyx-accent |
-| app.css:3047 | `.onyx-keychange-accept` | color | --onyx-accent-ink |
+| app.css:580 | `.onyx-newmsg-primary` | background | --onyx-accent |
+| app.css:580 | `.onyx-newmsg-primary` | border | --onyx-accent |
+| app.css:580 | `.onyx-newmsg-primary` | color | --onyx-accent-ink |
+| app.css:768 | `.onyx-calls-primary` | background | --onyx-accent |
+| app.css:771 | `.onyx-calls-primary` | color | --onyx-accent-ink |
+| app.css:816 | `.onyx-toast__undo` | color | --onyx-accent |
+| app.css:818 | `.onyx-toast__undo` | border | --onyx-accent |
+| app.css:875 | `.guest-claim-sheet__submit` | color | --onyx-accent-ink |
+| app.css:876 | `.guest-claim-sheet__submit` | background | --onyx-accent |
+| app.css:877 | `.guest-claim-sheet__submit` | border | --onyx-accent |
+| app.css:1192 | `.onyx-steward-btn-primary` | background | --onyx-accent |
+| app.css:1192 | `.onyx-steward-btn-primary` | border-color | --onyx-accent |
+| app.css:1192 | `.onyx-steward-btn-primary` | color | --onyx-accent-ink |
+| app.css:1768 | `.conn-submit` | color | --onyx-accent-ink |
+| app.css:1769 | `.conn-submit` | background | --onyx-accent |
+| app.css:1775 | `.conn-submit:hover:not(:disabled)` | background | --onyx-accent |
+| app.css:1779 | `.conn-submit:disabled` | background | --onyx-accent |
+| app.css:1818 | `.conn-submit:active:not(:disabled), .conn-identities-go:active:not(:disabled)` | background | --onyx-accent |
+| app.css:2325 | `.jump-to-date__jump` | color | --onyx-accent-ink |
+| app.css:2326 | `.jump-to-date__jump` | background | --onyx-accent |
+| app.css:2382 | `.onyx-member-action--primary` | background | --onyx-accent |
+| app.css:2382 | `.onyx-member-action--primary` | border-color | --onyx-accent |
+| app.css:2382 | `.onyx-member-action--primary` | color | --onyx-accent-ink |
+| app.css:2383 | `.onyx-member-action--primary:hover` | background | --onyx-accent |
+| app.css:2762 | `.onyx-keychange-accept` | background | --onyx-accent |
+| app.css:2762 | `.onyx-keychange-accept` | border | --onyx-accent |
+| app.css:2762 | `.onyx-keychange-accept` | color | --onyx-accent-ink |
 | pol-stats.css:114 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary` | border-color | --onyx-accent |
 | pol-stats.css:115 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary` | color | --onyx-accent-ink |
 | pol-stats.css:116 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary` | background | --onyx-accent |
 | pol-stats.css:119 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary:hover` | background | --onyx-accent |
 | pol-stats.css:565 | `.stats-page .stats-primary-metric .note i` | background | --pg-live |
-| pol-studio.css:603 | `.ap-action--apply` | color | --onyx-accent-ink |
-| pol-studio.css:604 | `.ap-action--apply` | background | --onyx-accent |
-| pol-studio.css:605 | `.ap-action--apply` | border-color | --onyx-accent |
-| pol-studio.css:775 | `.ts-studio .onyx-button--primary` | color | --onyx-accent-ink |
-| pol-studio.css:776 | `.ts-studio .onyx-button--primary` | background | --onyx-accent |
-| pol-studio.css:777 | `.ts-studio .onyx-button--primary` | border-color | --onyx-accent |
-| pol-studio.css:781 | `.ts-studio .onyx-button--primary:hover:not(:disabled)` | background | --onyx-accent |
-| pol-studio.css:1385 | `.ts-pv-badge--accent` | color | --lapis-bright |
-| pol-studio.css:1385 | `.ts-pv-badge--accent` | color | --onyx-accent |
-| pol-studio.css:1386 | `.ts-pv-badge--accent` | border-color | --lapis-bright |
-| pol-studio.css:1386 | `.ts-pv-badge--accent` | border-color | --onyx-accent |
-| pol-studio.css:1448 | `.ts-pv-btn--primary` | color | --onyx-accent-ink |
-| pol-studio.css:1449 | `.ts-pv-btn--primary` | background | --lapis |
-| pol-studio.css:1449 | `.ts-pv-btn--primary` | background | --onyx-accent |
-| pol-shell.css:298 | `.chb .chb-submit` | color | --onyx-accent-ink |
-| pol-shell.css:299 | `.chb .chb-submit` | background | --onyx-accent |
-| pol-shell.css:300 | `.chb .chb-submit` | border-color | --onyx-accent |
-| pol-shell.css:1062 | `.onyx-home .onyx-home-action--primary` | color | --onyx-accent-ink |
-| pol-shell.css:1062 | `.onyx-home .onyx-home-action--primary` | background | --onyx-accent |
-| pol-shell.css:1062 | `.onyx-home .onyx-home-action--primary` | border-color | --onyx-accent |
-| pol-thread.css:967 | `.onyx-frame .onyx-thread-reply` | color | --onyx-accent-ink |
-| pol-thread.css:968 | `.onyx-frame .onyx-thread-reply` | background | --onyx-accent |
-| pol-thread.css:1115 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready` | background | --onyx-accent |
-| pol-thread.css:1115 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready` | color | --onyx-accent-ink |
-| pol-thread.css:1116 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | background | --onyx-accent |
-| pol-thread.css:1116 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | color | --onyx-accent-ink |
+| pol-studio.css:597 | `.ap-action--apply` | color | --onyx-accent-ink |
+| pol-studio.css:598 | `.ap-action--apply` | background | --onyx-accent |
+| pol-studio.css:599 | `.ap-action--apply` | border-color | --onyx-accent |
+| pol-studio.css:769 | `.ts-studio .onyx-button--primary` | color | --onyx-accent-ink |
+| pol-studio.css:770 | `.ts-studio .onyx-button--primary` | background | --onyx-accent |
+| pol-studio.css:771 | `.ts-studio .onyx-button--primary` | border-color | --onyx-accent |
+| pol-studio.css:775 | `.ts-studio .onyx-button--primary:hover:not(:disabled)` | background | --onyx-accent |
+| pol-studio.css:1379 | `.ts-pv-badge--accent` | color | --lapis-bright |
+| pol-studio.css:1379 | `.ts-pv-badge--accent` | color | --onyx-accent |
+| pol-studio.css:1380 | `.ts-pv-badge--accent` | border-color | --lapis-bright |
+| pol-studio.css:1380 | `.ts-pv-badge--accent` | border-color | --onyx-accent |
+| pol-studio.css:1442 | `.ts-pv-btn--primary` | color | --onyx-accent-ink |
+| pol-studio.css:1443 | `.ts-pv-btn--primary` | background | --lapis |
+| pol-studio.css:1443 | `.ts-pv-btn--primary` | background | --onyx-accent |
+| pol-shell.css:279 | `.chb .chb-submit` | color | --onyx-accent-ink |
+| pol-shell.css:280 | `.chb .chb-submit` | background | --onyx-accent |
+| pol-shell.css:281 | `.chb .chb-submit` | border-color | --onyx-accent |
+| pol-shell.css:1029 | `.onyx-home .onyx-home-action--primary` | color | --onyx-accent-ink |
+| pol-shell.css:1029 | `.onyx-home .onyx-home-action--primary` | background | --onyx-accent |
+| pol-shell.css:1029 | `.onyx-home .onyx-home-action--primary` | border-color | --onyx-accent |
+| pol-thread.css:1069 | `.onyx-frame .onyx-thread-reply` | color | --onyx-accent-ink |
+| pol-thread.css:1070 | `.onyx-frame .onyx-thread-reply` | background | --onyx-accent |
+| pol-thread.css:1217 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready` | background | --onyx-accent |
+| pol-thread.css:1217 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready` | color | --onyx-accent-ink |
+| pol-thread.css:1218 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | background | --onyx-accent |
+| pol-thread.css:1218 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | color | --onyx-accent-ink |
 | pol-public.css:141 | `.public-frame__open` | color | --onyx-accent-ink |
 | pol-public.css:142 | `.public-frame__open` | background | --onyx-accent |
 | pol-public.css:148 | `.public-frame__open:hover` | background | --onyx-accent |
@@ -1877,10 +2233,10 @@ Accent tokens and their derived aliases: `--onyx-accent`, `--onyx-accent-ink`, `
 | pol-public.css:443 | `.r-btn.primary, .not-found-page__action, .onyxos-button--primary, .guides-hero-actions .gu` | background | --onyx-accent |
 | pol-public.css:449 | `.r-btn.primary:hover, .not-found-page__action:hover, .onyxos-button--primary:hover, .guide` | border-color | --onyx-accent |
 | pol-public.css:450 | `.r-btn.primary:hover, .not-found-page__action:hover, .onyxos-button--primary:hover, .guide` | background | --onyx-accent |
-| pol-public.css:540 | `.onyx-land-open` | border-color | --onyx-accent |
-| pol-public.css:540 | `.onyx-land-open` | color | --onyx-accent-ink |
-| pol-public.css:540 | `.onyx-land-open` | background | --onyx-accent |
-| pol-public.css:541 | `.onyx-land-open:hover` | background | --onyx-accent |
+| pol-public.css:541 | `.onyx-land-open` | border-color | --onyx-accent |
+| pol-public.css:541 | `.onyx-land-open` | color | --onyx-accent-ink |
+| pol-public.css:541 | `.onyx-land-open` | background | --onyx-accent |
+| pol-public.css:542 | `.onyx-land-open:hover` | background | --onyx-accent |
 | pol-public.css:1650 | `.public-frame :is(.r-btn.primary, .not-found-page__action, .onyxos-button--primary, .guide` | background | --onyx-accent |
 | polish.css:305 | `.polish-primary, .update-available button` | background | --onyx-accent |
 | polish.css:306 | `.polish-primary, .update-available button` | border | --onyx-accent |
@@ -1888,271 +2244,371 @@ Accent tokens and their derived aliases: `--onyx-accent`, `--onyx-accent-ink`, `
 | account2.css:59 | `.a2-btn--primary` | border-color | --onyx-accent |
 | account2.css:59 | `.a2-btn--primary` | background | --onyx-accent |
 | account2.css:59 | `.a2-btn--primary` | color | --onyx-accent-ink |
-| account2.css:117 | `.a2-reclaim__signin` | border-color | --onyx-accent |
-| account2.css:117 | `.a2-reclaim__signin` | background | --onyx-accent |
-| account2.css:117 | `.a2-reclaim__signin` | color | --onyx-accent-ink |
-| roomsettings.css:206 | `.rset-btn-primary` | color | --onyx-accent-ink |
-| roomsettings.css:207 | `.rset-btn-primary` | background | --onyx-accent |
-| roomsettings.css:208 | `.rset-btn-primary` | border-color | --onyx-accent |
-| roomsettings.css:212 | `.rset-btn-primary:hover` | background | --onyx-accent |
-| ui-sheets.css:265 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | color | --onyx-accent-ink |
-| ui-sheets.css:266 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | background | --onyx-accent |
-| ui-sheets.css:267 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | border | --onyx-accent |
+| account2.css:116 | `.a2-reclaim__signin` | border-color | --onyx-accent |
+| account2.css:116 | `.a2-reclaim__signin` | background | --onyx-accent |
+| account2.css:116 | `.a2-reclaim__signin` | color | --onyx-accent-ink |
+| roomsettings.css:204 | `.rset-btn-primary` | color | --onyx-accent-ink |
+| roomsettings.css:205 | `.rset-btn-primary` | background | --onyx-accent |
+| roomsettings.css:206 | `.rset-btn-primary` | border-color | --onyx-accent |
+| roomsettings.css:210 | `.rset-btn-primary:hover` | background | --onyx-accent |
+| gap-account.css:34 | `.gap-btn--primary, .pref-reset.gap-btn--primary` | color | --onyx-accent-ink |
+| gap-account.css:35 | `.gap-btn--primary, .pref-reset.gap-btn--primary` | background | --onyx-accent |
+| gap-account.css:36 | `.gap-btn--primary, .pref-reset.gap-btn--primary` | border-color | --onyx-accent |
+| gap-oper.css:220 | `.onyx-moddesk-sheet .oper-desk .oc-btn-primary` | background | --onyx-accent |
+| gap-oper.css:220 | `.onyx-moddesk-sheet .oper-desk .oc-btn-primary` | border-color | --onyx-accent |
+| gap-oper.css:220 | `.onyx-moddesk-sheet .oper-desk .oc-btn-primary` | color | --onyx-accent-ink |
+| gap-oper.css:221 | `.onyx-moddesk-sheet .oper-desk .oc-btn-primary:hover:not(:disabled)` | border-color | --onyx-accent |
+| gap-oper.css:264 | `.oc-reply[data-tone="good"]` | border-left-color | --onyx-accent |
+| gap-import.css:48 | `.hi-btn--primary` | border-color | --onyx-accent |
+| gap-import.css:49 | `.hi-btn--primary` | background | --onyx-accent |
+| gap-import.css:50 | `.hi-btn--primary` | color | --onyx-accent-ink |
+| gap-import.css:52 | `.hi-btn--primary:hover:not(:disabled)` | border-color | --onyx-accent |
+| gap-organize.css:386 | `.gorg-btn--primary` | color | --onyx-accent-ink |
+| gap-organize.css:386 | `.gorg-btn--primary` | background | --onyx-accent |
+| gap-organize.css:386 | `.gorg-btn--primary` | border-color | --onyx-accent |
+| gap-organize.css:387 | `.gorg-btn--primary:hover` | border-color | --onyx-accent |
+| gap-usermodes.css:68 | `button.um-btn.um-btn--primary` | border-color | --onyx-accent |
+| gap-usermodes.css:68 | `button.um-btn.um-btn--primary` | background | --onyx-accent |
+| gap-usermodes.css:68 | `button.um-btn.um-btn--primary` | color | --onyx-accent-ink |
+| gap-usermodes.css:69 | `button.um-btn.um-btn--primary:hover:not(:disabled)` | border-color | --onyx-accent |
+| gap-watch.css:392 | `.onyx-watch-btn-primary` | border-color | --onyx-accent |
+| gap-watch.css:393 | `.onyx-watch-btn-primary` | background | --onyx-accent |
+| gap-watch.css:394 | `.onyx-watch-btn-primary` | color | --onyx-accent-ink |
+| gap-watch.css:397 | `.onyx-watch-btn-primary:hover` | border-color | --onyx-accent |
+| gap-claim.css:126 | `.gc-btn--primary` | border-color | --onyx-accent |
+| gap-claim.css:127 | `.gc-btn--primary` | background | --onyx-accent |
+| gap-claim.css:128 | `.gc-btn--primary` | color | --onyx-accent-ink |
+| gap-claim.css:130 | `.gc-btn--primary:hover:not(:disabled)` | border-color | --onyx-accent |
+| ui-sheets.css:366 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | color | --onyx-accent-ink |
+| ui-sheets.css:367 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | background | --onyx-accent |
+| ui-sheets.css:368 | `.onyx-sheet :is(.onyx-newmsg-primary, .polish-primary, .chb-submit, .guest-claim-sheet__su` | border | --onyx-accent |
 
-### G7 · selection / toggle state (47)
+### G7 · focus (91)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:185 | `.shell-topic-card-follow.is-active` | border-color | --onyx-accent |
-| app.css:187 | `.shell-topic-follow.is-active` | border-color | --onyx-accent |
-| app.css:188 | `.shell-topic-action.is-active` | border-color | --onyx-accent |
-| app.css:194 | `.topic-chip.is-active` | border-color | --onyx-accent |
-| app.css:509 | `.onyx-rail .onyx-rail-filter-unread-on` | border-color | --onyx-accent |
-| app.css:510 | `.onyx-rail .onyx-rail-filter-unread-on` | color | --onyx-accent |
-| app.css:592 | `.onyx-rail .onyx-rail-star-on` | color | --onyx-accent |
-| app.css:700 | `.onyx-audience-toggle-set` | color | --onyx-accent |
-| app.css:701 | `.onyx-audience-toggle-set` | border-color | --onyx-accent |
-| app.css:805 | `.onyx-calls-toggle-open` | border-color | --onyx-accent |
-| app.css:806 | `.onyx-calls-toggle-open` | color | --onyx-accent |
-| app.css:1003 | `.onyx-land-tabs button[aria-selected="true"]` | border-color | --onyx-accent |
-| app.css:1212 | `.chb-sort-btn[aria-pressed="true"]` | color | --onyx-accent |
-| app.css:1212 | `.chb-sort-btn[aria-pressed="true"]` | border-color | --onyx-accent |
-| app.css:1246 | `.chb-skin[aria-pressed="true"]` | border-color | --onyx-accent |
-| app.css:1974 | `.conn-strength-on` | background | --onyx-accent |
-| app.css:2091 | `.onyx-notify-toggle-open` | border-color | --onyx-accent |
-| app.css:2091 | `.onyx-notify-toggle-open` | color | --onyx-accent |
-| app.css:2110 | `.notify-toggle[aria-pressed="true"]` | border-color | --onyx-accent |
-| app.css:2110 | `.notify-toggle[aria-pressed="true"]` | color | --onyx-accent |
-| app.css:2129 | `.room-notify-seg[aria-checked="true"]` | border-color | --onyx-accent |
-| app.css:2129 | `.room-notify-seg[aria-checked="true"]` | color | --onyx-accent |
-| app.css:2482 | `.onyx-composer .shell-composer-tool--emoji[aria-expanded="true"]` | border-color | --onyx-accent |
-| app.css:2712 | `.onyx-dmsafe-trigger[aria-expanded="true"]` | border-color | --onyx-accent |
-| app.css:2810 | `.onyx-spotlight-option[aria-selected="true"]` | border-left-color | --onyx-accent |
-| app.css:2877 | `.onyx-moddesk-toggle[aria-pressed="true"]` | border-color | --onyx-accent |
-| app.css:2934 | `.onyx-moddesk-sheet .moderation-cockpit__mode[aria-pressed="true"]` | border-color | --onyx-accent |
-| app.css:3098 | `.pref-segment[aria-checked="true"]` | border-color | --onyx-accent |
-| app.css:3098 | `.pref-segment[aria-checked="true"]` | color | --onyx-accent |
-| app.css:3105 | `.pref-toggle[aria-checked="true"] .pref-switch` | border-color | --onyx-accent |
-| app.css:3106 | `.pref-toggle[aria-checked="true"] .pref-switch::after` | background | --onyx-accent |
-| app.css:3212 | `.onyx-voice-chip[data-active="true"]` | border-color | --onyx-accent |
+| app.css:472 | `.onyx-rail-filter-input:focus` | outline | --focus-ring |
+| app.css:673 | `.onyx-composer input:focus` | border-color | --onyx-accent |
+| app.css:1669 | `.conn-input:focus-visible` | outline | --focus-ring |
+| app.css:1669 | `.conn-input:focus-visible` | border-color | --onyx-focus |
+| app.css:1713 | `.conn-offer-btn:focus-visible` | outline | --focus-ring |
+| app.css:1747 | `.conn-switch:focus-visible` | outline | --focus-ring |
+| app.css:1776 | `.conn-submit:focus-visible` | outline | --focus-ring |
+| app.css:1804 | `.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-b` | outline | --focus-ring |
+| app.css:1805 | `.conn-identity-select:focus-visible` | outline | --focus-ring |
+| app.css:2027 | `.onyx-nav-btn:focus-visible` | outline | --focus-ring |
+| app.css:2136 | `.onyx-home-row:focus-visible, .onyx-home-room:focus-visible, .onyx-home-action:focus-visib` | outline | --focus-ring |
+| app.css:2347 | `.onyx-roster-filter-input:focus-visible` | outline | --focus-ring |
+| app.css:2405 | `.onyx-palette-launcher:focus-visible, .onyx-spotlight-close:focus-visible` | outline | --focus-ring |
+| app.css:2705 | `.onyx-jump-latest:focus-visible` | outline | --focus-ring |
+| app.css:3365 | `:where(button, [href], input, select, textarea, [tabindex]):focus-visible` | outline | --focus-ring |
+| gap-appearance.css:310 | `.pref-input:focus-visible` | outline | --focus-ring |
+| gap-appearance.css:310 | `.pref-input:focus-visible` | border-color | --onyx-focus |
+| pol-stats.css:62 | `:is(.stats-page, .status-route, .roadmap-page) :is(a, button, input, [tabindex]):focus-vis` | outline | --focus-ring |
+| pol-stats.css:122 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary:focus-visible` | outline | --focus-ring |
+| pol-stats.css:342 | `.roadmap-card:focus-visible` | outline | --focus-ring |
+| pol-stats.css:750 | `.stats-page .stats-inspector:focus-visible` | outline | --focus-ring |
+| pol-stats.css:941 | `.stats-page .stats-room-search input:focus-visible` | border-color | --onyx-accent |
+| pol-studio.css:278 | `.ap-choice-toggle:focus-visible` | outline | --focus-ring |
+| pol-shell.css:725 | `.onyx-frame .onyx-rail-filter-input:focus` | outline | --focus-ring |
+| pol-shell.css:725 | `.onyx-frame .onyx-rail-filter-input:focus` | border-color | --onyx-accent |
+| pol-thread.css:196 | `.onyx-message:focus-visible` | outline | --focus-ring |
+| pol-thread.css:247 | `.onyx-row-action:focus-visible` | outline | --focus-ring |
+| pol-thread.css:485 | `.onyx-unread-divider:focus-visible` | outline | --focus-ring |
+| pol-thread.css:926 | `.shell-msg-lightbox-actions button:focus-visible` | outline | --focus-ring |
+| pol-thread.css:1121 | `.onyx-composer-bar:focus-within` | border-color | --onyx-accent |
+| pol-thread.css:1444 | `.onyx-message-search__surface:focus-within` | border-color | --onyx-accent |
+| pol-thread.css:2169 | `.onyx-edited-toggle:focus-visible` | outline | --focus-ring |
+| pol-roster.css:149 | `.onyx-mlist-group-head:focus-visible` | outline | --focus-ring |
+| pol-roster.css:213 | `.onyx-mlist-main:focus-visible` | outline | --focus-ring |
+| pol-public.css:45 | `.public-frame :where(a, button, summary, input, [tabindex]):focus-visible` | outline | --focus-ring |
+| pol-public.css:1408 | `.invite-form-panel .form-field input:focus-visible` | outline | --focus-ring |
+| pol-public.css:1408 | `.invite-form-panel .form-field input:focus-visible` | border-color | --onyx-focus |
+| calls-c8.css:35 | `.onyx-call-react-item:focus-visible` | outline | --focus-ring |
+| calls-c11.css:157 | `:where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-sheet, .onyx-stage-pa` | outline | --focus-ring |
+| polish.css:100 | `.onyx-composer .shell-composer-tools-item:focus-visible, .onyx-composer .shell-composer-to` | outline | --focus-ring |
+| polish.css:238 | `.time-scrubber__bar:focus-visible, .time-scrubber__close:focus-visible, .time-scrubber__co` | outline | --focus-ring |
+| polish.css:321 | `.polish-primary:focus-visible, .polish-ghost:focus-visible, .update-available button:focus` | outline | --focus-ring |
+| account2.css:37 | `.a2-input:focus-visible, .a2-select:focus-visible, .a2-textarea:focus-visible` | outline | --focus-ring |
+| account2.css:57 | `.a2-btn:focus-visible, .a2-link:focus-visible` | outline | --focus-ring |
+| account2.css:119 | `.a2-reclaim__signin:focus-visible, .a2-reclaim__dismiss:focus-visible` | outline | --focus-ring |
+| calls-c6.css:80 | `.onyx-call-ring .onyx-call-btn:focus-visible, .onyx-call-pip-card button:focus-visible, .o` | outline | --focus-ring |
+| gap-convo.css:141 | `.onyx-composer .gap-attach-quality-opt:focus-visible, .onyx-composer .gap-attach-keep:focu` | outline | --focus-ring |
+| gap-convo.css:216 | `.gap-collapsed-show:focus-visible` | outline | --focus-ring |
+| gap-account.css:41 | `.gap-btn:focus-visible` | outline | --focus-ring |
+| gap-oper.css:95 | `.onyx-moddesk-sheet .oper-desk .oc-tab:focus-visible` | outline | --focus-ring |
+| gap-oper.css:98 | `.oc-tabpanel:focus-visible` | outline | --focus-ring |
+| gap-oper.css:164 | `.oc-more > summary:focus-visible` | outline | --focus-ring |
+| gap-oper.css:200 | `.onyx-moddesk-sheet .oper-desk .oc-input:focus-visible` | outline | --focus-ring |
+| gap-oper.css:200 | `.onyx-moddesk-sheet .oper-desk .oc-input:focus-visible` | border-color | --onyx-accent |
+| gap-oper.css:219 | `.onyx-moddesk-sheet .oper-desk .oc-btn:focus-visible` | outline | --focus-ring |
+| gap-oper.css:292 | `.onyx-moddesk-sheet .oper-desk .oc-chip:focus-visible` | outline | --focus-ring |
+| gap-oper.css:415 | `.conn-foot .ap-footlink:focus-visible` | outline | --focus-ring |
+| gap-oper.css:424 | `.ap-input:focus-visible` | outline | --focus-ring |
+| gap-oper.css:424 | `.ap-input:focus-visible` | border-color | --onyx-accent |
+| gap-oper.css:428 | `.ap-btn:focus-visible` | outline | --focus-ring |
+| gap-import.css:45 | `.hi-btn:focus-visible, .hi-seg:focus-visible, .bk-btn:focus-visible, .bk-inspect:focus-vis` | outline | --focus-ring |
+| gap-import.css:105 | `.hi-note:focus-visible` | outline | --focus-ring |
+| gap-import.css:126 | `.hi-review-title:focus-visible` | outline | --focus-ring |
+| gap-import.css:166 | `.hi-left-out > summary:focus-visible` | outline | --focus-ring |
+| gap-import.css:202 | `.hi-check:focus-visible` | outline | --focus-ring |
+| gap-people.css:45 | `.onyx-roster-more:focus-visible` | outline | --focus-ring |
+| gap-organize.css:442 | `.gorg-input:focus, .gorg-select:focus, .gorg-textarea:focus, .gorg-note-input:focus` | border-color | --onyx-accent |
+| gap-organize.css:442 | `.gorg-input:focus, .gorg-select:focus, .gorg-textarea:focus, .gorg-note-input:focus` | outline | --focus-ring |
+| gap-usermodes.css:66 | `.um-btn:focus-visible, .um-choice:focus-visible, .um-inbox-link:focus-visible, .um-request` | outline | --focus-ring |
+| gap-usermodes.css:90 | `.um-input:focus-visible` | outline | --focus-ring |
+| gap-usermodes.css:90 | `.um-input:focus-visible` | border-color | --onyx-accent |
+| gap-commands.css:84 | `button.gap-help-row:focus-visible` | outline | --focus-ring |
+| gap-commands.css:135 | `.gap-keys-pref:focus-visible` | outline | --focus-ring |
+| gap-watch.css:542 | `.onyx-watch :is(button, a, input, select):focus-visible` | outline | --focus-ring |
+| gap-watch.css:670 | `.onyx-watch-input:focus-visible` | outline | --focus-ring |
+| gap-watch.css:670 | `.onyx-watch-input:focus-visible` | border-color | --onyx-accent |
+| gap-watch.css:692 | `.onyx-watch-sheet :is(button, a, input):focus-visible` | outline | --focus-ring |
+| gap-shell.css:43 | `.gs-join-field:focus-within` | outline | --focus-ring |
+| gap-shell.css:78 | `.onyx-frame .onyx-rail button.gs-join-go:focus-visible` | outline | --focus-ring |
+| gap-shell.css:100 | `.onyx-frame .onyx-rail button.gs-rail-activity:focus-visible` | outline | --focus-ring |
+| gap-shell.css:142 | `.onyx-frame .gs-seg button.gs-seg-btn:focus-visible` | outline | --focus-ring |
+| gap-shell.css:161 | `.gs-activity-list:focus-visible` | outline | --focus-ring |
+| gap-shell.css:226 | `.onyx-room-more-menu > a.gs-more-ledger:focus-visible` | outline | --focus-ring |
+| gap-shell.css:257 | `.onyx-frame .gs-leave button.gs-btn:focus-visible` | outline | --focus-ring |
+| gap-shell.css:298 | `.onyx-frame .gs-motd button.gs-motd-dismiss:focus-visible` | outline | --focus-ring |
+| gap-shell.css:319 | `.onyx-frame .gs-motd button.gs-motd-more:focus-visible` | outline | --focus-ring |
+| gap-claim.css:123 | `.gc-btn:focus-visible` | outline | --focus-ring |
+| ui-sheets.css:342 | `.onyx-sheet-close:focus-visible, .onyx-spotlight-close:focus-visible` | outline | --focus-ring |
+| calls-engine.css:39 | `.onyx-voice-chip:focus-visible, .onyx-call-join:focus-visible` | outline | --focus-ring |
+| calls-engine.css:176 | `.onyx-cbtn:focus-visible` | outline | --focus-ring |
+| calls-engine.css:192 | `.onyx-call-more-item:focus-visible` | outline | --focus-ring |
+
+### G7 · selection / toggle state (44)
+
+| file:line | selector | property | token |
+|---|---|---|---|
+| app.css:228 | `.shell-topic-card-follow.is-active` | border-color | --onyx-accent |
+| app.css:230 | `.shell-topic-follow.is-active` | border-color | --onyx-accent |
+| app.css:231 | `.shell-topic-action.is-active` | border-color | --onyx-accent |
+| app.css:237 | `.topic-chip.is-active` | border-color | --onyx-accent |
+| app.css:625 | `.onyx-audience-toggle-set` | color | --onyx-accent |
+| app.css:626 | `.onyx-audience-toggle-set` | border-color | --onyx-accent |
+| app.css:932 | `.chb-skin[aria-pressed="true"]` | border-color | --onyx-accent |
+| app.css:1563 | `.conn-identity[data-selected="true"]` | box-shadow | --onyx-accent |
+| app.css:1753 | `.conn-strength-on` | background | --onyx-accent |
+| app.css:2549 | `.onyx-spotlight-option[aria-selected="true"]` | border-left-color | --onyx-accent |
+| app.css:2659 | `.onyx-moddesk-sheet .moderation-cockpit__mode[aria-pressed="true"]` | border-color | --onyx-accent |
+| app.css:2808 | `.pref-segment[aria-checked="true"]` | border-color | --onyx-accent |
+| app.css:2808 | `.pref-segment[aria-checked="true"]` | color | --onyx-accent |
+| app.css:2815 | `.pref-toggle[aria-checked="true"] .pref-switch::after` | background | --onyx-accent |
+| app.css:2916 | `.onyx-voice-chip[data-active="true"]` | border-color | --onyx-accent |
 | pol-stats.css:687 | `.stats-page :is(.stats-window-options, .stats-control-group) button:is([aria-pressed='true` | border-color | --onyx-accent |
 | pol-stats.css:689 | `.stats-page :is(.stats-window-options, .stats-control-group) button:is([aria-pressed='true` | background | --pg-select |
 | pol-stats.css:956 | `.stats-page .data-room-row[data-selected='true']` | box-shadow | --onyx-accent |
 | pol-stats.css:973 | `.stats-page .data-action:is(.data-action--compare, .data-action--inspect)[aria-pressed='tr` | border-color | --onyx-accent |
 | pol-stats.css:974 | `.stats-page .data-action:is(.data-action--compare, .data-action--inspect)[aria-pressed='tr` | background | --pg-select |
-| pol-studio.css:1322 | `.ts-pv-chan[data-active='true']` | background | --lapis-deep |
-| pol-studio.css:1325 | `.ts-pv-chan[data-active='true'] .ts-pv-chan__hash` | color | --lapis-bright |
-| pol-studio.css:1325 | `.ts-pv-chan[data-active='true'] .ts-pv-chan__hash` | color | --onyx-accent |
-| pol-thread.css:1265 | `.onyx-composer .shell-command-item--active` | box-shadow | --onyx-accent |
-| pol-thread.css:1655 | `.room-media-index-filter[aria-selected='true']` | box-shadow | --onyx-accent |
-| pol-public.css:1289 | `.guides-step-toggle[aria-pressed="true"]` | border-color | --onyx-accent |
-| pol-public.css:1290 | `.guides-step-toggle[aria-pressed="true"]::before` | color | --onyx-accent |
+| pol-studio.css:1316 | `.ts-pv-chan[data-active='true']` | background | --lapis-deep |
+| pol-studio.css:1319 | `.ts-pv-chan[data-active='true'] .ts-pv-chan__hash` | color | --lapis-bright |
+| pol-studio.css:1319 | `.ts-pv-chan[data-active='true'] .ts-pv-chan__hash` | color | --onyx-accent |
+| pol-thread.css:1367 | `.onyx-composer .shell-command-item--active` | box-shadow | --onyx-accent |
+| pol-thread.css:1764 | `.room-media-index-filter[aria-selected='true']` | box-shadow | --onyx-accent |
+| pol-thread.css:2540 | `.onyx-frame .onyx-thread-pane button.topic-chip.is-active, .onyx-frame .onyx-thread-pane b` | border-color | --onyx-accent |
+| pol-public.css:1290 | `.guides-step-toggle[aria-pressed="true"]` | border-color | --onyx-accent |
+| pol-public.css:1291 | `.guides-step-toggle[aria-pressed="true"]::before` | color | --onyx-accent |
 | pol-public.css:1499 | `.onyxos-console__tabs button[aria-selected="true"]` | box-shadow | --onyx-accent |
-| pol-public.css:1570 | `.onyxos-console__tabs button[aria-selected="true"]` @@media (max-width: 768px) | box-shadow | --onyx-accent |
-| ui-sheets.css:449 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | --onyx-accent |
+| pol-public.css:1570 | `.onyxos-console__tabs button[aria-selected="true"]` @@media (max-width: 767.98px) | box-shadow | --onyx-accent |
+| gap-convo.css:136 | `.onyx-composer .gap-attach-quality-opt[aria-checked='true']` | box-shadow | --onyx-accent |
+| gap-oper.css:288 | `.onyx-moddesk-sheet .oper-desk .oc-chip[aria-pressed="true"]` | border-color | --onyx-accent |
+| gap-oper.css:289 | `.onyx-moddesk-sheet .oper-desk .oc-chip[aria-pressed="true"]` | background | --onyx-accent |
+| gap-import.css:85 | `.hi-seg[aria-checked="true"]` | border-color | --onyx-accent |
+| gap-import.css:85 | `.hi-seg[aria-checked="true"]` | color | --onyx-accent |
+| gap-organize.css:473 | `.gorg-switch[aria-checked="true"]` | background | --onyx-accent |
+| gap-organize.css:473 | `.gorg-switch[aria-checked="true"]` | border-color | --onyx-accent |
+| gap-organize.css:474 | `.gorg-switch[aria-checked="true"] .gorg-switch-knob` | background | --onyx-accent-ink |
+| gap-organize.css:573 | `.gorg-preset-option--on` | border-color | --onyx-accent |
+| gap-organize.css:583 | `.gorg-preset-option--on .gorg-preset-dot` | border | --onyx-accent |
+| gap-usermodes.css:356 | `button.um-choice.um-choice--on` | border-color | --onyx-accent |
+| gap-commands.css:159 | `.gap-keys-pref[aria-checked="true"] .gap-keys-pref-switch` | border-color | --onyx-accent |
+| gap-commands.css:160 | `.gap-keys-pref[aria-checked="true"] .gap-keys-pref-switch::after` | background | --onyx-accent |
+| ui-sheets.css:545 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | --onyx-accent |
 
-### G7 · focus (41)
-
-| file:line | selector | property | token |
-|---|---|---|---|
-| app.css:495 | `.onyx-rail-filter-input:focus` | outline | --onyx-accent |
-| app.css:769 | `.onyx-composer input:focus` | border-color | --onyx-accent |
-| app.css:1948 | `.conn-input:focus-visible` | outline | --onyx-accent |
-| app.css:1948 | `.conn-input:focus-visible` | border-color | --onyx-accent |
-| app.css:1997 | `.conn-submit:focus-visible` | outline | --onyx-accent |
-| app.css:2019 | `.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-b` | outline | --onyx-accent |
-| app.css:2179 | `.onyx-nav-btn:focus-visible` | outline | --onyx-accent |
-| app.css:2327 | `.onyx-home-row:focus-visible, .onyx-home-room:focus-visible, .onyx-home-action:focus-visib` | outline | --onyx-accent |
-| app.css:2555 | `.onyx-roster-filter-input:focus-visible` | outline | --onyx-accent |
-| app.css:2631 | `.onyx-palette-launcher:focus-visible, .onyx-spotlight-close:focus-visible, .onyx-shortcuts` | outline | --onyx-accent |
-| app.css:2985 | `.onyx-jump-latest:focus-visible` | outline | --onyx-accent |
-| app.css:3148 | `:root[data-high-contrast='true'] :focus-visible` | outline | --lapis-bright |
-| app.css:3821 | `:where(button, [href], input, select, textarea, [tabindex]):focus-visible` | outline | --focus-ring |
-| pol-stats.css:62 | `:is(.stats-page, .status-route, .roadmap-page) :is(a, button, input, [tabindex]):focus-vis` | outline | --focus-ring |
-| pol-stats.css:342 | `.roadmap-card:focus-visible` | outline | --focus-ring |
-| pol-stats.css:750 | `.stats-page .stats-inspector:focus-visible` | outline | --focus-ring |
-| pol-stats.css:941 | `.stats-page .stats-room-search input:focus-visible` | border-color | --onyx-accent |
-| pol-studio.css:283 | `.ap-choice-toggle:focus-visible` | outline | --onyx-accent |
-| pol-shell.css:758 | `.onyx-frame .onyx-rail-filter-input:focus` | outline | --focus-ring |
-| pol-shell.css:758 | `.onyx-frame .onyx-rail-filter-input:focus` | border-color | --onyx-accent |
-| pol-thread.css:192 | `.onyx-message:focus-visible` | outline | --focus-ring |
-| pol-thread.css:243 | `.onyx-row-action:focus-visible` | outline | --focus-ring |
-| pol-thread.css:479 | `.onyx-unread-divider:focus-visible` | outline | --focus-ring |
-| pol-thread.css:1019 | `.onyx-composer-bar:focus-within` | border-color | --onyx-accent |
-| pol-thread.css:1338 | `.onyx-message-search__surface:focus-within` | border-color | --onyx-accent |
-| pol-roster.css:153 | `.onyx-mlist-group-head:focus-visible` | outline | --focus-ring |
-| pol-roster.css:217 | `.onyx-mlist-main:focus-visible` | outline | --focus-ring |
-| pol-public.css:45 | `.public-frame :where(a, button, summary, input, [tabindex]):focus-visible` | outline | --onyx-accent |
-| pol-public.css:1408 | `.invite-form-panel .form-field input:focus-visible` | outline | --onyx-accent |
-| pol-public.css:1408 | `.invite-form-panel .form-field input:focus-visible` | border-color | --onyx-accent |
-| calls-c8.css:35 | `.onyx-call-react-item:focus-visible` | outline | --focus-ring |
-| calls-c11.css:157 | `:where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-sheet, .onyx-stage-pa` | outline | --focus-ring |
-| polish.css:100 | `.onyx-composer .shell-composer-tools-item:focus-visible, .onyx-composer .shell-composer-to` | outline | --focus-ring |
-| polish.css:238 | `.time-scrubber__bar:focus-visible, .time-scrubber__close:focus-visible, .time-scrubber__co` | outline | --focus-ring |
-| polish.css:321 | `.polish-primary:focus-visible, .polish-ghost:focus-visible, .update-available button:focus` | outline | --onyx-accent |
-| account2.css:37 | `.a2-input:focus-visible, .a2-select:focus-visible, .a2-textarea:focus-visible` | box-shadow | --focus-ring |
-| account2.css:57 | `.a2-btn:focus-visible, .a2-link:focus-visible` | box-shadow | --focus-ring |
-| account2.css:120 | `.a2-reclaim__signin:focus-visible, .a2-reclaim__dismiss:focus-visible` | box-shadow | --focus-ring |
-| calls-c6.css:81 | `.onyx-call-ring .onyx-call-btn:focus-visible, .onyx-call-pip-card button:focus-visible, .o` | outline | --focus-ring |
-| ui-sheets.css:241 | `.onyx-sheet-close:focus-visible, .onyx-you-close:focus-visible, .onyx-spotlight-close:focu` | outline | --focus-ring |
-| calls-engine.css:28 | `.onyx-cbtn:focus-visible` | outline | --onyx-accent |
-
-### G7 · unread / count / badge / pill (20)
+### G7 · other (outside the budget) (35)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:196 | `.topic-chip__unread` | background | --onyx-accent |
-| app.css:1225 | `.chb-pill` | border | --onyx-accent |
-| app.css:1225 | `.chb-pill` | color | --onyx-accent |
-| app.css:1232 | `.chb-ledger` | color | --onyx-accent |
-| app.css:1377 | `.onyx-scheduled-ledger` | color | --onyx-accent |
-| app.css:1776 | `.onyx-member-ledger` | color | --onyx-accent |
-| app.css:1858 | `.provenance-badge` | border | --lapis-bright |
-| app.css:1860 | `.provenance-badge` | background | --lapis |
-| app.css:1861 | `.provenance-badge` | color | --lapis-bright |
-| app.css:2347 | `.onyx-home-count` | color | --onyx-accent |
-| app.css:2492 | `.boost-pill.you` | border-color | --onyx-accent |
-| app.css:2984 | `.onyx-jump-latest--unread` | color | --onyx-accent-ink |
-| app.css:2984 | `.onyx-jump-latest--unread` | background | --onyx-accent |
-| app.css:2984 | `.onyx-jump-latest--unread` | border-color | --onyx-accent |
-| pol-shell.css:649 | `.onyx-topbar .shell-ribbon-badge` | color | --onyx-accent-ink |
-| pol-shell.css:650 | `.onyx-topbar .shell-ribbon-badge` | background | --onyx-accent |
-| pol-thread.css:591 | `.onyx-frame .onyx-jump-latest--unread` | color | --onyx-accent-ink |
-| pol-thread.css:591 | `.onyx-frame .onyx-jump-latest--unread` | background | --onyx-accent |
-| pol-thread.css:591 | `.onyx-frame .onyx-jump-latest--unread` | border-color | --onyx-accent |
-| pol-thread.css:592 | `.onyx-jump-latest--unread:hover` | border-color | --onyx-accent |
+| app.css:597 | `.onyx-whisper` | border-left | --onyx-accent |
+| app.css:1012 | `.onyx-composer .onyx-schedule-view` | color | --onyx-accent |
+| app.css:1618 | `.conn-identities-go` | color | --onyx-accent-ink |
+| app.css:1619 | `.conn-identities-go` | background | --onyx-accent |
+| app.css:1625 | `.conn-identities-go:hover:not(:disabled)` | background | --onyx-accent |
+| app.css:1626 | `.conn-identities-go:disabled` | background | --onyx-accent |
+| app.css:2178 | `.onyx-coach` | border | --onyx-accent |
+| pol-public.css:61 | `.public-frame__skip` | color | --onyx-accent-ink |
+| pol-public.css:62 | `.public-frame__skip` | background | --onyx-accent |
+| gap-convo.css:29 | `.onyx-composer > .gap-draft-status::before` | background | --onyx-accent |
+| gap-convo.css:57 | `.gap-drop-card` | border | --onyx-accent |
+| gap-convo.css:62 | `.gap-drop-icon` | color | --onyx-accent |
+| gap-convo.css:251 | `.onyx-message.gap-landed` | box-shadow | --onyx-accent |
+| gap-convo.css:257 | `.onyx-message.gap-landed` @@media (prefers-reduced-motion | background | --onyx-accent |
+| gap-convo.css:259 | `:root[data-reduce-motion='true'] .onyx-message.gap-landed` | background | --onyx-accent |
+| gap-oper.css:242 | `.oc-review` | border | --onyx-accent |
+| gap-oper.css:426 | `.ap-btn` | border | --onyx-accent |
+| gap-oper.css:426 | `.ap-btn` | background | --onyx-accent |
+| gap-oper.css:426 | `.ap-btn` | color | --onyx-accent-ink |
+| gap-oper.css:429 | `.ap-status-good` | color | --onyx-accent |
+| rx-shell.css:311 | `.onyx-rail .onyx-rail-emptystate-go` | color | --onyx-accent-ink |
+| rx-shell.css:311 | `.onyx-rail .onyx-rail-emptystate-go` | background | --onyx-accent |
+| rx-shell.css:311 | `.onyx-rail .onyx-rail-emptystate-go` | border | --onyx-accent |
+| rx-shell.css:312 | `.onyx-rail .onyx-rail-emptystate-go:hover` | background | --onyx-accent |
+| gap-import.css:378 | `.bk-btn[data-copy-state="copied"]` | border-color | --onyx-accent |
+| gap-import.css:378 | `.bk-btn[data-copy-state="copied"]` | color | --onyx-accent |
+| gap-people.css:106 | `.onyx-roster-care--offer` | color | --onyx-accent |
+| gap-organize.css:295 | `.gorg-choice > .gorg-i[data-icon="check"]` | color | --onyx-accent |
+| gap-usermodes.css:73 | `button.um-btn.um-btn--soft` | color | --onyx-accent |
+| gap-watch.css:106 | `.onyx-watch-icon-btn.onyx-watch-play` | color | --onyx-accent-ink |
+| gap-watch.css:107 | `.onyx-watch-icon-btn.onyx-watch-play` | background | --onyx-accent |
+| gap-watch.css:108 | `.onyx-watch-icon-btn.onyx-watch-play` | border-color | --onyx-accent |
+| gap-watch.css:111 | `.onyx-watch-icon-btn.onyx-watch-play:hover` | color | --onyx-accent-ink |
+| gap-watch.css:111 | `.onyx-watch-icon-btn.onyx-watch-play:hover` | background | --onyx-accent |
+| gap-auth.css:44 | `.ga-question` | border-left | --onyx-accent |
 
-### G7 · current location (17)
+### G7 · unread / count / badge / pill (18)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:453 | `.onyx-rail-active .onyx-rail-name` | color | --onyx-accent |
-| app.css:2188 | `.onyx-nav-btn--active .onyx-nav-icon` | background | --onyx-accent |
-| app.css:3084 | `.pref-category-tab[aria-selected="true"]` | box-shadow | --onyx-accent |
+| app.css:916 | `.chb-pill` | border | --onyx-accent |
+| app.css:1041 | `.onyx-scheduled-ledger` | color | --onyx-accent |
+| app.css:1309 | `.onyx-member-ledger` | color | --onyx-accent |
+| app.css:1391 | `.provenance-badge` | border | --lapis-bright |
+| app.css:1393 | `.provenance-badge` | background | --lapis |
+| app.css:1394 | `.provenance-badge` | color | --lapis-bright |
+| app.css:2704 | `.onyx-jump-latest--unread` | color | --onyx-accent-ink |
+| app.css:2704 | `.onyx-jump-latest--unread` | background | --onyx-accent |
+| app.css:2704 | `.onyx-jump-latest--unread` | border-color | --onyx-accent |
+| pol-shell.css:616 | `.onyx-topbar .shell-ribbon-badge` | color | --onyx-accent-ink |
+| pol-shell.css:617 | `.onyx-topbar .shell-ribbon-badge` | background | --onyx-accent |
+| pol-thread.css:595 | `.onyx-frame .onyx-jump-latest--unread` | color | --onyx-accent-ink |
+| pol-thread.css:595 | `.onyx-frame .onyx-jump-latest--unread` | background | --onyx-accent |
+| pol-thread.css:595 | `.onyx-frame .onyx-jump-latest--unread` | border-color | --onyx-accent |
+| pol-thread.css:596 | `.onyx-jump-latest--unread:hover` | border-color | --onyx-accent |
+| gap-usermodes.css:196 | `.um-requests__count` | color | --onyx-accent |
+| gap-usermodes.css:248 | `.um-inbox-link__count` | background | --onyx-accent |
+| gap-usermodes.css:249 | `.um-inbox-link__count` | color | --onyx-accent-ink |
+
+### G7 · current location (18)
+
+| file:line | selector | property | token |
+|---|---|---|---|
+| app.css:2794 | `.pref-category-tab[aria-selected="true"]` | box-shadow | --onyx-accent |
 | pol-stats.css:195 | `.status-observation[data-feed-state='current'] .status-observation__marker` | color | --onyx-accent |
 | pol-stats.css:321 | `.roadmap-legend a[aria-current='location']` | box-shadow | --onyx-accent |
 | pol-stats.css:340 | `.roadmap-card:is(:target, [data-current='true'])` | box-shadow | --onyx-accent |
 | pol-stats.css:455 | `.stats-page .stats-observation[data-feed-state='current'] .stats-observation__marker, .sta` | color | --pg-live |
 | pol-stats.css:602 | `.stats-page .stats-feed-step[data-step-state='current'] .stats-feed-step__heading > strong` | color | --pg-live |
-| pol-shell.css:693 | `.onyx-primary-nav .onyx-nav-btn--active::before` | background | --onyx-accent |
-| pol-shell.css:698 | `.onyx-nav-btn--active .onyx-nav-icon` | background | --onyx-accent |
-| pol-shell.css:813 | `.onyx-rail .onyx-rail-active::before` | background | --onyx-accent |
-| pol-thread.css:181 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | --onyx-accent |
+| pol-shell.css:660 | `.onyx-primary-nav .onyx-nav-btn--active::before` | background | --onyx-accent |
+| pol-shell.css:665 | `.onyx-nav-btn--active .onyx-nav-icon` | background | --onyx-accent |
+| pol-shell.css:780 | `.onyx-rail .onyx-rail-active::before` | background | --onyx-accent |
+| pol-thread.css:185 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | --onyx-accent |
+| pol-thread.css:2274 | `.onyx-message--compact.onyx-message-search-current` | box-shadow | --onyx-accent |
 | pol-public.css:127 | `.public-frame__nav a[aria-current="page"]` | box-shadow | --onyx-accent |
-| pol-public.css:333 | `.public-frame__nav a[aria-current="page"]` @@media (max-width: 768px) | box-shadow | --onyx-accent |
-| pol-public.css:1229 | `.guides-route__item[data-state="current"] .guides-route__card` | border-color | --onyx-accent |
-| pol-public.css:1234 | `.guides-route__item[data-state="current"] .guides-route__state` | color | --onyx-accent |
-| pol-public.css:1327 | `.guides-route__item[data-state="current"] .guides-route__card` @@media (max-width: 768px) | box-shadow | --onyx-accent |
+| pol-public.css:333 | `.public-frame__nav a[aria-current="page"]` @@media (max-width: 767.98px) | box-shadow | --onyx-accent |
+| pol-public.css:1230 | `.guides-route__item[data-state="current"] .guides-route__card` | border-color | --onyx-accent |
+| pol-public.css:1235 | `.guides-route__item[data-state="current"] .guides-route__state` | color | --onyx-accent |
+| pol-public.css:1328 | `.guides-route__item[data-state="current"] .guides-route__card` @@media (max-width: 767.98px) | box-shadow | --onyx-accent |
+| pol-public.css:1752 | `.public-related__list a[aria-current="page"]` | box-shadow | --onyx-accent |
+| gap-oper.css:92 | `.onyx-moddesk-sheet .oper-desk .oc-tab[aria-selected="true"]` | border-bottom-color | --onyx-accent |
 
-### G7 · mention (14)
+### G7 · mention (16)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:567 | `.onyx-rail-mention` | background | --onyx-accent |
-| app.css:567 | `.onyx-rail-mention` | color | --onyx-accent-ink |
-| app.css:2061 | `.shell-msg-mention` | color | --lapis-bright |
-| app.css:2062 | `.shell-msg-mention--self` | color | --onyx-accent-ink |
-| app.css:2062 | `.shell-msg-mention--self` | background | --onyx-accent |
-| app.css:2341 | `.is-mention .onyx-home-unread` | background | --onyx-accent |
-| app.css:2341 | `.is-mention .onyx-home-unread` | color | --onyx-accent-ink |
-| app.css:2365 | `.onyx-home-room-mention` | color | --onyx-accent |
-| pol-shell.css:128 | `.notif-center__row[data-type="mention"] .notif-center__glyph` | color | --onyx-accent |
-| pol-shell.css:717 | `.onyx-nav-badge--mention` | color | --onyx-accent-ink |
-| pol-shell.css:717 | `.onyx-nav-badge--mention` | background | --onyx-accent |
-| pol-shell.css:849 | `.onyx-rail .onyx-rail-mention` | color | --onyx-accent-ink |
-| pol-shell.css:849 | `.onyx-rail .onyx-rail-mention` | background | --onyx-accent |
-| pol-shell.css:849 | `.onyx-rail .onyx-rail-mention` | border-color | --onyx-accent |
+| app.css:528 | `.onyx-rail-mention` | background | --onyx-accent |
+| app.css:528 | `.onyx-rail-mention` | color | --onyx-accent-ink |
+| app.css:1924 | `.shell-msg-mention--self` | color | --onyx-accent-ink |
+| app.css:1924 | `.shell-msg-mention--self` | background | --onyx-accent |
+| app.css:2150 | `.is-mention .onyx-home-unread` | background | --onyx-accent |
+| app.css:2150 | `.is-mention .onyx-home-unread` | color | --onyx-accent-ink |
+| app.css:2174 | `.onyx-home-room-mention` | color | --onyx-accent |
+| pol-shell.css:115 | `.notif-center__row[data-type="mention"] .notif-center__glyph` | color | --onyx-accent |
+| pol-shell.css:684 | `.onyx-nav-badge--mention` | color | --onyx-accent-ink |
+| pol-shell.css:684 | `.onyx-nav-badge--mention` | background | --onyx-accent |
+| pol-shell.css:816 | `.onyx-rail .onyx-rail-mention` | color | --onyx-accent-ink |
+| pol-shell.css:816 | `.onyx-rail .onyx-rail-mention` | background | --onyx-accent |
+| pol-shell.css:816 | `.onyx-rail .onyx-rail-mention` | border-color | --onyx-accent |
+| gap-organize.css:125 | `.gorg-folder-count--mention` | color | --onyx-accent-ink |
+| gap-organize.css:125 | `.gorg-folder-count--mention` | background | --onyx-accent |
+| gap-organize.css:125 | `.gorg-folder-count--mention` | border-color | --onyx-accent |
 
 ### G7 · theme preview (intended theme accent) (13)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| pol-studio.css:552 | `.background-picker__swatch i` | background | --lapis |
-| pol-studio.css:556 | `.background-picker__card[data-kind='scene'] .background-picker__swatch i:nth-child(2)` | background | --lapis-deep |
-| pol-studio.css:1228 | `.ts-preview` | border | --seam |
-| pol-studio.css:1238 | `.ts-preview__bar` | border-bottom | --seam-faint |
-| pol-studio.css:1277 | `.ts-pv-side` | border-right | --seam-faint |
-| pol-studio.css:1278 | `.ts-pv-members` | border-left | --seam-faint |
-| pol-studio.css:1288 | `.ts-pv-side__server` | border-bottom | --seam-faint |
-| pol-studio.css:1291 | `.ts-pv-side__sigil` | color | --lapis-bright |
-| pol-studio.css:1291 | `.ts-pv-side__sigil` | color | --onyx-accent |
-| pol-studio.css:1317 | `.ts-pv-chan__hash--voice` | color | --onyx-accent |
-| pol-studio.css:1359 | `.ts-pv-head` | border-bottom | --seam-faint |
-| pol-studio.css:1465 | `.ts-pv-composer` | border | --seam-faint |
-| pol-public.css:581 | `.onyx-land-sketch-avatar--lapis` | background | --lapis |
+| pol-studio.css:546 | `.background-picker__swatch i` | background | --lapis |
+| pol-studio.css:550 | `.background-picker__card[data-kind='scene'] .background-picker__swatch i:nth-child(2)` | background | --lapis-deep |
+| pol-studio.css:1222 | `.ts-preview` | border | --seam |
+| pol-studio.css:1232 | `.ts-preview__bar` | border-bottom | --seam-faint |
+| pol-studio.css:1271 | `.ts-pv-side` | border-right | --seam-faint |
+| pol-studio.css:1272 | `.ts-pv-members` | border-left | --seam-faint |
+| pol-studio.css:1282 | `.ts-pv-side__server` | border-bottom | --seam-faint |
+| pol-studio.css:1285 | `.ts-pv-side__sigil` | color | --lapis-bright |
+| pol-studio.css:1285 | `.ts-pv-side__sigil` | color | --onyx-accent |
+| pol-studio.css:1311 | `.ts-pv-chan__hash--voice` | color | --onyx-accent |
+| pol-studio.css:1353 | `.ts-pv-head` | border-bottom | --seam-faint |
+| pol-studio.css:1459 | `.ts-pv-composer` | border | --seam-faint |
+| pol-public.css:582 | `.onyx-land-sketch-avatar--lapis` | background | --lapis |
 
-### G7 · other (outside the budget) (12)
-
-| file:line | selector | property | token |
-|---|---|---|---|
-| app.css:243 | `.onyx-gem` | background | --onyx-accent |
-| app.css:612 | `.onyx-newmsg-mark` | color | --onyx-accent |
-| app.css:672 | `.onyx-whisper` | border-left | --onyx-accent |
-| app.css:736 | `.onyx-member-prefix` | color | --onyx-accent |
-| app.css:752 | `.onyx-composer-target` | color | --onyx-accent |
-| app.css:1342 | `.onyx-composer .onyx-schedule-view` | color | --onyx-accent |
-| app.css:2302 | `.onyx-home-announce` | color | --onyx-accent |
-| app.css:2336 | `.onyx-home-row-meta` | color | --onyx-accent |
-| app.css:2369 | `.onyx-coach` | border | --onyx-accent |
-| app.css:2371 | `.onyx-coach-eyebrow` | color | --onyx-accent |
-| pol-public.css:61 | `.public-frame__skip` | color | --onyx-accent-ink |
-| pol-public.css:62 | `.public-frame__skip` | background | --onyx-accent |
-
-### G7 · status (success / online) (10)
+### G7 · control fill / data-viz (10)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:282 | `.onyx-conn-live` | color | --onyx-accent |
-| app.css:283 | `.onyx-conn-live .onyx-dot` | background | --onyx-accent |
-| app.css:323 | `.onyx-reconnect-online` | color | --onyx-accent |
-| app.css:324 | `.onyx-reconnect-online .onyx-reconnect-dot` | background | --onyx-accent |
-| app.css:1091 | `.onyx-toast--success` | border-color | --onyx-accent |
-| app.css:1220 | `.chb-row--live` | border-color | --onyx-accent |
-| app.css:1227 | `.chb-count--live` | color | --onyx-accent |
-| app.css:1506 | `.onyx-account-passkey-ok` | color | --onyx-accent |
-| app.css:1760 | `.onyx-member-dot` | background | --onyx-accent |
-| ui-sheets.css:803 | `.onyx-toast--success` | box-shadow | --onyx-accent |
+| pol-thread.css:1319 | `.shell-attachment-progress` | accent-color | --onyx-accent |
+| pol-public.css:1206 | `.guides-progress__meter` | color | --onyx-accent |
+| pol-public.css:1211 | `.guides-progress__meter::-webkit-progress-value` | background | --onyx-accent |
+| pol-public.css:1212 | `.guides-progress__meter::-moz-progress-bar` | background | --onyx-accent |
+| polish.css:230 | `.time-scrubber__bar--now .time-scrubber__bar-fill` | background | --onyx-accent |
+| gap-import.css:100 | `.hi-bar-fill` | background | --onyx-accent |
+| gap-import.css:199 | `.hi-check` | accent-color | --onyx-accent |
+| gap-watch.css:256 | `.onyx-watch-range` | accent-color | --onyx-accent |
+| gap-claim.css:155 | `.gc-bar-fill` | background | --onyx-accent |
+| ui-sheets.css:57 | `.onyx-sheet input[type="checkbox"], .onyx-sheet input[type="radio"]` | accent-color | --onyx-accent |
 
-### G7 · live-audio (calls) (7)
+### G7 · live-audio (calls) (9)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:843 | `.onyx-calls-pip[data-state="established"]` | background | --onyx-accent |
-| app.css:3185 | `.onyx-call-pip[data-state="live"]` | background | --onyx-accent |
-| app.css:3264 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring` | border-color | --onyx-accent |
-| app.css:3268 | `.onyx-call-ring::after` | border | --onyx-accent |
-| calls-c6.css:181 | `.onyx-call-pip-faces .onyx-call-avatar[data-speaking="true"]` | outline | --onyx-accent |
-| calls-c4.css:87 | `.onyx-tile[data-speaking="true"]` | border-color | --onyx-accent |
-| calls-c4.css:115 | `.onyx-tile-talk > span` | background | --onyx-accent |
+| app.css:726 | `.onyx-calls-pip[data-state="established"]` | background | --onyx-accent |
+| app.css:2890 | `.onyx-call-pip[data-state="live"]` | background | --onyx-accent |
+| app.css:2966 | `.onyx-call-person[data-speaking="true"] .onyx-call-ring` | border-color | --onyx-accent |
+| app.css:2970 | `.onyx-call-ring::after` | border | --onyx-accent |
+| calls-c6.css:174 | `.onyx-call-pip-faces .onyx-call-avatar[data-speaking="true"]` | outline | --onyx-accent |
+| calls-c4.css:86 | `.onyx-tile[data-speaking="true"]` | border-color | --onyx-accent |
+| calls-c4.css:114 | `.onyx-tile-talk > span` | background | --onyx-accent |
+| calls-engine.css:155 | `.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"]` | border-color | --onyx-accent |
+| calls-engine.css:155 | `.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"]` | box-shadow | --onyx-accent |
 
 ### G7 · link / nav text (6)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:1026 | `.onyx-land-action` | color | --onyx-accent |
-| app.css:1414 | `.onyx-account-nav__item` | color | --onyx-accent |
-| app.css:2060 | `.shell-msg-link` | color | --onyx-accent |
-| app.css:2064 | `.shell-msg-channel-link` | color | --onyx-accent |
-| pol-studio.css:1422 | `.ts-pv-msg__link` | color | --lapis-bright |
-| pol-studio.css:1422 | `.ts-pv-msg__link` | color | --onyx-accent |
+| app.css:1922 | `.shell-msg-link` | color | --onyx-accent |
+| app.css:1926 | `.shell-msg-channel-link` | color | --onyx-accent |
+| pol-studio.css:1416 | `.ts-pv-msg__link` | color | --lapis-bright |
+| pol-studio.css:1416 | `.ts-pv-msg__link` | color | --onyx-accent |
+| gap-import.css:375 | `.bk-btn--action` | border-color | --onyx-accent |
+| gap-import.css:376 | `.bk-btn--action:hover:not(:disabled)` | border-color | --onyx-accent |
 
-### G7 · control fill / data-viz (5)
-
-| file:line | selector | property | token |
-|---|---|---|---|
-| pol-thread.css:1217 | `.shell-attachment-progress` | accent-color | --onyx-accent |
-| pol-public.css:1205 | `.guides-progress__meter` | color | --onyx-accent |
-| pol-public.css:1210 | `.guides-progress__meter::-webkit-progress-value` | background | --onyx-accent |
-| pol-public.css:1211 | `.guides-progress__meter::-moz-progress-bar` | background | --onyx-accent |
-| polish.css:230 | `.time-scrubber__bar--now .time-scrubber__bar-fill` | background | --onyx-accent |
-
-### G7 · token alias (3)
+### G7 · token alias (5)
 
 | file:line | selector | property | token |
 |---|---|---|---|
-| app.css:71 | `:root` | --focus-ring | --onyx-accent |
+| app.css:90 | `:root` | --focus-ring | --onyx-accent |
+| gap-appearance.css:38 | `:root` | --onyx-focus | --onyx-accent |
+| gap-appearance.css:81 | `:root` | --focus-ring | --onyx-focus |
 | pol-stats.css:20 | `.ui-root.r:is(.stats-page, .status-route, .roadmap-page)` | --pg-live | --onyx-accent |
 | pol-stats.css:24 | `.ui-root.r:is(.stats-page, .status-route, .roadmap-page)` | --pg-select | --onyx-accent |
+
+### G7 · status (success / online) (2)
+
+| file:line | selector | property | token |
+|---|---|---|---|
+| app.css:912 | `.chb-row--live` | border-color | --onyx-accent |
+| gap-shell.css:147 | `.gs-activity-conn[data-state="live"] .gs-activity-conn-dot` | background | --onyx-accent |
 
 ## G8. Typography in use
 
@@ -2162,67 +2618,84 @@ Font-size distribution (px at a 16px root):
 
 | size | count | where |
 |---|---|---|
-| `13px (--text-sm)` | 317 | (317 sites — style-map.json typography.fontSizes) |
-| `12px (--text-2xs)` | 119 | (119 sites — style-map.json typography.fontSizes) |
-| `11px (--text-xs)` | 111 | (111 sites — style-map.json typography.fontSizes) |
-| `15px (--text-md)` | 86 | (86 sites — style-map.json typography.fontSizes) |
-| `12px` | 65 | app.css:145,149,157,158,162,172,173,180,181,184,186,193,354,465,471,773,1165,1167,1226,1232,1239,1241,1242,1248,1256,1257,1259,1298,1315,1338,1373,1376,1388,1418,1420,1426,1476,1486,1487,1492,1495,1497,1510,1517,1518,1582,1660,1672,1690,1707,1718,1790,1815,1828,1842,1845,1847,1848,3201,3214,3253,3284,3288,3326,3354 |
-| `13px` | 65 | app.css:348,731,823,900,954,1032,1043,1050,1309,1345,1365,1367,1377,1385,1414,1422,1427,1470,1473,1483,1491,1506,1509,1511,1544,1546,1547,1548,1549,1551,1558,1562,1570,1593,1620,1641,1698,1702,1711,1712,1713,1716,1726,1756,1759,1768,1772,1776,1792,1793,1794,1795,1811,1812,1814,1821,1827,1834,1843,3210,3219,3350,3361,3365,3369 |
-| `17px (--text-lg)` | 56 | app.css:234,611,612,626,2096,2230,2505,2686,2707,2767,2838,2890,2893,3077,3120,3796 · pol-stats.css:156,289,423,438,858,892,909 · pol-studio.css:96,440,1024 · pol-shell.css:53,166,920,1370 · pol-thread.css:889,1589,1882 · pol-roster.css:387 · pol-public.css:260,312,395,779,865,930,965,1009,1014,1080,1361,1444,1469,1589 · calls-c8.css:119 · calls-c11.css:138 · calls-c6.css:50 · ui-sheets.css:165,178,431,780,1070 |
-| `20px (--text-xl)` | 24 | app.css:2465 · pol-stats.css:237,363,378,580,643,742,794 · pol-shell.css:1164,1174 · pol-thread.css:861,1390,1895 · pol-public.css:691,824,963,988,1195,1264,1505,1588,1598 · calls-c6.css:36 · ui-sheets.css:604 |
-| `16px` | 16 | app.css:1115,1299,1938,3408 · pol-shell.css:1038,1319 · pol-thread.css:387,1289,1308,1569 · pol-roster.css:396,401 · pol-public.css:912,1404 · calls-c8.css:52 · ui-sheets.css:825 |
-| `11px` | 15 | app.css:196,415,677,688,1225,1236,1493,1715,2076,3193,3304 · pol-studio.css:1263 · pol-shell.css:840,1256,1421 |
-| `18px` | 14 | app.css:719,1205,1207,1237,1363,1364,1543,1545,1654,1749,1921,3287,3359 · pol-public.css:110 |
-| `15px` | 9 | app.css:156,859,1689,1755,1789,1810,3194 · pol-shell.css:1389 · pol-thread.css:406 |
-| `9px` | 6 | pol-studio.css:1296,1317,1341,1376,1412,1481 |
-| `20px` | 5 | app.css:961 · pol-thread.css:327 · pol-public.css:955,1421 · calls-c8.css:32 |
-| `24px` | 5 | app.css:2048,3195 · pol-thread.css:389,1310 · pol-public.css:1356 |
-| `24px (--text-2xl)` | 5 | app.css:2298 · pol-stats.css:642 · pol-thread.css:508,513,618 |
-| `10px` | 5 | pol-studio.css:1439 · pol-shell.css:647,707,1029,1238 |
-| `17px` | 4 | app.css:925,1020,1403,3341 |
-| `14px` | 4 | app.css:1148,1251,1417,1701 |
-| `28px` | 3 | app.css:851,1924 · pol-shell.css:1052 |
+| `13px (--text-sm)` | 448 | (448 sites — style-map.json typography.fontSizes) |
+| `11px (--text-xs)` | 153 | (153 sites — style-map.json typography.fontSizes) |
+| `12px (--text-2xs)` | 144 | (144 sites — style-map.json typography.fontSizes) |
+| `15px (--text-md)` | 133 | (133 sites — style-map.json typography.fontSizes) |
+| `13px` | 59 | app.css:706,783,982,1015,1031,1041,1049,1063,1070,1075,1095,1098,1108,1116,1131,1134,1136,1164,1165,1166,1167,1169,1176,1180,1188,1204,1222,1236,1265,1274,1275,1276,1279,1289,1292,1301,1305,1309,1325,1326,1327,1328,1344,1345,1347,1354,1360,1367,1376,2914,2923,3041,3052,3056,3060 · gap-appearance.css:190 · gap-oper.css:198,253,419 |
+| `17px (--text-lg)` | 54 | app.css:1547,1840,2302,2454,2516,2620,2829 · pol-stats.css:156,289,423,438,858,892,909 · pol-studio.css:434,1018 · pol-shell.css:150,887,1338 · pol-thread.css:993,1698,2002 · pol-roster.css:383 · pol-public.css:260,312,395,780,866,931,966,1010,1015,1081,1362,1444,1469,1589 · calls-c8.css:118 · calls-c11.css:138 · calls-c6.css:50 · gap-convo.css:68 · rx-shell.css:263,328,588 · gap-import.css:124,251 · gap-shell.css:240 · gap-auth.css:58 · ui-sheets.css:131,271,284,527,858,1163 |
+| `12px` | 51 | app.css:192,196,207,227,365,451,677,866,868,917,925,927,928,934,942,943,945,971,988,1008,1037,1040,1052,1068,1074,1101,1111,1112,1117,1120,1122,1135,1142,1143,1252,1270,1281,1323,1348,1361,1375,1378,1380,1381,2905,2918,2990,3019,3045 · pol-roster.css:400 · rx-shell.css:163 |
+| `16px` | 36 | app.css:831,972,1902,3088 · gap-appearance.css:313 · pol-shell.css:1005,1287 · pol-thread.css:393,1391,1410,1678,2330,2407,2475,2581 · pol-roster.css:392,399 · pol-public.css:913,1404 · calls-c8.css:52 · gap-account.css:141,145 · gap-oper.css:230,231,397,423 · rx-shell.css:258,435,459 · gap-import.css:454 · gap-organize.css:741 · gap-usermodes.css:399 · gap-watch.css:665 · gap-shell.css:345,362 · ui-sheets.css:903 |
+| `var(--oc-fs)` | 25 | gap-oper.css:28,38,85,108,112,115,165,176,183,196,212,247,263,281,329,353,360,361,367,374,391,393,400,401,403 |
+| `20px (--text-xl)` | 24 | app.css:2267 · pol-stats.css:237,363,378,580,643,742,794 · pol-shell.css:1131,1141 · pol-thread.css:1498,2015 · pol-public.css:692,825,964,989,1196,1265,1505,1588,1598 · calls-c6.css:36 · gap-import.css:140 · ui-sheets.css:692 |
+| `11px` | 15 | app.css:602,613,916,1118,1278,2898,3003 · pol-studio.css:1257 · pol-shell.css:807,1206,1224,1389 · rx-shell.css:364,374 · gap-organize.css:114 |
+| `var(--oc-fs-meta)` | 13 | gap-oper.css:36,109,110,166,261,325,328,331,352,354,369,377,392 |
+| `24px` | 9 | app.css:1865 · pol-thread.css:395,1412,2331,2477 · pol-public.css:1357 · gap-auth.css:29 · calls-engine.css:431,469 |
+| `14px` | 8 | app.css:849,937 · gap-oper.css:418,420,422,426 · gap-auth.css:26 · calls-engine.css:535 |
+| `15px` | 7 | app.css:742,1322,1343,2899 · pol-shell.css:1357 · pol-thread.css:412 · gap-people.css:60 |
+| `20px` | 6 | app.css:1499 · pol-thread.css:333 · pol-public.css:956,1421 · calls-c8.css:32 · gap-auth.css:95 |
+| `9px` | 6 | pol-studio.css:1290,1311,1335,1370,1406,1475 |
+| `18px` | 5 | app.css:1465,2989,3050 · pol-public.css:110 · calls-engine.css:227 |
+| `10px` | 5 | gap-appearance.css:186 · pol-studio.css:1433 · pol-shell.css:614,674,996 |
+| `var(--text-sm, 13px)` | 5 | gap-account.css:27,57,66,89,125 |
+| `max(1rem, 16px)` | 4 | app.css:1659 · pol-stats.css:1056 · pol-studio.css:1776 · pol-public.css:1665 |
+| `24px (--text-2xl)` | 4 | pol-stats.css:642 · pol-thread.css:513,518,622 |
+| `28px` | 3 | app.css:734,1468 · pol-shell.css:1019 |
+| `32px` | 3 | app.css:1859 · pol-public.css:1787 · calls-engine.css:395 |
+| `17px` | 3 | app.css:3032 · gap-organize.css:672 · calls-engine.css:293 |
 | `clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem)` | 3 | pol-stats.css:146,279,411 |
-| `max(1rem, 16px)` | 3 | pol-stats.css:1056 · pol-studio.css:1782 · pol-public.css:1665 |
-| `0` | 2 | pol-studio.css:307 · ui-sheets.css:230 |
-| `11.52px` | 2 | app.css:134,205 |
-| `inherit` | 2 | pol-public.css:1539 · calls-c4.css:27 |
-| `13.76px` | 1 | app.css:135 |
-| `44px` | 1 | app.css:914 |
-| `9.92px` | 1 | app.css:1863 |
-| `32px` | 1 | app.css:2043 |
-| `0.92em` | 1 | app.css:2068 |
-| `0.85em` | 1 | app.css:2081 |
-| `1.1em` | 1 | app.css:2085 |
+| `inherit` | 3 | pol-thread.css:2304 · pol-public.css:1539 · calls-c4.css:27 |
+| `0` | 2 | pol-studio.css:302 · ui-sheets.css:333 |
+| `11.52px` | 2 | app.css:181,246 |
+| `var(--text-xs, 12px)` | 2 | gap-account.css:11,129 |
+| `13.76px` | 1 | app.css:182 |
+| `9.92px` | 1 | app.css:1396 |
+| `clamp(2.25rem, 1.1rem + 2.2vw, 3.25rem)` | 1 | app.css:1839 |
+| `26px` | 1 | app.css:1899 |
+| `0.92em` | 1 | app.css:1930 |
+| `0.85em` | 1 | app.css:1942 |
+| `1.1em` | 1 | app.css:1946 |
+| `100%` | 1 | gap-appearance.css:150 |
+| `93.75%` | 1 | gap-appearance.css:151 |
+| `112.5%` | 1 | gap-appearance.css:152 |
 | `clamp(1.5rem, 1.15rem + 1.4vw, 2.25rem)` | 1 | pol-stats.css:80 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)` | 1 | pol-stats.css:546 |
-| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | 1 | pol-studio.css:86 |
-| `10.5px` | 1 | pol-thread.css:146 |
-| `17.6px` | 1 | pol-thread.css:616 |
-| `12.48px` | 1 | pol-roster.css:402 |
+| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | 1 | pol-studio.css:85 |
+| `10.5px` | 1 | pol-thread.css:150 |
+| `17.6px` | 1 | pol-thread.css:620 |
+| `9.6px` | 1 | pol-thread.css:1964 |
 | `0.9em` | 1 | pol-public.css:39 |
 | `clamp(2rem, 1.4rem + 2.6vw, 2.75rem)` | 1 | pol-public.css:385 |
-| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | 1 | pol-public.css:514 |
-| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | 1 | pol-public.css:523 |
-| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | 1 | pol-public.css:621 |
-| `clamp(2.375rem, 9.6vw, 2.75rem)` | 1 | pol-public.css:778 |
-| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | 1 | pol-public.css:909 |
-| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | 1 | pol-public.css:992 |
-| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | 1 | pol-public.css:1360 |
+| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | 1 | pol-public.css:515 |
+| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | 1 | pol-public.css:524 |
+| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | 1 | pol-public.css:622 |
+| `clamp(2.375rem, 9.6vw, 2.75rem)` | 1 | pol-public.css:779 |
+| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | 1 | pol-public.css:910 |
+| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | 1 | pol-public.css:993 |
+| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | 1 | pol-public.css:1361 |
 | `clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem)` | 1 | pol-public.css:1442 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2rem)` | 1 | pol-public.css:1461 |
 | `clamp(1.75rem, 1.3rem + 2vw, 2.5rem)` | 1 | pol-public.css:1557 |
+| `clamp(100%, calc(62.5% + 0.35vw), 125%)` | 1 | pol-public.css:1691 |
+| `38px` | 1 | pol-public.css:1795 |
+| `clamp(2.5rem, 1rem + 3.6vw, 3rem)` | 1 | pol-public.css:1826 |
+| `var(--text-2xs, 11px)` | 1 | gap-account.css:98 |
+| `10.56px` | 1 | rx-shell.css:47 |
+| `106.25%` | 1 | rx-shell.css:649 |
+| `22px` | 1 | calls-engine.css:162 |
+| `36px` | 1 | calls-engine.css:399 |
+| `19px` | 1 | calls-engine.css:455 |
 
 Font-weight distribution:
 
 | weight | count |
 |---|---|
-| `650` | 163 |
-| `600` | 142 |
-| `700` | 102 |
-| `400` | 17 |
-| `750` | 14 |
-| `500` | 7 |
+| `650` | 199 |
+| `600` | 194 |
+| `700` | 107 |
+| `400` | 20 |
+| `750` | 15 |
+| `500` | 8 |
 | `800` | 3 |
 | `inherit` | 1 |
 
@@ -2230,192 +2703,248 @@ Line-height distribution:
 
 | line-height | count |
 |---|---|
-| `var(--leading-snug)` | 40 |
-| `var(--leading-body)` | 38 |
-| `1` | 29 |
-| `var(--leading-tight)` | 23 |
-| `0` | 3 |
-| `16px` | 3 |
-| `20px` | 3 |
-| `1.6` | 3 |
+| `var(--leading-snug)` | 96 |
+| `var(--leading-body)` | 50 |
+| `1` | 26 |
+| `var(--leading-tight)` | 25 |
+| `1.2` | 8 |
+| `1.6` | 8 |
+| `1.3` | 5 |
+| `0` | 4 |
+| `1.4` | 4 |
+| `16px` | 4 |
+| `20px` | 4 |
+| `18px` | 3 |
+| `1.25` | 3 |
+| `var(--leading-snug, 1.35)` | 3 |
 | `1.05` | 2 |
 | `1.1` | 2 |
-| `1.2` | 2 |
-| `18px` | 2 |
+| `1.35` | 2 |
+| `1.5` | 2 |
 | `1.65` | 2 |
+| `1.45` | 2 |
 | `1.15` | 1 |
-| `1.45` | 1 |
-| `1.4` | 1 |
-| `1.25` | 1 |
-| `1.3` | 1 |
+| `1.62` | 1 |
 | `1.08` | 1 |
 | `1.02` | 1 |
-| `1.5` | 1 |
 | `1.9` | 1 |
 | `inherit` | 1 |
+| `1.72` | 1 |
 
-Size × line-height × weight set together in one rule (149 distinct combinations):
+Size × line-height × weight set together in one rule (195 distinct combinations):
 
 | size | line-height | weight | rules | where |
 |---|---|---|---|---|
-| `13px (--text-sm)` | `—` | `—` | 211 | (211 rules) |
-| `12px (--text-2xs)` | `—` | `—` | 86 | (86 rules) |
-| `12px` | `—` | `—` | 56 | (56 rules) |
-| `13px` | `—` | `—` | 56 | (56 rules) |
-| `11px (--text-xs)` | `—` | `—` | 46 | (46 rules) |
-| `13px (--text-sm)` | `—` | `600` | 43 | (43 rules) |
-| `15px (--text-md)` | `—` | `—` | 42 | (42 rules) |
-| `11px (--text-xs)` | `—` | `650` | 28 | pol-studio.css:117,129,356,451,489,503,648,657,690,820,1532 · pol-thread.css:460,938,1107,1257 · pol-roster.css:55,161 · pol-public.css:239,300,751,864,1090,1233,1515 · calls-c11.css:35 · calls-c6.css:27 · ui-sheets.css:169,598 |
-| `13px (--text-sm)` | `—` | `650` | 20 | app.css:634,1933,2903 · pol-stats.css:622 · pol-shell.css:182,201 · pol-thread.css:384,965,1130,1445,1762,1849 · pol-public.css:230,510,671,1133,1394,1497 · polish.css:106 · ui-sheets.css:263 |
-| `17px (--text-lg)` | `—` | `—` | 18 | app.css:611,2096,2230,2505,2686,2838,2893,3077,3120 · pol-roster.css:387 · pol-public.css:260,779,1009,1361,1444 · calls-c8.css:119 · calls-c6.css:50 · ui-sheets.css:431 |
-| `13px (--text-sm)` | `var(--leading-snug)` | `—` | 15 | app.css:1951,1952,1977 · pol-stats.css:961 · pol-studio.css:111,146,378,461,950 · pol-shell.css:155 · pol-thread.css:661,783 · pol-roster.css:129 · calls-c11.css:48 · ui-sheets.css:187 |
-| `13px (--text-sm)` | `var(--leading-body)` | `—` | 15 | pol-stats.css:485,605,606,764,833,852,913 · pol-studio.css:139,642,702,1056 · pol-thread.css:1434,1611,1827 · pol-public.css:630 |
-| `11px (--text-xs)` | `—` | `600` | 14 | app.css:2173,2371,2844 · pol-studio.css:712,903,1175 · pol-shell.css:187,484,764,783 · pol-thread.css:769,1798 · pol-roster.css:63 · calls-c4.css:33 |
-| `15px (--text-md)` | `—` | `650` | 13 | app.css:2274,3658 · pol-studio.css:458,808 · pol-shell.css:48 · pol-thread.css:621 · pol-public.css:143,536,586,629,966,1104,1242 |
-| `12px (--text-2xs)` | `—` | `600` | 12 | app.css:263,313,2319,2339,2365,2519,2976 · pol-shell.css:71,447 · pol-public.css:873 · calls-c8.css:19,74 |
-| `17px (--text-lg)` | `1` | `—` | 12 | app.css:612,626,2707,2767,2890 · pol-stats.css:858,892 · pol-studio.css:440,1024 · pol-shell.css:53,166 · pol-thread.css:1882 |
-| `16px` | `—` | `—` | 12 | app.css:1299,1938,3408 · pol-shell.css:1038,1319 · pol-thread.css:387,1308,1569 · pol-roster.css:396,401 · pol-public.css:1404 · ui-sheets.css:825 |
-| `11px (--text-xs)` | `—` | `700` | 11 | app.css:524,561,2249 · pol-stats.css:792,819,907,926 · pol-studio.css:1590 · pol-thread.css:482,1750 · roomsettings.css:155 |
-| `18px` | `—` | `—` | 9 | app.css:719,1205,1207,1237,1364,1545,1654,3287,3359 |
-| `20px (--text-xl)` | `—` | `700` | 9 | pol-shell.css:1174 · pol-public.css:691,963,1195,1264,1505,1588,1598 · ui-sheets.css:604 |
-| `15px` | `—` | `—` | 8 | app.css:156,859,1689,1789,1810,3194 · pol-shell.css:1389 · pol-thread.css:406 |
-| `17px (--text-lg)` | `—` | `650` | 8 | app.css:234 · pol-public.css:865,930,1080,1469 · ui-sheets.css:165,780,1070 |
-| `15px (--text-md)` | `var(--leading-body)` | `—` | 8 | app.css:1930 · pol-stats.css:191 · pol-thread.css:619,930,1857 · pol-public.css:28 · polish.css:265 · ui-sheets.css:776 |
-| `15px (--text-md)` | `—` | `600` | 8 | app.css:3085 · pol-studio.css:259,372 · pol-shell.css:1382,1400 · pol-public.css:122 · roomsettings.css:276 · ui-sheets.css:644 |
-| `11px` | `—` | `—` | 7 | app.css:1225,1236,1493,1715,2076,3193 · pol-shell.css:1256 |
-| `15px (--text-md)` | `—` | `700` | 7 | app.css:1987 · pol-studio.css:71 · pol-shell.css:582,729,1303 · pol-public.css:1178,1215 |
-| `12px` | `—` | `600` | 6 | app.css:354,1165,1426,1495,3201,3253 |
-| `12px (--text-2xs)` | `—` | `650` | 6 | app.css:2720 · pol-thread.css:407,1552 · pol-public.css:1071 · calls-c8.css:92 · calls-c4.css:106 |
-| `13px` | `—` | `650` | 5 | app.css:823,1050,3210,3219,3369 |
-| `18px` | `—` | `700` | 5 | app.css:1363,1543,1749,1921 · pol-public.css:110 |
-| `17px (--text-lg)` | `var(--leading-body)` | `—` | 5 | pol-stats.css:156,289,423 · pol-studio.css:96 · pol-public.css:395 |
+| `13px (--text-sm)` | `—` | `—` | 273 | (273 rules) |
+| `12px (--text-2xs)` | `—` | `—` | 95 | (95 rules) |
+| `15px (--text-md)` | `—` | `—` | 71 | (71 rules) |
+| `13px (--text-sm)` | `—` | `600` | 64 | (64 rules) |
+| `11px (--text-xs)` | `—` | `—` | 63 | (63 rules) |
+| `13px` | `—` | `—` | 51 | (51 rules) |
+| `12px` | `—` | `—` | 43 | (43 rules) |
+| `11px (--text-xs)` | `—` | `650` | 39 | app.css:1546 · pol-studio.css:112,124,351,445,483,497,642,651,684,814,1526 · pol-thread.css:466,1040,1209,1359 · pol-roster.css:53,157 · pol-public.css:239,300,752,865,1091,1234,1515,1724 · calls-c11.css:35 · calls-c6.css:27 · gap-import.css:118,139,207,298,304,412 · gap-people.css:73 · gap-watch.css:493 · gap-shell.css:276 · gap-claim.css:36 · ui-sheets.css:275 |
+| `13px (--text-sm)` | `var(--leading-snug)` | `—` | 35 | app.css:1506,1512,1520,1540,1672,1673,1695,1719,1756 · pol-stats.css:961 · pol-studio.css:106,141,373,455,944 · pol-shell.css:142 · pol-thread.css:665,796,2216,2299 · pol-roster.css:125 · calls-c11.css:48 · rx-shell.css:296 · gap-import.css:106,299 · gap-organize.css:341 · gap-watch.css:148,198,325,461,649,674 · gap-shell.css:182 · ui-sheets.css:293,1357 |
+| `16px` | `—` | `—` | 31 | app.css:972,1902,3088 · gap-appearance.css:313 · pol-shell.css:1005,1287 · pol-thread.css:393,1410,1678,2330,2407,2475,2581 · pol-roster.css:392,399 · pol-public.css:1404 · gap-account.css:141,145 · gap-oper.css:230,231,397 · rx-shell.css:258,435,459 · gap-import.css:454 · gap-organize.css:741 · gap-usermodes.css:399 · gap-watch.css:665 · gap-shell.css:345,362 · ui-sheets.css:903 |
+| `13px (--text-sm)` | `—` | `650` | 27 | app.css:559,1654,2628 · pol-stats.css:622 · pol-shell.css:165,184 · pol-thread.css:390,1067,1232,1554,1875,1966 · pol-public.css:230,511,672,1134,1394,1497 · polish.css:106 · gap-import.css:180,433 · gap-watch.css:383,524,642 · gap-shell.css:247,321 · ui-sheets.css:364 |
+| `13px (--text-sm)` | `var(--leading-body)` | `—` | 25 | pol-stats.css:485,605,606,764,833,852,913 · pol-studio.css:134,636,696,1050 · pol-thread.css:1543,1720,1940 · pol-public.css:631 · gap-convo.css:234 · gap-import.css:288,408,424 · gap-usermodes.css:283 · gap-shell.css:241,300,322 · gap-claim.css:56,84 |
+| `17px (--text-lg)` | `—` | `—` | 18 | app.css:1840,2302,2454,2620,2829 · pol-roster.css:383 · pol-public.css:260,780,1010,1362,1444 · calls-c8.css:118 · calls-c6.css:50 · rx-shell.css:263,328,588 · gap-import.css:251 · ui-sheets.css:527 |
+| `11px (--text-xs)` | `—` | `600` | 18 | app.css:2021,2180,2576 · pol-studio.css:706,897,1169 · pol-shell.css:170,449,731,750 · pol-thread.css:782,1911 · pol-roster.css:61 · calls-c4.css:33 · gap-organize.css:163,300,496 · gap-commands.css:57 |
+| `11px (--text-xs)` | `—` | `700` | 15 | app.css:494,523,2076 · pol-stats.css:792,819,907,926 · pol-studio.css:1584 · pol-thread.css:488,1863 · roomsettings.css:153 · gap-chanserv.css:58 · gap-organize.css:83,529,694 |
+| `15px (--text-md)` | `—` | `650` | 15 | app.css:1539,1718 · pol-studio.css:452,802 · pol-thread.css:625 · pol-public.css:143,537,587,630,967,1105,1243 · rx-shell.css:295 · gap-chanserv.css:168 · gap-organize.css:239 |
+| `var(--oc-fs)` | `—` | `—` | 15 | gap-oper.css:28,38,112,115,183,196,263,353,361,367,391,393,400,401,403 |
+| `12px (--text-2xs)` | `var(--leading-snug)` | `—` | 12 | pol-stats.css:555,696,793 · pol-studio.css:935 · gap-import.css:205,221,382,438 · gap-usermodes.css:22,30,360 · gap-watch.css:504 |
+| `12px (--text-2xs)` | `—` | `600` | 11 | app.css:334,2128,2148,2174,2316 · pol-shell.css:61,422 · pol-public.css:874 · calls-c8.css:19,74 · gap-usermodes.css:304 |
+| `15px (--text-md)` | `—` | `700` | 10 | app.css:1505,1621,1766 · pol-studio.css:71 · pol-shell.css:549,696,1271 · pol-public.css:1179,1216 · rx-shell.css:157 |
+| `15px (--text-md)` | `—` | `600` | 9 | app.css:2795 · pol-studio.css:254,367 · pol-shell.css:1350,1368 · pol-public.css:122 · roomsettings.css:274 · gap-chanserv.css:26 · ui-sheets.css:732 |
+| `20px (--text-xl)` | `—` | `700` | 9 | pol-shell.css:1141 · pol-public.css:692,964,1196,1265,1505,1588,1598 · ui-sheets.css:692 |
+| `var(--oc-fs-meta)` | `—` | `—` | 9 | gap-oper.css:36,110,166,261,331,352,369,377,392 |
+| `15px (--text-md)` | `var(--leading-body)` | `—` | 8 | app.css:1475 · pol-stats.css:191 · pol-thread.css:623,1032,1977 · pol-public.css:28 · polish.css:265 · ui-sheets.css:854 |
+| `15px` | `—` | `—` | 7 | app.css:742,1322,1343,2899 · pol-shell.css:1357 · pol-thread.css:412 · gap-people.css:60 |
+| `24px` | `—` | `—` | 7 | app.css:1865 · pol-thread.css:395,1412,2331,2477 · gap-auth.css:29 · calls-engine.css:431 |
+| `17px (--text-lg)` | `1` | `—` | 7 | app.css:2516 · pol-stats.css:858,892 · pol-studio.css:434,1018 · pol-shell.css:150 · pol-thread.css:2002 |
+| `17px (--text-lg)` | `var(--leading-snug)` | `650` | 7 | pol-stats.css:438 · pol-thread.css:1698 · gap-convo.css:68 · gap-import.css:124 · gap-shell.css:240 · ui-sheets.css:131,284 |
+| `17px (--text-lg)` | `—` | `650` | 7 | pol-public.css:866,931,1081,1469 · ui-sheets.css:271,858,1163 |
+| `12px (--text-2xs)` | `—` | `400` | 6 | pol-studio.css:1118 · pol-shell.css:254 · pol-thread.css:722 · gap-import.css:351 · gap-usermodes.css:148 · gap-shell.css:143 |
+| `12px` | `—` | `600` | 5 | app.css:365,866,1074,1120,2905 |
+| `14px` | `—` | `—` | 5 | app.css:849,937 · gap-oper.css:420 · gap-auth.css:26 · calls-engine.css:535 |
+| `11px` | `—` | `—` | 5 | app.css:916,1118,1278,2898 · pol-shell.css:1224 |
 | `20px (--text-xl)` | `var(--leading-tight)` | `700` | 5 | pol-stats.css:237,363,378,580,643 |
-| `24px` | `—` | `—` | 4 | app.css:2048,3195 · pol-thread.css:389,1310 |
-| `17px (--text-lg)` | `var(--leading-snug)` | `650` | 4 | app.css:3796 · pol-stats.css:438 · pol-thread.css:1589 · ui-sheets.css:178 |
-| `12px (--text-2xs)` | `var(--leading-snug)` | `—` | 4 | pol-stats.css:555,696,793 · pol-studio.css:941 |
-| `20px (--text-xl)` | `—` | `—` | 4 | pol-stats.css:742 · pol-shell.css:1164 · pol-thread.css:1390,1895 |
-| `12px (--text-2xs)` | `—` | `700` | 3 | app.css:583 · pol-stats.css:352,601 |
-| `11px` | `—` | `600` | 3 | app.css:677,688 · pol-shell.css:1421 |
-| `14px` | `—` | `—` | 3 | app.css:1148,1251,1417 |
-| `12px` | `—` | `650` | 3 | app.css:3214,3326,3354 |
+| `12px (--text-2xs)` | `—` | `700` | 5 | pol-stats.css:352,601 · gap-organize.css:595 · gap-usermodes.css:250 · gap-auth.css:50 |
+| `12px (--text-2xs)` | `—` | `650` | 5 | pol-thread.css:413,1661 · pol-public.css:1072 · calls-c8.css:92 · calls-c4.css:105 |
+| `13px` | `—` | `650` | 4 | app.css:706,2914,2923,3060 |
+| `max(1rem, 16px)` | `—` | `—` | 4 | app.css:1659 · pol-stats.css:1056 · pol-studio.css:1776 · pol-public.css:1665 |
+| `11px (--text-xs)` | `var(--leading-snug)` | `650` | 4 | pol-stats.css:71 · pol-public.css:376 · gap-watch.css:124 · ui-sheets.css:1342 |
+| `17px (--text-lg)` | `var(--leading-body)` | `—` | 4 | pol-stats.css:156,289,423 · pol-public.css:395 |
+| `20px (--text-xl)` | `—` | `—` | 4 | pol-stats.css:742 · pol-shell.css:1131 · pol-thread.css:1498,2015 |
+| `var(--text-sm, 13px)` | `—` | `—` | 4 | gap-account.css:27,66,89,125 |
+| `15px (--text-md)` | `var(--leading-snug)` | `600` | 4 | gap-import.css:204 · gap-claim.css:45,73 · ui-sheets.css:1352 |
+| `11px` | `—` | `600` | 3 | app.css:602,613 · pol-shell.css:1389 |
+| `32px` | `—` | `—` | 3 | app.css:1859 · pol-public.css:1787 · calls-engine.css:395 |
+| `12px` | `—` | `650` | 3 | app.css:2918,3019,3045 |
+| `18px` | `—` | `—` | 3 | app.css:2989,3050 · calls-engine.css:227 |
 | `clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem)` | `var(--leading-tight)` | `700` | 3 | pol-stats.css:146,279,411 |
-| `24px (--text-2xl)` | `var(--leading-tight)` | `700` | 3 | pol-stats.css:642 · pol-thread.css:513,618 |
-| `max(1rem, 16px)` | `—` | `—` | 3 | pol-stats.css:1056 · pol-studio.css:1782 · pol-public.css:1665 |
-| `12px (--text-2xs)` | `—` | `400` | 3 | pol-studio.css:1124 · pol-shell.css:271 · pol-thread.css:718 |
-| `9px` | `—` | `—` | 3 | pol-studio.css:1317,1412,1481 |
-| `11px (--text-xs)` | `var(--leading-snug)` | `—` | 3 | pol-shell.css:139 · pol-thread.css:1771 · account2.css:9 |
-| `17px (--text-lg)` | `—` | `700` | 3 | pol-shell.css:1370 · pol-public.css:965,1014 |
-| `11px` | `—` | `700` | 2 | app.css:196,415 |
-| `17px` | `—` | `—` | 2 | app.css:925,1403 |
-| `16px` | `1` | `—` | 2 | app.css:1115 · calls-c8.css:52 |
-| `13px` | `—` | `700` | 2 | app.css:1551,1827 |
-| `11px (--text-xs)` | `var(--leading-snug)` | `650` | 2 | pol-stats.css:71 · pol-public.css:376 |
+| `24px (--text-2xl)` | `var(--leading-tight)` | `700` | 3 | pol-stats.css:642 · pol-thread.css:518,622 |
+| `9px` | `—` | `—` | 3 | pol-studio.css:1311,1406,1475 |
+| `11px (--text-xs)` | `var(--leading-snug)` | `—` | 3 | pol-shell.css:126 · pol-thread.css:1884 · account2.css:9 |
+| `11px` | `18px` | `—` | 3 | pol-shell.css:807 · rx-shell.css:364,374 |
+| `11px (--text-xs)` | `1.3` | `—` | 3 | pol-shell.css:1219 · rx-shell.css:203,408 |
+| `17px (--text-lg)` | `—` | `700` | 3 | pol-shell.css:1338 · pol-public.css:966,1015 |
+| `15px (--text-md)` | `var(--leading-snug)` | `650` | 3 | pol-thread.css:794 · gap-import.css:287 · gap-watch.css:135 |
+| `15px (--text-md)` | `var(--leading-snug)` | `—` | 3 | pol-thread.css:2252 · calls-c8.css:79 · gap-oper.css:130 |
+| `var(--oc-fs)` | `—` | `600` | 3 | gap-oper.css:85,212,281 |
+| `var(--oc-fs)` | `var(--leading-snug)` | `—` | 3 | gap-oper.css:108,247,329 |
+| `13px (--text-sm)` | `1.2` | `600` | 3 | gap-import.css:33,334 · gap-claim.css:114 |
+| `16px` | `1` | `—` | 2 | app.css:831 · calls-c8.css:52 |
+| `13px` | `—` | `700` | 2 | app.css:1169,1360 |
+| `18px` | `—` | `700` | 2 | app.css:1465 · pol-public.css:110 |
+| `13px (--text-sm)` | `—` | `750` | 2 | app.css:1588 · pol-public.css:579 |
+| `15px (--text-md)` | `var(--leading-snug)` | `700` | 2 | pol-stats.css:183 · rx-shell.css:170 |
 | `13px (--text-sm)` | `var(--leading-tight)` | `650` | 2 | pol-stats.css:505,679 |
-| `13px (--text-sm)` | `var(--leading-tight)` | `600` | 2 | pol-studio.css:562,991 |
-| `11px (--text-xs)` | `var(--leading-tight)` | `—` | 2 | pol-studio.css:571,997 |
-| `9px` | `—` | `650` | 2 | pol-studio.css:1296,1376 |
-| `10px` | `16px` | `700` | 2 | pol-shell.css:707,1238 |
-| `20px` | `1` | `—` | 2 | pol-thread.css:327 · calls-c8.css:32 |
-| `13px (--text-sm)` | `—` | `400` | 2 | pol-thread.css:1209,1240 |
-| `20px (--text-xl)` | `var(--leading-snug)` | `600` | 2 | pol-public.css:824,988 |
-| `12px (--text-2xs)` | `1.6` | `—` | 2 | pol-public.css:1025,1535 |
-| `11.52px` | `—` | `—` | 1 | app.css:134 |
-| `13.76px` | `—` | `—` | 1 | app.css:135 |
-| `11.52px` | `—` | `600` | 1 | app.css:205 |
-| `28px` | `—` | `750` | 1 | app.css:851 |
-| `44px` | `1.05` | `750` | 1 | app.css:914 |
-| `20px` | `—` | `700` | 1 | app.css:961 |
-| `17px` | `—` | `700` | 1 | app.css:1020 |
-| `13px` | `—` | `600` | 1 | app.css:1548 |
-| `13px` | `1` | `—` | 1 | app.css:1593 |
-| `14px` | `—` | `700` | 1 | app.css:1701 |
-| `15px` | `—` | `700` | 1 | app.css:1755 |
-| `9.92px` | `1` | `800` | 1 | app.css:1863 |
-| `28px` | `1.15` | `750` | 1 | app.css:1924 |
-| `32px` | `—` | `—` | 1 | app.css:2043 |
-| `0.92em` | `—` | `—` | 1 | app.css:2068 |
-| `0.85em` | `—` | `—` | 1 | app.css:2081 |
-| `1.1em` | `—` | `—` | 1 | app.css:2085 |
-| `24px (--text-2xl)` | `—` | `600` | 1 | app.css:2298 |
-| `20px (--text-xl)` | `1` | `—` | 1 | app.css:2465 |
-| `11px (--text-xs)` | `1.2` | `—` | 1 | app.css:2747 |
-| `11px` | `—` | `650` | 1 | app.css:3304 |
-| `17px` | `—` | `750` | 1 | app.css:3341 |
-| `11px (--text-xs)` | `18px` | `700` | 1 | app.css:3590 |
+| `15px (--text-md)` | `—` | `400` | 2 | pol-stats.css:936 · rx-shell.css:202 |
+| `13px (--text-sm)` | `var(--leading-tight)` | `600` | 2 | pol-studio.css:556,985 |
+| `11px (--text-xs)` | `var(--leading-tight)` | `—` | 2 | pol-studio.css:565,991 |
+| `9px` | `—` | `650` | 2 | pol-studio.css:1290,1370 |
+| `15px (--text-md)` | `1.25` | `—` | 2 | pol-shell.css:1218 · rx-shell.css:407 |
+| `20px` | `1` | `—` | 2 | pol-thread.css:333 · calls-c8.css:32 |
+| `13px (--text-sm)` | `1` | `600` | 2 | pol-thread.css:914,2526 |
+| `13px (--text-sm)` | `—` | `400` | 2 | pol-thread.css:1311,1342 |
+| `inherit` | `—` | `—` | 2 | pol-thread.css:2304 · pol-public.css:1539 |
+| `12px (--text-2xs)` | `1.4` | `—` | 2 | pol-thread.css:2317 · gap-usermodes.css:179 |
+| `20px (--text-xl)` | `var(--leading-snug)` | `600` | 2 | pol-public.css:825,989 |
+| `12px (--text-2xs)` | `1.6` | `—` | 2 | pol-public.css:1026,1535 |
+| `20px` | `—` | `—` | 2 | pol-public.css:1421 · gap-auth.css:95 |
+| `var(--oc-fs)` | `—` | `650` | 2 | gap-oper.css:165,176 |
+| `var(--oc-fs-meta)` | `1.6` | `—` | 2 | gap-oper.css:325,354 |
+| `14px` | `—` | `650` | 2 | gap-oper.css:422,426 |
+| `13px (--text-sm)` | `1.2` | `—` | 2 | gap-import.css:80 · gap-usermodes.css:54 |
+| `11.52px` | `—` | `—` | 1 | app.css:181 |
+| `13.76px` | `—` | `—` | 1 | app.css:182 |
+| `11.52px` | `—` | `600` | 1 | app.css:246 |
+| `28px` | `—` | `750` | 1 | app.css:734 |
+| `13px` | `—` | `600` | 1 | app.css:1166 |
+| `13px` | `1` | `—` | 1 | app.css:1204 |
+| `9.92px` | `1` | `800` | 1 | app.css:1396 |
+| `28px` | `1.15` | `750` | 1 | app.css:1468 |
+| `20px` | `1` | `750` | 1 | app.css:1499 |
+| `17px (--text-lg)` | `var(--leading-tight)` | `700` | 1 | app.css:1547 |
+| `clamp(2.25rem, 1.1rem + 2.2vw, 3.25rem)` | `1.05` | `—` | 1 | app.css:1839 |
+| `26px` | `—` | `—` | 1 | app.css:1899 |
+| `0.92em` | `—` | `—` | 1 | app.css:1930 |
+| `0.85em` | `—` | `—` | 1 | app.css:1942 |
+| `1.1em` | `—` | `—` | 1 | app.css:1946 |
+| `20px (--text-xl)` | `1` | `—` | 1 | app.css:2267 |
+| `11px (--text-xs)` | `1.2` | `—` | 1 | app.css:2497 |
+| `11px` | `—` | `650` | 1 | app.css:3003 |
+| `17px` | `—` | `750` | 1 | app.css:3032 |
+| `100%` | `—` | `—` | 1 | gap-appearance.css:150 |
+| `93.75%` | `—` | `—` | 1 | gap-appearance.css:151 |
+| `112.5%` | `—` | `—` | 1 | gap-appearance.css:152 |
+| `10px` | `—` | `—` | 1 | gap-appearance.css:186 |
 | `clamp(1.5rem, 1.15rem + 1.4vw, 2.25rem)` | `var(--leading-tight)` | `650` | 1 | pol-stats.css:80 |
 | `15px (--text-md)` | `var(--leading-tight)` | `650` | 1 | pol-stats.css:106 |
-| `15px (--text-md)` | `var(--leading-snug)` | `700` | 1 | pol-stats.css:183 |
 | `11px (--text-xs)` | `var(--leading-snug)` | `700` | 1 | pol-stats.css:539 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem)` | `1` | `700` | 1 | pol-stats.css:546 |
 | `13px (--text-sm)` | `—` | `700` | 1 | pol-stats.css:600 |
 | `20px (--text-xl)` | `1` | `700` | 1 | pol-stats.css:794 |
 | `17px (--text-lg)` | `1.1` | `700` | 1 | pol-stats.css:909 |
-| `15px (--text-md)` | `—` | `400` | 1 | pol-stats.css:936 |
-| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | `var(--leading-tight)` | `650` | 1 | pol-studio.css:86 |
-| `13px (--text-sm)` | `var(--leading-snug)` | `400` | 1 | pol-studio.css:290 |
-| `0` | `—` | `—` | 1 | pol-studio.css:307 |
-| `12px (--text-2xs)` | `var(--leading-body)` | `—` | 1 | pol-studio.css:886 |
-| `13px (--text-sm)` | `—` | `500` | 1 | pol-studio.css:1078 |
-| `11px` | `1.4` | `—` | 1 | pol-studio.css:1263 |
-| `9px` | `—` | `700` | 1 | pol-studio.css:1341 |
-| `10px` | `—` | `650` | 1 | pol-studio.css:1439 |
-| `13px (--text-sm)` | `1` | `650` | 1 | pol-studio.css:1566 |
-| `10px` | `16px` | `—` | 1 | pol-shell.css:647 |
-| `11px` | `18px` | `—` | 1 | pol-shell.css:840 |
-| `17px (--text-lg)` | `var(--leading-snug)` | `700` | 1 | pol-shell.css:920 |
-| `10px` | `—` | `700` | 1 | pol-shell.css:1029 |
-| `28px` | `var(--leading-tight)` | `700` | 1 | pol-shell.css:1052 |
-| `15px (--text-md)` | `1.25` | `—` | 1 | pol-shell.css:1250 |
-| `11px (--text-xs)` | `1.3` | `—` | 1 | pol-shell.css:1251 |
-| `11px (--text-xs)` | `20px` | `—` | 1 | pol-shell.css:1388 |
-| `10.5px` | `—` | `—` | 1 | pol-thread.css:146 |
-| `13px (--text-sm)` | `1` | `—` | 1 | pol-thread.css:403 |
-| `24px (--text-2xl)` | `—` | `700` | 1 | pol-thread.css:508 |
-| `17.6px` | `—` | `—` | 1 | pol-thread.css:616 |
-| `15px (--text-md)` | `var(--leading-snug)` | `650` | 1 | pol-thread.css:781 |
-| `12px (--text-2xs)` | `var(--leading-snug)` | `600` | 1 | pol-thread.css:800 |
-| `13px (--text-sm)` | `1` | `600` | 1 | pol-thread.css:856 |
-| `20px (--text-xl)` | `—` | `400` | 1 | pol-thread.css:861 |
-| `17px (--text-lg)` | `var(--leading-tight)` | `650` | 1 | pol-thread.css:889 |
-| `15px (--text-md)` | `20px` | `—` | 1 | pol-thread.css:1042 |
-| `16px` | `20px` | `—` | 1 | pol-thread.css:1289 |
-| `15px (--text-md)` | `1` | `—` | 1 | pol-thread.css:1384 |
-| `12.48px` | `—` | `—` | 1 | pol-roster.css:402 |
+| `clamp(1.5rem, 1.1rem + 1.6vw, 2.125rem)` | `var(--leading-tight)` | `650` | 1 | pol-studio.css:85 |
+| `13px (--text-sm)` | `var(--leading-snug)` | `400` | 1 | pol-studio.css:285 |
+| `0` | `—` | `—` | 1 | pol-studio.css:302 |
+| `12px (--text-2xs)` | `var(--leading-body)` | `—` | 1 | pol-studio.css:880 |
+| `13px (--text-sm)` | `—` | `500` | 1 | pol-studio.css:1072 |
+| `11px` | `1.4` | `—` | 1 | pol-studio.css:1257 |
+| `9px` | `—` | `700` | 1 | pol-studio.css:1335 |
+| `10px` | `—` | `650` | 1 | pol-studio.css:1433 |
+| `13px (--text-sm)` | `1` | `650` | 1 | pol-studio.css:1560 |
+| `10px` | `16px` | `—` | 1 | pol-shell.css:614 |
+| `10px` | `16px` | `700` | 1 | pol-shell.css:674 |
+| `17px (--text-lg)` | `var(--leading-snug)` | `700` | 1 | pol-shell.css:887 |
+| `10px` | `—` | `700` | 1 | pol-shell.css:996 |
+| `28px` | `var(--leading-tight)` | `700` | 1 | pol-shell.css:1019 |
+| `11px` | `20px` | `700` | 1 | pol-shell.css:1206 |
+| `11px (--text-xs)` | `20px` | `—` | 1 | pol-shell.css:1356 |
+| `10.5px` | `—` | `—` | 1 | pol-thread.css:150 |
+| `13px (--text-sm)` | `1` | `—` | 1 | pol-thread.css:409 |
+| `24px (--text-2xl)` | `—` | `700` | 1 | pol-thread.css:513 |
+| `17.6px` | `—` | `—` | 1 | pol-thread.css:620 |
+| `12px (--text-2xs)` | `var(--leading-snug)` | `600` | 1 | pol-thread.css:813 |
+| `17px (--text-lg)` | `var(--leading-tight)` | `650` | 1 | pol-thread.css:993 |
+| `15px (--text-md)` | `20px` | `—` | 1 | pol-thread.css:1144 |
+| `16px` | `20px` | `—` | 1 | pol-thread.css:1391 |
+| `15px (--text-md)` | `1` | `—` | 1 | pol-thread.css:1490 |
+| `9.6px` | `—` | `—` | 1 | pol-thread.css:1964 |
+| `13px (--text-sm)` | `var(--leading-snug)` | `600` | 1 | pol-thread.css:2192 |
+| `11px (--text-xs)` | `1.6` | `—` | 1 | pol-thread.css:2261 |
+| `12px (--text-2xs)` | `16px` | `—` | 1 | pol-thread.css:2542 |
 | `0.9em` | `—` | `—` | 1 | pol-public.css:39 |
 | `17px (--text-lg)` | `—` | `600` | 1 | pol-public.css:312 |
 | `clamp(2rem, 1.4rem + 2.6vw, 2.75rem)` | `1.08` | `750` | 1 | pol-public.css:385 |
-| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | `1.02` | `750` | 1 | pol-public.css:514 |
-| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | `1.5` | `—` | 1 | pol-public.css:523 |
-| `13px (--text-sm)` | `—` | `750` | 1 | pol-public.css:578 |
-| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | `—` | `700` | 1 | pol-public.css:621 |
-| `clamp(2.375rem, 9.6vw, 2.75rem)` | `—` | `—` | 1 | pol-public.css:778 |
-| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | `—` | `700` | 1 | pol-public.css:909 |
-| `16px` | `1.65` | `—` | 1 | pol-public.css:912 |
-| `20px` | `1` | `400` | 1 | pol-public.css:955 |
-| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | `—` | `700` | 1 | pol-public.css:992 |
-| `24px` | `—` | `700` | 1 | pol-public.css:1356 |
-| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | `—` | `—` | 1 | pol-public.css:1360 |
-| `20px` | `—` | `—` | 1 | pol-public.css:1421 |
+| `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | `1.02` | `750` | 1 | pol-public.css:515 |
+| `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | `1.5` | `—` | 1 | pol-public.css:524 |
+| `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | `—` | `700` | 1 | pol-public.css:622 |
+| `clamp(2.375rem, 9.6vw, 2.75rem)` | `—` | `—` | 1 | pol-public.css:779 |
+| `clamp(1.5rem, 1.2rem + 1vw, 1.875rem)` | `—` | `700` | 1 | pol-public.css:910 |
+| `16px` | `1.65` | `—` | 1 | pol-public.css:913 |
+| `20px` | `1` | `400` | 1 | pol-public.css:956 |
+| `clamp(1.375rem, 1.2rem + 0.6vw, 1.625rem)` | `—` | `700` | 1 | pol-public.css:993 |
+| `24px` | `—` | `700` | 1 | pol-public.css:1357 |
+| `clamp(1.875rem, 1.4rem + 1.8vw, 2.5rem)` | `—` | `—` | 1 | pol-public.css:1361 |
 | `clamp(2.25rem, 1.4rem + 3.6vw, 3.5rem)` | `1.05` | `750` | 1 | pol-public.css:1442 |
 | `clamp(1.5rem, 1.2rem + 1.2vw, 2rem)` | `—` | `700` | 1 | pol-public.css:1461 |
-| `inherit` | `—` | `—` | 1 | pol-public.css:1539 |
 | `clamp(1.75rem, 1.3rem + 2vw, 2.5rem)` | `—` | `750` | 1 | pol-public.css:1557 |
 | `17px (--text-lg)` | `1.6` | `—` | 1 | pol-public.css:1589 |
 | `12px (--text-2xs)` | `1.9` | `—` | 1 | pol-public.css:1608 |
-| `15px (--text-md)` | `var(--leading-snug)` | `—` | 1 | calls-c8.css:79 |
+| `clamp(100%, calc(62.5% + 0.35vw), 125%)` | `—` | `—` | 1 | pol-public.css:1691 |
+| `38px` | `—` | `—` | 1 | pol-public.css:1795 |
+| `clamp(2.5rem, 1rem + 3.6vw, 3rem)` | `—` | `—` | 1 | pol-public.css:1826 |
 | `17px (--text-lg)` | `—` | `750` | 1 | calls-c11.css:138 |
 | `20px (--text-xl)` | `—` | `750` | 1 | calls-c6.css:36 |
 | `inherit` | `inherit` | `inherit` | 1 | calls-c4.css:27 |
-| `0` | `0` | `—` | 1 | ui-sheets.css:230 |
+| `12px (--text-2xs)` | `1.3` | `—` | 1 | gap-convo.css:15 |
+| `13px (--text-sm)` | `1.25` | `—` | 1 | gap-convo.css:125 |
+| `12px (--text-2xs)` | `1.35` | `—` | 1 | gap-convo.css:146 |
+| `var(--text-xs, 12px)` | `—` | `—` | 1 | gap-account.css:11 |
+| `var(--text-sm, 13px)` | `—` | `600` | 1 | gap-account.css:57 |
+| `var(--text-2xs, 11px)` | `—` | `600` | 1 | gap-account.css:98 |
+| `var(--text-xs, 12px)` | `1.5` | `—` | 1 | gap-account.css:129 |
+| `var(--oc-fs-meta)` | `var(--leading-snug)` | `—` | 1 | gap-oper.css:109 |
+| `var(--oc-fs-meta)` | `1.6` | `650` | 1 | gap-oper.css:328 |
+| `var(--oc-fs)` | `var(--leading-snug)` | `650` | 1 | gap-oper.css:360 |
+| `var(--oc-fs)` | `var(--leading-body)` | `—` | 1 | gap-oper.css:374 |
+| `14px` | `var(--leading-snug)` | `—` | 1 | gap-oper.css:418 |
+| `16px` | `var(--leading-snug)` | `—` | 1 | gap-oper.css:423 |
+| `10.56px` | `—` | `—` | 1 | rx-shell.css:47 |
+| `106.25%` | `—` | `—` | 1 | rx-shell.css:649 |
+| `20px (--text-xl)` | `var(--leading-tight)` | `650` | 1 | gap-import.css:140 |
+| `11px (--text-xs)` | `var(--leading-snug, 1.35)` | `—` | 1 | gap-people.css:52 |
+| `11px` | `16px` | `700` | 1 | gap-organize.css:114 |
+| `17px` | `1.72` | `—` | 1 | gap-organize.css:672 |
+| `13px (--text-sm)` | `1.45` | `—` | 1 | gap-commands.css:95 |
+| `11px (--text-xs)` | `1.45` | `—` | 1 | gap-commands.css:138 |
+| `17px (--text-lg)` | `var(--leading-snug)` | `—` | 1 | gap-auth.css:58 |
+| `0` | `0` | `—` | 1 | ui-sheets.css:333 |
+| `15px (--text-md)` | `var(--leading-snug, 1.35)` | `—` | 1 | calls-engine.css:81 |
+| `13px (--text-sm)` | `var(--leading-snug, 1.35)` | `—` | 1 | calls-engine.css:82 |
+| `22px` | `—` | `—` | 1 | calls-engine.css:162 |
+| `17px` | `—` | `—` | 1 | calls-engine.css:293 |
+| `36px` | `—` | `—` | 1 | calls-engine.css:399 |
+| `19px` | `—` | `—` | 1 | calls-engine.css:455 |
+| `24px` | `1.2` | `—` | 1 | calls-engine.css:469 |
 
 font-family declarations:
 
 | value | where |
 |---|---|
-| `var(--font-mono)` | app.css:631,1862,2068,2635,2746,3010,3068,3359 · pol-studio.css:1123,1156,1198,1411,1581 · pol-shell.css:151,270 · pol-thread.css:717,1266,1749 · pol-public.css:38,844,1024,1099,1196,1468,1504,1525,1534,1548,1608,1621 · calls-c8.css:115 · polish.css:130,179 · account2.css:34 |
-| `var(--font-mono, monospace)` | app.css:2895,2920 |
-| `inherit` | pol-thread.css:1268 |
-| `ui-monospace, SFMono-Regular, Menlo, monospace` | roomsettings.css:168 |
+| `var(--font-mono)` | app.css:556,1395,1930,2409,2496,2725,2783,3050 · pol-studio.css:1117,1150,1192,1405,1575 · pol-shell.css:138,253 · pol-thread.css:721,1368,1862,2246,2304,2316 · pol-public.css:38,845,1025,1100,1197,1468,1504,1525,1534,1548,1608,1621 · calls-c8.css:115 · polish.css:130,179 · account2.css:34 · gap-oper.css:114 · gap-import.css:350,414,423 · gap-commands.css:87 · gap-watch.css:164,408,503 · gap-shell.css:143,171 · gap-auth.css:19 |
+| `var(--font-mono, monospace)` | app.css:2645 |
+| `var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, san` | gap-appearance.css:115 |
+| `var(--font-display, var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helveti` | gap-appearance.css:119 |
+| `var(--font-serif, inherit)` | gap-appearance.css:124 |
+| `inherit` | pol-thread.css:1370 · gap-account.css:97 |
+| `ui-monospace, SFMono-Regular, Menlo, monospace` | roomsettings.css:166 |
+| `var(--font-mono, ui-monospace, monospace)` | gap-account.css:90 |
+| `var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)` | gap-people.css:163 |
+| `"Iowan Old Style", "Charter", "Georgia", "Cambria", serif` | gap-organize.css:671 |
 
 ## G9. Spacing in use (padding / margin / gap / inset components)
 
@@ -2423,1116 +2952,1133 @@ Scale: `--space-0`=0px · `--space-1`=4px · `--space-2`=8px · `--space-3`=12px
 
 | component value | on the 4px scale? | count | where |
 |---|---|---|---|
-| `0` | raw, on scale | 1233 | (1233 sites — style-map.json spacing.distribution) |
-| `8px (--space-2)` | token | 551 | (551 sites — style-map.json spacing.distribution) |
-| `12px (--space-3)` | token | 386 | (386 sites — style-map.json spacing.distribution) |
-| `16px (--space-4)` | token | 236 | (236 sites — style-map.json spacing.distribution) |
-| `4px (--space-1)` | token | 229 | (229 sites — style-map.json spacing.distribution) |
-| `2px` | **off scale** | 173 | (173 sites — style-map.json spacing.distribution) |
-| `8px` | raw, on scale | 136 | (136 sites — style-map.json spacing.distribution) |
-| `6px` | **off scale** | 128 | (128 sites — style-map.json spacing.distribution) |
-| `10px` | **off scale** | 99 | (99 sites — style-map.json spacing.distribution) |
-| `20px (--space-5)` | token | 82 | (82 sites — style-map.json spacing.distribution) |
-| `4px` | raw, on scale | 76 | (76 sites — style-map.json spacing.distribution) |
-| `12px` | raw, on scale | 66 | (66 sites — style-map.json spacing.distribution) |
-| `24px (--space-6)` | token | 56 | (56 sites — style-map.json spacing.distribution) |
-| `auto` | raw, on scale | 43 | app.css:711,908,1131,1226,1233,2044,2295,2576,3344,3361,3406 · pol-stats.css:39 · pol-studio.css:80,1332,1339,1508 · pol-shell.css:151,333,448,598,874 · pol-thread.css:951,1468 · pol-roster.css:21,74,171,311,343,362 · pol-public.css:86,112,193,209,1342 · calls-c8.css:62,72 · polish.css:339 · calls-c6.css:180 · calls-c4.css:57,72 · ui-sheets.css:555,728 · calls-engine.css:97 |
-| `16px` | raw, on scale | 32 | app.css:154,665,746,871,902,926,955,963,968,975,999,1157,1198,1215,1356,1396,1416,1536,1550,1610,1632,1684,1738,1785,1806,3087,3285,3340,3340,3347,3348,3396 |
-| `32px (--space-7)` | token | 24 | (24 sites — style-map.json spacing.distribution) |
-| `14px` | **off scale** | 23 | app.css:373,383,398,514,801,1275,1334,1943,2284,2529,2534,2840,3225,3225,3225,3239,3248,3252,3365 · pol-shell.css:1042 · pol-public.css:264,1398 · ui-sheets.css:907 |
-| `40px (--space-8)` | token | 22 | (22 sites — style-map.json spacing.distribution) |
-| `1px` | **off scale** | 19 | app.css:564,2338,2641,2990 · pol-studio.css:354,558,656,711,968,1531,1589 · pol-shell.css:791,820,874,972 · pol-roster.css:181 · pol-public.css:40,800 · polish.css:56 |
+| `0` | raw, on scale | 1637 | (1637 sites — style-map.json spacing.distribution) |
+| `8px (--space-2)` | token | 848 | (848 sites — style-map.json spacing.distribution) |
+| `12px (--space-3)` | token | 608 | (608 sites — style-map.json spacing.distribution) |
+| `4px (--space-1)` | token | 371 | (371 sites — style-map.json spacing.distribution) |
+| `16px (--space-4)` | token | 302 | (302 sites — style-map.json spacing.distribution) |
+| `2px` | **off scale** | 227 | (227 sites — style-map.json spacing.distribution) |
+| `20px (--space-5)` | token | 109 | (109 sites — style-map.json spacing.distribution) |
+| `8px` | raw, on scale | 108 | (108 sites — style-map.json spacing.distribution) |
+| `6px` | **off scale** | 105 | (105 sites — style-map.json spacing.distribution) |
+| `24px (--space-6)` | token | 68 | (68 sites — style-map.json spacing.distribution) |
+| `auto` | raw, on scale | 66 | (66 sites — style-map.json spacing.distribution) |
+| `4px` | raw, on scale | 65 | (65 sites — style-map.json spacing.distribution) |
+| `10px` | **off scale** | 62 | (62 sites — style-map.json spacing.distribution) |
+| `12px` | raw, on scale | 40 | app.css:590,715,737,743,754,862,879,889,908,923,936,961,1030,1033,1034,1050,1067,1072,1091,1140,1150,1168,1189,1302,1320,1341,1368,1934,2962,3031,3031,3039,3044,3049 · pol-shell.css:219 · pol-thread.css:2466 · pol-public.css:857 · gap-account.css:21 · ui-sheets.css:255,762 |
+| `1px` | **off scale** | 32 | app.css:1531,2147,2415 · pol-studio.css:349,552,650,705,962,1525,1583 · pol-shell.css:758,787,841,939,1189 · pol-thread.css:2235,2235,2465 · pol-roster.css:177 · pol-public.css:40,801 · polish.css:56 · gap-oper.css:316 · gap-import.css:137,264,299,359 · gap-usermodes.css:176,205,240,316 · gap-commands.css:62 |
+| `32px (--space-7)` | token | 32 | (32 sites — style-map.json spacing.distribution) |
+| `40px (--space-8)` | token | 24 | (24 sites — style-map.json spacing.distribution) |
 | `var(--sheet-pad)` | token | 17 | (17 sites — style-map.json spacing.distribution) |
-| `3px` | **off scale** | 13 | app.css:506,590,670,730,1972,2062 · pol-studio.css:218,219,1308,1488 · pol-shell.css:1415 · pol-thread.css:1013 · pol-public.css:657 |
-| `20px` | raw, on scale | 12 | app.css:343,870,878,933,989,1012,1013,3285,3368,3377,3396,3396 |
-| `5px` | **off scale** | 12 | app.css:493,564,2641 · pol-studio.css:1405,1461 · pol-shell.css:838 · pol-public.css:40,156,852 · ui-sheets.css:163,477,597 |
-| `56px` | **off scale** | 11 | pol-public.css:336,358,681,769,819,821,903,904,1441,1453,1580 |
-| `64px` | **off scale** | 8 | app.css:910,958,978,1046 · pol-public.css:206,503,1335,1441 |
-| `48px` | **off scale** | 7 | app.css:817,1011 · pol-public.css:210,589,769,776,792 |
-| `24px` | raw, on scale | 7 | app.css:817,893,910,1011,1058,3258,3258 |
-| `calc(-1 * var(--space-2))` | **off scale** | 6 | app.css:1958,1971 · pol-thread.css:1611 · pol-public.css:1212 · calls-c8.css:93 · ui-sheets.css:511 |
-| `calc(-1 * var(--sheet-pad))` | **off scale** | 6 | ui-sheets.css:157,585,720,760,760,899 |
-| `28px` | **off scale** | 5 | app.css:934,3258,3258 · pol-shell.css:754 · ui-sheets.css:845 |
-| `40px` | raw, on scale | 5 | app.css:1907 · pol-public.css:337,776,776 · ui-sheets.css:622 |
-| `-18px` | **off scale** | 5 | pol-studio.css:1703 · ui-sheets.css:336,865,981,1094 |
-| `calc(var(--pub-header-h, 64px) + var(--space-4))` | **off scale** | 5 | pol-public.css:906,995,1050,1051,1262 |
-| `-1px` | **off scale** | 4 | app.css:166,1979 · pol-thread.css:999 · pol-roster.css:261 |
-| `7px` | **off scale** | 4 | app.css:444,1334 · pol-shell.css:1388 · pol-thread.css:733 |
-| `96px` | **off scale** | 4 | app.css:910,1944 · pol-public.css:504,1405 |
-| `36px` | **off scale** | 4 | app.css:1907,3258 · pol-studio.css:1010 · pol-shell.css:1318 |
-| `-4px` | **off scale** | 4 | app.css:1914,2042,3284 · pol-public.css:94 |
-| `-6px` | **off scale** | 4 | app.css:3197,3267 · pol-public.css:159 · ui-sheets.css:228 |
-| `18px` | **off scale** | 3 | app.css:783,1794,2898 |
+| `14px` | **off scale** | 16 | app.css:384,402,1004,1664,2103,2326,2331,2942,3056 · pol-public.css:264,1398 · gap-watch.css:377,443,519 · ui-sheets.css:686,1006 |
+| `3px` | **off scale** | 15 | app.css:1751,1924 · gap-appearance.css:173 · pol-studio.css:213,214,1302,1482 · pol-shell.css:1383 · pol-thread.css:1115,2155,2532 · pol-public.css:658 · gap-import.css:413 · calls-engine.css:228,294 |
+| `16px` | raw, on scale | 14 | app.css:590,754,785,858,907,1168,1318,1339,2797,2987,3031,3031,3038,3039 |
+| `5px` | **off scale** | 12 | app.css:2415 · pol-studio.css:1399,1455 · pol-shell.css:805 · pol-thread.css:2542 · pol-public.css:40,156,853 · rx-shell.css:363,374 · gap-organize.css:112 · ui-sheets.css:573 |
+| `56px` | **off scale** | 12 | pol-public.css:336,358,682,770,820,822,904,905,1441,1453,1580,1772 |
+| `-8px` | **off scale** | 11 | app.css:1458 · pol-thread.css:2223,2458,2460,2461,2472 · gap-oper.css:157 · gap-shell.css:353,353,353 · ui-sheets.css:727 |
+| `-4px` | **off scale** | 11 | app.css:1458,1858,1897 · pol-thread.css:2459,2498,2589 · pol-public.css:94 · gap-shell.css:288,288,288 · calls-engine.css:153 |
+| `calc(-1 * var(--space-2))` | **off scale** | 10 | app.css:1484,1679,1750 · pol-thread.css:1720,2140,2140 · pol-public.css:1213 · calls-c8.css:93 · gap-import.css:458 · ui-sheets.css:607 |
+| `-2px` | **off scale** | 9 | pol-thread.css:2156,2314,2457,2458,2470,2498,2589 · calls-engine.css:164,573 |
+| `-6px` | **off scale** | 8 | app.css:1897,2901,2969 · pol-thread.css:2457,2598 · pol-public.css:159 · gap-organize.css:477 · ui-sheets.css:331 |
+| `48px` | **off scale** | 7 | app.css:700 · pol-public.css:210,590,770,777,793,1783 |
+| `40px` | raw, on scale | 7 | app.css:1449 · pol-public.css:337,777,777,1804,1823 · ui-sheets.css:710 |
+| `36px` | **off scale** | 6 | app.css:1449,1849 · pol-studio.css:1004 · pol-shell.css:1286 · gap-oper.css:144 · calls-engine.css:94 |
+| `64px` | **off scale** | 6 | pol-public.css:206,504,1336,1441,1761,1823 |
+| `72px` | **off scale** | 5 | app.css:1829 · pol-public.css:199,621,649,1823 |
+| `calc(var(--pub-header-h, 64px) + var(--space-4))` | **off scale** | 5 | pol-public.css:907,996,1051,1052,1263 |
+| `calc(-1 * var(--sheet-pad))` | **off scale** | 5 | ui-sheets.css:254,687,838,838,998 |
+| `-1px` | **off scale** | 4 | app.css:211,1758 · pol-thread.css:1101 · pol-roster.css:257 |
+| `20px` | raw, on scale | 4 | app.css:753,761,2987,3059 |
+| `7px` | **off scale** | 4 | app.css:1004 · pol-shell.css:1356 · pol-thread.css:737 · gap-shell.css:167 |
+| `32px` | raw, on scale | 4 | app.css:1449,1849,3081 · pol-public.css:1784 |
+| `calc(-1 * var(--space-1))` | **off scale** | 4 | app.css:1756 · pol-thread.css:2140 · gap-watch.css:281,539 |
+| `28px` | **off scale** | 4 | app.css:1849 · pol-shell.css:721 · gap-oper.css:61 · ui-sheets.css:934 |
+| `-18px` | **off scale** | 4 | pol-studio.css:1697 · ui-sheets.css:436,1073,1187 |
+| `max(var(--space-4), env(safe-area-inset-right, 0px))` | **off scale** | 4 | ui-sheets.css:1216,1264,1291,1304 |
+| `18px` | **off scale** | 3 | app.css:1327,2623 · gap-oper.css:115 |
+| `max(var(--space-5), env(safe-area-inset-right))` | **off scale** | 3 | app.css:1438,1857 · pol-studio.css:1823 |
+| `max(var(--space-5), env(safe-area-inset-left))` | **off scale** | 3 | app.css:1438,1857 · pol-studio.css:1823 |
+| `96px` | **off scale** | 3 | app.css:1665 · pol-public.css:505,1405 |
 | `clamp(var(--space-7), 5vw, 4.5rem)` | **off scale** | 3 | pol-stats.css:49,232,402 |
 | `clamp(var(--space-7), 6vw, 5rem)` | **off scale** | 3 | pol-stats.css:138,271,404 |
+| `-12px` | **off scale** | 3 | pol-studio.css:433 · pol-thread.css:2461 · ui-sheets.css:1438 |
+| `env(safe-area-inset-bottom, 0px)` | **off scale** | 3 | pol-shell.css:339 · gap-commands.css:51 · ui-sheets.css:1630 |
 | `var(--pt-gutter)` | token | 3 | (3 sites — style-map.json spacing.distribution) |
-| `72px` | **off scale** | 3 | pol-public.css:199,620,648 |
-| `calc(var(--space-6) + env(safe-area-inset-bottom, 0px))` | **off scale** | 3 | calls-c6.css:233 · ui-sheets.css:842,889 |
-| `var(--sheet-head-pad)` | token | 3 | (3 sites — style-map.json spacing.distribution) |
-| `calc(var(--sheet-grip-zone) + 2px)` | **off scale** | 3 | ui-sheets.css:343,855,912 |
-| `calc(var(--space-2) + env(safe-area-inset-bottom, 0px))` | **off scale** | 3 | ui-sheets.css:968 · calls-engine.css:92,117 |
-| `22px` | **off scale** | 2 | app.css:894,942 |
-| `32px` | raw, on scale | 2 | app.css:1907,3394 |
-| `-8px` | **off scale** | 2 | app.css:1914 · ui-sheets.css:639 |
-| `var(--pad-panel)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
-| `calc(120px + var(--kb-inset, 0px))` | **off scale** | 2 | pol-stats.css:1056 · pol-studio.css:1782 |
+| `calc(var(--space-4) + var(--safe-bottom))` | **off scale** | 3 | pol-thread.css:857 · pol-roster.css:345,363 |
+| `-10px` | **off scale** | 3 | pol-thread.css:2223 · gap-organize.css:477 · ui-sheets.css:448 |
+| `calc(var(--space-2) + var(--pt-compact-ts))` | **off scale** | 3 | pol-thread.css:2235,2276,2277 |
+| `max(var(--pub-gutter), env(safe-area-inset-right))` | **off scale** | 3 | pol-public.css:87,194,1812 |
+| `max(var(--pub-gutter), env(safe-area-inset-left))` | **off scale** | 3 | pol-public.css:87,194,1811 |
+| `calc(var(--space-6) + env(safe-area-inset-bottom, 0px))` | **off scale** | 3 | calls-c6.css:220 · ui-sheets.css:931,972 |
+| `var(--oc-gap)` | token | 3 | (3 sites — style-map.json spacing.distribution) |
+| `env(safe-area-inset-right, 0px)` | **off scale** | 3 | ui-sheets.css:400,1270 · calls-engine.css:414 |
+| `calc(var(--space-2) + env(safe-area-inset-bottom, 0px))` | **off scale** | 3 | ui-sheets.css:1060 · calls-engine.css:253,445 |
+| `max(var(--space-4), env(safe-area-inset-left, 0px))` | **off scale** | 3 | ui-sheets.css:1264,1291,1304 |
+| `24px` | raw, on scale | 2 | app.css:700,776 |
+| `calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px))` | **off scale** | 2 | app.css:1854,1882 |
+| `0.4em` | **off scale** | 2 | pol-stats.css:452 · gap-commands.css:26 |
+| `calc(120px + var(--kb-inset, 0px))` | **off scale** | 2 | pol-stats.css:1056 · pol-studio.css:1776 |
 | `env(safe-area-inset-top)` | **off scale** | 2 | pol-studio.css:48 · pol-public.css:74 |
-| `clamp(16px, 5vw, 48px)` | **off scale** | 2 | pol-studio.css:48,81 |
-| `44px` | **off scale** | 2 | pol-studio.css:1704 · pol-public.css:789 |
+| `clamp(16px, 5vw, 48px)` | **off scale** | 2 | pol-studio.css:48,80 |
+| `44px` | **off scale** | 2 | pol-studio.css:1698 · pol-public.css:790 |
 | `var(--safe-bottom, 0px)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
-| `calc(var(--space-3) + var(--safe-bottom))` | **off scale** | 2 | pol-thread.css:360,952 |
-| `calc(var(--space-4) + var(--safe-bottom))` | **off scale** | 2 | pol-roster.css:349,367 |
-| `max(var(--pub-gutter), env(safe-area-inset-right))` | **off scale** | 2 | pol-public.css:87,194 |
-| `max(var(--pub-gutter), env(safe-area-inset-left))` | **off scale** | 2 | pol-public.css:87,194 |
+| `calc(var(--space-3) + var(--safe-bottom))` | **off scale** | 2 | pol-thread.css:366,1054 |
+| `-3px` | **off scale** | 2 | pol-thread.css:2156 · calls-engine.css:50 |
+| `max(var(--space-1), var(--safe-bottom))` | **off scale** | 2 | pol-thread.css:2362 · rx-shell.css:510 |
+| `-9px` | **off scale** | 2 | pol-thread.css:2470 · ui-sheets.css:1451 |
 | `var(--pub-gutter)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
-| `1.15em` | **off scale** | 2 | pol-public.css:973,1243 |
-| `calc(var(--sheet-pad) + env(safe-area-inset-bottom, 0px))` | **off scale** | 2 | ui-sheets.css:310,1082 |
+| `1.15em` | **off scale** | 2 | pol-public.css:974,1244 |
+| `var(--pad-panel)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
+| `calc(var(--space-2) * -1)` | **off scale** | 2 | gap-account.css:114,118 |
+| `1.1em` | **off scale** | 2 | gap-account.css:128 · gap-shell.css:322 |
+| `max(var(--space-4), var(--safe-bottom))` | **off scale** | 2 | rx-shell.css:380,382 |
+| `max(var(--space-2), var(--safe-bottom))` | **off scale** | 2 | rx-shell.css:381,527 |
+| `max(var(--space-3), env(safe-area-inset-right, 0px))` | **off scale** | 2 | gap-watch.css:614 · ui-sheets.css:1273 |
+| `env(safe-area-inset-left, 0px)` | **off scale** | 2 | ui-sheets.css:400 · calls-engine.css:414 |
 | `var(--sheet-grip-zone)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
-| `env(safe-area-inset-top, 0px)` | **off scale** | 2 | ui-sheets.css:837 · calls-engine.css:107 |
+| `env(safe-area-inset-top, 0px)` | **off scale** | 2 | ui-sheets.css:927 · calls-engine.css:414 |
 | `var(--safe-top)` | token | 2 | (2 sites — style-map.json spacing.distribution) |
-| `-8.8px` | **off scale** | 1 | app.css:202 |
-| `1.92px` | **off scale** | 1 | app.css:1857 |
-| `7.2px` | **off scale** | 1 | app.css:1857 |
-| `max(var(--space-8), env(safe-area-inset-top))` | **off scale** | 1 | app.css:1896 |
-| `max(var(--space-6), env(safe-area-inset-bottom))` | **off scale** | 1 | app.css:1896 |
-| `168px` | **off scale** | 1 | app.css:1944 |
-| `calc(-1 * var(--space-1))` | **off scale** | 1 | app.css:1977 |
-| `max(var(--space-3), env(safe-area-inset-top))` | **off scale** | 1 | app.css:2038 |
-| `calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px))` | **off scale** | 1 | app.css:2038 |
-| `calc(168px + var(--kb-inset, 0px))` | **off scale** | 1 | app.css:2039 |
-| `12vh` | **off scale** | 1 | app.css:2651 |
-| `9px` | **off scale** | 1 | app.css:3324 |
-| `calc(10px + env(safe-area-inset-bottom, 0px))` | **off scale** | 1 | app.css:3398 |
-| `calc(var(--space-1) + env(safe-area-inset-bottom, 0px))` | **off scale** | 1 | app.css:3880 |
-| `calc(var(--mobile-nav-h) + var(--composer-h))` | **off scale** | 1 | app.css:3894 |
+| `22px` | **off scale** | 1 | app.css:777 |
+| `1.92px` | **off scale** | 1 | app.css:1390 |
+| `7.2px` | **off scale** | 1 | app.css:1390 |
+| `max(var(--space-8), env(safe-area-inset-top))` | **off scale** | 1 | app.css:1438 |
+| `max(var(--space-6), env(safe-area-inset-bottom))` | **off scale** | 1 | app.css:1438 |
+| `168px` | **off scale** | 1 | app.css:1665 |
+| `9px` | **off scale** | 1 | app.css:1727 |
+| `max(var(--space-3), env(safe-area-inset-top))` | **off scale** | 1 | app.css:1854 |
+| `calc(168px + var(--kb-inset, 0px))` | **off scale** | 1 | app.css:1855 |
+| `max(var(--space-4), env(safe-area-inset-top))` | **off scale** | 1 | app.css:1881 |
+| `calc(72px + var(--kb-inset, 0px))` | **off scale** | 1 | app.css:1904 |
+| `12vh` | **off scale** | 1 | app.css:2424 |
+| `calc(var(--mobile-nav-h) + var(--composer-h))` | **off scale** | 1 | app.css:3436 |
 | `clamp(16px, 4vw, 48px)` | **off scale** | 1 | pol-stats.css:40 |
 | `clamp(var(--space-4), 4vw, 4rem)` | **off scale** | 1 | pol-stats.css:328 |
-| `0.4em` | **off scale** | 1 | pol-stats.css:452 |
 | `clamp(var(--space-6), 4vw, 4rem)` | **off scale** | 1 | pol-stats.css:632 |
 | `clamp(2px, 0.6vw, 8px)` | **off scale** | 1 | pol-stats.css:708 |
 | `clamp(1px, 0.3vw, 4px)` | **off scale** | 1 | pol-stats.css:802 |
-| `clamp(28px, 6vw, 72px)` | **off scale** | 1 | pol-studio.css:81 |
-| `14vh` | **off scale** | 1 | pol-studio.css:81 |
-| `clamp(28px, 4vw, 44px)` | **off scale** | 1 | pol-studio.css:124 |
-| `clamp(32px, 5vw, 56px)` | **off scale** | 1 | pol-studio.css:408 |
-| `calc(var(--space-4) + 32px)` | **off scale** | 1 | pol-studio.css:421 |
-| `-12px` | **off scale** | 1 | pol-studio.css:439 |
-| `-14px` | **off scale** | 1 | pol-studio.css:1021 |
-| `18vh` | **off scale** | 1 | pol-studio.css:1677 |
-| `env(safe-area-inset-bottom, 0px)` | **off scale** | 1 | pol-shell.css:360 |
-| `calc(var(--sheet-pad, 16px) + 36px)` | **off scale** | 1 | pol-shell.css:1042 |
-| `calc(var(--space-3) + var(--safe-bottom, 0px))` | **off scale** | 1 | pol-shell.css:1289 |
-| `0.35em` | **off scale** | 1 | pol-thread.css:1768 |
-| `max(var(--space-3), var(--safe-top))` | **off scale** | 1 | pol-roster.css:349 |
+| `clamp(28px, 6vw, 72px)` | **off scale** | 1 | pol-studio.css:80 |
+| `14vh` | **off scale** | 1 | pol-studio.css:80 |
+| `clamp(28px, 4vw, 44px)` | **off scale** | 1 | pol-studio.css:119 |
+| `clamp(32px, 5vw, 56px)` | **off scale** | 1 | pol-studio.css:403 |
+| `calc(var(--space-4) + 32px)` | **off scale** | 1 | pol-studio.css:415 |
+| `-14px` | **off scale** | 1 | pol-studio.css:1015 |
+| `18vh` | **off scale** | 1 | pol-studio.css:1671 |
+| `clamp(40px, 4vw, 72px)` | **off scale** | 1 | pol-studio.css:1796 |
+| `max(var(--space-4), env(safe-area-inset-left))` | **off scale** | 1 | pol-studio.css:1822 |
+| `max(var(--space-4), env(safe-area-inset-right))` | **off scale** | 1 | pol-studio.css:1822 |
+| `calc(var(--sheet-pad, 16px) + 36px)` | **off scale** | 1 | pol-shell.css:1009 |
+| `calc(var(--space-3) + var(--safe-bottom, 0px))` | **off scale** | 1 | pol-shell.css:1257 |
+| `calc(var(--space-3) + var(--target-min) + var(--space-2) + var(--safe-top))` | **off scale** | 1 | pol-thread.css:857 |
+| `calc(var(--space-4) + var(--safe-right))` | **off scale** | 1 | pol-thread.css:857 |
+| `calc(var(--space-4) + var(--safe-left))` | **off scale** | 1 | pol-thread.css:857 |
+| `0.35em` | **off scale** | 1 | pol-thread.css:1881 |
+| `max(var(--space-4), calc((100% - var(--pt-measure)) / 2))` | **off scale** | 1 | pol-thread.css:2063 |
+| `100%` | **off scale** | 1 | pol-thread.css:2110 |
+| `calc(var(--space-3) * -1)` | **off scale** | 1 | pol-thread.css:2573 |
+| `max(var(--space-3), var(--safe-top))` | **off scale** | 1 | pol-roster.css:345 |
 | `max(var(--pub-gutter), calc((100% - var(--pub-measure)) / 2 + var(--pub-gutter)))` | **off scale** | 1 | pol-public.css:174 |
 | `calc(48px + env(safe-area-inset-bottom))` | **off scale** | 1 | pol-public.css:210 |
 | `calc(var(--space-8) + env(safe-area-inset-bottom))` | **off scale** | 1 | pol-public.css:283 |
-| `88px` | **off scale** | 1 | pol-public.css:504 |
-| `1.4em` | **off scale** | 1 | pol-public.css:1179 |
-| `calc(-1 * var(--pub-gutter, 20px))` | **off scale** | 1 | pol-public.css:1302 |
+| `88px` | **off scale** | 1 | pol-public.css:505 |
+| `1.4em` | **off scale** | 1 | pol-public.css:1180 |
+| `calc(-1 * var(--pub-gutter, 20px))` | **off scale** | 1 | pol-public.css:1303 |
 | `var(--pub-gutter, 20px)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
 | `140px` | **off scale** | 1 | pol-public.css:1405 |
 | `calc(var(--pub-header-h, 64px) + var(--space-2))` | **off scale** | 1 | pol-public.css:1455 |
 | `calc(140px + var(--kb-inset, 0px))` | **off scale** | 1 | pol-public.css:1666 |
+| `calc(32px + env(safe-area-inset-bottom))` | **off scale** | 1 | pol-public.css:1784 |
+| `calc(var(--pub-header-h) + env(safe-area-inset-top) + var(--space-4))` | **off scale** | 1 | pol-public.css:1817 |
 | `var(--gap-section)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
-| `194px` | **off scale** | 1 | calls-c6.css:191 |
-| `52px` | **off scale** | 1 | ui-sheets.css:128 |
-| `-10px` | **off scale** | 1 | ui-sheets.css:348 |
-| `min(14vh, 120px)` | **off scale** | 1 | ui-sheets.css:406 |
-| `84px` | **off scale** | 1 | ui-sheets.css:706 |
-| `calc(var(--sheet-pad) + 44px)` | **off scale** | 1 | ui-sheets.css:721 |
-| `136px` | **off scale** | 1 | ui-sheets.css:908 |
-| `calc(var(--sheet-grip-zone) - 4px)` | **off scale** | 1 | ui-sheets.css:911 |
-| `calc(-1 * var(--sheet-grip-zone))` | **off scale** | 1 | ui-sheets.css:912 |
-| `calc(var(--sheet-pad) + max(0px, env(safe-area-inset-bottom, 0px) - var(--kb-inset, 0px)))` | **off scale** | 1 | ui-sheets.css:1045 |
-| `calc(var(--sheet-grip-zone) + 6px)` | **off scale** | 1 | ui-sheets.css:1082 |
+| `194px` | **off scale** | 1 | calls-c6.css:184 |
+| `calc(-1 * var(--sheet-pad, 20px))` | **off scale** | 1 | gap-oper.css:48 |
+| `calc(var(--sheet-pad, 20px) + 44px)` | **off scale** | 1 | gap-oper.css:49 |
+| `var(--sheet-pad, 20px)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
+| `-4.8px` | **off scale** | 1 | rx-shell.css:46 |
+| `50px` | **off scale** | 1 | rx-shell.css:131 |
+| `calc(var(--space-3) * 2 + 18px)` | **off scale** | 1 | rx-shell.css:206 |
+| `46px` | **off scale** | 1 | rx-shell.css:542 |
+| `calc(var(--nav-rail-w) + var(--safe-left) + var(--space-2))` | **off scale** | 1 | rx-shell.css:542 |
+| `max(var(--space-4), calc((100% - var(--convo-measure)) / 2))` | **off scale** | 1 | rx-shell.css:612 |
+| `calc((100vw - var(--app-max)) / 2)` | **off scale** | 1 | rx-shell.css:642 |
+| `calc((100vw - var(--app-max)) / 2 + var(--space-4))` | **off scale** | 1 | rx-shell.css:643 |
+| `calc(var(--space-3) + 28px)` | **off scale** | 1 | gap-chanserv.css:160 |
+| `calc(32px + var(--space-3) + var(--space-2))` | **off scale** | 1 | gap-chanserv.css:216 |
+| `calc(var(--space-3) + 40px)` | **off scale** | 1 | gap-chanserv.css:253 |
+| `calc(var(--sheet-pad) + 56px)` | **off scale** | 1 | gap-people.css:134 |
+| `var(--gorg-gutter)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
+| `calc(var(--gorg-gutter) + 112px)` | **off scale** | 1 | gap-organize.css:653 |
+| `calc(var(--space-4) + 40px)` | **off scale** | 1 | gap-organize.css:737 |
+| `var(--sheet-grip-zone, 22px)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
+| `calc(var(--space-3) + 64px)` | **off scale** | 1 | gap-organize.css:753 |
+| `max(var(--space-3), env(safe-area-inset-left, 0px))` | **off scale** | 1 | gap-watch.css:614 |
+| `var(--sheet-pad, 16px)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
+| `calc(var(--space-4) + env(safe-area-inset-bottom, 0px))` | **off scale** | 1 | gap-shell.css:375 |
+| `calc(14px + 0.32em)` | **off scale** | 1 | gap-auth.css:33 |
+| `calc(-1 * var(--space-3))` | **off scale** | 1 | gap-auth.css:78 |
+| `52px` | **off scale** | 1 | ui-sheets.css:224 |
+| `var(--sheet-head-pad)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
+| `calc(var(--sheet-grip-zone) + 2px)` | **off scale** | 1 | ui-sheets.css:443 |
+| `min(14vh, 120px)` | **off scale** | 1 | ui-sheets.css:502 |
+| `84px` | **off scale** | 1 | ui-sheets.css:794 |
+| `136px` | **off scale** | 1 | ui-sheets.css:1007 |
+| `calc(var(--sheet-pad) + max(0px, env(safe-area-inset-bottom, 0px) - var(--kb-inset, 0px)))` | **off scale** | 1 | ui-sheets.css:1136 |
+| `calc(var(--sheet-grip-zone) + 6px)` | **off scale** | 1 | ui-sheets.css:1175 |
+| `calc(var(--sheet-pad) + env(safe-area-inset-bottom, 0px))` | **off scale** | 1 | ui-sheets.css:1175 |
+| `max(var(--space-6), env(safe-area-inset-top, 0px))` | **off scale** | 1 | ui-sheets.css:1207 |
+| `max(var(--space-5), env(safe-area-inset-right, 0px))` | **off scale** | 1 | ui-sheets.css:1207 |
+| `max(var(--space-5), env(safe-area-inset-left, 0px))` | **off scale** | 1 | ui-sheets.css:1207 |
+| `60px` | **off scale** | 1 | ui-sheets.css:1216 |
+| `min(10vh, 96px)` | **off scale** | 1 | ui-sheets.css:1226 |
+| `calc(var(--sheet-close) + 4px)` | **off scale** | 1 | ui-sheets.css:1539 |
 | `var(--safe-left)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
 | `var(--safe-right)` | token | 1 | (1 sites — style-map.json spacing.distribution) |
 | `max(8px, calc(var(--safe-bottom) + 4px))` | **off scale** | 1 | pol-ios.css:92 |
 | `max(var(--space-3), var(--safe-bottom))` | **off scale** | 1 | pol-ios.css:100 |
-| `env(safe-area-inset-left, 0px)` | **off scale** | 1 | calls-engine.css:108 |
-| `env(safe-area-inset-right, 0px)` | **off scale** | 1 | calls-engine.css:108 |
+| `-7px` | **off scale** | 1 | calls-engine.css:50 |
+| `max(var(--space-2), env(safe-area-inset-right, 0px))` | **off scale** | 1 | calls-engine.css:253 |
+| `max(var(--space-2), env(safe-area-inset-left, 0px))` | **off scale** | 1 | calls-engine.css:253 |
+| `-5px` | **off scale** | 1 | calls-engine.css:573 |
 
 ## G10. Radius values in use
 
 | value | count | where |
 |---|---|---|
-| `var(--radius)` | 278 | (278 sites — style-map.json radius) |
-| `6px` | 71 | app.css:159,172,342,366,382,397,440,681,693,761,778,797,866,887,939,995,1103,1137,1177,1187,1225,1271,1287,1305,1319,1329,1370,1381,1408,1465,1481,1515,1522,1556,1567,1579,1590,1606,1617,1628,1639,1652,1669,1695,1705,1723,1765,1819,1832,1845,2073,3209,3218,3226,3235,3240,3249,3303,3314,3318,3325,3336,3345,3348,3358,3373 · polish.css:46,190,255,297,343 |
-| `50%` | 38 | app.css:128,201,275,299,836,1746,1760,2332,2563,3104,3184,3189,3263,3267,3278 · pol-stats.css:176,448,564,890 · pol-studio.css:229,319,1245,1333,1509 · pol-shell.css:440,853,1035,1044 · pol-thread.css:504,610,1175 · pol-public.css:575,1043 · account2.css:151 · roomsettings.css:102,268 · ui-sheets.css:521,525 |
-| `var(--r-pill)` | 35 | (35 sites — style-map.json radius) |
-| `4px` | 23 | app.css:2069,2640 · pol-stats.css:675 · pol-studio.css:910,1083,1151,1152,1313,1381,1442,1466 · pol-thread.css:236,289,1066,1148,1263,1281,1647 · pol-public.css:41 · polish.css:62,134 · ui-sheets.css:482,505 |
-| `0` | 22 | app.css:2041,3125,3772 · pol-stats.css:332 · pol-studio.css:265 · pol-shell.css:1074,1093,1345 · pol-thread.css:916,1039 · pol-public.css:127,310,1326 · calls-c6.css:235 · calls-c4.css:64,67 · ui-sheets.css:119,626,742,836 · calls-engine.css:105,116 |
-| `2px` | 15 | app.css:1973,3406 · pol-stats.css:830 · pol-shell.css:583,819,1302,1377 · pol-thread.css:869 · polish.css:217,226 · ui-sheets.css:337,866,982,1095 · calls-engine.css:98 |
-| `999px` | 14 | app.css:173,184,186,193,196,205,267,318,332,3103 · roomsettings.css:258 · ui-sheets.css:728,884,907 |
-| `10px` | 11 | app.css:1156,1197,1354,1395,1534,1905 · pol-studio.css:246 · pol-public.css:293,553,1353,1389 |
-| `8px` | 10 | app.css:177,1087,1124,1216,1221,1243,1680,1734,1781,1802 |
-| `12px 12px 0 0` | 7 | pol-thread.css:362,1303 · pol-roster.css:370 · polish.css:367 · ui-sheets.css:309,970,1084 |
-| `3px` | 5 | app.css:245,569,2062,2081 · pol-public.css:1202 |
-| `var(--radius) var(--radius) 0 0` | 3 | app.css:3909 · ui-sheets.css:629 · calls-engine.css:93 |
-| `2px 2px 0 0` | 3 | pol-stats.css:717,811 · roomsettings.css:342 |
-| `0 3px 3px 0` | 2 | pol-shell.css:692,812 |
-| `1px` | 2 | pol-public.css:168,861 |
-| `0 0 6px 6px` | 1 | app.css:3293 |
-| `6px 6px 0 0` | 1 | app.css:3404 |
+| `var(--radius)` | 368 | (368 sites — style-map.json radius) |
+| `6px` | 58 | app.css:356,377,388,401,429,606,618,666,680,749,770,819,840,878,888,916,960,978,992,1001,1034,1045,1090,1106,1140,1147,1174,1185,1196,1213,1228,1234,1246,1268,1298,1352,1365,1378,1935,2913,2922,2930,2938,2943,2952,3002,3011,3018,3028,3036,3039,3049,3064 · polish.css:46,190,255,297,343 |
+| `50%` | 51 | app.css:175,244,301,322,719,1293,1585,1740,2141,2352,2814,2889,2894,2965,2969,2980 · pol-stats.css:176,448,564,890 · pol-studio.css:224,314,1239,1327,1503 · pol-shell.css:415,820,1002,1011 · pol-thread.css:509,614,1277 · pol-public.css:576,1044 · account2.css:150 · roomsettings.css:102,266 · gap-convo.css:28,278 · gap-chanserv.css:237 · gap-organize.css:235,469,581 · gap-commands.css:155 · gap-shell.css:105,146,177 · ui-sheets.css:617,621,1452 · calls-engine.css:88 |
+| `var(--r-pill)` | 39 | (39 sites — style-map.json radius) |
+| `0` | 30 | app.css:1834,1857,1893 · pol-stats.css:332 · pol-studio.css:260 · pol-shell.css:1041,1060,1313 · pol-thread.css:1018,1141,2125 · pol-public.css:127,310,1327 · calls-c6.css:222 · calls-c4.css:64,67 · gap-convo.css:122 · gap-watch.css:58,59 · gap-shell.css:158 · ui-sheets.css:215,714,818,926,1511,1622 · calls-engine.css:186,411,444 |
+| `4px` | 26 | app.css:1931,2414 · pol-stats.css:675 · pol-studio.css:904,1077,1145,1146,1307,1375,1436,1460 · pol-thread.css:240,295,911,1168,1250,1365,1383,1756,2259 · pol-public.css:41 · polish.css:62,134 · gap-chanserv.css:136 · ui-sheets.css:578,601 |
+| `999px` | 22 | app.css:218,227,229,236,239,246,339,348,2813 · roomsettings.css:256 · gap-account.css:102 · gap-oper.css:277,331,354,379 · gap-usermodes.css:178,247 · gap-commands.css:145 · ui-sheets.css:964,1006,1387,1440 |
+| `2px` | 16 | app.css:1752,3086 · pol-stats.css:830 · pol-shell.css:550,786,1270,1345 · pol-thread.css:973 · polish.css:217,226 · gap-import.css:99 · gap-claim.css:154 · ui-sheets.css:437,1074,1188 · calls-engine.css:260 |
+| `10px` | 8 | app.css:857,1447,1847 · pol-studio.css:241 · pol-public.css:293,554,1354,1389 |
+| `12px 12px 0 0` | 7 | pol-thread.css:368,1405 · pol-roster.css:366 · polish.css:367 · ui-sheets.css:410,1062,1177 |
+| `3px` | 6 | app.css:530,1924,1942 · pol-thread.css:2157 · pol-public.css:1203 · gap-convo.css:281 |
+| `8px` | 5 | app.css:908,929,1314,1335,1496 |
+| `calc(var(--radius) * 1.5)` | 4 | pol-shell.css:1290 · rx-shell.css:162,292 · gap-organize.css:233 |
+| `2px 2px 0 0` | 3 | pol-stats.css:717,811 · roomsettings.css:340 |
+| `1px` | 3 | pol-public.css:168,862 · gap-watch.css:182 |
+| `var(--radius) var(--radius) 0 0` | 3 | gap-oper.css:81 · ui-sheets.css:717 · calls-engine.css:254 |
+| `0 0 var(--radius) var(--radius)` | 3 | gap-watch.css:225 · gap-shell.css:233 · ui-sheets.css:718 |
+| `0 3px 3px 0` | 2 | pol-shell.css:659,779 |
+| `calc(var(--radius) * 2)` | 2 | pol-shell.css:1342 · rx-shell.css:326 |
+| `0 var(--radius) var(--radius) 0` | 2 | pol-thread.css:177,2238 |
+| `var(--radius, 6px)` | 2 | gap-account.css:25,72 |
+| `calc(var(--radius) - 2px)` | 2 | gap-shell.css:72,137 |
+| `13px` | 1 | app.css:1729 |
+| `0 0 6px 6px` | 1 | app.css:2995 |
+| `6px 6px 0 0` | 1 | app.css:3084 |
 | `inherit` | 1 | pol-stats.css:911 |
-| `calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0` | 1 | pol-shell.css:1291 |
-| `calc(var(--radius) * 1.5)` | 1 | pol-shell.css:1322 |
-| `calc(var(--radius) * 2)` | 1 | pol-shell.css:1374 |
-| `0 var(--radius) var(--radius) 0` | 1 | pol-thread.css:173 |
-| `0 0 4px 4px` | 1 | pol-thread.css:306 |
-| `calc(var(--radius) + 3px)` | 1 | pol-public.css:659 |
-| `0 0 var(--radius) var(--radius)` | 1 | ui-sheets.css:630 |
+| `calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0` | 1 | pol-shell.css:1259 |
+| `0 0 4px 4px` | 1 | pol-thread.css:312 |
+| `calc(var(--radius) + 3px)` | 1 | pol-public.css:660 |
 
 ## G11. Elevation / shadows (every declaration)
 
 | file:line | selector | property | value |
 |---|---|---|---|
-| app.css:84 | `:root` | --elev-0 | `none` |
-| app.css:85 | `:root` | --elev-1 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, transparent) inset` |
-| app.css:86 | `:root` | --elev-2 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-bg) 88%, transparent)` |
-| app.css:87 | `:root` | --elev-3 | `0 28px 56px -32px color-mix(in oklab, #000 90%, transparent), 0 1px 0 color-mix(in oklab, var(--onyx-text) 6%, transpare` |
-| app.css:136 | `.onyx-avatar--owner` | box-shadow | `0 0 0 2px var(--gold)` |
-| app.css:141 | `.onyx-row-avatar .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
-| app.css:203 | `.onyx-facepile-face .onyx-avatar` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| app.css:1906 | `.conn-card` | box-shadow | `var(--elev-2)` |
-| app.css:2041 | `.conn-card` | box-shadow | `none` |
-| app.css:2570 | `.onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 2px var(--onyx-faint)` |
-| app.css:2667 | `.onyx-spotlight-panel, .onyx-shortcuts-sheet` | box-shadow | `0 12px 32px rgb(0 8 16 / 45%)` |
-| app.css:2882 | `.onyx-moddesk-sheet` | box-shadow | `-8px 0 24px rgb(0 0 0 / 35%)` |
-| app.css:3074 | `.onyx-prefs` | box-shadow | `0 8px 24px rgba(0, 0, 0, 0.35)` |
-| app.css:3084 | `.pref-category-tab[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| app.css:3337 | `.onyx-call-sheet` | box-shadow | `0 12px 32px rgba(0, 0, 0, 0.35)` |
-| app.css:3613 | `.notif-center` | box-shadow | `var(--elev-2)` |
-| app.css:3695 | `.onyx-room-more-menu` | box-shadow | `var(--elev-2)` |
-| app.css:3764 | `.onyx-sheet-layer > .onyx-sheet` | box-shadow | `var(--elev-3)` |
+| app.css:128 | `:root` | --elev-0 | `none` |
+| app.css:129 | `:root` | --elev-1 | `0 1px 0 color-mix(in oklab, var(--onyx-text) 5%, transparent) inset` |
+| app.css:130 | `:root` | --elev-2 | `0 14px 36px -28px color-mix(in oklab, var(--onyx-bg) 88%, transparent)` |
+| app.css:131 | `:root` | --elev-3 | `0 28px 56px -32px color-mix(in oklab, #000 90%, transparent), 0 1px 0 color-mix(in oklab, var(--onyx-text) 6%, transpare` |
+| app.css:183 | `.onyx-avatar--owner` | box-shadow | `0 0 0 2px var(--gold)` |
+| app.css:188 | `.onyx-row-avatar .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
+| app.css:1448 | `.conn-stage` | box-shadow | `var(--elev-2)` |
+| app.css:1563 | `.conn-identity[data-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| app.css:1785 | `.conn-submit--quiet, .conn-submit--quiet:hover:not(:disabled)` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| app.css:1835 | `.conn-stage` | box-shadow | `none` |
+| app.css:1848 | `.conn-card` | box-shadow | `var(--elev-2)` |
+| app.css:1857 | `.conn-stage` | box-shadow | `none` |
+| app.css:1894 | `.conn-stage` | box-shadow | `none` |
+| app.css:2794 | `.pref-category-tab[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| app.css:3339 | `.onyx-room-more-menu` | box-shadow | `var(--elev-2)` |
 | pol-stats.css:321 | `.roadmap-legend a[aria-current='location']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
 | pol-stats.css:340 | `.roadmap-card:is(:target, [data-current='true'])` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-stats.css:956 | `.stats-page .data-room-row[data-selected='true']` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-studio.css:230 | `.ap-swatch > span, .ap-theme-swatch > span` | box-shadow | `inset 0 0 0 1px color-mix(in oklab, #000 25%, transparent)` |
-| pol-studio.css:321 | `.ap-choice-toggle > b::after` | box-shadow | `0 1px 3px color-mix(in oklab, #000 40%, transparent)` |
-| pol-studio.css:538 | `.background-picker__card--selected` | box-shadow | `inset 0 0 0 1px var(--onyx-text)` |
-| pol-shell.css:432 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | box-shadow | `var(--elev-3)` |
-| pol-shell.css:652 | `.onyx-topbar .shell-ribbon-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-shell.css:714 | `.onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-shell.css:1245 | `.onyx-room-back-count` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| pol-shell.css:1292 | `.onyx-frame .onyx-room-more-menu` | box-shadow | `var(--elev-3)` |
-| pol-shell.css:1377 | `.onyx-rail .onyx-rail-color` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
-| pol-shell.css:1431 | `.onyx-mobile-nav .onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| pol-thread.css:170 | `.onyx-mention` | box-shadow | `inset 2px 0 0 var(--gold)` |
-| pol-thread.css:181 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-thread.css:211 | `.onyx-row-actions` | box-shadow | `var(--elev-2)` |
-| pol-thread.css:277 | `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-react-picker` | box-shadow | `var(--elev-3)` |
-| pol-thread.css:586 | `.onyx-frame .onyx-jump-latest` | box-shadow | `var(--elev-3)` |
-| pol-thread.css:926 | `.onyx-thread-msg-face .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
-| pol-thread.css:1251 | `.onyx-composer .shell-command-menu, .onyx-composer .shell-emoji-picker` | box-shadow | `var(--elev-3)` |
-| pol-thread.css:1265 | `.onyx-composer .shell-command-item--active` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| pol-thread.css:1655 | `.room-media-index-filter[aria-selected='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
-| pol-roster.css:243 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px var(--onyx-faint)` |
-| pol-roster.css:352 | `.onyx-frame > .onyx-roster:popover-open, .onyx-roster:popover-open` | box-shadow | `var(--elev-3)` |
-| pol-roster.css:414 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px CanvasText` |
+| pol-studio.css:225 | `.ap-swatch > span, .ap-theme-swatch > span` | box-shadow | `inset 0 0 0 1px color-mix(in oklab, #000 25%, transparent)` |
+| pol-studio.css:316 | `.ap-choice-toggle > b::after` | box-shadow | `0 1px 3px color-mix(in oklab, #000 40%, transparent)` |
+| pol-studio.css:532 | `.background-picker__card--selected` | box-shadow | `inset 0 0 0 1px var(--onyx-text)` |
+| pol-shell.css:407 | `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` | box-shadow | `var(--elev-3)` |
+| pol-shell.css:619 | `.onyx-topbar .shell-ribbon-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-shell.css:681 | `.onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-shell.css:1260 | `.onyx-frame .onyx-room-more-menu` | box-shadow | `var(--elev-3)` |
+| pol-shell.css:1345 | `.onyx-rail .onyx-rail-color` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
+| pol-shell.css:1399 | `.onyx-mobile-nav .onyx-nav-badge` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| pol-thread.css:174 | `.onyx-mention` | box-shadow | `inset 2px 0 0 var(--gold)` |
+| pol-thread.css:185 | `.onyx-message-search-current, .onyx-message-search-current:hover` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-thread.css:215 | `.onyx-row-actions` | box-shadow | `var(--elev-2)` |
+| pol-thread.css:283 | `.onyx-msg-menu-pop .onyx-msg-menu, .onyx-react-pop .onyx-react-picker` | box-shadow | `var(--elev-3)` |
+| pol-thread.css:590 | `.onyx-frame .onyx-jump-latest` | box-shadow | `var(--elev-3)` |
+| pol-thread.css:1028 | `.onyx-thread-msg-face .onyx-avatar` | box-shadow | `0 0 0 1px var(--nick-tint)` |
+| pol-thread.css:1353 | `.onyx-composer .shell-command-menu, .onyx-composer .shell-emoji-picker` | box-shadow | `var(--elev-3)` |
+| pol-thread.css:1367 | `.onyx-composer .shell-command-item--active` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-thread.css:1764 | `.room-media-index-filter[aria-selected='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| pol-thread.css:2126 | `.onyx-sheet-layer.onyx-thread-pop > .onyx-sheet.onyx-thread-sheet` | box-shadow | `none` |
+| pol-thread.css:2273 | `.onyx-message--compact.onyx-mention, .onyx-message--compact.onyx-messa` | box-shadow | `inset 2px 0 0 var(--gold)` |
+| pol-thread.css:2274 | `.onyx-message--compact.onyx-message-search-current` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-roster.css:239 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px var(--onyx-faint)` |
+| pol-roster.css:348 | `.onyx-frame > .onyx-roster:popover-open, .onyx-roster:popover-open` | box-shadow | `var(--elev-3)` |
+| pol-roster.css:423 | `.onyx-roster .onyx-roster-head` | box-shadow | `0 calc(-1 * var(--space-3)) 0 var(--onyx-panel)` |
+| pol-roster.css:434 | `.onyx-roster .onyx-roster-filter` | box-shadow | `0 0 0 var(--space-1) var(--onyx-panel), 0 var(--space-2) 0 var(--space-1) var(--onyx-panel)` |
+| pol-roster.css:436 | `.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:f` | box-shadow | `none` |
+| pol-roster.css:469 | `.onyx-roster .onyx-member-presence-dot--away` | box-shadow | `inset 0 0 0 1.5px CanvasText` |
 | pol-public.css:127 | `.public-frame__nav a[aria-current="page"]` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
 | pol-public.css:333 | `.public-frame__nav a[aria-current="page"]` | box-shadow | `inset 3px 0 0 var(--onyx-accent)` |
-| pol-public.css:555 | `.onyx-land-sketch-window` | box-shadow | `var(--elev-2)` |
-| pol-public.css:677 | `.onyx-land-tabs button[aria-selected="true"]` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
-| pol-public.css:835 | `.ab-scene` | box-shadow | `var(--elev-2)` |
-| pol-public.css:1327 | `.guides-route__item[data-state="current"] .guides-route__card` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| pol-public.css:556 | `.onyx-land-sketch-window` | box-shadow | `var(--elev-2)` |
+| pol-public.css:678 | `.onyx-land-tabs button[aria-selected="true"]` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| pol-public.css:836 | `.ab-scene` | box-shadow | `var(--elev-2)` |
+| pol-public.css:1328 | `.guides-route__item[data-state="current"] .guides-route__card` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-public.css:1499 | `.onyxos-console__tabs button[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | pol-public.css:1570 | `.onyxos-console__tabs button[aria-selected="true"]` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| pol-public.css:1707 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-o` | box-shadow | `inset 0 0 0 1px var(--onyx-line)` |
+| pol-public.css:1711 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-o` | box-shadow | `inset 0 0 0 1px var(--onyx-dim)` |
+| pol-public.css:1752 | `.public-related__list a[aria-current="page"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
 | polish.css:47 | `.shell-composer-tools` | box-shadow | `var(--elev-3)` |
 | polish.css:344 | `.update-available` | box-shadow | `0 8px 24px rgb(0 0 0 / 0.35)` |
 | polish.css:383 | `.update-available` | box-shadow | `none` |
-| account2.css:37 | `.a2-input:focus-visible, .a2-select:focus-visible, .a2-textarea:focus-` | box-shadow | `var(--focus-ring)` |
-| account2.css:57 | `.a2-btn:focus-visible, .a2-link:focus-visible` | box-shadow | `var(--focus-ring)` |
-| account2.css:120 | `.a2-reclaim__signin:focus-visible, .a2-reclaim__dismiss:focus-visible` | box-shadow | `var(--focus-ring)` |
-| account2.css:157 | `.a2-dot--avatar` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
-| calls-c6.css:104 | `.onyx-call-pip-card` | box-shadow | `var(--elev-3)` |
-| ui-sheets.css:69 | `.onyx-sheet-layer > .onyx-sheet` | box-shadow | `var(--elev-3)` |
-| ui-sheets.css:413 | `.onyx-spotlight-panel` | box-shadow | `var(--elev-3)` |
-| ui-sheets.css:449 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
-| ui-sheets.css:509 | `.notif-center .notif-center__filter[aria-pressed="true"]` | box-shadow | `none` |
-| ui-sheets.css:800 | `.onyx-toast` | box-shadow | `var(--elev-3)` |
-| ui-sheets.css:803 | `.onyx-toast--success` | box-shadow | `inset 3px 0 0 var(--onyx-accent), var(--elev-3)` |
-| ui-sheets.css:804 | `.onyx-toast--danger` | box-shadow | `inset 3px 0 0 var(--onyx-bad), var(--elev-3)` |
-| ui-sheets.css:805 | `.onyx-toast--warning` | box-shadow | `inset 3px 0 0 var(--onyx-warn), var(--elev-3)` |
-| ui-sheets.css:886 | `.onyx-prefs .pref-category-tab[aria-selected="true"]` | box-shadow | `none` |
-| ui-sheets.css:971 | `.onyx-room-more-menu` | box-shadow | `var(--elev-3)` |
+| account2.css:156 | `.a2-dot--avatar` | box-shadow | `0 0 0 2px var(--onyx-panel)` |
+| calls-c6.css:97 | `.onyx-call-pip-card` | box-shadow | `var(--elev-3)` |
+| gap-convo.css:136 | `.onyx-composer .gap-attach-quality-opt[aria-checked='true']` | box-shadow | `inset 0 -2px 0 var(--onyx-accent)` |
+| gap-convo.css:251 | `.onyx-message.gap-landed` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| gap-oper.css:408 | `.oc-tabs` | box-shadow | `0 calc(-1 * var(--sheet-grip-zone)) 0 0 var(--onyx-panel)` |
+| rx-shell.css:47 | `.onyx-facepile-face .onyx-avatar` | box-shadow | `0 0 0 2px var(--onyx-bg)` |
+| gap-import.css:245 | `.hi-review-foot` | box-shadow | `0 28px 0 0 var(--onyx-panel), 0 56px 0 0 var(--onyx-panel), 0 84px 0 0 var(--onyx-panel)` |
+| gap-watch.css:227 | `.onyx-watch-details` | box-shadow | `var(--elev-2)` |
+| gap-shell.css:232 | `.onyx-frame .onyx-room-more-menu > button.gs-more-leave` | box-shadow | `0 -1px 0 var(--onyx-line)` |
+| ui-sheets.css:165 | `.onyx-sheet-layer > .onyx-sheet` | box-shadow | `var(--elev-3)` |
+| ui-sheets.css:509 | `.onyx-spotlight-panel` | box-shadow | `var(--elev-3)` |
+| ui-sheets.css:545 | `.onyx-spotlight-option[aria-selected="true"]` | box-shadow | `inset 2px 0 0 var(--onyx-accent)` |
+| ui-sheets.css:605 | `.notif-center .notif-center__filter[aria-pressed="true"]` | box-shadow | `none` |
+| ui-sheets.css:878 | `.onyx-toast` | box-shadow | `var(--elev-3)` |
+| ui-sheets.css:881 | `.onyx-toast--success` | box-shadow | `inset 3px 0 0 var(--onyx-success), var(--elev-3)` |
+| ui-sheets.css:882 | `.onyx-toast--danger` | box-shadow | `inset 3px 0 0 var(--onyx-bad), var(--elev-3)` |
+| ui-sheets.css:883 | `.onyx-toast--warning` | box-shadow | `inset 3px 0 0 var(--onyx-warn), var(--elev-3)` |
+| ui-sheets.css:966 | `.onyx-prefs .pref-category-tab[aria-selected="true"]` | box-shadow | `none` |
+| ui-sheets.css:1063 | `.onyx-room-more-menu` | box-shadow | `var(--elev-3)` |
 | pol-ios.css:86 | `.onyx-frame` | box-shadow | `inset 0 var(--safe-top) 0 0 var(--onyx-panel)` |
-| calls-engine.css:94 | `.onyx-call-more` | box-shadow | `0 -12px 32px rgba(0, 0, 0, 0.45)` |
+| calls-engine.css:66 | `.onyx-thread-pane > .onyx-call-stage, .onyx-thread-pane > .onyx-join-b` | box-shadow | `calc(-1 * var(--shell-measure)) 0 0 0 var(--onyx-bg), var(--shell-measure) 0 0 0 var(--onyx-bg), calc(-2 * var(--shell-m` |
+| calls-engine.css:155 | `.onyx-call-head-faces .onyx-call-avatar[data-speaking="true"]` | box-shadow | `0 0 0 1px var(--onyx-accent)` |
+| calls-engine.css:255 | `.onyx-call-more` | box-shadow | `var(--elev-3)` |
 
 ## G12. !important (every use)
 
 | file:line | selector | declaration | context |
 |---|---|---|---|
-| app.css:3138 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation-duration: 0.001ms` |  |
-| app.css:3139 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation-iteration-count: 1` |  |
-| app.css:3140 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `transition-duration: 0.001ms` |  |
-| app.css:3141 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `scroll-behavior: auto` |  |
-| app.css:3148 | `:root[data-high-contrast='true'] :focus-visible` | `outline: 3px solid var(--lapis-bright)` |  |
-| app.css:3151 | `:root[data-reduce-transparency='true'] *` | `backdrop-filter: none` |  |
-| app.css:3927 | `*, *::before, *::after` | `animation: none` | @media (prefers-reduced-motion: reduce) |
-| app.css:3928 | `*, *::before, *::after` | `transition-duration: 0ms` | @media (prefers-reduced-motion: reduce) |
-| app.css:3929 | `*, *::before, *::after` | `scroll-behavior: auto` | @media (prefers-reduced-motion: reduce) |
-| app.css:3942 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation: none` |  |
+| app.css:2846 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation-duration: 0.001ms` |  |
+| app.css:2847 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation-iteration-count: 1` |  |
+| app.css:2848 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `transition-duration: 0.001ms` |  |
+| app.css:2849 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `scroll-behavior: auto` |  |
+| app.css:2856 | `:root[data-reduce-transparency='true'] *` | `backdrop-filter: none` |  |
+| app.css:3452 | `*, *::before, *::after` | `animation: none` | @media (prefers-reduced-motion: reduce) |
+| app.css:3453 | `*, *::before, *::after` | `transition-duration: 0ms` | @media (prefers-reduced-motion: reduce) |
+| app.css:3454 | `*, *::before, *::after` | `scroll-behavior: auto` | @media (prefers-reduced-motion: reduce) |
+| app.css:3467 | `:root[data-reduce-motion='true'] *, :root[data-reduce-motion='true'] *::before, ` | `animation: none` |  |
 | pol-stats.css:1062 | `:is(.stats-page, .status-route, .roadmap-page) *` | `transition: none` | @media (prefers-reduced-motion: reduce) |
 | pol-ios.css:126 | `.onyx-sheet-layer:has(> [data-shortcut-scope="a2hs"]), [data-shortcut-scope="a2h` | `display: none` | @media (display-mode: standalone) |
 
 ## G13. Same selector declared more than once in the same context
 
-278 selectors are declared in more than one rule; 133 across files. Property conflicts: 223. Declarations shadowed by a later identical selector: 340 (114 merely restate the winning value).
+352 selectors are declared in more than one rule; 136 across files. Property conflicts: 69. Declarations shadowed by a later identical selector: 88 (19 merely restate the winning value).
 
-### G13.0 Rules fully overridden by a later identical selector (54 rules, 134 declarations — deletable without visual change)
+### G13.0 Rules fully overridden by a later identical selector (1 rules, 1 declarations — deletable without visual change)
 
 | file:line | selector | decls | context |
 |---|---|---|---|
-| app.css:282 | `.onyx-conn-live` | 1 |  |
-| app.css:283 | `.onyx-conn-live .onyx-dot` | 1 |  |
-| app.css:323 | `.onyx-reconnect-online` | 1 |  |
-| app.css:324 | `.onyx-reconnect-online .onyx-reconnect-dot` | 1 |  |
-| app.css:508 | `.onyx-rail .onyx-rail-filter-unread-on` | 2 |  |
-| app.css:592 | `.onyx-rail .onyx-rail-star-on` | 1 |  |
-| app.css:804 | `.onyx-calls-toggle-open` | 2 |  |
-| app.css:923 | `.onyx-land-lede` | 4 |  |
-| app.css:930 | `.onyx-land-cta` | 4 |  |
-| app.css:937 | `.onyx-land-open` | 6 |  |
-| app.css:946 | `.onyx-land-link` | 3 |  |
-| app.css:952 | `.onyx-land-note` | 3 |  |
-| app.css:958 | `.onyx-land-trust` | 1 |  |
-| app.css:960 | `.onyx-land-h2` | 3 |  |
-| app.css:966 | `.onyx-land-claims` | 3 |  |
-| app.css:972 | `.onyx-land-claims dt` | 1 |  |
-| app.css:973 | `.onyx-land-claims dd` | 2 |  |
-| app.css:975 | `.onyx-land-detail` | 2 |  |
-| app.css:976 | `.onyx-land-detail a` | 1 |  |
-| app.css:978 | `.onyx-land-board` | 1 |  |
-| app.css:980 | `.onyx-land-board-head p` | 3 |  |
-| app.css:986 | `.onyx-land-tabs` | 3 |  |
-| app.css:992 | `.onyx-land-tabs button` | 7 |  |
-| app.css:1017 | `.onyx-land-panel-copy p` | 1 |  |
-| app.css:1019 | `.onyx-land-h3` | 3 |  |
-| app.css:1025 | `.onyx-land-action` | 4 |  |
-| app.css:1034 | `.onyx-land-links` | 4 |  |
-| app.css:1041 | `.onyx-land-links a` | 1 |  |
-| app.css:1043 | `.onyx-land-footnote` | 2 |  |
-| app.css:1044 | `.onyx-land-footnote a` | 1 |  |
-| app.css:1046 | `.onyx-land-shelf` | 1 |  |
-| app.css:1048 | `.onyx-land-shelf-label` | 4 |  |
-| app.css:1055 | `.onyx-land-shelf-list` | 6 |  |
-| app.css:1064 | `.onyx-land-shelf-list a` | 1 |  |
-| app.css:1119 | `.guest-claim-chip` | 7 |  |
-| app.css:2091 | `.onyx-notify-toggle-open` | 2 |  |
-| app.css:2188 | `.onyx-nav-btn--active .onyx-nav-icon` | 1 |  |
-| app.css:2234 | `.onyx-you-close` | 6 |  |
-| app.css:2432 | `.onyx-composer .shell-command-item--active` | 1 |  |
-| app.css:2492 | `.boost-pill.you` | 1 |  |
-| app.css:2557 | `.onyx-roster .onyx-member` | 3 |  |
-| app.css:2558 | `.onyx-roster .onyx-member.onyx-away` | 1 |  |
-| app.css:2698 | `.onyx-spotlight-close, .onyx-shortcuts-close` | 9 |  |
-| app.css:2712 | `.onyx-dmsafe-trigger[aria-expanded="true"]` | 1 |  |
-| app.css:2788 | `.onyx-spotlight-group + .onyx-spotlight-group` | 1 |  |
-| app.css:2865 | `.onyx-spotlight` | 2 | @media (max-width: 767.98px) |
-| app.css:2877 | `.onyx-moddesk-toggle[aria-pressed="true"]` | 1 |  |
-| app.css:3398 | `.onyx-call-bar` | 1 | @media (max-width: 640px) |
-| app.css:3399 | `.onyx-call-bar-center` | 1 | @media (max-width: 640px) |
-| app.css:3402 | `.onyx-cbtn-leave` | 1 | @media (max-width: 640px) |
-| app.css:3403 | `.onyx-call-more` | 3 | @media (max-width: 640px) |
-| app.css:3768 | `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` | 5 |  |
-| app.css:3842 | `.onyx-rail .onyx-rail-star-on` | 1 |  |
-| pol-shell.css:304 | `.chb .chb-sort-btn[aria-pressed="true"]` | 2 |  |
+| calls-c11.css:186 | `.onyx-stage-hand-row .onyx-call-btn` | 1 | @media (max-width: 767.98px) |
 
 ### G13.1 Cross-file duplicates with conflicting values
 
 | selector | context | property | values in cascade order | winner |
 |---|---|---|---|---|
-| `.onyx-thread-sheet` |  | padding | app.css:154 `16px`<br>pol-thread.css:876 `0` | pol-thread.css:876 |
-| `.onyx-thread-sheet` |  | gap | app.css:154 `12px`<br>pol-thread.css:876 `0` | pol-thread.css:876 |
-| `.topic-chip` |  | font-size | app.css:193 `12px`<br>pol-thread.css:626 `var(--text-sm)` | pol-thread.css:626 |
-| `.onyx-rail .onyx-rail-filter-unread` |  | font-size | app.css:505 `var(--text-2xs)`<br>pol-shell.css:764 `var(--text-xs)` | pol-shell.css:764 |
-| `.onyx-rail .onyx-rail-filter-unread` |  | padding | app.css:506 `3px var(--space-2)`<br>pol-shell.css:763 `0 var(--space-2)` | pol-shell.css:763 |
-| `.onyx-rail .onyx-rail-filter-clear` |  | font-size | app.css:505 `var(--text-2xs)`<br>pol-shell.css:764 `var(--text-xs)` | pol-shell.css:764 |
-| `.onyx-rail .onyx-rail-filter-clear` |  | padding | app.css:506 `3px var(--space-2)`<br>pol-shell.css:763 `0 var(--space-2)` | pol-shell.css:763 |
-| `.onyx-rail .onyx-rail-new` |  | font-size | app.css:505 `var(--text-2xs)`<br>pol-shell.css:783 `var(--text-xs)` | pol-shell.css:783 |
-| `.onyx-rail .onyx-rail-new` |  | padding | app.css:506 `3px var(--space-2)`<br>pol-shell.css:779 `0 var(--space-2)` | pol-shell.css:779 |
-| `.onyx-rail .onyx-rail-star` |  | width | app.css:501 `auto`<br>pol-shell.css:858 `28px` | pol-shell.css:858 |
-| `.onyx-rail .onyx-rail-star` |  | border | app.css:503 `1px solid var(--onyx-line)`<br>pol-shell.css:861 `0` | pol-shell.css:861 |
-| `.onyx-rail .onyx-rail-star` |  | color | app.css:504 `var(--onyx-dim)`<br>app.css:589 `var(--onyx-faint)`<br>pol-shell.css:862 `var(--onyx-faint)` | pol-shell.css:862 |
-| `.onyx-rail .onyx-rail-star` |  | padding | app.css:506 `3px var(--space-2)`<br>app.css:590 `3px 6px`<br>pol-shell.css:860 `0` | pol-shell.css:860 |
-| `.onyx-rail .onyx-rail-filter-unread-on` |  | border-color | app.css:509 `var(--onyx-accent)`<br>pol-shell.css:768 `var(--onyx-dim)` | pol-shell.css:768 |
-| `.onyx-rail .onyx-rail-filter-unread-on` |  | color | app.css:510 `var(--onyx-accent)`<br>pol-shell.css:768 `var(--onyx-text)` | pol-shell.css:768 |
-| `.onyx-rail-meta` |  | gap | app.css:553 `6px`<br>pol-shell.css:826 `4px` | pol-shell.css:826 |
-| `.onyx-rail .onyx-rail-star-on` |  | color | app.css:592 `var(--onyx-accent)`<br>app.css:3842 `var(--onyx-text)`<br>pol-shell.css:870 `var(--onyx-dim)` | pol-shell.css:870 |
-| `.onyx-newmsg-sheet` |  | gap | app.css:606 `10px`<br>ui-sheets.css:767 `var(--space-3)` | ui-sheets.css:767 |
-| `.onyx-composer` |  | align-items | app.css:744 `center`<br>pol-thread.css:985 `stretch` | pol-thread.css:985 |
-| `.onyx-composer` |  | gap | app.css:745 `10px`<br>pol-thread.css:987 `var(--space-2)` | pol-thread.css:987 |
-| `.onyx-composer` |  | padding | app.css:746 `10px 16px`<br>pol-thread.css:988 `var(--space-2) var(--space-4) var(--space-3)` | pol-thread.css:988 |
-| `.onyx-composer` |  | background | app.css:747 `var(--onyx-panel)`<br>pol-thread.css:989 `var(--onyx-bg)` | pol-thread.css:989 |
-| `.onyx-composer` |  | border-top | app.css:748 `1px solid var(--onyx-line)`<br>pol-thread.css:990 `0` | pol-thread.css:990 |
-| `.onyx-land-h1` |  | font-size | app.css:914 `44px`<br>pol-public.css:514 `clamp(2.5rem, 1.6rem + 3.4vw, 4rem)` | pol-public.css:514 |
-| `.onyx-land-h1` |  | letter-spacing | app.css:916 `-0.02em`<br>pol-public.css:516 `-0.03em` | pol-public.css:516 |
-| `.onyx-land-h1` |  | line-height | app.css:917 `1.05`<br>pol-public.css:517 `1.02` | pol-public.css:517 |
-| `.onyx-land-lede` |  | font-size | app.css:925 `17px`<br>pol-public.css:523 `clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem)` | pol-public.css:523 |
-| `.onyx-land-lede` |  | margin | app.css:926 `16px 0 0`<br>pol-public.css:521 `var(--space-5) 0 0` | pol-public.css:521 |
-| `.onyx-land-lede` |  | max-width | app.css:927 `52ch`<br>pol-public.css:520 `36ch` | pol-public.css:520 |
-| `.onyx-land-cta` |  | gap | app.css:933 `12px 20px`<br>pol-public.css:526 `var(--space-3)` | pol-public.css:526 |
-| `.onyx-land-cta` |  | margin-top | app.css:934 `28px`<br>pol-public.css:526 `var(--space-7)` | pol-public.css:526 |
-| `.onyx-land-open` |  | border-radius | app.css:939 `6px`<br>pol-public.css:535 `var(--radius)` | pol-public.css:535 |
-| `.onyx-land-open` |  | padding | app.css:942 `10px 22px`<br>pol-public.css:533 `0 var(--space-6)` | pol-public.css:533 |
-| `.onyx-land-link` |  | align-self | app.css:947 `center`<br>pol-public.css:542 `auto` | pol-public.css:542 |
-| `.onyx-land-link` |  | font-weight | app.css:949 `600`<br>pol-public.css:537 `650` | pol-public.css:537 |
-| `.onyx-land-note` |  | font-size | app.css:954 `13px`<br>pol-public.css:544 `var(--text-sm)` | pol-public.css:544 |
-| `.onyx-land-note` |  | margin | app.css:955 `16px 0 0`<br>pol-public.css:544 `var(--space-5) 0 0` | pol-public.css:544 |
-| `.onyx-land-trust` |  | margin-top | app.css:958 `64px`<br>pol-public.css:620 `0` | pol-public.css:620 |
-| `.onyx-land-h2` |  | font-size | app.css:961 `20px`<br>pol-public.css:621 `clamp(1.5rem, 1.2rem + 1vw, 2rem)` | pol-public.css:621 |
-| `.onyx-land-h2` |  | margin | app.css:963 `0 0 16px`<br>pol-public.css:621 `0` | pol-public.css:621 |
-| `.onyx-land-claims` |  | gap | app.css:968 `16px`<br>pol-public.css:625 `var(--space-6)` | pol-public.css:625 |
-| `.onyx-land-claims` |  | margin | app.css:969 `0`<br>pol-public.css:626 `var(--space-7) 0 0` | pol-public.css:626 |
-| `.onyx-land-claims dd` |  | margin | app.css:973 `2px 0 0`<br>pol-public.css:630 `var(--space-1) 0 0` | pol-public.css:630 |
-| `.onyx-land-detail` |  | margin | app.css:975 `16px 0 0`<br>pol-public.css:644 `var(--space-6) 0 0` | pol-public.css:644 |
-| `.onyx-land-board` |  | margin-top | app.css:978 `64px`<br>pol-public.css:648 `0` | pol-public.css:648 |
-| `.onyx-land-board-head p` |  | margin | app.css:982 `8px 0 0`<br>pol-public.css:650 `var(--space-3) 0 0` | pol-public.css:650 |
-| `.onyx-land-board-head p` |  | max-width | app.css:983 `62ch`<br>pol-public.css:650 `60ch` | pol-public.css:650 |
-| `.onyx-land-tabs` |  | display | app.css:987 `flex`<br>pol-public.css:652 `inline-flex` | pol-public.css:652 |
-| `.onyx-land-tabs` |  | gap | app.css:988 `8px`<br>pol-public.css:654 `2px` | pol-public.css:654 |
-| `.onyx-land-tabs` |  | margin-top | app.css:989 `20px`<br>pol-public.css:656 `var(--space-7)` | pol-public.css:656 |
-| `.onyx-land-tabs button` |  | border | app.css:994 `1px solid var(--onyx-line)`<br>pol-public.css:666 `0` | pol-public.css:666 |
-| `.onyx-land-tabs button` |  | border-radius | app.css:995 `6px`<br>pol-public.css:667 `var(--radius)` | pol-public.css:667 |
-| `.onyx-land-tabs button` |  | padding | app.css:999 `8px 16px`<br>pol-public.css:665 `0 var(--space-4)` | pol-public.css:665 |
-| `.onyx-land-panel` |  | display | app.css:1009 `flex`<br>pol-public.css:679 `grid` | pol-public.css:679 |
-| `.onyx-land-panel` |  | gap | app.css:1011 `24px 48px`<br>pol-public.css:681 `var(--space-6) 56px` | pol-public.css:681 |
-| `.onyx-land-panel` |  | margin-top | app.css:1012 `20px`<br>pol-public.css:682 `var(--space-5)` | pol-public.css:682 |
-| `.onyx-land-h3` |  | font-size | app.css:1020 `17px`<br>pol-public.css:691 `var(--text-xl)` | pol-public.css:691 |
-| `.onyx-land-h3` |  | margin | app.css:1022 `0 0 8px`<br>pol-public.css:691 `0` | pol-public.css:691 |
-| `.onyx-land-action` |  | color | app.css:1026 `var(--onyx-accent)`<br>pol-public.css:701 `var(--onyx-text)` | pol-public.css:701 |
-| `.onyx-land-action` |  | display | app.css:1027 `inline-block`<br>pol-public.css:693 `inline-flex` | pol-public.css:693 |
-| `.onyx-land-action` |  | margin-top | app.css:1029 `12px`<br>pol-public.css:697 `var(--space-5)` | pol-public.css:697 |
-| `.onyx-land-links` |  | gap | app.css:1037 `10px`<br>pol-public.css:716 `0` | pol-public.css:716 |
-| `.onyx-land-links` |  | min-width | app.css:1038 `200px`<br>pol-public.css:716 `0` | pol-public.css:716 |
-| `.onyx-land-footnote` |  | font-size | app.css:1043 `13px`<br>pol-public.css:739 `var(--text-sm)` | pol-public.css:739 |
-| `.onyx-land-footnote a` |  | color | app.css:1044 `var(--onyx-text)`<br>pol-public.css:740 `var(--onyx-dim)` | pol-public.css:740 |
-| `.onyx-land-shelf` |  | margin-top | app.css:1046 `64px`<br>pol-public.css:747 `0` | pol-public.css:747 |
-| `.onyx-land-shelf-label` |  | font-size | app.css:1050 `13px`<br>pol-public.css:751 `var(--text-xs)` | pol-public.css:751 |
-| `.onyx-land-shelf-label` |  | margin | app.css:1052 `0 0 12px`<br>pol-public.css:751 `0` | pol-public.css:751 |
-| `.onyx-land-shelf-list` |  | gap | app.css:1058 `8px 24px`<br>pol-public.css:752 `0 var(--space-5)` | pol-public.css:752 |
-| `.onyx-land-shelf-list a` |  | color | app.css:1064 `var(--onyx-text)`<br>pol-public.css:757 `var(--onyx-dim)` | pol-public.css:757 |
-| `.onyx-toaster` |  | right | app.css:1068 `16px`<br>ui-sheets.css:789 `var(--space-5)` | ui-sheets.css:789 |
-| `.onyx-toaster` |  | bottom | app.css:1069 `16px`<br>ui-sheets.css:790 `calc(var(--composer-h) + var(--space-6))` | ui-sheets.css:790 |
-| `.onyx-toaster` |  | z-index | app.css:1070 `60`<br>ui-sheets.css:788 `90` | ui-sheets.css:788 |
-| `.onyx-toaster` |  | max-width | app.css:1077 `min(360px, 90vw)`<br>ui-sheets.css:791 `min(380px, calc(100vw - 2 * var(--space-4)))` | ui-sheets.css:791 |
-| `.onyx-toast` |  | align-items | app.css:1082 `flex-start`<br>ui-sheets.css:794 `center` | ui-sheets.css:794 |
-| `.onyx-toast` |  | gap | app.css:1083 `8px`<br>ui-sheets.css:795 `var(--space-3)` | ui-sheets.css:795 |
-| `.onyx-toast` |  | border-radius | app.css:1087 `8px`<br>ui-sheets.css:798 `var(--radius)` | ui-sheets.css:798 |
-| `.onyx-toast` |  | padding | app.css:1088 `8px 10px`<br>ui-sheets.css:797 `var(--space-2) var(--space-2) var(--space-2) var(-` | ui-sheets.css:797 |
-| `.guest-claim-chip` |  | gap | app.css:1122 `8px`<br>pol-shell.css:1103 `var(--space-3)` | pol-shell.css:1103 |
-| `.guest-claim-chip` |  | border-radius | app.css:1124 `8px`<br>pol-shell.css:1107 `var(--radius)` | pol-shell.css:1107 |
-| `.guest-claim-chip` |  | padding | app.css:1125 `6px 10px`<br>pol-shell.css:1104 `var(--space-3)` | pol-shell.css:1104 |
-| `.onyx-you-close` |  | color | app.css:2235 `var(--onyx-text)`<br>ui-sheets.css:232 `var(--onyx-dim)` | ui-sheets.css:232 |
-| `.onyx-you-close` |  | border | app.css:2237 `1px solid var(--onyx-line)`<br>ui-sheets.css:234 `0` | ui-sheets.css:234 |
-| `.onyx-you-close` |  | padding | app.css:2239 `var(--space-1) var(--space-3)`<br>ui-sheets.css:229 `0` | ui-sheets.css:229 |
-| `.onyx-coach-dismiss` |  | color | app.css:2375 `var(--onyx-dim)`<br>pol-shell.css:1080 `var(--onyx-faint)` | pol-shell.css:1080 |
-| `.onyx-roster .onyx-member` |  | flex-wrap | app.css:2557 `wrap`<br>pol-roster.css:189 `nowrap` | pol-roster.css:189 |
-| `.onyx-roster .onyx-member` |  | min-height | app.css:2557 `36px`<br>pol-roster.css:191 `40px` | pol-roster.css:191 |
-| `.onyx-spotlight-close:focus-visible` |  | outline | app.css:2631 `2px solid var(--onyx-accent)`<br>ui-sheets.css:241 `var(--focus-ring)` | ui-sheets.css:241 |
-| `.onyx-spotlight-close:focus-visible` |  | outline-offset | app.css:2631 `1px`<br>ui-sheets.css:241 `var(--focus-offset)` | ui-sheets.css:241 |
-| `.onyx-shortcuts-close:focus-visible` |  | outline | app.css:2631 `2px solid var(--onyx-accent)`<br>ui-sheets.css:241 `var(--focus-ring)` | ui-sheets.css:241 |
-| `.onyx-shortcuts-close:focus-visible` |  | outline-offset | app.css:2631 `1px`<br>ui-sheets.css:241 `var(--focus-offset)` | ui-sheets.css:241 |
-| `.onyx-spotlight-foot kbd` |  | background | app.css:2638 `var(--onyx-panel-2)`<br>ui-sheets.css:480 `var(--onyx-bg)` | ui-sheets.css:480 |
-| `.onyx-spotlight-foot kbd` |  | padding | app.css:2641 `1px 5px`<br>ui-sheets.css:477 `0 5px` | ui-sheets.css:477 |
-| `.onyx-spotlight-backdrop` |  | background | app.css:2654 `rgb(0 0 0 / 55%)`<br>ui-sheets.css:407 `var(--sheet-veil)` | ui-sheets.css:407 |
-| `.onyx-spotlight-panel` |  | width | app.css:2658 `min(560px, 100%)`<br>ui-sheets.css:410 `min(600px, 100%)` | ui-sheets.css:410 |
-| `.onyx-spotlight-panel` |  | max-height | app.css:2659 `min(70vh, 560px)`<br>ui-sheets.css:411 `min(64vh, 560px)` | ui-sheets.css:411 |
-| `.onyx-spotlight-panel` |  | box-shadow | app.css:2667 `0 12px 32px rgb(0 8 16 / 45%)`<br>ui-sheets.css:413 `var(--elev-3)` | ui-sheets.css:413 |
-| `.onyx-spotlight-panel` |  | animation | app.css:2668 `onyx-switcher-in var(--dur-fast) ease-out`<br>ui-sheets.css:415 `ui-sheet-drop var(--dur-fast) var(--ease)` | ui-sheets.css:415 |
-| `.onyx-spotlight-search` |  | gap | app.css:2682 `var(--space-2)`<br>ui-sheets.css:419 `var(--space-3)` | ui-sheets.css:419 |
-| `.onyx-spotlight-search` |  | padding | app.css:2683 `10px var(--space-3)`<br>ui-sheets.css:421 `0 var(--space-2) 0 var(--space-4)` | ui-sheets.css:421 |
-| `.onyx-spotlight-input` |  | font-size | app.css:2694 `var(--text-md)`<br>ui-sheets.css:431 `var(--text-lg)` | ui-sheets.css:431 |
-| `.onyx-spotlight-input` |  | padding | app.css:2695 `6px 0`<br>ui-sheets.css:431 `10px 0` | ui-sheets.css:431 |
-| `.onyx-spotlight-close` |  | min-width | app.css:2700 `32px`<br>ui-sheets.css:226 `var(--sheet-close)` | ui-sheets.css:226 |
-| `.onyx-spotlight-close` |  | min-height | app.css:2701 `32px`<br>ui-sheets.css:227 `var(--sheet-close)` | ui-sheets.css:227 |
-| `.onyx-spotlight-close` |  | border | app.css:2703 `1px solid var(--onyx-line)`<br>ui-sheets.css:234 `0` | ui-sheets.css:234 |
-| `.onyx-spotlight-close` |  | font-size | app.css:2707 `var(--text-lg)`<br>ui-sheets.css:230 `0` | ui-sheets.css:230 |
-| `.onyx-spotlight-close` |  | line-height | app.css:2708 `1`<br>ui-sheets.css:231 `0` | ui-sheets.css:231 |
-| `.onyx-spotlight-close` |  | margin | ui-sheets.css:228 `0 -6px 0 0`<br>ui-sheets.css:433 `0` | ui-sheets.css:433 |
-| `.onyx-shortcuts-close` |  | min-width | app.css:2700 `32px`<br>ui-sheets.css:226 `var(--sheet-close)` | ui-sheets.css:226 |
-| `.onyx-shortcuts-close` |  | min-height | app.css:2701 `32px`<br>ui-sheets.css:227 `var(--sheet-close)` | ui-sheets.css:227 |
-| `.onyx-shortcuts-close` |  | border | app.css:2703 `1px solid var(--onyx-line)`<br>ui-sheets.css:234 `0` | ui-sheets.css:234 |
-| `.onyx-shortcuts-close` |  | font-size | app.css:2707 `var(--text-lg)`<br>ui-sheets.css:230 `0` | ui-sheets.css:230 |
-| `.onyx-shortcuts-close` |  | line-height | app.css:2708 `1`<br>ui-sheets.css:231 `0` | ui-sheets.css:231 |
-| `.onyx-spotlight-results` |  | padding | app.css:2784 `6px`<br>ui-sheets.css:435 `var(--space-2)` | ui-sheets.css:435 |
-| `.onyx-spotlight-group + .onyx-spotlight-group` |  | margin-top | app.css:2788 `6px`<br>ui-sheets.css:437 `var(--space-2)` | ui-sheets.css:437 |
-| `.onyx-spotlight-section` |  | padding | app.css:2791 `6px var(--space-2) var(--space-1)`<br>ui-sheets.css:436 `var(--space-2) var(--space-3) var(--space-1)` | ui-sheets.css:436 |
-| `.onyx-spotlight-option` |  | gap | app.css:2800 `10px`<br>ui-sheets.css:440 `var(--space-3)` | ui-sheets.css:440 |
-| `.onyx-spotlight-option` |  | min-height | app.css:2801 `36px`<br>ui-sheets.css:441 `40px` | ui-sheets.css:441 |
-| `.onyx-spotlight-option` |  | padding | app.css:2802 `6px var(--space-2)`<br>ui-sheets.css:442 `0 var(--space-3)` | ui-sheets.css:442 |
-| `.onyx-spotlight-option` |  | border-left | app.css:2804 `2px solid transparent`<br>ui-sheets.css:443 `0` | ui-sheets.css:443 |
-| `.onyx-spotlight-title mark` |  | text-decoration | app.css:2814 `underline`<br>ui-sheets.css:461 `none` | ui-sheets.css:461 |
-| `.onyx-spotlight-hint` |  | color | app.css:2818 `var(--onyx-dim)`<br>ui-sheets.css:462 `var(--onyx-faint)` | ui-sheets.css:462 |
-| `.onyx-spotlight-hint` |  | font-size | app.css:2819 `var(--text-2xs)`<br>ui-sheets.css:462 `var(--text-sm)` | ui-sheets.css:462 |
-| `.onyx-spotlight-foot` |  | padding | app.css:2829 `var(--space-2) var(--space-3)`<br>ui-sheets.css:469 `var(--space-2) var(--space-4)` | ui-sheets.css:469 |
-| `.onyx-spotlight` | @media (max-width: 767.98px) | padding | app.css:2865 `var(--space-2)`<br>ui-sheets.css:830 `0` | ui-sheets.css:830 |
-| `.onyx-spotlight` | @media (max-width: 767.98px) | align-items | app.css:2865 `start`<br>ui-sheets.css:830 `stretch` | ui-sheets.css:830 |
-| `.onyx-spotlight-panel` | @media (max-width: 767.98px) | max-height | app.css:2866 `calc(100dvh - 16px)`<br>ui-sheets.css:833 `none` | ui-sheets.css:833 |
-| `.onyx-call-people` |  | align-items | app.css:3257 `center`<br>calls-engine.css:21 `flex-start` | calls-engine.css:21 |
-| `.onyx-call-bar` |  | grid-template-columns | app.css:3292 `1fr auto 1fr`<br>calls-engine.css:24 `minmax(0, 1fr) auto minmax(0, 1fr)` | calls-engine.css:24 |
-| `.onyx-call-bar` | @media (max-width: 640px) | padding | app.css:3398 `10px 12px calc(10px + env(safe-area-inset-bottom, `<br>calls-engine.css:85 `var(--space-2) var(--space-2) var(--space-2)` | calls-engine.css:85 |
-| `.onyx-call-bar-center` | @media (max-width: 640px) | justify-content | app.css:3399 `space-between`<br>calls-engine.css:77 `stretch` | calls-engine.css:77 |
-| `.onyx-call-more` | @media (max-width: 640px) | left | app.css:3403 `auto`<br>calls-engine.css:90 `0` | calls-engine.css:90 |
-| `.onyx-frame` |  | height | app.css:3433 `100vh`<br>app.css:3434 `100dvh`<br>pol-ios.css:65 `var(--vvh, 100dvh)` | pol-ios.css:65 |
-| `.onyx-frame > .onyx-primary-nav` |  | padding | app.css:3443 `var(--space-2) var(--space-1)`<br>pol-shell.css:671 `var(--space-2) 0` | pol-shell.css:671 |
-| `.onyx-frame > .onyx-primary-nav` |  | gap | app.css:3444 `var(--space-1)`<br>pol-shell.css:670 `2px` | pol-shell.css:670 |
-| `.onyx-primary-nav .onyx-nav-btn` |  | padding | app.css:3496 `var(--space-2) 0`<br>pol-shell.css:677 `0` | pol-shell.css:677 |
-| `.onyx-primary-nav .onyx-nav-btn` |  | min-height | app.css:3497 `var(--target-min)`<br>pol-shell.css:676 `40px` | pol-shell.css:676 |
-| `.notif-center__filters` |  | display | app.css:3618 `flex`<br>pol-shell.css:60 `grid` | pol-shell.css:60 |
-| `.onyx-sheet-layer` |  | padding | app.css:3727 `var(--space-4)`<br>ui-sheets.css:57 `var(--space-6) var(--space-4)` | ui-sheets.css:57 |
-| `.onyx-sheet-backdrop` |  | background | app.css:3739 `color-mix(in srgb, #000 55%, transparent)`<br>ui-sheets.css:60 `var(--sheet-veil)` | ui-sheets.css:60 |
-| `.onyx-sheet-layer > .onyx-sheet` |  | animation | app.css:3765 `onyx-sheet-in var(--dur-fast) var(--ease)`<br>ui-sheets.css:73 `ui-sheet-pop var(--dur-base) var(--ease)` | ui-sheets.css:73 |
-| `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` |  | animation-name | app.css:3773 `onyx-sheet-side-in`<br>ui-sheets.css:120 `ui-sheet-side` | ui-sheets.css:120 |
-| `.onyx-sheet-close` |  | min-width | app.css:3805 `32px`<br>ui-sheets.css:226 `var(--sheet-close)` | ui-sheets.css:226 |
-| `.onyx-sheet-close` |  | min-height | app.css:3806 `32px`<br>ui-sheets.css:227 `var(--sheet-close)` | ui-sheets.css:227 |
-| `.onyx-sheet-close` |  | border | app.css:3811 `1px solid var(--onyx-line)`<br>ui-sheets.css:234 `0` | ui-sheets.css:234 |
-| `.onyx-frame > .onyx-mobile-nav` | @media (max-width: 767.98px) | gap | app.css:3878 `2px`<br>pol-shell.css:1409 `0` | pol-shell.css:1409 |
-| `.onyx-frame > .onyx-mobile-nav` | @media (max-width: 767.98px) | padding | app.css:3880 `var(--space-1) var(--space-1) calc(var(--space-1) `<br>pol-shell.css:1411 `0 var(--space-1) var(--safe-bottom, 0px)` | pol-shell.css:1411 |
-| `.onyx-mobile-nav .onyx-nav-btn` | @media (max-width: 767.98px) | font-size | app.css:3885 `var(--text-xs)`<br>pol-shell.css:1421 `11px` | pol-shell.css:1421 |
-| `.onyx-sheet-layer > .onyx-sheet` | @media (max-width: 767.98px) | max-height | app.css:3907 `92dvh`<br>ui-sheets.css:307 `var(--sheet-max-h)` | ui-sheets.css:307 |
-| `.onyx-sheet-layer > .onyx-sheet` | @media (max-width: 767.98px) | border-radius | app.css:3909 `var(--radius) var(--radius) 0 0`<br>ui-sheets.css:309 `12px 12px 0 0` | ui-sheets.css:309 |
-| `.onyx-sheet-layer > .onyx-sheet` | @media (max-width: 767.98px) | padding-bottom | ui-sheets.css:310 `calc(var(--sheet-pad) + env(safe-area-inset-bottom`<br>ui-sheets.css:1045 `calc(var(--sheet-pad) + max(0px, env(safe-area-ins` | ui-sheets.css:1045 |
-| `.notif-center .notif-center__open` |  | grid-template-columns | pol-shell.css:103 `28px minmax(0, 1fr)`<br>ui-sheets.css:524 `32px minmax(0, 1fr)` | ui-sheets.css:524 |
-| `.notif-center .notif-center__open` |  | min-height | pol-shell.css:108 `44px`<br>ui-sheets.css:524 `52px` | ui-sheets.css:524 |
-| `.notif-center .notif-center__open` |  | padding | pol-shell.css:109 `var(--space-2)`<br>ui-sheets.css:524 `var(--space-2) var(--space-2)` | ui-sheets.css:524 |
-| `.chb .chb-sort-btn[aria-pressed="true"]` |  | border-color | pol-shell.css:304 `var(--onyx-dim)`<br>ui-sheets.css:738 `transparent` | ui-sheets.css:738 |
-| `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` |  | width | pol-shell.css:426 `min(360px, 100%)`<br>ui-sheets.css:1060 `min(380px, 100%)` | ui-sheets.css:1060 |
-| `:root` | @media (max-width: 767.98px) | --sheet-max-h | ui-sheets.css:293 `calc(100dvh - env(safe-area-inset-top, 0px) - 20px`<br>ui-sheets.css:1037 `calc(var(--vvh, 100dvh) - env(safe-area-inset-top,` | ui-sheets.css:1037 |
+| `:root` |  | --onyx-bg | app.css:24 `#0b0e12`<br>gap-appearance.css:23 `var(--onyx-theme-bg, #0b0e12)` | gap-appearance.css:23 |
+| `:root` |  | --onyx-panel | app.css:25 `#12161c`<br>gap-appearance.css:24 `var(--onyx-theme-panel, #12161c)` | gap-appearance.css:24 |
+| `:root` |  | --onyx-panel-2 | app.css:26 `#181e27`<br>gap-appearance.css:25 `var(--onyx-theme-panel-2, #181e27)` | gap-appearance.css:25 |
+| `:root` |  | --onyx-line | app.css:27 `#232b36`<br>gap-appearance.css:26 `var(--onyx-theme-line, #232b36)` | gap-appearance.css:26 |
+| `:root` |  | --onyx-text | app.css:28 `#e8e6e1`<br>gap-appearance.css:27 `var(--onyx-theme-text, #e8e6e1)` | gap-appearance.css:27 |
+| `:root` |  | --onyx-dim | app.css:29 `#9aa3ad`<br>gap-appearance.css:28 `var(--onyx-theme-dim, #9aa3ad)` | gap-appearance.css:28 |
+| `:root` |  | --onyx-faint | app.css:30 `#606973`<br>gap-appearance.css:29 `var(--onyx-theme-faint, #606973)` | gap-appearance.css:29 |
+| `:root` |  | --onyx-accent | app.css:31 `#46c08a`<br>gap-appearance.css:30 `var(--onyx-theme-accent, #46c08a)` | gap-appearance.css:30 |
+| `:root` |  | --onyx-accent-ink | app.css:32 `#06281a`<br>gap-appearance.css:31 `var(--onyx-theme-accent-ink, #06281a)` | gap-appearance.css:31 |
+| `:root` |  | --onyx-warn | app.css:33 `#d9a13b`<br>gap-appearance.css:32 `var(--onyx-theme-warn, #d9a13b)` | gap-appearance.css:32 |
+| `:root` |  | --onyx-bad | app.css:34 `#e5484d`<br>gap-appearance.css:33 `var(--onyx-theme-bad, #e5484d)` | gap-appearance.css:33 |
+| `:root` |  | --focus-ring | app.css:90 `1px solid var(--onyx-accent)`<br>gap-appearance.css:81 `var(--focus-width) solid var(--onyx-focus)` | gap-appearance.css:81 |
+| `:root` |  | --focus-offset | app.css:91 `-1px`<br>gap-appearance.css:82 `calc(-1 * var(--focus-width))` | gap-appearance.css:82 |
+| `:root` |  | --dur-micro | app.css:117 `100ms`<br>gap-appearance.css:111 `calc(var(--dur, 220ms) * 10 / 22)` | gap-appearance.css:111 |
+| `:root` |  | --dur-fast | app.css:118 `160ms`<br>gap-appearance.css:110 `calc(var(--dur, 220ms) * 16 / 22)` | gap-appearance.css:110 |
+| `:root` |  | --dur-base | app.css:119 `220ms`<br>gap-appearance.css:109 `var(--dur, 220ms)` | gap-appearance.css:109 |
+| `:root` |  | --radius | app.css:127 `6px`<br>gap-appearance.css:108 `calc(var(--r-0, 0px) + (var(--r-sm, 4px) + var(--r` | gap-appearance.css:108 |
+| `.onyx-rail .onyx-rail-filter-unread` |  | font-size | app.css:482 `var(--text-2xs)`<br>pol-shell.css:731 `var(--text-xs)` | pol-shell.css:731 |
+| `.onyx-rail .onyx-rail-filter-clear` |  | font-size | app.css:482 `var(--text-2xs)`<br>pol-shell.css:731 `var(--text-xs)` | pol-shell.css:731 |
+| `.onyx-rail .onyx-rail-new` |  | font-size | app.css:482 `var(--text-2xs)`<br>pol-shell.css:750 `var(--text-xs)` | pol-shell.css:750 |
+| `.onyx-rail .onyx-rail-star` |  | width | app.css:478 `auto`<br>pol-shell.css:825 `28px` | pol-shell.css:825 |
+| `.onyx-rail .onyx-rail-star` |  | border | app.css:480 `1px solid var(--onyx-line)`<br>pol-shell.css:828 `0` | pol-shell.css:828 |
+| `.onyx-rail .onyx-rail-star` |  | color | app.css:481 `var(--onyx-dim)`<br>pol-shell.css:829 `var(--onyx-faint)` | pol-shell.css:829 |
+| `.onyx-spotlight-foot kbd` |  | background | app.css:2412 `var(--onyx-panel-2)`<br>ui-sheets.css:576 `var(--onyx-bg)` | ui-sheets.css:576 |
+| `.onyx-spotlight-foot kbd` |  | padding | app.css:2415 `1px 5px`<br>ui-sheets.css:573 `0 5px` | ui-sheets.css:573 |
+| `.onyx-spotlight-panel` |  | max-height | app.css:2431 `min(70vh, 560px)`<br>ui-sheets.css:507 `min(64vh, 560px)` | ui-sheets.css:507 |
+| `.onyx-call-caption-translate` |  | margin-left | calls-c8.css:72 `auto`<br>calls-c8.css:85 `0` | calls-c8.css:85 |
+| `.onyx-tile-nick` |  | font-size | calls-c4.css:105 `var(--text-2xs)`<br>calls-engine.css:350 `var(--text-sm)` | calls-engine.css:350 |
 
 ### G13.2 Cross-file duplicates (all)
 
 | selector | context | occurrences |
 |---|---|---|
-| `:root` |  | app.css:4, pol-thread.css:11, pol-thread.css:37, ui-sheets.css:14 |
-| `.onyx-system` |  | app.css:145, pol-thread.css:488 |
-| `.onyx-day-divider` |  | app.css:149, pol-thread.css:451 |
-| `.onyx-day-divider-label` |  | app.css:150, pol-thread.css:459 |
-| `.onyx-thread-sheet` |  | app.css:154, pol-thread.css:876 |
-| `.topic-chip` |  | app.css:193, pol-thread.css:626 |
-| `html` |  | app.css:209, app.css:3828, pol-ios.css:24 |
-| `.onyx-rail li` |  | app.css:431, pol-shell.css:791 |
-| `.onyx-rail .onyx-rail-filter-unread` |  | app.css:496, pol-shell.css:759 |
-| `.onyx-rail .onyx-rail-filter-clear` |  | app.css:496, pol-shell.css:759 |
-| `.onyx-rail .onyx-rail-new` |  | app.css:496, pol-shell.css:775 |
-| `.onyx-rail .onyx-rail-star` |  | app.css:496, app.css:587, pol-shell.css:855 |
-| `.onyx-rail .onyx-rail-filter-unread-on` |  | app.css:508, pol-shell.css:768 |
-| `.onyx-rail .onyx-rail-item` |  | app.css:534, pol-shell.css:794 |
-| `.onyx-rail-copy` |  | app.css:540, pol-shell.css:820 |
-| `.onyx-rail-meta` |  | app.css:553, pol-shell.css:826 |
-| `.onyx-rail-avatar` |  | app.css:574, account2.css:156 |
-| `.onyx-rail .onyx-rail-star-on` |  | app.css:592, app.css:3842, pol-shell.css:870 |
-| `.onyx-newmsg-sheet` |  | app.css:596, ui-sheets.css:767 |
-| `.onyx-composer` |  | app.css:742, app.css:2387, pol-thread.css:983 |
-| `.onyx-land-h1` |  | app.css:913, pol-public.css:513 |
-| `.onyx-land-lede` |  | app.css:923, pol-public.css:519 |
-| `.onyx-land-cta` |  | app.css:930, pol-public.css:526 |
-| `.onyx-land-open` |  | app.css:937, pol-public.css:527, pol-public.css:540 |
-| `.onyx-land-link` |  | app.css:946, pol-public.css:527, pol-public.css:542 |
-| `.onyx-land-note` |  | app.css:952, pol-public.css:544 |
-| `.onyx-land-trust` |  | app.css:958, pol-public.css:620 |
-| `.onyx-land-h2` |  | app.css:960, pol-public.css:621 |
-| `.onyx-land-claims` |  | app.css:966, pol-public.css:622 |
-| `.onyx-land-claims dt` |  | app.css:972, pol-public.css:629 |
-| `.onyx-land-claims dd` |  | app.css:973, pol-public.css:630 |
-| `.onyx-land-detail` |  | app.css:975, pol-public.css:644 |
-| `.onyx-land-detail a` |  | app.css:976, pol-public.css:645 |
-| `.onyx-land-board` |  | app.css:978, pol-public.css:648 |
-| `.onyx-land-board-head p` |  | app.css:980, pol-public.css:650 |
-| `.onyx-land-tabs` |  | app.css:986, pol-public.css:651 |
-| `.onyx-land-tabs button` |  | app.css:992, pol-public.css:662 |
-| `.onyx-land-tabs button[aria-selected="true"]` |  | app.css:1002, pol-public.css:677 |
-| `.onyx-land-panel` |  | app.css:1007, pol-public.css:678 |
-| `.onyx-land-panel-copy` |  | app.css:1016, pol-public.css:689 |
-| `.onyx-land-panel-copy p` |  | app.css:1017, pol-public.css:690 |
-| `.onyx-land-h3` |  | app.css:1019, pol-public.css:691 |
-| `.onyx-land-action` |  | app.css:1025, pol-public.css:692 |
-| `.onyx-land-links` |  | app.css:1034, pol-public.css:716 |
-| `.onyx-land-links a` |  | app.css:1041, pol-public.css:717 |
-| `.onyx-land-footnote` |  | app.css:1043, pol-public.css:739 |
-| `.onyx-land-footnote a` |  | app.css:1044, pol-public.css:740 |
-| `.onyx-land-shelf` |  | app.css:1046, pol-public.css:742 |
-| `.onyx-land-shelf-label` |  | app.css:1048, pol-public.css:751 |
-| `.onyx-land-shelf-list` |  | app.css:1055, pol-public.css:752 |
-| `.onyx-land-shelf-list a` |  | app.css:1064, pol-public.css:753 |
-| `.onyx-toaster` |  | app.css:1066, ui-sheets.css:787 |
-| `.onyx-toast` |  | app.css:1080, ui-sheets.css:793 |
-| `.onyx-toast--success` |  | app.css:1091, ui-sheets.css:803 |
-| `.onyx-toast--danger` |  | app.css:1092, ui-sheets.css:804 |
-| `.onyx-toast--warning` |  | app.css:1093, ui-sheets.css:805 |
-| `.onyx-toast__dismiss` |  | app.css:1109, ui-sheets.css:806 |
-| `.guest-claim-chip` |  | app.css:1119, pol-shell.css:1100 |
-| `.onyx-nav-btn--active .onyx-nav-icon` |  | app.css:2188, pol-shell.css:698 |
-| `.onyx-you-close` |  | app.css:2234, ui-sheets.css:214 |
-| `.onyx-coach-dismiss` |  | app.css:2373, pol-shell.css:1080 |
-| `.onyx-composer .shell-command-item--active` |  | app.css:2432, pol-thread.css:1265 |
-| `.onyx-composer .shell-emoji-search` |  | app.css:2452, pol-thread.css:1270 |
-| `.onyx-roster .onyx-member` |  | app.css:2557, pol-roster.css:185 |
-| `.onyx-roster .onyx-member.onyx-away` |  | app.css:2558, pol-roster.css:253 |
-| `.onyx-spotlight-close:focus-visible` |  | app.css:2629, ui-sheets.css:238 |
-| `.onyx-shortcuts-close:focus-visible` |  | app.css:2629, ui-sheets.css:238 |
-| `.onyx-spotlight-foot kbd` |  | app.css:2632, app.css:2834, ui-sheets.css:472 |
-| `.onyx-spotlight` |  | app.css:2644, ui-sheets.css:406 |
-| `.onyx-spotlight-backdrop` |  | app.css:2654, ui-sheets.css:407 |
-| `.onyx-spotlight-panel` |  | app.css:2655, ui-sheets.css:409 |
-| `.onyx-spotlight-search` |  | app.css:2679, ui-sheets.css:418 |
-| `.onyx-spotlight-sigil` |  | app.css:2686, ui-sheets.css:423 |
-| `.onyx-spotlight-input` |  | app.css:2687, ui-sheets.css:431 |
-| `.onyx-spotlight-close` |  | app.css:2698, ui-sheets.css:214, ui-sheets.css:433 |
-| `.onyx-shortcuts-close` |  | app.css:2698, ui-sheets.css:214 |
-| `.onyx-spotlight-results` |  | app.css:2781, ui-sheets.css:435, ui-sheets.css:1021 |
-| `.onyx-spotlight-group + .onyx-spotlight-group` |  | app.css:2788, ui-sheets.css:437 |
-| `.onyx-spotlight-section` |  | app.css:2789, ui-sheets.css:436 |
-| `.onyx-spotlight-option` |  | app.css:2797, ui-sheets.css:439 |
-| `.onyx-spotlight-option[aria-selected="true"]` |  | app.css:2808, ui-sheets.css:447 |
-| `.onyx-spotlight-icon` |  | app.css:2812, ui-sheets.css:451 |
-| `.onyx-spotlight-title mark` |  | app.css:2814, ui-sheets.css:461 |
-| `.onyx-spotlight-hint` |  | app.css:2815, ui-sheets.css:462 |
-| `.onyx-spotlight-foot` |  | app.css:2827, ui-sheets.css:465 |
-| `.onyx-spotlight` | @media (max-width: 767.98px) | app.css:2865, ui-sheets.css:830, ui-sheets.css:1041 |
-| `.onyx-spotlight-panel` | @media (max-width: 767.98px) | app.css:2866, ui-sheets.css:831 |
-| `.onyx-spotlight-hint` | @media (max-width: 767.98px) | app.css:2867, ui-sheets.css:845 |
-| `.onyx-jump-latest-count` |  | app.css:2986, pol-thread.css:593 |
-| `.pref-action-card__icon` |  | app.css:3120, ui-sheets.css:939 |
-| `.onyx-call-people` |  | app.css:3256, calls-engine.css:21 |
-| `.onyx-call-person` |  | app.css:3262, calls-engine.css:22 |
-| `.onyx-call-bar` |  | app.css:3291, calls-c8.css:13, calls-engine.css:24 |
-| `.onyx-call-bar-left` |  | app.css:3295, calls-engine.css:25 |
-| `.onyx-call-bar-right` |  | app.css:3300, calls-engine.css:26 |
-| `.onyx-cbtn-leave` |  | app.css:3308, calls-engine.css:29 |
-| `.onyx-sec-chip` |  | app.css:3323, calls-engine.css:27 |
-| `.onyx-call-bar` | @media (max-width: 640px) | app.css:3398, calls-engine.css:68, calls-engine.css:85 |
-| `.onyx-call-bar-center` | @media (max-width: 640px) | app.css:3399, calls-engine.css:75 |
-| `.onyx-cbtn` | @media (max-width: 640px) | app.css:3400, calls-engine.css:86 |
-| `.onyx-cbtn-leave` | @media (max-width: 640px) | app.css:3402, calls-engine.css:82 |
-| `.onyx-call-more` | @media (max-width: 640px) | app.css:3403, calls-engine.css:89 |
-| `.onyx-frame` |  | app.css:3425, pol-ios.css:64, pol-ios.css:82 |
-| `.onyx-frame > .onyx-primary-nav` |  | app.css:3439, pol-shell.css:668 |
-| `.onyx-frame > .onyx-topbar` |  | app.css:3450, pol-shell.css:571 |
-| `.onyx-frame > .onyx-rail` |  | app.css:3453, pol-shell.css:720 |
-| `.onyx-primary-nav .onyx-nav-btn` |  | app.css:3494, pol-shell.css:674 |
-| `.notif-center__head` |  | app.css:3616, pol-shell.css:47 |
-| `.notif-center__filters` |  | app.css:3618, pol-shell.css:59 |
-| `.notif-center__list` |  | app.css:3619, pol-shell.css:88 |
-| `.onyx-room-header` |  | app.css:3637, roomsettings.css:9 |
-| `.onyx-room-more-menu > button` |  | app.css:3699, pol-shell.css:976 |
-| `.onyx-sheet-layer` |  | app.css:3721, ui-sheets.css:57 |
-| `.onyx-sheet-layer[data-placement="side"]` |  | app.css:3731, ui-sheets.css:113 |
-| `.onyx-sheet-backdrop` |  | app.css:3736, ui-sheets.css:59 |
-| `.onyx-sheet-layer > .onyx-sheet` |  | app.css:3761, ui-sheets.css:64 |
-| `.onyx-sheet-layer[data-placement="side"] > .onyx-sheet` |  | app.css:3768, ui-sheets.css:115 |
-| `.onyx-sheet-close` |  | app.css:3801, ui-sheets.css:214 |
-| `.onyx-frame > .onyx-rail` | @media (max-width: 767.98px) | app.css:3869, pol-shell.css:1310 |
-| `.onyx-frame > .onyx-mobile-nav` | @media (max-width: 767.98px) | app.css:3874, pol-shell.css:1408, pol-ios.css:91 |
-| `.onyx-mobile-nav .onyx-nav-btn` | @media (max-width: 767.98px) | app.css:3885, pol-shell.css:1413 |
-| `.onyx-sheet-layer` | @media (max-width: 767.98px) | app.css:3896, ui-sheets.css:296, ui-sheets.css:1041 |
-| `.onyx-sheet-layer > .onyx-sheet` | @media (max-width: 767.98px) | app.css:3902, ui-sheets.css:302, ui-sheets.css:1043 |
-| `.notif-center .notif-center__filter[aria-pressed="true"]` |  | pol-shell.css:76, ui-sheets.css:506 |
-| `.notif-center .notif-center__open` |  | pol-shell.css:101, ui-sheets.css:524 |
-| `.notif-center .notif-center__dismiss` |  | pol-shell.css:161, ui-sheets.css:526 |
-| `.chb .chb-sort-btn[aria-pressed="true"]` |  | pol-shell.css:304, ui-sheets.css:738 |
-| `.onyx-profile-pop:not(.onyx-sheet-layer)` |  | pol-shell.css:411, ui-sheets.css:1057 |
-| `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` |  | pol-shell.css:424, ui-sheets.css:1059 |
-| `:root` | @media (max-width: 767.98px) | pol-thread.css:1891, ui-sheets.css:290, ui-sheets.css:1036 |
-| `.onyx-tile` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c4.css:144 |
-| `.onyx-tile-video` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c4.css:144 |
-| `.onyx-call-pip-card` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c6.css:273 |
+| `:root` |  | app.css:23, gap-appearance.css:22, gap-appearance.css:79, gap-appearance.css:107, pol-thread.css:11, pol-thread.css:37, pol-thread.css:2049, rx-shell.css:27, gap-import.css:10, gap-commands.css:9, gap-watch.css:13, gap-shell.css:11, ui-sheets.css:27 |
+| `.onyx-system` |  | app.css:192, pol-thread.css:494 |
+| `.onyx-day-divider` |  | app.css:196, pol-thread.css:457 |
+| `.onyx-day-divider-label` |  | app.css:197, pol-thread.css:465 |
+| `.onyx-thread-sheet` |  | app.css:201, pol-thread.css:980, pol-thread.css:2134 |
+| `.onyx-topic-tools` |  | app.css:215, pol-thread.css:2544 |
+| `.shell-topic-create` |  | app.css:216, pol-thread.css:2547 |
+| `.shell-topic-create-input` |  | app.css:217, pol-thread.css:2548 |
+| `.shell-topic-forum` |  | app.css:220, pol-thread.css:2559 |
+| `.shell-topic-card-title` |  | app.css:222, pol-thread.css:2563 |
+| `.shell-topic-card-meta` |  | app.css:223, pol-thread.css:2564, pol-thread.css:2566 |
+| `.shell-topic-card-preview` |  | app.css:224, pol-thread.css:2564, pol-thread.css:2567 |
+| `.shell-topic-card-author` |  | app.css:225, pol-thread.css:2569 |
+| `.topic-chip` |  | app.css:236, pol-thread.css:630 |
+| `.topic-chip__unread` |  | app.css:239, app.css:3385, pol-thread.css:2542 |
+| `html` |  | app.css:250, app.css:3375, gap-appearance.css:150, pol-ios.css:24 |
+| `body` |  | app.css:250, gap-appearance.css:114 |
+| `.onyx-reconnect` |  | app.css:309, gap-shell.css:339 |
+| `.onyx-reconnect-msg` |  | app.css:327, gap-shell.css:329 |
+| `.onyx-roster` |  | app.css:409, app.css:415, pol-roster.css:409 |
+| `.onyx-rail .onyx-rail-filter-unread` |  | app.css:473, pol-shell.css:726 |
+| `.onyx-rail .onyx-rail-filter-clear` |  | app.css:473, pol-shell.css:726 |
+| `.onyx-rail .onyx-rail-new` |  | app.css:473, pol-shell.css:742 |
+| `.onyx-rail .onyx-rail-star` |  | app.css:473, pol-shell.css:822 |
+| `.onyx-rail .onyx-rail-item` |  | app.css:503, pol-shell.css:761 |
+| `.onyx-rail-copy` |  | app.css:507, pol-shell.css:787 |
+| `.onyx-rail-meta` |  | app.css:519, pol-shell.css:793 |
+| `.onyx-rail-avatar` |  | app.css:535, account2.css:155 |
+| `.onyx-newmsg-sheet` |  | app.css:547, ui-sheets.css:845 |
+| `.onyx-composer` |  | app.css:653, app.css:2195, pol-thread.css:1085 |
+| `.onyx-calls` |  | app.css:698, calls-engine.css:465 |
+| `.onyx-toaster` |  | app.css:791, ui-sheets.css:865 |
+| `.onyx-toast` |  | app.css:801, ui-sheets.css:871 |
+| `.onyx-toast--warning` |  | app.css:809, ui-sheets.css:883 |
+| `.onyx-toast__dismiss` |  | app.css:825, ui-sheets.css:884 |
+| `.onyx-schedule-pop` |  | app.css:954, gap-usermodes.css:364 |
+| `.onyx-member-card` |  | app.css:1283, ui-sheets.css:1528 |
+| `.shell-msg-link` |  | app.css:1922, pol-thread.css:2320 |
+| `.shell-msg-codeblock` |  | app.css:1933, pol-thread.css:2294 |
+| `.shell-msg-codeblock code` |  | app.css:1937, pol-thread.css:2304 |
+| `.shell-msg-blockquote` |  | app.css:1939, gap-appearance.css:122 |
+| `.onyx-coach-dismiss` |  | app.css:2182, pol-shell.css:1047 |
+| `.onyx-composer .shell-emoji-search` |  | app.css:2256, pol-thread.css:1372 |
+| `.onyx-spotlight-close:focus-visible` |  | app.css:2404, ui-sheets.css:341 |
+| `.onyx-spotlight-foot kbd` |  | app.css:2406, app.css:2569, ui-sheets.css:568 |
+| `.onyx-spotlight` |  | app.css:2418, ui-sheets.css:502, ui-sheets.css:1127 |
+| `.onyx-spotlight-backdrop` |  | app.css:2427, ui-sheets.css:503 |
+| `.onyx-spotlight-panel` |  | app.css:2428, ui-sheets.css:505 |
+| `.onyx-spotlight-search` |  | app.css:2449, ui-sheets.css:514 |
+| `.onyx-spotlight-sigil` |  | app.css:2454, ui-sheets.css:519 |
+| `.onyx-spotlight-input` |  | app.css:2455, ui-sheets.css:527 |
+| `.onyx-dmsafe-panel` |  | app.css:2477, ui-sheets.css:1674 |
+| `.onyx-spotlight-results` |  | app.css:2528, ui-sheets.css:531, ui-sheets.css:1110 |
+| `.onyx-spotlight-section` |  | app.css:2534, ui-sheets.css:532 |
+| `.onyx-spotlight-option` |  | app.css:2541, ui-sheets.css:535 |
+| `.onyx-spotlight-option[aria-selected="true"]` |  | app.css:2548, ui-sheets.css:543 |
+| `.onyx-spotlight-icon` |  | app.css:2551, ui-sheets.css:547 |
+| `.onyx-spotlight-title mark` |  | app.css:2553, ui-sheets.css:557 |
+| `.onyx-spotlight-hint` |  | app.css:2554, ui-sheets.css:558 |
+| `.onyx-spotlight-foot` |  | app.css:2564, ui-sheets.css:561 |
+| `.oper-desk` |  | app.css:2654, gap-oper.css:23 |
+| `.onyx-moddesk-sheet .moderation-cockpit__mode small` |  | app.css:2660, ui-sheets.css:1571 |
+| `.onyx-jump-latest-count` |  | app.css:2706, pol-thread.css:597 |
+| `.pref-action-card__icon` |  | app.css:2829, ui-sheets.css:1029 |
+| `.onyx-header-voice` |  | app.css:2910, calls-engine.css:35 |
+| `.onyx-voice-chip` |  | app.css:2911, calls-engine.css:36 |
+| `.onyx-voice-chip-status` |  | app.css:2917, calls-engine.css:38 |
+| `.onyx-call-join` |  | app.css:2920, calls-engine.css:40 |
+| `.onyx-join-banner` |  | app.css:2928, calls-engine.css:74 |
+| `.onyx-join-banner-copy strong` |  | app.css:2934, calls-engine.css:81 |
+| `.onyx-join-banner-copy span` |  | app.css:2935, calls-engine.css:82 |
+| `.onyx-join-banner-actions` |  | app.css:2936, calls-engine.css:83 |
+| `.onyx-join-banner-hide` |  | app.css:2937, calls-engine.css:85 |
+| `.onyx-call-btn` |  | app.css:2941, calls-engine.css:542 |
+| `.onyx-call-stage` |  | app.css:2950, calls-engine.css:125 |
+| `.onyx-call-stage-status` |  | app.css:2954, calls-engine.css:135 |
+| `.onyx-call-people` |  | app.css:2959, calls-engine.css:160 |
+| `.onyx-call-person` |  | app.css:2964, calls-engine.css:161 |
+| `.onyx-call-name` |  | app.css:2984, calls-engine.css:163 |
+| `.onyx-call-role` |  | app.css:2986, calls-engine.css:164 |
+| `.onyx-call-bar` |  | app.css:2993, calls-c8.css:13, calls-engine.css:170 |
+| `.onyx-cbtn` |  | app.css:3000, calls-engine.css:175 |
+| `.onyx-cbtn-leave` |  | app.css:3006, calls-engine.css:177 |
+| `.onyx-join-banner` | @media (max-width: 640.98px) | app.css:3079, calls-engine.css:110, calls-engine.css:112 |
+| `.onyx-frame` |  | app.css:3105, pol-ios.css:64, pol-ios.css:82 |
+| `.onyx-frame > .onyx-primary-nav` |  | app.css:3117, pol-shell.css:635 |
+| `.onyx-frame > .onyx-topbar` |  | app.css:3126, pol-shell.css:538 |
+| `.onyx-frame > .onyx-rail` |  | app.css:3129, pol-shell.css:687 |
+| `.onyx-primary-nav .onyx-nav-btn` |  | app.css:3170, pol-shell.css:641 |
+| `.notif-center__filters` |  | app.css:3271, pol-shell.css:49 |
+| `.notif-center__list` |  | app.css:3272, pol-shell.css:78 |
+| `.onyx-room-header` |  | app.css:3290, roomsettings.css:9 |
+| `.onyx-room-more-menu > button` |  | app.css:3342, pol-shell.css:943 |
+| `.onyx-frame > .onyx-rail` | @media (max-width: 599.98px) | app.css:3414, pol-shell.css:1278 |
+| `.onyx-frame > .onyx-mobile-nav` | @media (max-width: 599.98px) | app.css:3419, pol-shell.css:1376, pol-ios.css:91 |
+| `.onyx-mobile-nav .onyx-nav-btn` | @media (max-width: 599.98px) | app.css:3427, pol-shell.css:1381 |
+| `:root` | @media (prefers-reduced-motion | app.css:3442, gap-appearance.css:130 |
+| `:root[data-reduce-motion='true']` |  | app.css:3458, gap-appearance.css:137 |
+| `.ap-lede` |  | pol-studio.css:92, gap-oper.css:418 |
+| `.notif-center .notif-center__filter[aria-pressed="true"]` |  | pol-shell.css:66, ui-sheets.css:602 |
+| `.notif-center .notif-center__open` |  | pol-shell.css:91, ui-sheets.css:620 |
+| `.notif-center .notif-center__dismiss` |  | pol-shell.css:148, ui-sheets.css:622 |
+| `.onyx-voice-chip-count` |  | pol-shell.css:313, calls-engine.css:37 |
+| `.onyx-profile-pop:not(.onyx-sheet-layer)` |  | pol-shell.css:390, ui-sheets.css:1150 |
+| `.onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card` |  | pol-shell.css:402, ui-sheets.css:1152 |
+| `.onyx-sheet.onyx-you > .onyx-you-head` |  | pol-shell.css:1009, ui-sheets.css:682 |
+| `.onyx-mobile-nav .onyx-nav-badge` | @media (max-width: 599.98px) | pol-shell.css:1399, rx-shell.css:374 |
+| `.onyx-roster .onyx-member` |  | pol-roster.css:181, gap-people.css:21 |
+| `.onyx-call-captions-copy` |  | calls-c8.css:71, calls-engine.css:548 |
+| `.onyx-call-caption-translate` |  | calls-c8.css:71, calls-c8.css:85, calls-engine.css:548 |
+| `.onyx-vs-btn` | @media (max-width: 767.98px) | calls-c8.css:131, calls-engine.css:554 |
+| `.onyx-stage-hand-row .onyx-call-btn` |  | calls-c11.css:107, calls-engine.css:547 |
+| `.onyx-tile` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c4.css:142 |
+| `.onyx-tile-video` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c4.css:142 |
+| `.onyx-call-pip-card` | @media (prefers-reduced-motion | calls-c11.css:170, calls-c6.css:260 |
+| `.onyx-stage-actions .onyx-call-btn` | @media (max-width: 767.98px) | calls-c11.css:185, calls-engine.css:553 |
+| `.onyx-stage-hand-row .onyx-call-btn` | @media (max-width: 767.98px) | calls-c11.css:186, calls-engine.css:553 |
+| `.onyx-call-ring-actions .onyx-call-btn` |  | calls-c6.css:64, calls-engine.css:544 |
+| `.onyx-call-pip-btn` |  | calls-c6.css:177, calls-engine.css:545 |
+| `.onyx-call-pip-card` | @media (max-width: 767.98px) | calls-c6.css:191, calls-engine.css:499 |
+| `.onyx-call-pip-card[data-corner]` | @media (max-width: 767.98px) | calls-c6.css:191, calls-engine.css:499 |
+| `.onyx-call-pip-handle` | @media (max-width: 767.98px) | calls-c6.css:198, calls-engine.css:509 |
+| `.onyx-call-ring-actions .onyx-call-btn` | @media (max-width: 767.98px) | calls-c6.css:230, calls-engine.css:551 |
+| `.onyx-call-lost .onyx-call-btn` | @media (max-width: 767.98px) | calls-c6.css:256, calls-engine.css:552 |
+| `.onyx-cq-prompt .onyx-call-btn` |  | calls-c4.css:55, calls-engine.css:543 |
+| `.onyx-call-video` |  | calls-c4.css:70, calls-engine.css:342 |
+| `.onyx-call-grid` |  | calls-c4.css:71, calls-engine.css:343 |
+| `.onyx-call-grid[data-columns="2"]` |  | calls-c4.css:72, calls-engine.css:335 |
+| `.onyx-call-grid[data-columns="3"]` |  | calls-c4.css:73, calls-engine.css:336 |
+| `.onyx-call-grid[data-columns="4"]` |  | calls-c4.css:74, calls-engine.css:337 |
+| `.onyx-tile` |  | calls-c4.css:81, calls-engine.css:353 |
+| `.onyx-tile-nick` |  | calls-c4.css:101, calls-c4.css:110, calls-engine.css:350 |
+| `.onyx-call-primary` |  | calls-c4.css:135, calls-engine.css:348 |
+| `.onyx-frame > .onyx-main > .onyx-composer` | @media (min-width: 600px) | gap-convo.css:325, rx-shell.css:614 |
+| `:root` | @media (min-width: 600px) and  | rx-shell.css:388, ui-sheets.css:1203 |
+| `:root` | @media (max-height: 520px) | gap-watch.css:585, ui-sheets.css:1239 |
 
 ### G13.3 Same-file duplicates
 
 | selector | context | occurrences | conflicting props |
 |---|---|---|---|
-| `.topic-chip__unread` |  | app.css:196, app.css:3838 | background, color |
-| `.onyx-topbar` |  | app.css:222, app.css:3532 | gap, padding |
-| `.onyx-gem` |  | app.css:240, app.css:3833 | background |
-| `.onyx-conn-live` |  | app.css:282, app.css:3834 | color |
-| `.onyx-conn-live .onyx-dot` |  | app.css:283, app.css:3835 | background |
-| `.onyx-reconnect-online` |  | app.css:323, app.css:3836 | color |
-| `.onyx-reconnect-online .onyx-reconnect-dot` |  | app.css:324, app.css:3837 | background |
-| `.onyx-rail` |  | app.css:405, app.css:411 |  |
-| `.onyx-roster` |  | app.css:405, app.css:412 |  |
-| `.onyx-thread` |  | app.css:425, app.css:668 |  |
-| `.onyx-newmsg-mark` |  | app.css:612, app.css:3852 | color |
-| `.onyx-newmsg-secondary` |  | app.css:647, app.css:654 |  |
-| `.onyx-newmsg-primary` |  | app.css:647, app.css:655 |  |
-| `.onyx-thread-pane` |  | app.css:660, app.css:2961 |  |
-| `.onyx-message` |  | app.css:670, app.css:1586 |  |
-| `.onyx-member-prefix` |  | app.css:734, app.css:3839 | color |
-| `.onyx-composer-target` |  | app.css:751, app.css:3841 | color |
-| `.onyx-calls-toggle-open` |  | app.css:804, app.css:3574 | border-color, color |
-| `.onyx-account-totp-enroll` |  | app.css:1431, app.css:1471 |  |
-| `.onyx-account-passkey-rename` |  | app.css:1431, app.css:1500 |  |
-| `.onyx-msg-menu` |  | app.css:1603, app.css:1840 |  |
-| `.onyx-member-identity` |  | app.css:1742, app.css:2572 |  |
-| `.onyx-member-pronouns` |  | app.css:1756, app.css:1757 |  |
-| `.onyx-member-status` |  | app.css:1756, app.css:1757 |  |
-| `.onyx-member-guest` |  | app.css:1756, app.css:1758 |  |
-| `.onyx-member-dot` |  | app.css:1760, app.css:3840 | background |
-| `.onyx-msg-menu-delete-confirm-cancel` |  | app.css:1830, app.css:1837 |  |
-| `.onyx-msg-menu-delete-confirm-delete` |  | app.css:1830, app.css:1838 |  |
-| `.conn-cancel` |  | app.css:2003, app.css:2012 | padding |
-| `.conn-alt-btn` |  | app.css:2003, app.css:2016 | background, padding |
-| `.onyx-leave` |  | app.css:2003, app.css:2055 | padding |
-| `.onyx-notify-toggle-open` |  | app.css:2091, app.css:3574 | border-color, color |
-| `.onyx-home-privacy` |  | app.css:2299, app.css:2300 | color, font-size |
-| `.onyx-home-announce` |  | app.css:2302, app.css:3843 | color |
-| `.onyx-home-row-meta` |  | app.css:2336, app.css:3845 | color |
-| `.onyx-home-count` |  | app.css:2347, app.css:3843 | color |
-| `.onyx-coach` |  | app.css:2367, app.css:3847 |  |
-| `.onyx-coach-eyebrow` |  | app.css:2371, app.css:3845 | color |
-| `.shell-command-menu` |  | app.css:2402, app.css:2410 |  |
-| `.shell-emoji-picker` |  | app.css:2402, app.css:2443 |  |
-| `.onyx-composer .shell-composer-tool--emoji[aria-expanded="true"]` |  | app.css:2482, app.css:3849 | border-color |
-| `.boost-pill.you` |  | app.css:2492, app.css:3848 | border-color |
-| `.onyx-shortcuts-sheet` |  | app.css:2655, app.css:2836 |  |
-| `.onyx-dmsafe-trigger[aria-expanded="true"]` |  | app.css:2712, app.css:3849 | border-color |
-| `.onyx-keychange-kicker` |  | app.css:2753, app.css:3026 | color |
-| `.onyx-moddesk-toggle[aria-pressed="true"]` |  | app.css:2877, app.css:3849 | border-color |
-| `.onyx-moddesk-sheet .moderation-cockpit__modes` |  | app.css:2931, app.css:2933 |  |
-| `.onyx-keychange-accept` |  | app.css:3039, app.css:3047 |  |
-| `.onyx-keychange-dismiss` |  | app.css:3039, app.css:3049 |  |
-| `:root[data-reduce-motion='true'] *` |  | app.css:3135, app.css:3940 |  |
-| `:root[data-reduce-motion='true'] *::before` |  | app.css:3135, app.css:3940 |  |
-| `:root[data-reduce-motion='true'] *::after` |  | app.css:3135, app.css:3940 |  |
-| `.onyx-join-banner` | @media (max-width: 640px) | app.css:3388, app.css:3392 |  |
+| `.onyx-topbar` |  | app.css:263, app.css:3206 |  |
+| `.onyx-gem` |  | app.css:275, app.css:3380 |  |
+| `.onyx-rail` |  | app.css:409, app.css:414 |  |
+| `.onyx-thread` |  | app.css:417, app.css:593 |  |
+| `.onyx-newmsg-secondary` |  | app.css:572, app.css:579 |  |
+| `.onyx-newmsg-primary` |  | app.css:572, app.css:580 |  |
+| `.onyx-thread-pane` |  | app.css:585, app.css:2686 |  |
+| `.onyx-message` |  | app.css:595, app.css:1200 |  |
+| `.onyx-composer-target` |  | app.css:657, app.css:3387 |  |
+| `.onyx-account-totp-enroll` |  | app.css:1085, app.css:1096 |  |
+| `.onyx-msg-menu` |  | app.css:1211, app.css:1373 |  |
+| `.onyx-member-pronouns` |  | app.css:1289, app.css:1290 |  |
+| `.onyx-member-status` |  | app.css:1289, app.css:1290 |  |
+| `.onyx-member-guest` |  | app.css:1289, app.css:1291 |  |
+| `.onyx-member-dot` |  | app.css:1293, app.css:3386 |  |
+| `.onyx-msg-menu-delete-confirm-cancel` |  | app.css:1363, app.css:1370 |  |
+| `.onyx-msg-menu-delete-confirm-delete` |  | app.css:1363, app.css:1371 |  |
+| `.conn-cancel` |  | app.css:1787, app.css:1795 |  |
+| `.conn-alt-btn` |  | app.css:1787, app.css:1799 | background |
+| `.onyx-home-privacy` |  | app.css:2118, app.css:2119 | color, font-size |
+| `.onyx-home-announce` |  | app.css:2121, app.css:3388 |  |
+| `.onyx-home-row-meta` |  | app.css:2145, app.css:3390 |  |
+| `.onyx-home-count` |  | app.css:2156, app.css:3388 |  |
+| `.onyx-coach` |  | app.css:2176, app.css:3392 |  |
+| `.onyx-coach-eyebrow` |  | app.css:2180, app.css:3390 |  |
+| `.shell-command-menu` |  | app.css:2210, app.css:2218 |  |
+| `.shell-emoji-picker` |  | app.css:2210, app.css:2248 |  |
+| `.onyx-composer .shell-composer-tool--emoji[aria-expanded="true"]` |  | app.css:2281, app.css:3393 |  |
+| `.onyx-shortcuts-sheet` |  | app.css:2428, app.css:2571 |  |
+| `.onyx-keychange-kicker` |  | app.css:2503, app.css:2741 | color |
+| `.onyx-moddesk-sheet .moderation-cockpit__modes` |  | app.css:2656, app.css:2658 |  |
+| `.onyx-keychange-accept` |  | app.css:2754, app.css:2762 |  |
+| `.onyx-keychange-dismiss` |  | app.css:2754, app.css:2764 |  |
+| `:root[data-reduce-motion='true'] *` |  | app.css:2843, app.css:3465 |  |
+| `:root[data-reduce-motion='true'] *::before` |  | app.css:2843, app.css:3465 |  |
+| `:root[data-reduce-motion='true'] *::after` |  | app.css:2843, app.css:3465 |  |
+| `:root[data-high-contrast='true']` |  | gap-appearance.css:43, gap-appearance.css:86 |  |
+| `:root[data-density='compact'] .onyx-message:not(.onyx-message--compact):not(.onyx-continua` |  | gap-appearance.css:166, gap-appearance.css:187 |  |
+| `:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuati` |  | gap-appearance.css:174, gap-appearance.css:191 |  |
 | `.status-quiet-link` |  | pol-stats.css:205, pol-stats.css:247 |  |
-| `.status-hero` | @media (max-width: 767px) | pol-stats.css:993, pol-stats.css:996 |  |
-| `.roadmap-hero` | @media (max-width: 767px) | pol-stats.css:993, pol-stats.css:997 |  |
-| `.stats-page .data-hero.stats-hero` | @media (max-width: 767px) | pol-stats.css:993, pol-stats.css:998 |  |
-| `.status-quiet-link` | @media (max-width: 767px) | pol-stats.css:1001, pol-stats.css:1004 |  |
-| `.stats-page .stats-feed-step:last-child` | @media (max-width: 767px) | pol-stats.css:1016, pol-stats.css:1019 | border-bottom |
+| `.status-hero` | @media (max-width: 767.98px) | pol-stats.css:993, pol-stats.css:996 |  |
+| `.roadmap-hero` | @media (max-width: 767.98px) | pol-stats.css:993, pol-stats.css:997 |  |
+| `.stats-page .data-hero.stats-hero` | @media (max-width: 767.98px) | pol-stats.css:993, pol-stats.css:998 |  |
+| `.status-quiet-link` | @media (max-width: 767.98px) | pol-stats.css:1001, pol-stats.css:1004 |  |
+| `.stats-page .stats-feed-step:last-child` | @media (max-width: 767.98px) | pol-stats.css:1016, pol-stats.css:1019 | border-bottom |
 | `.stats-page .stats-inspector-metrics > div` | @media (max-width: 400px) | pol-stats.css:1042, pol-stats.css:1044 | padding-inline |
-| `.ap-studio` |  | pol-studio.css:407, pol-studio.css:475 |  |
-| `.background-picker__meta` |  | pol-studio.css:569, pol-studio.css:576 | color |
-| `.ts-pv-side` |  | pol-studio.css:1267, pol-studio.css:1277 |  |
-| `.ts-pv-members` |  | pol-studio.css:1267, pol-studio.css:1278 |  |
-| `.ts-pv-members__head` |  | pol-studio.css:1293, pol-studio.css:1303 |  |
-| `.ts-footer__right` |  | pol-studio.css:1640, pol-studio.css:1649 |  |
-| `.ts-editor` | @media (max-width: 768px) | pol-studio.css:1681, pol-studio.css:1692 |  |
-| `.onyx-account-persona-wear` |  | pol-shell.css:231, pol-shell.css:251 |  |
-| `.onyx-calls-leave` |  | pol-shell.css:311, pol-shell.css:329 | color, background |
-| `.onyx-room-settings-toggle` |  | pol-shell.css:380, pol-shell.css:558 |  |
-| `.onyx-pins-toggle` |  | pol-shell.css:380, pol-shell.css:559 |  |
-| `.onyx-media-toggle` |  | pol-shell.css:380, pol-shell.css:560 |  |
-| `.onyx-jump-toggle` |  | pol-shell.css:380, pol-shell.css:561 |  |
-| `.onyx-scrubber-toggle` |  | pol-shell.css:380, pol-shell.css:562 |  |
-| `.onyx-topbar .onyx-palette-launcher::before` |  | pol-shell.css:542, pol-shell.css:597 | width, height |
-| `.onyx-room-more-alerts .room-notify-name::before` |  | pol-shell.css:542, pol-shell.css:1004 |  |
-| `.onyx-topbar .onyx-palette-launcher` |  | pol-shell.css:554, pol-shell.css:586 |  |
-| `.onyx-room-more-alerts .room-notify-name` |  | pol-shell.css:555, pol-shell.css:995 |  |
-| `.onyx-rail .onyx-rail-label` |  | pol-shell.css:771, pol-shell.css:774 |  |
-| `.onyx-rail .onyx-rail-label` | @media (max-width: 767.98px) | pol-shell.css:1329, pol-shell.css:1331 |  |
-| `.onyx-rail-row .onyx-rail-sub` | @media (max-width: 767.98px) | pol-shell.css:1379, pol-shell.css:1381 | display |
-| `.onyx-edited` |  | pol-thread.css:159, pol-thread.css:166 |  |
-| `.onyx-react-pop .onyx-react-picker` |  | pol-thread.css:261, pol-thread.css:271, pol-thread.css:309 |  |
-| `.onyx-msg-menu-pop .onyx-msg-menu` |  | pol-thread.css:271, pol-thread.css:279 |  |
-| `.onyx-msg-menu .onyx-msg-menu-item[aria-label$="for everyone"]` |  | pol-thread.css:300, pol-thread.css:302 |  |
-| `.onyx-room-intro-face` |  | pol-thread.css:603, pol-thread.css:615 | background, border |
-| `.shell-msg-media-img` |  | pol-thread.css:683, pol-thread.css:694 |  |
-| `.shell-msg-media-video` |  | pol-thread.css:683, pol-thread.css:695 |  |
-| `.shell-msg-media-audio` |  | pol-thread.css:683, pol-thread.css:696 |  |
-| `.shell-msg-preview-title` |  | pol-thread.css:774, pol-thread.css:781 |  |
-| `.shell-msg-preview-desc` |  | pol-thread.css:774, pol-thread.css:783 |  |
-| `.shell-msg-preview-thumb` |  | pol-thread.css:784, pol-thread.css:793 |  |
-| `.shell-msg-preview-consent` |  | pol-thread.css:784, pol-thread.css:794 |  |
-| `.shell-msg-lightbox-close` |  | pol-thread.css:844, pol-thread.css:861 | padding, font-size, font-weight |
-| `.onyx-composer .shell-command-menu` |  | pol-thread.css:1250, pol-thread.css:1252 |  |
-| `.onyx-composer .shell-emoji-picker` |  | pol-thread.css:1250, pol-thread.css:1269 |  |
-| `.onyx-composer .shell-command-menu` | @media (max-width: 767.98px) | pol-thread.css:1298, pol-thread.css:1305 |  |
-| `.onyx-message-search__surface` |  | pol-thread.css:1324, pol-thread.css:1327 |  |
-| `.onyx-message-search__body` |  | pol-thread.css:1324, pol-thread.css:1394 |  |
-| `.onyx-message-search__saved` |  | pol-thread.css:1420, pol-thread.css:1431 |  |
-| `.onyx-message-search__recall` |  | pol-thread.css:1420, pol-thread.css:1473 |  |
-| `.onyx-message-search__server` |  | pol-thread.css:1420, pol-thread.css:1431 |  |
-| `.onyx-message-search__vault` |  | pol-thread.css:1420, pol-thread.css:1431 |  |
-| `.onyx-message-search__history-off` |  | pol-thread.css:1420, pol-thread.css:1434 |  |
-| `.onyx-message-search__vault-mode` |  | pol-thread.css:1451, pol-thread.css:1467 |  |
-| `.onyx-message-search__saved-run` |  | pol-thread.css:1524, pol-thread.css:1542 |  |
-| `.onyx-message-search__server-row` |  | pol-thread.css:1524, pol-thread.css:1543 |  |
-| `.pins-ledger` |  | pol-thread.css:1807, pol-thread.css:1814 |  |
-| `.pins-item-body--missing` |  | pol-thread.css:1865, pol-thread.css:1868 |  |
-| `.pins-item-body--deleted` |  | pol-thread.css:1865, pol-thread.css:1868 |  |
-| `.onyx-mlist-close` |  | pol-roster.css:67, pol-roster.css:85 | display |
-| `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` |  | pol-roster.css:176, pol-roster.css:179 |  |
-| `.onyx-mlist-main:focus-visible` |  | pol-roster.css:212, pol-roster.css:217 |  |
-| `.onyx-roster:popover-open .onyx-mlist-main` | @media (max-width: 767.98px) | pol-roster.css:399, pol-roster.css:401 |  |
+| `.ap-wrap` |  | pol-studio.css:75, pol-studio.css:1790 |  |
+| `.ap-studio` |  | pol-studio.css:402, pol-studio.css:469 |  |
+| `.background-picker__meta` |  | pol-studio.css:563, pol-studio.css:570 | color |
+| `.ts-preview-pane` |  | pol-studio.css:1206, pol-studio.css:1831 |  |
+| `.ts-pv-side` |  | pol-studio.css:1261, pol-studio.css:1271 |  |
+| `.ts-pv-members` |  | pol-studio.css:1261, pol-studio.css:1272 |  |
+| `.ts-pv-members__head` |  | pol-studio.css:1287, pol-studio.css:1297 |  |
+| `.ts-footer__right` |  | pol-studio.css:1634, pol-studio.css:1643 |  |
+| `.ts-editor` | @media (max-width: 767.98px) | pol-studio.css:1675, pol-studio.css:1686 |  |
+| `.onyx-account-persona-wear` |  | pol-shell.css:214, pol-shell.css:234 |  |
+| `.onyx-calls-leave` |  | pol-shell.css:290, pol-shell.css:308 | color, background |
+| `.onyx-room-settings-toggle` |  | pol-shell.css:359, pol-shell.css:525 |  |
+| `.onyx-pins-toggle` |  | pol-shell.css:359, pol-shell.css:526 |  |
+| `.onyx-media-toggle` |  | pol-shell.css:359, pol-shell.css:527 |  |
+| `.onyx-jump-toggle` |  | pol-shell.css:359, pol-shell.css:528 |  |
+| `.onyx-scrubber-toggle` |  | pol-shell.css:359, pol-shell.css:529 |  |
+| `.onyx-topbar .onyx-palette-launcher::before` |  | pol-shell.css:509, pol-shell.css:564 | width, height |
+| `.onyx-room-more-alerts .room-notify-name::before` |  | pol-shell.css:509, pol-shell.css:971 |  |
+| `.onyx-topbar .onyx-palette-launcher` |  | pol-shell.css:521, pol-shell.css:553 |  |
+| `.onyx-room-more-alerts .room-notify-name` |  | pol-shell.css:522, pol-shell.css:962 |  |
+| `.onyx-rail .onyx-rail-label` |  | pol-shell.css:738, pol-shell.css:741 |  |
+| `.onyx-rail .onyx-rail-label` | @media (max-width: 599.98px) | pol-shell.css:1297, pol-shell.css:1299 |  |
+| `.onyx-rail-row .onyx-rail-sub` | @media (max-width: 599.98px) | pol-shell.css:1347, pol-shell.css:1349 | display |
+| `.onyx-edited` |  | pol-thread.css:163, pol-thread.css:170 |  |
+| `.onyx-react-pop .onyx-react-picker` |  | pol-thread.css:267, pol-thread.css:277, pol-thread.css:315 |  |
+| `.onyx-msg-menu-pop .onyx-msg-menu` |  | pol-thread.css:277, pol-thread.css:285 |  |
+| `.onyx-msg-menu .onyx-msg-menu-item[aria-label$="for everyone"]` |  | pol-thread.css:306, pol-thread.css:308 |  |
+| `.onyx-msg-menu-pop .onyx-msg-menu` | @media (min-width: 768px) | pol-thread.css:348, pol-thread.css:2354 |  |
+| `.onyx-message .onyx-body` |  | pol-thread.css:451, pol-thread.css:2292 |  |
+| `.onyx-room-intro-face` |  | pol-thread.css:607, pol-thread.css:619 | background, border |
+| `.shell-msg-media-img` |  | pol-thread.css:687, pol-thread.css:698 |  |
+| `.shell-msg-media-video` |  | pol-thread.css:687, pol-thread.css:699 |  |
+| `.shell-msg-media-audio` |  | pol-thread.css:687, pol-thread.css:700 |  |
+| `.shell-msg-file` |  | pol-thread.css:731, pol-thread.css:2322 |  |
+| `.shell-msg-preview` |  | pol-thread.css:765, pol-thread.css:2321 |  |
+| `.shell-msg-preview-title` |  | pol-thread.css:787, pol-thread.css:794 |  |
+| `.shell-msg-preview-desc` |  | pol-thread.css:787, pol-thread.css:796 |  |
+| `.shell-msg-preview-thumb` |  | pol-thread.css:797, pol-thread.css:806 |  |
+| `.shell-msg-preview-consent` |  | pol-thread.css:797, pol-thread.css:807 |  |
+| `.shell-msg-lightbox-zoom` |  | pol-thread.css:899, pol-thread.css:919 | padding |
+| `.shell-msg-lightbox-close` |  | pol-thread.css:899, pol-thread.css:919 | padding |
+| `.onyx-thread-sheet .onyx-thread-head` |  | pol-thread.css:981, pol-thread.css:2135 |  |
+| `.onyx-thread-sheet .onyx-thread-close` |  | pol-thread.css:995, pol-thread.css:2140 |  |
+| `.onyx-thread-sheet .onyx-thread-msg-text` |  | pol-thread.css:1032, pol-thread.css:2137 |  |
+| `.onyx-composer .shell-command-menu` |  | pol-thread.css:1352, pol-thread.css:1354 |  |
+| `.onyx-composer .shell-emoji-picker` |  | pol-thread.css:1352, pol-thread.css:1371 |  |
+| `.onyx-composer .shell-command-menu` | @media (max-width: 767.98px) | pol-thread.css:1400, pol-thread.css:1407 |  |
+| `.onyx-message-search__surface` |  | pol-thread.css:1429, pol-thread.css:1433 |  |
+| `.onyx-message-search__body` |  | pol-thread.css:1429, pol-thread.css:1501 |  |
+| `.onyx-message-search__button--close` |  | pol-thread.css:1496, pol-thread.css:1498 |  |
+| `.onyx-message-search__saved` |  | pol-thread.css:1529, pol-thread.css:1540 |  |
+| `.onyx-message-search__recall` |  | pol-thread.css:1529, pol-thread.css:1582 |  |
+| `.onyx-message-search__server` |  | pol-thread.css:1529, pol-thread.css:1540 |  |
+| `.onyx-message-search__vault` |  | pol-thread.css:1529, pol-thread.css:1540 |  |
+| `.onyx-message-search__history-off` |  | pol-thread.css:1529, pol-thread.css:1543 |  |
+| `.onyx-message-search__vault-mode` |  | pol-thread.css:1560, pol-thread.css:1576 |  |
+| `.onyx-message-search__saved-run` |  | pol-thread.css:1633, pol-thread.css:1651 |  |
+| `.onyx-message-search__server-row` |  | pol-thread.css:1633, pol-thread.css:1652 |  |
+| `.pins-ledger` |  | pol-thread.css:1920, pol-thread.css:1927 |  |
+| `.pins-item-body--missing` |  | pol-thread.css:1985, pol-thread.css:1988 |  |
+| `.pins-item-body--deleted` |  | pol-thread.css:1985, pol-thread.css:1988 |  |
+| `.onyx-message--compact.onyx-message-search-current` |  | pol-thread.css:2272, pol-thread.css:2274 | box-shadow |
+| `.onyx-frame .room-media-index button.room-media-index-close` | @media (pointer: coarse), (hov | pol-thread.css:2482, pol-thread.css:2488 |  |
+| `.onyx-frame .pins-panel button.pins-close` | @media (pointer: coarse), (hov | pol-thread.css:2482, pol-thread.css:2488 |  |
+| `.onyx-frame .pins-panel button.pins-item-unpin` | @media (pointer: coarse), (hov | pol-thread.css:2482, pol-thread.css:2488 |  |
+| `.onyx-frame .onyx-thread-pane button.topic-chip` |  | pol-thread.css:2515, pol-thread.css:2532 |  |
+| `.onyx-frame .onyx-thread-pane button.shell-topic-card-follow` |  | pol-thread.css:2515, pol-thread.css:2541 |  |
+| `.onyx-roster .onyx-roster-head` |  | pol-roster.css:42, pol-roster.css:416 |  |
+| `.onyx-mlist-close` |  | pol-roster.css:65, pol-roster.css:83 | display |
+| `.onyx-roster .onyx-roster-filter` |  | pol-roster.css:88, pol-roster.css:425 |  |
+| `.onyx-roster .onyx-roster-filter-input` |  | pol-roster.css:99, pol-roster.css:437 |  |
+| `.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within)` |  | pol-roster.css:113, pol-roster.css:436 |  |
+| `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` |  | pol-roster.css:172, pol-roster.css:175 |  |
+| `.onyx-roster .onyx-mlist-rows` |  | pol-roster.css:177, pol-roster.css:449 |  |
+| `.onyx-mlist-main:focus-visible` |  | pol-roster.css:208, pol-roster.css:213 |  |
+| `.onyx-roster:popover-open .onyx-mlist-main` | @media (max-width: 599.98px) | pol-roster.css:397, pol-roster.css:399 |  |
+| `.onyx-roster .onyx-mlist-groups` |  | pol-roster.css:444, pol-roster.css:449 |  |
+| `.public-frame__footer-inner` |  | pol-public.css:203, pol-public.css:1810 |  |
 | `.not-found-page__action` |  | pol-public.css:407, pol-public.css:437, pol-public.css:1622 | color, background |
-| `.guides-copy` |  | pol-public.css:407, pol-public.css:1247 | min-height, padding |
-| `.guides-download` |  | pol-public.css:407, pol-public.css:1247 | min-height, padding |
-| `.guides-reset` |  | pol-public.css:407, pol-public.css:1247, pol-public.css:1255 | min-height, padding, color |
+| `.guides-copy` |  | pol-public.css:407, pol-public.css:1248 | min-height, padding |
+| `.guides-download` |  | pol-public.css:407, pol-public.css:1248 | min-height, padding |
+| `.guides-reset` |  | pol-public.css:407, pol-public.css:1248, pol-public.css:1256 | min-height, padding, color |
 | `.pub-refresh` |  | pol-public.css:456, pol-public.css:467 |  |
-| `.onyx-land-sketch-log` | @media (max-width: 600px) | pol-public.css:784, pol-public.css:786 |  |
+| `.onyx-land-open` |  | pol-public.css:528, pol-public.css:541 |  |
+| `.onyx-land-link` |  | pol-public.css:528, pol-public.css:543 |  |
+| `.onyx-land-sketch-log` | @media (max-width: 600px) | pol-public.css:785, pol-public.css:787 |  |
 | `.onyxos-source` |  | pol-public.css:1448, pol-public.css:1511 |  |
 | `.onyxos-workbench` |  | pol-public.css:1448, pol-public.css:1541 |  |
-| `.onyxos-source` | @media (max-width: 768px) | pol-public.css:1562, pol-public.css:1572 |  |
-| `.onyxos-workbench` | @media (max-width: 768px) | pol-public.css:1562, pol-public.css:1572 |  |
+| `.onyxos-source` | @media (max-width: 767.98px) | pol-public.css:1562, pol-public.css:1572 |  |
+| `.onyxos-workbench` | @media (max-width: 767.98px) | pol-public.css:1562, pol-public.css:1572 |  |
 | `.onyx-call-react-item:focus-visible` |  | calls-c8.css:34, calls-c8.css:35 |  |
-| `.onyx-call-caption-translate` |  | calls-c8.css:71, calls-c8.css:85 | margin-left |
+| `.shell-composer-tools` |  | polish.css:34, polish.css:392 |  |
 | `.polish-primary` |  | polish.css:292, polish.css:303 |  |
 | `.polish-ghost` |  | polish.css:292, polish.css:312 |  |
 | `.update-available button` |  | polish.css:292, polish.css:303 |  |
 | `.a2-textarea` |  | account2.css:20, account2.css:34 | font-size |
 | `.a2-link` |  | account2.css:40, account2.css:53 | color |
-| `.a2-reclaim__signin` |  | account2.css:104, account2.css:117 | background, color |
-| `.a2-reclaim__dismiss` |  | account2.css:104, account2.css:118 | color |
+| `.a2-reclaim__signin` |  | account2.css:104, account2.css:116 | background |
+| `.a2-reclaim__dismiss` |  | account2.css:104, account2.css:117 |  |
 | `.rset-group-mark` |  | roomsettings.css:90, roomsettings.css:112 |  |
-| `.rset-textarea` |  | roomsettings.css:170, roomsettings.css:185 |  |
-| `.onyx-tile-top` |  | calls-c4.css:95, calls-c4.css:99 |  |
-| `.onyx-tile-bottom` |  | calls-c4.css:95, calls-c4.css:100 |  |
-| `.onyx-tile-nick` |  | calls-c4.css:102, calls-c4.css:111 | font-size |
-| `.onyx-sheet-layer[data-placement] > .onyx-sheet` | @media (max-width: 767.98px) | ui-sheets.css:302, ui-sheets.css:1043 | padding-bottom |
-| `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet` | @media (max-width: 767.98px) | ui-sheets.css:315, ui-sheets.css:365 |  |
-| `.onyx-you .onyx-you-group__title` |  | ui-sheets.css:610, ui-sheets.css:611 |  |
-| `.onyx-prefs .pref-category-content` |  | ui-sheets.css:676, ui-sheets.css:1021 |  |
-| `.onyx-toaster` | @media (max-width: 767.98px) | ui-sheets.css:809, ui-sheets.css:1049 | bottom |
-| `.onyx-room-more-menu` | @media (max-width: 767.98px) | ui-sheets.css:960, ui-sheets.css:1047 | bottom |
-| `.onyx-sec-chip` | @media (max-width: 640px) | calls-engine.css:64, calls-engine.css:83 | width |
+| `.rset-textarea` |  | roomsettings.css:168, roomsettings.css:183 |  |
+| `.onyx-tile-top` |  | calls-c4.css:94, calls-c4.css:98 |  |
+| `.onyx-tile-bottom` |  | calls-c4.css:94, calls-c4.css:99 |  |
+| `.onyx-composer .gap-attach-quality-opt` | @media (pointer: coarse) | gap-convo.css:168, gap-convo.css:170 |  |
+| `.onyx-composer .gap-attach-keep` | @media (pointer: coarse) | gap-convo.css:168, gap-convo.css:171 |  |
+| `.gap-skeleton-avatar` |  | gap-convo.css:278, gap-convo.css:288 |  |
+| `.gap-skeleton-name` |  | gap-convo.css:280, gap-convo.css:282, gap-convo.css:288 | background |
+| `.gap-skeleton-line` |  | gap-convo.css:280, gap-convo.css:283, gap-convo.css:288 |  |
+| `.oc-meta-inline` |  | gap-oper.css:110, gap-oper.css:111 |  |
+| `.onyx-moddesk-sheet .oper-desk .oc-input-mono` |  | gap-oper.css:114, gap-oper.css:198 |  |
+| `.oc-wire` |  | gap-oper.css:114, gap-oper.css:248 |  |
+| `.oc-list` |  | gap-oper.css:345, gap-oper.css:346 |  |
+| `.oc-members` |  | gap-oper.css:345, gap-oper.css:367 |  |
+| `.oc-plain` |  | gap-oper.css:345, gap-oper.css:369 |  |
+| `.oc-tags` |  | gap-oper.css:345, gap-oper.css:355 |  |
+| `.ap-hint` |  | gap-oper.css:418, gap-oper.css:419 | font-size, color |
+| `.onyx-rail .onyx-rail-row > .onyx-rail-star` | @media (hover: hover) | rx-shell.css:88, rx-shell.css:99 |  |
+| `.onyx-rail .onyx-rail-row > .onyx-rail-more` | @media (hover: hover) | rx-shell.css:88, rx-shell.css:97 |  |
+| `.onyx-rail .onyx-rail-entry > .onyx-rail-more` | @media (hover: hover) | rx-shell.css:88, rx-shell.css:97 |  |
+| `.onyx-railmenu-head .onyx-railmenu-tile` |  | rx-shell.css:150, rx-shell.css:162 |  |
+| `.onyx-railmenu-head .onyx-railmenu-face` |  | rx-shell.css:150, rx-shell.css:163 | font-size |
+| `.onyx-frame[data-calls="true"] > .onyx-topbar` | @media (min-width: 600px) and  | rx-shell.css:484, rx-shell.css:495 |  |
+| `.hi-note` |  | gap-import.css:88, gap-import.css:102 |  |
+| `.hi-review-foot` |  | gap-import.css:228, gap-import.css:244 |  |
+| `.hi-dest-input` | @media (hover: none), (pointer | gap-import.css:448, gap-import.css:453 |  |
+| `.bk-select-input` | @media (hover: none), (pointer | gap-import.css:448, gap-import.css:453 |  |
+| `.gorg-menu-face` |  | gap-organize.css:223, gap-organize.css:235 | border-radius |
+| `.gorg-input` |  | gap-organize.css:423, gap-organize.css:435 |  |
+| `.gorg-select` |  | gap-organize.css:423, gap-organize.css:436 |  |
+| `.gorg-textarea` |  | gap-organize.css:423, gap-organize.css:437 |  |
+| `.gorg-note-input` |  | gap-organize.css:423, gap-organize.css:437 |  |
+| `.gorg-tucked-name--static` | @media (max-width: 767.98px) | gap-organize.css:732, gap-organize.css:733 |  |
+| `.gorg-textarea` | @media (max-width: 767.98px) | gap-organize.css:738, gap-organize.css:742 |  |
+| `.gorg-note-input` | @media (max-width: 767.98px) | gap-organize.css:738, gap-organize.css:742 |  |
+| `.um-input` | @media (hover: none), (pointer | gap-usermodes.css:393, gap-usermodes.css:399 |  |
+| `.um-list__row` | @media (hover: none), (pointer | gap-usermodes.css:393, gap-usermodes.css:401 |  |
+| `.onyx-watch-glyph` |  | gap-watch.css:72, gap-watch.css:93 | background, cursor |
+| `.onyx-watch-honest` |  | gap-watch.css:321, gap-watch.css:330 |  |
+| `.onyx-watch-heading` | @media (max-height: 520px) | gap-watch.css:593, gap-watch.css:601 |  |
+| `.gs-activity-foot` |  | gap-shell.css:189, gap-shell.css:191 | font-size, color |
+| `.gc-btn` |  | gap-claim.css:104, gap-claim.css:121 |  |
+| `.onyx-sheet-layer` |  | ui-sheets.css:78, ui-sheets.css:153, ui-sheets.css:1127 |  |
+| `.onyx-sheet-layer[data-placement="side"]` |  | ui-sheets.css:86, ui-sheets.css:209 |  |
+| `.onyx-sheet-backdrop` |  | ui-sheets.css:90, ui-sheets.css:155 |  |
+| `.onyx-sheet-layer > .onyx-sheet` |  | ui-sheets.css:114, ui-sheets.css:160 |  |
+| `.onyx-sheet-close` |  | ui-sheets.css:136, ui-sheets.css:320 |  |
+| `.onyx-spotlight-close` |  | ui-sheets.css:320, ui-sheets.css:529 | margin |
+| `:root` | @media (max-width: 599.98px) | ui-sheets.css:391, ui-sheets.css:1131 | --sheet-max-h |
+| `.onyx-sheet-layer > .onyx-sheet` | @media (max-width: 599.98px) | ui-sheets.css:403, ui-sheets.css:1134 |  |
+| `.onyx-sheet-layer[data-placement] > .onyx-sheet` | @media (max-width: 599.98px) | ui-sheets.css:403, ui-sheets.css:1134 |  |
+| `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet` | @media (max-width: 599.98px) | ui-sheets.css:415, ui-sheets.css:465 |  |
+| `.onyx-you .onyx-you-group__title` |  | ui-sheets.css:698, ui-sheets.css:699 |  |
+| `.onyx-prefs .pref-category-content` |  | ui-sheets.css:764, ui-sheets.css:1110 |  |
+| `.onyx-toaster` | @media (max-width: 767.98px) | ui-sheets.css:887, ui-sheets.css:1142 |  |
+| `.onyx-prefs .pref-category-nav` | @media (max-width: 640.98px),  | ui-sheets.css:954, ui-sheets.css:969 |  |
+| `.onyx-prefs .pref-category-nav__landmark` | @media (max-width: 640.98px),  | ui-sheets.css:970, ui-sheets.css:974 |  |
+| `.onyx-room-more-menu` | @media (max-width: 599.98px) | ui-sheets.css:1054, ui-sheets.css:1138 |  |
+| `.onyx-sheet .rset-toggle-track` |  | ui-sheets.css:1378, ui-sheets.css:1408 |  |
+| `.onyx-call-join` | @media (hover: none) | calls-engine.css:49, calls-engine.css:51 |  |
+| `.onyx-call-meta .onyx-sec-chip` |  | calls-engine.css:144, calls-engine.css:577 |  |
+| `.onyx-call-bar-center > .onyx-cbtn` | @container onyx-call (max-widt | calls-engine.css:198, calls-engine.css:200 |  |
+| `.onyx-call-bar-center > .onyx-cbtn` | @media (max-width: 640.98px) | calls-engine.css:238, calls-engine.css:240 |  |
+| `.onyx-call-people` | @media (max-height: 620px) and | calls-engine.css:281, calls-engine.css:290 |  |
+| `.onyx-call-people[data-density]` | @media (max-height: 620px) and | calls-engine.css:281, calls-engine.css:290 |  |
+| `.onyx-call-bar-center > .onyx-cbtn` | @media (max-height: 500px) | calls-engine.css:318, calls-engine.css:320 |  |
+| `.onyx-call-grid[data-columns="1"]` |  | calls-engine.css:334, calls-engine.css:343 |  |
+| `.onyx-call-grid` | @media (max-width: 767.98px) | calls-engine.css:369, calls-engine.css:378 |  |
+| `.onyx-call-pip-btn` | @media (max-width: 767.98px) | calls-engine.css:507, calls-engine.css:550 |  |
+| `.onyx-call-pip-card` | @media (max-height: 500px) and | calls-engine.css:514, calls-engine.css:521 |  |
+| `.onyx-call-pip-card[data-corner]` | @media (max-height: 500px) and | calls-engine.css:514, calls-engine.css:521 |  |
 
 ## G14. Classes painted by more than one file
 
-360 classes are the key (rightmost) element of rules in two or more files (rule count in parentheses; every rule location is in style-map.json `multiFileClasses`).
+474 classes are the key (rightmost) element of rules in two or more files (rule count in parentheses; every rule location is in style-map.json `multiFileClasses`).
 
 | files | classes |
 |---|---|
-| app.css + ui-sheets.css | `.onyx-sheet-close` (10) `.onyx-you-link` (9) `.onyx-spotlight-close` (7) `.onyx-prefs` (7) `.pref-category-tab` (7) `.onyx-sheet-backdrop` (7) `.onyx-spotlight-panel` (6) `.onyx-shortcuts-sheet` (6) `.onyx-spotlight-option` (6) `.onyx-account-nav__item` (5) `.onyx-you-close` (5) `.onyx-shortcuts-close` (5) `.onyx-spotlight` (5) `.onyx-spotlight-input` (5) `.onyx-spotlight-icon` (5) `.onyx-spotlight-hint` (5) `.onyx-toaster` (4) `.chb-skin` (4) `.onyx-account-nav` (4) `.onyx-member-action` (4) `.onyx-you-leave` (4) `.onyx-member-action--primary` (4) `.onyx-spotlight-results` (4) `.onyx-prefs-body` (4) `.pref-category-nav` (4) `.pref-category-tabs` (4) `.pref-category-content` (4) `.onyx-toast__dismiss` (3) `.chb-filter` (3) `.chb-sort` (3) `.chb-topic` (3) `.onyx-account-section` (3) `.onyx-member-identity` (3) `.onyx-member-pronouns` (3) `.onyx-you` (3) `.onyx-you-group__title` (3) `.jump-to-date-close` (3) `.onyx-spotlight-backdrop` (3) `.onyx-spotlight-search` (3) `.onyx-spotlight-foot` (3) `.onyx-moddesk-sheet` (3) `.onyx-moddesk-head` (3) `.pref-category-tab__summary` (3) `.onyx-reclaim-lead` (2) `.onyx-newmsg-sheet` (2) `.onyx-newmsg-actions` (2) `.onyx-toast` (2) `.onyx-toast--success` (2) `.onyx-toast--danger` (2) `.onyx-toast--warning` (2) `.guest-claim-sheet__form` (2) `.chb-toolbar` (2) `.chb-status` (2) `.chb-list` (2) `.chb-name` (2) `.chb-pill` (2) `.chb-count` (2) `.chb-count--live` (2) `.chb-ledger` (2) `.chb-join` (2) `.chb-create` (2) `.chb-skins` (2) `.chb-check` (2) `.chb-create-actions` (2) `.onyx-scheduled-empty` (2) `.onyx-account` (2) `.onyx-profile-nick` (2) `.onyx-profile-account` (2) `.onyx-member-name` (2) `.onyx-member-nickline` (2) `.onyx-member-actions` (2) `.onyx-you-identity` (2) `.onyx-you-title` (2) `.onyx-you-nick` (2) `.onyx-you-desc` (2) `.onyx-you-lede` (2) `.onyx-you-group` (2) `.onyx-you-group__hint` (2) `.onyx-you-leave-row` (2) `.jump-to-date-head` (2) `.jump-to-date-title` (2) `.onyx-spotlight-sigil` (2) `.onyx-spotlight-group` (2) `.onyx-spotlight-section` (2) `.onyx-spotlight-title` (2) `.shortcuts-overlay` (2) `.shortcuts-overlay__row` (2) `.onyx-moddesk-room` (2) `.onyx-invshare-preview` (2) `.onyx-invshare-url` (2) `.pref-category-tab__label` (2) `.pref-action-card__icon` (2) `.notif-center` (2) `.onyx-sheet-title` (2) |
-| app.css + pol-shell.css | `.onyx-rail-item` (10) `.onyx-nav-icon` (10) `.onyx-palette-launcher` (10) `.onyx-rail-star` (9) `.onyx-nav-btn` (9) `.onyx-rail-label` (8) `.onyx-rail-sub` (8) `.onyx-topbar` (7) `.onyx-rail` (7) `.onyx-rail-name` (7) `.onyx-rail-filter-input` (6) `.onyx-rail-new` (6) `.onyx-rail-time` (6) `.onyx-moddesk-toggle` (6) `.onyx-main` (6) `.onyx-rail-active` (5) `.onyx-rail-browse` (5) `.room-notify-name` (5) `.room-notify-seg` (5) `.onyx-dmsafe-trigger` (5) `.shell-ribbon-bell` (5) `.onyx-brand` (4) `.onyx-gem` (4) `.onyx-conn-live` (4) `.onyx-rail-section-heading` (4) `.onyx-rail-copy` (4) `.onyx-rail-unread` (4) `.guest-claim-chip__keep` (4) `.guest-claim-chip__dismiss` (4) `.onyx-primary-nav` (4) `.onyx-nav-btn--active` (4) `.onyx-home-inner` (4) `.onyx-home-empty` (4) `.onyx-home-action` (4) `.onyx-coach-dismiss` (4) `.onyx-coach` (4) `.onyx-coach-eyebrow` (4) `.onyx-palette-kbd` (4) `.onyx-room-header-btn` (4) `.onyx-conn` (3) `.onyx-rail-filter` (3) `.onyx-rail-filter-unread` (3) `.onyx-rail-filter-clear` (3) `.onyx-rail-section` (3) `.onyx-rail-empty` (3) `.onyx-rail-color` (3) `.onyx-rail-star-on` (3) `.guest-claim-chip` (3) `.onyx-nav-btn--dialog-open` (3) `.onyx-home-empty-copy` (3) `.onyx-header-voice` (3) `.onyx-voice-chip` (3) `.onyx-voice-chip-status` (3) `.onyx-call-join` (3) `.onyx-topbar-search` (3) `.onyx-topbar-global` (3) `.onyx-room-more-toggle` (3) `.shell-ribbon-badge` (3) `.onyx-room-header-id` (3) `.onyx-room-header-name` (3) `.onyx-room-header-topic` (3) `.onyx-room-header-actions` (3) `.onyx-conn-connecting` (2) `.onyx-rail-filter-unread-on` (2) `.onyx-rail-filter-empty` (2) `.onyx-rail-row` (2) `.onyx-rail-meta` (2) `.onyx-rail-mention` (2) `.onyx-rail-keywarn` (2) `.guest-claim-chip__text` (2) `.guest-claim-chip__actions` (2) `.chb-close` (2) `.onyx-account-hint` (2) `.onyx-account-actions` (2) `.onyx-profile-badge` (2) `.onyx-home-masthead` (2) `.onyx-home-title` (2) `.onyx-home-inbox` (2) `.onyx-home-invite` (2) `.onyx-home-rooms` (2) `.onyx-home-actions` (2) `.onyx-coach-text` (2) `.onyx-dmsafe-bar` (2) `.onyx-dmsafe-chip` (2) `.pref-action-card` (2) `.onyx-call-join-label` (2) `.onyx-search-toggle-open` (2) `.shell-ribbon-inbox` (2) `.notif-center__head` (2) |
-| app.css + pol-thread.css | `.onyx-message` (13) `.onyx-msg-menu-trigger` (9) `.onyx-msg-menu-item` (9) `.onyx-msg-menu` (7) `.onyx-react-picker` (7) `.shell-command-menu` (7) `.onyx-react-choice` (6) `.boost-pill` (6) `.boost-add` (6) `.onyx-ts` (6) `.onyx-audience-toggle` (5) `.onyx-body` (5) `.shell-emoji-picker` (5) `.shell-emoji-choice` (5) `.onyx-day-divider` (4) `.topic-chip` (4) `.shell-command-item` (4) `.shell-composer-tool--emoji` (4) `.onyx-jump-latest` (4) `.onyx-system` (3) `.onyx-thread-indicator` (3) `.onyx-topic-tools` (3) `.onyx-topic` (3) `.onyx-sender` (3) `.onyx-composer-target` (3) `.onyx-react-search` (3) `.onyx-react-grid` (3) `.shell-composer-popovers` (3) `.shell-command-usage` (3) `.shell-emoji-search` (3) `.shell-emoji-grid` (3) `.you` (3) `.boost-count` (3) `.onyx-jump-latest--unread` (3) `.onyx-day-divider-label` (2) `.onyx-thread-sheet` (2) `.onyx-thread-head` (2) `.onyx-thread-title` (2) `.onyx-thread-desc` (2) `.onyx-thread-msg` (2) `.onyx-thread-msg-from` (2) `.onyx-thread-msg-text` (2) `.onyx-thread-state` (2) `.onyx-audience-toggle-set` (2) `.onyx-composer-error` (2) `.onyx-msg-menu-delete-confirm` (2) `.onyx-msg-menu-backdrop` (2) `.onyx-feed-empty` (2) `.onyx-feed-empty-title` (2) `.onyx-feed-empty-body` (2) `.shell-command-item--active` (2) `.shell-command-desc` (2) `.boost-bar` (2) `.boost-emoji` (2) `.onyx-jump-latest-count` (2) |
-| app.css + pol-public.css | `.onyx-land-open` (5) `.onyx-land-link` (5) `.onyx-land-claims` (4) `.onyx-land-panel` (4) `.onyx-land-action` (4) `.onyx-land-h1` (3) `.onyx-land-lede` (3) `.onyx-land-cta` (3) `.onyx-land-note` (3) `.onyx-land-trust` (3) `.onyx-land-board` (3) `.onyx-land-tabs` (3) `.onyx-landing` (2) `.onyx-land-h2` (2) `.onyx-land-detail` (2) `.onyx-land-panel-copy` (2) `.onyx-land-h3` (2) `.onyx-land-panel-note` (2) `.onyx-land-links` (2) `.onyx-land-footnote` (2) `.onyx-land-shelf` (2) `.onyx-land-shelf-label` (2) `.onyx-land-shelf-list` (2) |
-| app.css + pol-roster.css | `.onyx-roster-filter-input` (9) `.onyx-member-message` (7) `.onyx-member` (6) `.onyx-member-presence-dot` (5) `.onyx-roster-filter` (4) `.onyx-away` (3) `.onyx-roster-care` (3) `.onyx-roster-head` (3) `.onyx-roster-count` (3) `.onyx-member-presence-dot--away` (3) `.onyx-avatar--sm` (2) `.onyx-roster-empty` (2) `.onyx-member-role` (2) |
-| pol-shell.css + ui-sheets.css | `.notif-center__dismiss` (7) `.notif-center__filter` (6) `.notif-center__row` (6) `.notif-center__glyph` (5) `.notif-center__open` (4) `.notif-center__close` (3) `.notif-center__empty` (3) `.onyx-profile-pop` (3) `.shell-ribbon-bell-icon` (3) `.pref-reset-all` (2) `.onyx-profile-summary` (2) `.onyx-profile-backdrop` (2) |
-| pol-stats.css + pol-public.css | `.r-btn` (16) `.primary` (6) `.label` (6) `.data-hero` (5) `.data-card` (4) `.r-wrap` (3) `.r-kicker` (3) `.ui-root` (2) `.r` (2) `.r-section` (2) `.sub` (2) |
-| app.css + calls-engine.css | `.onyx-sec-chip` (8) `.onyx-cbtn-leave` (7) `.onyx-call-bar-center` (5) `.onyx-call-bar-right` (5) `.onyx-call-more` (5) `.onyx-call-person` (4) `.onyx-call-bar-left` (4) `.onyx-call-more-wrap` (3) `.onyx-call-where` (2) |
-| app.css + pol-shell.css + ui-sheets.css | `.chb-card` (7) `.onyx-room-more-menu` (6) `.chb-sort-btn` (5) `.onyx-member-card` (5) `.onyx-you-head` (5) `.notif-center__filters` (4) `.notif-center__list` (3) `.onyx-room-more-scrim` (3) |
-| app.css + pol-shell.css + roomsettings.css | `.onyx-facepile` (5) `.onyx-room-header` (4) `.room-notify` (3) `.onyx-convohead` (3) `.onyx-dmsafe` (3) |
-| pol-shell.css + roomsettings.css | `.onyx-room-topic-toggle` (4) `.onyx-room-header-sub` (4) `.onyx-room-privacy` (3) `.onyx-room-header-topic-open` (2) |
-| app.css + calls-c4.css | `.onyx-call-avatar-lg` (3) `.onyx-cbtn-cap` (3) `.onyx-call-you` (2) |
-| account2.css + ui-sheets.css | `.a2-body` (2) `.a2-section` (2) `.a2-status` (2) |
-| app.css + pol-shell.css + pol-ios.css | `.onyx-frame` (8) `.onyx-mobile-nav` (7) |
-| app.css + calls-c4.css + calls-engine.css | `.onyx-call-stage` (7) `.onyx-call-more-item` (5) |
-| calls-c11.css + calls-c4.css | `.onyx-tile` (13) `.onyx-tile-video` (6) |
-| pol-shell.css + pol-thread.css | `.shell-composer-tool` (6) `.shell-composer-action-label` (3) |
-| pol-thread.css + polish.css | `.shell-composer-tool--more` (6) `.shell-composer-more-wrap` (3) |
-| app.css + pol-shell.css + calls-c8.css + calls-c11.css + roomsettings.css + calls-c6.css + calls-c4.css | `.onyx-ci` (40) |
-| app.css + calls-c11.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-cbtn` (17) |
-| app.css + calls-c11.css + calls-c6.css + ui-sheets.css | `.onyx-sheet` (26) |
-| app.css + calls-c6.css + ui-sheets.css + pol-ios.css | `.onyx-sheet-layer` (16) |
-| app.css + calls-c11.css + calls-c6.css + calls-c4.css | `.onyx-call-btn` (13) |
-| app.css + calls-c8.css + calls-c4.css + calls-engine.css | `.onyx-call-bar` (11) |
-| app.css + pol-shell.css + pol-thread.css + pol-ios.css | `.onyx-composer` (8) |
-| app.css + pol-shell.css + pol-thread.css + pol-roster.css | `.onyx-avatar` (7) |
-| pol-shell.css + pol-thread.css + pol-roster.css | `.pt-ico` (61) |
-| app.css + pol-shell.css + pol-roster.css | `.onyx-roster` (15) |
-| app.css + calls-c11.css + calls-c6.css | `.onyx-call-ring` (12) |
-| app.css + calls-c6.css + calls-engine.css | `.onyx-call-people` (7) |
-| app.css + pol-shell.css + account2.css | `.onyx-rail-avatar` (5) |
-| app.css + roomsettings.css + ui-sheets.css | `.onyx-sheet-head` (5) |
-| calls-c11.css + calls-c6.css | `.onyx-call-pip-card` (11) |
-| calls-c4.css + calls-engine.css | `.onyx-call-video` (6) |
-| app.css + calls-c11.css | `.onyx-call-sheet` (5) |
-| pol-shell.css + pol-roster.css | `.onyx-members-toggle` (5) |
-| app.css + calls-c6.css | `.onyx-call-avatar` (4) |
+| app.css + ui-sheets.css | `.onyx-you-link` (9) `.notify-toggle` (8) `.onyx-spotlight-panel` (8) `.onyx-prefs` (8) `.pref-category-tab` (8) `.onyx-spotlight` (7) `.onyx-spotlight-option` (7) `.onyx-account` (6) `.onyx-spotlight-close` (6) `.onyx-shortcuts-sheet` (6) `.onyx-spotlight-hint` (6) `.onyx-account-nav__item` (5) `.onyx-spotlight-input` (5) `.onyx-prefs-body` (5) `.pref-category-nav` (5) `.pref-category-content` (5) `.chb-skin` (4) `.onyx-account-nav` (4) `.onyx-you` (4) `.onyx-you-leave` (4) `.jump-to-date-close` (4) `.onyx-member-action--primary` (4) `.onyx-spotlight-search` (4) `.onyx-spotlight-results` (4) `.pref-category-tabs` (4) `.onyx-toast__dismiss` (3) `.chb-filter` (3) `.chb-sort` (3) `.chb-topic` (3) `.onyx-account-drop-confirm` (3) `.onyx-member-pronouns` (3) `.onyx-member-ledger` (3) `.onyx-member-confirm` (3) `.onyx-you-identity` (3) `.onyx-you-group__title` (3) `.onyx-member-identity` (3) `.onyx-spotlight-backdrop` (3) `.onyx-spotlight-foot` (3) `.pref-category-tab__summary` (3) `.onyx-reclaim-lead` (2) `.onyx-newmsg-sheet` (2) `.onyx-newmsg-actions` (2) `.onyx-toast` (2) `.onyx-toast--warning` (2) `.guest-claim-sheet__form` (2) `.guest-claim-sheet__hint` (2) `.chb-toolbar` (2) `.chb-status` (2) `.chb-list` (2) `.chb-name` (2) `.chb-pill` (2) `.chb-count` (2) `.chb-join` (2) `.chb-create` (2) `.chb-skins` (2) `.chb-create-actions` (2) `.onyx-scheduled-empty` (2) `.onyx-account-section__title` (2) `.onyx-profile-nick` (2) `.onyx-profile-account` (2) `.onyx-member-name` (2) `.onyx-member-nickline` (2) `.onyx-member-actions` (2) `.onyx-moderation-actions` (2) `.onyx-you-nick` (2) `.onyx-you-desc` (2) `.onyx-you-lede` (2) `.onyx-you-group__hint` (2) `.onyx-you-leave-row` (2) `.jump-to-date-head` (2) `.jump-to-date-title` (2) `.onyx-spotlight-sigil` (2) `.onyx-dmsafe-panel` (2) `.onyx-spotlight-section` (2) `.onyx-spotlight-title` (2) `.shortcuts-overlay` (2) `.shortcuts-overlay__row` (2) `.onyx-moddesk-close` (2) `.onyx-invshare-preview` (2) `.onyx-invshare-url` (2) `.pref-category-tab__label` (2) `.pref-action-card__icon` (2) `.notif-center` (2) |
+| app.css + pol-thread.css | `.topic-chip` (10) `.onyx-msg-menu-trigger` (10) `.onyx-msg-menu` (10) `.onyx-msg-menu-item` (10) `.onyx-thread-indicator` (9) `.onyx-react-picker` (9) `.boost-pill` (9) `.shell-topic-action` (8) `.shell-topic-card-follow` (8) `.is-active` (8) `.shell-command-menu` (8) `.shell-topic-follow` (7) `.onyx-audience-toggle` (7) `.onyx-react-choice` (7) `.boost-add` (7) `.shell-emoji-choice` (6) `.onyx-jump-latest` (6) `.onyx-thread-sheet` (5) `.shell-topic-create-input` (5) `.topic-filter-bar` (5) `.onyx-react-search` (5) `.shell-emoji-picker` (5) `.shell-command-item` (5) `.shell-emoji-search` (5) `.shell-emoji-grid` (5) `.onyx-system` (4) `.onyx-topic-tools` (4) `.onyx-react-grid` (4) `.shell-msg-codeblock` (4) `.shell-composer-tool--emoji` (4) `.onyx-thread-head` (3) `.shell-topic-card-main` (3) `.shell-topic-card-meta` (3) `.shell-topic-card-preview` (3) `.topic-chip__unread` (3) `.onyx-topic` (3) `.onyx-thread` (3) `.onyx-sender` (3) `.onyx-composer-target` (3) `.shell-command-usage` (3) `.boost-bar` (3) `.onyx-jump-latest--unread` (3) `.onyx-day-divider-label` (2) `.onyx-thread-title` (2) `.onyx-thread-desc` (2) `.onyx-thread-msg-from` (2) `.onyx-thread-state` (2) `.shell-topic-create` (2) `.shell-topic-forum` (2) `.shell-topic-card-title` (2) `.shell-topic-card-author` (2) `.onyx-audience-toggle-set` (2) `.onyx-composer-error` (2) `.onyx-msg-menu-delete-confirm` (2) `.onyx-msg-menu-backdrop` (2) `.shell-msg-text` (2) `.shell-msg-link` (2) `.shell-msg-codeblock-lang` (2) `.onyx-feed-empty` (2) `.onyx-feed-empty-title` (2) `.onyx-feed-empty-body` (2) `.shell-command-desc` (2) `.boost-emoji` (2) `.onyx-jump-latest-count` (2) |
+| app.css + pol-shell.css | `.onyx-rail-sub` (8) `.onyx-rail-name` (6) `.onyx-gem` (4) `.onyx-rail-section-heading` (4) `.onyx-rail-copy` (4) `.onyx-rail-unread` (4) `.guest-claim-chip__dismiss` (4) `.onyx-nav-btn--active` (4) `.onyx-home-empty` (4) `.onyx-home-action` (4) `.onyx-coach` (4) `.onyx-coach-eyebrow` (4) `.onyx-dmsafe-trigger` (4) `.onyx-conn` (3) `.onyx-nav-btn--dialog-open` (3) `.onyx-home-empty-copy` (3) `.onyx-room-more-toggle` (3) `.shell-ribbon-badge` (3) `.onyx-room-header-id` (3) `.onyx-room-header-actions` (3) `.onyx-conn-live` (3) `.onyx-conn-connecting` (2) `.onyx-rail-filter-empty` (2) `.onyx-rail-mention` (2) `.onyx-rail-keywarn` (2) `.guest-claim-chip__text` (2) `.guest-claim-chip__actions` (2) `.onyx-account-hint` (2) `.onyx-profile-badge` (2) `.onyx-home-masthead` (2) `.onyx-home-title` (2) `.onyx-home-inbox` (2) `.onyx-home-invite` (2) `.onyx-home-rooms` (2) `.onyx-home-actions` (2) `.onyx-coach-text` (2) `.onyx-dmsafe-bar` (2) `.onyx-dmsafe-chip` (2) `.pref-action-card` (2) `.onyx-search-toggle-open` (2) `.shell-ribbon-inbox` (2) |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-palette-launcher` (16) `.onyx-topbar` (14) `.onyx-nav-btn` (12) `.onyx-rail-star` (11) `.onyx-rail-new` (9) `.onyx-rail-browse` (9) `.onyx-nav-icon` (9) `.shell-ribbon-bell` (9) `.onyx-rail` (8) `.onyx-rail-filter-input` (8) `.onyx-rail-time` (7) `.onyx-palette-kbd` (7) `.onyx-rail-active` (6) `.onyx-rail-filter-unread` (6) `.room-notify-name` (6) `.onyx-primary-nav` (6) `.onyx-moddesk-toggle` (6) `.onyx-brand` (5) `.onyx-rail-filter` (5) `.onyx-rail-filter-clear` (5) `.onyx-rail-empty` (5) `.guest-claim-chip__keep` (5) `.onyx-topbar-search` (5) `.onyx-room-header-btn` (5) `.onyx-room-header-name` (5) `.onyx-rail-meta` (4) `.onyx-rail-color` (4) `.onyx-home-inner` (4) `.onyx-topbar-global` (4) `.onyx-room-header-topic` (4) `.onyx-rail-row` (3) `.onyx-call-join-label` (3) |
+| pol-shell.css + rx-shell.css | `.onyx-shi` (37) `.onyx-ident` (11) `.onyx-rail-foot` (7) `.onyx-room-header-icon` (6) `.onyx-ident-nick` (4) `.onyx-room-more-search` (4) `.onyx-topbar-title` (4) `.onyx-nav-glyph` (4) `.onyx-nav-badge` (4) `.onyx-rail-title` (4) `.onyx-rail-tile` (4) `.onyx-room-header-titles` (4) `.onyx-search-toggle` (3) `.onyx-rail-zero` (3) `.onyx-palette-launcher-label` (3) `.onyx-rail-new-label` (3) `.onyx-room-back` (3) `.onyx-room-header-topic-row` (3) `.onyx-ident-badge` (2) `.guest-claim-chip__icon` (2) |
+| app.css + calls-engine.css | `.onyx-call-person` (17) `.onyx-sec-chip` (10) `.onyx-call-name` (8) `.onyx-call-role` (8) `.onyx-join-banner` (7) `.onyx-call-more` (7) `.onyx-call-pip` (6) `.onyx-cbtn-leave` (6) `.onyx-join-banner-actions` (5) `.onyx-join-banner-hide` (4) `.onyx-call-people-count` (4) `.onyx-join-banner-copy` (4) `.onyx-calls` (3) `.onyx-call-faces` (3) `.onyx-call-stage-status` (3) `.onyx-call-where` (3) `.onyx-calls-title` (2) `.onyx-call-badge` (2) `.onyx-call-timer` (2) |
+| pol-shell.css + ui-sheets.css | `.notif-center__dismiss` (7) `.notif-center__row` (6) `.chb-card` (6) `.notif-center__filter` (5) `.notif-center__glyph` (5) `.onyx-profile-pop` (5) `.notif-center__open` (4) `.notif-center__empty` (3) `.pref-category-nav__landmark` (3) `.shell-ribbon-bell-icon` (3) `.pref-reset-all` (2) `.onyx-profile-summary` (2) `.onyx-profile-backdrop` (2) |
+| pol-stats.css + pol-public.css | `.r-btn` (16) `.primary` (6) `.data-hero` (6) `.label` (6) `.data-card` (4) `.r-wrap` (3) `.r-kicker` (3) `.ui-root` (2) `.r` (2) `.r-section` (2) `.sub` (2) |
+| calls-c4.css + calls-engine.css | `.onyx-call-grid` (24) `.onyx-call-video` (11) `.onyx-tile-btn` (9) `.onyx-tile-tag` (5) `.onyx-tile-top` (4) `.onyx-tile-nick` (4) `.onyx-call-more-share` (3) `.onyx-tile-tag-text` (3) `.onyx-call-primary` (2) `.onyx-cbtn-share` (2) |
+| calls-c8.css + calls-engine.css | `.onyx-call-caption-translate` (6) `.onyx-call-react-item` (5) `.onyx-call-captions-copy` (5) `.onyx-call-captions` (4) `.onyx-call-more-react` (3) `.onyx-vs-select` (3) `.onyx-vs-btn` (3) `.onyx-vs-range` (2) `.onyx-vs-toggle` (2) `.onyx-cbtn-react` (2) |
+| calls-c6.css + calls-engine.css | `.onyx-call-pip-btn` (7) `.onyx-call-pip-faces` (4) `.onyx-call-ring-meta` (3) `.onyx-call-pip-handle` (3) `.onyx-call-pip-live` (3) `.onyx-call-pip-corner` (3) `.onyx-call-pip-body` (3) `.onyx-call-ring-sub` (2) `.onyx-call-pip-cap` (2) |
+| app.css + pol-roster.css | `.onyx-member-message` (7) `.onyx-member-presence-dot` (5) `.onyx-roster-head` (4) `.onyx-roster-count` (3) `.onyx-member-presence-dot--away` (3) `.onyx-avatar--sm` (2) `.onyx-roster-empty` (2) `.onyx-member-role` (2) |
+| pol-thread.css + gap-convo.css | `.onyx-attach-remove` (6) `.onyx-message-search__body` (6) `.onyx-message-search__deep` (6) `.onyx-message-search` (5) `.onyx-attach-row` (3) `.onyx-attach-status` (3) `.shell-attachment-progress` (3) `.onyx-attach-name` (2) |
+| app.css + pol-shell.css + ui-sheets.css | `.onyx-member-card` (10) `.onyx-room-more-menu` (10) `.onyx-you-head` (4) `.notif-center__filters` (4) `.onyx-account-actions` (3) `.notif-center__list` (3) `.onyx-room-more-scrim` (3) |
+| roomsettings.css + ui-sheets.css | `.onyx-sheet-head` (8) `.rset-toggle-track` (5) `.rset-toggle-thumb` (5) `.rset-toggle` (4) `.rset-section` (2) `.rset-toggle-text` (2) |
+| account2.css + ui-sheets.css | `.a2-btn` (6) `.a2-input` (4) `.a2-row--fill` (3) `.a2-status` (3) `.a2-body` (2) `.a2-section` (2) |
+| app.css + gap-oper.css | `.onyx-moddesk-hint` (3) `.onyx-moddesk-form` (3) `.oper-desk` (3) `.onyx-moddesk-offline` (2) `.onyx-moddesk-errors` (2) `.oper-event-console` (2) |
+| app.css + calls-c4.css + calls-engine.css | `.onyx-call-stage` (14) `.onyx-call-avatar-lg` (13) `.onyx-call-more-item` (10) `.onyx-cbtn-cap` (5) `.onyx-call-you` (3) |
+| app.css + gap-usermodes.css | `.onyx-schedule-pop` (2) `.onyx-schedule-sub` (2) `.onyx-schedule-custom` (2) `.onyx-schedule-when` (2) `.onyx-scheduled-list` (2) |
+| pol-thread.css + polish.css | `.shell-composer-tools-item` (15) `.shell-composer-tool--more` (6) `.shell-composer-tools-action` (4) `.shell-composer-more-wrap` (3) |
+| rx-shell.css + gap-organize.css | `.onyx-railmenu-item` (8) `.gorg-menu-label` (2) `.gorg-menu-hint` (2) `.onyx-railmenu-label` (2) |
+| app.css + gap-account.css | `.onyx-account-field` (5) `.pref-reset` (5) `.pref-toggle` (2) `.pref-actions` (2) |
+| roomsettings.css + gap-chanserv.css | `.rset-input` (4) `.rset-access-row` (3) `.rset-select` (2) `.rset-flags` (2) |
+| pol-shell.css + roomsettings.css + rx-shell.css | `.onyx-room-topic-toggle` (6) `.onyx-room-header-sub` (5) `.onyx-room-privacy` (4) |
+| app.css + gap-auth.css | `.conn-link` (9) `.conn-title` (6) `.conn-actions` (2) |
+| gap-appearance.css + pol-thread.css | `.onyx-mention` (9) `.onyx-message--compact` (7) `.shell-msg-spoiler-label` (4) |
+| pol-roster.css + rx-shell.css | `.onyx-mlist-close` (7) `.onyx-mlist-group-head` (7) `.onyx-mlist-find` (5) |
+| app.css + calls-c11.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-call-btn` (24) `.onyx-cbtn` (21) |
+| app.css + pol-shell.css + rx-shell.css + calls-engine.css | `.onyx-call-join` (11) `.onyx-voice-chip-status` (6) |
+| app.css + pol-shell.css + roomsettings.css + rx-shell.css | `.onyx-facepile` (8) `.room-notify` (4) |
+| app.css + calls-c6.css + calls-engine.css | `.onyx-call-people` (16) `.onyx-call-avatar` (8) |
+| app.css + pol-roster.css + rx-shell.css | `.onyx-roster-filter-input` (12) `.onyx-roster-care` (4) |
+| app.css + gap-appearance.css + pol-thread.css | `.onyx-day-divider` (8) `.shell-composer-popovers` (5) |
+| app.css + rx-shell.css + ui-sheets.css | `.onyx-sheet-backdrop` (8) `.onyx-toaster` (6) |
+| app.css + pol-shell.css + calls-engine.css | `.onyx-voice-chip` (8) `.onyx-header-voice` (4) |
+| app.css + gap-people.css + ui-sheets.css | `.chb-check` (6) `.onyx-member-action` (6) |
+| app.css + gap-organize.css + ui-sheets.css | `.notify-group-title` (4) `.notify-row` (3) |
+| app.css + pol-shell.css + roomsettings.css | `.onyx-convohead` (3) `.onyx-dmsafe` (3) |
+| pol-shell.css + pol-thread.css | `.shell-composer-tool` (7) `.shell-composer-action-label` (3) |
+| app.css + rx-shell.css | `.onyx-nav-label` (5) `.onyx-facepile-face` (2) |
+| app.css + gap-appearance.css | `.onyx-home-row` (5) `.shell-msg-blockquote` (2) |
+| app.css + gap-shell.css | `.onyx-reconnect` (2) `.onyx-reconnect-msg` (2) |
+| app.css + gap-organize.css | `.notify-hint` (2) `.onyx-home-head` (2) |
+| app.css + gap-claim.css | `.pref-group` (2) `.pref-group-head` (2) |
+| gap-appearance.css + pol-studio.css | `.ap` (2) `.ap-background-host` (2) |
+| app.css + pol-shell.css + calls-c8.css + calls-c11.css + roomsettings.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-ci` (49) |
+| pol-thread.css + calls-c11.css + calls-c6.css + rx-shell.css + gap-commands.css + gap-shell.css + ui-sheets.css + calls-engine.css | `.onyx-sheet` (39) |
+| app.css + gap-appearance.css + pol-shell.css + pol-thread.css + gap-convo.css + rx-shell.css + gap-organize.css + pol-ios.css | `.onyx-composer` (18) |
+| app.css + gap-appearance.css + pol-shell.css + pol-thread.css + rx-shell.css + gap-organize.css + pol-ios.css | `.onyx-frame` (15) |
+| pol-shell.css + pol-thread.css + pol-roster.css + gap-convo.css + rx-shell.css + gap-watch.css | `.pt-ico` (77) |
+| app.css + gap-appearance.css + pol-thread.css + gap-convo.css + gap-organize.css + gap-commands.css | `.onyx-message` (28) |
+| app.css + pol-shell.css + pol-thread.css + pol-roster.css + rx-shell.css + ui-sheets.css | `.onyx-roster` (24) |
+| app.css + gap-appearance.css + pol-shell.css + pol-thread.css + pol-roster.css + rx-shell.css | `.onyx-avatar` (10) |
+| pol-thread.css + calls-c6.css + rx-shell.css + ui-sheets.css + pol-ios.css | `.onyx-sheet-layer` (27) |
+| app.css + gap-appearance.css + pol-shell.css + rx-shell.css + gap-organize.css | `.onyx-rail-item` (22) |
+| app.css + gap-appearance.css + pol-thread.css + rx-shell.css + gap-organize.css | `.onyx-thread-pane` (11) |
+| app.css + pol-shell.css + roomsettings.css + rx-shell.css + gap-organize.css | `.onyx-room-header` (10) |
+| app.css + gap-appearance.css + pol-roster.css + rx-shell.css + gap-people.css | `.onyx-member` (9) |
+| app.css + pol-shell.css + pol-thread.css + rx-shell.css + gap-organize.css | `.onyx-main` (9) |
+| app.css + calls-c11.css + calls-c6.css + calls-engine.css | `.onyx-call-ring` (14) |
+| app.css + pol-shell.css + rx-shell.css + ui-sheets.css | `.room-notify-seg` (11) |
+| app.css + gap-account.css + gap-usermodes.css + ui-sheets.css | `.pref-switch` (10) |
+| app.css + calls-c8.css + calls-c4.css + calls-engine.css | `.onyx-call-bar` (10) |
+| app.css + pol-thread.css + gap-organize.css + gap-commands.css | `.onyx-body` (9) |
+| app.css + pol-shell.css + account2.css + rx-shell.css | `.onyx-rail-avatar` (6) |
+| app.css + gap-oper.css + gap-people.css + ui-sheets.css | `.onyx-moddesk-head` (4) |
+| calls-c11.css + calls-c4.css + calls-engine.css | `.onyx-tile` (23) |
+| calls-c11.css + calls-c6.css + calls-engine.css | `.onyx-call-pip-card` (19) |
+| app.css + pol-thread.css + gap-organize.css | `.onyx-ts` (11) |
+| gap-appearance.css + pol-roster.css + rx-shell.css | `.onyx-mlist-main` (10) |
+| roomsettings.css + gap-chanserv.css + gap-people.css | `.rset-btn` (10) |
+| app.css + pol-shell.css + gap-organize.css | `.onyx-rail-label` (8) |
+| app.css + pol-shell.css + pol-ios.css | `.onyx-mobile-nav` (7) |
+| app.css + gap-commands.css + ui-sheets.css | `.onyx-spotlight-icon` (7) |
+| pol-shell.css + pol-roster.css + rx-shell.css | `.onyx-members-toggle` (7) |
+| app.css + calls-c11.css + calls-engine.css | `.onyx-call-sheet` (6) |
+| app.css + pol-shell.css + pol-thread.css | `.onyx-coach-dismiss` (5) |
+| app.css + gap-oper.css + ui-sheets.css | `.onyx-moddesk-sheet` (5) |
+| gap-chanserv.css + gap-shell.css + ui-sheets.css | `.onyx-sheet-x` (5) |
+| app.css + gap-import.css + gap-usermodes.css | `.pref-desc` (4) |
+| app.css + gap-appearance.css + gap-claim.css | `.pref-label` (3) |
+| calls-c11.css + calls-c4.css | `.onyx-tile-video` (6) |
+| app.css + pol-studio.css | `.onyx-button` (5) |
+| pol-thread.css + ui-sheets.css | `.onyx-sheet-grip` (5) |
+| pol-studio.css + gap-oper.css | `.ap-lede` (3) |
 | pol-studio.css + pol-shell.css | `.on` (3) |
+| pol-thread.css + gap-organize.css | `.onyx-row-avatar` (3) |
+| app.css + gap-people.css | `.onyx-member-mod` (2) |
+| pol-shell.css + calls-engine.css | `.onyx-voice-chip-count` (2) |
+| pol-shell.css + roomsettings.css | `.onyx-room-header-topic-open` (2) |
 | polish.css + pol-ios.css | `.a2hs-sheet` (2) |
+| roomsettings.css + gap-organize.css | `.rset-heading` (2) |
 
-### G14.1 Cross-file property fights (538): one class, same state, same context, same property, different values in different files
+### G14.1 Cross-file property fights (278): one class, same state, same context, same property, different values in different files
 
-Full selectors for every value are in style-map.json `fights`. 364 fights are won by a later file raising specificity (marked ↑); 40 would change winner if the files were wrapped in @layer in link order (marked **flip**: an earlier file out-specifies a later one). Each value is `file:line(specificity abc) value`, in cascade order.
+Full selectors for every value are in style-map.json `fights`. 194 fights are won by a later file raising specificity (marked ↑); 65 would change winner if the files were wrapped in @layer in link order (marked **flip**: an earlier file out-specifies a later one). Each value is `file:line(specificity abc) value`, in cascade order.
 
 | class | state | context | property: values in cascade order |
 |---|---|---|---|
-| `.a2-body` | `(base)` |  | **padding** ↑: account2.css:6(010) `var(--pad-panel)` → ui-sheets.css:731(020) `0` |
-| `.a2-status` | `(base)` |  | **margin-top** ↑: account2.css:123(010) `var(--space-3)` → ui-sheets.css:606(020) `var(--space-4)` |
-| `.boost-count` | `(base)` |  | **color** ↑: app.css:2494(010) `var(--onyx-dim)` → pol-thread.css:407(020) `var(--onyx-dim)` → pol-thread.css:413(040) `var(--onyx-text)` |
-| `.boost-pill` | `(base)` |  | **background** ↑: app.css:2489(010) `var(--onyx-panel-2)` → pol-thread.css:400(030) `var(--onyx-panel)`<br>**font-size** ↑: app.css:2488(010) `var(--text-2xs)` → pol-thread.css:403(030) `var(--text-sm)`<br>**gap** ↑: app.css:2487(010) `var(--space-1)` → pol-thread.css:399(030) `6px`<br>**padding** ↑: app.css:2490(010) `2px var(--space-2)` → pol-thread.css:398(030) `0 var(--space-2)` |
-| `.boost-pill` | `.you` |  | **border-color** ↑: app.css:2492(020) `var(--onyx-accent)` → app.css:3848(020) `var(--onyx-dim)` → pol-thread.css:411(030) `color-mix(in oklab, var(` |
-| `.chb-card` | `(base)` |  | **background** ↑: pol-shell.css:288(020) `var(--onyx-panel-2)` → ui-sheets.css:742(020) `transparent` → ui-sheets.css:743(030) `color-mix(in oklab, var(`<br>**border** ↑: app.css:1221(010) `1px solid var(--onyx-lin` → ui-sheets.css:742(020) `0`<br>**border-color** ↑: pol-shell.css:289(020) `var(--onyx-dim)` → ui-sheets.css:744(030) `var(--onyx-line)`<br>**border-radius** ↑: app.css:1221(010) `8px` → ui-sheets.css:742(020) `0`<br>**padding** ↑: app.css:1221(010) `8px 10px` → ui-sheets.css:742(020) `var(--space-3) var(--spa` |
-| `.chb-check` | `(base)` |  | **align-items** ↑: app.css:1249(010) `baseline` → ui-sheets.css:756(020) `center` |
-| `.chb-close` | `(base)` |  | **border** ↑: app.css:1207(010) `none` → pol-shell.css:303(020) `0` |
-| `.chb-count--live` | `(base)` |  | **color** ↑: app.css:1227(010) `var(--onyx-accent)` → ui-sheets.css:747(020) `var(--onyx-text)` |
-| `.chb-create` | `(base)` |  | **gap** ↑: app.css:1235(010) `12px` → ui-sheets.css:752(020) `var(--space-4)` |
-| `.chb-ledger` | `(base)` |  | **color** ↑: app.css:1232(010) `var(--onyx-accent)` → ui-sheets.css:750(020) `var(--onyx-dim)`<br>**font-size** ↑: app.css:1232(010) `12px` → ui-sheets.css:750(020) `var(--text-sm)` |
-| `.chb-list` | `(base)` |  | **gap** ↑: app.css:1219(010) `8px` → ui-sheets.css:740(020) `0` |
-| `.chb-pill` | `(base)` |  | **color** ↑: app.css:1225(010) `var(--onyx-accent)` → ui-sheets.css:748(020) `var(--onyx-dim)` |
-| `.chb-skin` | `[aria-pressed=""]` |  | **border-color** ↑: app.css:1246(020) `var(--onyx-accent)` → ui-sheets.css:755(030) `var(--onyx-text)` |
-| `.chb-skins` | `(base)` |  | **padding** ↑: app.css:1243(010) `8px 10px` → ui-sheets.css:753(020) `var(--space-3)` |
-| `.chb-sort` | `(base)` |  | **gap** ↑: app.css:1211(010) `4px` → ui-sheets.css:736(020) `2px` |
-| `.chb-sort-btn` | `[aria-pressed=""]` |  | **border-color** ↑: app.css:1212(020) `var(--onyx-accent)` → pol-shell.css:304(030) `var(--onyx-dim)` → ui-sheets.css:738(030) `transparent`<br>**color** ↑: app.css:1212(020) `var(--onyx-accent)` → pol-shell.css:304(030) `var(--onyx-text)` → ui-sheets.css:738(030) `var(--onyx-text)` |
-| `.chb-toolbar` | `(base)` |  | **gap** ↑: app.css:1209(010) `8px` → ui-sheets.css:734(020) `var(--space-2)`<br>**margin** ↑: app.css:1209(010) `12px 0` → ui-sheets.css:734(020) `0 0 var(--space-3)` |
-| `.chb-topic` | `(base)` |  | **margin** ↑: app.css:1229(010) `4px 0` → ui-sheets.css:749(020) `2px 0 var(--space-2)` |
+| `.a2-body` | `(base)` |  | **padding** ↑: account2.css:6(010) `var(--pad-panel)` → ui-sheets.css:807(020) `0` |
+| `.a2-input` | `(base)` |  | **flex** ↑: account2.css:18(020) `1 1 auto` → ui-sheets.css:1462(040) `1` |
+| `.a2-status` | `(base)` |  | **margin-top** ↑: account2.css:122(010) `var(--space-3)` → ui-sheets.css:694(020) `var(--space-4)` |
+| `.ap` | `(base)` |  | **background** **flip**: gap-appearance.css:287(030) `transparent` → pol-studio.css:26(010) `var(--onyx-bg)` |
+| `.ap-background-host` | `(base)` |  | **background** **flip**: gap-appearance.css:287(030) `transparent` → pol-studio.css:36(010) `var(--onyx-bg)` |
+| `.chb-card` | `(base)` |  | **background** ↑: pol-shell.css:269(020) `var(--onyx-panel-2)` → ui-sheets.css:818(020) `transparent` → ui-sheets.css:819(030) `color-mix(in oklab, var(`<br>**border-color** ↑: pol-shell.css:270(020) `var(--onyx-dim)` → ui-sheets.css:820(030) `var(--onyx-line)` |
+| `.chb-check` | `(base)` |  | **gap** ↑: app.css:935(010) `8px` → gap-people.css:121(020) `var(--space-2)`<br>**min-height**: gap-people.css:122(020) `36px` → ui-sheets.css:833(020) `32px` → ui-sheets.css:833(020) `32px` |
+| `.chb-skin` | `[aria-pressed=""]` |  | **border-color** ↑: app.css:932(020) `var(--onyx-accent)` → ui-sheets.css:831(030) `var(--onyx-text)` |
+| `.chb-toolbar` | `(base)` |  | **gap** ↑: app.css:902(010) `8px` → ui-sheets.css:810(020) `var(--space-2)` |
+| `.conn-link` | `(base)` |  | **margin-top** ↑: app.css:1679(010) `calc(-1 * var(--space-2)` → gap-auth.css:74(020) `0` → gap-auth.css:74(020) `0` |
 | `.data-card` | `(base)` |  | **background** **flip**: pol-stats.css:640(020) `var(--pg-panel)` → pol-public.css:403(010) `var(--onyx-panel)`<br>**border** **flip**: pol-stats.css:638(020) `1px solid var(--pg-line)` → pol-public.css:401(010) `1px solid var(--onyx-lin`<br>**padding** **flip**: pol-stats.css:637(020) `var(--space-5)` → pol-public.css:400(010) `var(--space-6)` |
-| `.guest-claim-chip` | `(base)` |  | **border-radius**: app.css:1124(010) `8px` → pol-shell.css:1107(010) `var(--radius)`<br>**gap**: app.css:1122(010) `8px` → pol-shell.css:1103(010) `var(--space-3)`<br>**padding**: app.css:1125(010) `6px 10px` → pol-shell.css:1104(010) `var(--space-3)` |
-| `.guest-claim-chip__actions` | `(base)` |  | **gap** ↑: app.css:1131(010) `6px` → pol-shell.css:1113(020) `var(--space-1)`<br>**margin-left** ↑: app.css:1131(010) `auto` → pol-shell.css:1113(020) `0` |
-| `.guest-claim-chip__dismiss` | `(base)` |  | **color** ↑: app.css:1144(010) `var(--onyx-dim)` → pol-shell.css:1132(020) `var(--onyx-faint)` |
-| `.guest-claim-chip__keep` | `(base)` |  | **background** ↑: app.css:1135(010) `var(--onyx-accent)` → pol-shell.css:1121(020) `var(--onyx-panel-2)`<br>**border** ↑: app.css:1136(010) `1px solid var(--onyx-acc` → pol-shell.css:1122(020) `1px solid var(--onyx-lin`<br>**border-radius** ↑: app.css:1137(010) `6px` → pol-shell.css:1123(020) `var(--radius)`<br>**color** ↑: app.css:1134(010) `var(--onyx-accent-ink)` → pol-shell.css:1120(020) `var(--onyx-text)`<br>**padding** ↑: app.css:1138(010) `2px 10px` → pol-shell.css:1116(020) `0 var(--space-3)` |
-| `.guest-claim-sheet__form` | `(base)` |  | **gap** ↑: app.css:1163(010) `6px` → ui-sheets.css:775(020) `var(--space-2)` |
-| `.jump-to-date-close` | `(base)` |  | **background** ↑: app.css:2507(010) `none` → ui-sheets.css:233(020) `transparent`<br>**border** ↑: app.css:2508(010) `1px solid var(--onyx-lin` → ui-sheets.css:234(020) `0`<br>**padding** ↑: app.css:2508(010) `var(--space-1) 10px` → ui-sheets.css:229(020) `0` |
+| `.gorg-menu-label` | `(base)` |  | **font-size** **flip**: rx-shell.css:202(020) `var(--text-md)` → gap-organize.css:268(010) `var(--text-sm)`<br>**font-weight** **flip**: rx-shell.css:202(020) `400` → gap-organize.css:268(010) `600` |
+| `.guest-claim-chip__actions` | `(base)` |  | **margin-left** ↑: app.css:837(010) `auto` → pol-shell.css:1080(020) `0` |
+| `.guest-claim-chip__keep` | `(base)` |  | **border-radius** ↑: app.css:840(010) `6px` → pol-shell.css:1090(020) `var(--radius)` |
+| `.guest-claim-sheet__form` | `(base)` |  | **gap** ↑: app.css:864(010) `6px` → ui-sheets.css:853(020) `var(--space-2)` |
+| `.jump-to-date-close` | `(base)` |  | **background** ↑: app.css:2304(010) `none` → ui-sheets.css:336(020) `transparent` |
 | `.label` | `(base)` |  | **color**: pol-stats.css:538(020) `var(--pg-dim)` → pol-public.css:375(020) `var(--onyx-dim)`<br>**font-weight**: pol-stats.css:540(020) `700` → pol-public.css:377(020) `650` |
-| `.notif-center` | `(base)` |  | **position** ↑: app.css:3601(010) `absolute` → ui-sheets.css:498(020) `relative`<br>**right** ↑: app.css:3603(010) `0` → ui-sheets.css:500(020) `auto`<br>**top** ↑: app.css:3602(010) `calc(100% + var(--space-` → ui-sheets.css:499(020) `auto` |
-| `.notif-center__close` | `(base)` |  | **font-size** **flip**: pol-shell.css:53(020) `var(--text-lg)` → ui-sheets.css:230(010) `0`<br>**line-height** **flip**: pol-shell.css:54(020) `1` → ui-sheets.css:231(010) `0`<br>**min-height** **flip**: pol-shell.css:51(020) `32px` → ui-sheets.css:227(010) `var(--sheet-close)`<br>**min-width** **flip**: pol-shell.css:50(020) `32px` → ui-sheets.css:226(010) `var(--sheet-close)` |
-| `.notif-center__empty` | `(base)` |  | **border** ↑: pol-shell.css:84(010) `1px dashed var(--onyx-li` → ui-sheets.css:547(020) `0`<br>**margin** ↑: pol-shell.css:79(010) `var(--space-2) 0 0` → ui-sheets.css:545(020) `var(--space-2) 0`<br>**padding** ↑: pol-shell.css:80(010) `var(--space-5) var(--spa` → ui-sheets.css:546(020) `var(--space-7) var(--spa` |
-| `.notif-center__filter` | `(base)` |  | **font-size** ↑: pol-shell.css:71(020) `var(--text-2xs)` → ui-sheets.css:505(030) `var(--text-sm)`<br>**min-height** ↑: pol-shell.css:68(020) `28px` → ui-sheets.css:505(030) `32px` |
-| `.notif-center__filters` | `(base)` |  | **display**: app.css:3618(010) `flex` → pol-shell.css:60(010) `grid`<br>**margin** ↑: app.css:3618(010) `var(--space-2) 0` → ui-sheets.css:504(020) `0` |
-| `.notif-center__glyph` | `(base)` |  | **border-radius** ↑: pol-shell.css:126(010) `var(--radius)` → ui-sheets.css:525(020) `50%`<br>**height** ↑: pol-shell.css:121(010) `28px` → ui-sheets.css:525(020) `32px`<br>**width** ↑: pol-shell.css:120(010) `28px` → ui-sheets.css:525(020) `32px` |
-| `.notif-center__list` | `(base)` |  | **margin** ↑: app.css:3619(010) `0` → ui-sheets.css:511(020) `0 calc(-1 * var(--space-` |
-| `.notif-center__open` | `(base)` |  | **grid-template-columns**: pol-shell.css:103(020) `28px minmax(0, 1fr)` → ui-sheets.css:524(020) `32px minmax(0, 1fr)`<br>**min-height**: pol-shell.css:108(020) `44px` → ui-sheets.css:524(020) `52px`<br>**padding**: pol-shell.css:109(020) `var(--space-2)` → ui-sheets.css:524(020) `var(--space-2) var(--spa` |
-| `.notif-center__row` | `[data-unread=""]` |  | **background** ↑: pol-shell.css:99(020) `color-mix(in oklab, var(` → ui-sheets.css:513(030) `transparent` |
-| `.notif-center__row` | `(base)` |  | **border-left** ↑: pol-shell.css:96(010) `2px solid transparent` → ui-sheets.css:512(020) `0` |
-| `.onyx-account` | `(base)` |  | **width** ↑: app.css:1397(010) `min(560px, 94vw)` → ui-sheets.css:679(020) `min(var(--sheet-w-lg), 1` |
-| `.onyx-account-hint` | `(base)` |  | **margin** ↑: app.css:1418(010) `0 0 8px` → pol-shell.css:227(020) `0` |
-| `.onyx-account-nav` | `(base)` |  | **gap** ↑: app.css:1413(010) `12px` → ui-sheets.css:693(020) `2px`<br>**margin** ↑: app.css:1413(010) `12px 0 4px` → ui-sheets.css:694(020) `0` |
-| `.onyx-account-nav__item` | `(base)` |  | **color** ↑: app.css:1414(010) `var(--onyx-accent)` → ui-sheets.css:702(020) `var(--onyx-dim)`<br>**font-size** ↑: app.css:1414(010) `13px` → ui-sheets.css:701(020) `var(--text-sm)` |
-| `.onyx-audience-toggle` | `(base)` |  | **border-radius** ↑: app.css:693(010) `6px` → pol-thread.css:1110(030) `var(--radius)`<br>**font-size** ↑: app.css:688(010) `11px` → pol-thread.css:1107(020) `var(--text-xs)`<br>**font-weight** ↑: app.css:689(010) `600` → pol-thread.css:1108(020) `650`<br>**padding** ↑: app.css:694(010) `2px 8px` → pol-thread.css:1105(020) `0 var(--space-2)` → pol-thread.css:1110(030) `0 var(--space-2)` |
-| `.onyx-audience-toggle-set` | `(base)` |  | **border-color** ↑: app.css:701(010) `var(--onyx-accent)` → pol-thread.css:1111(030) `var(--onyx-dim)`<br>**color** ↑: app.css:700(010) `var(--onyx-accent)` → pol-thread.css:1111(030) `var(--onyx-text)` |
-| `.onyx-avatar` | `(base)` |  | **box-shadow**: app.css:141(020) `0 0 0 1px var(--nick-tin` → app.css:203(020) `0 0 0 2px var(--onyx-bg)` → pol-thread.css:926(020) `0 0 0 1px var(--nick-tin` |
-| `.onyx-body` | `(base)` |  | **color** ↑: app.css:706(010) `var(--onyx-text)` → app.css:708(020) `var(--onyx-dim)` → pol-thread.css:185(020) `var(--onyx-dim)` → pol-thread.css:445(020) `var(--onyx-text)` |
-| `.onyx-brand` | `(base)` |  | **gap** ↑: app.css:231(010) `10px` → pol-shell.css:581(020) `var(--space-2)` |
-| `.onyx-call-avatar-lg` | `(base)` |  | **font-size** ↑ **flip**: app.css:3195(010) `24px` → app.css:3287(030) `18px` → calls-c4.css:140(020) `var(--text-md)`<br>**height** ↑ **flip**: app.css:3195(010) `72px` → app.css:3287(030) `56px` → calls-c4.css:140(020) `40px`<br>**width** ↑ **flip**: app.css:3195(010) `72px` → app.css:3287(030) `56px` → calls-c4.css:140(020) `40px` |
-| `.onyx-call-bar` | `(base)` |  | **border-radius** ↑: app.css:3293(010) `0 0 6px 6px` → calls-c4.css:67(030) `0`<br>**grid-template-columns**: app.css:3292(010) `1fr auto 1fr` → calls-engine.css:24(010) `minmax(0, 1fr) auto minm` |
-| `.onyx-call-bar` | `(base)` | @media (max-width: 640px) | **padding**: app.css:3398(010) `10px 12px calc(10px + en` → calls-engine.css:85(010) `var(--space-2) var(--spa` |
-| `.onyx-call-bar-center` | `(base)` | @media (max-width: 640px) | **justify-content**: app.css:3399(010) `space-between` → calls-engine.css:77(010) `stretch` |
-| `.onyx-call-btn` | `(base)` |  | **min-height** ↑: app.css:3239(010) `36px` → calls-c11.css:107(020) `var(--target-floor)` → calls-c6.css:64(020) `var(--target-min)` → calls-c4.css:55(020) `28px`<br>**padding** ↑: app.css:3239(010) `0 14px` → calls-c11.css:107(020) `0 var(--space-2)` → calls-c4.css:55(020) `0 var(--space-2)` |
-| `.onyx-call-join` | `(base)` |  | **min-height** ↑: app.css:3217(010) `30px` → pol-shell.css:937(030) `32px` |
-| `.onyx-call-more` | `(base)` | @media (max-width: 640px) | **left**: app.css:3403(010) `auto` → calls-engine.css:90(010) `0` |
-| `.onyx-call-people` | `(base)` |  | **align-items**: app.css:3257(010) `center` → calls-engine.css:21(010) `flex-start` |
-| `.onyx-call-ring` | `::after` |  | **animation**: app.css:3270(031) `onyx-call-breathe 1.6s e` → app.css:3271(051) `none` → calls-c11.css:167(031) `none` |
-| `.onyx-call-you` | `(base)` |  | **color** ↑: app.css:3283(010) `var(--onyx-faint)` → calls-c4.css:113(020) `var(--onyx-dim)` |
-| `.onyx-cbtn` | `(base)` | @media (max-width: 640px) | **width** ↑: app.css:3400(010) `48px` → calls-engine.css:80(020) `100%` → calls-engine.css:80(020) `100%` |
-| `.onyx-cbtn-cap` | `(base)` |  | **line-height** ↑: app.css:3310(010) `1` → calls-c4.css:27(020) `inherit` |
-| `.onyx-ci` | `(base)` |  | **height** ↑: app.css:3163(010) `18px` → app.css:3221(020) `16px` → app.css:3280(020) `14px` → app.css:3328(020) `14px` → calls-c8.css:49(020) `14px` → calls-c11.css:42(020) `14px` → roomsettings.css:39(020) `14px` → calls-c6.css:170(020) `14px` → calls-c6.css:185(020) `16px` → calls-c4.css:53(020) `14px` → calls-c4.css:108(020) `14px` → calls-c4.css:123(020) `14px`<br>**width** ↑: app.css:3162(010) `18px` → app.css:3221(020) `16px` → app.css:3280(020) `14px` → app.css:3328(020) `14px` → calls-c8.css:49(020) `14px` → calls-c11.css:42(020) `14px` → roomsettings.css:39(020) `14px` → calls-c6.css:170(020) `14px` → calls-c6.css:185(020) `16px` → calls-c4.css:53(020) `14px` → calls-c4.css:108(020) `14px` → calls-c4.css:123(020) `14px` |
-| `.onyx-coach` | `(base)` |  | **background** ↑: app.css:2369(010) `var(--onyx-panel)` → pol-shell.css:1071(020) `transparent`<br>**border** ↑: app.css:2369(010) `1px solid var(--onyx-acc` → pol-shell.css:1072(020) `0`<br>**border-radius** ↑: app.css:2369(010) `var(--radius)` → pol-shell.css:1074(020) `0`<br>**display** ↑: app.css:2368(010) `flex` → pol-shell.css:1078(040) `none`<br>**flex-direction** ↑: app.css:2368(010) `column` → pol-shell.css:1067(020) `row`<br>**gap** ↑: app.css:2368(010) `2px` → pol-shell.css:1069(020) `var(--space-2)`<br>**padding** ↑: app.css:2369(010) `10px var(--space-8) 10px` → pol-shell.css:1070(020) `var(--space-2) var(--spa` |
-| `.onyx-coach-dismiss` | `(base)` |  | **color**: app.css:2375(010) `var(--onyx-dim)` → pol-shell.css:1080(010) `var(--onyx-faint)` |
-| `.onyx-coach-eyebrow` | `(base)` |  | **color** ↑: app.css:2371(010) `var(--onyx-accent)` → app.css:3846(010) `var(--onyx-dim)` → pol-shell.css:1076(020) `var(--onyx-faint)` |
-| `.onyx-coach-text` | `(base)` |  | **color** ↑: app.css:2372(010) `var(--onyx-text)` → pol-shell.css:1079(020) `var(--onyx-dim)`<br>**font-size** ↑: app.css:2372(010) `var(--text-md)` → pol-shell.css:1079(020) `var(--text-sm)` |
-| `.onyx-composer` | `(base)` |  | **align-items**: app.css:744(010) `center` → pol-thread.css:985(010) `stretch`<br>**background**: app.css:747(010) `var(--onyx-panel)` → pol-thread.css:989(010) `var(--onyx-bg)`<br>**border-top**: app.css:748(010) `1px solid var(--onyx-lin` → pol-thread.css:990(010) `0`<br>**display** ↑: app.css:743(010) `flex` → pol-shell.css:568(040) `none`<br>**gap**: app.css:745(010) `10px` → pol-thread.css:987(010) `var(--space-2)`<br>**padding**: app.css:746(010) `10px 16px` → pol-thread.css:988(010) `var(--space-2) var(--spa` |
-| `.onyx-conn` | `(base)` |  | **border** ↑: app.css:266(010) `1px solid var(--onyx-lin` → pol-shell.css:605(020) `0`<br>**border-radius** ↑: app.css:267(010) `999px` → pol-shell.css:606(020) `var(--radius)`<br>**font-size** ↑: app.css:263(010) `var(--text-2xs)` → pol-shell.css:607(020) `var(--text-sm)`<br>**padding** ↑: app.css:268(010) `var(--space-1) var(--spa` → pol-shell.css:604(020) `0 var(--space-2)` |
-| `.onyx-convohead` | `(base)` |  | **margin** ↑: app.css:2592(010) `0 0 var(--space-2)` → pol-shell.css:931(020) `0` → roomsettings.css:23(020) `0` |
-| `.onyx-dmsafe` | `(base)` |  | **margin** ↑: app.css:2714(010) `0 0 10px` → pol-shell.css:931(020) `0` → roomsettings.css:24(020) `0` |
-| `.onyx-dmsafe-bar` | `(base)` |  | **flex-wrap** ↑: app.css:2715(010) `wrap` → pol-shell.css:932(020) `nowrap`<br>**justify-content** ↑: app.css:2715(010) `space-between` → pol-shell.css:932(020) `flex-start` |
-| `.onyx-facepile` | `(base)` |  | **padding** ↑: app.css:200(010) `4px 0 4px 4px` → roomsettings.css:26(020) `0 var(--space-1) 0 0` |
-| `.onyx-feed-empty-body` | `(base)` |  | **margin** ↑: app.css:2379(010) `0` → pol-thread.css:622(020) `var(--space-1) 0 0` |
-| `.onyx-feed-empty-title` | `(base)` |  | **font-weight** ↑: app.css:2378(010) `600` → pol-thread.css:621(020) `650`<br>**margin** ↑: app.css:2378(010) `0 0 var(--space-1)` → pol-thread.css:621(020) `0` |
-| `.onyx-frame` | `(base)` |  | **height**: app.css:3433(010) `100vh` → app.css:3434(010) `100dvh` → pol-ios.css:65(010) `var(--vvh, 100dvh)` |
-| `.onyx-gem` | `(base)` |  | **border-radius** ↑: app.css:245(010) `3px` → pol-shell.css:583(020) `2px`<br>**height** ↑: app.css:242(010) `14px` → pol-shell.css:583(020) `11px`<br>**width** ↑: app.css:241(010) `14px` → pol-shell.css:583(020) `11px` |
-| `.onyx-home-action` | `(base)` |  | **min-height** ↑: app.css:2343(010) `36px` → pol-shell.css:1061(020) `40px`<br>**padding** ↑: app.css:2343(010) `6px var(--space-3)` → pol-shell.css:1061(020) `0 var(--space-4)` |
-| `.onyx-home-empty` | `(base)` |  | **background** ↑: app.css:2315(010) `var(--onyx-panel)` → pol-shell.css:1056(020) `transparent`<br>**border** ↑: app.css:2315(010) `1px solid var(--onyx-lin` → pol-shell.css:1057(020) `0`<br>**gap** ↑: app.css:2314(010) `10px` → pol-shell.css:1054(020) `var(--space-4)`<br>**padding** ↑: app.css:2315(010) `var(--space-3)` → pol-shell.css:1055(020) `0` |
-| `.onyx-home-inner` | `(base)` |  | **gap** ↑: app.css:2295(010) `var(--space-4)` → pol-shell.css:1050(020) `var(--space-5)`<br>**max-width** ↑: app.css:2295(010) `720px` → pol-shell.css:1050(020) `640px`<br>**padding** ↑: app.css:2295(010) `var(--space-4) 0 var(--s` → pol-shell.css:1050(020) `var(--space-8) var(--spa` |
-| `.onyx-home-invite` | `(base)` |  | **background** ↑: app.css:2315(010) `var(--onyx-panel)` → pol-shell.css:1090(020) `transparent`<br>**border** ↑: app.css:2315(010) `1px solid var(--onyx-lin` → pol-shell.css:1091(020) `0`<br>**border-radius** ↑: app.css:2315(010) `var(--radius)` → pol-shell.css:1093(020) `0`<br>**flex-direction** ↑: app.css:2314(010) `column` → pol-shell.css:1084(020) `row`<br>**gap** ↑: app.css:2314(010) `10px` → pol-shell.css:1088(020) `var(--space-3)`<br>**padding** ↑: app.css:2315(010) `var(--space-3)` → pol-shell.css:1089(020) `var(--space-3) 0 0` |
-| `.onyx-home-masthead` | `(base)` |  | **gap** ↑: app.css:2296(010) `6px` → pol-shell.css:1051(020) `var(--space-1)` |
-| `.onyx-home-title` | `(base)` |  | **font-size** ↑: app.css:2298(010) `var(--text-2xl)` → pol-shell.css:1052(020) `1.75rem`<br>**font-weight** ↑: app.css:2298(010) `600` → pol-shell.css:1052(020) `700` |
-| `.onyx-invshare-url` | `(base)` |  | **font-size** ↑: app.css:3068(010) `var(--text-2xs)` → ui-sheets.css:771(020) `var(--text-sm)` |
-| `.onyx-jump-latest` | `(base)` |  | **background** ↑: app.css:2979(010) `var(--onyx-panel)` → pol-thread.css:584(020) `var(--onyx-panel-2)`<br>**border-radius** ↑: app.css:2981(010) `var(--radius)` → pol-thread.css:583(020) `var(--r-pill)`<br>**font-size** ↑: app.css:2976(010) `var(--text-2xs)` → pol-thread.css:587(020) `var(--text-sm)`<br>**gap** ↑: app.css:2972(010) `var(--space-1)` → pol-thread.css:580(020) `6px`<br>**padding** ↑: app.css:2974(010) `var(--space-1) var(--spa` → pol-thread.css:582(020) `0 var(--space-3) 0 var(-` |
-| `.onyx-land-action` | `(base)` |  | **color**: app.css:1026(010) `var(--onyx-accent)` → pol-public.css:701(010) `var(--onyx-text)`<br>**display**: app.css:1027(010) `inline-block` → pol-public.css:693(010) `inline-flex`<br>**margin-top**: app.css:1029(010) `12px` → pol-public.css:697(010) `var(--space-5)` |
-| `.onyx-land-board` | `(base)` |  | **margin-top**: app.css:978(010) `64px` → pol-public.css:648(010) `0` |
-| `.onyx-land-claims` | `(base)` |  | **gap**: app.css:968(010) `16px` → pol-public.css:625(010) `var(--space-6)`<br>**margin**: app.css:969(010) `0` → pol-public.css:626(010) `var(--space-7) 0 0` |
-| `.onyx-land-cta` | `(base)` |  | **gap**: app.css:933(010) `12px 20px` → pol-public.css:526(010) `var(--space-3)`<br>**margin-top**: app.css:934(010) `28px` → pol-public.css:526(010) `var(--space-7)` |
-| `.onyx-land-detail` | `(base)` |  | **margin**: app.css:975(010) `16px 0 0` → pol-public.css:644(010) `var(--space-6) 0 0` |
-| `.onyx-land-footnote` | `(base)` |  | **font-size**: app.css:1043(010) `13px` → pol-public.css:739(010) `var(--text-sm)` |
-| `.onyx-land-h1` | `(base)` |  | **font-size**: app.css:914(010) `44px` → pol-public.css:514(010) `clamp(2.5rem, 1.6rem + 3`<br>**letter-spacing**: app.css:916(010) `-0.02em` → pol-public.css:516(010) `-0.03em`<br>**line-height**: app.css:917(010) `1.05` → pol-public.css:517(010) `1.02` |
-| `.onyx-land-h2` | `(base)` |  | **font-size**: app.css:961(010) `20px` → pol-public.css:621(010) `clamp(1.5rem, 1.2rem + 1`<br>**margin**: app.css:963(010) `0 0 16px` → pol-public.css:621(010) `0` |
-| `.onyx-land-h3` | `(base)` |  | **font-size**: app.css:1020(010) `17px` → pol-public.css:691(010) `var(--text-xl)`<br>**margin**: app.css:1022(010) `0 0 8px` → pol-public.css:691(010) `0` |
-| `.onyx-land-lede` | `(base)` |  | **font-size**: app.css:925(010) `17px` → pol-public.css:523(010) `clamp(1.0625rem, 0.95rem`<br>**margin**: app.css:926(010) `16px 0 0` → pol-public.css:521(010) `var(--space-5) 0 0`<br>**max-width**: app.css:927(010) `52ch` → pol-public.css:520(010) `36ch` |
-| `.onyx-land-link` | `(base)` |  | **align-self**: app.css:947(010) `center` → pol-public.css:542(010) `auto`<br>**font-weight**: app.css:949(010) `600` → pol-public.css:537(010) `650` |
-| `.onyx-land-links` | `(base)` |  | **gap**: app.css:1037(010) `10px` → pol-public.css:716(010) `0`<br>**min-width**: app.css:1038(010) `200px` → pol-public.css:716(010) `0` |
-| `.onyx-land-note` | `(base)` |  | **font-size**: app.css:954(010) `13px` → pol-public.css:544(010) `var(--text-sm)`<br>**margin**: app.css:955(010) `16px 0 0` → pol-public.css:544(010) `var(--space-5) 0 0` |
-| `.onyx-land-open` | `(base)` |  | **border-radius**: app.css:939(010) `6px` → pol-public.css:535(010) `var(--radius)`<br>**padding**: app.css:942(010) `10px 22px` → pol-public.css:533(010) `0 var(--space-6)` |
-| `.onyx-land-panel` | `(base)` |  | **display**: app.css:1009(010) `flex` → pol-public.css:679(010) `grid`<br>**gap**: app.css:1011(010) `24px 48px` → pol-public.css:681(010) `var(--space-6) 56px`<br>**margin-top**: app.css:1012(010) `20px` → pol-public.css:682(010) `var(--space-5)` |
-| `.onyx-land-panel-note` | `(base)` |  | **font-size** ↑: app.css:1032(010) `13px` → pol-public.css:715(020) `var(--text-sm)` |
-| `.onyx-land-shelf` | `(base)` |  | **margin-top**: app.css:1046(010) `64px` → pol-public.css:747(010) `0` |
-| `.onyx-land-shelf-label` | `(base)` |  | **font-size**: app.css:1050(010) `13px` → pol-public.css:751(010) `var(--text-xs)`<br>**margin**: app.css:1052(010) `0 0 12px` → pol-public.css:751(010) `0` |
-| `.onyx-land-shelf-list` | `(base)` |  | **gap**: app.css:1058(010) `8px 24px` → pol-public.css:752(010) `0 var(--space-5)` |
-| `.onyx-land-tabs` | `(base)` |  | **display**: app.css:987(010) `flex` → pol-public.css:652(010) `inline-flex`<br>**gap**: app.css:988(010) `8px` → pol-public.css:654(010) `2px`<br>**margin-top**: app.css:989(010) `20px` → pol-public.css:656(010) `var(--space-7)` |
-| `.onyx-land-trust` | `(base)` |  | **margin-top**: app.css:958(010) `64px` → pol-public.css:620(010) `0` |
-| `.onyx-landing` | `(base)` |  | **margin** ↑: app.css:908(010) `0 auto` → pol-public.css:497(020) `0`<br>**max-width** ↑: app.css:909(010) `880px` → pol-public.css:497(020) `none`<br>**padding** ↑: app.css:910(010) `64px 24px 96px` → pol-public.css:497(020) `0` |
-| `.onyx-member` | `(base)` |  | **flex-wrap**: app.css:2557(020) `wrap` → pol-roster.css:189(020) `nowrap`<br>**font-size** ↑: app.css:731(010) `13px` → pol-roster.css:193(020) `var(--text-md)`<br>**gap** ↑: app.css:729(010) `6px` → pol-roster.css:190(020) `0`<br>**min-height**: app.css:2557(020) `36px` → pol-roster.css:191(020) `40px`<br>**padding** ↑: app.css:730(010) `3px 0` → pol-roster.css:192(020) `0` |
-| `.onyx-member-actions` | `(base)` |  | **display** ↑: app.css:1761(010) `flex` → ui-sheets.css:1073(020) `grid`<br>**gap** ↑: app.css:1761(010) `8px` → ui-sheets.css:1073(020) `var(--space-2)` |
-| `.onyx-member-card` | `(base)` |  | **background** ↑: app.css:1732(010) `var(--onyx-panel-2)` → pol-shell.css:431(030) `var(--onyx-panel)` → ui-sheets.css:1066(030) `var(--onyx-panel)`<br>**border-radius** ↑: app.css:1734(010) `8px` → ui-sheets.css:1065(030) `var(--radius)`<br>**gap** ↑: app.css:1737(010) `10px` → ui-sheets.css:1062(030) `var(--space-4)`<br>**margin** ↑: app.css:1738(010) `8px 0 8px 16px` → pol-shell.css:429(030) `0`<br>**max-width** ↑: app.css:1739(010) `340px` → pol-shell.css:427(030) `100%` → ui-sheets.css:1061(030) `100%`<br>**padding** ↑: app.css:1740(010) `12px` → ui-sheets.css:1063(030) `var(--sheet-pad)`<br>**width**: pol-shell.css:426(030) `min(360px, 100%)` → ui-sheets.css:1060(030) `min(380px, 100%)` |
-| `.onyx-member-identity` | `(base)` |  | **gap** ↑: app.css:1742(010) `10px` → ui-sheets.css:1069(020) `var(--space-3)` |
-| `.onyx-member-message` | `(base)` |  | **background** ↑: app.css:2579(010) `transparent` → pol-roster.css:294(020) `var(--onyx-panel)`<br>**color** ↑: app.css:2582(010) `var(--onyx-text)` → pol-roster.css:297(020) `var(--onyx-dim)`<br>**min-height** ↑: app.css:2585(010) `24px` → pol-roster.css:291(020) `0`<br>**padding** ↑: app.css:2586(010) `2px var(--space-2)` → pol-roster.css:292(020) `0` |
-| `.onyx-member-name` | `(base)` |  | **font-size** ↑: app.css:1755(010) `15px` → ui-sheets.css:1070(020) `var(--text-lg)`<br>**font-weight** ↑: app.css:1755(010) `700` → ui-sheets.css:1070(020) `650` |
-| `.onyx-member-nickline` | `(base)` |  | **font-size** ↑: app.css:1756(010) `13px` → ui-sheets.css:1072(020) `var(--text-sm)`<br>**margin** ↑: app.css:1756(010) `2px 0 0` → ui-sheets.css:1072(020) `0` |
-| `.onyx-member-presence-dot` | `(base)` |  | **background** ↑: app.css:2561(010) `var(--onyx-dim)` → pol-roster.css:237(020) `var(--onyx-text)`<br>**bottom** ↑: app.css:2564(010) `-1px` → pol-roster.css:234(020) `-2px`<br>**height** ↑: app.css:2565(010) `8px` → pol-roster.css:236(020) `10px`<br>**right** ↑: app.css:2567(010) `-1px` → pol-roster.css:233(020) `-2px`<br>**width** ↑: app.css:2568(010) `8px` → pol-roster.css:235(020) `10px` |
-| `.onyx-member-presence-dot--away` | `(base)` |  | **box-shadow** ↑: app.css:2570(010) `inset 0 0 0 2px var(--on` → pol-roster.css:243(020) `inset 0 0 0 1.5px var(--` |
-| `.onyx-member-pronouns` | `(base)` |  | **font-size** ↑: app.css:1756(010) `13px` → ui-sheets.css:1072(020) `var(--text-sm)`<br>**margin** ↑: app.css:1756(010) `2px 0 0` → ui-sheets.css:1072(020) `0` |
-| `.onyx-member-role` | `(base)` |  | **padding** ↑: app.css:2575(010) `0 6px` → pol-roster.css:262(020) `0` |
-| `.onyx-mobile-nav` | `(base)` | @media (max-width: 767.98px) | **display** ↑: app.css:3876(020) `flex` → pol-shell.css:1204(040) `none` → pol-ios.css:110(040) `none`<br>**gap**: app.css:3878(020) `2px` → pol-shell.css:1409(020) `0`<br>**padding**: app.css:3880(020) `var(--space-1) var(--spa` → pol-shell.css:1411(020) `0 var(--space-1) var(--s` |
-| `.onyx-moddesk-room` | `(base)` |  | **font-size** ↑: app.css:2895(010) `var(--text-sm)` → ui-sheets.css:728(020) `var(--text-2xs)` |
-| `.onyx-moddesk-sheet` | `(base)` |  | **padding** ↑: app.css:2883(010) `var(--space-4)` → ui-sheets.css:709(020) `0 var(--sheet-pad) var(-` |
-| `.onyx-moddesk-toggle` | `(base)` |  | **min-height** ↑: app.css:2875(010) `24px` → pol-shell.css:665(020) `32px` |
-| `.onyx-msg-menu` | `(base)` |  | **background** ↑: app.css:1604(010) `var(--onyx-panel-2)` → pol-thread.css:274(020) `var(--onyx-panel)`<br>**border-radius** ↑: app.css:1606(010) `6px` → pol-thread.css:276(020) `var(--radius)`<br>**gap** ↑: app.css:1609(010) `2px` → pol-thread.css:279(020) `0`<br>**margin** ↑: app.css:1610(010) `4px 0 4px 16px` → pol-thread.css:273(020) `0`<br>**max-width** ↑: app.css:1611(010) `280px` → pol-thread.css:279(020) `none`<br>**padding** ↑: app.css:1612(010) `6px` → pol-thread.css:279(020) `var(--space-1)` |
-| `.onyx-msg-menu-item` | `:hover` |  | **background** ↑: app.css:1624(020) `var(--onyx-panel)` → pol-thread.css:298(030) `var(--onyx-panel-2)` |
-| `.onyx-msg-menu-item` | `(base)` |  | **border** ↑: app.css:1616(010) `none` → pol-thread.css:288(030) `0`<br>**border-radius** ↑: app.css:1617(010) `6px` → pol-thread.css:289(030) `4px`<br>**font-size** ↑: app.css:1620(010) `13px` → pol-thread.css:292(030) `var(--text-sm)`<br>**padding** ↑: app.css:1621(010) `6px 10px` → pol-thread.css:286(030) `0 var(--space-3)` |
-| `.onyx-msg-menu-trigger` | `(base)` |  | **border** ↑: app.css:1589(010) `1px solid transparent` → pol-thread.css:235(020) `0`<br>**border-radius** ↑: app.css:1590(010) `6px` → pol-thread.css:236(020) `4px`<br>**color** ↑: app.css:1591(010) `var(--onyx-faint)` → pol-thread.css:237(020) `var(--onyx-dim)`<br>**padding** ↑: app.css:1596(010) `0 6px` → pol-thread.css:233(020) `0` |
-| `.onyx-msg-menu-trigger` | `:hover` |  | **border-color** ↑: app.css:1600(020) `var(--onyx-line)` → pol-thread.css:242(030) `transparent` |
-| `.onyx-msg-menu-trigger` | `[aria-expanded=""]` |  | **border-color** ↑: app.css:1600(020) `var(--onyx-line)` → pol-thread.css:242(030) `transparent` |
-| `.onyx-nav-btn` | `(base)` |  | **border** ↑: app.css:2170(010) `1px solid transparent` → pol-shell.css:680(020) `0`<br>**color** ↑: app.css:2168(010) `var(--onyx-dim)` → pol-shell.css:679(020) `var(--onyx-faint)`<br>**min-height** ↑: app.css:2167(010) `44px` → app.css:3497(020) `var(--target-min)` → pol-shell.css:676(020) `40px`<br>**padding** ↑: app.css:2166(010) `var(--space-2) 2px` → app.css:3496(020) `var(--space-2) 0` → pol-shell.css:677(020) `0` |
-| `.onyx-nav-btn` | `(base)` | @media (max-width: 767.98px) | **font-size**: app.css:3885(020) `var(--text-xs)` → pol-shell.css:1421(020) `11px` |
-| `.onyx-nav-icon` | `(base)` |  | **background**: app.css:2188(020) `var(--onyx-accent)` → app.css:2193(010) `currentColor` → pol-shell.css:697(020) `currentColor` → pol-shell.css:698(020) `var(--onyx-accent)` |
-| `.onyx-newmsg-sheet` | `(base)` |  | **gap**: app.css:606(010) `10px` → ui-sheets.css:767(010) `var(--space-3)` |
-| `.onyx-palette-launcher` | `(base)` |  | **color** ↑: app.css:2622(010) `var(--onyx-dim)` → pol-shell.css:592(020) `var(--onyx-faint)`<br>**flex** ↑: app.css:2626(010) `none` → pol-shell.css:587(020) `1 1 auto`<br>**padding** ↑: app.css:2618(010) `var(--space-1) 10px` → pol-shell.css:591(020) `0 var(--space-2) 0 10px` |
-| `.onyx-palette-launcher` | `:hover` |  | **color** ↑: app.css:2628(020) `var(--onyx-text)` → pol-shell.css:596(030) `var(--onyx-dim)` |
-| `.onyx-prefs-body` | `(base)` |  | **grid-template-columns** ↑: app.css:3080(010) `200px minmax(0, 1fr)` → ui-sheets.css:672(020) `212px minmax(0, 1fr)` |
-| `.onyx-primary-nav` | `(base)` |  | **align-items** ↑: app.css:2142(010) `stretch` → pol-shell.css:669(020) `center`<br>**gap** ↑: app.css:2143(010) `var(--space-1)` → app.css:3444(020) `var(--space-1)` → pol-shell.css:670(020) `2px`<br>**padding** ↑: app.css:2144(010) `10px 6px` → app.css:3443(020) `var(--space-2) var(--spa` → pol-shell.css:671(020) `var(--space-2) 0` |
-| `.onyx-profile-account` | `(base)` |  | **font-size** ↑: app.css:1702(010) `13px` → ui-sheets.css:781(020) `var(--text-sm)` |
-| `.onyx-profile-nick` | `(base)` |  | **font-size** ↑: app.css:1701(010) `14px` → ui-sheets.css:780(020) `var(--text-lg)`<br>**font-weight** ↑: app.css:1701(010) `700` → ui-sheets.css:780(020) `650` |
-| `.onyx-rail` | `(base)` |  | **padding** ↑: app.css:408(010) `12px` → pol-shell.css:723(020) `0 var(--space-2) var(--s` |
-| `.onyx-rail-avatar` | `(base)` |  | **border-radius** ↑: app.css:580(010) `var(--radius)` → pol-shell.css:440(020) `50%` → pol-shell.css:853(020) `50%`<br>**height** ↑: app.css:579(010) `24px` → pol-shell.css:853(020) `28px`<br>**width** ↑: app.css:578(010) `24px` → pol-shell.css:853(020) `28px` |
-| `.onyx-rail-color` | `(base)` |  | **border-radius** ↑: app.css:569(010) `3px` → pol-shell.css:819(020) `2px`<br>**height** ↑: app.css:571(010) `10px` → pol-shell.css:819(020) `14px`<br>**width** ↑: app.css:572(010) `4px` → pol-shell.css:819(020) `3px` |
-| `.onyx-rail-copy` | `(base)` |  | **flex-direction** ↑: app.css:542(010) `column` → pol-shell.css:829(020) `row` |
-| `.onyx-rail-empty` | `(base)` |  | **color** ↑: app.css:531(010) `var(--onyx-dim)` → pol-shell.css:789(020) `var(--onyx-faint)` |
-| `.onyx-rail-filter` | `(base)` |  | **gap** ↑: app.css:479(010) `6px` → pol-shell.css:739(020) `var(--space-1)`<br>**margin** ↑: app.css:481(010) `0 0 var(--space-3)` → pol-shell.css:739(020) `0 0 var(--space-2)` |
-| `.onyx-rail-filter-clear` | `(base)` |  | **font-size**: app.css:505(020) `var(--text-2xs)` → pol-shell.css:764(020) `var(--text-xs)`<br>**padding**: app.css:506(020) `3px var(--space-2)` → pol-shell.css:763(020) `0 var(--space-2)` |
-| `.onyx-rail-filter-input` | `:focus` |  | **outline** ↑: app.css:495(020) `1px solid var(--onyx-acc` → pol-shell.css:758(030) `var(--focus-ring)`<br>**outline-offset** ↑: app.css:495(020) `0` → pol-shell.css:758(030) `var(--focus-offset)` |
-| `.onyx-rail-filter-input` | `(base)` |  | **padding** ↑: app.css:493(010) `5px var(--space-2)` → pol-shell.css:754(020) `0 var(--space-2) 0 28px` |
-| `.onyx-rail-filter-unread` | `(base)` |  | **font-size**: app.css:505(020) `var(--text-2xs)` → pol-shell.css:764(020) `var(--text-xs)`<br>**padding**: app.css:506(020) `3px var(--space-2)` → pol-shell.css:763(020) `0 var(--space-2)` |
-| `.onyx-rail-filter-unread-on` | `(base)` |  | **border-color**: app.css:509(020) `var(--onyx-accent)` → pol-shell.css:768(020) `var(--onyx-dim)`<br>**color**: app.css:510(020) `var(--onyx-accent)` → pol-shell.css:768(020) `var(--onyx-text)` |
-| `.onyx-rail-label` | `(base)` |  | **letter-spacing** ↑: app.css:527(010) `0.08em` → pol-shell.css:774(020) `var(--tracking-kicker)`<br>**margin**: app.css:522(020) `0` → app.css:529(010) `0 0 var(--space-2)` → pol-shell.css:774(020) `var(--space-2) 0 var(--s` |
-| `.onyx-rail-meta` | `(base)` |  | **gap**: app.css:553(010) `6px` → pol-shell.css:826(010) `4px` |
-| `.onyx-rail-name` | `(base)` |  | **color** ↑: app.css:453(020) `var(--onyx-accent)` → pol-shell.css:815(030) `var(--onyx-text)`<br>**font-weight** ↑: app.css:454(020) `650` → app.css:556(020) `650` → pol-shell.css:815(030) `650` → pol-shell.css:817(030) `700` |
-| `.onyx-rail-new` | `(base)` |  | **color** ↑: app.css:504(020) `var(--onyx-dim)` → pol-shell.css:782(020) `var(--onyx-dim)` → pol-shell.css:788(030) `var(--onyx-text)`<br>**font-size**: app.css:505(020) `var(--text-2xs)` → pol-shell.css:783(020) `var(--text-xs)`<br>**padding**: app.css:506(020) `3px var(--space-2)` → pol-shell.css:779(020) `0 var(--space-2)` |
-| `.onyx-rail-section-heading` | `(base)` |  | **justify-content** ↑: app.css:518(010) `space-between` → pol-shell.css:1461(030) `flex-end` |
-| `.onyx-rail-star` | `(base)` |  | **border**: app.css:503(020) `1px solid var(--onyx-lin` → pol-shell.css:861(020) `0`<br>**color**: app.css:504(020) `var(--onyx-dim)` → app.css:589(020) `var(--onyx-faint)` → pol-shell.css:862(020) `var(--onyx-faint)`<br>**padding**: app.css:506(020) `3px var(--space-2)` → app.css:590(020) `3px 6px` → pol-shell.css:860(020) `0`<br>**width**: app.css:501(020) `auto` → pol-shell.css:858(020) `28px` |
-| `.onyx-rail-star-on` | `(base)` |  | **color**: app.css:592(020) `var(--onyx-accent)` → app.css:3842(020) `var(--onyx-text)` → pol-shell.css:870(020) `var(--onyx-dim)` |
-| `.onyx-rail-sub` | `(base)` |  | **color** ↑: app.css:547(010) `var(--onyx-faint)` → pol-shell.css:824(020) `var(--onyx-faint)` → pol-shell.css:825(030) `var(--onyx-dim)`<br>**font-size** ↑: app.css:548(010) `var(--text-2xs)` → pol-shell.css:824(020) `var(--text-xs)` |
-| `.onyx-rail-unread` | `(base)` |  | **border-radius** ↑: app.css:559(010) `var(--radius)` → pol-shell.css:846(020) `var(--r-pill)`<br>**font-size** ↑: app.css:561(010) `var(--text-xs)` → pol-shell.css:840(020) `11px`<br>**padding** ↑: app.css:564(010) `1px 5px` → pol-shell.css:838(020) `0 5px` |
-| `.onyx-react-choice` | `:hover` |  | **background** ↑: app.css:1657(020) `var(--onyx-panel)` → pol-thread.css:331(030) `var(--onyx-panel-2)` |
-| `.onyx-react-choice` | `(base)` |  | **font-size** ↑: app.css:1654(010) `18px` → pol-thread.css:327(030) `20px`<br>**padding** ↑: app.css:1655(010) `4px` → pol-thread.css:326(030) `0` |
-| `.onyx-react-grid` | `(base)` |  | **grid-template-columns** ↑: app.css:1646(010) `repeat(6, 1fr)` → pol-thread.css:320(020) `repeat(8, minmax(0, 1fr)` |
-| `.onyx-react-picker` | `(base)` |  | **background** ↑: app.css:1626(010) `var(--onyx-panel-2)` → pol-thread.css:274(020) `var(--onyx-panel)`<br>**border-radius** ↑: app.css:1628(010) `6px` → pol-thread.css:276(020) `var(--radius)`<br>**gap** ↑: app.css:1631(010) `6px` → pol-thread.css:309(020) `var(--space-2)`<br>**margin** ↑: app.css:1632(010) `4px 0 4px 16px` → pol-thread.css:273(020) `0`<br>**max-width** ↑: app.css:1633(010) `280px` → pol-thread.css:309(020) `none`<br>**padding** ↑: app.css:1634(010) `6px` → pol-thread.css:309(020) `var(--space-2)` |
-| `.onyx-react-search` | `(base)` |  | **background** ↑: app.css:1637(010) `var(--onyx-panel)` → pol-thread.css:313(020) `var(--onyx-bg)`<br>**border-radius** ↑: app.css:1639(010) `6px` → pol-thread.css:315(020) `var(--radius)`<br>**font-size** ↑: app.css:1641(010) `13px` → pol-thread.css:318(020) `var(--text-sm)`<br>**padding** ↑: app.css:1642(010) `6px 10px` → pol-thread.css:312(020) `0 var(--space-3)` |
-| `.onyx-reclaim-lead` | `(base)` |  | **font-size** ↑: app.css:348(010) `13px` → ui-sheets.css:776(020) `var(--text-md)`<br>**margin** ↑: app.css:347(010) `0 0 12px` → ui-sheets.css:776(020) `0 0 var(--space-4)` |
-| `.onyx-room-header` | `(base)` |  | **min-height** ↑: app.css:3642(010) `48px` → pol-shell.css:896(020) `52px`<br>**padding** ↑: app.css:3643(010) `var(--space-2) var(--spa` → pol-shell.css:897(020) `var(--space-2) var(--spa`<br>**row-gap** **flip**: pol-shell.css:895(020) `2px` → roomsettings.css:9(010) `var(--space-1)` |
-| `.onyx-room-header-actions` | `(base)` |  | **gap** ↑: app.css:3677(010) `var(--space-2)` → pol-shell.css:934(020) `2px` |
-| `.onyx-room-header-id` | `(base)` |  | **align-items** ↑: app.css:3652(010) `baseline` → pol-shell.css:905(020) `center`<br>**flex** ↑: app.css:3649(010) `1 1 auto` → pol-shell.css:903(020) `1 1 0`<br>**gap** ↑: app.css:3653(010) `var(--space-3)` → pol-shell.css:906(020) `var(--space-2)` |
-| `.onyx-room-header-name` | `(base)` |  | **font-size** ↑: app.css:3658(010) `var(--text-md)` → pol-shell.css:920(020) `var(--text-lg)`<br>**font-weight** ↑: app.css:3659(010) `650` → pol-shell.css:921(020) `700` |
-| `.onyx-room-more-menu` | `(base)` | @media (max-width: 767.98px) | **animation** **flip**: pol-shell.css:1293(020) `onyx-sheet-in var(--dur-` → ui-sheets.css:972(010) `ui-sheet-rise var(--dur-`<br>**border-radius** **flip**: pol-shell.css:1291(020) `calc(var(--radius) * 2) ` → ui-sheets.css:970(010) `12px 12px 0 0`<br>**bottom** **flip**: pol-shell.css:1285(020) `0` → ui-sheets.css:965(010) `0` → ui-sheets.css:1047(010) `var(--kb-inset, 0px)`<br>**padding** **flip**: pol-shell.css:1289(020) `0 var(--space-2) calc(va` → ui-sheets.css:968(010) `var(--sheet-grip-zone) v`<br>**z-index** **flip**: pol-shell.css:1286(020) `59` → ui-sheets.css:966(010) `61` |
-| `.onyx-room-more-menu` | `(base)` |  | **min-width** ↑: app.css:3690(010) `200px` → pol-shell.css:968(020) `248px` |
-| `.onyx-room-more-scrim` | `(base)` | @media (max-width: 767.98px) | **background** **flip**: pol-shell.css:1279(020) `color-mix(in srgb, #000 ` → ui-sheets.css:957(010) `var(--sheet-veil)`<br>**z-index** **flip**: pol-shell.css:1279(020) `58` → ui-sheets.css:956(010) `60` |
-| `.onyx-room-more-toggle` | `[aria-expanded=""]` |  | **border-color** ↑: app.css:3580(020) `var(--onyx-dim)` → pol-shell.css:953(040) `transparent` → pol-shell.css:953(040) `transparent` |
-| `.onyx-room-privacy` | `(base)` |  | **color** **flip**: pol-shell.css:928(030) `var(--onyx-faint)` → roomsettings.css:36(010) `var(--onyx-dim)` |
-| `.onyx-room-topic-toggle` | `(base)` |  | **color** **flip**: pol-shell.css:927(020) `var(--onyx-faint)` → roomsettings.css:53(010) `var(--onyx-dim)` |
-| `.onyx-roster-care` | `(base)` |  | **border** ↑: app.css:1578(010) `1px solid var(--onyx-lin` → pol-roster.css:318(020) `0`<br>**font-size** ↑: app.css:1582(010) `12px` → pol-roster.css:321(020) `var(--text-sm)`<br>**padding** ↑: app.css:1584(010) `2px 10px` → pol-roster.css:316(020) `var(--space-1) 0` |
-| `.onyx-roster-count` | `(base)` |  | **color** ↑: app.css:2541(010) `var(--onyx-dim)` → pol-roster.css:62(020) `var(--onyx-faint)` |
-| `.onyx-roster-empty` | `(base)` |  | **margin** ↑: app.css:2556(010) `var(--space-2) 0` → pol-roster.css:127(020) `var(--space-3) var(--spa` |
-| `.onyx-roster-filter` | `(base)` |  | **margin** ↑: app.css:2542(010) `var(--space-1) 0 var(--s` → pol-roster.css:94(020) `var(--space-1) var(--spa` |
-| `.onyx-roster-filter-input` | `(base)` |  | **background** ↑: app.css:2544(010) `var(--onyx-bg)` → pol-roster.css:107(020) `transparent`<br>**border** ↑: app.css:2545(010) `1px solid var(--onyx-lin` → pol-roster.css:108(020) `0`<br>**min-height** ↑: app.css:2551(010) `32px` → pol-roster.css:105(020) `30px`<br>**padding** ↑: app.css:2552(010) `var(--space-1) var(--spa` → pol-roster.css:106(020) `0` |
-| `.onyx-roster-filter-input` | `:focus-visible` |  | **outline** ↑: app.css:2555(020) `2px solid var(--onyx-acc` → pol-roster.css:112(030) `none` |
-| `.onyx-roster-head` | `(base)` |  | **align-items** ↑: app.css:2539(010) `baseline` → pol-roster.css:45(020) `center`<br>**justify-content** ↑: app.css:2539(010) `space-between` → pol-roster.css:47(020) `flex-start` |
-| `.onyx-search-toggle-open` | `(base)` |  | **border-color** ↑: app.css:3580(010) `var(--onyx-dim)` → pol-shell.css:953(030) `transparent` |
-| `.onyx-sender` | `(base)` |  | **margin-right** ↑: app.css:674(010) `8px` → app.css:2997(020) `6px` → pol-thread.css:125(030) `var(--space-2)` |
-| `.onyx-sheet` | `(base)` |  | **animation**: app.css:3765(020) `onyx-sheet-in var(--dur-` → ui-sheets.css:73(020) `ui-sheet-pop var(--dur-b`<br>**animation-name**: app.css:3773(030) `onyx-sheet-side-in` → ui-sheets.css:120(030) `ui-sheet-side` → ui-sheets.css:136(030) `ui-sheet-drop`<br>**border-radius** **flip**: app.css:3772(030) `0` → ui-sheets.css:66(020) `var(--radius)` → ui-sheets.css:119(030) `0`<br>**max-height** **flip**: app.css:3770(030) `none` → ui-sheets.css:65(020) `var(--sheet-max-h)` → ui-sheets.css:117(030) `none` → ui-sheets.css:135(030) `min(calc(100dvh - 72px),` |
-| `.onyx-sheet` | `(base)` | @media (max-width: 767.98px) | **border-radius** ↑ **flip**: app.css:3909(020) `var(--radius) var(--radi` → app.css:3909(030) `var(--radius) var(--radi` → ui-sheets.css:309(020) `12px 12px 0 0` → ui-sheets.css:309(030) `12px 12px 0 0`<br>**max-height** ↑ **flip**: app.css:3907(020) `92dvh` → app.css:3907(030) `92dvh` → ui-sheets.css:307(020) `var(--sheet-max-h)` → ui-sheets.css:307(030) `var(--sheet-max-h)` |
-| `.onyx-sheet-backdrop` | `(base)` |  | **background** **flip**: app.css:3150(030) `var(--onyx-bg)` → app.css:3739(010) `color-mix(in srgb, #000 ` → ui-sheets.css:60(010) `var(--sheet-veil)` → ui-sheets.css:131(030) `color-mix(in srgb, #000 ` |
-| `.onyx-sheet-close` | `(base)` |  | **background** ↑: app.css:3810(010) `transparent` → ui-sheets.css:233(020) `transparent` → ui-sheets.css:233(010) `transparent` → ui-sheets.css:718(020) `var(--onyx-panel)`<br>**border** ↑: app.css:3811(010) `1px solid var(--onyx-lin` → ui-sheets.css:234(020) `0` → ui-sheets.css:234(010) `0`<br>**min-height** ↑: app.css:3806(010) `32px` → ui-sheets.css:227(020) `var(--sheet-close)` → ui-sheets.css:227(010) `var(--sheet-close)`<br>**min-width** ↑: app.css:3805(010) `32px` → ui-sheets.css:226(020) `var(--sheet-close)` → ui-sheets.css:226(010) `var(--sheet-close)` |
-| `.onyx-sheet-head` | `(base)` |  | **margin-bottom** ↑: app.css:3791(010) `var(--space-3)` → roomsettings.css:128(020) `0` → ui-sheets.css:503(020) `0` → ui-sheets.css:768(020) `var(--space-1)` |
-| `.onyx-sheet-layer` | `(base)` |  | **padding**: app.css:3727(010) `var(--space-4)` → ui-sheets.css:57(010) `var(--space-6) var(--spa` |
-| `.onyx-sheet-layer` | `[data-placement=""]` |  | **padding**: app.css:3733(020) `0` → ui-sheets.css:113(020) `0` → ui-sheets.css:128(020) `52px var(--space-4) var(`<br>**place-items**: app.css:3732(020) `stretch end` → ui-sheets.css:127(020) `start end` |
-| `.onyx-shortcuts-close` | `(base)` |  | **border**: app.css:2703(010) `1px solid var(--onyx-lin` → ui-sheets.css:234(010) `0`<br>**font-size**: app.css:2707(010) `var(--text-lg)` → ui-sheets.css:230(010) `0`<br>**line-height**: app.css:2708(010) `1` → ui-sheets.css:231(010) `0`<br>**min-height**: app.css:2701(010) `32px` → ui-sheets.css:227(010) `var(--sheet-close)`<br>**min-width**: app.css:2700(010) `32px` → ui-sheets.css:226(010) `var(--sheet-close)` |
-| `.onyx-shortcuts-close` | `:focus-visible` |  | **outline**: app.css:2631(020) `2px solid var(--onyx-acc` → ui-sheets.css:241(020) `var(--focus-ring)`<br>**outline-offset**: app.css:2631(020) `1px` → ui-sheets.css:241(020) `var(--focus-offset)` |
-| `.onyx-shortcuts-sheet` | `(base)` |  | **display** ↑: app.css:2661(010) `flex` → ui-sheets.css:486(020) `block`<br>**width** ↑: app.css:2658(010) `min(560px, 100%)` → ui-sheets.css:486(020) `min(680px, 100%)` |
-| `.onyx-spotlight` | `(base)` | @media (max-width: 767.98px) | **align-items**: app.css:2865(010) `start` → ui-sheets.css:830(010) `stretch`<br>**padding**: app.css:2865(010) `var(--space-2)` → ui-sheets.css:830(010) `0` |
-| `.onyx-spotlight-backdrop` | `(base)` |  | **background** **flip**: app.css:2654(010) `rgb(0 0 0 / 55%)` → app.css:3150(030) `var(--onyx-bg)` → ui-sheets.css:407(010) `var(--sheet-veil)` |
-| `.onyx-spotlight-close` | `(base)` |  | **border**: app.css:2703(010) `1px solid var(--onyx-lin` → ui-sheets.css:234(010) `0`<br>**font-size**: app.css:2707(010) `var(--text-lg)` → ui-sheets.css:230(010) `0`<br>**line-height**: app.css:2708(010) `1` → ui-sheets.css:231(010) `0`<br>**min-height**: app.css:2701(010) `32px` → ui-sheets.css:227(010) `var(--sheet-close)`<br>**min-width**: app.css:2700(010) `32px` → ui-sheets.css:226(010) `var(--sheet-close)` |
-| `.onyx-spotlight-close` | `:focus-visible` |  | **outline**: app.css:2631(020) `2px solid var(--onyx-acc` → ui-sheets.css:241(020) `var(--focus-ring)`<br>**outline-offset**: app.css:2631(020) `1px` → ui-sheets.css:241(020) `var(--focus-offset)` |
-| `.onyx-spotlight-foot` | `(base)` |  | **padding**: app.css:2829(010) `var(--space-2) var(--spa` → ui-sheets.css:469(010) `var(--space-2) var(--spa` |
-| `.onyx-spotlight-group` | `(base)` |  | **margin-top**: app.css:2788(020) `6px` → ui-sheets.css:437(020) `var(--space-2)` |
-| `.onyx-spotlight-hint` | `(base)` |  | **color** ↑: app.css:2818(010) `var(--onyx-dim)` → ui-sheets.css:462(010) `var(--onyx-faint)` → ui-sheets.css:463(030) `var(--onyx-dim)`<br>**font-size**: app.css:2819(010) `var(--text-2xs)` → ui-sheets.css:462(010) `var(--text-sm)` |
-| `.onyx-spotlight-input` | `(base)` |  | **font-size**: app.css:2694(010) `var(--text-md)` → ui-sheets.css:431(010) `var(--text-lg)`<br>**padding**: app.css:2695(010) `6px 0` → ui-sheets.css:431(010) `10px 0` |
-| `.onyx-spotlight-option` | `(base)` |  | **border-left**: app.css:2804(010) `2px solid transparent` → ui-sheets.css:443(010) `0`<br>**gap**: app.css:2800(010) `10px` → ui-sheets.css:440(010) `var(--space-3)`<br>**min-height**: app.css:2801(010) `36px` → ui-sheets.css:441(010) `40px`<br>**padding**: app.css:2802(010) `6px var(--space-2)` → ui-sheets.css:442(010) `0 var(--space-3)` |
-| `.onyx-spotlight-panel` | `(base)` |  | **animation**: app.css:2668(010) `onyx-switcher-in var(--d` → ui-sheets.css:415(010) `ui-sheet-drop var(--dur-`<br>**box-shadow**: app.css:2667(010) `0 12px 32px rgb(0 8 16 /` → ui-sheets.css:413(010) `var(--elev-3)`<br>**max-height**: app.css:2659(010) `min(70vh, 560px)` → ui-sheets.css:411(010) `min(64vh, 560px)`<br>**width**: app.css:2658(010) `min(560px, 100%)` → ui-sheets.css:410(010) `min(600px, 100%)` |
-| `.onyx-spotlight-panel` | `(base)` | @media (max-width: 767.98px) | **max-height**: app.css:2866(010) `calc(100dvh - 16px)` → ui-sheets.css:833(010) `none` |
-| `.onyx-spotlight-results` | `(base)` |  | **padding**: app.css:2784(010) `6px` → ui-sheets.css:435(010) `var(--space-2)` |
-| `.onyx-spotlight-search` | `(base)` |  | **gap**: app.css:2682(010) `var(--space-2)` → ui-sheets.css:419(010) `var(--space-3)`<br>**padding**: app.css:2683(010) `10px var(--space-3)` → ui-sheets.css:421(010) `0 var(--space-2) 0 var(-` |
-| `.onyx-spotlight-section` | `(base)` |  | **padding**: app.css:2791(010) `6px var(--space-2) var(-` → ui-sheets.css:436(010) `var(--space-2) var(--spa` |
-| `.onyx-thread-desc` | `(base)` |  | **font-size** ↑: app.css:157(010) `12px` → pol-thread.css:890(020) `var(--text-sm)` |
-| `.onyx-thread-head` | `(base)` |  | **align-items** ↑: app.css:155(010) `baseline` → pol-thread.css:882(020) `center`<br>**gap** ↑: app.css:155(010) `8px` → pol-thread.css:883(020) `var(--space-3)` |
-| `.onyx-thread-indicator` | `(base)` |  | **background** ↑: app.css:158(010) `none` → pol-thread.css:432(030) `transparent`<br>**border** ↑: app.css:158(010) `none` → pol-thread.css:433(030) `1px solid transparent`<br>**font-size** ↑: app.css:158(010) `12px` → pol-thread.css:437(030) `var(--text-sm)`<br>**padding** ↑: app.css:158(010) `2px 4px` → pol-thread.css:431(030) `0 var(--space-2) 0 6px` |
-| `.onyx-thread-msg` | `(base)` |  | **border** ↑: app.css:159(010) `1px solid var(--onyx-lin` → pol-thread.css:915(020) `0`<br>**border-radius** ↑: app.css:159(010) `6px` → pol-thread.css:916(020) `0`<br>**padding** ↑: app.css:159(010) `8px` → pol-thread.css:913(020) `var(--space-2) var(--spa` |
-| `.onyx-thread-msg-text` | `(base)` |  | **margin** ↑: app.css:161(010) `4px 0 0` → pol-thread.css:930(020) `0` |
-| `.onyx-thread-sheet` | `(base)` |  | **gap**: app.css:154(010) `12px` → pol-thread.css:876(010) `0`<br>**padding**: app.css:154(010) `16px` → pol-thread.css:876(010) `0` |
-| `.onyx-thread-state` | `(base)` |  | **font-size** ↑: app.css:162(010) `12px` → pol-thread.css:945(020) `var(--text-sm)` |
-| `.onyx-thread-title` | `(base)` |  | **font-size** ↑: app.css:156(010) `15px` → pol-thread.css:889(020) `var(--text-lg)` |
-| `.onyx-toast` | `(base)` |  | **align-items**: app.css:1082(010) `flex-start` → ui-sheets.css:794(010) `center`<br>**border-radius**: app.css:1087(010) `8px` → ui-sheets.css:798(010) `var(--radius)`<br>**gap**: app.css:1083(010) `8px` → ui-sheets.css:795(010) `var(--space-3)`<br>**padding**: app.css:1088(010) `8px 10px` → ui-sheets.css:797(010) `var(--space-2) var(--spa` |
-| `.onyx-toaster` | `(base)` |  | **bottom**: app.css:1069(010) `16px` → ui-sheets.css:790(010) `calc(var(--composer-h) +`<br>**max-width**: app.css:1077(010) `min(360px, 90vw)` → ui-sheets.css:791(010) `min(380px, calc(100vw - `<br>**right**: app.css:1068(010) `16px` → ui-sheets.css:789(010) `var(--space-5)`<br>**z-index**: app.css:1070(010) `60` → ui-sheets.css:788(010) `90` |
-| `.onyx-topbar` | `(base)` |  | **display** ↑: app.css:223(010) `flex` → pol-shell.css:572(020) `grid`<br>**gap** ↑: app.css:225(010) `var(--space-4)` → app.css:3533(010) `var(--space-3)` → pol-shell.css:575(020) `var(--space-4)`<br>**min-height** ↑: app.css:3535(010) `52px` → pol-shell.css:576(020) `48px`<br>**padding** ↑: app.css:226(010) `10px var(--space-4)` → app.css:3534(010) `var(--space-2) var(--spa` → pol-shell.css:577(020) `0 var(--space-3) 0 var(-` |
-| `.onyx-topbar-global` | `(base)` |  | **gap** ↑: app.css:3548(010) `var(--space-2)` → pol-shell.css:599(020) `var(--space-1)` |
-| `.onyx-topbar-search` | `(base)` |  | **justify-content** ↑: app.css:3542(010) `center` → pol-shell.css:585(020) `stretch` |
-| `.onyx-topic` | `(base)` |  | **overflow** ↑: app.css:252(010) `hidden` → pol-thread.css:1226(020) `visible`<br>**white-space** ↑: app.css:254(010) `nowrap` → pol-thread.css:1227(020) `normal` |
-| `.onyx-topic-tools` | `(base)` |  | **display** ↑: app.css:170(010) `flex` → pol-thread.css:632(011) `block`<br>**padding** ↑: app.css:170(010) `4px 0` → pol-thread.css:632(011) `0 0 var(--space-2)` |
-| `.onyx-ts` | `(base)` |  | **font-size** ↑: app.css:2993(020) `var(--text-2xs)` → pol-thread.css:130(030) `var(--text-2xs)` → pol-thread.css:146(030) `10.5px` |
-| `.onyx-you` | `(base)` |  | **padding** ↑: app.css:2221(010) `var(--space-4)` → ui-sheets.css:580(020) `0 var(--sheet-pad) var(-`<br>**width** ↑: app.css:2222(010) `min(440px, calc(100vw - ` → ui-sheets.css:579(020) `min(460px, 100%)` |
-| `.onyx-you-close` | `(base)` |  | **border**: app.css:2237(010) `1px solid var(--onyx-lin` → ui-sheets.css:234(010) `0`<br>**color**: app.css:2235(010) `var(--onyx-text)` → ui-sheets.css:232(010) `var(--onyx-dim)`<br>**padding**: app.css:2239(010) `var(--space-1) var(--spa` → ui-sheets.css:229(010) `0` |
-| `.onyx-you-desc` | `(base)` |  | **font-size** ↑: app.css:2232(010) `var(--text-2xs)` → ui-sheets.css:605(020) `var(--text-sm)` |
-| `.onyx-you-group` | `(base)` |  | **margin-top** ↑: app.css:2245(010) `var(--space-4)` → ui-sheets.css:609(020) `var(--space-5)` |
-| `.onyx-you-group__title` | `(base)` |  | **letter-spacing** ↑: app.css:2252(010) `0.08em` → ui-sheets.css:610(020) `var(--tracking-kicker)`<br>**margin** ↑: app.css:2248(010) `0 0 var(--space-1)` → ui-sheets.css:610(020) `0 0 2px` |
-| `.onyx-you-head` | `(base)` |  | **display** ↑ **flip**: app.css:2228(010) `flex` → pol-shell.css:1042(030) `flex` → ui-sheets.css:584(020) `block`<br>**gap** ↑: app.css:2228(010) `var(--space-3)` → pol-shell.css:1042(030) `14px` |
-| `.onyx-you-leave` | `(base)` |  | **border** ↑: app.css:2282(010) `1px solid var(--onyx-lin` → ui-sheets.css:653(030) `1px solid color-mix(in o`<br>**color** ↑: app.css:2280(010) `var(--onyx-text)` → ui-sheets.css:651(030) `var(--onyx-bad)` |
-| `.onyx-you-leave-row` | `(base)` |  | **justify-content** ↑: app.css:2277(010) `flex-end` → ui-sheets.css:647(020) `stretch`<br>**margin-top** ↑: app.css:2277(010) `var(--space-4)` → ui-sheets.css:647(020) `var(--space-6)` |
-| `.onyx-you-lede` | `(base)` |  | **margin** ↑: app.css:2243(010) `var(--space-3) 0 0` → ui-sheets.css:607(020) `var(--space-4) 0 0` |
-| `.onyx-you-link` | `(base)` |  | **border-radius** ↑: app.css:2267(010) `var(--radius)` → ui-sheets.css:626(020) `0`<br>**display** ↑: app.css:2259(010) `block` → ui-sheets.css:618(020) `flex`<br>**margin** ↑: app.css:2262(010) `0 0 6px` → ui-sheets.css:621(020) `0`<br>**padding** ↑: app.css:2263(010) `10px var(--space-3)` → ui-sheets.css:622(020) `var(--space-2) 40px var(` |
-| `.onyx-you-nick` | `(base)` |  | **font-weight** ↑: app.css:2231(010) `650` → ui-sheets.css:604(020) `700`<br>**margin** ↑: app.css:2231(010) `var(--space-1) 0 0` → ui-sheets.css:604(020) `2px 0 0` |
-| `.onyx-you-title` | `(base)` |  | **font-size** ↑: app.css:2230(010) `var(--text-lg)` → ui-sheets.css:598(020) `var(--text-xs)`<br>**margin** ↑: app.css:2230(010) `0` → ui-sheets.css:597(020) `5px 0 0` |
-| `.pref-category-content` | `(base)` |  | **padding** ↑: app.css:3087(010) `var(--space-4)` → ui-sheets.css:676(020) `var(--space-5) var(--she` |
-| `.pref-category-tab` | `[aria-selected=""]` |  | **border-color** ↑: app.css:3084(020) `var(--onyx-line)` → ui-sheets.css:675(030) `transparent` |
-| `.pref-category-tab` | `(base)` |  | **min-height** ↑: app.css:3083(010) `44px` → ui-sheets.css:674(020) `48px`<br>**padding** ↑: app.css:3083(010) `6px 10px` → ui-sheets.css:674(020) `6px 12px` |
-| `.pt-ico` | `(base)` | @media (max-width: 767.98px) | **height**: pol-shell.css:1262(040) `21px` → pol-roster.css:395(040) `20px` → pol-roster.css:395(040) `20px`<br>**width**: pol-shell.css:1262(040) `21px` → pol-roster.css:395(040) `20px` → pol-roster.css:395(040) `20px` |
-| `.pt-ico` | `(base)` |  | **height** ↑ **flip**: pol-thread.css:30(010) `18px` → pol-thread.css:415(030) `16px` → pol-thread.css:441(030) `16px` → pol-thread.css:589(020) `16px` → pol-thread.css:617(020) `28px` → pol-thread.css:648(020) `14px` → pol-thread.css:666(020) `14px` → pol-thread.css:973(020) `16px` → pol-thread.css:1077(031) `20px` → pol-thread.css:1151(030) `16px` → pol-thread.css:1337(020) `16px` → pol-thread.css:1339(020) `18px` → pol-thread.css:1503(020) `14px` → pol-thread.css:1609(020) `16px` → pol-thread.css:1609(020) `16px` → pol-thread.css:1609(020) `16px` → pol-roster.css:84(020) `16px` → pol-roster.css:101(020) `14px` → pol-roster.css:170(020) `14px` → pol-roster.css:300(030) `16px`<br>**transform** ↑: pol-thread.css:666(020) `scaleY(-1)` → pol-thread.css:1505(040) `rotate(45deg)` → pol-roster.css:179(040) `rotate(-90deg)`<br>**width** ↑ **flip**: pol-thread.css:29(010) `18px` → pol-thread.css:415(030) `16px` → pol-thread.css:441(030) `16px` → pol-thread.css:589(020) `16px` → pol-thread.css:617(020) `28px` → pol-thread.css:648(020) `14px` → pol-thread.css:666(020) `14px` → pol-thread.css:973(020) `16px` → pol-thread.css:1077(031) `20px` → pol-thread.css:1151(030) `16px` → pol-thread.css:1337(020) `16px` → pol-thread.css:1339(020) `18px` → pol-thread.css:1503(020) `14px` → pol-thread.css:1609(020) `16px` → pol-thread.css:1609(020) `16px` → pol-thread.css:1609(020) `16px` → pol-roster.css:84(020) `16px` → pol-roster.css:101(020) `14px` → pol-roster.css:169(020) `14px` → pol-roster.css:300(030) `16px` |
-| `.r-btn` | `(base)` |  | **background** **flip**: pol-stats.css:105(020) `var(--pg-raised)` → pol-public.css:423(010) `transparent`<br>**border** **flip**: pol-stats.css:102(020) `1px solid var(--pg-line)` → pol-public.css:420(010) `1px solid var(--onyx-lin`<br>**color** **flip**: pol-stats.css:104(020) `var(--pg-text)` → pol-public.css:422(010) `var(--onyx-text)`<br>**font-size**: pol-stats.css:106(020) `var(--text-md)` → pol-public.css:1087(020) `var(--text-sm)`<br>**line-height** **flip**: pol-stats.css:108(020) `var(--leading-tight)` → pol-public.css:426(010) `1.2`<br>**min-height**: pol-stats.css:100(020) `var(--target-min)` → pol-public.css:418(010) `var(--target-min)` → pol-public.css:1087(020) `36px` → pol-public.css:1411(020) `48px`<br>**padding** **flip**: pol-stats.css:101(020) `var(--space-2) var(--spa` → pol-public.css:419(010) `0 var(--space-5)` → pol-public.css:1087(020) `0 var(--space-3)` |
+| `.notif-center` | `(base)` |  | **right** ↑: app.css:3262(010) `0` → ui-sheets.css:596(020) `auto` |
+| `.notif-center__empty` | `(base)` |  | **border** ↑: pol-shell.css:74(010) `1px dashed var(--onyx-li` → ui-sheets.css:643(020) `0`<br>**margin** ↑: pol-shell.css:69(010) `var(--space-2) 0 0` → ui-sheets.css:641(020) `var(--space-2) 0`<br>**padding** ↑: pol-shell.css:70(010) `var(--space-5) var(--spa` → ui-sheets.css:642(020) `var(--space-7) var(--spa` |
+| `.notif-center__filter` | `(base)` |  | **font-size** ↑: pol-shell.css:61(020) `var(--text-2xs)` → ui-sheets.css:601(030) `var(--text-sm)`<br>**min-height** ↑: pol-shell.css:58(020) `28px` → ui-sheets.css:601(030) `32px` |
+| `.notif-center__glyph` | `(base)` |  | **border-radius** ↑: pol-shell.css:113(010) `var(--radius)` → ui-sheets.css:621(020) `50%`<br>**height** ↑: pol-shell.css:108(010) `28px` → ui-sheets.css:621(020) `32px`<br>**width** ↑: pol-shell.css:107(010) `28px` → ui-sheets.css:621(020) `32px` |
+| `.notif-center__row` | `[data-unread=""]` |  | **background** ↑: pol-shell.css:89(020) `color-mix(in oklab, var(` → ui-sheets.css:609(030) `transparent` |
+| `.notif-center__row` | `(base)` |  | **border-left** ↑: pol-shell.css:86(010) `2px solid transparent` → ui-sheets.css:608(020) `0` |
+| `.notify-group-title` | `(base)` |  | **margin-bottom** ↑: gap-organize.css:551(020) `var(--space-2)` → gap-organize.css:551(020) `var(--space-2)` → ui-sheets.css:1349(030) `0` |
+| `.onyx-account-drop-confirm` | `(base)` |  | **gap** ↑: app.css:1129(010) `8px` → ui-sheets.css:1508(020) `var(--space-1)` |
+| `.onyx-account-hint` | `(base)` |  | **margin** ↑: app.css:1066(010) `0 0 8px` → pol-shell.css:210(020) `0` |
+| `.onyx-account-nav__item` | `(base)` |  | **font-size** ↑: app.css:1063(010) `0.8125rem` → ui-sheets.css:789(020) `var(--text-sm)` |
+| `.onyx-attach-remove` | `(base)` |  | **grid-column** ↑: pol-thread.css:1304(020) `3` → gap-convo.css:86(030) `4` |
+| `.onyx-attach-row` | `(base)` |  | **grid-template-columns** ↑: pol-thread.css:1293(010) `minmax(0, 1fr) auto auto` → gap-convo.css:82(020) `minmax(0, 1fr) auto auto` |
+| `.onyx-audience-toggle` | `(base)` |  | **border-radius** ↑: app.css:618(010) `6px` → pol-thread.css:1212(030) `var(--radius)`<br>**font-size** ↑: app.css:613(010) `0.6875rem` → pol-thread.css:1209(020) `var(--text-xs)`<br>**font-weight** ↑: app.css:614(010) `600` → pol-thread.css:1210(020) `650`<br>**padding** ↑: app.css:619(010) `2px 8px` → pol-thread.css:1207(020) `0 var(--space-2)` → pol-thread.css:1212(030) `0 var(--space-2)` |
+| `.onyx-audience-toggle-set` | `(base)` |  | **border-color** ↑: app.css:626(010) `var(--onyx-accent)` → pol-thread.css:1213(030) `var(--onyx-dim)`<br>**color** ↑: app.css:625(010) `var(--onyx-accent)` → pol-thread.css:1213(030) `var(--onyx-text)` |
+| `.onyx-avatar` | `(base)` |  | **box-shadow**: app.css:188(020) `0 0 0 1px var(--nick-tin` → pol-thread.css:1028(020) `0 0 0 1px var(--nick-tin` → rx-shell.css:47(020) `0 0 0 2px var(--onyx-bg)`<br>**font-size** **flip**: gap-appearance.css:186(040) `0.625rem` → gap-appearance.css:190(040) `0.8125rem` → pol-thread.css:620(020) `1.1rem` → pol-thread.css:1964(020) `0.6rem` → rx-shell.css:47(020) `0.66rem`<br>**height** **flip**: gap-appearance.css:186(040) `1.5rem` → gap-appearance.css:190(040) `2.5rem` → pol-thread.css:620(020) `4rem` → pol-thread.css:1964(020) `1.75rem`<br>**width** **flip**: gap-appearance.css:186(040) `1.5rem` → gap-appearance.css:190(040) `2.5rem` → pol-thread.css:620(020) `4rem` → pol-thread.css:1964(020) `1.75rem` |
+| `.onyx-body` | `(base)` |  | **color** ↑: app.css:629(010) `var(--onyx-text)` → app.css:631(020) `var(--onyx-dim)` → pol-thread.css:189(020) `var(--onyx-dim)` → pol-thread.css:451(020) `var(--onyx-text)` → gap-commands.css:20(020) `var(--onyx-text)`<br>**font-size** ↑: pol-thread.css:140(030) `var(--text-md)` → pol-thread.css:2252(020) `var(--text-md)` → gap-organize.css:672(040) `1.0625rem`<br>**line-height** ↑: pol-thread.css:2252(020) `var(--leading-snug)` → gap-organize.css:673(040) `1.72` |
+| `.onyx-button` | `(base)` |  | **border-radius** ↑: app.css:1090(010) `6px` → pol-studio.css:756(020) `var(--radius)`<br>**padding** ↑: app.css:1091(010) `4px 12px` → pol-studio.css:748(020) `0 var(--space-3)` |
+| `.onyx-call-avatar` | `(base)` |  | **border-color**: app.css:2901(020) `var(--onyx-panel)` → calls-engine.css:153(020) `var(--onyx-bg)`<br>**margin-left**: app.css:2901(020) `-6px` → calls-engine.css:153(020) `-4px` |
+| `.onyx-call-avatar-lg` | `(base)` |  | **font-size** **flip**: app.css:2989(030) `1.125rem` → calls-c4.css:138(020) `var(--text-md)` → calls-engine.css:162(010) `1.375rem`<br>**height** **flip**: app.css:2989(030) `56px` → calls-c4.css:138(020) `40px` → calls-engine.css:162(010) `64px`<br>**width** **flip**: app.css:2989(030) `56px` → calls-c4.css:138(020) `40px` → calls-engine.css:162(010) `64px` |
+| `.onyx-call-bar` | `(base)` |  | **border-radius** ↑: app.css:2995(010) `0 0 6px 6px` → calls-c4.css:67(030) `0` |
+| `.onyx-call-btn` | `(base)` | @media (max-width: 767.98px) | **min-height**: calls-c11.css:185(020) `var(--target-min)` → calls-c11.css:186(020) `var(--target-min)` → calls-engine.css:551(020) `52px` → calls-engine.css:552(020) `var(--target-min)` → calls-engine.css:553(020) `var(--target-min)` → calls-engine.css:553(020) `var(--target-min)` |
+| `.onyx-call-btn` | `(base)` |  | **padding** ↑: app.css:2942(010) `0 14px` → calls-c11.css:107(020) `0 var(--space-2)` → calls-c4.css:55(020) `0 var(--space-2)`<br>**white-space**: calls-c11.css:71(020) `normal` → calls-engine.css:84(020) `nowrap` |
+| `.onyx-call-more-item` | `(base)` |  | **border** ↑: app.css:3011(010) `0` → calls-engine.css:189(030) `1px solid var(--onyx-lin`<br>**width** ↑: app.css:3010(010) `100%` → calls-engine.css:189(030) `auto` |
+| `.onyx-call-name` | `(base)` |  | **font-size** **flip**: app.css:2990(030) `0.75rem` → calls-engine.css:163(010) `var(--text-md)` |
+| `.onyx-call-person` | `(base)` |  | **width** **flip**: app.css:2988(030) `72px` → calls-engine.css:161(010) `96px` |
+| `.onyx-call-ring` | `::after` |  | **animation**: app.css:2972(031) `onyx-call-breathe 1.6s e` → app.css:2973(051) `none` → calls-c11.css:167(031) `none` |
+| `.onyx-call-stage` | `(base)` |  | **position** ↑: app.css:2951(010) `relative` → calls-engine.css:57(020) `sticky` |
+| `.onyx-call-you` | `(base)` |  | **color** ↑: app.css:2985(010) `var(--onyx-faint)` → calls-c4.css:112(020) `var(--onyx-dim)` |
+| `.onyx-cbtn-cap` | `(base)` |  | **line-height** ↑: app.css:3008(010) `1` → calls-c4.css:27(020) `inherit` |
+| `.onyx-ci` | `(base)` |  | **height** ↑: app.css:2868(010) `18px` → app.css:2925(020) `16px` → app.css:2982(020) `14px` → app.css:3021(020) `14px` → calls-c8.css:49(020) `14px` → calls-c11.css:42(020) `14px` → roomsettings.css:39(020) `14px` → calls-c6.css:163(020) `14px` → calls-c6.css:178(020) `16px` → calls-c4.css:53(020) `14px` → calls-c4.css:107(020) `14px` → calls-c4.css:122(020) `14px` → calls-engine.css:90(020) `16px` → calls-engine.css:91(020) `16px` → calls-engine.css:193(020) `16px` → calls-engine.css:479(020) `20px`<br>**width** ↑: app.css:2867(010) `18px` → app.css:2925(020) `16px` → app.css:2982(020) `14px` → app.css:3021(020) `14px` → calls-c8.css:49(020) `14px` → calls-c11.css:42(020) `14px` → roomsettings.css:39(020) `14px` → calls-c6.css:163(020) `14px` → calls-c6.css:178(020) `16px` → calls-c4.css:53(020) `14px` → calls-c4.css:107(020) `14px` → calls-c4.css:122(020) `14px` → calls-engine.css:90(020) `16px` → calls-engine.css:91(020) `16px` → calls-engine.css:193(020) `16px` → calls-engine.css:479(020) `20px` |
+| `.onyx-coach` | `(base)` |  | **background** ↑: app.css:2178(010) `var(--onyx-panel)` → pol-shell.css:1038(020) `transparent`<br>**border** ↑: app.css:2178(010) `1px solid var(--onyx-acc` → pol-shell.css:1039(020) `0`<br>**border-radius** ↑: app.css:2178(010) `var(--radius)` → pol-shell.css:1041(020) `0`<br>**display** ↑: app.css:2177(010) `flex` → pol-shell.css:1045(040) `none`<br>**flex-direction** ↑: app.css:2177(010) `column` → pol-shell.css:1034(020) `row`<br>**gap** ↑: app.css:2177(010) `2px` → pol-shell.css:1036(020) `var(--space-2)`<br>**padding** ↑: app.css:2178(010) `10px var(--space-8) 10px` → pol-shell.css:1037(020) `var(--space-2) var(--spa` |
+| `.onyx-coach-eyebrow` | `(base)` |  | **color** ↑: app.css:3391(010) `var(--onyx-dim)` → pol-shell.css:1043(020) `var(--onyx-faint)` |
+| `.onyx-coach-text` | `(base)` |  | **color** ↑: app.css:2181(010) `var(--onyx-text)` → pol-shell.css:1046(020) `var(--onyx-dim)` |
+| `.onyx-composer` | `(base)` |  | **display** ↑: app.css:654(010) `flex` → pol-shell.css:535(040) `none` |
+| `.onyx-composer` | `(base)` | @media (min-width: 768px) | **padding-inline** **flip**: gap-appearance.css:227(040) `var(--space-4)` → pol-thread.css:2063(020) `max(var(--space-4), calc` |
+| `.onyx-convohead` | `(base)` |  | **margin** ↑: app.css:2368(010) `0 0 var(--space-2)` → pol-shell.css:898(020) `0` → roomsettings.css:23(020) `0` |
+| `.onyx-home-action` | `(base)` |  | **min-height** ↑: app.css:2152(010) `36px` → pol-shell.css:1028(020) `40px`<br>**padding** ↑: app.css:2152(010) `6px var(--space-3)` → pol-shell.css:1028(020) `0 var(--space-4)` |
+| `.onyx-home-empty` | `(base)` |  | **background** ↑: app.css:2124(010) `var(--onyx-panel)` → pol-shell.css:1023(020) `transparent`<br>**border** ↑: app.css:2124(010) `1px solid var(--onyx-lin` → pol-shell.css:1024(020) `0`<br>**gap** ↑: app.css:2123(010) `10px` → pol-shell.css:1021(020) `var(--space-4)` |
+| `.onyx-home-head` | `(base)` |  | **align-items** ↑: app.css:2126(010) `flex-start` → gap-organize.css:626(020) `center` |
+| `.onyx-home-invite` | `(base)` |  | **background** ↑: app.css:2124(010) `var(--onyx-panel)` → pol-shell.css:1057(020) `transparent`<br>**border** ↑: app.css:2124(010) `1px solid var(--onyx-lin` → pol-shell.css:1058(020) `0`<br>**border-radius** ↑: app.css:2124(010) `var(--radius)` → pol-shell.css:1060(020) `0`<br>**flex-direction** ↑: app.css:2123(010) `column` → pol-shell.css:1051(020) `row`<br>**gap** ↑: app.css:2123(010) `10px` → pol-shell.css:1055(020) `var(--space-3)` |
+| `.onyx-home-row` | `(base)` |  | **min-height** ↑: app.css:2131(010) `44px` → gap-appearance.css:203(030) `52px` |
+| `.onyx-member` | `(base)` |  | **min-height** **flip**: gap-appearance.css:202(040) `48px` → pol-roster.css:187(020) `40px` |
+| `.onyx-member-actions` | `(base)` |  | **display** ↑: app.css:1294(010) `flex` → ui-sheets.css:1166(020) `grid`<br>**gap** ↑: app.css:1294(010) `8px` → ui-sheets.css:1166(020) `var(--space-2)` |
+| `.onyx-member-mod` | `(base)` |  | **gap** ↑: app.css:1310(010) `8px` → gap-people.css:66(020) `var(--space-2)` |
+| `.onyx-member-nickline` | `(base)` |  | **font-size** ↑: app.css:1289(010) `0.8125rem` → ui-sheets.css:1165(020) `var(--text-sm)`<br>**margin** ↑: app.css:1289(010) `2px 0 0` → ui-sheets.css:1165(020) `0` |
+| `.onyx-member-pronouns` | `(base)` |  | **font-size** ↑: app.css:1289(010) `0.8125rem` → ui-sheets.css:1165(020) `var(--text-sm)`<br>**margin** ↑: app.css:1289(010) `2px 0 0` → ui-sheets.css:1165(020) `0` |
+| `.onyx-mention` | `(base)` |  | **background** **flip**: gap-appearance.css:243(030) `color-mix(in oklab, var(` → pol-thread.css:173(010) `color-mix(in oklab, var(` |
+| `.onyx-mention` | `:hover` |  | **background** **flip**: gap-appearance.css:245(040) `color-mix(in oklab, var(` → pol-thread.css:180(020) `color-mix(in oklab, var(` |
+| `.onyx-mention` | `:focus-within` |  | **background** **flip**: gap-appearance.css:245(040) `color-mix(in oklab, var(` → pol-thread.css:180(020) `color-mix(in oklab, var(` |
+| `.onyx-message` | `:not()` |  | **line-height** **flip**: gap-appearance.css:165(040) `1.4` → gap-appearance.css:173(040) `1.62` → pol-thread.css:106(020) `var(--leading-body)` |
+| `.onyx-message` | `:not():not()` |  | **margin-top** **flip**: gap-appearance.css:167(050) `var(--space-1)` → gap-appearance.css:175(050) `var(--space-5)` → pol-thread.css:110(030) `var(--space-3)` → gap-organize.css:669(050) `var(--space-5)`<br>**min-height** **flip**: gap-appearance.css:187(050) `calc(1.5rem + var(--spac` → gap-appearance.css:191(050) `calc(2.5rem + var(--spac` → pol-thread.css:112(030) `calc(2rem + var(--space-`<br>**padding-top** **flip**: gap-appearance.css:168(050) `2px` → gap-appearance.css:176(050) `var(--space-2)` → pol-thread.css:111(030) `var(--space-1)` |
+| `.onyx-message--compact` | `(base)` |  | **line-height** **flip**: gap-appearance.css:170(030) `1.35` → gap-appearance.css:178(030) `1.6` → pol-thread.css:2237(020) `var(--leading-snug)` |
+| `.onyx-mlist-main` | `(base)` |  | **min-height** **flip**: gap-appearance.css:202(040) `48px` → pol-roster.css:198(020) `40px` |
+| `.onyx-mobile-nav` | `(base)` | @media (max-width: 599.98px) | **display** ↑: app.css:3421(020) `flex` → pol-shell.css:1171(040) `none` → pol-ios.css:110(040) `none` |
+| `.onyx-moddesk-errors` | `(base)` |  | **font-size** ↑: app.css:2623(010) `var(--text-sm)` → gap-oper.css:401(020) `var(--oc-fs)` |
+| `.onyx-moddesk-hint` | `(base)` |  | **font-size** ↑: app.css:2621(010) `var(--text-sm)` → gap-oper.css:392(020) `var(--oc-fs-meta)` → gap-oper.css:401(020) `var(--oc-fs)` |
+| `.onyx-moddesk-offline` | `(base)` |  | **font-size** ↑: app.css:2622(010) `var(--text-sm)` → gap-oper.css:401(020) `var(--oc-fs)` |
+| `.onyx-moderation-actions` | `(base)` |  | **gap** ↑: app.css:1329(010) `8px` → ui-sheets.css:1645(030) `var(--space-2)` |
+| `.onyx-msg-menu` | `(base)` |  | **border-radius** ↑: app.css:1213(010) `6px` → pol-thread.css:282(020) `var(--radius)` |
+| `.onyx-msg-menu-item` | `:hover` |  | **background** ↑: app.css:1225(020) `var(--onyx-panel)` → pol-thread.css:304(030) `var(--onyx-panel-2)` |
+| `.onyx-msg-menu-item` | `(base)` |  | **border** ↑: app.css:1219(010) `none` → pol-thread.css:294(030) `0`<br>**font-size** ↑: app.css:1222(010) `0.8125rem` → pol-thread.css:298(030) `var(--text-sm)` |
+| `.onyx-nav-badge` | `(base)` |  | **font-size** ↑: pol-shell.css:674(010) `0.625rem` → rx-shell.css:364(020) `0.6875rem`<br>**height** ↑: pol-shell.css:671(010) `16px` → rx-shell.css:362(020) `18px`<br>**left** ↑: pol-shell.css:669(010) `calc(100% - 7px)` → rx-shell.css:360(020) `calc(100% - 3px)`<br>**line-height** ↑: pol-shell.css:676(010) `16px` → rx-shell.css:365(020) `18px`<br>**min-width** ↑: pol-shell.css:670(010) `16px` → rx-shell.css:361(020) `18px`<br>**padding** ↑: pol-shell.css:672(010) `0 4px` → rx-shell.css:363(020) `0 5px`<br>**top** ↑: pol-shell.css:668(010) `-6px` → rx-shell.css:359(020) `-9px` |
+| `.onyx-nav-btn` | `(base)` |  | **border** ↑: app.css:2018(010) `1px solid transparent` → pol-shell.css:647(020) `0`<br>**color** ↑: app.css:2016(010) `var(--onyx-dim)` → pol-shell.css:646(020) `var(--onyx-faint)`<br>**min-height** ↑: app.css:2015(010) `44px` → pol-shell.css:643(020) `40px`<br>**padding** ↑: app.css:2014(010) `var(--space-2) 2px` → pol-shell.css:644(020) `0` |
+| `.onyx-palette-launcher` | `(base)` |  | **color** ↑: app.css:2397(010) `var(--onyx-dim)` → pol-shell.css:559(020) `var(--onyx-faint)`<br>**flex** ↑: app.css:2401(010) `none` → pol-shell.css:554(020) `1 1 auto` |
+| `.onyx-palette-launcher` | `:hover` |  | **color** ↑: app.css:2403(020) `var(--onyx-text)` → pol-shell.css:563(030) `var(--onyx-dim)` |
+| `.onyx-prefs-body` | `(base)` |  | **grid-template-columns** ↑: app.css:2790(010) `200px minmax(0, 1fr)` → ui-sheets.css:760(020) `212px minmax(0, 1fr)` |
+| `.onyx-profile-account` | `(base)` |  | **font-size** ↑: app.css:1265(010) `0.8125rem` → ui-sheets.css:859(020) `var(--text-sm)` |
+| `.onyx-rail-color` | `(base)` |  | **border-radius** ↑: app.css:530(010) `3px` → pol-shell.css:786(020) `2px`<br>**height** ↑: app.css:532(010) `10px` → pol-shell.css:786(020) `14px`<br>**width** ↑: app.css:533(010) `4px` → pol-shell.css:786(020) `3px` |
+| `.onyx-rail-copy` | `(base)` |  | **flex-direction** ↑: app.css:509(010) `column` → pol-shell.css:796(020) `row` |
+| `.onyx-rail-empty` | `(base)` |  | **color** ↑: pol-shell.css:756(020) `var(--onyx-faint)` → rx-shell.css:296(030) `var(--onyx-dim)`<br>**padding** ↑: pol-shell.css:756(020) `var(--space-1) var(--spa` → rx-shell.css:296(030) `0` |
+| `.onyx-rail-filter-clear` | `(base)` |  | **font-size**: app.css:482(020) `var(--text-2xs)` → pol-shell.css:731(020) `var(--text-xs)` |
+| `.onyx-rail-filter-unread` | `(base)` |  | **font-size**: app.css:482(020) `var(--text-2xs)` → pol-shell.css:731(020) `var(--text-xs)` |
+| `.onyx-rail-foot` | `(base)` |  | **display** ↑: pol-shell.css:704(030) `none` → pol-shell.css:841(010) `flex` → rx-shell.css:316(040) `none` |
+| `.onyx-rail-item` | `(base)` |  | **flex** ↑: app.css:506(020) `1` → rx-shell.css:66(030) `1 1 auto`<br>**min-height** **flip**: gap-appearance.css:200(040) `44px` → pol-shell.css:765(020) `32px` |
+| `.onyx-rail-label` | `(base)` |  | **letter-spacing** ↑: app.css:497(010) `0.08em` → pol-shell.css:741(020) `var(--tracking-kicker)` |
+| `.onyx-rail-name` | `(base)` |  | **font-weight** ↑: app.css:440(020) `650` → pol-shell.css:782(030) `650` → pol-shell.css:784(030) `700` |
+| `.onyx-rail-new` | `(base)` |  | **color** ↑: app.css:481(020) `var(--onyx-dim)` → pol-shell.css:749(020) `var(--onyx-dim)` → pol-shell.css:755(030) `var(--onyx-text)`<br>**font-size**: app.css:482(020) `var(--text-2xs)` → pol-shell.css:750(020) `var(--text-xs)` |
+| `.onyx-rail-section-heading` | `(base)` |  | **justify-content** ↑: app.css:489(010) `space-between` → pol-shell.css:1429(030) `flex-end` |
+| `.onyx-rail-star` | `(base)` |  | **border**: app.css:480(020) `1px solid var(--onyx-lin` → pol-shell.css:828(020) `0`<br>**color**: app.css:481(020) `var(--onyx-dim)` → pol-shell.css:829(020) `var(--onyx-faint)`<br>**width**: app.css:478(020) `auto` → pol-shell.css:825(020) `28px` |
+| `.onyx-rail-sub` | `(base)` |  | **color** ↑: app.css:514(010) `var(--onyx-faint)` → pol-shell.css:791(020) `var(--onyx-faint)` → pol-shell.css:792(030) `var(--onyx-dim)` |
+| `.onyx-rail-unread` | `(base)` |  | **font-size** ↑: app.css:523(010) `var(--text-xs)` → pol-shell.css:807(020) `0.6875rem` |
+| `.onyx-railmenu-item` | `(base)` |  | **min-height** **flip**: rx-shell.css:182(030) `34px` → gap-organize.css:253(020) `var(--target-min)`<br>**padding** **flip**: rx-shell.css:183(030) `0 var(--space-3)` → gap-organize.css:254(020) `var(--space-1) var(--spa` |
+| `.onyx-react-choice` | `:hover` |  | **background** ↑: app.css:1249(020) `var(--onyx-panel)` → pol-thread.css:337(030) `var(--onyx-panel-2)` |
+| `.onyx-react-grid` | `(base)` |  | **grid-template-columns** ↑: app.css:1240(010) `repeat(6, 1fr)` → pol-thread.css:326(020) `repeat(8, minmax(0, 1fr)` |
+| `.onyx-react-picker` | `(base)` |  | **border-radius** ↑: app.css:1228(010) `6px` → pol-thread.css:282(020) `var(--radius)` |
+| `.onyx-react-search` | `(base)` |  | **border-radius** ↑: app.css:1234(010) `6px` → pol-thread.css:321(020) `var(--radius)`<br>**font-size** ↑: app.css:1236(010) `0.8125rem` → pol-thread.css:324(020) `var(--text-sm)` |
+| `.onyx-room-header` | `(base)` |  | **row-gap** **flip**: pol-shell.css:862(020) `2px` → roomsettings.css:9(010) `var(--space-1)` |
+| `.onyx-room-header-name` | `(base)` |  | **font-size** ↑: app.css:3305(010) `var(--text-md)` → pol-shell.css:887(020) `var(--text-lg)` |
+| `.onyx-room-more-menu` | `(base)` | @media (max-width: 599.98px) | **animation** **flip**: pol-shell.css:1261(020) `ui-sheet-pop var(--dur-f` → ui-sheets.css:1064(010) `ui-sheet-rise var(--dur-`<br>**border-radius** **flip**: pol-shell.css:1259(020) `calc(var(--radius) * 2) ` → ui-sheets.css:1062(010) `12px 12px 0 0`<br>**bottom** **flip**: pol-shell.css:1253(020) `0` → ui-sheets.css:1138(010) `var(--kb-inset, 0px)`<br>**padding** **flip**: pol-shell.css:1257(020) `0 var(--space-2) calc(va` → ui-sheets.css:1060(010) `var(--sheet-grip-zone) v` |
+| `.onyx-room-more-scrim` | `(base)` | @media (max-width: 599.98px) | **background** **flip**: pol-shell.css:1247(020) `color-mix(in srgb, #000 ` → ui-sheets.css:1051(010) `var(--sheet-veil)` |
+| `.onyx-room-more-toggle` | `[aria-expanded=""]` |  | **border-color** ↑: app.css:3247(020) `var(--onyx-dim)` → pol-shell.css:920(040) `transparent` → pol-shell.css:920(040) `transparent` |
+| `.onyx-room-privacy` | `(base)` |  | **color** **flip**: pol-shell.css:895(030) `var(--onyx-faint)` → roomsettings.css:36(010) `var(--onyx-dim)` |
+| `.onyx-room-topic-toggle` | `(base)` |  | **color** **flip**: pol-shell.css:894(020) `var(--onyx-faint)` → roomsettings.css:53(010) `var(--onyx-dim)` |
+| `.onyx-roster-filter-input` | `(base)` |  | **border** ↑: app.css:2339(010) `1px solid var(--onyx-lin` → pol-roster.css:104(020) `0` |
+| `.onyx-roster-filter-input` | `:focus-visible` |  | **outline** ↑: app.css:2347(020) `var(--focus-ring)` → pol-roster.css:108(030) `none` |
+| `.onyx-search-toggle-open` | `(base)` |  | **border-color** ↑: app.css:3247(010) `var(--onyx-dim)` → pol-shell.css:920(030) `transparent` |
+| `.onyx-sec-chip` | `[data-tone=""]` |  | **color** ↑: app.css:3022(020) `var(--onyx-warn)` → app.css:3023(020) `var(--onyx-bad)` → calls-engine.css:150(030) `var(--onyx-dim)` |
+| `.onyx-sec-chip` | `(base)` |  | **height** ↑: app.css:3017(010) `28px` → calls-engine.css:144(020) `32px` |
+| `.onyx-sender` | `(base)` |  | **margin-right** ↑: app.css:599(010) `8px` → pol-thread.css:129(030) `var(--space-2)` → pol-thread.css:2251(020) `var(--space-2)` |
+| `.onyx-sheet-backdrop` | `(base)` |  | **animation** **flip**: rx-shell.css:245(030) `none` → ui-sheets.css:157(010) `ui-sheet-veil-in var(--d`<br>**background** **flip**: app.css:2855(030) `var(--onyx-bg)` → rx-shell.css:245(030) `transparent` → ui-sheets.css:156(010) `var(--sheet-veil)` → ui-sheets.css:227(030) `color-mix(in srgb, #000 ` |
+| `.onyx-sheet-head` | `(base)` |  | **margin-bottom** **flip**: roomsettings.css:128(020) `0` → ui-sheets.css:126(010) `var(--space-3)` → ui-sheets.css:599(020) `0` → ui-sheets.css:846(020) `var(--space-1)` |
+| `.onyx-sheet-x` | `(base)` |  | **height** ↑ **flip**: gap-chanserv.css:188(020) `14px` → gap-shell.css:296(041) `16px` → ui-sheets.css:69(010) `18px` → ui-sheets.css:637(030) `14px` → ui-sheets.css:1024(020) `14px`<br>**width** ↑ **flip**: gap-chanserv.css:188(020) `14px` → gap-shell.css:296(041) `16px` → ui-sheets.css:68(010) `18px` → ui-sheets.css:637(030) `14px` → ui-sheets.css:1024(020) `14px` |
+| `.onyx-shi` | `(base)` |  | **height** ↑ **flip**: pol-shell.css:489(010) `20px` → pol-shell.css:754(030) `14px` → pol-shell.css:818(030) `14px` → pol-shell.css:833(030) `15px` → pol-shell.css:853(030) `18px` → pol-shell.css:1048(020) `16px` → pol-shell.css:1103(020) `16px` → rx-shell.css:81(030) `16px` → rx-shell.css:193(030) `18px` → rx-shell.css:294(020) `22px` → rx-shell.css:351(030) `19px` → rx-shell.css:354(020) `16px`<br>**width** ↑ **flip**: pol-shell.css:488(010) `20px` → pol-shell.css:754(030) `14px` → pol-shell.css:818(030) `14px` → pol-shell.css:833(030) `15px` → pol-shell.css:853(030) `18px` → pol-shell.css:1048(020) `16px` → pol-shell.css:1103(020) `16px` → rx-shell.css:81(030) `16px` → rx-shell.css:193(030) `18px` → rx-shell.css:294(020) `22px` → rx-shell.css:351(030) `19px` → rx-shell.css:354(020) `16px` |
+| `.onyx-shi` | `(base)` | @media (max-width: 599.98px) | **height** **flip**: pol-shell.css:1200(020) `24px` → pol-shell.css:1228(020) `22px` → pol-shell.css:1302(030) `18px` → pol-shell.css:1304(040) `20px` → rx-shell.css:327(020) `28px`<br>**width** **flip**: pol-shell.css:1200(020) `24px` → pol-shell.css:1228(020) `22px` → pol-shell.css:1302(030) `18px` → pol-shell.css:1304(040) `20px` → rx-shell.css:327(020) `28px` |
+| `.onyx-shortcuts-sheet` | `(base)` |  | **display** ↑: app.css:2433(010) `flex` → ui-sheets.css:582(020) `block` |
+| `.onyx-spotlight-backdrop` | `(base)` |  | **background** **flip**: app.css:2855(030) `var(--onyx-bg)` → ui-sheets.css:503(010) `var(--sheet-veil)` |
+| `.onyx-spotlight-icon` | `[data-icon=""]` |  | **-webkit-mask-image**: gap-commands.css:173(020) `var(--onyx-i-person)` → gap-commands.css:174(020) `var(--gap-i-clock)` → ui-sheets.css:554(020) `var(--onyx-i-hash)` → ui-sheets.css:555(020) `var(--onyx-i-person)`<br>**mask-image**: gap-commands.css:173(020) `var(--onyx-i-person)` → gap-commands.css:174(020) `var(--gap-i-clock)` → ui-sheets.css:554(020) `var(--onyx-i-hash)` → ui-sheets.css:555(020) `var(--onyx-i-person)` |
+| `.onyx-spotlight-panel` | `(base)` |  | **max-height**: app.css:2431(010) `min(70vh, 560px)` → ui-sheets.css:507(010) `min(64vh, 560px)` |
+| `.onyx-system` | `(base)` |  | **font-size** ↑: app.css:192(010) `0.75rem` → pol-thread.css:2276(020) `var(--text-sm)` |
+| `.onyx-thread` | `(base)` |  | **gap** ↑: app.css:593(010) `2px` → pol-thread.css:2233(020) `0` |
+| `.onyx-thread-indicator` | `(base)` |  | **background** ↑: app.css:205(010) `none` → pol-thread.css:438(030) `transparent` |
+| `.onyx-thread-pane` | `(base)` | @media (min-width: 600px) | **padding-inline** **flip**: gap-appearance.css:223(050) `var(--space-4)` → rx-shell.css:612(030) `max(var(--space-4), calc` |
+| `.onyx-thread-state` | `(base)` |  | **font-size** ↑: app.css:207(010) `0.75rem` → pol-thread.css:1047(020) `var(--text-sm)` |
+| `.onyx-tile` | `(base)` |  | **width**: calls-c4.css:137(020) `160px` → calls-engine.css:349(020) `min(100%, calc(var(--gri` |
+| `.onyx-tile-nick` | `(base)` |  | **font-size**: calls-c4.css:105(010) `var(--text-2xs)` → calls-engine.css:350(010) `var(--text-sm)` |
+| `.onyx-topbar` | `(base)` |  | **min-height** ↑: app.css:3207(010) `52px` → pol-shell.css:543(020) `48px` |
+| `.onyx-topic` | `(base)` |  | **overflow** ↑: app.css:283(010) `hidden` → pol-thread.css:1328(020) `visible`<br>**white-space** ↑: app.css:285(010) `nowrap` → pol-thread.css:1329(020) `normal` |
+| `.onyx-ts` | `(base)` |  | **display** ↑: pol-thread.css:2242(030) `inline-block` → gap-organize.css:676(040) `none`<br>**font-size** ↑: app.css:2710(020) `var(--text-2xs)` → pol-thread.css:134(030) `var(--text-2xs)` → pol-thread.css:150(030) `0.65625rem` → pol-thread.css:2247(030) `var(--text-2xs)`<br>**opacity** ↑: pol-thread.css:151(030) `0` → pol-thread.css:156(030) `1` → pol-thread.css:156(030) `1` → gap-organize.css:675(040) `0.55` |
+| `.pref-actions` | `(base)` |  | **margin-top** ↑: app.css:2816(010) `var(--space-2)` → gap-account.css:133(020) `0` |
+| `.pref-category-tab` | `(base)` |  | **min-height** ↑: app.css:2793(010) `44px` → ui-sheets.css:762(020) `48px` |
+| `.pref-desc` | `(base)` |  | **margin-bottom**: gap-import.css:268(020) `0` → gap-usermodes.css:111(020) `var(--space-2)` |
+| `.pref-label` | `(base)` |  | **margin** ↑: app.css:2803(010) `0 0 6px` → gap-claim.css:32(020) `0` |
+| `.pref-switch` | `(base)` |  | **background** ↑: app.css:2813(010) `var(--onyx-bg)` → ui-sheets.css:1388(020) `var(--onyx-bg)` → ui-sheets.css:1401(040) `var(--onyx-text)` |
+| `.pref-switch` | `::after` |  | **background** ↑ **flip**: app.css:2814(011) `var(--onyx-dim)` → app.css:2815(031) `var(--onyx-accent)` → ui-sheets.css:1397(021) `var(--onyx-dim)` → ui-sheets.css:1403(041) `var(--onyx-panel)`<br>**height** ↑: app.css:2814(011) `14px` → ui-sheets.css:1396(021) `18px`<br>**transform** ↑: app.css:2815(031) `translateX(14px)` → ui-sheets.css:1403(041) `translateX(16px)`<br>**transition** ↑: app.css:2814(011) `transform var(--dur-fast` → ui-sheets.css:1398(021) `transform var(--dur-fast`<br>**width** ↑: app.css:2814(011) `14px` → ui-sheets.css:1395(021) `18px` |
+| `.pt-ico` | `(base)` | @media (max-width: 599.98px) | **height**: pol-shell.css:1230(040) `21px` → pol-roster.css:391(040) `20px` → pol-roster.css:391(040) `20px`<br>**width**: pol-shell.css:1230(040) `21px` → pol-roster.css:391(040) `20px` → pol-roster.css:391(040) `20px` |
+| `.pt-ico` | `(base)` |  | **height** ↑ **flip**: pol-thread.css:30(010) `18px` → pol-thread.css:421(030) `16px` → pol-thread.css:447(030) `16px` → pol-thread.css:593(020) `16px` → pol-thread.css:621(020) `28px` → pol-thread.css:652(020) `14px` → pol-thread.css:670(020) `14px` → pol-thread.css:921(020) `20px` → pol-thread.css:1075(020) `16px` → pol-thread.css:1179(031) `20px` → pol-thread.css:1253(030) `16px` → pol-thread.css:1443(020) `16px` → pol-thread.css:1445(020) `18px` → pol-thread.css:1612(020) `14px` → pol-thread.css:1718(020) `16px` → pol-thread.css:1718(020) `16px` → pol-thread.css:1718(020) `16px` → pol-thread.css:2141(030) `20px` → pol-thread.css:2196(020) `14px` → pol-roster.css:82(020) `16px` → pol-roster.css:98(020) `14px` → pol-roster.css:166(020) `14px` → pol-roster.css:296(030) `16px` → gap-convo.css:64(020) `28px` → gap-watch.css:102(020) `16px` → gap-watch.css:102(020) `16px` → gap-watch.css:430(020) `16px`<br>**transform** ↑ **flip**: pol-thread.css:670(020) `scaleY(-1)` → pol-thread.css:1614(040) `rotate(45deg)` → pol-roster.css:175(040) `rotate(-90deg)` → gap-watch.css:114(030) `rotate(180deg)`<br>**transition**: pol-roster.css:170(020) `transform var(--dur-fast` → gap-watch.css:113(020) `transform var(--dur-fast`<br>**width** ↑ **flip**: pol-thread.css:29(010) `18px` → pol-thread.css:421(030) `16px` → pol-thread.css:447(030) `16px` → pol-thread.css:593(020) `16px` → pol-thread.css:621(020) `28px` → pol-thread.css:652(020) `14px` → pol-thread.css:670(020) `14px` → pol-thread.css:921(020) `20px` → pol-thread.css:1075(020) `16px` → pol-thread.css:1179(031) `20px` → pol-thread.css:1253(030) `16px` → pol-thread.css:1443(020) `16px` → pol-thread.css:1445(020) `18px` → pol-thread.css:1612(020) `14px` → pol-thread.css:1718(020) `16px` → pol-thread.css:1718(020) `16px` → pol-thread.css:1718(020) `16px` → pol-thread.css:2141(030) `20px` → pol-thread.css:2196(020) `14px` → pol-roster.css:82(020) `16px` → pol-roster.css:98(020) `14px` → pol-roster.css:165(020) `14px` → pol-roster.css:296(030) `16px` → gap-convo.css:64(020) `28px` → gap-watch.css:102(020) `16px` → gap-watch.css:102(020) `16px` → gap-watch.css:430(020) `16px` |
+| `.r-btn` | `(base)` |  | **background** **flip**: pol-stats.css:105(020) `var(--pg-raised)` → pol-public.css:423(010) `transparent`<br>**border** **flip**: pol-stats.css:102(020) `1px solid var(--pg-line)` → pol-public.css:420(010) `1px solid var(--onyx-lin`<br>**color** **flip**: pol-stats.css:104(020) `var(--pg-text)` → pol-public.css:422(010) `var(--onyx-text)`<br>**font-size**: pol-stats.css:106(020) `var(--text-md)` → pol-public.css:1088(020) `var(--text-sm)`<br>**line-height** **flip**: pol-stats.css:108(020) `var(--leading-tight)` → pol-public.css:426(010) `1.2`<br>**min-height**: pol-stats.css:100(020) `var(--target-min)` → pol-public.css:418(010) `var(--target-min)` → pol-public.css:1088(020) `36px` → pol-public.css:1411(020) `48px`<br>**padding** **flip**: pol-stats.css:101(020) `var(--space-2) var(--spa` → pol-public.css:419(010) `0 var(--space-5)` → pol-public.css:1088(020) `0 var(--space-3)` |
 | `.r-section` | `(base)` |  | **padding-block** **flip**: pol-stats.css:49(020) `clamp(var(--space-7), 5v` → pol-public.css:356(010) `var(--space-7) 0` |
-| `.room-notify` | `(base)` |  | **border-bottom** ↑: app.css:2126(010) `1px solid var(--onyx-lin` → roomsettings.css:22(020) `0`<br>**display** ↑: app.css:2126(010) `flex` → pol-shell.css:989(020) `grid`<br>**gap** ↑: app.css:2126(010) `6px` → pol-shell.css:991(020) `2px`<br>**padding** ↑: app.css:2126(010) `6px var(--space-3)` → pol-shell.css:992(020) `0` → roomsettings.css:22(020) `0` |
-| `.room-notify-name` | `(base)` |  | **color** ↑: app.css:2127(010) `var(--onyx-dim)` → pol-shell.css:1002(020) `var(--onyx-text)`<br>**font-size** ↑: app.css:2127(010) `var(--text-2xs)` → pol-shell.css:1001(020) `var(--text-sm)` |
-| `.room-notify-seg` | `(base)` |  | **background** ↑: app.css:2128(010) `transparent` → pol-shell.css:1010(020) `var(--onyx-bg)`<br>**color** ↑: app.css:2128(010) `var(--onyx-text)` → pol-shell.css:1009(020) `var(--onyx-dim)`<br>**font-size** ↑: app.css:2128(010) `var(--text-2xs)` → pol-shell.css:1008(020) `var(--text-sm)`<br>**padding** ↑: app.css:2128(010) `2px 10px` → pol-shell.css:1007(020) `0 var(--space-2)` |
-| `.room-notify-seg` | `[aria-checked=""]` |  | **border-color** ↑: app.css:2129(020) `var(--onyx-accent)` → pol-shell.css:1014(030) `var(--onyx-dim)`<br>**color** ↑: app.css:2129(020) `var(--onyx-accent)` → pol-shell.css:1014(030) `var(--onyx-text)`<br>**font-weight** ↑: app.css:2129(020) `600` → pol-shell.css:1014(030) `650` |
-| `.shell-command-item` | `(base)` |  | **align-items** ↑: app.css:2420(020) `baseline` → pol-thread.css:1263(030) `center`<br>**border-radius** ↑: app.css:2425(020) `var(--radius)` → pol-thread.css:1263(030) `4px` |
-| `.shell-command-usage` | `(base)` |  | **font-weight** ↑: app.css:2433(010) `650` → pol-thread.css:1266(020) `600` |
-| `.shell-composer-popovers` | `(base)` |  | **bottom** ↑: app.css:2393(010) `calc(100% + 6px)` → pol-thread.css:1249(020) `calc(100% - var(--space-`<br>**left** ↑: app.css:2391(010) `16px` → pol-thread.css:1249(020) `var(--space-4)`<br>**right** ↑: app.css:2392(010) `16px` → pol-thread.css:1249(020) `var(--space-4)` |
-| `.shell-emoji-choice` | `(base)` |  | **border-radius** ↑: app.css:2464(020) `var(--radius)` → pol-thread.css:1281(030) `4px`<br>**padding** ↑: app.css:2467(020) `6px 0` → pol-thread.css:1281(030) `0` |
-| `.shell-emoji-grid` | `(base)` |  | **grid-template-columns** ↑: app.css:2456(010) `repeat(auto-fill, minmax` → pol-thread.css:1280(020) `repeat(auto-fill, minmax`<br>**max-height** ↑: app.css:2458(010) `200px` → pol-thread.css:1280(020) `220px` |
-| `.shell-emoji-picker` | `(base)` |  | **width** ↑: app.css:2445(010) `min(320px, 100%)` → pol-thread.css:1269(020) `min(340px, 100%)` |
-| `.shell-ribbon-badge` | `(base)` |  | **background** ↑: app.css:3595(010) `var(--onyx-panel-2)` → pol-shell.css:650(020) `var(--onyx-accent)`<br>**border** ↑: app.css:3596(010) `1px solid var(--onyx-lin` → pol-shell.css:651(020) `0`<br>**color** ↑: app.css:3594(010) `var(--onyx-text)` → pol-shell.css:649(020) `var(--onyx-accent-ink)`<br>**font-size** ↑: app.css:3590(010) `var(--text-xs)` → pol-shell.css:647(020) `10px`<br>**line-height** ↑: app.css:3592(010) `18px` → pol-shell.css:648(020) `16px`<br>**min-width** ↑: app.css:3588(010) `18px` → pol-shell.css:644(020) `16px`<br>**padding** ↑: app.css:3589(010) `0 var(--space-1)` → pol-shell.css:646(020) `0 4px` |
-| `.shell-ribbon-bell` | `(base)` |  | **color** ↑: app.css:3561(010) `var(--onyx-text)` → pol-shell.css:634(020) `var(--onyx-dim)`<br>**min-height** ↑: app.css:3557(010) `32px` → pol-shell.css:632(020) `36px`<br>**padding** ↑: app.css:3558(010) `0 var(--space-3)` → pol-shell.css:633(020) `0` |
-| `.shell-ribbon-bell-icon` | `(base)` |  | **height** **flip**: pol-shell.css:639(020) `20px` → ui-sheets.css:568(010) `18px`<br>**width** **flip**: pol-shell.css:639(020) `20px` → ui-sheets.css:567(010) `18px` |
-| `.shortcuts-overlay` | `(base)` |  | **gap** ↑: app.css:2840(010) `14px` → ui-sheets.css:487(020) `var(--space-5)` |
+| `.room-notify-name` | `(base)` |  | **color** ↑: app.css:1981(010) `var(--onyx-dim)` → pol-shell.css:969(020) `var(--onyx-text)` → rx-shell.css:225(020) `var(--onyx-dim)` |
+| `.room-notify-seg` | `(base)` |  | **min-height** ↑: pol-shell.css:973(020) `30px` → rx-shell.css:231(030) `32px` |
+| `.rset-btn` | `(base)` |  | **align-self** ↑: roomsettings.css:188(010) `flex-start` → gap-chanserv.css:74(030) `center` → gap-chanserv.css:204(020) `auto` → gap-chanserv.css:204(020) `auto`<br>**min-width**: gap-chanserv.css:204(020) `5.5rem` → gap-chanserv.css:204(020) `5.5rem` → gap-people.css:146(020) `0` |
+| `.rset-input` | `(base)` |  | **width** ↑: roomsettings.css:172(010) `100%` → gap-chanserv.css:84(020) `auto` → gap-chanserv.css:202(020) `auto` → gap-chanserv.css:202(020) `auto` |
+| `.rset-select` | `(base)` |  | **width** ↑: roomsettings.css:172(010) `100%` → gap-chanserv.css:85(020) `auto` |
+| `.rset-toggle` | `(base)` |  | **align-items** ↑: roomsettings.css:232(010) `flex-start` → ui-sheets.css:1406(020) `center`<br>**min-height** ↑: roomsettings.css:235(010) `40px` → ui-sheets.css:1406(020) `48px` |
+| `.rset-toggle-thumb` | `(base)` |  | **background** ↑: roomsettings.css:267(010) `var(--onyx-faint)` → roomsettings.css:272(020) `var(--onyx-text)` → ui-sheets.css:1397(020) `var(--onyx-dim)` → ui-sheets.css:1403(030) `var(--onyx-panel)`<br>**height** ↑: roomsettings.css:265(010) `12px` → ui-sheets.css:1396(020) `18px`<br>**transform** ↑: roomsettings.css:272(020) `translateX(14px)` → ui-sheets.css:1403(030) `translateX(16px)`<br>**width** ↑: roomsettings.css:264(010) `12px` → ui-sheets.css:1395(020) `18px` |
+| `.rset-toggle-track` | `(base)` |  | **background** ↑: roomsettings.css:257(010) `var(--onyx-bg)` → roomsettings.css:271(020) `var(--onyx-panel-2)` → ui-sheets.css:1388(020) `var(--onyx-bg)` → ui-sheets.css:1401(030) `var(--onyx-text)`<br>**border-color** ↑: roomsettings.css:271(020) `var(--onyx-dim)` → ui-sheets.css:1401(030) `var(--onyx-text)`<br>**height** ↑: roomsettings.css:253(010) `18px` → ui-sheets.css:1384(020) `24px`<br>**width** ↑: roomsettings.css:252(010) `32px` → ui-sheets.css:1383(020) `40px` |
+| `.shell-composer-popovers` | `(base)` |  | **bottom** ↑: app.css:2201(010) `calc(100% + 6px)` → pol-thread.css:1351(020) `calc(100% - var(--space-`<br>**left** ↑: app.css:2199(010) `16px` → pol-thread.css:1351(020) `var(--space-4)`<br>**right** ↑: app.css:2200(010) `16px` → pol-thread.css:1351(020) `var(--space-4)` |
+| `.shell-composer-popovers` | `(base)` | @media (min-width: 768px) | **left** **flip**: gap-appearance.css:229(050) `var(--space-4)` → pol-thread.css:2065(030) `max(var(--space-4), calc`<br>**right** **flip**: gap-appearance.css:230(050) `var(--space-4)` → pol-thread.css:2066(030) `max(var(--space-4), calc` |
+| `.shell-emoji-grid` | `(base)` |  | **grid-template-columns** ↑: app.css:2260(010) `repeat(auto-fill, minmax` → pol-thread.css:1382(020) `repeat(auto-fill, minmax` |
+| `.shell-msg-codeblock` | `(base)` |  | **margin** ↑: app.css:1934(010) `6px 0` → pol-thread.css:2139(030) `var(--space-1) 0` → pol-thread.css:2271(020) `2px 0` |
+| `.shell-ribbon-badge` | `(base)` |  | **padding** ↑: app.css:3255(010) `0 var(--space-1)` → pol-shell.css:613(020) `0 4px` |
+| `.shell-ribbon-bell` | `(base)` |  | **padding** ↑: app.css:3227(010) `0 var(--space-3)` → pol-shell.css:600(020) `0` |
+| `.shell-ribbon-bell-icon` | `(base)` |  | **height** **flip**: pol-shell.css:606(020) `20px` → ui-sheets.css:664(010) `18px`<br>**width** **flip**: pol-shell.css:606(020) `20px` → ui-sheets.css:663(010) `18px` |
+| `.shell-topic-action` | `(base)` |  | **background** ↑: app.css:218(010) `none` → pol-thread.css:2521(031) `transparent`<br>**border-radius** ↑: app.css:218(010) `999px` → pol-thread.css:2523(031) `var(--r-pill)` |
+| `.shell-topic-card-follow` | `(base)` |  | **background** ↑: app.css:227(010) `none` → pol-thread.css:2521(031) `transparent`<br>**border-radius** ↑: app.css:227(010) `999px` → pol-thread.css:2523(031) `var(--r-pill)`<br>**font-size** ↑: app.css:227(010) `0.75rem` → pol-thread.css:2526(031) `var(--text-sm)`<br>**margin** ↑: app.css:227(010) `0 10px 8px` → pol-thread.css:2541(031) `0 var(--space-3) var(--s`<br>**padding** ↑: app.css:227(010) `2px 10px` → pol-thread.css:2520(031) `0 var(--space-3)` |
+| `.shell-topic-card-main` | `(base)` |  | **gap** ↑: app.css:221(010) `4px` → pol-thread.css:2562(031) `var(--space-1)`<br>**padding** ↑: app.css:221(010) `8px 10px` → pol-thread.css:2562(031) `var(--space-3)` |
+| `.shell-topic-follow` | `(base)` |  | **background** ↑: app.css:229(010) `none` → pol-thread.css:2521(031) `transparent`<br>**border-radius** ↑: app.css:229(010) `999px` → pol-thread.css:2523(031) `var(--r-pill)` |
 | `.sub` | `(base)` |  | **color** **flip**: pol-stats.css:422(030) `var(--pg-dim)` → pol-public.css:394(020) `var(--onyx-dim)`<br>**margin** **flip**: pol-stats.css:421(030) `var(--space-2) 0 0` → pol-public.css:393(020) `var(--space-4) 0 0`<br>**max-width** **flip**: pol-stats.css:420(030) `55ch` → pol-public.css:392(020) `62ch` |
-| `.topic-chip` | `(base)` |  | **font-size**: app.css:193(010) `12px` → pol-thread.css:626(010) `var(--text-sm)` |
-| `.you` | `.boost-pill` |  | **border-color** ↑: app.css:2492(020) `var(--onyx-accent)` → app.css:3848(020) `var(--onyx-dim)` → pol-thread.css:411(030) `color-mix(in oklab, var(` |
+| `.topic-chip` | `(base)` |  | **border-radius** ↑: app.css:236(010) `999px` → pol-thread.css:2523(031) `var(--r-pill)` |
+| `.topic-filter-bar` | `(base)` |  | **padding** ↑: app.css:235(010) `4px 0` → pol-thread.css:2514(020) `var(--space-1) 0` |
 
 ## G15. Specificity
 
-Histogram (a,b,c → selectors): 0,0,0→15 · 0,0,1→7 · 0,1,0→2450 · 0,1,1→291 · 0,1,2→29 · 0,1,3→2 · 0,2,0→1212 · 0,2,1→181 · 0,2,2→17 · 0,3,0→391 · 0,3,1→53 · 0,3,2→5 · 0,4,0→60 · 0,4,1→15 · 0,5,0→5 · 0,5,1→2 · 0,6,0→1 · 1,2,0→1 · 1,3,0→1
+Histogram (a,b,c → selectors): 0,0,0→16 · 0,0,1→12 · 0,1,0→3396 · 0,1,1→363 · 0,1,2→40 · 0,1,3→4 · 0,2,0→1853 · 0,2,1→248 · 0,2,2→27 · 0,3,0→762 · 0,3,1→129 · 0,3,2→7 · 0,4,0→140 · 0,4,1→46 · 0,4,2→1 · 0,5,0→25 · 0,5,1→11 · 0,6,0→4 · 0,6,1→3 · 0,6,2→1 · 1,0,0→2 · 1,2,0→6 · 1,3,0→3
 
-Outliers (103: ids, ≥4 class-level parts, or ≥4 compounds deep):
+Outliers (266: ids, ≥4 class-level parts, or ≥4 compounds deep):
 
 | file:line | selector | specificity | compounds |
 |---|---|---|---|
-| pol-shell.css:1452 | `.onyx-rail[data-collection="rooms"]:not(:has(> [data-testid="sidebar-favorites"])) #sidebar-channels-label` | 1,3,0 | 2 |
-| pol-shell.css:1452 | `.onyx-rail[data-collection="messages"] #sidebar-dms-label` | 1,2,0 | 2 |
-| pol-thread.css:1071 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:hover:not(:disabled)` | 0,6,0 | 4 |
-| app.css:3271 | `.onyx-call-stage[data-motion="still"] .onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | 0,5,1 | 3 |
-| pol-thread.css:1100 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more[aria-expanded='true` | 0,5,1 | 4 |
-| pol-thread.css:256 | `.onyx-message:hover:not(:focus-within):not(.onyx-message--active) > .onyx-row-actions` | 0,5,0 | 2 |
-| pol-thread.css:1073 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:disabled` | 0,5,0 | 4 |
-| pol-thread.css:1075 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool[aria-expanded='true']` | 0,5,0 | 4 |
-| pol-thread.css:1078 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool > .shell-composer-action-` | 0,5,0 | 5 |
-| pol-thread.css:1116 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | 0,5,0 | 3 |
+| gap-appearance.css:278 | `:root[data-shell-scheme='light'][data-scene='appearance'] #onyx-scene` | 1,3,0 | 2 |
+| pol-shell.css:1420 | `.onyx-rail[data-collection="rooms"]:not(:has(> [data-testid="sidebar-favorites"])) #sidebar-channels-label` | 1,3,0 | 2 |
+| gap-organize.css:62 | `.onyx-rail[data-collection="rooms"]:has(> .gorg-folder) #sidebar-channels-label` | 1,3,0 | 2 |
+| gap-appearance.css:271 | `:root[data-scene='appearance'] #onyx-scene` | 1,2,0 | 2 |
+| gap-appearance.css:273 | `:root[data-shell-scheme='light'] #onyx-scene` | 1,2,0 | 2 |
+| gap-appearance.css:280 | `:root[data-high-contrast='true'] #onyx-scene` | 1,2,0 | 2 |
+| gap-appearance.css:290 | `:root[data-reduce-transparency='true'] #onyx-scene` | 1,2,0 | 2 |
+| pol-shell.css:1420 | `.onyx-rail[data-collection="messages"] #sidebar-dms-label` | 1,2,0 | 2 |
+| ui-sheets.css:1489 | `.onyx-sheet :is( .onyx-account-drop-go, [data-testid="steward-close-confirm"], [data-testid="ban-add-submit"],` | 1,2,0 | 2 |
+| gap-appearance.css:259 | `#onyx-scene` | 1,0,0 | 1 |
+| gap-appearance.css:282 | `#onyx-scene` | 1,0,0 | 1 |
+| ui-sheets.css:1585 | `:root[data-kb="open"] .onyx-sheet-layer > .onyx-sheet:has(:is(input, textarea, select):focus) > :is(.onyx-shee` | 0,6,2 | 4 |
+| ui-sheets.css:1579 | `:root[data-kb="open"] .onyx-sheet-layer > .onyx-sheet:has(:is(input, textarea, select):focus) :is(.onyx-sheet-` | 0,6,1 | 4 |
+| ui-sheets.css:1580 | `:root[data-kb="open"] .onyx-sheet-layer > .onyx-sheet:has(:is(input, textarea, select):focus) > :is(.onyx-shee` | 0,6,1 | 4 |
+| ui-sheets.css:1586 | `:root[data-kb="open"] .onyx-sheet-layer > .onyx-sheet:has(:is(input, textarea, select):focus) .onyx-sheet-titl` | 0,6,1 | 4 |
+| pol-thread.css:1173 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:hover:not(:disabled)` | 0,6,0 | 4 |
+| pol-public.css:1709 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-bu` | 0,6,0 | 2 |
+| pol-public.css:1713 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-bu` | 0,6,0 | 2 |
+| rx-shell.css:271 | `.onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] > .onyx-sheet.onyx-railmenu` | 0,6,0 | 3 |
+| app.css:2973 | `.onyx-call-stage[data-motion="still"] .onyx-call-person[data-speaking="true"] .onyx-call-ring::after` | 0,5,1 | 3 |
+| pol-thread.css:1202 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more[aria-expanded='true` | 0,5,1 | 4 |
+| pol-thread.css:2533 | `.onyx-frame .onyx-thread-pane button.shell-topic-action:hover:not(:disabled)` | 0,5,1 | 3 |
+| gap-shell.css:75 | `.onyx-frame .onyx-rail button.gs-join-go:hover:not(:disabled)` | 0,5,1 | 3 |
+| gap-shell.css:76 | `.onyx-frame .onyx-rail button.gs-join-go:disabled:hover` | 0,5,1 | 3 |
+| gap-shell.css:259 | `.onyx-frame .gs-leave button.gs-btn.gs-btn--danger:hover` | 0,5,1 | 3 |
+| gap-shell.css:351 | `.onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger` | 0,5,1 | 5 |
+| ui-sheets.css:902 | `.onyx-sheet :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), sele` | 0,5,1 | 2 |
+| ui-sheets.css:904 | `.onyx-sheet :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), sele` | 0,5,1 | 2 |
+| ui-sheets.css:1587 | `:root[data-kb="open"] .onyx-newmsg-sheet:has(input:focus) :is(.onyx-newmsg-help, .onyx-newmsg-hint, .onyx-newm` | 0,5,1 | 3 |
+| ui-sheets.css:1588 | `:root[data-kb="open"] .guest-claim-sheet:has(input:focus) .guest-claim-sheet__hint` | 0,5,1 | 3 |
+| gap-appearance.css:166 | `:root[data-density='compact'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation)` | 0,5,0 | 2 |
+| gap-appearance.css:174 | `:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation)` | 0,5,0 | 2 |
+| gap-appearance.css:187 | `:root[data-density='compact'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation)` | 0,5,0 | 2 |
+| gap-appearance.css:191 | `:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation)` | 0,5,0 | 2 |
+| gap-appearance.css:223 | `:root[data-width='full'] .onyx-frame > .onyx-main > .onyx-thread-pane` | 0,5,0 | 4 |
+| gap-appearance.css:228 | `:root[data-width='full'] .onyx-main > .onyx-composer > .shell-composer-popovers` | 0,5,0 | 4 |
+| pol-thread.css:260 | `.onyx-message:hover:not(:focus-within):not(.onyx-message--active) > .onyx-row-actions` | 0,5,0 | 2 |
+| pol-thread.css:262 | `.onyx-continuation:hover:not(:focus-within):not(.onyx-message--active) > .onyx-ts` | 0,5,0 | 2 |
+| pol-thread.css:1175 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool:disabled` | 0,5,0 | 4 |
+| pol-thread.css:1177 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool[aria-expanded='true']` | 0,5,0 | 4 |
+| pol-thread.css:1180 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool > .shell-composer-action-` | 0,5,0 | 5 |
+| pol-thread.css:1218 | `.onyx-composer .onyx-composer-bar > .onyx-composer-send--ready:hover:not(:disabled)` | 0,5,0 | 3 |
+| pol-thread.css:2055 | `.onyx-main > .onyx-thread-pane > .onyx-thread-frame > :not(.onyx-jump-latest):not(.onyx-room-intro)` | 0,5,0 | 4 |
+| pol-thread.css:2363 | `:root[data-kb="open"] .onyx-frame .onyx-main > .onyx-composer` | 0,5,0 | 4 |
+| pol-thread.css:2467 | `.onyx-frame .onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool` | 0,5,0 | 5 |
+| pol-public.css:1704 | `.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-bu` | 0,5,0 | 2 |
+| gap-oper.css:217 | `.onyx-moddesk-sheet .oper-desk .oc-btn:hover:not(:disabled)` | 0,5,0 | 3 |
+| gap-oper.css:221 | `.onyx-moddesk-sheet .oper-desk .oc-btn-primary:hover:not(:disabled)` | 0,5,0 | 3 |
+| gap-oper.css:223 | `.onyx-moddesk-sheet .oper-desk .oc-btn-danger:hover:not(:disabled)` | 0,5,0 | 3 |
+| gap-oper.css:285 | `.onyx-moddesk-sheet .oper-desk .oc-chip:hover:not(:disabled)` | 0,5,0 | 3 |
+| gap-organize.css:658 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane > .onyx-thread-frame > *` | 0,5,0 | 5 |
+| gap-organize.css:669 | `.onyx-frame[data-reader="true"] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation)` | 0,5,0 | 2 |
+| ui-sheets.css:1640 | `.onyx-sheet.onyx-moderation-review:is([data-kind="kick"], [data-kind="ban"]) .onyx-member-confirm:not(:disable` | 0,5,0 | 2 |
+| calls-engine.css:440 | `.onyx-call-stage[data-size="expanded"] .onyx-call-grid[data-columns="1"] > .onyx-tile` | 0,5,0 | 3 |
+| calls-engine.css:440 | `.onyx-call-stage[data-size="fullscreen"] .onyx-call-grid[data-columns="1"] > .onyx-tile` | 0,5,0 | 3 |
+| gap-shell.css:373 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger::before` | 0,4,2 | 4 |
 | pol-stats.css:602 | `.stats-page .stats-feed-step[data-step-state='current'] .stats-feed-step__heading > strong` | 0,4,1 | 4 |
 | pol-stats.css:603 | `.stats-page .stats-feed-step[data-step-state='attention'] .stats-feed-step__heading > strong` | 0,4,1 | 4 |
 | pol-stats.css:604 | `.stats-page .stats-feed-step[data-step-state='unavailable'] .stats-feed-step__heading > strong` | 0,4,1 | 4 |
 | pol-stats.css:685 | `.stats-page :is(.stats-window-options, .stats-control-group) button:hover:not(:disabled)` | 0,4,1 | 3 |
 | pol-stats.css:955 | `.stats-page .data-list > div > .data-room-row:first-child` | 0,4,1 | 4 |
 | pol-stats.css:1052 | `.stats-page :is(.stats-refresh, .data-action, .public-room-comparison__share, .public-room-comparison__clear, ` | 0,4,1 | 2 |
-| pol-studio.css:556 | `.background-picker__card[data-kind='scene'] .background-picker__swatch i:nth-child(2)` | 0,4,1 | 3 |
-| pol-thread.css:1071 | `.onyx-composer .onyx-composer-bar > button:hover:not(:disabled)` | 0,4,1 | 3 |
-| pol-thread.css:1091 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more::before` | 0,4,1 | 4 |
+| pol-studio.css:550 | `.background-picker__card[data-kind='scene'] .background-picker__swatch i:nth-child(2)` | 0,4,1 | 3 |
+| pol-thread.css:1173 | `.onyx-composer .onyx-composer-bar > button:hover:not(:disabled)` | 0,4,1 | 3 |
+| pol-thread.css:1193 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool--more::before` | 0,4,1 | 4 |
+| pol-thread.css:2533 | `.onyx-frame .onyx-thread-pane button.topic-chip:hover` | 0,4,1 | 3 |
+| pol-thread.css:2533 | `.onyx-frame .onyx-thread-pane button.shell-topic-follow:hover` | 0,4,1 | 3 |
+| pol-thread.css:2533 | `.onyx-frame .onyx-thread-pane button.shell-topic-card-follow:hover` | 0,4,1 | 3 |
+| pol-thread.css:2537 | `.onyx-frame .onyx-thread-pane button.topic-chip.is-active` | 0,4,1 | 3 |
+| pol-thread.css:2537 | `.onyx-frame .onyx-thread-pane button.shell-topic-action.is-active` | 0,4,1 | 3 |
+| pol-thread.css:2537 | `.onyx-frame .onyx-thread-pane button.shell-topic-follow.is-active` | 0,4,1 | 3 |
+| pol-thread.css:2537 | `.onyx-frame .onyx-thread-pane button.shell-topic-card-follow.is-active` | 0,4,1 | 3 |
 | calls-c4.css:42 | `.onyx-cq[data-tier="2"] .onyx-cq-bars > span[data-on="true"]` | 0,4,1 | 3 |
 | calls-c4.css:44 | `.onyx-cq[data-tier="3"] .onyx-cq-bars > span[data-on="true"]` | 0,4,1 | 3 |
-| ui-sheets.css:328 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)::before` | 0,4,1 | 3 |
-| ui-sheets.css:824 | `.onyx-sheet :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea)` | 0,4,1 | 2 |
-| ui-sheets.css:826 | `.onyx-sheet :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select)` | 0,4,1 | 2 |
-| ui-sheets.css:1028 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button:active` | 0,4,1 | 4 |
-| app.css:3517 | `.onyx-primary-nav .onyx-nav-btn:hover .onyx-nav-label` | 0,4,0 | 3 |
-| app.css:3517 | `.onyx-primary-nav .onyx-nav-btn:focus-visible .onyx-nav-label` | 0,4,0 | 3 |
+| gap-organize.css:70 | `.onyx-rail [data-testid="sidebar-channels"]:has(> ul:empty) > .onyx-rail-label` | 0,4,1 | 3 |
+| gap-usermodes.css:69 | `button.um-btn.um-btn--primary:hover:not(:disabled)` | 0,4,1 | 1 |
+| gap-usermodes.css:72 | `button.um-btn.um-btn--quiet:hover:not(:disabled)` | 0,4,1 | 1 |
+| gap-shell.css:76 | `.onyx-frame .onyx-rail button.gs-join-go:disabled` | 0,4,1 | 3 |
+| gap-shell.css:78 | `.onyx-frame .onyx-rail button.gs-join-go:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:99 | `.onyx-frame .onyx-rail button.gs-rail-activity:hover` | 0,4,1 | 3 |
+| gap-shell.css:100 | `.onyx-frame .onyx-rail button.gs-rail-activity:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:140 | `.onyx-frame .gs-seg button.gs-seg-btn:hover` | 0,4,1 | 3 |
+| gap-shell.css:141 | `.onyx-frame .gs-seg button.gs-seg-btn[aria-pressed="true"]` | 0,4,1 | 3 |
+| gap-shell.css:142 | `.onyx-frame .gs-seg button.gs-seg-btn:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:255 | `.onyx-frame .gs-leave button.gs-btn:hover` | 0,4,1 | 3 |
+| gap-shell.css:256 | `.onyx-frame .gs-leave button.gs-btn.gs-btn--ghost` | 0,4,1 | 3 |
+| gap-shell.css:257 | `.onyx-frame .gs-leave button.gs-btn:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:258 | `.onyx-frame .gs-leave button.gs-btn.gs-btn--danger` | 0,4,1 | 3 |
+| gap-shell.css:296 | `.onyx-frame .gs-motd button.gs-motd-dismiss .onyx-sheet-x` | 0,4,1 | 4 |
+| gap-shell.css:297 | `.onyx-frame .gs-motd button.gs-motd-dismiss:hover` | 0,4,1 | 3 |
+| gap-shell.css:298 | `.onyx-frame .gs-motd button.gs-motd-dismiss:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:318 | `.onyx-frame .gs-motd button.gs-motd-more:hover` | 0,4,1 | 3 |
+| gap-shell.css:319 | `.onyx-frame .gs-motd button.gs-motd-more:focus-visible` | 0,4,1 | 3 |
+| gap-shell.css:351 | `.onyx-frame .onyx-room-header .onyx-room-more .onyx-room-more-menu > button` | 0,4,1 | 5 |
+| gap-shell.css:368 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > a.gs-more-ledger` | 0,4,1 | 4 |
+| ui-sheets.css:428 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)::before` | 0,4,1 | 3 |
+| ui-sheets.css:1117 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button:active` | 0,4,1 | 4 |
+| ui-sheets.css:1250 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)::before` | 0,4,1 | 3 |
+| ui-sheets.css:1402 | `.onyx-sheet .pref-toggle[aria-checked="true"] .pref-switch::after` | 0,4,1 | 3 |
+| ui-sheets.css:1544 | `html:has(.onyx-overlays [data-shortcut-scope]) .onyx-roster:popover-open` | 0,4,1 | 2 |
+| ui-sheets.css:1632 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > .onyx-room-more-cancel::before` | 0,4,1 | 4 |
+| calls-engine.css:147 | `.onyx-call-meta .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci)` | 0,4,1 | 3 |
+| app.css:3191 | `.onyx-primary-nav .onyx-nav-btn:hover .onyx-nav-label` | 0,4,0 | 3 |
+| app.css:3191 | `.onyx-primary-nav .onyx-nav-btn:focus-visible .onyx-nav-label` | 0,4,0 | 3 |
+| gap-appearance.css:165 | `:root[data-density='compact'] .onyx-message:not(.onyx-message--compact)` | 0,4,0 | 2 |
+| gap-appearance.css:173 | `:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact)` | 0,4,0 | 2 |
+| gap-appearance.css:186 | `:root[data-density='compact'] .onyx-row-avatar .onyx-avatar` | 0,4,0 | 3 |
+| gap-appearance.css:190 | `:root[data-density='roomy'] .onyx-row-avatar .onyx-avatar` | 0,4,0 | 3 |
+| gap-appearance.css:194 | `:root[data-density='compact'] .onyx-rail .onyx-rail-item` | 0,4,0 | 3 |
+| gap-appearance.css:195 | `:root[data-density='compact'] .onyx-frame .onyx-mlist-main` | 0,4,0 | 3 |
+| gap-appearance.css:195 | `:root[data-density='compact'] .onyx-roster .onyx-member` | 0,4,0 | 3 |
+| gap-appearance.css:200 | `:root[data-density='roomy'] .onyx-rail .onyx-rail-item` | 0,4,0 | 3 |
+| gap-appearance.css:201 | `:root[data-density='roomy'] .onyx-frame .onyx-mlist-main` | 0,4,0 | 3 |
+| gap-appearance.css:201 | `:root[data-density='roomy'] .onyx-roster .onyx-member` | 0,4,0 | 3 |
+| gap-appearance.css:227 | `:root[data-width='full'] .onyx-main > .onyx-composer` | 0,4,0 | 3 |
+| gap-appearance.css:244 | `:root[data-shell-scheme='light'] .onyx-mention:hover` | 0,4,0 | 2 |
+| gap-appearance.css:244 | `:root[data-shell-scheme='light'] .onyx-mention:focus-within` | 0,4,0 | 2 |
 | pol-stats.css:118 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary:hover` | 0,4,0 | 2 |
 | pol-stats.css:121 | `:is(.stats-page, .status-route, .roadmap-page) .r-btn.primary:focus-visible` | 0,4,0 | 2 |
 | pol-stats.css:453 | `.stats-page .stats-observation[data-feed-state='current'] .stats-observation__marker` | 0,4,0 | 3 |
@@ -3549,61 +4095,134 @@ Outliers (103: ids, ≥4 class-level parts, or ≥4 compounds deep):
 | pol-stats.css:972 | `.stats-page .data-action:is(.data-action--compare, .data-action--inspect)[aria-pressed='true']` | 0,4,0 | 2 |
 | pol-stats.css:1045 | `.stats-page .stats-summary > .data-metric:first-child` | 0,4,0 | 3 |
 | pol-stats.css:1072 | `.stats-page .stats-observation[data-feed-state='current'] .stats-observation__marker` | 0,4,0 | 3 |
-| pol-studio.css:769 | `.ts-studio .onyx-button--ghost:hover:not(:disabled)` | 0,4,0 | 2 |
-| pol-studio.css:780 | `.ts-studio .onyx-button--primary:hover:not(:disabled)` | 0,4,0 | 2 |
-| pol-studio.css:1772 | `.ap :is(.ap-chip, .ap-theme-chip, .ts-theme-chip, .background-picker__card, .ts-scheme-toggle__btn, .ts-studio` | 0,4,0 | 2 |
-| pol-shell.css:568 | `.onyx-frame[data-convo="false"] > .onyx-main > .onyx-composer` | 0,4,0 | 3 |
-| pol-shell.css:951 | `.onyx-frame .onyx-room-header .onyx-room-more-toggle[aria-expanded="true"]` | 0,4,0 | 3 |
-| pol-shell.css:951 | `.onyx-frame .onyx-room-header .onyx-room-more-toggle[aria-expanded="true"]` | 0,4,0 | 3 |
-| pol-shell.css:962 | `.onyx-frame .onyx-room-header .onyx-members-toggle:hover` | 0,4,0 | 3 |
-| pol-shell.css:1078 | `.onyx-home .onyx-home-empty.is-first-room ~ .onyx-coach` | 0,4,0 | 3 |
-| pol-shell.css:1203 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-topbar` | 0,4,0 | 2 |
-| pol-shell.css:1203 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-mobile-nav` | 0,4,0 | 2 |
-| pol-shell.css:1206 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-main` | 0,4,0 | 2 |
-| pol-shell.css:1262 | `.onyx-frame .onyx-room-header .onyx-members-toggle .pt-ico` | 0,4,0 | 4 |
-| pol-shell.css:1272 | `.onyx-frame .onyx-room-header .onyx-call-join .onyx-ci` | 0,4,0 | 4 |
-| pol-shell.css:1336 | `.onyx-rail .onyx-rail-filter .onyx-rail-new .onyx-shi` | 0,4,0 | 4 |
-| pol-shell.css:1467 | `:root[data-kb="open"] .onyx-frame > .onyx-main` | 0,4,0 | 3 |
-| pol-thread.css:216 | `.onyx-thread > .onyx-message:first-child > .onyx-row-actions` | 0,4,0 | 3 |
-| pol-thread.css:255 | `.onyx-message:hover:not(:focus-within):not(.onyx-message--active)` | 0,4,0 | 1 |
-| pol-thread.css:413 | `.onyx-message .boost-pill.you .boost-count` | 0,4,0 | 3 |
-| pol-thread.css:1054 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool` | 0,4,0 | 4 |
-| pol-thread.css:1290 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool` | 0,4,0 | 4 |
-| pol-thread.css:1505 | `.onyx-message-search__save[open] > .onyx-message-search__save-toggle .pt-ico` | 0,4,0 | 3 |
-| pol-roster.css:117 | `.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within)` | 0,4,0 | 2 |
-| pol-roster.css:124 | `.onyx-roster:has(.onyx-roster-filter:focus-within) .onyx-mlist-find` | 0,4,0 | 2 |
-| pol-roster.css:176 | `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
-| pol-roster.css:179 | `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
-| pol-roster.css:305 | `.onyx-roster .onyx-member:hover > .onyx-member-message` | 0,4,0 | 3 |
-| pol-roster.css:305 | `.onyx-roster .onyx-member:focus-within > .onyx-member-message` | 0,4,0 | 3 |
-| pol-roster.css:307 | `.onyx-roster .onyx-member:hover > .onyx-member-role--shown` | 0,4,0 | 3 |
-| pol-roster.css:394 | `.onyx-roster:popover-open .onyx-mlist-find .pt-ico` | 0,4,0 | 3 |
-| pol-roster.css:394 | `.onyx-roster:popover-open .onyx-mlist-close .pt-ico` | 0,4,0 | 3 |
-| pol-roster.css:398 | `.onyx-roster:popover-open .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
+| pol-studio.css:763 | `.ts-studio .onyx-button--ghost:hover:not(:disabled)` | 0,4,0 | 2 |
+| pol-studio.css:774 | `.ts-studio .onyx-button--primary:hover:not(:disabled)` | 0,4,0 | 2 |
+| pol-studio.css:1766 | `.ap :is(.ap-chip, .ap-theme-chip, .ts-theme-chip, .background-picker__card, .ts-scheme-toggle__btn, .ts-studio` | 0,4,0 | 2 |
+| pol-shell.css:535 | `.onyx-frame[data-convo="false"] > .onyx-main > .onyx-composer` | 0,4,0 | 3 |
+| pol-shell.css:918 | `.onyx-frame .onyx-room-header .onyx-room-more-toggle[aria-expanded="true"]` | 0,4,0 | 3 |
+| pol-shell.css:918 | `.onyx-frame .onyx-room-header .onyx-room-more-toggle[aria-expanded="true"]` | 0,4,0 | 3 |
+| pol-shell.css:929 | `.onyx-frame .onyx-room-header .onyx-members-toggle:hover` | 0,4,0 | 3 |
+| pol-shell.css:1045 | `.onyx-home .onyx-home-empty.is-first-room ~ .onyx-coach` | 0,4,0 | 3 |
+| pol-shell.css:1170 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-topbar` | 0,4,0 | 2 |
+| pol-shell.css:1170 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-mobile-nav` | 0,4,0 | 2 |
+| pol-shell.css:1173 | `.onyx-frame:not([data-convo="false"]):not([data-nav-drawer="true"]) > .onyx-main` | 0,4,0 | 2 |
+| pol-shell.css:1230 | `.onyx-frame .onyx-room-header .onyx-members-toggle .pt-ico` | 0,4,0 | 4 |
+| pol-shell.css:1240 | `.onyx-frame .onyx-room-header .onyx-call-join .onyx-ci` | 0,4,0 | 4 |
+| pol-shell.css:1304 | `.onyx-rail .onyx-rail-filter .onyx-rail-new .onyx-shi` | 0,4,0 | 4 |
+| pol-shell.css:1435 | `:root[data-kb="open"] .onyx-frame > .onyx-main` | 0,4,0 | 3 |
+| pol-thread.css:220 | `.onyx-thread > .onyx-message:first-child > .onyx-row-actions` | 0,4,0 | 3 |
+| pol-thread.css:259 | `.onyx-message:hover:not(:focus-within):not(.onyx-message--active)` | 0,4,0 | 1 |
+| pol-thread.css:419 | `.onyx-message .boost-pill.you .boost-count` | 0,4,0 | 3 |
+| pol-thread.css:1156 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool` | 0,4,0 | 4 |
+| pol-thread.css:1392 | `.onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool` | 0,4,0 | 4 |
+| pol-thread.css:1614 | `.onyx-message-search__save[open] > .onyx-message-search__save-toggle .pt-ico` | 0,4,0 | 3 |
+| pol-thread.css:2118 | `.onyx-sheet-layer.onyx-thread-pop > .onyx-sheet.onyx-thread-sheet` | 0,4,0 | 2 |
+| pol-roster.css:113 | `.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within)` | 0,4,0 | 2 |
+| pol-roster.css:120 | `.onyx-roster:has(.onyx-roster-filter:focus-within) .onyx-mlist-find` | 0,4,0 | 2 |
+| pol-roster.css:172 | `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
+| pol-roster.css:175 | `.onyx-roster-group:not([open]) > .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
+| pol-roster.css:301 | `.onyx-roster .onyx-member:hover > .onyx-member-message` | 0,4,0 | 3 |
+| pol-roster.css:301 | `.onyx-roster .onyx-member:focus-within > .onyx-member-message` | 0,4,0 | 3 |
+| pol-roster.css:303 | `.onyx-roster .onyx-member:hover > .onyx-member-role--shown` | 0,4,0 | 3 |
+| pol-roster.css:390 | `.onyx-roster:popover-open .onyx-mlist-find .pt-ico` | 0,4,0 | 3 |
+| pol-roster.css:390 | `.onyx-roster:popover-open .onyx-mlist-close .pt-ico` | 0,4,0 | 3 |
+| pol-roster.css:394 | `.onyx-roster:popover-open .onyx-mlist-group-head > .pt-ico` | 0,4,0 | 3 |
+| pol-roster.css:436 | `.onyx-roster .onyx-roster-filter:not(.onyx-roster-filter--open):not(:focus-within)` | 0,4,0 | 2 |
 | pol-public.css:1648 | `.public-frame :is(.r-btn.primary, .not-found-page__action, .onyxos-button--primary, .guides-hero-actions .guid` | 0,4,0 | 2 |
-| calls-c6.css:226 | `.onyx-sheet-layer.onyx-call-ring-layer > .onyx-sheet.onyx-call-ring` | 0,4,0 | 2 |
-| calls-c6.css:266 | `.onyx-call-stage[data-reconnecting="true"] .onyx-cbtn:disabled` | 0,4,0 | 2 |
-| calls-c4.css:157 | `.onyx-call-grid > .onyx-tile:nth-child(n+5) .onyx-tile-video` | 0,4,0 | 3 |
-| ui-sheets.css:316 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet:has(> :is(.onyx-sheet-head, .jump-to-date-head))` | 0,4,0 | 2 |
-| ui-sheets.css:342 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)` | 0,4,0 | 3 |
-| ui-sheets.css:542 | `.notif-center .notif-center__row:hover .notif-center__dismiss` | 0,4,0 | 3 |
-| ui-sheets.css:542 | `.notif-center .notif-center__row:focus-within .notif-center__dismiss` | 0,4,0 | 3 |
-| ui-sheets.css:741 | `.chb .chb-row + .chb-row .chb-card` | 0,4,0 | 4 |
+| calls-c6.css:213 | `.onyx-sheet-layer.onyx-call-ring-layer > .onyx-sheet.onyx-call-ring` | 0,4,0 | 2 |
+| calls-c6.css:253 | `.onyx-call-stage[data-reconnecting="true"] .onyx-cbtn:disabled` | 0,4,0 | 2 |
+| calls-c4.css:151 | `.onyx-call-grid > .onyx-tile:nth-child(n+5) .onyx-tile-video` | 0,4,0 | 3 |
+| gap-convo.css:132 | `.onyx-composer .gap-attach-quality-opt:hover:not(:disabled)` | 0,4,0 | 2 |
+| gap-convo.css:163 | `.onyx-composer .gap-attach-keep:hover:not(:disabled)` | 0,4,0 | 2 |
+| gap-convo.css:259 | `:root[data-reduce-motion='true'] .onyx-message.gap-landed` | 0,4,0 | 2 |
+| gap-oper.css:14 | `.onyx-sheet-layer[data-placement="side"] > .onyx-moddesk-sheet[data-testid="oper-sheet"]` | 0,4,0 | 2 |
+| gap-oper.css:18 | `.onyx-sheet-layer[data-placement="side"] > .onyx-moddesk-sheet[data-testid="oper-sheet"]` | 0,4,0 | 2 |
+| gap-oper.css:89 | `.onyx-moddesk-sheet .oper-desk .oc-tab:hover` | 0,4,0 | 3 |
+| gap-oper.css:90 | `.onyx-moddesk-sheet .oper-desk .oc-tab[aria-selected="true"]` | 0,4,0 | 3 |
+| gap-oper.css:95 | `.onyx-moddesk-sheet .oper-desk .oc-tab:focus-visible` | 0,4,0 | 3 |
+| gap-oper.css:200 | `.onyx-moddesk-sheet .oper-desk .oc-input:focus-visible` | 0,4,0 | 3 |
+| gap-oper.css:218 | `.onyx-moddesk-sheet .oper-desk .oc-btn:disabled` | 0,4,0 | 3 |
+| gap-oper.css:219 | `.onyx-moddesk-sheet .oper-desk .oc-btn:focus-visible` | 0,4,0 | 3 |
+| gap-oper.css:286 | `.onyx-moddesk-sheet .oper-desk .oc-chip[aria-pressed="true"]` | 0,4,0 | 3 |
+| gap-oper.css:291 | `.onyx-moddesk-sheet .oper-desk .oc-chip:disabled` | 0,4,0 | 3 |
+| gap-oper.css:292 | `.onyx-moddesk-sheet .oper-desk .oc-chip:focus-visible` | 0,4,0 | 3 |
+| rx-shell.css:100 | `.onyx-rail .onyx-rail-row:is(:hover, :focus-within, .onyx-rail-row--menu) > :is(.onyx-rail-star, .onyx-rail-mo` | 0,4,0 | 3 |
+| rx-shell.css:100 | `.onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) > .onyx-rail-more` | 0,4,0 | 3 |
+| rx-shell.css:103 | `.onyx-rail .onyx-rail-row:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-meta` | 0,4,0 | 3 |
+| rx-shell.css:103 | `.onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-meta` | 0,4,0 | 3 |
+| rx-shell.css:105 | `.onyx-rail .onyx-rail-entry:is(:hover, :focus-within, .onyx-rail-row--menu) .onyx-rail-time` | 0,4,0 | 3 |
+| rx-shell.css:106 | `.onyx-rail .onyx-rail-row:is(:hover, :focus-within) > .onyx-rail-item` | 0,4,0 | 3 |
+| rx-shell.css:106 | `.onyx-rail .onyx-rail-entry:is(:hover, :focus-within) > .onyx-rail-item` | 0,4,0 | 3 |
+| rx-shell.css:194 | `.onyx-railmenu .onyx-railmenu-item:hover:not(:disabled)` | 0,4,0 | 2 |
+| rx-shell.css:196 | `.onyx-railmenu .onyx-railmenu-item:disabled .onyx-shi` | 0,4,0 | 3 |
+| rx-shell.css:204 | `.onyx-frame .onyx-railmenu .onyx-railmenu-item:has(.gorg-menu-hint)` | 0,4,0 | 3 |
+| rx-shell.css:246 | `.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu` | 0,4,0 | 2 |
+| rx-shell.css:270 | `.onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement]` | 0,4,0 | 2 |
+| rx-shell.css:316 | `.onyx-rail[data-collection="rooms"]:has(.onyx-rail-zero) .onyx-rail-foot` | 0,4,0 | 2 |
+| rx-shell.css:382 | `.onyx-frame > .onyx-roster[popover]:not(:popover-open)` | 0,4,0 | 2 |
+| rx-shell.css:425 | `.onyx-rail .onyx-rail-filter .onyx-rail-new .onyx-shi` | 0,4,0 | 4 |
+| rx-shell.css:436 | `.onyx-frame .onyx-rail .onyx-rail-filter .onyx-rail-new` | 0,4,0 | 4 |
+| rx-shell.css:530 | `:root[data-kb="open"] .onyx-frame .onyx-room-header` | 0,4,0 | 3 |
+| rx-shell.css:531 | `:root[data-kb="open"] .onyx-frame .onyx-room-header-topic-row` | 0,4,0 | 3 |
+| rx-shell.css:689 | `.onyx-railmenu-layer[data-anchored="true"] > .onyx-sheet.onyx-railmenu` | 0,4,0 | 2 |
+| gap-import.css:59 | `.hi-btn--quiet.hi-btn--danger:hover:not(:disabled)` | 0,4,0 | 1 |
+| gap-organize.css:646 | `:root .onyx-frame[data-reader="true"] > :is(.onyx-primary-nav, .onyx-topbar, .onyx-rail, .onyx-roster, .onyx-m` | 0,4,0 | 3 |
+| gap-organize.css:647 | `:root .onyx-frame[data-reader="true"] > .onyx-main` | 0,4,0 | 3 |
+| gap-organize.css:654 | `.onyx-frame[data-reader="true"] .onyx-room-header-actions > :not(.onyx-room-more)` | 0,4,0 | 3 |
+| gap-organize.css:655 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane` | 0,4,0 | 3 |
+| gap-organize.css:658 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane > *` | 0,4,0 | 4 |
+| gap-organize.css:663 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-composer` | 0,4,0 | 3 |
+| gap-organize.css:667 | `.onyx-frame[data-reader="true"] .onyx-message:not(.onyx-message--compact)` | 0,4,0 | 2 |
+| gap-organize.css:670 | `.onyx-frame[data-reader="true"] .onyx-message > .onyx-body` | 0,4,0 | 3 |
+| gap-organize.css:675 | `.onyx-frame[data-reader="true"] .onyx-message > .onyx-ts` | 0,4,0 | 3 |
+| gap-organize.css:676 | `.onyx-frame[data-reader="true"] .onyx-continuation > .onyx-ts` | 0,4,0 | 3 |
+| gap-organize.css:754 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-thread-pane` | 0,4,0 | 3 |
+| gap-organize.css:755 | `.onyx-frame[data-reader="true"] .onyx-main > .onyx-composer` | 0,4,0 | 3 |
+| gap-commands.css:38 | `.onyx-sheet-layer.gap-help > .onyx-sheet.gap-help-sheet` | 0,4,0 | 2 |
+| gap-claim.css:167 | `.gc-actions > .gc-btn:last-child:nth-child(even)` | 0,4,0 | 2 |
+| ui-sheets.css:416 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet:has(> :is(.onyx-sheet-head, .jump-to-date-head))` | 0,4,0 | 2 |
+| ui-sheets.css:442 | `.onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)` | 0,4,0 | 3 |
+| ui-sheets.css:638 | `.notif-center .notif-center__row:hover .notif-center__dismiss` | 0,4,0 | 3 |
+| ui-sheets.css:638 | `.notif-center .notif-center__row:focus-within .notif-center__dismiss` | 0,4,0 | 3 |
+| ui-sheets.css:817 | `.chb .chb-row + .chb-row .chb-card` | 0,4,0 | 4 |
+| ui-sheets.css:1400 | `.onyx-sheet .pref-toggle[aria-checked="true"] .pref-switch` | 0,4,0 | 3 |
+| ui-sheets.css:1462 | `.onyx-sheet .a2-add .a2-row--fill > .a2-input` | 0,4,0 | 4 |
+| ui-sheets.css:1463 | `.onyx-sheet .a2-add .a2-row--fill > .a2-btn` | 0,4,0 | 4 |
+| ui-sheets.css:1479 | `.onyx-sheet .onyx-danger-zone > :is(h3, .onyx-steward-label:first-child)` | 0,4,0 | 3 |
+| ui-sheets.css:1516 | `.onyx-sheet :is(.onyx-account-drop-arm, .onyx-steward-btn-danger, .onyx-moddesk-danger, .pref-reset--danger):n` | 0,4,0 | 2 |
+| ui-sheets.css:1617 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > .onyx-room-more-cancel` | 0,4,0 | 4 |
+| ui-sheets.css:1663 | `:root[data-kb="open"] .onyx-frame :is(.onyx-sheet-layer, .onyx-spotlight, .onyx-profile-pop, .onyx-room-more-m` | 0,4,0 | 3 |
+| ui-sheets.css:1664 | `:root[data-kb="open"] .onyx-frame .onyx-toaster` | 0,4,0 | 3 |
 | pol-ios.css:110 | `:root[data-kb="open"] .onyx-frame > .onyx-mobile-nav` | 0,4,0 | 3 |
 | pol-ios.css:112 | `:root[data-kb="open"] .onyx-main > .onyx-composer` | 0,4,0 | 3 |
-| app.css:2943 | `.onyx-moddesk-sheet .moderation-desk__rail > div span:first-child` | 0,3,2 | 4 |
+| calls-engine.css:386 | `.onyx-call-grid:has(> .onyx-tile:nth-child(5)) > .onyx-tile` | 0,4,0 | 2 |
+| calls-engine.css:428 | `.onyx-call-stage[data-size="expanded"] .onyx-call-people > .onyx-call-person` | 0,4,0 | 3 |
+| calls-engine.css:428 | `.onyx-call-stage[data-size="fullscreen"] .onyx-call-people > .onyx-call-person` | 0,4,0 | 3 |
+| calls-engine.css:438 | `.onyx-call-stage[data-size="expanded"] .onyx-call-grid > .onyx-tile` | 0,4,0 | 3 |
+| calls-engine.css:438 | `.onyx-call-stage[data-size="fullscreen"] .onyx-call-grid > .onyx-tile` | 0,4,0 | 3 |
+| calls-engine.css:452 | `.onyx-call-stage[data-size="expanded"] .onyx-call-people > .onyx-call-person` | 0,4,0 | 3 |
+| calls-engine.css:452 | `.onyx-call-stage[data-size="fullscreen"] .onyx-call-people > .onyx-call-person` | 0,4,0 | 3 |
+| calls-engine.css:460 | `.onyx-call-stage[data-size="expanded"] .onyx-call-grid > .onyx-tile` | 0,4,0 | 3 |
+| calls-engine.css:460 | `.onyx-call-stage[data-size="fullscreen"] .onyx-call-grid > .onyx-tile` | 0,4,0 | 3 |
+| app.css:2668 | `.onyx-moddesk-sheet .moderation-desk__rail > div span:first-child` | 0,3,2 | 4 |
 | pol-stats.css:825 | `.stats-page .stats-heatmap thead th:first-child` | 0,3,2 | 4 |
 | pol-stats.css:904 | `.stats-page .public-room-comparison__table tr:last-child :is(th, td)` | 0,3,2 | 4 |
 | pol-stats.css:906 | `.stats-page .public-room-comparison__table thead th:first-child` | 0,3,2 | 4 |
 | pol-stats.css:559 | `.stats-page .stats-primary-metric .note i` | 0,3,1 | 4 |
 | pol-stats.css:659 | `.stats-page .data-card .stats-window-copy p` | 0,3,1 | 4 |
-| pol-thread.css:1077 | `.onyx-composer .onyx-composer-bar > button .pt-ico` | 0,3,1 | 4 |
-| pol-thread.css:1078 | `.onyx-composer .onyx-composer-bar > button > .shell-composer-action-label` | 0,3,1 | 4 |
-| calls-c8.css:119 | `.onyx-call-sheet-layer .onyx-voice-settings .onyx-call-sheet-head h2` | 0,3,1 | 4 |
-| ui-sheets.css:200 | `.onyx-sheet-layer .onyx-sheet .onyx-sheet-head-actions > button` | 0,3,1 | 4 |
-| ui-sheets.css:850 | `.onyx-sheet-layer .onyx-sheet .onyx-sheet-head-actions > button` | 0,3,1 | 4 |
-| ui-sheets.css:950 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button` | 0,3,1 | 4 |
-| ui-sheets.css:985 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button` | 0,3,1 | 4 |
+| pol-thread.css:1179 | `.onyx-composer .onyx-composer-bar > button .pt-ico` | 0,3,1 | 4 |
+| pol-thread.css:1180 | `.onyx-composer .onyx-composer-bar > button > .shell-composer-action-label` | 0,3,1 | 4 |
+| pol-thread.css:2447 | `.onyx-frame .shell-msg-lightbox .shell-msg-lightbox-actions > button` | 0,3,1 | 4 |
+| pol-thread.css:2467 | `.onyx-frame .onyx-composer .onyx-composer-bar > button` | 0,3,1 | 4 |
+| calls-c8.css:118 | `.onyx-call-sheet-layer .onyx-voice-settings .onyx-call-sheet-head h2` | 0,3,1 | 4 |
+| gap-oper.css:403 | `.onyx-moddesk-sheet .oper-desk .onyx-moddesk-form :is(input, select)` | 0,3,1 | 4 |
+| gap-oper.css:403 | `.onyx-moddesk-sheet .oper-desk .onyx-moddesk-row :is(input, select)` | 0,3,1 | 4 |
+| ui-sheets.css:306 | `.onyx-sheet-layer .onyx-sheet .onyx-sheet-head-actions > button` | 0,3,1 | 4 |
+| ui-sheets.css:911 | `.onyx-sheet-layer .onyx-sheet .onyx-sheet-head-actions > button` | 0,3,1 | 4 |
+| ui-sheets.css:938 | `.onyx-sheet-layer .onyx-sheet .onyx-sheet-head-actions > button` | 0,3,1 | 4 |
+| ui-sheets.css:1040 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button` | 0,3,1 | 4 |
+| ui-sheets.css:1046 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button` | 0,3,1 | 4 |
+| ui-sheets.css:1077 | `.onyx-frame .onyx-room-more .onyx-room-more-menu > button` | 0,3,1 | 4 |
 | pol-stats.css:825 | `.stats-page .stats-heatmap tbody th` | 0,2,2 | 4 |
 | pol-stats.css:883 | `.stats-page .public-room-comparison__prompt p strong` | 0,2,2 | 4 |
 | pol-stats.css:905 | `.stats-page .public-room-comparison__table thead th` | 0,2,2 | 4 |
@@ -3612,386 +4231,454 @@ Outliers (103: ids, ≥4 class-level parts, or ≥4 compounds deep):
 
 ## G16. Dead rules (selectors matching nothing the Elm views render)
 
-Method: a class is live when it appears as a whitespace-separated token in any Elm string literal under src/ (comments excluded), in a ports.js / media/*.ts string, or extends a literal dynamic prefix (a literal ending in "-"/"_" followed by `++`). Everything else is dead. Data-attribute selectors are dead when the attribute is never written. 64 rules (221 declarations) are fully dead; 7 rules carry dead selector-list members; 49 distinct styled classes are never emitted.
+Method: a class is live when it appears as a whitespace-separated token in any Elm string literal under src/ (comments excluded), in a ports.js / media/*.ts string, or extends a literal dynamic prefix (a literal ending in "-"/"_" followed by `++`). Everything else is dead. Data-attribute selectors are dead when the attribute is never written. 5 rules (5 declarations) are fully dead; 0 rules carry dead selector-list members; 4 distinct styled classes are never emitted.
 
-Dynamic prefixes honoured: `guides-page-- (src/View/Guides.elm:247)`, `onyx-home-outbox- (src/View/Home.elm:243)`, `onyx-land-sketch-avatar-- (src/View/Landing.elm:103)`, `onyx-land-claim-icon-- (src/View/Landing.elm:189)`, `public-info-page-- (src/View/PublicInfo.elm:140)`, `onyx-button-- (src/View/Studio.elm:174)`, `ts-audit__badge-- (src/View/Studio.elm:1151)`, `onyx-toast-- (src/View/Toast.elm:39)`, `trust-page-- (src/View/Trust.elm:223)`.
+Dynamic prefixes honoured: `conn-point-icon-- (src/View/Connect.elm:319)`, `guides-page-- (src/View/Guides.elm:247)`, `onyx-home-outbox- (src/View/Home.elm:244)`, `onyx-land-sketch-avatar-- (src/View/Landing.elm:120)`, `onyx-land-claim-icon-- (src/View/Landing.elm:206)`, `oc-btn- (src/View/OperKit.elm:172)`, `public-info-page-- (src/View/PublicInfo.elm:140)`, `onyx-button-- (src/View/Studio.elm:174)`, `ts-audit__badge-- (src/View/Studio.elm:1151)`, `onyx-toast-- (src/View/Toast.elm:39)`, `trust-page-- (src/View/Trust.elm:223)`.
 
 ### G16.1 Fully dead rules
 
 | file:line | selector | decls | never emitted |
 |---|---|---|---|
-| app.css:463 | `.onyx-rail-count` | 3 | `.onyx-rail-count` |
-| app.css:609 | `.onyx-newmsg-header` | 3 | `.onyx-newmsg-header` |
-| app.css:610 | `.onyx-newmsg-header > div:nth-child(2)` | 2 | `.onyx-newmsg-header` |
-| app.css:611 | `.onyx-newmsg-header h2` | 2 | `.onyx-newmsg-header` |
-| app.css:612 | `.onyx-newmsg-mark` | 3 | `.onyx-newmsg-mark` |
-| app.css:613 | `.onyx-newmsg-eyebrow` | 5 | `.onyx-newmsg-eyebrow` |
-| app.css:620 | `.onyx-newmsg-close` | 8 | `.onyx-newmsg-close` |
-| app.css:734 | `.onyx-member-prefix` | 3 | `.onyx-member-prefix` |
-| app.css:794 | `.onyx-calls-toggle` | 7 | `.onyx-calls-toggle` |
-| app.css:804 | `.onyx-calls-toggle-open` | 2 | `.onyx-calls-toggle-open` |
-| app.css:1204 | `.chb-head` | 3 | `.chb-head` |
-| app.css:1205 | `.chb-title` | 2 | `.chb-title` |
-| app.css:1206 | `.chb-desc` | 3 | `.chb-desc` |
-| app.css:1207 | `.chb-close` | 5 | `.chb-close` |
-| app.css:1236 | `.chb-eyebrow` | 2 | `.chb-eyebrow` |
-| app.css:1237 | `.chb-create-header h2` | 2 | `.chb-create-header` |
-| app.css:1238 | `.chb-create-lead` | 2 | `.chb-create-lead` |
-| app.css:1268 | `.onyx-composer .onyx-schedule-open` | 7 | `.onyx-schedule-open` |
-| app.css:1278 | `.onyx-composer .onyx-schedule-open:disabled` | 2 | `.onyx-schedule-open` |
-| app.css:1362 | `.onyx-scheduled-head` | 3 | `.onyx-scheduled-head` |
-| app.css:1363 | `.onyx-scheduled-title` | 3 | `.onyx-scheduled-title` |
-| app.css:1365 | `.onyx-scheduled-desc` | 3 | `.onyx-scheduled-desc` |
-| app.css:1402 | `.onyx-account-head` | 3 | `.onyx-account-head` |
-| app.css:1403 | `.onyx-account-title` | 3 | `.onyx-account-title` |
-| app.css:1404 | `.onyx-account-close` | 6 | `.onyx-account-close` |
-| app.css:1542 | `.onyx-steward-head` | 3 | `.onyx-steward-head` |
-| app.css:1543 | `.onyx-steward-title` | 3 | `.onyx-steward-title` |
-| app.css:1544 | `.onyx-steward-room` | 2 | `.onyx-steward-room` |
-| app.css:1545 | `.onyx-steward-close` | 5 | `.onyx-steward-close` |
-| app.css:1666 | `.onyx-member-profile` | 8 | `.onyx-member-profile` |
-| app.css:1676 | `.onyx-member-profile:hover` | 2 | `.onyx-member-profile` |
-| app.css:1688 | `.onyx-profile-head` | 3 | `.onyx-profile-head` |
-| app.css:1689 | `.onyx-profile-title` | 2 | `.onyx-profile-title` |
-| app.css:1690 | `.onyx-profile-desc` | 3 | `.onyx-profile-desc` |
-| app.css:1691 | `.onyx-profile-close` | 8 | `.onyx-profile-close` |
-| app.css:1720 | `.onyx-member-nick` | 8 | `.onyx-member-nick` |
-| app.css:1730 | `.onyx-member-nick:hover` | 1 | `.onyx-member-nick` |
-| app.css:1743 | `.onyx-member-avatar` | 10 | `.onyx-member-avatar` |
-| app.css:2055 | `.onyx-leave` | 2 | `.onyx-leave` |
-| app.css:2095 | `.notify-head` | 3 | `.notify-head` |
-| app.css:2096 | `.notify-title` | 3 | `.notify-title` |
-| app.css:2097 | `.notify-close` | 6 | `.notify-close` |
-| app.css:2571 | `.onyx-roster .onyx-member-prefix` | 2 | `.onyx-member-prefix` |
-| app.css:2573 | `.onyx-member-identity .onyx-member-nick` | 3 | `.onyx-member-nick` |
-| app.css:2574 | `.onyx-away .onyx-member-nick` | 2 | `.onyx-member-nick` |
-| app.css:2576 | `.onyx-member-row-actions` | 3 | `.onyx-member-row-actions` |
-| app.css:2577 | `.onyx-member-row-actions .onyx-member-profile` | 1 | `.onyx-member-row-actions` `.onyx-member-profile` |
-| app.css:2837 | `.onyx-shortcuts-header` | 4 | `.onyx-shortcuts-header` |
-| app.css:2838 | `.onyx-shortcuts-header h2` | 2 | `.onyx-shortcuts-header` |
-| app.css:2839 | `.onyx-shortcuts-description` | 3 | `.onyx-shortcuts-description` |
-| app.css:3075 | `.onyx-prefs-head` | 5 | `.onyx-prefs-head` |
-| app.css:3076 | `.onyx-prefs-head > div` | 2 | `.onyx-prefs-head` |
-| app.css:3077 | `.onyx-prefs-title` | 2 | `.onyx-prefs-title` |
-| app.css:3078 | `.onyx-prefs-desc` | 3 | `.onyx-prefs-desc` |
-| app.css:3079 | `.onyx-prefs-close` | 7 | `.onyx-prefs-close` |
-| app.css:3616 | `.notif-center__head` | 3 | `.notif-center__head` |
-| app.css:3617 | `.notif-center__head > span` | 2 | `.notif-center__head` |
-| app.css:3839 | `.onyx-member-prefix` | 1 | `.onyx-member-prefix` |
-| app.css:3852 | `.onyx-newmsg-mark` | 1 | `.onyx-newmsg-mark` |
-| pol-shell.css:47 | `.notif-center__head` | 2 | `.notif-center__head` |
-| pol-shell.css:48 | `.notif-center__title` | 3 | `.notif-center__title` |
-| pol-shell.css:49 | `.notif-center .notif-center__close` | 6 | `.notif-center__close` |
-| pol-shell.css:303 | `.chb .chb-close` | 4 | `.chb-close` |
-| pol-public.css:1372 | `.invite-preview-title` | 1 | `.invite-preview-title` |
+| gap-appearance.css:271 | `:root[data-scene='appearance'] #onyx-scene` | 1 | `[data-scene]` |
+| gap-appearance.css:278 | `:root[data-shell-scheme='light'][data-scene='appearance'] #onyx-scene` | 1 | `[data-scene]` |
+| gap-appearance.css:285 | `:root[data-scene] body` | 1 | `[data-scene]` |
+| gap-appearance.css:286 | `:root[data-scene='appearance'] .ap, :root[data-scene='appearance'] .ap-background-host` | 1 | `[data-scene]` |
+| gap-appearance.css:291 | `:root[data-reduce-transparency='true'][data-scene] body` | 1 | `[data-scene]` |
 
 ### G16.2 Rules with dead selector-list members
 
 | file:line | dead members |
 |---|---|
-| app.css:2003 | `.onyx-leave` |
-| app.css:2629 | `.onyx-shortcuts-close:focus-visible` |
-| app.css:2698 | `.onyx-shortcuts-close` |
-| app.css:3574 | `.onyx-calls-toggle-open` |
-| ui-sheets.css:214 | `.notif-center__close`<br>`.onyx-shortcuts-close` |
-| ui-sheets.css:238 | `.onyx-shortcuts-close:focus-visible` |
-| ui-sheets.css:996 | `.notif-center__close:hover`<br>`.onyx-shortcuts-close:hover` |
 
 ### G16.3 Never-emitted classes
 
-`.chb-close` (app.css,pol-shell.css) · `.chb-create-header` (app.css) · `.chb-create-lead` (app.css) · `.chb-desc` (app.css) · `.chb-eyebrow` (app.css) · `.chb-head` (app.css) · `.chb-title` (app.css) · `.invite-preview-title` (pol-public.css) · `.notif-center__close` (pol-shell.css,ui-sheets.css) · `.notif-center__head` (app.css,pol-shell.css) · `.notif-center__title` (pol-shell.css) · `.notify-close` (app.css) · `.notify-head` (app.css) · `.notify-title` (app.css) · `.onyx-account-close` (app.css) · `.onyx-account-head` (app.css) · `.onyx-account-title` (app.css) · `.onyx-calls-toggle` (app.css) · `.onyx-calls-toggle-open` (app.css) · `.onyx-leave` (app.css) · `.onyx-member-avatar` (app.css) · `.onyx-member-nick` (app.css) · `.onyx-member-prefix` (app.css) · `.onyx-member-profile` (app.css) · `.onyx-member-row-actions` (app.css) · `.onyx-newmsg-close` (app.css) · `.onyx-newmsg-eyebrow` (app.css) · `.onyx-newmsg-header` (app.css) · `.onyx-newmsg-mark` (app.css) · `.onyx-prefs-close` (app.css) · `.onyx-prefs-desc` (app.css) · `.onyx-prefs-head` (app.css) · `.onyx-prefs-title` (app.css) · `.onyx-profile-close` (app.css) · `.onyx-profile-desc` (app.css) · `.onyx-profile-head` (app.css) · `.onyx-profile-title` (app.css) · `.onyx-rail-count` (app.css) · `.onyx-schedule-open` (app.css) · `.onyx-scheduled-desc` (app.css) · `.onyx-scheduled-head` (app.css) · `.onyx-scheduled-title` (app.css) · `.onyx-shortcuts-close` (app.css,ui-sheets.css) · `.onyx-shortcuts-description` (app.css) · `.onyx-shortcuts-header` (app.css) · `.onyx-steward-close` (app.css) · `.onyx-steward-head` (app.css) · `.onyx-steward-room` (app.css) · `.onyx-steward-title` (app.css)
+`.onyx-call-dm-start` (pol-shell.css) · `.onyx-moddesk-form--danger` (ui-sheets.css) · `.onyx-shortcuts-close` (ui-sheets.css) · `.onyx-you-close` (ui-sheets.css)
 
 ### G16.4 Attribute values never seen as literals (lower confidence: the value may be computed)
 
 | file:line | selector | unseen |
 |---|---|---|
-| pol-shell.css:538 | `.onyx-shi[data-icon="bell"]` | `[data-icon="bell"]` |
-| pol-thread.css:82 | `.pt-ico[data-icon="calendar"]` | `[data-icon="calendar"]` |
-| pol-thread.css:83 | `.pt-ico[data-icon="chart"]` | `[data-icon="chart"]` |
+| pol-thread.css:84 | `.pt-ico[data-icon="calendar"]` | `[data-icon="calendar"]` |
+| pol-thread.css:85 | `.pt-ico[data-icon="chart"]` | `[data-icon="chart"]` |
 
-### G16.5 Classes the views emit in class / classList that no stylesheet mentions (0)
+### G16.5 Classes the views emit in class / classList that no stylesheet mentions (2)
 
-
+`and` (src/View/Attention.elm:428) · `gorg-more` (src/View/Organize.elm:958)
 
 ## G17. Component families (classes by naming pattern, where each is defined)
 
 
-### avatar / facepile (31 classes, 6 multi-file, 1 dead)
+### avatar / facepile (33 classes, 8 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.onyx-avatar--md` `.onyx-avatar--owner` `.onyx-avatar--service` `.onyx-call-avatar-md` `.onyx-call-avatar-sm` `.onyx-facepile-away` `.onyx-facepile-face` `.onyx-facepile-overflow` `.onyx-home-avatar` `.onyx-home-avatar-person` `.onyx-member-avatar` **dead** `.onyx-member-avatar-slot` |
+| app.css | `.conn-identity-avatar` `.onyx-avatar--md` `.onyx-avatar--owner` `.onyx-avatar--service` `.onyx-call-avatar-md` `.onyx-call-avatar-sm` `.onyx-facepile-away` `.onyx-facepile-overflow` `.onyx-home-avatar` `.onyx-home-avatar-person` `.onyx-member-avatar-slot` |
 | pol-shell.css | `.onyx-call-ring-avatar` `.onyx-face` `.onyx-ident-avatar` `.onyx-room-header-avatar` `.onyx-you-avatar` |
 | pol-public.css | `.onyx-land-sketch-avatar` `.onyx-land-sketch-avatar--gold` `.onyx-land-sketch-avatar--lapis` `.onyx-land-sketch-avatar--shu` |
-| pol-thread.css | `.onyx-room-intro-face` `.onyx-row-avatar` `.onyx-thread-msg-face` |
-| app.css + pol-shell.css + pol-thread.css + pol-roster.css | `.onyx-avatar` |
+| pol-thread.css | `.onyx-room-intro-face` `.onyx-thread-msg-face` `.pins-item-face` |
+| gap-convo.css | `.gap-skeleton-avatar` |
+| app.css + gap-appearance.css + pol-shell.css + pol-thread.css + pol-roster.css + rx-shell.css | `.onyx-avatar` |
 | app.css + pol-roster.css | `.onyx-avatar--sm` |
-| app.css + calls-c6.css | `.onyx-call-avatar` |
-| app.css + calls-c4.css | `.onyx-call-avatar-lg` |
-| app.css + pol-shell.css + roomsettings.css | `.onyx-facepile` |
-| app.css + pol-shell.css + account2.css | `.onyx-rail-avatar` |
+| app.css + calls-c6.css + calls-engine.css | `.onyx-call-avatar` |
+| app.css + calls-c4.css + calls-engine.css | `.onyx-call-avatar-lg` |
+| app.css + pol-shell.css + roomsettings.css + rx-shell.css | `.onyx-facepile` |
+| app.css + rx-shell.css | `.onyx-facepile-face` |
+| app.css + pol-shell.css + account2.css + rx-shell.css | `.onyx-rail-avatar` |
+| pol-thread.css + gap-organize.css | `.onyx-row-avatar` |
 | calls-c4.css | `.onyx-tile-avatar` |
 
-### divider (4 classes, 2 multi-file, 0 dead)
+### divider (5 classes, 2 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css + pol-thread.css | `.onyx-day-divider` `.onyx-day-divider-label` |
 | pol-public.css | `.ab-seam` |
+| gap-chanserv.css | `.cs-rule-group` |
+| app.css + gap-appearance.css + pol-thread.css | `.onyx-day-divider` |
+| app.css + pol-thread.css | `.onyx-day-divider-label` |
 | pol-stats.css | `.r-divider` |
 
-### sheet / dialog / popover (65 classes, 21 multi-file, 0 dead)
+### sheet / dialog / popover (83 classes, 22 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.guest-claim-sheet` `.guest-claim-sheet__actions` `.guest-claim-sheet__cancel` `.guest-claim-sheet__error` `.guest-claim-sheet__hint` `.guest-claim-sheet__label` `.guest-claim-sheet__lede` `.guest-claim-sheet__submit` `.jump-to-date-sheet` `.onyx-call-sheet-body` `.onyx-call-sheet-close` `.onyx-call-sheet-head` `.onyx-overlays` `.onyx-profile-sheet` `.shortcuts-overlay__desc` `.shortcuts-overlay__group-name` `.shortcuts-overlay__kbd` `.shortcuts-overlay__keys` `.shortcuts-overlay__rows` `.shortcuts-overlay__sep` |
-| app.css + ui-sheets.css | `.guest-claim-sheet__form` `.onyx-moddesk-sheet` `.onyx-newmsg-sheet` `.onyx-sheet-backdrop` `.onyx-sheet-close` `.onyx-sheet-title` `.onyx-shortcuts-sheet` `.onyx-spotlight-backdrop` `.shortcuts-overlay` `.shortcuts-overlay__row` |
-| pol-thread.css | `.onyx-react-backdrop` `.shell-msg-lightbox` `.shell-msg-lightbox-actions` `.shell-msg-lightbox-backdrop` `.shell-msg-lightbox-close` `.shell-msg-lightbox-dialog` `.shell-msg-lightbox-img` `.shell-msg-lightbox-save` |
-| ui-sheets.css | `.onyx-sheet-grip` `.onyx-sheet-head-actions` `.onyx-sheet-heading` `.onyx-sheet-kicker` `.onyx-sheet-spacer` `.onyx-sheet-sub` `.onyx-sheet-x` |
+| app.css | `.guest-claim-sheet` `.guest-claim-sheet__actions` `.guest-claim-sheet__cancel` `.guest-claim-sheet__error` `.guest-claim-sheet__label` `.guest-claim-sheet__lede` `.guest-claim-sheet__submit` `.jump-to-date-sheet` `.onyx-call-sheet-body` `.onyx-call-sheet-close` `.onyx-call-sheet-head` `.onyx-overlays` `.onyx-profile-sheet` `.shortcuts-overlay__desc` `.shortcuts-overlay__group-name` `.shortcuts-overlay__kbd` `.shortcuts-overlay__keys` `.shortcuts-overlay__rows` `.shortcuts-overlay__sep` |
+| pol-thread.css | `.onyx-react-backdrop` `.onyx-thread-backdrop` `.shell-msg-lightbox` `.shell-msg-lightbox-actions` `.shell-msg-lightbox-backdrop` `.shell-msg-lightbox-close` `.shell-msg-lightbox-dialog` `.shell-msg-lightbox-img` `.shell-msg-lightbox-save` `.shell-msg-lightbox-save-label` `.shell-msg-lightbox-spacer` `.shell-msg-lightbox-stage` `.shell-msg-lightbox-zoom` |
+| gap-import.css | `.bk-card--modal` `.bk-dialog` `.bk-dialog--inspect` `.bk-dialog-actions` `.bk-dialog-body` `.bk-modal-copy` `.bk-modal-row` |
+| app.css + ui-sheets.css | `.guest-claim-sheet__form` `.guest-claim-sheet__hint` `.onyx-newmsg-sheet` `.onyx-shortcuts-sheet` `.onyx-spotlight-backdrop` `.shortcuts-overlay` `.shortcuts-overlay__row` |
+| ui-sheets.css | `.onyx-sheet-close` `.onyx-sheet-head-actions` `.onyx-sheet-heading` `.onyx-sheet-kicker` `.onyx-sheet-spacer` `.onyx-sheet-sub` `.onyx-sheet-title` |
 | polish.css | `.a2hs-sheet__actions` `.a2hs-sheet__detail` `.a2hs-sheet__status` `.onyx-sheet-lede` |
-| app.css + pol-thread.css | `.onyx-msg-menu-backdrop` `.onyx-thread-sheet` `.shell-composer-popovers` |
+| app.css + pol-thread.css | `.onyx-msg-menu-backdrop` `.onyx-thread-sheet` |
+| gap-watch.css | `.onyx-watch-sheet` `.onyx-watch-sheet-actions` |
 | account2.css | `.a2-sheet` |
 | polish.css + pol-ios.css | `.a2hs-sheet` |
+| gap-oper.css | `.ap-sheet` |
+| gap-commands.css | `.gap-help-sheet` |
+| calls-engine.css | `.onyx-call-more-scrim` |
 | calls-c6.css | `.onyx-call-ring-layer` |
-| app.css + calls-c11.css | `.onyx-call-sheet` |
+| app.css + calls-c11.css + calls-engine.css | `.onyx-call-sheet` |
+| app.css + gap-oper.css + ui-sheets.css | `.onyx-moddesk-sheet` |
 | app.css + pol-shell.css | `.onyx-nav-btn--dialog-open` |
 | pol-shell.css + ui-sheets.css | `.onyx-profile-backdrop` |
+| rx-shell.css | `.onyx-railmenu-layer` |
 | app.css + pol-shell.css + ui-sheets.css | `.onyx-room-more-scrim` |
-| app.css + calls-c11.css + calls-c6.css + ui-sheets.css | `.onyx-sheet` |
-| app.css + roomsettings.css + ui-sheets.css | `.onyx-sheet-head` |
-| app.css + calls-c6.css + ui-sheets.css + pol-ios.css | `.onyx-sheet-layer` |
+| pol-thread.css + calls-c11.css + calls-c6.css + rx-shell.css + gap-commands.css + gap-shell.css + ui-sheets.css + calls-engine.css | `.onyx-sheet` |
+| app.css + rx-shell.css + ui-sheets.css | `.onyx-sheet-backdrop` |
+| pol-thread.css + ui-sheets.css | `.onyx-sheet-grip` |
+| roomsettings.css + ui-sheets.css | `.onyx-sheet-head` |
+| pol-thread.css + calls-c6.css + rx-shell.css + ui-sheets.css + pol-ios.css | `.onyx-sheet-layer` |
+| gap-chanserv.css + gap-shell.css + ui-sheets.css | `.onyx-sheet-x` |
 | calls-c11.css | `.onyx-stage-hands-sheet-list` |
 | pol-public.css | `.onyxos-source__sheet` |
+| app.css + gap-appearance.css + pol-thread.css | `.shell-composer-popovers` |
 | pol-shell.css | `.shortcuts-overlay__group` |
 
-### heading / kicker / label (192 classes, 20 multi-file, 11 dead)
+### heading / kicker / label (244 classes, 38 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.chb-eyebrow` **dead** `.chb-invite-heading` `.chb-invite-label` `.chb-skin-label` `.chb-title` **dead** `.conn-alt-title` `.conn-hint` `.conn-label` `.conn-title` `.jump-to-date__hint` `.moderation-cockpit__hint` `.notify-group-title` `.notify-hint` `.notify-title` **dead** `.onyx-account-passkey-meta` `.onyx-account-persona-offers-label` `.onyx-account-section__title` `.onyx-account-title` **dead** `.onyx-call-hint` `.onyx-calls-kicker` `.onyx-calls-rooms-title` `.onyx-calls-title` `.onyx-dmsafe-kicker` `.onyx-dmsafe-number-label` `.onyx-home-label` `.onyx-invshare-label` `.onyx-keychange-col-label` `.onyx-keychange-kicker` `.onyx-keychange-lede` `.onyx-keychange-sub` `.onyx-keychange-title` `.onyx-member-meta` `.onyx-moddesk-eyebrow` `.onyx-moddesk-hint` `.onyx-moderation-title` `.onyx-nav-label` `.onyx-newmsg-eyebrow` **dead** `.onyx-newmsg-hint` `.onyx-prefs-title` **dead** `.onyx-profile-title` **dead** `.onyx-reclaim-label` `.onyx-schedule-headings` `.onyx-schedule-sub` `.onyx-schedule-title` `.onyx-scheduled-meta` `.onyx-scheduled-title` **dead** `.onyx-steward-label` `.onyx-steward-title` **dead** `.person-safety__note-label` `.person-safety__title` `.pref-label` `.pref-section-title` |
-| pol-public.css | `.a11y-kicker` `.a11y-lede` `.ab-eyebrow` `.ab-kicker` `.ab-lede` `.ab-scene__label` `.ab-scene__title` `.ab-title` `.dl-checksum-label` `.dl-kicker` `.dl-lede` `.dl-section-title` `.guides-index__eyebrow` `.guides-kicker` `.guides-route__title` `.guides-route-map__eyebrow` `.guides-share__eyebrow` `.guides-snapshot__eyebrow` `.invite-lede` `.invite-preview-title` **dead** `.onyx-land-kicker` `.onyx-land-sketch-caption` `.onyx-land-sketch-meta` `.onyxos-eyebrow` `.onyxos-lede` `.onyxos-section-heading` `.public-frame__current-kicker` `.public-frame__current-label` `.public-frame__footer-title` `.public-frame__nav-more-title` `.trust-article-heading` |
-| pol-thread.css | `.onyx-intro-title` `.onyx-message-search__section-title` `.onyx-message-search__target-kicker` `.onyx-message-search__vault-label` `.onyx-outbox-label` `.onyx-room-intro-title` `.onyx-thread-headings` `.onyx-thread-msg-meta` `.pins-context-kicker` `.pins-title` `.room-media-index-context-kicker` `.room-media-index-meta` `.room-media-index-title` `.shell-composer-context-label` `.shell-msg-preview-title` `.shell-msg-spoiler-label` |
-| pol-studio.css | `.ap-background-stage__heading` `.ap-ghint` `.ap-glabel` `.ap-label` `.ap-lede` `.ap-readiness-title` `.onyx-field__label` `.ts-audit__label` `.ts-eyebrow` `.ts-factory__hint` `.ts-preview__bar-title` `.ts-section__heading` `.ts-simple-look__hint` `.ts-token-label` |
-| calls-c8.css | `.onyx-call-caption` `.onyx-call-caption-nick` `.onyx-call-caption-text` `.onyx-call-caption-tr` `.onyx-call-caption-translate` `.onyx-call-captions` `.onyx-call-captions-copy` `.onyx-call-captions-head` `.onyx-call-captions-log` `.onyx-call-captions-source` `.onyx-call-captions-state` `.onyx-call-captions-title` `.onyx-vs-label` `.onyx-vs-title` |
+| app.css | `.chb-invite-heading` `.chb-invite-label` `.chb-skin-label` `.conn-alt-title` `.conn-hint` `.conn-identities-eyebrow` `.conn-identities-title` `.conn-label` `.conn-point-title` `.jump-to-date__hint` `.moderation-cockpit__hint` `.onyx-account-passkey-meta` `.onyx-account-persona-offers-label` `.onyx-call-hint` `.onyx-calls-kicker` `.onyx-calls-rooms-title` `.onyx-dmsafe-kicker` `.onyx-dmsafe-number-label` `.onyx-home-label` `.onyx-invshare-label` `.onyx-keychange-col-label` `.onyx-keychange-kicker` `.onyx-keychange-lede` `.onyx-keychange-sub` `.onyx-keychange-title` `.onyx-member-meta` `.onyx-moderation-title` `.onyx-newmsg-hint` `.onyx-reclaim-label` `.onyx-schedule-headings` `.onyx-schedule-title` `.onyx-scheduled-meta` `.onyx-steward-label` `.person-safety__note-label` `.person-safety__title` `.pref-section-title` |
+| pol-public.css | `.a11y-kicker` `.a11y-lede` `.ab-eyebrow` `.ab-kicker` `.ab-lede` `.ab-scene__label` `.ab-scene__title` `.ab-title` `.dl-checksum-label` `.dl-kicker` `.dl-lede` `.dl-section-title` `.guides-index__eyebrow` `.guides-kicker` `.guides-route__title` `.guides-route-map__eyebrow` `.guides-share__eyebrow` `.guides-snapshot__eyebrow` `.invite-lede` `.onyx-land-kicker` `.onyx-land-lede` `.onyx-land-shelf-label` `.onyx-land-sketch-caption` `.onyx-land-sketch-meta` `.onyxos-eyebrow` `.onyxos-lede` `.onyxos-section-heading` `.public-frame__current-kicker` `.public-frame__current-label` `.public-frame__footer-title` `.public-frame__nav-more-title` `.public-related__title` `.trust-article-heading` |
+| pol-thread.css | `.onyx-intro-title` `.onyx-message-search__section-title` `.onyx-message-search__target-kicker` `.onyx-message-search__vault-label` `.onyx-outbox-label` `.onyx-room-intro-title` `.onyx-thread-headings` `.onyx-thread-msg-meta` `.pins-context-kicker` `.pins-title` `.room-media-index-context-kicker` `.room-media-index-meta` `.room-media-index-title` `.shell-composer-context-label` `.shell-msg-preview-title` |
+| pol-studio.css | `.ap-background-stage__heading` `.ap-ghint` `.ap-glabel` `.ap-label` `.ap-readiness-title` `.onyx-field__label` `.ts-audit__label` `.ts-eyebrow` `.ts-factory__hint` `.ts-preview__bar-title` `.ts-section__heading` `.ts-simple-look__hint` `.ts-token-label` |
+| gap-import.css | `.bk-detail-label` `.bk-section-title` `.bk-title` `.hi-activity-sub` `.hi-batch-meta` `.hi-conv-meta` `.hi-dest-label` `.hi-hint` `.hi-kicker` `.hi-review-bar-title` `.hi-review-sub` `.hi-review-title` `.hi-tally-label` |
 | pol-stats.css | `.data-room-heading` `.public-room-comparison__lede` `.r-title` `.roadmap-kicker` `.roadmap-lede` `.stats-chart-caption` `.stats-feed-step__heading` `.stats-title-accent` `.status-kicker` `.status-lede` `.status-observation__label` |
-| pol-shell.css | `.conn-strength-label` `.notif-center__title` **dead** `.onyx-account-section__subtitle` `.onyx-conn-label` `.onyx-rail-line--sub` `.onyx-rail-new-label` `.onyx-rail-title` `.onyx-room-header-titles` `.onyx-room-more-title` `.onyx-topbar-title` |
-| roomsettings.css | `.rset-access-meta` `.rset-bridge-label` `.rset-event-title` `.rset-group-indicator-label` `.rset-heading` `.rset-hint` `.rset-insights-title` `.rset-label` `.rset-readonly-label` `.rset-roles-label` |
-| app.css + pol-shell.css | `.onyx-account-hint` `.onyx-call-join-label` `.onyx-coach-eyebrow` `.onyx-home-title` `.onyx-rail-label` `.onyx-rail-meta` `.onyx-rail-section-heading` `.onyx-rail-sub` |
+| calls-c8.css | `.onyx-call-caption` `.onyx-call-caption-nick` `.onyx-call-caption-text` `.onyx-call-caption-tr` `.onyx-call-captions-head` `.onyx-call-captions-log` `.onyx-call-captions-source` `.onyx-call-captions-state` `.onyx-call-captions-title` `.onyx-vs-label` `.onyx-vs-title` |
+| gap-oper.css | `.ap-hint` `.oc-hint` `.oc-lede` `.oc-meta` `.oc-meta-inline` `.oc-more-hint` `.oc-more-title` `.oc-replies-title` `.oc-sub` `.oc-sub-title` |
+| gap-watch.css | `.onyx-watch-handoff-label` `.onyx-watch-heading` `.onyx-watch-hint` `.onyx-watch-kicker` `.onyx-watch-label` `.onyx-watch-link-label` `.onyx-watch-meta` `.onyx-watch-review-title` `.onyx-watch-title` |
+| roomsettings.css | `.rset-access-meta` `.rset-bridge-label` `.rset-event-title` `.rset-group-indicator-label` `.rset-hint` `.rset-insights-title` `.rset-label` `.rset-readonly-label` `.rset-roles-label` |
+| gap-usermodes.css | `.um-blocks__title` `.um-held__title` `.um-hint` `.um-hint--inline` `.um-label` `.um-memo__title` `.um-requests__title` `.um-selfname__label` |
+| gap-organize.css | `.gorg-digest-kicker` `.gorg-note-label` `.gorg-reader-label` `.gorg-rset-hint` `.gorg-rset-title` `.gorg-saved-meta` `.gorg-sub` |
 | account2.css | `.a2-heading` `.a2-hint` `.a2-label` `.a2-ready__label` `.a2-reclaim__title` |
-| app.css + ui-sheets.css | `.jump-to-date-title` `.onyx-you-group__hint` `.onyx-you-group__title` `.onyx-you-lede` `.onyx-you-title` |
-| calls-c6.css | `.onyx-call-ring-kicker` `.onyx-call-ring-meta` `.onyx-call-ring-sub` `.onyx-call-ring-title` |
+| pol-shell.css | `.conn-strength-label` `.onyx-account-section__subtitle` `.onyx-conn-label` `.onyx-rail-line--sub` `.onyx-room-more-title` |
+| app.css + ui-sheets.css | `.jump-to-date-title` `.onyx-account-section__title` `.onyx-you-group__hint` `.onyx-you-group__title` `.onyx-you-lede` |
+| app.css + pol-shell.css | `.onyx-account-hint` `.onyx-coach-eyebrow` `.onyx-home-title` `.onyx-rail-section-heading` `.onyx-rail-sub` |
+| gap-shell.css | `.gs-door-sub` `.gs-leave-title` `.gs-motd-pack-title` `.gs-motd-title` |
+| pol-shell.css + rx-shell.css | `.onyx-rail-new-label` `.onyx-rail-title` `.onyx-room-header-titles` `.onyx-topbar-title` |
 | pol-stats.css + pol-public.css | `.label` `.r-kicker` `.sub` |
-| app.css + pol-public.css | `.onyx-land-lede` `.onyx-land-shelf-label` |
+| calls-c8.css + calls-engine.css | `.onyx-call-caption-translate` `.onyx-call-captions` `.onyx-call-captions-copy` |
+| gap-commands.css | `.gap-keys-pref-hint` `.gap-keys-pref-title` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-call-join-label` `.onyx-rail-meta` |
+| calls-c6.css | `.onyx-call-ring-kicker` `.onyx-call-ring-title` |
+| calls-c6.css + calls-engine.css | `.onyx-call-ring-meta` `.onyx-call-ring-sub` |
+| gap-people.css | `.onyx-member-mod-title` `.onyx-roster-more-hint` |
 | pol-roster.css | `.onyx-mlist-group-title` `.onyx-mlist-title` |
 | calls-c11.css | `.onyx-stage-hint` `.onyx-stage-title` |
-| pol-shell.css + roomsettings.css | `.onyx-room-header-sub` |
+| pol-studio.css + gap-oper.css | `.ap-lede` |
+| app.css + gap-auth.css | `.conn-title` |
+| gap-chanserv.css | `.cs-join-title` |
+| gap-auth.css | `.ga-question-label` |
+| gap-convo.css | `.gap-drop-title` |
+| gap-account.css | `.gap-review-title` |
+| gap-claim.css | `.gc-kicker` |
+| app.css + gap-organize.css + ui-sheets.css | `.notify-group-title` |
+| app.css + gap-organize.css | `.notify-hint` |
+| calls-engine.css | `.onyx-call-meta` |
+| app.css + calls-engine.css | `.onyx-calls-title` |
+| app.css + gap-oper.css | `.onyx-moddesk-hint` |
+| app.css + rx-shell.css | `.onyx-nav-label` |
+| app.css + pol-shell.css + gap-organize.css | `.onyx-rail-label` |
+| pol-shell.css + roomsettings.css + rx-shell.css | `.onyx-room-header-sub` |
+| app.css + gap-usermodes.css | `.onyx-schedule-sub` |
 | app.css + pol-thread.css | `.onyx-thread-title` |
+| app.css + gap-appearance.css + gap-claim.css | `.pref-label` |
+| roomsettings.css + gap-organize.css | `.rset-heading` |
+| gap-appearance.css + pol-thread.css | `.shell-msg-spoiler-label` |
 | polish.css | `.time-scrubber__label` |
 
-### button-like by declarations (per-instance class name) (94 classes, 11 multi-file, 4 dead)
+### input / textarea / field (51 classes, 6 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.conn-cancel` `.conn-link` `.jump-to-date__copy` `.jump-to-date__jump` `.jump-to-date__preset` `.notify-remove` `.onyx-account-cert-bind` `.onyx-account-cert-remove-go` `.onyx-account-data-download` `.onyx-account-data-history` `.onyx-account-device-publish` `.onyx-account-device-remove-legacy` `.onyx-account-drop-arm` `.onyx-account-drop-cancel` `.onyx-account-drop-go` `.onyx-account-email-save` `.onyx-account-keytrans-refresh` `.onyx-account-logout` `.onyx-account-passkey-add` `.onyx-account-passkey-cancel` `.onyx-account-passkey-refresh` `.onyx-account-passkey-remove` `.onyx-account-passkey-remove-go` `.onyx-account-passkey-rename` `.onyx-account-passkey-save` `.onyx-account-password-save` `.onyx-account-recovery-clear` `.onyx-account-recovery-copy` `.onyx-account-recovery-done` `.onyx-account-recovery-generate` `.onyx-account-recovery-refresh` `.onyx-account-refresh` `.onyx-account-session__drop` `.onyx-account-totp-confirm-go` `.onyx-account-totp-copy` `.onyx-account-totp-disable` `.onyx-account-totp-enroll` `.onyx-calls-room` `.onyx-home-room` `.onyx-keychange-accept` `.onyx-keychange-dismiss` `.onyx-keychange-retry` `.onyx-leave` **dead** `.onyx-member-nick` **dead** `.onyx-member-profile` **dead** `.onyx-reclaim-cancel` `.onyx-reconnect-retry` `.onyx-scheduled-cancel` `.pref-reset` `.shell-msg-channel-link` `.shell-topic-follow` |
-| pol-thread.css | `.onyx-message-search__deep` `.onyx-message-search__saved-delete` `.onyx-message-search__saved-run` `.onyx-message-search__vault-mode` `.room-media-index-filter` `.room-media-index-jump` `.room-media-index-retry` `.shell-msg-media-consent` `.shell-msg-preview-consent` |
-| pol-shell.css | `.onyx-account-persona-claim-go` `.onyx-account-persona-off` `.onyx-account-persona-wear` `.onyx-calls-join-video` `.onyx-calls-join-voice` `.onyx-calls-leave` `.onyx-calls-mute` |
-| pol-public.css | `.dl-copy` `.guides-copy` `.guides-download` `.guides-reset` |
-| app.css + pol-shell.css | `.onyx-call-join` `.onyx-coach-dismiss` `.onyx-dmsafe-trigger` `.shell-ribbon-bell` |
-| account2.css | `.a2-link` `.a2-reclaim__dismiss` `.a2-reclaim__signin` |
-| polish.css | `.time-scrubber__bar` `.time-scrubber__close` `.time-scrubber__copy` |
-| pol-studio.css | `.ts-audit__fix` `.ts-token-revert` `.ts-token-swatch` |
-| app.css + pol-thread.css | `.onyx-jump-latest` `.onyx-thread-indicator` |
-| app.css + pol-roster.css | `.onyx-member-message` `.onyx-roster-care` |
-| app.css + ui-sheets.css | `.onyx-you-leave` `.onyx-you-link` |
-| pol-shell.css + ui-sheets.css | `.notif-center__close` **dead** |
-| calls-c4.css | `.onyx-cq-prompt-x` |
-| pol-roster.css | `.onyx-mlist-find` |
-| pol-stats.css | `.status-quiet-link` |
-
-### input / textarea / field (29 classes, 2 multi-file, 0 dead)
-
-| defined in | classes |
-|---|---|
-| app.css | `.chb-field` `.chb-field-desc` `.chb-field-error` `.conn-field` `.conn-input` `.notify-input` `.onyx-account-field` `.onyx-account-field-label` `.onyx-steward-field` `.shell-topic-create-input` |
+| app.css | `.chb-field` `.chb-field-desc` `.chb-field-error` `.conn-field` `.conn-input` `.notify-input` `.onyx-account-field-label` `.onyx-steward-field` |
+| gap-oper.css | `.ap-field` `.ap-input` `.oc-field` `.oc-input` `.oc-input-mono` `.oc-textarea` |
+| gap-organize.css | `.gorg-field-label` `.gorg-input` `.gorg-note-input` `.gorg-quiet-field` `.gorg-textarea` |
+| gap-import.css | `.bk-field` `.bk-fields` `.bk-select-input` `.hi-dest-input` |
 | pol-thread.css | `.onyx-composer-field` `.onyx-message-search__input` `.onyx-message-search__query-field` `.onyx-message-search__save-input` |
 | pol-studio.css | `.onyx-field` `.onyx-field__input` `.ts-save-input` `.ts-token-text-field` |
 | pol-public.css | `.form-field` `.form-field-error` `.onyx-land-sketch-input` |
-| account2.css | `.a2-input` `.a2-textarea` |
-| roomsettings.css | `.rset-input` `.rset-textarea` |
+| gap-shell.css | `.gs-join-field` `.gs-join-input` |
+| gap-watch.css | `.onyx-watch-field` `.onyx-watch-input` |
+| gap-usermodes.css | `.um-input` `.um-input--area` |
+| account2.css + ui-sheets.css | `.a2-input` |
+| account2.css | `.a2-textarea` |
+| app.css + gap-account.css | `.onyx-account-field` |
 | pol-shell.css | `.onyx-rail-filter-field` |
-| app.css + pol-shell.css | `.onyx-rail-filter-input` |
-| app.css + pol-roster.css | `.onyx-roster-filter-input` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-rail-filter-input` |
+| app.css + pol-roster.css + rx-shell.css | `.onyx-roster-filter-input` |
 | calls-c8.css | `.onyx-vs-field` |
+| gap-appearance.css | `.pref-input` |
+| roomsettings.css + gap-chanserv.css | `.rset-input` |
+| roomsettings.css | `.rset-textarea` |
+| app.css + pol-thread.css | `.shell-topic-create-input` |
 
-### button (130 classes, 22 multi-file, 1 dead)
+### button (200 classes, 31 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.chb-actions` `.chb-invite-actions` `.conn-actions` `.conn-alt-btn` `.conn-submit` `.jump-to-date__actions` `.notify-add-btn` `.onyx-call-btn-ghost` `.onyx-call-btn-primary` `.onyx-calls-primary` `.onyx-convohead-action` `.onyx-home-caught-up-button` `.onyx-ident-action` `.onyx-keychange-actions` `.onyx-member-advanced-actions` `.onyx-member-row-actions` **dead** `.onyx-moddesk-actions` `.onyx-moddesk-danger` `.onyx-moderation-actions` `.onyx-newmsg-primary` `.onyx-newmsg-secondary` `.onyx-primary-nav-context` `.onyx-reclaim-actions` `.onyx-reclaim-submit` `.onyx-scheduled-actions` `.onyx-steward-actions` `.onyx-steward-btn` `.onyx-steward-btn-danger` `.onyx-steward-btn-primary` `.person-safety__actions` `.pref-action-card__body` `.pref-action-card__title` `.pref-actions` `.pref-reset--danger` `.pref-row-action` `.shell-topic-action` `.shell-topic-actions` |
-| pol-public.css | `.ab-cta` `.ab-cta--section` `.dl-actions` `.dl-cta` `.guides-action` `.guides-card-actions` `.guides-hero-actions` `.guides-progress__actions` `.guides-share__actions` `.invite-actions` `.not-found-page__action` `.onyx-land-sketch-send` `.onyxos-button` `.onyxos-button--primary` `.onyxos-hero__actions` `.public-frame__nav-actions` `.public-frame__nav-primary` |
-| pol-studio.css | `.ap-action` `.ap-action--apply` `.ap-action--quiet` `.ap-background-actions` `.onyx-button` `.onyx-button--ghost` `.onyx-button--primary` `.ts-eyedropper-button` `.ts-factory__actions` `.ts-pv-actions` `.ts-pv-btn` `.ts-pv-btn--danger` `.ts-pv-btn--primary` `.ts-pv-btn--send` `.ts-scheme-toggle__btn` `.ts-seed-btn` |
-| app.css + pol-shell.css | `.guest-claim-chip__actions` `.onyx-account-actions` `.onyx-home-action` `.onyx-home-actions` `.onyx-nav-btn` `.onyx-nav-btn--active` `.onyx-primary-nav` `.onyx-room-header-actions` `.onyx-room-header-btn` `.pref-action-card` |
-| pol-thread.css | `.onyx-composer-send` `.onyx-composer-send--ready` `.onyx-composer-send-label` `.onyx-earlier-button` `.onyx-latest-button` `.onyx-message-search__button` `.onyx-row-action` `.onyx-row-actions` |
-| pol-shell.css | `.chb-ghost` `.chb-submit` `.notif-center__action` `.onyx-home-action--primary` `.onyx-home-action--quiet` `.onyx-moddesk-form--danger` `.onyx-nav-btn--selected` |
-| app.css + ui-sheets.css | `.chb-create-actions` `.onyx-member-action` `.onyx-member-action--primary` `.onyx-member-actions` `.onyx-newmsg-actions` `.pref-action-card__icon` |
+| app.css | `.chb-actions` `.chb-invite-actions` `.conn-alt-btn` `.conn-identities-actions` `.conn-offer-btn` `.conn-submit` `.conn-submit--quiet` `.jump-to-date__actions` `.notify-add-btn` `.onyx-call-btn-ghost` `.onyx-call-btn-primary` `.onyx-calls-primary` `.onyx-convohead-action` `.onyx-home-caught-up-button` `.onyx-ident-action` `.onyx-keychange-actions` `.onyx-member-advanced-actions` `.onyx-moddesk-actions` `.onyx-moddesk-danger` `.onyx-newmsg-primary` `.onyx-newmsg-secondary` `.onyx-primary-nav-context` `.onyx-reclaim-actions` `.onyx-reclaim-submit` `.onyx-scheduled-actions` `.onyx-steward-actions` `.onyx-steward-btn` `.onyx-steward-btn-danger` `.onyx-steward-btn-primary` `.person-safety__actions` `.pref-action-card__body` `.pref-action-card__title` `.pref-reset--danger` `.pref-row-action` |
+| pol-public.css | `.ab-cta` `.ab-cta--section` `.dl-actions` `.dl-cta` `.guides-action` `.guides-card-actions` `.guides-hero-actions` `.guides-progress__actions` `.guides-share__actions` `.invite-actions` `.not-found-page__action` `.onyx-land-action` `.onyx-land-cta` `.onyx-land-sketch-send` `.onyxos-button` `.onyxos-button--primary` `.onyxos-hero__actions` `.public-frame__nav-actions` `.public-frame__nav-primary` |
+| pol-studio.css | `.ap-action` `.ap-action--apply` `.ap-action--quiet` `.ap-background-actions` `.onyx-button--ghost` `.onyx-button--primary` `.ts-eyedropper-button` `.ts-factory__actions` `.ts-pv-actions` `.ts-pv-btn` `.ts-pv-btn--danger` `.ts-pv-btn--primary` `.ts-pv-btn--send` `.ts-scheme-toggle__btn` `.ts-seed-btn` |
+| gap-import.css | `.bk-actions` `.bk-btn` `.bk-btn--action` `.bk-btn--link` `.bk-btn-label` `.hi-btn` `.hi-btn--danger` `.hi-btn--primary` `.hi-btn--quiet` `.hi-note-actions` |
+| gap-oper.css | `.ap-actions` `.ap-btn` `.oc-btn` `.oc-btn-align` `.oc-btn-danger` `.oc-btn-primary` `.oc-btn-quiet` `.oc-btn-small` `.oc-review-danger` |
+| pol-thread.css | `.onyx-composer-send` `.onyx-composer-send--ready` `.onyx-composer-send-label` `.onyx-earlier-button` `.onyx-latest-button` `.onyx-message-search__button` `.onyx-row-action` `.onyx-row-actions` `.shell-topic-actions` |
+| gap-organize.css | `.gorg-btn` `.gorg-btn--danger` `.gorg-btn--primary` `.gorg-folder-row-actions` `.gorg-note-actions` `.gorg-outbox-actions` `.gorg-tucked-action` |
+| gap-usermodes.css | `.um-actions` `.um-btn` `.um-btn--danger` `.um-btn--primary` `.um-btn--quiet` `.um-btn--soft` `.um-request__actions` |
+| app.css + ui-sheets.css | `.chb-create-actions` `.onyx-member-action--primary` `.onyx-member-actions` `.onyx-moderation-actions` `.onyx-newmsg-actions` `.pref-action-card__icon` |
+| pol-shell.css | `.chb-ghost` `.chb-submit` `.notif-center__action` `.onyx-home-action--primary` `.onyx-home-action--quiet` `.onyx-nav-btn--selected` |
 | pol-stats.css | `.data-action` `.data-action--ledger` `.data-room-actions` `.public-room-comparison__actions` `.r-cta` `.status-check__button` |
-| polish.css | `.first-run-notify__actions` `.polish-ghost` `.polish-primary` `.shell-composer-tools-action` |
-| account2.css | `.a2-btn` `.a2-btn--danger` `.a2-btn--primary` |
-| calls-c6.css | `.onyx-call-btn-danger` `.onyx-call-pip-btn` `.onyx-call-ring-actions` |
-| roomsettings.css | `.rset-actions` `.rset-btn` `.rset-btn-primary` |
-| calls-c4.css | `.onyx-call-primary` `.onyx-tile-btn` |
-| app.css + pol-public.css | `.onyx-land-action` `.onyx-land-cta` |
-| app.css + pol-shell.css + ui-sheets.css | `.chb-sort-btn` |
-| app.css + calls-c11.css + calls-c6.css + calls-c4.css | `.onyx-call-btn` |
+| app.css + pol-shell.css | `.guest-claim-chip__actions` `.onyx-home-action` `.onyx-home-actions` `.onyx-nav-btn--active` `.onyx-room-header-actions` `.pref-action-card` |
+| gap-watch.css | `.onyx-watch-actions` `.onyx-watch-btn` `.onyx-watch-btn-danger` `.onyx-watch-btn-primary` `.onyx-watch-confirm-actions` `.onyx-watch-text-btn` |
+| gap-account.css | `.gap-actions` `.gap-btn` `.gap-btn--primary` `.gap-btn--quiet` `.gap-list-actions` |
+| gap-claim.css | `.gc-actions` `.gc-btn` `.gc-btn--danger` `.gc-btn--primary` `.gc-btn--quiet` |
+| gap-shell.css | `.gs-btn` `.gs-btn--danger` `.gs-btn--ghost` `.gs-leave-actions` `.gs-seg-btn` |
+| gap-commands.css | `.onyx-action-lead` `.onyx-action-nick` `.onyx-action-star` `.onyx-message--action` |
+| gap-chanserv.css | `.cs-btn-danger` `.cs-join-actions` `.cs-knock-actions` |
+| polish.css | `.first-run-notify__actions` `.polish-ghost` `.polish-primary` |
+| gap-people.css | `.gp-actions` `.gp-btn-danger` `.onyx-member-action--danger` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-nav-btn` `.onyx-primary-nav` `.onyx-room-header-btn` |
+| account2.css | `.a2-btn--danger` `.a2-btn--primary` |
+| ui-sheets.css | `.chb-sort-btn` `.onyx-danger-zone` |
+| calls-c6.css | `.onyx-call-btn-danger` `.onyx-call-ring-actions` |
+| calls-engine.css | `.onyx-call-btn-label` `.onyx-call-btn-long` |
+| calls-c4.css + calls-engine.css | `.onyx-call-primary` `.onyx-tile-btn` |
+| roomsettings.css | `.rset-actions` `.rset-btn-primary` |
+| account2.css + ui-sheets.css | `.a2-btn` |
+| app.css + gap-auth.css | `.conn-actions` |
+| gap-auth.css | `.ga-actions` |
+| app.css + pol-shell.css + ui-sheets.css | `.onyx-account-actions` |
+| app.css + pol-studio.css | `.onyx-button` |
+| app.css + calls-c11.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-call-btn` |
+| calls-c6.css + calls-engine.css | `.onyx-call-pip-btn` |
+| app.css + gap-people.css + ui-sheets.css | `.onyx-member-action` |
+| rx-shell.css | `.onyx-rail-emptystate-actions` |
 | calls-c11.css | `.onyx-stage-actions` |
-| calls-c8.css | `.onyx-vs-btn` |
+| calls-c8.css + calls-engine.css | `.onyx-vs-btn` |
+| app.css + gap-account.css | `.pref-actions` |
 | pol-stats.css + pol-public.css | `.r-btn` |
+| roomsettings.css + gap-chanserv.css + gap-people.css | `.rset-btn` |
 | pol-shell.css + pol-thread.css | `.shell-composer-action-label` |
+| pol-thread.css + polish.css | `.shell-composer-tools-action` |
+| app.css + pol-thread.css | `.shell-topic-action` |
 
-### card (38 classes, 5 multi-file, 0 dead)
+### card (45 classes, 14 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
 | pol-public.css | `.ab-who-card` `.dl-card` `.dl-card--soon` `.dl-card-head` `.guides-card` `.guides-card__meta` `.guides-card--optional` `.guides-card--principles` `.guides-route__card` `.public-info-card` |
-| app.css | `.chb-card-head` `.conn-card` `.shell-topic-card` `.shell-topic-card-author` `.shell-topic-card-follow` `.shell-topic-card-main` `.shell-topic-card-meta` `.shell-topic-card-preview` `.shell-topic-card-title` |
-| calls-c4.css | `.onyx-tile-bottom` `.onyx-tile-name` `.onyx-tile-nick` `.onyx-tile-q` `.onyx-tile-spacer` `.onyx-tile-talk` `.onyx-tile-top` |
 | pol-stats.css | `.roadmap-card` `.roadmap-card-head` `.stats-card-heading` `.stats-card-quiet` `.stats-flow-card` `.stats-heatmap-card` |
-| app.css + pol-shell.css + ui-sheets.css | `.chb-card` `.onyx-member-card` |
-| calls-c11.css + calls-c4.css | `.onyx-tile` `.onyx-tile-video` |
+| app.css + pol-thread.css | `.shell-topic-card-author` `.shell-topic-card-follow` `.shell-topic-card-main` `.shell-topic-card-meta` `.shell-topic-card-preview` `.shell-topic-card-title` |
+| calls-c4.css | `.onyx-tile-bottom` `.onyx-tile-name` `.onyx-tile-q` `.onyx-tile-spacer` `.onyx-tile-talk` |
+| gap-import.css | `.bk-card` `.hi-card` |
+| app.css | `.chb-card-head` `.conn-card` |
+| gap-claim.css | `.gc-card` `.gc-card--prefs` |
+| gap-oper.css | `.oc-card` `.oc-card-head` |
+| calls-c4.css + calls-engine.css | `.onyx-tile-nick` `.onyx-tile-top` |
+| pol-shell.css + ui-sheets.css | `.chb-card` |
 | pol-stats.css + pol-public.css | `.data-card` |
-| pol-shell.css | `.onyx-rail-tile` |
+| gap-convo.css | `.gap-drop-card` |
+| app.css + pol-shell.css + ui-sheets.css | `.onyx-member-card` |
+| pol-shell.css + rx-shell.css | `.onyx-rail-tile` |
+| calls-c11.css + calls-c4.css + calls-engine.css | `.onyx-tile` |
+| calls-c11.css + calls-c4.css | `.onyx-tile-video` |
+| pol-thread.css | `.shell-topic-card` |
 
-### badge / count / dot (78 classes, 14 multi-file, 1 dead)
+### badge / count / dot (94 classes, 24 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.chb-count--started` `.notify-count` `.onyx-call-badge` `.onyx-call-badge-hand` `.onyx-call-people-count` `.onyx-call-pip` `.onyx-calls-pip` `.onyx-dot` `.onyx-home-count` `.onyx-home-unread` `.onyx-member-dot` `.onyx-rail-count` **dead** `.onyx-reconnect-dot` `.onyx-voice-count` `.pref-count` `.provenance-badge` `.shell-topic-card-unread` |
 | pol-studio.css | `.ap-tag` `.ts-audit__badge` `.ts-audit__badge--aa` `.ts-audit__badge--aa-large` `.ts-audit__badge--aaa` `.ts-audit__badge--fail` `.ts-audit__badge--na` `.ts-badge` `.ts-badge--modified` `.ts-preview__bar-dot` `.ts-pv-badge` `.ts-pv-badge--accent` `.ts-pv-badge--hot` `.ts-pv-chan__count` `.ts-pv-member__dot` `.ts-token-badge` |
-| calls-c6.css | `.onyx-call-pip-body` `.onyx-call-pip-cap` `.onyx-call-pip-corner` `.onyx-call-pip-faces` `.onyx-call-pip-handle` `.onyx-call-pip-live` `.onyx-call-pip-more` `.onyx-call-pip-where` |
-| pol-shell.css | `.onyx-call-pip-leave` `.onyx-ident-badge` `.onyx-nav-badge` `.onyx-nav-badge--mention` `.onyx-rail-has-unread` `.onyx-room-back-count` `.onyx-you-conn-dot` |
-| pol-thread.css | `.onyx-earlier-count` `.onyx-message-search__count` `.onyx-message-search__server-count` `.onyx-thread-count` `.onyx-unread-divider` `.onyx-unread-divider-label` `.unread` |
-| app.css + pol-shell.css | `.onyx-profile-badge` `.onyx-rail-filter-unread` `.onyx-rail-filter-unread-on` `.onyx-rail-unread` `.shell-ribbon-badge` |
-| app.css + pol-thread.css | `.boost-count` `.onyx-jump-latest--unread` `.onyx-jump-latest-count` |
+| app.css | `.chb-count--started` `.notify-count` `.onyx-call-badge-hand` `.onyx-calls-pip` `.onyx-dot` `.onyx-home-count` `.onyx-home-unread` `.onyx-member-dot` `.onyx-reconnect-dot` `.onyx-voice-count` `.pref-count` `.provenance-badge` `.shell-topic-card-unread` |
+| pol-thread.css | `.boost-count` `.onyx-earlier-count` `.onyx-message-search__count` `.onyx-message-search__server-count` `.onyx-thread-count` `.onyx-unread-divider` `.onyx-unread-divider-label` `.unread` |
+| gap-organize.css | `.gorg-folder-count` `.gorg-folder-count--mention` `.gorg-folder-row-count` `.gorg-note-count` `.gorg-preset-dot` `.gorg-tucked-count` |
+| calls-c6.css + calls-engine.css | `.onyx-call-pip-body` `.onyx-call-pip-cap` `.onyx-call-pip-corner` `.onyx-call-pip-faces` `.onyx-call-pip-handle` `.onyx-call-pip-live` |
+| pol-shell.css | `.onyx-call-pip-leave` `.onyx-nav-badge--mention` `.onyx-rail-filter-unread-on` `.onyx-rail-has-unread` `.onyx-room-back-count` `.onyx-you-conn-dot` |
+| gap-usermodes.css | `.um-inbox-link__count` `.um-requests__count` `.um-tag` `.um-tag--lock` |
+| app.css + calls-engine.css | `.onyx-call-badge` `.onyx-call-people-count` `.onyx-call-pip` |
 | app.css + pol-roster.css | `.onyx-member-presence-dot` `.onyx-member-presence-dot--away` `.onyx-roster-count` |
+| app.css + pol-shell.css | `.onyx-profile-badge` `.onyx-rail-unread` `.shell-ribbon-badge` |
 | account2.css | `.a2-dot` `.a2-dot--avatar` |
-| app.css + ui-sheets.css | `.chb-count` `.chb-count--live` |
-| calls-c4.css | `.onyx-tile-tag` `.onyx-tile-tag-text` |
+| gap-shell.css | `.gs-activity-conn-dot` `.gs-door-dot` |
+| calls-c6.css | `.onyx-call-pip-more` `.onyx-call-pip-where` |
+| pol-shell.css + rx-shell.css | `.onyx-ident-badge` `.onyx-nav-badge` |
+| app.css + pol-thread.css | `.onyx-jump-latest--unread` `.onyx-jump-latest-count` |
+| calls-c4.css + calls-engine.css | `.onyx-tile-tag` `.onyx-tile-tag-text` |
+| app.css + ui-sheets.css | `.chb-count` |
+| ui-sheets.css | `.chb-count--live` |
+| gap-chanserv.css | `.cs-slow-dot` |
+| gap-account.css | `.gap-badge` |
+| gap-claim.css | `.gc-facts-counts` |
 | pol-public.css | `.guides-progress__count` |
-| calls-c11.css + calls-c6.css | `.onyx-call-pip-card` |
+| gap-oper.css | `.oc-tag` |
+| calls-c11.css + calls-c6.css + calls-engine.css | `.onyx-call-pip-card` |
 | pol-roster.css | `.onyx-mlist-group-count` |
+| rx-shell.css | `.onyx-nav-label-count` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-rail-filter-unread` |
 | roomsettings.css | `.rset-bridge-dot` |
 | polish.css | `.shell-composer-tools-kbd` |
 | pol-stats.css | `.stats-result-count` |
 
-### chip (39 classes, 9 multi-file, 0 dead)
+### chip (41 classes, 11 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
 | pol-studio.css | `.ap-chip` `.ap-chip--theme` `.ap-chips` `.ap-theme-chip` `.ap-theme-chip--custom` `.ap-theme-chip--on` `.ts-theme-chip` `.ts-theme-chip__label` `.ts-theme-chip__scheme` `.ts-theme-chip--custom` `.ts-theme-chip-del` `.ts-theme-chip-wrap` |
-| pol-shell.css | `.guest-claim-chip__hint` `.guest-claim-chip__icon` `.guest-claim-chip__line` `.guest-claim-chip__nick` `.onyx-account-chip` `.onyx-account-chips` `.onyx-account-chips__desc` `.onyx-account-chips__label` `.onyx-voice-chip-count` |
-| app.css + pol-shell.css | `.guest-claim-chip` `.guest-claim-chip__dismiss` `.guest-claim-chip__keep` `.guest-claim-chip__text` `.onyx-dmsafe-chip` `.onyx-voice-chip` `.onyx-voice-chip-status` |
-| app.css | `.onyx-dmsafe-chip-plain` `.onyx-dmsafe-chip-warn` `.topic-chip__hash` `.topic-chip__unread` |
+| pol-shell.css | `.guest-claim-chip` `.guest-claim-chip__hint` `.guest-claim-chip__line` `.guest-claim-chip__nick` `.onyx-account-chip` `.onyx-account-chips` `.onyx-account-chips__desc` `.onyx-account-chips__label` |
+| app.css + pol-shell.css | `.guest-claim-chip__dismiss` `.guest-claim-chip__text` `.onyx-dmsafe-chip` |
+| app.css | `.onyx-dmsafe-chip-plain` `.onyx-dmsafe-chip-warn` `.topic-chip__hash` |
 | pol-thread.css | `.onyx-message-search__recall-chip` `.topic-chip__label` `.topic-chip--all` |
+| gap-oper.css | `.oc-chip` `.oc-chips` |
 | pol-stats.css | `.public-room-comparison__chip` `.public-room-comparison__chips` |
+| app.css + pol-thread.css | `.topic-chip` `.topic-chip__unread` |
+| pol-shell.css + rx-shell.css | `.guest-claim-chip__icon` |
+| app.css + pol-shell.css + rx-shell.css | `.guest-claim-chip__keep` |
 | app.css + calls-engine.css | `.onyx-sec-chip` |
-| app.css + pol-thread.css | `.topic-chip` |
+| app.css + pol-shell.css + calls-engine.css | `.onyx-voice-chip` |
+| pol-shell.css + calls-engine.css | `.onyx-voice-chip-count` |
+| app.css + pol-shell.css + rx-shell.css + calls-engine.css | `.onyx-voice-chip-status` |
 
-### empty state (32 classes, 10 multi-file, 0 dead)
+### button-like by declarations (per-instance class name) (68 classes, 9 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.chb-empty-title` `.is-empty` `.jump-to-date__empty` `.onyx-account-empty` `.onyx-account-personas-empty` `.onyx-dmsafe-empty` `.onyx-empty` `.onyx-empty-small` `.onyx-keychange-col-empty` `.onyx-newmsg-empty` `.onyx-profile-empty` `.onyx-react-empty` `.pref-placeholder` |
-| pol-shell.css | `.moderation-cockpit__empty` `.moderation-cockpit__empty-wrap` `.onyx-rail-zero` `.onyx-room-header-topic-empty` |
-| app.css + pol-shell.css | `.onyx-home-empty` `.onyx-home-empty-copy` `.onyx-rail-empty` `.onyx-rail-filter-empty` |
+| app.css | `.conn-cancel` `.conn-identities-dismiss` `.conn-identities-go` `.conn-identity-forget` `.jump-to-date__copy` `.jump-to-date__jump` `.jump-to-date__preset` `.notify-remove` `.onyx-account-session__drop` `.onyx-account-totp-enroll` `.onyx-calls-room` `.onyx-home-room` `.onyx-keychange-accept` `.onyx-keychange-dismiss` `.onyx-keychange-retry` `.onyx-reclaim-cancel` `.onyx-reconnect-retry` `.onyx-scheduled-cancel` `.shell-msg-channel-link` |
+| pol-thread.css | `.onyx-message-search__saved-delete` `.onyx-message-search__saved-run` `.onyx-message-search__vault-mode` `.room-media-index-filter` `.room-media-index-jump` `.room-media-index-retry` `.shell-msg-media-consent` `.shell-msg-preview-consent` |
+| pol-shell.css | `.onyx-account-persona-claim-go` `.onyx-account-persona-off` `.onyx-account-persona-wear` `.onyx-calls-join-video` `.onyx-calls-join-voice` `.onyx-calls-leave` `.onyx-calls-mute` |
+| gap-organize.css | `.gorg-link` `.gorg-note-add` `.gorg-preset-option` `.gorg-reader-exit` `.gorg-saved-open` |
+| pol-public.css | `.dl-copy` `.guides-copy` `.guides-download` `.guides-reset` |
+| account2.css | `.a2-link` `.a2-reclaim__dismiss` `.a2-reclaim__signin` |
+| polish.css | `.time-scrubber__bar` `.time-scrubber__close` `.time-scrubber__copy` |
+| pol-studio.css | `.ts-audit__fix` `.ts-token-revert` `.ts-token-swatch` |
+| gap-import.css | `.bk-inspect` |
+| app.css + gap-auth.css | `.conn-link` |
+| gap-convo.css | `.gap-collapsed-show` |
+| gap-commands.css | `.gap-keys-pref` |
+| app.css + pol-shell.css + rx-shell.css + calls-engine.css | `.onyx-call-join` |
+| app.css + pol-shell.css + pol-thread.css | `.onyx-coach-dismiss` |
+| calls-c4.css | `.onyx-cq-prompt-x` |
+| app.css + pol-shell.css | `.onyx-dmsafe-trigger` |
+| pol-thread.css + gap-convo.css | `.onyx-message-search__deep` |
+| pol-roster.css + rx-shell.css | `.onyx-mlist-find` |
+| gap-people.css | `.onyx-roster-more` |
+| gap-watch.css | `.onyx-watch-range` |
+| app.css + ui-sheets.css | `.onyx-you-leave` |
+| app.css + gap-account.css | `.pref-reset` |
+| app.css + pol-shell.css + rx-shell.css | `.shell-ribbon-bell` |
+| pol-stats.css | `.status-quiet-link` |
+
+### empty state (44 classes, 11 multi-file, 0 dead)
+
+| defined in | classes |
+|---|---|
+| app.css | `.chb-empty-title` `.is-empty` `.jump-to-date__empty` `.onyx-account-empty` `.onyx-account-personas-empty` `.onyx-dmsafe-empty` `.onyx-empty` `.onyx-empty-small` `.onyx-keychange-col-empty` `.onyx-newmsg-empty` `.onyx-profile-empty` `.onyx-react-empty` |
+| rx-shell.css | `.onyx-rail-emptystate` `.onyx-rail-emptystate-alt` `.onyx-rail-emptystate-go` `.onyx-rail-emptystate-mark` `.onyx-rail-emptystate-title` |
 | pol-stats.css | `.channel-spark-empty` `.data-empty` `.public-room-comparison__empty` |
+| gap-organize.css | `.gorg-empty` `.gorg-empty-body` `.gorg-empty-title` |
+| pol-shell.css | `.moderation-cockpit__empty` `.moderation-cockpit__empty-wrap` `.onyx-room-header-topic-empty` |
 | app.css + pol-thread.css | `.onyx-feed-empty` `.onyx-feed-empty-body` `.onyx-feed-empty-title` |
+| app.css + pol-shell.css | `.onyx-home-empty` `.onyx-home-empty-copy` `.onyx-rail-filter-empty` |
 | pol-thread.css | `.pins-empty` `.room-media-index-empty` |
+| gap-account.css | `.gap-empty` |
+| gap-shell.css | `.gs-activity-empty` |
 | pol-shell.css + ui-sheets.css | `.notif-center__empty` |
+| gap-oper.css | `.oc-empty` |
+| gap-convo.css | `.onyx-message-search__empty` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-rail-empty` |
+| pol-shell.css + rx-shell.css | `.onyx-rail-zero` |
 | app.css + pol-roster.css | `.onyx-roster-empty` |
 | app.css + ui-sheets.css | `.onyx-scheduled-empty` |
+| gap-watch.css | `.onyx-watch-empty` |
 
-### list / row / item (112 classes, 11 multi-file, 0 dead)
+### list / row / item (169 classes, 18 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.chb-invitee-row` `.chb-row--live` `.chb-skins-row` `.conn-alt-row` `.moderation-desk__ban-list` `.moderation-desk__ban-row` `.moderation-desk__log-list` `.notify-item` `.notify-list` `.notify-row` `.notify-row-copy` `.notify-row-hint` `.notify-row-title` `.onyx-account-cert-item` `.onyx-account-cert-list` `.onyx-account-device-list` `.onyx-account-passkey-list-title` `.onyx-account-passkey-row` `.onyx-account-persona-list` `.onyx-account-persona-row` `.onyx-account-totp-row` `.onyx-call-peer-list` `.onyx-calls-rooms-list` `.onyx-dmsafe-ready-row` `.onyx-home-list` `.onyx-home-outbox-item` `.onyx-home-outbox-list` `.onyx-home-row` `.onyx-home-row-copy` `.onyx-home-row-meta` `.onyx-home-row-name` `.onyx-moddesk-row` `.onyx-scheduled-item` `.onyx-scheduled-list` `.onyx-steward-item` `.onyx-steward-list` `.pref-row` `.pref-row-copy` `.pref-row-preview` `.pref-rows` |
-| pol-thread.css | `.onyx-attach-row` `.onyx-message-search__saved-list` `.onyx-message-search__saved-row` `.onyx-message-search__server-list` `.onyx-message-search__server-row` `.pins-item` `.pins-item-body` `.pins-item-body--deleted` `.pins-item-body--locked` `.pins-item-body--missing` `.pins-item-from` `.pins-item-main` `.pins-item-meta` `.pins-item-state` `.pins-item-unpin` `.pins-item-when` `.pins-list` `.pins-list-item` `.room-media-index-item` `.room-media-index-list` `.room-media-index-row` `.room-media-index-row--file` `.room-media-index-row--link` `.room-media-index-row--picture` |
+| app.css | `.chb-invitee-row` `.chb-row--live` `.chb-skins-row` `.conn-alt-row` `.conn-identities-list` `.moderation-desk__ban-list` `.moderation-desk__ban-row` `.moderation-desk__log-list` `.notify-item` `.notify-list` `.notify-row-copy` `.notify-row-hint` `.notify-row-title` `.onyx-account-cert-item` `.onyx-account-cert-list` `.onyx-account-passkey-list-title` `.onyx-account-passkey-row` `.onyx-account-persona-list` `.onyx-account-persona-row` `.onyx-account-totp-row` `.onyx-call-peer-list` `.onyx-calls-rooms-list` `.onyx-dmsafe-ready-row` `.onyx-home-list` `.onyx-home-outbox-item` `.onyx-home-outbox-list` `.onyx-home-row-copy` `.onyx-home-row-meta` `.onyx-home-row-name` `.onyx-moddesk-row` `.onyx-scheduled-item` `.onyx-steward-item` `.onyx-steward-list` `.pref-row` `.pref-row-copy` `.pref-row-preview` `.pref-rows` |
+| pol-thread.css | `.onyx-edit-history-item` `.onyx-edit-history-list` `.onyx-message-search__saved-list` `.onyx-message-search__saved-row` `.onyx-message-search__server-list` `.onyx-message-search__server-row` `.pins-item` `.pins-item-body` `.pins-item-body--deleted` `.pins-item-body--locked` `.pins-item-body--missing` `.pins-item-from` `.pins-item-main` `.pins-item-meta` `.pins-item-state` `.pins-item-unpin` `.pins-item-when` `.pins-list` `.pins-list-item` `.room-media-index-item` `.room-media-index-list` `.room-media-index-row` `.room-media-index-row--file` `.room-media-index-row--link` `.room-media-index-row--picture` `.shell-command-item--active` |
+| gap-oper.css | `.oc-item` `.oc-item-compact` `.oc-item-main` `.oc-item-note` `.oc-item-sub` `.oc-item-title` `.oc-list` `.oc-replies-list` `.oc-row` `.oc-row-between` `.oc-row-tight` |
+| gap-organize.css | `.gorg-folder-list` `.gorg-folder-row` `.gorg-folder-row-name` `.gorg-row-more` `.gorg-rset-row` `.gorg-saved-list` `.gorg-saved-row` `.gorg-tucked-list` `.gorg-tucked-row` |
+| pol-public.css | `.a11y-list` `.a11y-topic-list` `.dl-artifact-list` `.dl-checksum-row` `.guides-index__list` `.guides-route__item` `.onyx-land-shelf-list` `.public-related__list` |
 | pol-studio.css | `.ap-readiness-row` `.ts-audit__list` `.ts-audit__row` `.ts-header__title-row` `.ts-save-row` `.ts-section__heading-row` `.ts-token-color-row` |
-| pol-public.css | `.a11y-list` `.a11y-topic-list` `.dl-artifact-list` `.dl-checksum-row` `.guides-index__list` `.guides-route__item` |
+| gap-usermodes.css | `.um-held__item` `.um-list` `.um-list__name` `.um-list__row` `.um-memo__list` `.um-memo__row` `.um-requests__list` |
+| gap-import.css | `.bk-detail-list` `.hi-activity-row` `.hi-batch-row` `.hi-left-list` `.hi-tally-cell` |
 | pol-stats.css | `.data-list` `.data-room-row` `.data-row` `.stats-feed-timeline-list` `.stats-flow-list` |
-| roomsettings.css | `.onyx-dmsafe-rows` `.rset-access-list` `.rset-access-row` `.rset-roles-list` `.rset-roles-row` |
-| account2.css | `.a2-list` `.a2-row` `.a2-row--between` `.a2-row--fill` |
+| gap-account.css | `.gap-inline-row` `.gap-list` `.gap-list-row` `.gap-list-text` `.gap-subhead-row` |
+| roomsettings.css | `.onyx-dmsafe-rows` `.rset-access-list` `.rset-roles-list` `.rset-roles-row` |
+| account2.css | `.a2-list` `.a2-row` `.a2-row--between` |
 | app.css + ui-sheets.css | `.chb-list` `.onyx-account-nav__item` `.onyx-you-leave-row` |
-| pol-shell.css | `.chb-row` `.onyx-account-passkey-list` `.onyx-room-header-topic-row` |
-| polish.css | `.shell-composer-tools-item` `.shell-composer-tools-item-desc` `.shell-composer-tools-item-title` |
-| calls-c8.css | `.onyx-call-react-item` `.onyx-vs-key-row` |
-| app.css + pol-shell.css | `.onyx-rail-item` `.onyx-rail-row` |
-| app.css + pol-thread.css | `.shell-command-item` `.shell-command-item--active` |
+| gap-chanserv.css | `.cs-mlock-row` `.cs-my-rooms-list` `.cs-row` |
+| gap-commands.css | `.gap-help-item` `.gap-help-row` `.gap-help-rows` |
+| gap-shell.css | `.gs-act-row` `.gs-activity-list` `.gs-motd-pack-list` |
+| gap-watch.css | `.onyx-watch-end-row` `.onyx-watch-review-list` `.onyx-watch-roster-list` |
+| pol-shell.css | `.chb-row` `.onyx-account-passkey-list` |
+| gap-auth.css | `.ga-alt-row` `.ga-signin-row` |
+| polish.css | `.shell-composer-tools-item-desc` `.shell-composer-tools-item-title` |
+| account2.css + ui-sheets.css | `.a2-row--fill` |
+| gap-convo.css | `.gap-skeleton-row` |
 | app.css + pol-shell.css + ui-sheets.css | `.notif-center__list` |
 | pol-shell.css + ui-sheets.css | `.notif-center__row` |
+| app.css + gap-organize.css + ui-sheets.css | `.notify-row` |
+| pol-thread.css + gap-convo.css | `.onyx-attach-row` |
 | app.css + calls-c4.css + calls-engine.css | `.onyx-call-more-item` |
-| app.css + pol-public.css | `.onyx-land-shelf-list` |
+| calls-c8.css + calls-engine.css | `.onyx-call-react-item` |
+| app.css + gap-appearance.css | `.onyx-home-row` |
+| gap-people.css | `.onyx-member-mod-row` |
 | pol-roster.css | `.onyx-mlist-rows` |
+| rx-shell.css | `.onyx-rail-entry` |
+| app.css + gap-appearance.css + pol-shell.css + rx-shell.css + gap-organize.css | `.onyx-rail-item` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-rail-row` |
+| pol-shell.css + rx-shell.css | `.onyx-room-header-topic-row` |
+| app.css + gap-usermodes.css | `.onyx-scheduled-list` |
 | calls-c11.css | `.onyx-stage-hand-row` |
+| calls-c8.css | `.onyx-vs-key-row` |
+| roomsettings.css + gap-chanserv.css | `.rset-access-row` |
+| app.css + pol-thread.css | `.shell-command-item` |
+| pol-thread.css + polish.css | `.shell-composer-tools-item` |
 
-### icon button (31 classes, 10 multi-file, 8 dead)
-
-| defined in | classes |
-|---|---|
-| app.css | `.notify-close` **dead** `.onyx-account-close` **dead** `.onyx-dmsafe-close` `.onyx-moddesk-close` `.onyx-newmsg-close` **dead** `.onyx-prefs-close` **dead** `.onyx-profile-close` **dead** `.onyx-schedule-close` `.onyx-scheduled-close` `.onyx-steward-close` **dead** |
-| pol-thread.css | `.onyx-message-search__button--close` `.onyx-thread-close` `.pins-close` `.room-media-index-close` `.shell-composer-context-close` |
-| app.css + ui-sheets.css | `.jump-to-date-close` `.onyx-shortcuts-close` **dead** `.onyx-you-close` |
-| calls-c8.css | `.onyx-cbtn-hand` `.onyx-cbtn-react` |
-| app.css + pol-shell.css | `.chb-close` **dead** |
-| app.css + calls-c11.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-cbtn` |
-| app.css + calls-c4.css | `.onyx-cbtn-cap` |
-| app.css + calls-engine.css | `.onyx-cbtn-leave` |
-| calls-c4.css | `.onyx-cbtn-share` |
-| calls-c11.css | `.onyx-cbtn-wide` |
-| pol-roster.css | `.onyx-mlist-close` |
-| pol-public.css | `.onyxos-close` |
-| pol-shell.css + pol-thread.css | `.shell-composer-tool` |
-| app.css + pol-thread.css | `.shell-composer-tool--emoji` |
-| pol-thread.css + polish.css | `.shell-composer-tool--more` |
-
-### switch / toggle (43 classes, 8 multi-file, 2 dead)
+### switch / toggle (58 classes, 17 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| app.css | `.notify-toggle` `.onyx-calls-toggle` **dead** `.onyx-calls-toggle-open` **dead** `.onyx-member-advanced-toggle` `.onyx-moddesk-toggles` `.onyx-notify-toggle` `.onyx-notify-toggle-open` `.pref-switch` `.pref-toggle` `.pref-toggle-text` `.pref-toggle-title` |
-| pol-shell.css | `.onyx-account-push-toggle` `.onyx-jump-toggle` `.onyx-media-toggle` `.onyx-media-toggle-open` `.onyx-pins-toggle` `.onyx-pins-toggle-open` `.onyx-room-settings-toggle` `.onyx-scrubber-toggle` `.onyx-search-toggle` |
-| roomsettings.css | `.rset-toggle` `.rset-toggle-label` `.rset-toggle-text` `.rset-toggle-thumb` `.rset-toggle-track` |
-| app.css + pol-shell.css | `.onyx-moddesk-toggle` `.onyx-room-more-toggle` `.onyx-search-toggle-open` |
-| calls-c8.css | `.onyx-vs-toggle` `.onyx-vs-toggle-label` `.onyx-vs-toggle-text` |
+| app.css | `.conn-switch` `.conn-toggle` `.conn-toggle-body` `.conn-toggle-description` `.conn-toggle-label` `.onyx-member-advanced-toggle` `.onyx-moddesk-toggles` `.onyx-notify-toggle` `.onyx-notify-toggle-open` `.pref-toggle-text` `.pref-toggle-title` |
+| pol-shell.css | `.onyx-account-push-toggle` `.onyx-jump-toggle` `.onyx-media-toggle` `.onyx-media-toggle-open` `.onyx-pins-toggle` `.onyx-pins-toggle-open` `.onyx-room-settings-toggle` `.onyx-scrubber-toggle` |
+| roomsettings.css + ui-sheets.css | `.rset-toggle` `.rset-toggle-text` `.rset-toggle-thumb` `.rset-toggle-track` |
+| gap-organize.css | `.gorg-switch` `.gorg-switch-knob` `.gorg-tucked-toggle` |
+| pol-thread.css | `.onyx-edited-toggle` `.onyx-message-search__save-toggle` `.onyx-topic-tools-toggle` |
+| gap-usermodes.css | `.um-fold__toggle` `.um-more__toggle` `.um-switch` |
+| gap-account.css | `.gap-switch` `.gap-switches` |
 | app.css + pol-thread.css | `.onyx-audience-toggle` `.onyx-audience-toggle-set` |
-| pol-thread.css | `.onyx-message-search__save-toggle` `.onyx-topic-tools-toggle` |
+| app.css + pol-shell.css | `.onyx-room-more-toggle` `.onyx-search-toggle-open` |
+| calls-c8.css | `.onyx-vs-toggle-label` `.onyx-vs-toggle-text` |
 | pol-studio.css | `.ts-advanced__toggle` `.ts-scheme-toggle` |
-| app.css + ui-sheets.css | `.chb-check` |
+| app.css + gap-people.css + ui-sheets.css | `.chb-check` |
+| gap-commands.css | `.gap-keys-pref-switch` |
 | pol-public.css | `.guides-step-toggle` |
-| pol-shell.css + pol-roster.css | `.onyx-members-toggle` |
+| gap-import.css | `.hi-check` |
+| app.css + ui-sheets.css | `.notify-toggle` |
+| pol-shell.css + pol-roster.css + rx-shell.css | `.onyx-members-toggle` |
 | pol-roster.css | `.onyx-members-toggle-count` |
-| pol-shell.css + roomsettings.css | `.onyx-room-topic-toggle` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-moddesk-toggle` |
+| pol-shell.css + roomsettings.css + rx-shell.css | `.onyx-room-topic-toggle` |
+| pol-shell.css + rx-shell.css | `.onyx-search-toggle` |
+| calls-c8.css + calls-engine.css | `.onyx-vs-toggle` |
+| gap-watch.css | `.onyx-watch-roster-toggle` |
+| app.css + gap-account.css + gap-usermodes.css + ui-sheets.css | `.pref-switch` |
+| app.css + gap-account.css | `.pref-toggle` |
+| roomsettings.css | `.rset-toggle-label` |
 | pol-stats.css | `.status-check` |
 
-### tabs (10 classes, 5 multi-file, 0 dead)
+### toast / banner / notice (23 classes, 8 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
-| pol-studio.css | `.onyx-tabs` `.onyx-tabs__content` `.onyx-tabs__list` `.onyx-tabs__trigger` |
-| app.css + ui-sheets.css | `.pref-category-tab` `.pref-category-tab__label` `.pref-category-tab__summary` `.pref-category-tabs` |
-| app.css + pol-public.css | `.onyx-land-tabs` |
-| pol-public.css | `.onyxos-console__tabs` |
-
-### toast / banner / notice (23 classes, 6 multi-file, 0 dead)
-
-| defined in | classes |
-|---|---|
-| app.css | `.jump-to-date__notice` `.onyx-join-banner` `.onyx-join-banner-actions` `.onyx-join-banner-copy` `.onyx-join-banner-failed` `.onyx-join-banner-hide` `.onyx-join-banner-warn` `.onyx-notices` `.onyx-toast__body` `.onyx-toast__undo` `.onyx-toast--info` |
-| app.css + ui-sheets.css | `.onyx-toast` `.onyx-toast__dismiss` `.onyx-toast--danger` `.onyx-toast--success` `.onyx-toast--warning` `.onyx-toaster` |
-| pol-shell.css | `.onyx-room-more-alerts` `.onyx-steward-notice` `.onyx-steward-notices` |
+| app.css | `.jump-to-date__notice` `.onyx-join-banner-failed` `.onyx-join-banner-warn` `.onyx-notices` `.onyx-toast__body` `.onyx-toast__undo` `.onyx-toast--info` |
+| app.css + calls-engine.css | `.onyx-join-banner` `.onyx-join-banner-actions` `.onyx-join-banner-copy` `.onyx-join-banner-hide` |
+| app.css + ui-sheets.css | `.onyx-toast` `.onyx-toast__dismiss` `.onyx-toast--warning` |
+| ui-sheets.css | `.onyx-toast--danger` `.onyx-toast--success` `.ui-icon--alert` |
+| gap-people.css | `.gp-notice` `.gp-notices` |
 | account2.css | `.a2-reclaim--alert` |
 | pol-thread.css | `.onyx-message-search__server-notice` |
-| ui-sheets.css | `.ui-icon--alert` |
+| pol-shell.css | `.onyx-room-more-alerts` |
+| app.css + rx-shell.css + ui-sheets.css | `.onyx-toaster` |
 
 ### pill (6 classes, 2 multi-file, 0 dead)
 
@@ -4003,191 +4690,231 @@ Dynamic prefixes honoured: `guides-page-- (src/View/Guides.elm:247)`, `onyx-home
 | app.css + ui-sheets.css | `.chb-pill` |
 | pol-shell.css | `.chb-pill--in` |
 
-### skeleton / loading (12 classes, 0 multi-file, 0 dead)
+### skeleton / loading (18 classes, 1 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
+| gap-convo.css | `.gap-loading` `.gap-skeleton` `.gap-skeleton-body` `.gap-skeleton-line` `.gap-skeleton-line--short` `.gap-skeleton-name` |
 | pol-public.css | `.guides-progress` `.guides-progress__eyebrow` `.guides-progress__head` `.guides-progress__meter` `.guides-progress__status` |
-| pol-thread.css | `.onyx-pending` `.onyx-pending-note` `.room-media-index-skeleton` `.room-media-index-status--loading` `.shell-attachment-progress` |
+| pol-thread.css | `.onyx-pending` `.onyx-pending-note` `.room-media-index-skeleton` `.room-media-index-status--loading` |
 | app.css | `.chb-invite-progress` `.onyx-account-pending` |
+| pol-thread.css + gap-convo.css | `.shell-attachment-progress` |
 
-### menu / palette / dropdown (59 classes, 24 multi-file, 0 dead)
+### icon button (28 classes, 11 multi-file, 0 dead)
+
+| defined in | classes |
+|---|---|
+| pol-thread.css | `.onyx-message-search__button--close` `.onyx-thread-close` `.pins-close` `.room-media-index-close` `.shell-composer-context-close` |
+| app.css | `.onyx-dmsafe-close` `.onyx-schedule-close` `.onyx-scheduled-close` |
+| gap-organize.css | `.gorg-icon-btn` `.gorg-more--close` |
+| app.css + ui-sheets.css | `.jump-to-date-close` `.onyx-moddesk-close` |
+| gap-watch.css | `.onyx-watch-close` `.onyx-watch-icon-btn` |
+| gap-chanserv.css | `.cs-join-close` |
+| app.css + calls-c11.css + calls-c6.css + calls-c4.css + calls-engine.css | `.onyx-cbtn` |
+| app.css + calls-c4.css + calls-engine.css | `.onyx-cbtn-cap` |
+| calls-c8.css | `.onyx-cbtn-hand` |
+| app.css + calls-engine.css | `.onyx-cbtn-leave` |
+| calls-c8.css + calls-engine.css | `.onyx-cbtn-react` |
+| calls-c4.css + calls-engine.css | `.onyx-cbtn-share` |
+| calls-c11.css | `.onyx-cbtn-wide` |
+| ui-sheets.css | `.onyx-member-card-close` |
+| pol-roster.css + rx-shell.css | `.onyx-mlist-close` |
+| pol-public.css | `.onyxos-close` |
+| pol-shell.css + pol-thread.css | `.shell-composer-tool` |
+| app.css + pol-thread.css | `.shell-composer-tool--emoji` |
+| pol-thread.css + polish.css | `.shell-composer-tool--more` |
+
+### menu / palette / dropdown (86 classes, 28 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
 | app.css | `.onyx-msg-menu-delete-confirm-actions` `.onyx-msg-menu-delete-confirm-cancel` `.onyx-msg-menu-delete-confirm-copy` `.onyx-msg-menu-delete-confirm-delete` `.onyx-msg-menu-delete-confirm-title` `.onyx-msg-menu-translation` `.onyx-msg-menu-translation-action` `.onyx-msg-menu-translation-actions` `.onyx-msg-menu-translation-copy-status` `.onyx-msg-menu-translation-head` `.onyx-msg-menu-translation-note` `.onyx-msg-menu-translation-text` `.onyx-spotlight-empty` `.onyx-spotlight-empty-sub` `.onyx-spotlight-empty-text` `.onyx-spotlight-status` |
-| app.css + ui-sheets.css | `.onyx-spotlight` `.onyx-spotlight-close` `.onyx-spotlight-foot` `.onyx-spotlight-group` `.onyx-spotlight-hint` `.onyx-spotlight-icon` `.onyx-spotlight-input` `.onyx-spotlight-option` `.onyx-spotlight-panel` `.onyx-spotlight-results` `.onyx-spotlight-search` `.onyx-spotlight-section` `.onyx-spotlight-sigil` `.onyx-spotlight-title` |
+| gap-organize.css | `.gorg-menu` `.gorg-menu-close` `.gorg-menu-copy` `.gorg-menu-face` `.gorg-menu-head` `.gorg-menu-item` `.gorg-menu-items` `.gorg-menu-note` `.gorg-menu-sub` `.gorg-menu-tile` `.gorg-menu-title` `.gorg-menu-titles` |
+| app.css + ui-sheets.css | `.onyx-spotlight` `.onyx-spotlight-close` `.onyx-spotlight-foot` `.onyx-spotlight-hint` `.onyx-spotlight-input` `.onyx-spotlight-option` `.onyx-spotlight-panel` `.onyx-spotlight-results` `.onyx-spotlight-search` `.onyx-spotlight-section` `.onyx-spotlight-sigil` `.onyx-spotlight-title` |
+| rx-shell.css | `.onyx-railmenu` `.onyx-railmenu-close` `.onyx-railmenu-face` `.onyx-railmenu-head` `.onyx-railmenu-hint` `.onyx-railmenu-item--danger` `.onyx-railmenu-notify` `.onyx-railmenu-sub` `.onyx-railmenu-tile` `.onyx-railmenu-title` `.onyx-railmenu-titles` |
 | pol-studio.css | `.background-picker` `.background-picker__card` `.background-picker__card--selected` `.background-picker__copy` `.background-picker__grid` `.background-picker__group` `.background-picker__heading` `.background-picker__meta` `.background-picker__swatch` `.ts-public-look-picker` |
 | app.css + pol-thread.css | `.onyx-msg-menu` `.onyx-msg-menu-delete-confirm` `.onyx-msg-menu-item` `.onyx-msg-menu-trigger` `.onyx-react-picker` `.shell-command-menu` `.shell-emoji-picker` |
 | pol-thread.css | `.onyx-msg-menu-head` `.onyx-msg-menu-head-from` `.onyx-msg-menu-head-text` `.onyx-msg-menu-pop` `.shell-nick-menu` |
-| app.css + pol-shell.css | `.onyx-palette-kbd` `.onyx-palette-launcher` |
+| rx-shell.css + gap-organize.css | `.gorg-menu-hint` `.gorg-menu-label` `.onyx-railmenu-item` `.onyx-railmenu-label` |
+| app.css + pol-shell.css + rx-shell.css | `.onyx-palette-kbd` `.onyx-palette-launcher` |
 | calls-c8.css | `.onyx-call-react-menu` |
-| pol-shell.css | `.onyx-palette-launcher-label` |
+| pol-shell.css + rx-shell.css | `.onyx-palette-launcher-label` |
 | app.css + pol-shell.css + ui-sheets.css | `.onyx-room-more-menu` |
+| ui-sheets.css | `.onyx-spotlight-group` |
+| app.css + gap-commands.css + ui-sheets.css | `.onyx-spotlight-icon` |
 | pol-public.css | `.public-frame__menu-toggle` |
 | pol-stats.css | `.stats-spotlight-metrics` |
 
-### segmented control (9 classes, 3 multi-file, 0 dead)
+### segmented control (21 classes, 3 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
+| gap-organize.css | `.gorg-choice` `.gorg-choice--on` `.gorg-choice-label` `.gorg-choice-meta` `.gorg-choices` |
+| gap-usermodes.css | `.um-choice` `.um-choice__hint` `.um-choice__title` `.um-choice--on` |
 | pol-studio.css | `.ap-chips--choices` `.ap-choice-toggle` `.ap-choice-toggles` |
 | app.css | `.conn-strength-seg` `.pref-segment` `.pref-segments` |
+| gap-shell.css | `.gs-seg` `.gs-seg-count` |
 | app.css + pol-thread.css | `.onyx-react-choice` `.shell-emoji-choice` |
-| app.css + pol-shell.css | `.room-notify-seg` |
+| gap-import.css | `.hi-seg` |
+| app.css + pol-shell.css + rx-shell.css + ui-sheets.css | `.room-notify-seg` |
 
-### select (3 classes, 0 multi-file, 0 dead)
+### select (9 classes, 2 multi-file, 0 dead)
 
 | defined in | classes |
 |---|---|
+| gap-import.css | `.bk-select` `.bk-select-label` `.bk-select-wrap` |
 | account2.css | `.a2-select` |
-| calls-c8.css | `.onyx-vs-select` |
-| roomsettings.css | `.rset-select` |
+| app.css | `.conn-identity-select` |
+| gap-organize.css | `.gorg-select` |
+| calls-c8.css + calls-engine.css | `.onyx-vs-select` |
+| gap-watch.css | `.onyx-watch-select` |
+| roomsettings.css + gap-chanserv.css | `.rset-select` |
+
+### tabs (15 classes, 4 multi-file, 0 dead)
+
+| defined in | classes |
+|---|---|
+| pol-studio.css | `.onyx-tabs` `.onyx-tabs__content` `.onyx-tabs__list` `.onyx-tabs__trigger` |
+| app.css + ui-sheets.css | `.pref-category-tab` `.pref-category-tab__label` `.pref-category-tab__summary` `.pref-category-tabs` |
+| gap-oper.css | `.oc-tab` `.oc-tablist` `.oc-tabs` |
+| gap-chanserv.css | `.cs-tab` `.cs-tabs` |
+| pol-public.css | `.onyx-land-tabs` `.onyxos-console__tabs` |
 
 ### G17.1 Base-class property matrix (live classes; unconditional `.class { }` rules only, last declaration in cascade order)
 
 
-**button** — 43 parallel implementations
+**button** — 54 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.a2-btn` | account2.css | `var(--target-floor)` |  | `var(--space-1) var(--space-3)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.a2-btn` | account2.css, ui-sheets.css | `var(--target-floor)` |  | `var(--space-1) var(--space-3)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.ap-action` | pol-studio.css | `var(--target-min)` |  | `0 var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` |  |  |
+| `.ap-btn` | gap-oper.css | `44px` |  | `0 var(--space-4)` | `0.875rem` | `650` | `var(--radius)` | `1px solid var(--onyx-accent)` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
+| `.bk-btn` | gap-import.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.conn-alt-btn` | app.css | `var(--target-min)` |  | `0 var(--space-3)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.conn-offer-btn` | app.css | `var(--target-min)` |  | `0 var(--space-4)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.conn-submit` | app.css | `48px` |  | `0 var(--space-4)` | `var(--text-md)` | `700` | `var(--radius)` | `0` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
+| `.gap-btn` | gap-account.css | `32px` |  | `4px 12px` | `var(--text-sm, 13px)` |  | `var(--radius, 6px)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.gc-btn` | gap-claim.css | `36px` |  | `0 var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.gorg-btn` | gap-organize.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.guides-action` | pol-public.css | `var(--target-min)` |  | `0 var(--space-5)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.hi-btn` | gap-import.css | `36px` |  | `0 var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.notify-add-btn` | app.css |  |  | `6px var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-call-btn` | app.css, calls-c11.css, calls-c6.css, calls-c4.css | `36px` |  | `0 14px` |  | `650` | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-call-btn-danger` | calls-c6.css |  |  |  |  |  |  |  | `var(--onyx-bad)` | `#fff` |
+| `.onyx-action-star` | gap-commands.css |  |  |  |  | `700` |  |  |  | `var(--onyx-faint)` |
+| `.onyx-button` | app.css, pol-studio.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-call-btn` | app.css, calls-c11.css, calls-c6.css, calls-c4.css, calls-engine.css | `36px` |  | `0 14px` |  | `650` | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-call-btn-danger` | calls-c6.css |  |  |  |  |  |  |  | `var(--onyx-bad)` | `var(--onyx-bad-ink)` |
 | `.onyx-call-btn-primary` | app.css |  |  |  |  |  |  |  | `var(--onyx-text)` | `var(--onyx-bg)` |
-| `.onyx-call-pip-btn` | calls-c6.css | `30px` |  | `0 var(--space-3)` | `var(--text-sm)` |  |  |  |  |  |
+| `.onyx-call-pip-btn` | calls-c6.css, calls-engine.css | `30px` |  | `0 var(--space-3)` | `var(--text-sm)` |  |  |  |  |  |
 | `.onyx-calls-primary` | app.css |  |  | `10px 22px` |  | `650` | `6px` | `0` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
 | `.onyx-convohead-action` | app.css | `28px` |  | `var(--space-1) 10px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-earlier-button` | pol-thread.css | `var(--target-floor)` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--r-pill)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-home-action` | app.css, pol-shell.css | `36px` |  | `6px var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-home-caught-up-button` | app.css | `36px` |  | `6px var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-ident-action` | app.css |  |  | `4px 12px` |  |  | `999px` | `1px solid var(--onyx-line)` | `none` | `inherit` |
-| `.onyx-land-action` | app.css, pol-public.css | `var(--target-min)` |  | `0 var(--space-5)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.onyx-ident-action` | app.css |  |  |  |  |  | `999px` |  | `none` | `inherit` |
+| `.onyx-land-action` | pol-public.css | `var(--target-min)` |  | `0 var(--space-5)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
 | `.onyx-land-sketch-send` | pol-public.css |  | `32px` |  |  |  | `var(--radius)` |  | `var(--onyx-panel-2)` |  |
 | `.onyx-latest-button` | pol-thread.css | `var(--target-floor)` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--r-pill)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-member-action` | app.css, ui-sheets.css |  |  | `4px 12px` | `13px` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-nav-btn` | app.css, pol-shell.css | `44px` |  | `var(--space-2) 2px` | `var(--text-xs)` | `600` | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-member-action` | app.css, gap-people.css, ui-sheets.css |  |  | `4px 12px` | `0.8125rem` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-nav-btn` | app.css, pol-shell.css, rx-shell.css | `44px` |  | `var(--space-2) 2px` | `var(--text-xs)` | `600` | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-newmsg-primary` | app.css |  |  | `6px var(--space-3)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-accent)` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
 | `.onyx-newmsg-secondary` | app.css |  |  | `6px var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-primary-nav` | app.css, pol-shell.css |  |  | `10px 6px` |  |  |  |  | `var(--onyx-panel)` |  |
-| `.onyx-reclaim-submit` | app.css |  |  | `6px 14px` |  | `600` | `6px` | `1px solid var(--onyx-accent)` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
-| `.onyx-room-header-btn` | app.css, pol-shell.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-room-header-btn` | app.css, pol-shell.css, rx-shell.css |  |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` |  |
 | `.onyx-row-action` | pol-thread.css | `0` | `30px` | `0` |  |  | `4px` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-row-actions` | pol-thread.css |  |  | `2px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
-| `.onyx-steward-btn` | app.css |  |  | `4px 12px` | `13px` |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-steward-btn` | app.css |  |  | `4px 12px` | `0.8125rem` |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-steward-btn-danger` | app.css |  |  |  |  |  |  |  | `transparent` | `var(--onyx-bad)` |
 | `.onyx-steward-btn-primary` | app.css |  |  |  |  | `700` |  |  | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
-| `.onyx-tile-btn` | calls-c4.css |  | `28px` | `0` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
+| `.onyx-tile-btn` | calls-c4.css, calls-engine.css |  | `28px` | `0` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
+| `.onyx-watch-btn` | gap-watch.css | `var(--gw-control)` |  | `0 14px` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-watch-btn-danger` | gap-watch.css |  |  |  |  |  |  |  | `transparent` | `var(--onyx-bad)` |
+| `.onyx-watch-btn-primary` | gap-watch.css |  |  |  |  |  |  |  | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
+| `.onyx-watch-text-btn` | gap-watch.css | `var(--gw-control)` |  | `0 var(--space-1)` | `var(--text-sm)` |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.onyxos-button` | pol-public.css | `var(--target-min)` |  | `0 var(--space-5)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.polish-ghost` | polish.css | `var(--target-min)` |  | `var(--space-2) var(--space-4)` |  | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.polish-primary` | polish.css | `var(--target-min)` |  | `var(--space-2) var(--space-4)` |  | `650` | `6px` | `1px solid var(--onyx-accent)` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
 | `.pref-action-card` | app.css, pol-shell.css | `44px` |  | `10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.pref-row-action` | app.css | `24px` |  | `var(--space-1) 10px` | `var(--text-2xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.r-btn` | pol-stats.css, pol-public.css | `var(--target-min)` |  | `0 var(--space-5)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.rset-btn` | roomsettings.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.rset-btn` | roomsettings.css, gap-chanserv.css, gap-people.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.rset-btn-primary` | roomsettings.css |  |  |  |  | `600` |  |  | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
 | `.shell-composer-action-label` | pol-shell.css, pol-thread.css |  |  |  | `var(--text-sm)` | `600` |  |  |  |  |
-| `.shell-topic-action` | app.css |  |  | `2px 10px` | `12px` |  | `999px` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
+| `.shell-topic-action` | app.css, pol-thread.css |  |  |  |  |  | `999px` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
 | `.ts-pv-btn` | pol-studio.css | `20px` |  | `0 var(--space-2)` | `10px` | `650` | `4px` | `1px solid transparent` |  |  |
 
-**button-like by declarations (per-instance class name)** — 76 parallel implementations
+**button-like by declarations (per-instance class name)** — 54 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.a2-link` | account2.css | `var(--target-floor)` |  | `var(--space-1) var(--space-3)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.bk-inspect` | gap-import.css | `28px` |  | `0` | `var(--text-2xs)` |  |  | `0` | `none` | `var(--onyx-dim)` |
 | `.conn-cancel` | app.css | `48px` |  | `0 var(--space-5)` |  | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.conn-link` | app.css | `32px` |  | `0` | `var(--text-sm)` | `600` |  | `0` | `none` | `var(--onyx-dim)` |
+| `.conn-identities-dismiss` | app.css | `48px` |  | `0 var(--space-4)` |  | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.conn-identities-go` | app.css | `48px` |  | `0 var(--space-4)` | `var(--text-md)` | `700` | `var(--radius)` | `0` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
+| `.conn-identity-forget` | app.css | `var(--target-min)` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.conn-link` | app.css, gap-auth.css | `32px` |  | `0` | `var(--text-sm)` | `600` |  | `0` | `none` | `var(--onyx-dim)` |
 | `.dl-copy` | pol-public.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.gap-collapsed-show` | gap-convo.css | `var(--target-floor)` |  | `2px var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.gap-keys-pref` | gap-commands.css | `var(--target-min)` |  | `var(--space-2) var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.gorg-link` | gap-organize.css |  |  | `2px var(--space-1)` | `var(--text-sm)` | `600` | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.gorg-note-add` | gap-organize.css | `32px` |  | `0 var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px dashed var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.gorg-preset-option` | gap-organize.css | `var(--target-min)` |  | `var(--space-2) var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.gorg-reader-exit` | gap-organize.css | `28px` |  | `0 var(--space-3)` | `var(--text-xs)` | `700` | `var(--r-pill)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.gorg-saved-open` | gap-organize.css | `var(--target-min)` |  | `var(--space-2) var(--space-3)` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-text)` |
 | `.guides-copy` | pol-public.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.guides-download` | pol-public.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.guides-reset` | pol-public.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.notify-remove` | app.css |  |  | `var(--space-1) var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-cert-bind` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-cert-remove-go` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-data-download` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-data-history` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-device-publish` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-device-remove-legacy` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-drop-arm` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-drop-cancel` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-drop-go` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-email-save` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-keytrans-refresh` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-logout` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-add` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-cancel` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-refresh` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-remove` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-remove-go` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-rename` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-passkey-save` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-password-save` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-account-persona-claim-go` | pol-shell.css | `28px` |  | `4px 12px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-account-persona-off` | pol-shell.css | `28px` |  | `4px 12px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-account-persona-wear` | pol-shell.css | `28px` |  | `4px 12px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-recovery-clear` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-recovery-copy` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-recovery-done` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-recovery-generate` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-recovery-refresh` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-refresh` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-totp-confirm-go` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-totp-copy` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-totp-disable` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-account-totp-enroll` | app.css |  |  | `4px 12px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-call-join` | app.css, pol-shell.css | `30px` |  | `0 10px` | `13px` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-call-join` | app.css, pol-shell.css, rx-shell.css, calls-engine.css | `32px` |  | `0 10px` | `0.8125rem` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-calls-join-video` | pol-shell.css | `36px` |  | `var(--space-2) var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-calls-join-voice` | pol-shell.css | `36px` |  | `var(--space-2) var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-calls-leave` | pol-shell.css | `36px` |  | `var(--space-2) var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-bad)` |
 | `.onyx-calls-mute` | pol-shell.css | `36px` |  | `var(--space-2) var(--space-4)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-calls-room` | app.css | `36px` |  | `6px 8px` |  |  | `6px` | `0` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-coach-dismiss` | app.css, pol-shell.css |  | `32px` |  |  |  | `var(--radius)` | `0` | `none` | `var(--onyx-faint)` |
+| `.onyx-coach-dismiss` | app.css, pol-shell.css, pol-thread.css |  | `32px` |  |  |  | `var(--radius)` | `0` | `none` | `var(--onyx-faint)` |
 | `.onyx-cq-prompt-x` | calls-c4.css |  | `28px` |  |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-dmsafe-trigger` | app.css, pol-shell.css | `28px` |  | `var(--space-1) 10px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-home-room` | app.css | `44px` |  | `var(--space-2) 10px` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.onyx-jump-latest` | app.css, pol-thread.css |  |  | `var(--space-1) var(--space-3)` | `var(--text-2xs)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-text)` |
 | `.onyx-keychange-accept` | app.css | `32px` |  | `6px var(--space-3)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-accent)` | `var(--onyx-accent)` | `var(--onyx-accent-ink)` |
 | `.onyx-keychange-dismiss` | app.css | `32px` |  | `6px var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-keychange-retry` | app.css |  |  | `0` |  |  |  | `0` | `transparent` | `var(--onyx-text)` |
-| `.onyx-member-message` | app.css, pol-roster.css | `24px` |  | `2px var(--space-2)` | `var(--text-2xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-mlist-find` | pol-roster.css |  | `28px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-mlist-find` | pol-roster.css, rx-shell.css |  | `28px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-reclaim-cancel` | app.css |  |  | `6px 14px` |  |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-reconnect-retry` | app.css |  |  | `2px var(--space-3)` | `var(--text-2xs)` | `600` | `999px` | `1px solid currentColor` | `transparent` | `inherit` |
-| `.onyx-roster-care` | app.css, pol-roster.css |  |  | `2px 10px` | `12px` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-scheduled-cancel` | app.css |  |  | `4px 12px` | `13px` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-thread-indicator` | app.css, pol-thread.css |  |  | `2px 4px` | `12px` |  |  | `none` | `none` | `var(--onyx-dim)` |
-| `.onyx-you-leave` | app.css, ui-sheets.css |  |  | `6px 14px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-you-link` | app.css, ui-sheets.css |  |  | `10px var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.pref-reset` | app.css | `32px` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-roster-more` | gap-people.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-scheduled-cancel` | app.css |  |  | `4px 12px` | `0.8125rem` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-watch-range` | gap-watch.css |  | `var(--gw-control)` |  |  |  |  |  | `transparent` |  |
+| `.onyx-you-leave` | app.css, ui-sheets.css |  |  | `6px 14px` |  |  | `var(--radius)` |  | `transparent` |  |
+| `.pref-reset` | app.css, gap-account.css | `32px` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.room-media-index-filter` | pol-thread.css | `32px` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` | `600` | `4px` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.room-media-index-jump` | pol-thread.css | `var(--target-floor)` |  | `2px var(--space-3)` | `var(--text-xs)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.room-media-index-retry` | pol-thread.css | `var(--target-floor)` |  | `2px var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.shell-msg-channel-link` | app.css |  |  | `0` |  |  |  | `0` | `none` | `var(--onyx-accent)` |
 | `.shell-msg-media-consent` | pol-thread.css | `var(--target-floor)` |  | `var(--space-2) var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px dashed var(--pt-seam)` | `var(--onyx-panel)` | `var(--onyx-text)` |
 | `.shell-msg-preview-consent` | pol-thread.css |  | `72px` | `var(--space-1)` | `var(--text-2xs)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-dim)` |
-| `.shell-ribbon-bell` | app.css, pol-shell.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.shell-topic-follow` | app.css |  |  | `2px 10px` | `12px` |  | `999px` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
+| `.shell-ribbon-bell` | app.css, pol-shell.css, rx-shell.css |  |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` |  |
 | `.status-quiet-link` | pol-stats.css | `var(--target-min)` |  | `var(--space-2) var(--space-4)` |  | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.ts-token-revert` | pol-studio.css | `var(--target-floor)` |  | `0 var(--space-2)` | `var(--text-xs)` | `600` | `var(--radius)` | `1px solid color-mix(in oklab, var(--onyx` | `transparent` | `var(--onyx-warn)` |
 | `.ts-token-swatch` | pol-studio.css |  | `32px` | `2px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
 
-**icon button** — 10 parallel implementations
+**icon button** — 12 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.jump-to-date-close` | app.css, ui-sheets.css |  |  | `var(--space-1) 10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
-| `.onyx-cbtn` | app.css, calls-c11.css, calls-c6.css, calls-c4.css, calls-engine.css |  | `44px` |  | `11px` | `650` | `6px` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-cbtn-leave` | app.css, calls-engine.css |  |  |  |  |  |  |  | `var(--onyx-bad)` | `#fff` |
-| `.onyx-dmsafe-close` | app.css | `28px` |  |  | `var(--text-lg)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-mlist-close` | pol-roster.css |  | `28px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-moddesk-close` | app.css | `32px` |  |  | `var(--text-lg)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-scheduled-close` | app.css |  |  |  | `18px` |  |  | `none` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-you-close` | app.css, ui-sheets.css | `var(--sheet-close)` | `var(--sheet-close)` | `0` | `0` |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.cs-join-close` | gap-chanserv.css |  | `32px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.gorg-icon-btn` | gap-organize.css |  | `32px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-faint)` |
+| `.jump-to-date-close` | app.css, ui-sheets.css |  |  |  |  |  | `var(--radius)` |  | `none` | `var(--onyx-dim)` |
+| `.onyx-cbtn` | app.css, calls-c11.css, calls-c6.css, calls-c4.css, calls-engine.css |  | `48px` |  | `0.6875rem` | `650` | `6px` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-cbtn-leave` | app.css, calls-engine.css |  |  |  |  |  |  |  | `var(--onyx-bad)` | `var(--onyx-bad-ink)` |
+| `.onyx-dmsafe-close` | app.css |  |  |  | `var(--text-lg)` |  | `var(--radius)` |  | `transparent` | `var(--onyx-dim)` |
+| `.onyx-mlist-close` | pol-roster.css, rx-shell.css |  | `28px` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-moddesk-close` | app.css, ui-sheets.css |  |  |  |  |  | `var(--radius)` |  | `transparent` | `var(--onyx-dim)` |
+| `.onyx-scheduled-close` | app.css |  |  |  |  |  |  | `none` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-watch-icon-btn` | gap-watch.css |  | `var(--gw-control)` | `0` |  |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
 | `.pins-close` | pol-thread.css |  | `32px` | `0` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.room-media-index-close` | pol-thread.css |  | `32px` | `0` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 
@@ -4197,14 +4924,14 @@ Dynamic prefixes honoured: `guides-page-- (src/View/Guides.elm:247)`, `onyx-home
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.ap-chip` | pol-studio.css | `var(--target-min)` |  | `0 var(--space-4)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-dim)` |
 | `.ap-theme-chip` | pol-studio.css | `var(--target-min)` |  | `0 var(--space-4)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-dim)` |
-| `.guest-claim-chip` | app.css, pol-shell.css |  |  | `var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.guest-claim-chip` | pol-shell.css |  |  | `var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
 | `.onyx-account-chip` | pol-shell.css | `28px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--r-pill)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-dmsafe-chip` | app.css, pol-shell.css |  |  | `2px var(--space-2)` | `var(--text-2xs)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` |  | `var(--onyx-text)` |
+| `.onyx-dmsafe-chip` | app.css, pol-shell.css |  |  | `2px var(--space-2)` | `var(--text-2xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` |  |  |
 | `.onyx-dmsafe-chip-plain` | app.css |  |  |  |  | `500` |  |  |  | `var(--onyx-dim)` |
-| `.onyx-sec-chip` | app.css, calls-engine.css |  | `28px` | `0 9px` | `12px` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-voice-chip` | app.css, pol-shell.css |  | `30px` | `0 10px` | `13px` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-voice-chip-status` | app.css, pol-shell.css |  |  |  |  | `500` |  |  |  | `var(--onyx-dim)` |
-| `.topic-chip` | app.css, pol-thread.css | `var(--target-floor)` |  | `2px 10px` | `var(--text-sm)` |  | `999px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-sec-chip` | app.css, calls-engine.css |  | `28px` |  | `0.75rem` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-voice-chip` | app.css, pol-shell.css, calls-engine.css |  | `32px` | `0 10px` | `0.8125rem` | `650` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-voice-chip-status` | app.css, pol-shell.css, rx-shell.css, calls-engine.css |  |  |  |  | `500` |  |  |  | `var(--onyx-dim)` |
+| `.topic-chip` | app.css, pol-thread.css | `var(--target-floor)` |  |  | `var(--text-sm)` |  | `999px` |  | `transparent` |  |
 | `.ts-theme-chip` | pol-studio.css | `var(--target-min)` |  | `var(--space-1) var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-dim)` |
 | `.ts-theme-chip-del` | pol-studio.css |  | `28px` | `0` | `var(--text-lg)` |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-faint)` |
 
@@ -4212,168 +4939,212 @@ Dynamic prefixes honoured: `guides-page-- (src/View/Guides.elm:247)`, `onyx-home
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.boost-pill` | app.css, pol-thread.css |  |  | `2px var(--space-2)` | `var(--text-2xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.chb-pill` | app.css, ui-sheets.css |  |  | `0 6px` | `11px` |  | `6px` | `1px solid var(--onyx-accent)` |  | `var(--onyx-accent)` |
+| `.boost-pill` | app.css, pol-thread.css |  |  |  |  |  | `var(--radius)` |  |  | `var(--onyx-text)` |
+| `.chb-pill` | app.css, ui-sheets.css |  |  | `0 6px` | `0.6875rem` |  | `6px` | `1px solid var(--onyx-accent)` |  |  |
 
-**input / textarea / field** — 16 parallel implementations
+**input / textarea / field** — 28 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.a2-input` | account2.css | `var(--target-floor)` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.a2-input` | account2.css, ui-sheets.css | `var(--target-floor)` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.a2-textarea` | account2.css | `var(--target-floor)` |  | `var(--space-1) var(--space-2)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.chb-field-desc` | app.css |  |  |  | `12px` |  |  |  |  | `var(--onyx-dim)` |
-| `.chb-field-error` | app.css |  |  |  | `12px` |  |  |  |  | `var(--onyx-warn)` |
-| `.conn-input` | app.css | `48px` |  | `0 14px` | `1rem` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.ap-input` | gap-oper.css | `96px` |  | `var(--space-2) var(--space-3)` | `16px` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.bk-select-input` | gap-import.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.chb-field-desc` | app.css |  |  |  | `0.75rem` |  |  |  |  | `var(--onyx-dim)` |
+| `.chb-field-error` | app.css |  |  |  | `0.75rem` |  |  |  |  | `var(--onyx-warn)` |
+| `.conn-input` | app.css | `48px` |  | `0 14px` | `max(1rem, 16px)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.gorg-field-label` | gap-organize.css |  |  |  | `var(--text-xs)` | `600` |  |  |  | `var(--onyx-dim)` |
+| `.gorg-input` | gap-organize.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.gorg-note-input` | gap-organize.css |  |  | `var(--space-2) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.gorg-textarea` | gap-organize.css |  |  | `var(--space-2) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.gs-join-field` | gap-shell.css | `32px` |  | `0 2px 0 var(--space-2)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.gs-join-input` | gap-shell.css |  | `30px` | `0` | `var(--text-sm)` |  |  | `0` | `transparent` | `var(--onyx-text)` |
+| `.hi-dest-input` | gap-import.css | `36px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--gi-field)` | `var(--onyx-text)` |
 | `.notify-input` | app.css |  |  | `6px 10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.onyx-account-field` | app.css |  |  | `4px 8px` | `13px` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-account-field-label` | app.css |  |  |  | `12px` |  |  |  |  | `var(--onyx-dim)` |
+| `.onyx-account-field` | app.css, gap-account.css |  |  | `4px 8px` | `0.8125rem` |  | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-account-field-label` | app.css |  |  |  | `0.75rem` |  |  |  |  | `var(--onyx-dim)` |
 | `.onyx-land-sketch-input` | pol-public.css |  |  |  | `var(--text-md)` |  |  |  |  | `var(--onyx-faint)` |
-| `.onyx-rail-filter-input` | app.css, pol-shell.css |  |  | `5px var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.onyx-roster-filter-input` | app.css, pol-roster.css | `32px` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.onyx-steward-field` | app.css |  |  | `6px 10px` | `13px` |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.rset-input` | roomsettings.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.onyx-rail-filter-input` | app.css, pol-shell.css, rx-shell.css |  |  |  | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.onyx-roster-filter-input` | app.css, pol-roster.css, rx-shell.css |  |  |  | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` |  | `var(--onyx-text)` |
+| `.onyx-steward-field` | app.css |  |  | `6px 10px` | `0.8125rem` |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.onyx-watch-input` | gap-watch.css | `var(--target-min)` |  | `0 var(--space-3)` | `16px` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.pref-input` | gap-appearance.css | `36px` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.rset-input` | roomsettings.css, gap-chanserv.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
 | `.rset-textarea` | roomsettings.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
-| `.shell-topic-create-input` | app.css |  |  | `2px 8px` | `12px` |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.shell-topic-create-input` | app.css, pol-thread.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.ts-save-input` | pol-studio.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.um-input` | gap-usermodes.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 
-**select** — 3 parallel implementations
+**select** — 7 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.a2-select` | account2.css | `var(--target-floor)` |  | `var(--space-1) var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-vs-select` | calls-c8.css | `40px` |  | `0 var(--space-2)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.rset-select` | roomsettings.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.bk-select-label` | gap-import.css |  |  |  | `var(--text-xs)` | `650` |  |  |  | `var(--onyx-faint)` |
+| `.conn-identity-select` | app.css | `56px` |  | `var(--space-2) var(--space-3)` |  |  |  | `0` | `transparent` | `var(--onyx-text)` |
+| `.gorg-select` | gap-organize.css | `36px` |  | `0 var(--space-2)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.onyx-vs-select` | calls-c8.css, calls-engine.css | `40px` |  | `0 var(--space-2)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-watch-select` | gap-watch.css | `var(--gw-control)` |  | `0 var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
+| `.rset-select` | roomsettings.css, gap-chanserv.css | `36px` |  | `var(--space-1) var(--space-2)` | `var(--text-md)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` | `var(--onyx-text)` |
 
-**badge / count / dot** — 38 parallel implementations
+**badge / count / dot** — 47 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.a2-dot` | account2.css |  | `8px` |  |  |  | `50%` | `1px solid var(--onyx-dim)` | `transparent` |  |
 | `.ap-tag` | pol-studio.css |  |  |  | `var(--text-md)` | `700` |  |  |  | `var(--onyx-text)` |
-| `.chb-count` | app.css, ui-sheets.css |  |  |  | `12px` |  |  |  |  | `var(--onyx-dim)` |
+| `.cs-slow-dot` | gap-chanserv.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
+| `.gap-badge` | gap-account.css |  |  | `0 6px` | `var(--text-2xs, 11px)` | `600` | `999px` | `1px solid var(--onyx-line)` |  | `var(--onyx-dim)` |
+| `.gorg-folder-count` | gap-organize.css |  | `18px` | `0 5px` | `0.6875rem` | `700` | `var(--r-pill)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.gorg-folder-row-count` | gap-organize.css |  |  |  |  | `400` |  |  |  | `var(--onyx-faint)` |
+| `.gorg-note-count` | gap-organize.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-faint)` |
+| `.gorg-preset-dot` | gap-organize.css |  | `16px` |  |  |  | `50%` | `2px solid var(--onyx-dim)` |  |  |
+| `.gorg-tucked-count` | gap-organize.css |  |  |  | `var(--text-xs)` |  |  |  |  | `var(--onyx-faint)` |
+| `.gs-activity-conn-dot` | gap-shell.css |  | `7px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
+| `.gs-door-dot` | gap-shell.css |  | `7px` |  |  |  | `50%` |  | `var(--onyx-warn)` |  |
 | `.notify-count` | app.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-dim)` |
-| `.onyx-call-badge` | app.css |  | `24px` |  |  |  | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
-| `.onyx-call-pip` | app.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
-| `.onyx-call-pip-card` | calls-c11.css, calls-c6.css |  |  |  |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-text)` |
-| `.onyx-call-pip-corner` | calls-c6.css |  | `var(--target-floor)` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-call-pip-live` | calls-c6.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-dim)` |
+| `.oc-tag` | gap-oper.css |  |  | `0 var(--space-2)` | `var(--oc-fs-meta)` |  | `999px` | `1px solid var(--onyx-line)` |  | `var(--onyx-dim)` |
+| `.onyx-call-badge` | app.css, calls-engine.css |  | `24px` |  |  |  | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
+| `.onyx-call-pip` | app.css, calls-engine.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
+| `.onyx-call-pip-card` | calls-c11.css, calls-c6.css, calls-engine.css |  |  |  |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-text)` |
+| `.onyx-call-pip-corner` | calls-c6.css, calls-engine.css |  | `var(--target-floor)` | `0` |  |  | `var(--radius)` | `0` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-call-pip-live` | calls-c6.css, calls-engine.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-dim)` |
 | `.onyx-call-pip-more` | calls-c6.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-dim)` |
 | `.onyx-calls-pip` | app.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
 | `.onyx-dot` | app.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
 | `.onyx-earlier-count` | pol-thread.css |  |  | `0 6px` | `var(--text-2xs)` |  | `var(--r-pill)` |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-home-count` | app.css |  |  |  |  | `600` |  |  |  | `var(--onyx-text)` |
-| `.onyx-home-unread` | app.css |  |  | `1px 6px` | `var(--text-2xs)` | `600` | `var(--radius)` |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-ident-badge` | pol-shell.css |  |  | `0 6px` | `var(--text-xs)` | `600` | `var(--r-pill)` |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
+| `.onyx-home-unread` | app.css |  |  | `1px 6px` | `var(--text-2xs)` | `600` | `var(--radius)` |  | `var(--onyx-panel-2)` |  |
+| `.onyx-ident-badge` | pol-shell.css, rx-shell.css |  |  | `0 6px` | `var(--text-xs)` | `600` | `var(--r-pill)` |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
 | `.onyx-member-dot` | app.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-text)` |  |
-| `.onyx-member-presence-dot` | app.css, pol-roster.css |  | `8px` |  |  |  | `50%` | `2px solid var(--onyx-panel)` | `var(--onyx-dim)` |  |
+| `.onyx-member-presence-dot` | app.css, pol-roster.css |  |  |  |  |  | `50%` | `2px solid var(--onyx-panel)` |  |  |
 | `.onyx-mlist-group-count` | pol-roster.css |  |  |  |  | `600` |  |  |  | `var(--onyx-faint)` |
-| `.onyx-nav-badge` | pol-shell.css |  | `16px` | `0 4px` | `10px` | `700` | `var(--r-pill)` |  | `var(--onyx-text)` | `var(--onyx-bg)` |
-| `.onyx-profile-badge` | app.css, pol-shell.css |  |  | `2px 8px` | `12px` |  | `6px` |  | `var(--onyx-panel)` |  |
-| `.onyx-rail-unread` | app.css, pol-shell.css |  |  | `1px 5px` | `var(--text-xs)` | `700` | `var(--radius)` |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-nav-badge` | pol-shell.css, rx-shell.css |  | `16px` | `0 4px` | `0.625rem` | `700` | `var(--r-pill)` |  | `var(--onyx-text)` | `var(--onyx-bg)` |
+| `.onyx-profile-badge` | app.css, pol-shell.css |  |  | `2px 8px` | `0.75rem` |  | `6px` |  | `var(--onyx-panel)` |  |
+| `.onyx-rail-unread` | app.css, pol-shell.css |  |  |  | `var(--text-xs)` | `700` |  |  |  |  |
 | `.onyx-reconnect-dot` | app.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-warn)` |  |
-| `.onyx-roster-count` | app.css, pol-roster.css |  |  |  | `var(--text-xs)` |  |  |  |  | `var(--onyx-dim)` |
 | `.onyx-thread-count` | pol-thread.css |  |  |  | `var(--text-xs)` | `650` |  |  |  | `var(--onyx-dim)` |
-| `.onyx-tile-tag` | calls-c4.css |  | `24px` | `0 var(--space-2)` | `var(--text-2xs)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
+| `.onyx-tile-tag` | calls-c4.css, calls-engine.css |  | `24px` | `0 var(--space-2)` | `var(--text-2xs)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
 | `.onyx-unread-divider-label` | pol-thread.css |  |  |  | `var(--text-xs)` | `700` |  |  |  |  |
-| `.onyx-voice-count` | app.css |  |  |  | `12px` | `600` |  |  |  | `var(--onyx-dim)` |
+| `.onyx-voice-count` | app.css |  |  |  | `0.75rem` | `600` |  |  |  | `var(--onyx-dim)` |
 | `.onyx-you-conn-dot` | pol-shell.css |  | `7px` |  |  |  | `50%` |  | `var(--onyx-dim)` |  |
 | `.pref-count` | app.css |  |  |  | `var(--text-2xs)` |  |  |  |  | `var(--onyx-dim)` |
 | `.provenance-badge` | app.css | `1.35rem` |  | `0.12rem 0.45rem` | `0.62rem` | `800` | `var(--r-pill)` | `1px solid color-mix(in oklab, var(--lapi` | `color-mix(in oklab, var(--lapis) 10%, tr` | `var(--lapis-bright)` |
 | `.rset-bridge-dot` | roomsettings.css |  | `8px` |  |  |  | `50%` |  | `var(--onyx-dim)` |  |
 | `.shell-composer-tools-kbd` | polish.css |  |  | `0 var(--space-1)` | `var(--text-2xs)` |  | `4px` | `1px solid var(--onyx-line)` |  |  |
-| `.shell-ribbon-badge` | app.css, pol-shell.css |  |  | `0 var(--space-1)` | `var(--text-xs)` | `700` | `var(--r-pill)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.shell-ribbon-badge` | app.css, pol-shell.css |  |  | `0 var(--space-1)` |  | `700` | `var(--r-pill)` |  |  |  |
 | `.shell-topic-card-unread` | app.css |  |  |  |  | `700` |  |  |  | `var(--onyx-text)` |
 | `.ts-badge` | pol-studio.css |  |  | `1px var(--space-2)` | `var(--text-xs)` | `650` | `var(--r-pill)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.ts-pv-badge` | pol-studio.css |  |  | `0 4px` | `9px` | `650` | `4px` | `1px solid transparent` |  |  |
 | `.ts-token-badge` | pol-studio.css |  |  |  | `var(--text-2xs)` | `400` |  |  |  | `var(--onyx-dim)` |
+| `.um-tag` | gap-usermodes.css |  |  | `1px 6px` | `var(--text-2xs)` |  | `999px` | `1px solid var(--onyx-line)` |  | `var(--onyx-dim)` |
 
-**card** — 15 parallel implementations
+**card** — 19 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.ab-who-card` | pol-public.css |  |  | `var(--space-5)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
-| `.chb-card` | app.css, pol-shell.css, ui-sheets.css |  |  | `8px 10px` |  |  | `8px` | `1px solid var(--onyx-line)` |  |  |
-| `.conn-card` | app.css |  |  | `36px 40px 32px` |  |  | `10px` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.bk-card` | gap-import.css |  |  | `var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-text)` |
 | `.data-card` | pol-stats.css, pol-public.css |  |  | `var(--space-6)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
 | `.dl-card` | pol-public.css |  |  | `var(--space-5)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.gap-drop-card` | gap-convo.css |  |  | `var(--space-7) var(--space-5)` |  |  | `var(--radius)` | `2px dashed var(--onyx-accent)` | `var(--onyx-panel)` |  |
+| `.gc-card` | gap-claim.css |  |  | `var(--space-3) var(--space-4)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
 | `.guides-card` | pol-public.css |  |  | `var(--space-6)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
-| `.onyx-member-card` | app.css, pol-shell.css, ui-sheets.css |  |  | `12px` |  |  | `8px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
-| `.onyx-tile` | calls-c11.css, calls-c4.css |  |  |  |  |  | `var(--radius)` | `2px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
-| `.onyx-tile-nick` | calls-c4.css |  | `24px` | `0 var(--space-2)` | `var(--text-xs)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
+| `.oc-card` | gap-oper.css |  |  | `var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.onyx-tile` | calls-c11.css, calls-c4.css, calls-engine.css |  |  |  |  |  | `var(--radius)` | `2px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
+| `.onyx-tile-nick` | calls-c4.css, calls-engine.css |  | `24px` | `0 var(--space-2)` | `var(--text-sm)` | `650` | `var(--radius)` | `1px solid var(--onyx-line)` | `color-mix(in srgb, var(--onyx-bg) 78%, t` | `var(--onyx-text)` |
 | `.onyx-tile-video` | calls-c11.css, calls-c4.css |  | `100%` |  |  |  |  |  | `var(--onyx-bg)` |  |
 | `.roadmap-card` | pol-stats.css |  |  | `var(--space-6) var(--space-4)` |  |  | `0` |  |  |  |
-| `.shell-topic-card` | app.css |  |  |  |  |  | `8px` | `1px solid var(--onyx-line)` |  |  |
-| `.shell-topic-card-follow` | app.css |  |  | `2px 10px` | `12px` |  | `999px` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
-| `.shell-topic-card-main` | app.css |  |  | `8px 10px` |  |  |  | `none` | `none` | `inherit` |
-| `.shell-topic-card-meta` | app.css |  |  |  | `12px` |  |  |  |  | `var(--onyx-dim)` |
+| `.shell-topic-card` | pol-thread.css |  |  |  |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.shell-topic-card-author` | app.css, pol-thread.css |  |  |  |  | `650` |  |  |  | `var(--onyx-text)` |
+| `.shell-topic-card-follow` | app.css, pol-thread.css |  |  | `2px 10px` | `0.75rem` |  | `999px` | `1px solid var(--onyx-line)` | `none` | `var(--onyx-dim)` |
+| `.shell-topic-card-main` | app.css, pol-thread.css |  |  | `8px 10px` |  |  |  | `none` | `none` | `inherit` |
+| `.shell-topic-card-meta` | app.css, pol-thread.css |  |  |  | `var(--text-sm)` |  |  |  |  | `var(--onyx-dim)` |
+| `.shell-topic-card-preview` | app.css, pol-thread.css |  |  |  | `var(--text-sm)` |  |  |  |  | `var(--onyx-dim)` |
+| `.shell-topic-card-title` | app.css, pol-thread.css |  |  |  | `var(--text-md)` | `700` |  |  |  |  |
 
-**tabs** — 2 parallel implementations
+**tabs** — 5 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.onyx-land-tabs` | app.css, pol-public.css |  |  | `3px` |  |  | `calc(var(--radius) + 3px)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
-| `.pref-category-tab` | app.css, ui-sheets.css | `44px` |  | `6px 10px` |  |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-text)` |
+| `.cs-tab` | gap-chanserv.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `4px` | `1px solid transparent` | `transparent` | `var(--onyx-dim)` |
+| `.cs-tabs` | gap-chanserv.css |  |  | `2px` |  |  | `var(--radius)` |  | `var(--onyx-panel-2)` |  |
+| `.oc-tabs` | gap-oper.css |  |  | `var(--space-2) calc(var(--sheet-pad, 20p` |  |  |  |  | `var(--onyx-panel)` |  |
+| `.onyx-land-tabs` | pol-public.css |  |  | `3px` |  |  | `calc(var(--radius) + 3px)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.pref-category-tab` | app.css, ui-sheets.css | `44px` |  |  |  |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-text)` |
 
-**segmented control** — 6 parallel implementations
+**segmented control** — 10 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `.ap-choice-toggle` | pol-studio.css | `52px` |  | `var(--space-3) var(--space-4)` | `var(--text-md)` | `600` | `0` | `0` | `transparent` | `var(--onyx-text)` |
 | `.ap-choice-toggles` | pol-studio.css |  |  |  |  |  | `10px` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
 | `.conn-strength-seg` | app.css |  | `4px` |  |  |  | `2px` |  | `var(--onyx-line)` |  |
-| `.onyx-react-choice` | app.css, pol-thread.css |  |  | `4px` | `18px` |  | `6px` | `none` | `transparent` |  |
+| `.gorg-choice` | gap-organize.css | `var(--target-min)` |  | `0 var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-text)` |
+| `.gorg-choice-meta` | gap-organize.css |  |  |  | `var(--text-xs)` |  |  |  |  | `var(--onyx-faint)` |
+| `.gs-seg` | gap-shell.css |  |  | `2px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.gs-seg-count` | gap-shell.css |  |  |  | `var(--text-2xs)` | `400` |  |  |  | `var(--onyx-faint)` |
+| `.hi-seg` | gap-import.css | `40px` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-react-choice` | app.css, pol-thread.css |  |  |  |  |  | `6px` | `none` | `transparent` |  |
 | `.pref-segment` | app.css | `32px` |  | `var(--space-1) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.room-notify-seg` | app.css, pol-shell.css |  |  | `2px 10px` | `var(--text-2xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 
-**switch / toggle** — 20 parallel implementations
+**switch / toggle** — 25 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
+| `.conn-switch` | app.css |  | `26px` |  |  |  | `13px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
+| `.conn-toggle-description` | app.css |  |  |  | `var(--text-sm)` |  |  |  |  | `var(--onyx-dim)` |
+| `.conn-toggle-label` | app.css |  |  |  | `var(--text-md)` | `650` |  |  |  |  |
+| `.gap-keys-pref-switch` | gap-commands.css |  | `20px` |  |  |  | `999px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.gorg-switch` | gap-organize.css | `0` | `24px` | `0` |  |  | `var(--r-pill)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
+| `.gorg-switch-knob` | gap-organize.css |  | `16px` |  |  |  | `50%` |  | `var(--onyx-dim)` |  |
 | `.guides-step-toggle` | pol-public.css | `32px` |  | `0 var(--space-3)` | `var(--text-sm)` | `600` | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
-| `.notify-toggle` | app.css |  |  | `var(--space-1) var(--space-3)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-account-push-toggle` | pol-shell.css | `28px` |  | `4px 12px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
-| `.onyx-audience-toggle` | app.css, pol-thread.css |  |  | `2px 8px` | `11px` | `600` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-audience-toggle` | app.css, pol-thread.css |  |  | `2px 8px` | `0.6875rem` | `600` | `6px` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-edited-toggle` | pol-thread.css |  |  | `2px 3px` | `var(--text-xs)` |  | `3px` |  |  | `var(--onyx-dim)` |
 | `.onyx-media-toggle-open` | pol-shell.css |  |  |  |  | `650` |  |  | `var(--onyx-panel-2)` |  |
-| `.onyx-moddesk-toggle` | app.css, pol-shell.css | `24px` |  | `var(--space-1) 10px` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
+| `.onyx-moddesk-toggle` | app.css, pol-shell.css, rx-shell.css |  |  |  | `var(--text-sm)` |  | `var(--radius)` |  | `transparent` | `var(--onyx-text)` |
 | `.onyx-notify-toggle` | app.css |  |  | `var(--space-1) 10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-text)` |
 | `.onyx-notify-toggle-open` | app.css |  |  |  |  |  |  |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-pins-toggle-open` | pol-shell.css |  |  |  |  | `650` |  |  | `var(--onyx-panel-2)` |  |
-| `.onyx-room-topic-toggle` | pol-shell.css, roomsettings.css | `var(--target-floor)` |  | `0 var(--space-2)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
+| `.onyx-room-topic-toggle` | pol-shell.css, roomsettings.css, rx-shell.css | `var(--target-floor)` |  | `0 var(--space-2)` | `var(--text-xs)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-search-toggle-open` | app.css, pol-shell.css |  |  |  |  |  |  |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
 | `.onyx-topic-tools-toggle` | pol-thread.css | `28px` |  | `0 var(--space-2) 0 var(--space-1)` | `var(--text-sm)` | `600` | `var(--radius)` |  |  | `var(--onyx-dim)` |
-| `.pref-switch` | app.css |  | `20px` |  |  |  | `999px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
-| `.pref-toggle` | app.css | `44px` |  | `var(--space-2) 10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.pref-toggle-title` | app.css |  |  |  | `var(--text-sm)` | `600` |  |  |  |  |
-| `.rset-toggle` | roomsettings.css | `40px` |  | `var(--space-2)` |  |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-text)` |
+| `.pref-switch` | app.css, gap-account.css, gap-usermodes.css, ui-sheets.css |  |  |  |  |  | `999px` |  | `var(--onyx-bg)` |  |
+| `.pref-toggle` | app.css, gap-account.css | `44px` |  | `var(--space-2) 10px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.rset-toggle` | roomsettings.css, ui-sheets.css | `40px` |  | `var(--space-2)` |  |  | `var(--radius)` | `1px solid transparent` | `transparent` | `var(--onyx-text)` |
 | `.rset-toggle-label` | roomsettings.css |  |  |  | `var(--text-md)` | `600` |  |  |  |  |
-| `.rset-toggle-thumb` | roomsettings.css |  | `12px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
-| `.rset-toggle-track` | roomsettings.css |  | `18px` |  |  |  | `999px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.rset-toggle-thumb` | roomsettings.css, ui-sheets.css |  | `12px` |  |  |  | `50%` |  | `var(--onyx-faint)` |  |
+| `.rset-toggle-track` | roomsettings.css, ui-sheets.css |  | `18px` |  |  |  | `999px` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
 | `.ts-scheme-toggle` | pol-studio.css |  |  | `2px` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
 
-**toast / banner / notice** — 4 parallel implementations
+**toast / banner / notice** — 5 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.onyx-join-banner` | app.css |  |  | `12px 14px` |  |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` |  |
-| `.onyx-join-banner-hide` | app.css |  | `28px` |  |  |  | `6px` | `0` | `transparent` | `var(--onyx-dim)` |
-| `.onyx-steward-notice` | pol-shell.css |  |  | `var(--space-2) var(--space-3)` | `var(--text-sm)` |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.gp-notice` | gap-people.css |  |  |  | `var(--text-xs)` |  |  |  |  | `var(--onyx-dim)` |
+| `.gp-notices` | gap-people.css |  |  | `var(--space-2)` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-bg)` |  |
+| `.onyx-join-banner` | app.css, calls-engine.css |  |  | `var(--space-2) var(--space-2) var(--spac` |  |  | `6px` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` |  |
+| `.onyx-join-banner-hide` | app.css, calls-engine.css |  | `32px` |  |  |  | `6px` | `0` | `transparent` | `var(--onyx-dim)` |
 | `.onyx-toast` | app.css, ui-sheets.css | `48px` |  | `var(--space-2) var(--space-2) var(--spac` |  |  | `var(--radius)` | `1px solid var(--onyx-line)` | `var(--onyx-panel)` | `var(--onyx-text)` |
 
-**avatar / facepile** — 13 parallel implementations
+**avatar / facepile** — 15 parallel implementations
 
 | class | files | min-height | height | padding | font-size | font-weight | border-radius | border | background | color |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `.onyx-avatar` | app.css, pol-shell.css, pol-thread.css, pol-roster.css |  |  |  |  | `800` | `50%` |  | `var(--onyx-avatar-bg)` | `var(--onyx-avatar-fg)` |
-| `.onyx-call-avatar` | app.css, calls-c6.css |  |  |  |  | `700` | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-call-avatar-lg` | app.css, calls-c4.css |  | `72px` |  | `24px` |  |  |  |  |  |
-| `.onyx-call-avatar-md` | app.css |  | `40px` |  | `15px` |  |  |  |  |  |
-| `.onyx-call-avatar-sm` | app.css |  | `24px` |  | `11px` |  |  |  |  |  |
-| `.onyx-face` | pol-shell.css |  | `28px` |  | `10px` | `700` | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
-| `.onyx-facepile-face` | app.css |  |  | `0` |  |  | `50%` | `none` | `none` |  |
+| `.conn-identity-avatar` | app.css |  | `32px` |  | `var(--text-sm)` | `750` | `50%` |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.gap-skeleton-avatar` | gap-convo.css |  | `2rem` |  |  |  | `50%` |  | `var(--onyx-panel-2)` |  |
+| `.onyx-avatar` | app.css, gap-appearance.css, pol-shell.css, pol-thread.css, pol-roster.css, rx-shell.css |  |  |  |  | `800` | `50%` |  | `var(--onyx-avatar-bg)` | `var(--onyx-avatar-fg)` |
+| `.onyx-call-avatar` | app.css, calls-c6.css, calls-engine.css |  |  |  |  | `700` | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-text)` |
+| `.onyx-call-avatar-lg` | app.css, calls-c4.css, calls-engine.css |  | `64px` |  | `1.375rem` |  |  |  |  |  |
+| `.onyx-call-avatar-md` | app.css |  | `40px` |  | `0.9375rem` |  |  |  |  |  |
+| `.onyx-call-avatar-sm` | app.css |  | `24px` |  | `0.6875rem` |  |  |  |  |  |
+| `.onyx-face` | pol-shell.css |  | `28px` |  | `0.625rem` | `700` | `50%` | `1px solid var(--onyx-line)` | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
+| `.onyx-facepile-face` | app.css, rx-shell.css |  |  | `0` |  |  | `50%` | `none` | `none` |  |
 | `.onyx-facepile-overflow` | app.css |  | `2rem` | `0 8px` | `0.72rem` | `600` | `999px` |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
 | `.onyx-home-avatar` | app.css |  | `28px` |  | `var(--text-sm)` | `600` | `var(--radius)` |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
 | `.onyx-land-sketch-avatar` | pol-public.css |  | `36px` |  | `var(--text-sm)` | `750` | `50%` |  | `var(--onyx-panel-2)` | `var(--onyx-text)` |
-| `.onyx-rail-avatar` | app.css, pol-shell.css, account2.css |  | `24px` |  | `var(--text-2xs)` | `700` | `var(--radius)` |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
+| `.onyx-rail-avatar` | app.css, pol-shell.css, account2.css, rx-shell.css |  |  |  |  | `700` |  |  | `var(--onyx-panel-2)` | `var(--onyx-dim)` |
 | `.onyx-room-intro-face` | pol-thread.css |  | `4rem` |  |  |  | `50%` | `0` | `transparent` | `var(--onyx-text)` |
-| `.onyx-you-avatar` | pol-shell.css |  | `52px` |  | `16px` |  |  |  |  | `var(--onyx-text)` |
+| `.onyx-you-avatar` | pol-shell.css |  | `52px` |  | `1rem` |  |  |  |  | `var(--onyx-text)` |
 <!-- END GENERATED STYLE INVENTORY -->

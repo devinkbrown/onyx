@@ -40,12 +40,10 @@
 /* ── 2. Header: title, count, folded filter ─────────────────────────── */
 
 .onyx-roster .onyx-roster-head {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   justify-content: flex-start;
-  min-height: 32px;
   padding: 0 var(--space-1) 0 var(--space-2);
 }
 
@@ -91,7 +89,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: var(--space-1) var(--space-1) var(--space-2);
   padding: 0 var(--space-2);
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
@@ -102,7 +99,6 @@
 .onyx-roster .onyx-roster-filter-input {
   flex: 1;
   min-width: 0;
-  min-height: 30px;
   padding: 0;
   background: transparent;
   border: 0;
@@ -350,7 +346,7 @@
     border: 0;
     border-left: 1px solid var(--onyx-line);
     box-shadow: var(--elev-3);
-    animation: onyx-sheet-in var(--dur-base) var(--ease);
+    animation: ui-sheet-pop var(--dur-base) var(--ease);
   }
   .onyx-roster::backdrop { background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-roster:popover-open .onyx-mlist-close { display: grid; }
@@ -420,7 +416,7 @@
 .onyx-roster .onyx-roster-head {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: calc(var(--z-raised) + 2);
   flex: none;
   min-height: var(--rs-head);
   background: var(--onyx-panel);
@@ -429,7 +425,7 @@
 .onyx-roster .onyx-roster-filter {
   position: sticky;
   top: var(--rs-head);
-  z-index: 3;
+  z-index: calc(var(--z-raised) + 2);
   flex: none;
   box-sizing: border-box;
   height: 34px;
@@ -442,7 +438,7 @@
 .onyx-roster .onyx-mlist-group-head {
   position: sticky;
   top: calc(var(--rs-head) + var(--rs-filter));
-  z-index: 2;
+  z-index: calc(var(--z-raised) + 1);
   background: var(--onyx-panel);
 }
 .onyx-roster .onyx-mlist-groups { gap: var(--space-2); }

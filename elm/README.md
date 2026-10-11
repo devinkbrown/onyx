@@ -25,7 +25,7 @@ the client parity map, the server feature map, the design direction and the call
 - `ports.js` (+ `historyImport.js`, `media/*.ts` for the Cadence voice engine and the
   background renderer) — the JS side: WebSocket, IndexedDB vault, WebCrypto, WebAuthn,
   WebRTC, uploads, notifications, service worker registration.
-- `app.css` + `css/*.css` — styles (tokens first, then per-surface sheets in `index.html` link order).
+- `app.css` + `css/*.css` — styles (tokens first, then per-surface sheets; the `index.html` link order IS the cascade order and is documented there).
 - `tests/` — elm-test vectors; `*.smoke.mjs` — jsdom smoke suites over the real bundle and
   `ports.js`; `tools/` — build (`build.sh`), screenshots (`screens*.mjs`), CSS coverage,
   contrast audit, style map, call end-to-end.
@@ -77,6 +77,12 @@ node tools/css-coverage.mjs                                    # 0 unstyled, 0 u
 bash tools/build.sh                                            # → dist-elm/ (never touches out/)
 node tools/screens.mjs --vp all --out <dir>                    # real-Chromium aspect-ratio matrix
 ```
+
+CSS changes also pass the pixel-regression harness (`tools/css-regress.mjs`: shoot the
+~600-shot matrix before and after, then `diff` — a step is accepted only when every diff is zero
+or an intentional, listed fix) and the CSS guard smokes (`cssGuard.smoke.mjs`:
+no `:not(#_)`, one `--z-*` ladder, one 768px seam, one focus-ring token). `tools/css-inert.mjs`
+asks Chromium which declarations are never used. See `design/STYLE_MAP.md` §5.4.
 
 `elm.json` pins must stay complete (direct + indirect + test-indirect):
 an incomplete closure fails with `ERROR IN DEPENDENCIES` when the

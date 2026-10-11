@@ -15,7 +15,7 @@
 
 /* ---------- C6 · ring dialogs ---------- */
 
-.onyx-sheet-layer.onyx-call-ring-layer { z-index: 80; }
+.onyx-sheet-layer.onyx-call-ring-layer { z-index: var(--z-dialog); }
 
 .onyx-sheet.onyx-call-ring {
   width: min(380px, 100%);
@@ -61,7 +61,7 @@
   margin-top: var(--space-5);
 }
 
-.onyx-call-ring-actions .onyx-call-btn { flex: 1 1 0; min-height: var(--target-min); }
+.onyx-call-ring-actions .onyx-call-btn { flex: 1 1 0; }
 .onyx-call-ring-actions .onyx-call-btn:disabled { opacity: 0.6; cursor: default; }
 
 .onyx-call-ring-meta {
@@ -76,25 +76,18 @@
 .onyx-call-ring .onyx-call-btn:focus-visible,
 .onyx-call-pip-card button:focus-visible,
 .onyx-call-pip-card:focus-visible,
-.onyx-call-lost .onyx-call-btn:focus-visible,
-.onyx-call-dm-start:focus-visible {
+.onyx-call-lost .onyx-call-btn:focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset-out);
 }
 
 /* ---------- C6 · DM call entry (room header More menu) ---------- */
-
-.onyx-room-more-menu > button.onyx-call-dm-start {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 
 /* ---------- C7 · mini voice view ---------- */
 
 .onyx-call-pip-card {
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-call);
   width: min(300px, calc(100vw - 24px));
   box-sizing: border-box;
   color: var(--onyx-text);
@@ -181,7 +174,7 @@
 .onyx-call-pip-faces .onyx-call-avatar[data-speaking="true"] { outline: 2px solid var(--onyx-accent); outline-offset: 0; }
 .onyx-call-pip-more { margin-left: var(--space-1); font-size: var(--text-2xs); color: var(--onyx-dim); }
 
-.onyx-call-pip-btn { min-height: 30px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+.onyx-call-pip-btn { padding: 0 var(--space-3); font-size: var(--text-sm); }
 .onyx-call-pip-btn .onyx-ci { width: 16px; height: 16px; }
 .onyx-call-pip-btn:disabled { opacity: 0.5; cursor: default; }
 .onyx-call-pip-card[data-reconnecting="true"] .onyx-call-pip-faces { opacity: 0.55; }
@@ -194,22 +187,16 @@
 /* 375px: a 160px card docked top-right under the header — the bottom
    is the composer's (spec §2.8 / §2.18). Corner cycling is a desktop
    affordance; the card's buttons drop to 28px. */
-@media (max-width: 767px) {
+@media (max-width: 767.98px) {
   .onyx-call-pip-card,
   .onyx-call-pip-card[data-corner] {
-    top: calc(var(--mobile-nav-h) + var(--space-2));
-    right: var(--space-3);
     bottom: auto;
     left: auto;
-    width: 160px;
   }
 
   .onyx-call-pip-corner { display: none; }
   .onyx-call-pip-handle { padding: var(--space-1) var(--space-2); cursor: default; }
   .onyx-call-pip-live { display: none; }
-  .onyx-call-pip-body { padding: var(--space-2); gap: var(--space-1); }
-  .onyx-call-pip-faces { flex-basis: 100%; }
-  .onyx-call-pip-btn { min-height: 28px; padding: 0 var(--space-2); font-size: var(--text-2xs); }
   .onyx-call-pip-cap {
     position: absolute;
     width: 1px;
@@ -240,7 +227,7 @@
   .onyx-call-ring-who-text { justify-items: center; }
   .onyx-call-ring-meta { justify-content: center; }
   .onyx-call-ring-actions { margin-top: var(--space-8); gap: var(--space-4); }
-  .onyx-call-ring-actions .onyx-call-btn { min-height: 52px; font-size: var(--text-md); }
+  .onyx-call-ring-actions .onyx-call-btn { font-size: var(--text-md); }
 }
 
 /* ---------- C10 · reconnecting ---------- */
@@ -265,8 +252,8 @@
 .onyx-call-stage[data-reconnecting="true"] .onyx-call-people { opacity: 0.55; }
 .onyx-call-stage[data-reconnecting="true"] .onyx-cbtn:disabled { opacity: 0.45; cursor: default; }
 
-@media (max-width: 767px) {
-  .onyx-call-lost .onyx-call-btn { width: 100%; min-height: var(--target-min); }
+@media (max-width: 767.98px) {
+  .onyx-call-lost .onyx-call-btn { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -104,7 +104,7 @@ button.gap-help-row:focus-visible { outline: var(--focus-ring); outline-offset: 
 }
 
 /* Narrow sheets (phones, fold, split panes): usage over description. */
-@container (max-width: 520px) {
+@container (max-width: 520.98px) {
   .gap-help-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .gap-help-alias { display: block; margin-left: 0; }
 }

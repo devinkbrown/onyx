@@ -104,7 +104,7 @@
   font-weight: 650;
 }
 
-.onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-floor); padding: 0 var(--space-2); font-size: var(--text-sm); }
+.onyx-stage-hand-row .onyx-call-btn { padding: 0 var(--space-2); font-size: var(--text-sm); }
 
 .onyx-stage-hands-open { display: none; }
 
@@ -155,7 +155,7 @@
 :where(.onyx-call-stage, .onyx-call-bar, .onyx-call-more, .onyx-call-sheet, .onyx-stage-panel, .onyx-header-voice,
   .onyx-join-banner) :where(button):focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: var(--focus-offset-out);
 }
 
 /* Reduced motion (spec §3.4): the in-app "still" scene setting stops the
@@ -186,6 +186,6 @@
   .onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-min); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 640.98px) {
   .onyx-cbtn.onyx-cbtn-wide { width: 48px; min-width: 48px; padding: 0; }
 }

@@ -27,6 +27,35 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const dist = resolve(repo, opt('--dist', 'elm/dist-elm'));
 const out = resolve(repo, opt('--out', '/tmp/onyx-screens'));
 const only = opt('--only', '') ? opt('--only', '').split(',') : null;
+// Determinism switches for pixel-regression runs (elm/tools/css-regress.mjs):
+//   --freeze ISO   fixed instant for the fake server's timestamps AND the
+//                  page's Date (every page load starts at it, then ticks at
+//                  real speed), so relative times and clock labels never
+//                  move between runs
+//   --dpr N        override deviceScaleFactor for every viewport
+//   --full         fullPage screenshots (long public pages)
+//   --stable       animations: 'disabled' on every screenshot
+//   --port N       pin the fake server's port
+//   --vp wWxH      ad-hoc viewport, e.g. w768x900 (DPR 1, mouse)
+const freezeAt = opt('--freeze', '') ? Date.parse(opt('--freeze', '')) : null;
+if (opt('--freeze', '') && Number.isNaN(freezeAt)) { console.error('--freeze needs an ISO date'); process.exit(2); }
+const dprOverride = opt('--dpr', '') ? Number(opt('--dpr', '')) : null;
+const fullPage = args.includes('--full');
+const stable = args.includes('--stable');
+const clockMs = () => (freezeAt ?? Date.now());
+// Scenario files build their fixtures from Date.now() too (message times,
+// "N minutes ago"): freeze this process's clock as well, or every run bakes
+// the wall-clock minute into the shots.
+if (freezeAt) {
+  const RealDate = Date;
+  globalThis.Date = class FrozenDate extends RealDate {
+    constructor(...a) { if (a.length === 0) super(freezeAt); else super(...a); }
+    static now() { return freezeAt; }
+  };
+}
+// --port N pins the fake server's port (it shows up in invite links, so a
+// random port makes those shots differ run to run).
+const portArg = opt('--port', '') ? Number(opt('--port', '')) : 0;
 mkdirSync(out, { recursive: true });
 if (!existsSync(join(dist, 'index.html'))) {
   console.error(`no build at ${dist} — run: bash elm/tools/build.sh`);
@@ -47,10 +76,10 @@ const chromePath = process.env.CHROMIUM || ['/usr/bin/chromium-browser', '/usr/b
 
 // ---- fake IRC server -------------------------------------------------------
 const NET = 'onyx.test';
-const now = () => new Date().toISOString();
+const now = () => new Date(clockMs()).toISOString();
 const MEMBERS = ['~mara', '@jun', '@iris', '+theo', 'sol', 'ash', 'nova', 'kip', 'rue', 'lark'];
 const seed = (nick, room) => {
-  const t = (m) => new Date(Date.now() - m * 60000).toISOString();
+  const t = (m) => new Date(clockMs() - m * 60000).toISOString();
   return [
     `@time=${t(190)};msgid=s1 :mara!m@onyx.test PRIVMSG ${room} :Morning all — the new build is up on staging 🎉`,
     `@time=${t(188)};msgid=s2 :jun!j@onyx.test PRIVMSG ${room} :Nice. Release notes are at https://eshmaki.me/roadmap if anyone wants a look`,
@@ -153,7 +182,10 @@ server.on('upgrade', (req, sock) => {
   sock.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${wsAccept(req.headers['sec-websocket-key'])}\r\n\r\n`);
   ircSession(sock);
 });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+await new Promise((r) => {
+  server.once('error', () => server.listen(0, '127.0.0.1', r)); // pinned port busy: fall back to any
+  server.listen(portArg, '127.0.0.1', r);
+});
 const base = `http://127.0.0.1:${server.address().port}`;
 const pin = `ws=${encodeURIComponent(base.replace('http', 'ws') + '/ws')}`;
 
@@ -231,6 +263,11 @@ const MATRIX = {
   ultrawide: { viewport: { width: 2560, height: 1080 }, deviceScaleFactor: 1 },
   'ultrawide-qhd': { viewport: { width: 3440, height: 1440 }, deviceScaleFactor: 1 },
 };
+// The 767/768/769 seam (mobile/desktop breakpoint) and other ad-hoc sizes:
+// `--vp w768x900` = 768x900 mouse viewport at DPR 1.
+for (const m of (opt('--vp', '') || '').matchAll(/\bw(\d+)x(\d+)\b/g)) {
+  MATRIX[m[0]] = { viewport: { width: Number(m[1]), height: Number(m[2]) }, deviceScaleFactor: 1 };
+}
 const vpArg = opt('--vp', 'phone,desktop');
 const vpNames = vpArg === 'all' ? Object.keys(MATRIX) : vpArg.split(',');
 const VIEWPORTS = {};
@@ -245,7 +282,21 @@ const problems = [];
 for (const [name, run] of Object.entries(SCENARIOS)) {
   if (only && !only.includes(name)) continue;
   for (const [vp, ctxOpts] of Object.entries(VIEWPORTS)) {
-    const ctx = await browser.newContext({ ...ctxOpts, colorScheme: 'dark', reducedMotion: 'reduce' });
+    const ctx = await browser.newContext({ ...ctxOpts, ...(dprOverride ? { deviceScaleFactor: dprOverride } : {}), colorScheme: 'dark', reducedMotion: 'reduce', timezoneId: freezeAt ? 'UTC' : undefined, locale: freezeAt ? 'en-US' : undefined });
+    // Not ctx.clock: Playwright's fake timers/rAF stall Elm's render loop. A
+    // Date shim that starts every page load at the frozen instant and then
+    // ticks at real speed keeps timers, rAF and animation untouched.
+    if (freezeAt) {
+      await ctx.addInitScript((base) => {
+        const RealDate = Date; const offset = base - RealDate.now();
+        class FakeDate extends RealDate {
+          constructor(...a) { if (a.length === 0) super(RealDate.now() + offset); else super(...a); }
+          static now() { return RealDate.now() + offset; }
+        }
+        // eslint-disable-next-line no-global-assign
+        Date = FakeDate; // (global binding; window.Date alone misses `Date.now()` captured via globalThis)
+      }, freezeAt);
+    }
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push(`${name}/${vp}: pageerror ${e.message}`));
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`${name}/${vp}: console ${m.text()}`); });
@@ -254,7 +305,7 @@ for (const [name, run] of Object.entries(SCENARIOS)) {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       if (overflow > 1) problems.push(`${name}/${vp}: horizontal overflow ${overflow}px`);
       const file = `${name}--${vp}.png`;
-      await page.screenshot({ path: join(out, file), fullPage: vp === 'phone' ? false : false });
+      await page.screenshot({ path: join(out, file), fullPage, ...(stable ? { animations: 'disabled', caret: 'hide' } : {}) });
       shots.push({ name, vp, file });
     } catch (e) {
       problems.push(`${name}/${vp}: FAILED ${e.message.split('\n')[0]}`);

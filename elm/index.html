@@ -13,65 +13,80 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
 <title>Onyx</title>
+<!-- Stylesheets. THE ORDER OF THESE LINKS IS THE CASCADE ORDER: at equal
+     specificity a later file wins, and several rules rely on that (the
+     newer slices re-cut v1 rules from app.css). Do not reorder, add or drop a
+     file without re-shooting the pixel matrix (elm/tools/css-regress.mjs).
+     tools/elm-overlay.mjs copies every stylesheet link below in this
+     order and requires css/gap-appearance.css; elm/tools/build.sh requires
+     app.css; both hash the file names.
+      1  app.css                  tokens (:root: palette, space, type, motion, radius, elevation, z-index ladder), the zero-specificity button floor, v1 component rules
+      2  css/gap-appearance.css   theme -> shell token bridge, text size, density, width, high contrast, scene veil (must stay right after app.css)
+      3  css/pol-stats.css        /stats /status /roadmap
+      4  css/pol-studio.css       /appearance + Theme Studio
+      5  css/pol-shell.css        shell polish: rail, room header, inbox, nav, topbar
+      6  css/pol-thread.css       transcript, composer, search, pins, media, lightbox
+      7  css/pol-roster.css       member list
+      8  css/pol-public.css       public pages: landing, about, download, guides, invite
+      9  css/calls-c8.css         calls: reactions, voice settings
+     10  css/calls-c11.css        calls: stage mode
+     11  css/polish.css           composer tools, time scrubber, first-run, update strip
+     12  css/account2.css         account: passkeys / reclaim
+     13  css/roomsettings.css     room settings sheet
+     14  css/calls-c6.css         calls: ring dialogs, mini view, reconnecting
+     15  css/calls-c4.css         calls: tiles, grid, camera / share
+     16  css/gap-convo.css        conversation gaps: drafts, paste, drop, edit
+     17  css/gap-account.css      account gaps: protect, history, names
+     18  css/gap-oper.css         operator desk
+     19  css/rx-shell.css         responsive shell (every aspect ratio): frame, rail, nav, header
+     20  css/gap-chanserv.css     channel services
+     21  css/gap-import.css       history import / export
+     22  css/gap-people.css       people: cards, desks, stewardship
+     23  css/gap-organize.css     folders, saved messages, notes, quiet hours, reader mode
+     24  css/gap-usermodes.css    user modes, privacy, blocks, offline memos
+     25  css/gap-commands.css     palette, shortcuts, help
+     26  css/gap-watch.css        watch parties
+     27  css/gap-shell.css        shell gaps: activity, join errors, MOTD, offline
+     28  css/gap-auth.css         sign-in links, 2FA, passkeys
+     29  css/gap-claim.css        guest -> account history claim
+     30  css/ui-sheets.css        THE sheet system: primitive, head, widths, bottom sheets, every overlay body
+     31  css/pol-ios.css          device geometry: document feel, --vvh frame height, safe areas, keyboard
+     32  css/calls-engine.css     calls: control bar, container queries, phone call screen (last)
+     Rules of thumb: tokens and the button floor live in app.css; a sheet or
+     overlay body belongs in ui-sheets.css; a component size rule is one
+     class (the floor has zero specificity); z-index only from the z-index
+     ladder in app.css; breakpoints only from the vocabulary documented in app.css. -->
 <link rel="stylesheet" href="app.css">
-<!-- v3/gap-appearance: theme → shell token bridge, text size, density,
-     width, high contrast, scene veil. Right after app.css. -->
 <link rel="stylesheet" href="css/gap-appearance.css">
 <link rel="stylesheet" href="css/pol-stats.css">
-
 <link rel="stylesheet" href="css/pol-studio.css">
-
 <link rel="stylesheet" href="css/pol-shell.css">
-
 <link rel="stylesheet" href="css/pol-thread.css">
 <link rel="stylesheet" href="css/pol-roster.css">
-
 <link rel="stylesheet" href="css/pol-public.css">
 <link rel="stylesheet" href="css/calls-c8.css">
 <link rel="stylesheet" href="css/calls-c11.css">
-
 <link rel="stylesheet" href="css/polish.css">
 <link rel="stylesheet" href="css/account2.css">
-
 <link rel="stylesheet" href="css/roomsettings.css">
-
 <link rel="stylesheet" href="css/calls-c6.css">
-
 <link rel="stylesheet" href="css/calls-c4.css">
-
 <link rel="stylesheet" href="css/gap-convo.css">
 <link rel="stylesheet" href="css/gap-account.css">
 <link rel="stylesheet" href="css/gap-oper.css">
-
 <link rel="stylesheet" href="css/rx-shell.css">
-
 <link rel="stylesheet" href="css/gap-chanserv.css">
-
 <link rel="stylesheet" href="css/gap-import.css">
-
 <link rel="stylesheet" href="css/gap-people.css">
-
-<!-- v3/gap-organize: folders, saved messages, notes, quiet hours, reader mode -->
 <link rel="stylesheet" href="css/gap-organize.css">
-
 <link rel="stylesheet" href="css/gap-usermodes.css">
-
 <link rel="stylesheet" href="css/gap-commands.css">
-
 <link rel="stylesheet" href="css/gap-watch.css">
-
 <link rel="stylesheet" href="css/gap-shell.css">
-
-<!-- v3/gap-auth -->
 <link rel="stylesheet" href="css/gap-auth.css">
-
-<!-- v3/gap-claim -->
 <link rel="stylesheet" href="css/gap-claim.css">
-
 <link rel="stylesheet" href="css/ui-sheets.css">
-
 <link rel="stylesheet" href="css/pol-ios.css">
-
 <link rel="stylesheet" href="css/calls-engine.css">
 </head>
 <body>

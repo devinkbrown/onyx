@@ -62,7 +62,7 @@
 
 /* Counts, then the date range: one line when there is room, two when not. */
 .gc-facts-range::before { content: " \00B7  "; white-space: pre; }
-@container gc (max-width: 520px) {
+@container gc (max-width: 520.98px) {
   .gc-facts-counts,
   .gc-facts-range { display: block; }
   .gc-facts-range::before { content: none; }
@@ -117,10 +117,8 @@
   text-align: center;
   cursor: pointer;
 }
-/* The shell sets a 24px floor on every button with a (0,3,0) selector
-   (app.css `.onyx-frame :where(button):not(…):not(…)`), so the real
-   heights are stated at a higher specificity: 36px, and 44px for a finger. */
-.gc-card .gc-actions button.gc-btn { min-height: 36px; }
+/* 36px, and 44px for a finger (the 24px frame floor has zero specificity). */
+.gc-btn { min-height: 36px; }
 .gc-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
 .gc-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .gc-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; }
@@ -131,7 +129,7 @@
 }
 .gc-btn--primary:hover:not(:disabled) { border-color: var(--onyx-accent); filter: brightness(1.08); }
 .gc-btn--primary:disabled { border-color: var(--onyx-line); background: var(--onyx-panel-2); color: var(--onyx-faint); }
-.gc-btn--primary:focus-visible { outline-color: var(--onyx-text); outline-offset: 2px; }
+.gc-btn--primary:focus-visible { outline-color: var(--onyx-text); outline-offset: var(--focus-offset-out); }
 .gc-btn--quiet { border-color: transparent; background: transparent; color: var(--onyx-dim); }
 .gc-btn--quiet:hover:not(:disabled) { border-color: var(--onyx-bad); color: var(--onyx-bad); }
 .gc-btn--danger { border-color: var(--onyx-bad); color: var(--onyx-bad); }
@@ -175,7 +173,7 @@
 /* ---------- touch: 44px targets at any width ---------- */
 
 @media (hover: none), (pointer: coarse) {
-  .gc-card .gc-actions button.gc-btn { min-height: var(--target-min); }
+  .gc-btn { min-height: var(--target-min); }
 }
 
 /* Short viewports (phone landscape): tighter card, no kicker. */

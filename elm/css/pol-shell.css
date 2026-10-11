@@ -44,16 +44,6 @@
    Rows: glyph tile | kicker line (kind · context · when · read) over the
    message | dismiss. Unread rows carry a hairline left rule. */
 
-.notif-center__head { padding-bottom: var(--space-2); border-bottom: 1px solid var(--onyx-line); }
-.notif-center__title { flex: 1; font-size: var(--text-md); font-weight: 650; }
-.notif-center .notif-center__close {
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0;
-  font-size: var(--text-lg);
-  line-height: 1;
-  color: var(--onyx-dim);
-}
 .notif-center .notif-center__action:disabled { opacity: 0.5; cursor: default; }
 
 .notif-center__filters {
@@ -100,13 +90,10 @@
 
 .notif-center .notif-center__open {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
   gap: var(--space-3);
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: var(--space-2);
   text-align: left;
   background: transparent;
   border: 0;
@@ -159,13 +146,9 @@
 .notif-center__row[data-unread="false"] .notif-center__text { color: var(--onyx-dim); }
 
 .notif-center .notif-center__dismiss {
-  min-width: 32px;
-  min-height: 32px;
   margin-top: var(--space-1);
-  padding: 0;
   font-size: var(--text-lg);
   line-height: 1;
-  color: var(--onyx-faint);
   border-color: transparent;
 }
 .notif-center .notif-center__dismiss:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
@@ -279,8 +262,6 @@
 }
 .moderation-ban-form > button,
 .moderation-cockpit__form > button { align-self: flex-start; }
-.onyx-moddesk-form--danger { border-top-color: color-mix(in oklab, var(--onyx-bad) 55%, var(--onyx-line)); }
-.onyx-moddesk-form--danger label:first-of-type { color: var(--onyx-bad); }
 
 /* ---------- Room browser + formation ---------------------------------- */
 
@@ -300,8 +281,6 @@
   border-color: var(--onyx-accent);
 }
 .chb .chb-submit:hover { border-color: var(--onyx-text); }
-.chb .chb-close { background: transparent; border: 0; color: var(--onyx-dim); min-width: 32px; }
-.chb .chb-sort-btn[aria-pressed="true"] { color: var(--onyx-text); border-color: var(--onyx-dim); }
 
 /* ---------- Calls hub + call chrome hooks ----------------------------- */
 
@@ -411,7 +390,6 @@
 .onyx-profile-pop:not(.onyx-sheet-layer) {
   position: fixed;
   inset: 0;
-  z-index: 60;
   display: grid;
   place-items: center;
   padding: var(--space-4);
@@ -423,12 +401,9 @@
 }
 .onyx-profile-pop:not(.onyx-sheet-layer) > .onyx-member-card {
   position: relative;
-  width: min(360px, 100%);
-  max-width: 100%;
   max-height: calc(100dvh - 2 * var(--space-4));
   margin: 0;
   overflow-y: auto;
-  background: var(--onyx-panel);
   box-shadow: var(--elev-3);
 }
 .onyx-member-copy { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
@@ -449,16 +424,6 @@
 
 /* ---------- Stewardship / switcher / shortcuts ------------------------ */
 
-.onyx-steward-notices { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
-.onyx-steward-notice {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  background: var(--onyx-bg);
-  border: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
-  overflow-wrap: anywhere;
-}
 .onyx-palette-launcher-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .shortcuts-overlay__group { min-width: 0; }
 
@@ -1041,7 +1006,7 @@
 
 /* You hub (the sheet family styles the list): the face beside the
    identity, and the connection line the phone bar no longer shows. */
-.onyx-sheet.onyx-you > .onyx-you-head { display: flex; align-items: flex-start; gap: 14px; padding-right: calc(var(--sheet-pad, 16px) + 36px); }
+.onyx-sheet.onyx-you > .onyx-you-head { padding-right: calc(var(--sheet-pad, 16px) + 36px); }
 .onyx-you-conn { display: flex; align-items: center; gap: 6px; margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--onyx-dim); }
 .onyx-you-conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--onyx-dim); }
 .onyx-you-conn[data-state="connecting"] { color: var(--onyx-warn); }
@@ -1279,21 +1244,21 @@
   .onyx-frame .onyx-room-header-sub { padding: 0 var(--space-3) var(--space-1); font-size: var(--text-xs); }
 
   /* More → a bottom action sheet over a dim scrim. */
-  .onyx-frame .onyx-room-more-scrim { z-index: 58; background: color-mix(in srgb, #000 55%, transparent); }
+  .onyx-frame .onyx-room-more-scrim { z-index: var(--z-menu-sheet); background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-frame .onyx-room-more-menu {
     position: fixed;
     top: auto;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 59;
+    z-index: calc(var(--z-menu-sheet) + 1);
     min-width: 0;
     max-height: 85dvh;
     padding: 0 var(--space-2) calc(var(--space-3) + var(--safe-bottom, 0px));
     border-width: 1px 0 0;
     border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
     box-shadow: var(--elev-3);
-    animation: onyx-sheet-in var(--dur-fast) var(--ease);
+    animation: ui-sheet-pop var(--dur-fast) var(--ease);
   }
   .onyx-room-more-head {
     display: flex;

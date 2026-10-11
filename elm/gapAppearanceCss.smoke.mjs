@@ -119,6 +119,8 @@ test("no shell font-size is left in px (Text size reaches everything)", () => {
 test("the scene layer never takes a hit and is dropped under reduced transparency", () => {
   const scene = block(gap, "#onyx-scene {");
   assert.match(scene, /pointer-events:\s*none/);
-  assert.match(scene, /z-index:\s*-1/);
+  // behind the shell: the --z-under rung of the ladder in app.css is -1
+  assert.match(scene, /z-index:\s*var\(--z-under\)/);
+  assert.match(read("app.css"), /--z-under:\s*-1;/);
   assert.match(gap, /:root\[data-reduce-transparency='true'\] #onyx-scene \{ display: none; \}/);
 });
