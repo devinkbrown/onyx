@@ -100,9 +100,13 @@ declare const __ONYX_VIDEO_WORKER__: string;
   // the `cameraSupported` capability).
   const VIDEO_ENABLED = false;
   const startCamera = adapter.startCamera.bind(adapter);
+  const joinVoice = adapter.joinVoice.bind(adapter);
   Object.assign(adapter, {
     videoEnabled: VIDEO_ENABLED,
     startCamera: (channel?: string) => (VIDEO_ENABLED ? startCamera(channel) : Promise.resolve(false)),
+    // "Join with video" must not reach engine.joinVideo either.
+    joinVoice: (channel: string, opts?: { video?: boolean }) =>
+      joinVoice(channel, { ...(opts || {}), video: VIDEO_ENABLED && !!(opts && opts.video) }),
   });
 
   window.OnyxVoiceEngine = adapter;
