@@ -2,7 +2,7 @@ module View.Chanserv exposing
     ( composerSlowWaiting
     , joinPromptActions
     , joinPromptCard
-    , knockRequests
+    , knockAction
     , listsSection
     , moreRules
     , muteButton
@@ -29,7 +29,7 @@ and a Mute action on the member card.
 
 -}
 
-import App exposing (Model, Msg(..))
+import App exposing (Model, Msg(..), NotificationType(..))
 import Chanserv exposing (Registration(..), Tone(..))
 import Dict
 import Html exposing (Html, button, details, div, form, h3, h4, input, label, li, option, p, section, select, span, strong, summary, text, textarea, ul)
@@ -1187,7 +1187,7 @@ promptActions model channel code =
 
         retry =
             if code == "480" || code == "471" then
-                [ button [ type_ "button", class "rset-btn", attribute "data-testid" "join-prompt-retry", disabled offline, onClick (BrowserEnter channel) ] [ text "Try again" ] ]
+                [ button [ type_ "button", class "rset-btn", attribute "data-testid" "join-prompt-retry", disabled offline, onClick (BrowserEnterRoom channel) ] [ text "Try again" ] ]
 
             else
                 []
@@ -1203,58 +1203,46 @@ promptActions model channel code =
 -- KNOCKS (hosts' inbox)
 
 
-knockRequests : Model -> Html Msg
-knockRequests model =
-    case model.chanserv.knocks of
-        [] ->
-            text ""
+{-| The Invite action on an inbox row that says "X asks to join #c"
+(710). The row itself is an ordinary notification; this adds the one
+thing a host needs, and says "Invited" once it has been used.
+-}
+knockAction : Model -> App.InboxNotification -> Html Msg
+knockAction model note =
+    case ( note.kind, note.from, note.channel ) of
+        ( NotifSystem, Just nick, Just channel ) ->
+            case
+                List.filter
+                    (\k -> String.toLower k.nick == String.toLower nick && String.toLower k.channel == String.toLower channel)
+                    model.chanserv.knocks
+            of
+                k :: _ ->
+                    div [ class "cs-knock-actions" ]
+                        [ if k.invited then
+                            span [ class "rset-hint", attribute "role" "status", attribute "data-testid" "knock-invited" ] [ text "Invited" ]
 
-        knocks ->
-            section [ class "cs-knocks", attribute "aria-labelledby" "cs-knocks-title", attribute "data-testid" "knock-requests" ]
-                [ h3 [ class "cs-knocks-title", id "cs-knocks-title" ] [ text "Join requests" ]
-                , ul [ class "cs-knock-list" ]
-                    (List.map
-                        (\k ->
-                            li [ class "cs-knock", attribute "data-testid" "knock-request" ]
-                                [ div [ class "cs-knock-copy" ]
-                                    [ p [ class "cs-knock-line" ]
-                                        [ strong [] [ text k.nick ]
-                                        , text " asks to join "
-                                        , strong [] [ text k.channel ]
-                                        ]
-                                    , if String.isEmpty k.reason || k.reason == "wants to join" then
-                                        text ""
-
-                                      else
-                                        p [ class "rset-hint cs-knock-note" ] [ text ("“" ++ k.reason ++ "”") ]
-                                    ]
-                                , div [ class "cs-knock-actions" ]
-                                    [ if k.invited then
-                                        span [ class "rset-hint", attribute "role" "status" ] [ text "Invited" ]
-
-                                      else
-                                        button
-                                            [ type_ "button"
-                                            , class "rset-btn rset-btn-primary"
-                                            , attribute "data-testid" "knock-invite"
-                                            , attribute "aria-label" ("Invite " ++ k.nick ++ " to " ++ k.channel)
-                                            , disabled (not (live model) || not (App.isChannelOp model k.channel))
-                                            , onClick (cs (Chanserv.InviteKnock k.id))
-                                            ]
-                                            [ text "Invite" ]
-                                    , button
-                                        [ type_ "button"
-                                        , class "rset-btn"
-                                        , attribute "aria-label" ("Dismiss the request from " ++ k.nick)
-                                        , onClick (cs (Chanserv.DismissKnock k.id))
-                                        ]
-                                        [ text "Dismiss" ]
-                                    ]
+                          else
+                            button
+                                [ type_ "button"
+                                , class "rset-btn rset-btn-primary"
+                                , attribute "data-testid" "knock-invite"
+                                , attribute "aria-label" ("Invite " ++ k.nick ++ " to " ++ k.channel)
+                                , disabled (not (live model) || not (App.isChannelOp model k.channel))
+                                , onClick (cs (Chanserv.InviteKnock k.id))
                                 ]
-                        )
-                        knocks
-                    )
-                ]
+                                [ text "Invite" ]
+                        , if k.reason == "" || k.reason == "wants to join" then
+                            text ""
+
+                          else
+                            span [ class "rset-hint cs-knock-note" ] [ text ("\u{201C}" ++ k.reason ++ "\u{201D}") ]
+                        ]
+
+                [] ->
+                    text ""
+
+        _ ->
+            text ""
 
 
 

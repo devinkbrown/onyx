@@ -26,6 +26,7 @@ import Json.Decode as Decode
 import Outbox
 import Polish
 import Schedule
+import View.Chanserv -- v3/gap-chanserv
 import View.Icon exposing (icon)
 import View.Polish
 
@@ -80,6 +81,7 @@ composer model =
         -- wide: [attach] [field] [emoji] [tools] [send]. The tools tray
         -- (View.Polish) also carries Attach, so phones drop the
         -- separate attach button.
+        , View.Chanserv.slowNote model -- v3/gap-chanserv
         , div [ class "onyx-composer-bar" ]
             [ attachButton model
             , if App.composerAudienceOffered model then
@@ -137,7 +139,7 @@ composer model =
                 [ type_ "submit"
                 , class "onyx-composer-send"
                 , classList [ ( "onyx-composer-send--ready", ready && canSaveOrSend && hasDraft ) ]
-                , disabled (not ready || not canSaveOrSend)
+                , disabled (not ready || not canSaveOrSend || (editingNow == Nothing && View.Chanserv.composerSlowWaiting model)) -- v3/gap-chanserv
                 , attribute "aria-label"
                     (if editingNow /= Nothing then
                         "Save edit"

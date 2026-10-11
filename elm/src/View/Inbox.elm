@@ -21,6 +21,7 @@ import Html exposing (Html, button, div, li, p, span, text, ul)
 import Html.Attributes exposing (attribute, class, disabled)
 import Html.Events exposing (onClick)
 import Set
+import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
 
 
@@ -237,6 +238,7 @@ inboxRow model note =
             , onClick (NotificationDismissed note.id)
             ]
             [ span [ class "onyx-sheet-x", attribute "aria-hidden" "true" ] [] ]
+        , View.Chanserv.knockAction model note -- v3/gap-chanserv
         ]
 
 
