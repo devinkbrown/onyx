@@ -248,7 +248,7 @@
   width: 272px;
   margin: 0;
   overflow-y: auto;
-  animation: onyx-sheet-in var(--dur-fast) var(--ease);
+  animation: ui-sheet-pop var(--dur-fast) var(--ease);
 }
 .onyx-railmenu-layer[data-anchored="true"] .onyx-railmenu-close { display: none; }
 .onyx-railmenu-layer[data-anchored="true"] .onyx-railmenu-head { padding-top: var(--space-1); }

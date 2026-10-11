@@ -72,6 +72,80 @@
   mask: var(--onyx-i-close) center / contain no-repeat;
 }
 
+/* 0. The sheet primitive (View.Sheet): layer, backdrop, panel, head. The rest
+   of this file (and every sheet body) builds on it. Moved here from app.css. */
+
+.onyx-sheet-layer {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+}
+
+.onyx-sheet-layer[data-placement="side"] {
+  place-items: stretch end;
+}
+
+.onyx-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+/* Zero-specificity base so each sheet's own class keeps its width,
+   padding and layout. */
+:where(.onyx-sheet) {
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--pad-panel);
+  color: var(--onyx-text);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+:where(.onyx-sheet-layer[data-placement="side"]) > :where(.onyx-sheet) {
+  width: min(420px, 100%);
+}
+
+.onyx-sheet-layer > .onyx-sheet {
+  position: relative;
+  margin: 0;
+}
+
+.onyx-sheet:focus:not(:focus-visible) { outline: none; }
+
+.onyx-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.onyx-sheet-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: var(--leading-snug);
+}
+
+.onyx-sheet-close {
+  font: inherit;
+}
+
+.onyx-sheet-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+
+/* Under 768px a sheet is as wide as its layer (its own width / max-width
+   rule narrows it again); the bottom-sheet look itself is section 4. */
+@media (max-width: 767.98px) {
+  .onyx-sheet-layer > .onyx-sheet,
+  .onyx-sheet-layer[data-placement="side"] > .onyx-sheet { width: 100%; }
+}
+
 /* ===================================================================
    1. Layer, veil, panel (desktop first)
    =================================================================== */
@@ -1120,8 +1194,8 @@
 
 /* ===================================================================
    14. Medium (600–767px: fold-open, small tablets, split screen).
-   app.css turns every sheet into a full-width bottom sheet under
-   768px; here overlays stay centred dialogs, right-hand side panels
+   every sheet is a full-width layer under 768px (section 0); here
+   overlays stay centred dialogs, right-hand side panels
    and the top-right inbox popover, each at its own width.
    =================================================================== */
 
@@ -1141,7 +1215,7 @@
     place-items: start end;
     padding: 60px max(var(--space-4), env(safe-area-inset-right, 0px)) var(--space-4) var(--space-4);
   }
-  /* app.css pins width: 100%; the cap is each sheet's own width. */
+  /* Under 768px a sheet is width: 100% (section 0); the cap is each sheet's own width. */
   .onyx-sheet-layer > .onyx-sheet { max-width: min(var(--sheet-w, var(--sheet-w-md)), 100%); }
   .onyx-sheet-layer[data-placement="side"] > .onyx-sheet { max-width: min(var(--sheet-w, var(--sheet-w-side)), 100%); }
 

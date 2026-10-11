@@ -3610,7 +3610,7 @@ html, body {
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);
   box-shadow: var(--elev-2);
-  animation: onyx-sheet-in var(--dur-fast) var(--ease);
+  animation: ui-sheet-pop var(--dur-fast) var(--ease);
 }
 
 .onyx-room-more-menu > button {
@@ -3632,80 +3632,6 @@ html, body {
 .onyx-room-more-menu > button:hover { background: var(--onyx-panel-2); }
 .onyx-room-more-menu > button:disabled { opacity: 0.5; cursor: default; }
 .onyx-room-more-menu > button[aria-pressed="true"] { background: var(--onyx-panel-2); }
-
-/* 3. Shared sheet primitive (View.Sheet) -------------------------------- */
-
-.onyx-sheet-layer {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-}
-
-.onyx-sheet-layer[data-placement="side"] {
-  place-items: stretch end;
-}
-
-.onyx-sheet-backdrop {
-  position: absolute;
-  inset: 0;
-}
-
-/* Zero-specificity base so each sheet's own class keeps its width,
-   padding and layout. */
-:where(.onyx-sheet) {
-  box-sizing: border-box;
-  max-width: 100%;
-  max-height: calc(100dvh - 2 * var(--space-4));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: var(--pad-panel);
-  color: var(--onyx-text);
-  background: var(--onyx-panel);
-  border: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
-}
-
-:where(.onyx-sheet-layer[data-placement="side"]) > :where(.onyx-sheet) {
-  width: min(420px, 100%);
-}
-
-.onyx-sheet-layer > .onyx-sheet {
-  position: relative;
-  margin: 0;
-}
-
-.onyx-sheet:focus:not(:focus-visible) { outline: none; }
-
-@keyframes onyx-sheet-in {
-  from { opacity: 0; transform: translateY(6px); }
-}
-
-@keyframes onyx-sheet-side-in {
-  from { opacity: 0; transform: translateX(16px); }
-}
-
-.onyx-sheet-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.onyx-sheet-title {
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 650;
-  line-height: var(--leading-snug);
-}
-
-.onyx-sheet-close {
-  font: inherit;
-}
-
-.onyx-sheet-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
 
 /* 4. Focus, targets, scroll-padding ------------------------------------- */
 
@@ -3783,26 +3709,6 @@ html { scroll-padding-block: var(--space-6); }
   /* The bottom nav and composer are outside the scroller; any page-
      level scroll still keeps focused rows above them (2.4.11). */
   html { scroll-padding-bottom: calc(var(--mobile-nav-h) + var(--composer-h)); }
-}
-
-/* Under 768px sheets become bottom sheets. */
-@media (max-width: 767.98px) {
-  .onyx-sheet-layer,
-  .onyx-sheet-layer[data-placement="side"] {
-    place-items: end stretch;
-    padding: 0;
-  }
-
-  .onyx-sheet-layer > .onyx-sheet,
-  .onyx-sheet-layer[data-placement="side"] > .onyx-sheet {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    max-height: 92dvh;
-    border-width: 1px 0 0;
-    border-radius: var(--radius) var(--radius) 0 0;
-    animation-name: onyx-sheet-in;
-  }
 }
 
 /* Reduced motion: zero the duration ladder AND stop every animation,

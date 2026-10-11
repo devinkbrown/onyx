@@ -346,7 +346,7 @@
     border: 0;
     border-left: 1px solid var(--onyx-line);
     box-shadow: var(--elev-3);
-    animation: onyx-sheet-in var(--dur-base) var(--ease);
+    animation: ui-sheet-pop var(--dur-base) var(--ease);
   }
   .onyx-roster::backdrop { background: color-mix(in srgb, #000 55%, transparent); }
   .onyx-roster:popover-open .onyx-mlist-close { display: grid; }

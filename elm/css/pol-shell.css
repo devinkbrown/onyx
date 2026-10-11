@@ -1258,7 +1258,7 @@
     border-width: 1px 0 0;
     border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
     box-shadow: var(--elev-3);
-    animation: onyx-sheet-in var(--dur-fast) var(--ease);
+    animation: ui-sheet-pop var(--dur-fast) var(--ease);
   }
   .onyx-room-more-head {
     display: flex;
