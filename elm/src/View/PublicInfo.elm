@@ -13,7 +13,7 @@ import App exposing (Model, Msg)
 import Html exposing (Html, article, div, h1, h2, p, section, span, text)
 import Html.Attributes exposing (attribute, class, id)
 import Route exposing (Route)
-import View.PublicFrame exposing (frame)
+import View.PublicFrame exposing (frame, relatedNav)
 
 
 {-| The four supporting pages. -}
@@ -152,6 +152,7 @@ view page =
                 , p [] [ text item.statement ]
                 ]
             ]
+        , relatedNav ("/" ++ key ++ "/")
         ]
 
 
