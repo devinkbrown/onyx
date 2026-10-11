@@ -281,7 +281,8 @@
 /* Two-pane widths below the dialog breakpoint (foldables open, small
    tablets): a bottom sheet the width of the list pane, not of the screen. */
 @media (min-width: 600px) and (max-width: 767.98px) {
-  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] { place-items: end center; justify-content: center; }
+  /* The layer is a reversed flex column: the cross axis is horizontal. */
+  .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] { align-items: center; justify-content: flex-start; }
   .onyx-overlays .onyx-sheet-layer.onyx-railmenu-layer[data-placement] > .onyx-sheet.onyx-railmenu { width: min(420px, 100%); border-width: 1px 1px 0; }
 }
 

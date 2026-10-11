@@ -29,12 +29,29 @@ Elm. The five destinations are Home / Rooms / Messages / Calls / You.
   - Messages → DMs with previews.
 - Then the conversation column, then an optional context rail.
 
-**Mobile (<768px)**
+**Mobile (<600px)** (v3/rx-shell moved the seam from 768px)
 
 - A bottom nav with the same five items.
 - The collection sidebar becomes the Rooms / Messages page.
 - A conversation is a pushed page with a back control.
 - "You" is a full-screen dialog.
+
+**Every other ratio** (`css/rx-shell.css`)
+
+- 600–767px (foldables open, small tablets, 200% zoom): the icon rail,
+  the list and the conversation side by side — a real two-pane, not a
+  stretched phone.
+- Windows under 520px tall (landscape phones, short laptops at zoom): the
+  global bar folds into the sidebar head and shares one 44px row with the
+  room header.
+- Wide screens: the transcript keeps a ~72ch measure; from 1960px the
+  frame stops growing inside a calm surround; the context rail's member
+  list pins its head, filter and section headings.
+- Touch (`hover: none`) keeps 44px targets at every width. Note the frame
+  gives every button a 24px floor at specificity (0,3,0): size rules for
+  shell buttons need three classes (guarded by `rxShellCss.smoke.mjs`).
+- Rows carry an overflow menu (Favorite, Mark as read, Notifications,
+  Leave — which asks first); a DM's has Mark as read and Mute.
 
 ### Rules
 
