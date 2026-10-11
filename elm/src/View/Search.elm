@@ -532,7 +532,7 @@ gapSearchEmpty model query count =
             && List.isEmpty (App.vaultHits model)
             && List.isEmpty (App.serverResultsForPanel model)
     then
-        div [ class "onyx-message-search__empty gap-search-empty", attribute "data-testid" "search-empty" ]
+        div [ class "onyx-message-search__empty", attribute "data-testid" "search-empty" ]
             [ strong [] [ text "No matches yet" ]
             , span [] [ text "Try a shorter phrase, or search full server history if it's available." ]
             ]

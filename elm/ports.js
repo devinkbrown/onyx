@@ -11255,8 +11255,9 @@ function fetchPublicFeed(url) {
   function gapCompact(file, kind, bytes) {
     if (!file || kind === "file" || kind === "tiff") return Promise.resolve(null);
     if (kind === "webp" && bytes && gapAscii(bytes, 12, 4) === "VP8X" && (bytes[20] & 0x02)) return Promise.resolve(null);
-    if (typeof createImageBitmap !== "function" || typeof document === "undefined") return Promise.resolve(null);
-    return createImageBitmap(file).then(function (bitmap) {
+    var decode = typeof globalThis !== "undefined" ? globalThis.createImageBitmap : null;
+    if (typeof decode !== "function" || typeof document === "undefined") return Promise.resolve(null);
+    return decode.call(globalThis, file).then(function (bitmap) {
       var maxEdge = 1600;
       var scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height, 1));
       var width = Math.max(1, Math.round(bitmap.width * scale));
@@ -11644,6 +11645,8 @@ function fetchPublicFeed(url) {
 
   function wireGapConvo(app, held) {
     var doc = typeof document !== "undefined" ? document : null;
+    /* A stub document (smoke harnesses) without the event API gets no wiring. */
+    if (doc && (typeof doc.addEventListener !== "function" || typeof doc.getElementById !== "function")) doc = null;
     var uploads = createGapUploads(app);
     if (app.ports.gapUploadVariant) {
       app.ports.gapUploadVariant.subscribe(function (req) {

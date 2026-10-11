@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+/* global DataTransfer, DragEvent */
 /**
  * screens-gap-convo.mjs — v3/gap-convo scenarios for screens.mjs.
  *
