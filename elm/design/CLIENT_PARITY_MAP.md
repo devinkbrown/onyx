@@ -581,7 +581,7 @@ Hosted-but-owned-elsewhere surfaces (Account, Prefs, Pins, Scheduled, Jump, Whoi
 | D182 | Self-updating relative `<time>` + ISO title | `components/RelativeTime.tsx`; `ScheduledMessagesSheet.tsx:92` (UI) | FULL | `View/Scheduled.elm:114` | — |
 | D183 | Virtual-keyboard inset (mobile) | `lib/mobile/virtualKeyboardOverlay.ts`; `AppShell.tsx:840` (auto) | FULL | `ports.js:9955` | Elm visualViewport works on iOS too |
 | D184 | Mobile breakpoint switch (900px) | `lib/mobile/breakpoints.ts:16`; `AppShell.tsx:839` (auto) | FULL | CSS 768px | layout-only |
-| D185 | Message bookmarks (add/remove) | `store.ts:9984` (DEAD) | N/A | — | no caller |
+| D185 | Message bookmarks (add/remove) | `store.ts:9984` (DEAD) | N/A | `View/Organize.elm` `bookmarkMenuItem` / `bookmarksSheet`; `Organize.addBookmark` | Solid's was dead; v3/gap-organize ships it (message menu "Save message", You hub / room More "Saved messages", Home strip; encrypted rows keep their place, never their words) |
 | D186 | Channel bookmarks / categories libs | `lib/channel/bookmarks.ts`, `categories.ts` (portable identity only) | N/A | — | account mapper |
 
 #### Stale or overstated claims in COVERAGE.md / V3_ROADMAP.md
@@ -2219,7 +2219,7 @@ Walked every action in `src/lib/store/store.ts` 15569–18340 (plus the window e
 | B40 | tempBan (timed +b with auto-lift and retries) | DEAD, store:16415 (no UI in the cockpit) | N/A | `View/Bans.elm:84/102/128` → `App.elm:20427`, lift `App.elm:20570` | Elm is better: a reachable "Add a timed block" |
 | B41 | addHighlightWord / removeHighlightWord | `src/app/KeywordListControl.tsx:31/41` (UI), slash store:8291/8298 | FULL | `View/Notify.elm:362/403`, `App.elm:39317`; `/highlight` `App.elm:14655/14673` | Keyword sort uses codepoint order (COVERAGE narrowing) |
 | B42 | openHighlightModal / closeHighlightModal | DEAD, store:16503 | N/A | — | — |
-| B43 | setUserNote / getUserNote / deleteUserNote | DEAD, store:16509–16532 | N/A | none | Private notes are never surfaced in Solid |
+| B43 | setUserNote / getUserNote / deleteUserNote | DEAD, store:16509–16532 | N/A | `View/Organize.elm` `memberNote`; `Organize.setNote` | Solid never surfaced them; v3/gap-organize shows a private note on the member card (owner-scoped `onyx:user-notes`, 2048 chars, 512 people) |
 | B44 | openInviteModal / closeInviteModal | DEAD, store:16546 | N/A | (Elm `InviteShareOpen` is a different surface) | — |
 | B45 | setNickColorOverride / clearNickColorOverride | DEAD; `nickColorOverrides` has no reader | N/A | `App.elm:42567/42592` folds with no View dispatcher (CORE-ONLY) | — |
 | B46 | setCTCPVersionReply / TimeEnabled / PingEnabled / Enabled | DEAD setters; the persisted config drives auto-replies | N/A | config load `App.elm:37844`, `Main.elm:1646`; replies via `foldCtcpQuery` | Stored config is honoured in both; neither can edit it |
