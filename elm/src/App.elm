@@ -233,6 +233,7 @@ type alias BanAddForm =
     , extPattern : String
     , extNegated : Bool
     , error : String
+    , reviewing : Bool -- v3/rx-sheets: a block is reviewed before it sends
     }
 
 
@@ -245,6 +246,7 @@ blankBanAdd =
     , extPattern = ""
     , extNegated = False
     , error = ""
+    , reviewing = False
     }
 
 
@@ -1006,7 +1008,6 @@ type alias Model =
     -- v3/gap-people
     , peerAccounts : PeerAccount.Accounts
     , rosterLimits : RosterWindow.Limits
-    , tempBanReview : Maybe { channel : String, mask : String, minutes : Int }
     , stewardLeaving : Bool
     , webhookStatus : String
 
@@ -2936,6 +2937,8 @@ type Msg
     | BanAddExtPattern String
     | BanAddExtNegated Bool
     | BanAddSubmit String
+    | BanAddReview String -- v3/rx-sheets
+    | BanAddReviewCancel -- v3/rx-sheets
     | TempBanElapsed { key : String }
     | UnbanReviewRequested { channel : String, mask : String }
     | UnbanReviewConfirmed
@@ -4131,7 +4134,6 @@ init nick url =
     -- v3/gap-people
     , peerAccounts = PeerAccount.empty
     , rosterLimits = Dict.empty
-    , tempBanReview = Nothing
     , stewardLeaving = False
     , webhookStatus = ""
 
@@ -4753,7 +4755,6 @@ blank =
     -- v3/gap-people
     , peerAccounts = PeerAccount.empty
     , rosterLimits = Dict.empty
-    , tempBanReview = Nothing
     , stewardLeaving = False
     , webhookStatus = ""
 
@@ -23578,14 +23579,15 @@ requestTempBan model channel mask minutes =
                             )
 
 
-{-| Apply a ban-add field edit, clearing a stale submit error. -}
+{-| Apply a ban-add field edit, clearing a stale submit error and any
+staged review (an edited block is reviewed again before it sends). -}
 touchBanAdd : (BanAddForm -> BanAddForm) -> BanAddForm -> BanAddForm
 touchBanAdd edit form =
     let
         edited =
             edit form
     in
-    { edited | error = "" }
+    { edited | error = "", reviewing = False }
 
 
 {-| Resolve the ban-add form to a mask (raw trimmed text, or the
@@ -23616,33 +23618,30 @@ resolveBanAddMask form =
             Just mask
 
 
-{-| Submit the moderation-desk ban-add form (feeds the timed-ban
-core: bad minutes, an unresolvable mask, an unnormalizable entry,
-or an offline link all report into the form instead of sending). -}
-submitBanAdd : Model -> String -> ( Model, List Outbound )
-submitBanAdd model channel =
+{-| Check the moderation-desk ban-add form: bad minutes, an
+unresolvable mask, an unnormalizable entry or an offline link come
+back as the form error; otherwise the mask and minutes to send. -}
+validateBanAdd : Model -> Result String { mask : String, minutes : Int }
+validateBanAdd model =
     let
         form =
             model.banAdd
-
-        fail message =
-            ( { model | banAdd = { form | error = message } }, [] )
     in
     case String.toInt (String.trim form.minutes) of
         Nothing ->
-            fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+            Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
         Just minutes ->
             if minutes < 1 || minutes > maxTempBanMinutes then
-                fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+                Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
             else if model.connection /= Live then
-                fail "You are offline — reconnect to add blocks."
+                Err "You are offline — reconnect to add blocks."
 
             else
                 case resolveBanAddMask form of
                     Nothing ->
-                        fail
+                        Err
                             (if form.useExtBan then
                                 "That extended ban does not validate — check the type and pattern."
 
@@ -23653,18 +23652,62 @@ submitBanAdd model channel =
                     Just mask ->
                         case normalizeBanEntry mask Nothing Nothing of
                             Nothing ->
-                                fail "Enter a ban mask."
+                                Err "Enter a ban mask."
 
                             Just _ ->
-                                -- v3/gap-people: guard (match everyone / you),
-                                -- then stage a review; `GapPeople.TempBanConfirm`
-                                -- sends.
+                                -- v3/gap-people: refuse a mask that matches
+                                -- everyone or you. Runs at review time and again
+                                -- at submit (v3/rx-sheets review row).
                                 case TimedBlock.check { nick = model.ourNick, account = model.accountName } mask of
                                     Just problem ->
-                                        fail problem
+                                        Err problem
 
                                     Nothing ->
-                                        ( { model | tempBanReview = Just { channel = channel, mask = String.trim mask, minutes = minutes } }, [] )
+                                        Ok { mask = mask, minutes = minutes }
+
+
+{-| Submit the moderation-desk ban-add form (feeds the timed-ban
+core: bad minutes, an unresolvable mask, an unnormalizable entry,
+or an offline link all report into the form instead of sending). -}
+submitBanAdd : Model -> String -> ( Model, List Outbound )
+submitBanAdd model channel =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok ok ->
+            -- v3/gap-people: the review may have been open for a while — only
+            -- send while we are still a moderator here.
+            if not (isChannelOp model channel) then
+                ( { model | banAdd = { form | error = "You no longer have moderator permission in this room.", reviewing = False } }, [] )
+
+            else
+                let
+                    ( sent, out ) =
+                        requestTempBan model channel ok.mask ok.minutes
+                in
+                ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
+
+
+{-| v3/rx-sheets — stage the block for review (the desk's other bans
+already review first): a valid form shows the confirm row, an invalid
+one reports its error and sends nothing. -}
+reviewBanAdd : Model -> ( Model, List Outbound )
+reviewBanAdd model =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok _ ->
+            ( { model | banAdd = { form | error = "", reviewing = True } }, [] )
 
 
 {-| Fire a timed-ban unban (mirroring the oracle `fire`: an unknown
@@ -39852,7 +39895,43 @@ settleSteps =
     , settleStepRemembered -- v3/rx-public
     , settleStepUserModes -- v3/gap-usermodes
     , settleStepOper -- v3/gap-oper
+    , settleStepRxSheets -- v3/rx-sheets (last: sees every overlay the steps above opened)
     ]
+
+
+-- v3/rx-sheets
+
+
+{-| One sheet at a time over the You hub: any overlay that opens while
+the hub is open (the reclaim dialog, Notifications, a ring, …) closes
+the hub, so the new sheet is the one topmost layer for paint, focus
+and Escape. The quiet asks (first-run notifications, Add to Home
+Screen) rise on their own and leave the hub alone. Only computed while
+the hub is open.
+-}
+settleStepRxSheets : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRxSheets _ prior ( next, outs ) =
+    if next.youHubOpen then
+        let
+            before =
+                List.map Tuple.first (overlayStack prior)
+
+            quiet =
+                [ "you", "first-run-notify", "a2hs" ]
+
+            opened =
+                overlayStack next
+                    |> List.map Tuple.first
+                    |> List.filter (\key -> not (List.member key before) && not (List.member key quiet))
+        in
+        if List.isEmpty opened then
+            ( next, outs )
+
+        else
+            ( { next | youHubOpen = False }, outs )
+
+    else
+        ( next, outs )
 
 
 settleStepConnect : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -41716,6 +41795,13 @@ updateCore msg model =
 
         BanAddSubmit channel ->
             submitBanAdd model channel
+
+        -- v3/rx-sheets
+        BanAddReview _ ->
+            reviewBanAdd model
+
+        BanAddReviewCancel ->
+            ( { model | banAdd = (\form -> { form | reviewing = False }) model.banAdd }, [] )
 
         TempBanElapsed req ->
             fireTempBan model req.key
@@ -46469,36 +46555,38 @@ updateCore msg model =
                     ( model, [] )
 
                 Just kind ->
-                    -- v3/gap-people: only kinds this role may stage.
+                    -- v3/gap-people: only kinds this role may stage (the
+                    -- role, not the experience mode, is what the server
+                    -- enforces; the form is hidden for everyone else).
                     if not (List.member kind (ModAuthority.deskKinds (moderationActor model channel))) then
                         ( model, [] )
 
                     else
-                    ( { model
-                        | userProfileCard = Nothing
-                        , moderationDraft =
-                            Just
-                                { kind = kind
-                                , channel = channel
-                                , target =
-                                    case String.trim model.moderationDesk.member of
-                                        "" ->
-                                            Nothing
+                        ( { model
+                            | userProfileCard = Nothing
+                            , moderationDraft =
+                                Just
+                                    { kind = kind
+                                    , channel = channel
+                                    , target =
+                                        case String.trim model.moderationDesk.member of
+                                            "" ->
+                                                Nothing
 
-                                        nick ->
-                                            Just nick
-                                , mask = Nothing
-                                , reason =
-                                    case String.trim model.moderationDesk.reason of
-                                        "" ->
-                                            Nothing
+                                            nick ->
+                                                Just nick
+                                    , mask = Nothing
+                                    , reason =
+                                        case String.trim model.moderationDesk.reason of
+                                            "" ->
+                                                Nothing
 
-                                        reason ->
-                                            Just reason
-                                }
-                      }
-                    , []
-                    )
+                                            reason ->
+                                                Just reason
+                                    }
+                          }
+                        , []
+                        )
 
         ModerationDeskSubmitBan channel ->
             -- The desk ban-mask form stages a mask draft into the
@@ -52539,32 +52627,6 @@ updateGapPeople sub model =
             , [ PrefsFocus { id = RosterWindow.rowId groupKey current } ]
             )
 
-        GapPeople.TempBanConfirm ->
-            case model.tempBanReview of
-                Nothing ->
-                    ( model, [] )
-
-                Just review ->
-                    let
-                        form =
-                            model.banAdd
-                    in
-                    if model.connection /= Live then
-                        ( { model | tempBanReview = Nothing, banAdd = { form | error = "You are offline — reconnect to add blocks." } }, [] )
-
-                    else if not (isChannelOp model review.channel) then
-                        ( { model | tempBanReview = Nothing, banAdd = { form | error = "You no longer have moderator permission in this room." } }, [] )
-
-                    else
-                        let
-                            ( sent, out ) =
-                                requestTempBan { model | tempBanReview = Nothing } review.channel review.mask review.minutes
-                        in
-                        ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
-
-        GapPeople.TempBanCancel ->
-            ( { model | tempBanReview = Nothing }, [] )
-
         GapPeople.StewardInvite room ->
             updateCore (InviteShareOpen room) { model | stewardRoom = Nothing, stewardLeaving = False }
 
@@ -52607,7 +52669,7 @@ settleStepPeople msg prior ( m, outs ) =
         closed =
             case msg of
                 WsClosed _ ->
-                    { m | peerAccounts = PeerAccount.empty, roomTransfers = Dict.empty, tempBanReview = Nothing }
+                    { m | peerAccounts = PeerAccount.empty, roomTransfers = Dict.empty }
 
                 _ ->
                     m
@@ -52619,23 +52681,16 @@ settleStepPeople msg prior ( m, outs ) =
             else
                 closed
 
-        reviewed =
-            if roomChanged || clearsTempBanReview msg then
-                { windowed | tempBanReview = Nothing }
-
-            else
-                windowed
-
         steward =
             case msg of
                 StewardOpen _ ->
-                    { reviewed | stewardLeaving = False }
+                    { windowed | stewardLeaving = False }
 
                 StewardClose ->
-                    { reviewed | stewardLeaving = False }
+                    { windowed | stewardLeaving = False }
 
                 _ ->
-                    reviewed
+                    windowed
 
         ( transferred, transferOut ) =
             settleTransferActions msg prior steward
@@ -52657,34 +52712,6 @@ quietOfferToast m =
 
     else
         m
-
-
-clearsTempBanReview : Msg -> Bool
-clearsTempBanReview msg =
-    case msg of
-        BanAddMask _ ->
-            True
-
-        BanAddMinutes _ ->
-            True
-
-        BanAddUseExtBan _ ->
-            True
-
-        BanAddExtType _ ->
-            True
-
-        BanAddExtPattern _ ->
-            True
-
-        BanAddExtNegated _ ->
-            True
-
-        ModerationSheetClose ->
-            True
-
-        _ ->
-            False
 
 
 {-| The handover signals (and the registration transfer) behind the

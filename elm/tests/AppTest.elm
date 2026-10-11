@@ -12032,29 +12032,30 @@ suite =
                         ()
             ]
         , describe "ban-add form"
-            [ test "raw submit stages a review; confirm sends +b and clears the form" <|
+            [ test "raw review then confirm sends +b and clears the form" <|
                 \_ ->
                     let
                         base =
                             blankBanAdd
 
-                        -- v3/gap-people: submit reviews first, confirm sends.
+                        -- v3/rx-sheets + v3/gap-people: the form reviews first
+                        -- (nothing sent), the confirm sends.
                         live =
                             { stewardLive | banAdd = { base | mask = " spam!*@* ", minutes = "10" } }
 
                         ( staged, stagedOut ) =
-                            update (BanAddSubmit "#harbor") live
+                            update (BanAddReview "#harbor") live
 
                         ( m, outs ) =
-                            update (GapPeopleMsg GapPeople.TempBanConfirm) staged
+                            update (BanAddSubmit "#harbor") staged
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] stagedOut
-                        , \_ -> Expect.equal (Just { channel = "#harbor", mask = "spam!*@*", minutes = 10 }) staged.tempBanReview
+                        , \_ -> Expect.equal True staged.banAdd.reviewing
                         , \_ ->
                             Expect.equal True
                                 (List.member (SendLine "MODE #harbor +b spam!*@*\r\n") outs)
-                        , \_ -> Expect.equal Nothing m.tempBanReview
+                        , \_ -> Expect.equal False m.banAdd.reviewing
                         , \_ -> Expect.equal "" m.banAdd.mask
                         , \_ -> Expect.equal "" m.banAdd.error
                         , \_ -> Expect.equal "10" m.banAdd.minutes
@@ -12072,10 +12073,10 @@ suite =
                             }
 
                         ( staged, _ ) =
-                            update (BanAddSubmit "#harbor") live
+                            update (BanAddReview "#harbor") live
 
                         ( m, outs ) =
-                            update (GapPeopleMsg GapPeople.TempBanConfirm) staged
+                            update (BanAddSubmit "#harbor") staged
                     in
                     Expect.all
                         [ \_ ->

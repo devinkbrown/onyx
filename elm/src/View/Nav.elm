@@ -22,7 +22,7 @@ language tools and Advanced group live in later slices (4.1).
 import App exposing (Model, Msg(..))
 import Avatar
 import Dict
-import Html exposing (Html, button, div, h2, h3, nav, p, section, small, span, strong, text)
+import Html exposing (Html, button, div, h3, nav, p, section, small, span, strong, text)
 import Html.Attributes exposing (attribute, class, classList, type_)
 import Html.Events exposing (onClick)
 import Nav
@@ -256,7 +256,7 @@ youHub model =
         in
         Sheet.view
             { scope = "you"
-            , label = Sheet.Labelled "You"
+            , label = Sheet.LabelledBy (Sheet.titleId "you")
             , onClose = YouHubClose
             , placement = Sheet.Center
             , layerClass = "onyx-you-veil"
@@ -266,11 +266,17 @@ youHub model =
             , modal = True
             , attrs = [ attribute "data-testid" "you-hub", attribute "data-guest" (boolString guest) ]
             }
-                [ div [ class "onyx-you-head" ]
+                [ -- v3/rx-sheets: the shared pinned head (title + close), so
+                  -- the close stays in reach while the identity card and
+                  -- the settings list scroll (short and landscape screens).
+                  Sheet.headerWith
+                    (Sheet.head { scope = "you", title = "You", closeLabel = "Close You", onClose = YouHubClose }
+                        |> (\h -> { h | closeTestId = Just "you-close", headClass = "onyx-you-bar" })
+                    )
+                , div [ class "onyx-you-head" ]
                     [ span [ class "onyx-face onyx-you-avatar", attribute "aria-hidden" "true" ] [ text (Avatar.initials nick) ]
                     , div [ class "onyx-you-identity" ]
-                        [ h2 [ class "onyx-you-title" ] [ text "You" ]
-                        , p [ class "onyx-you-nick", attribute "data-testid" "you-nick" ]
+                        [ p [ class "onyx-you-nick", attribute "data-testid" "you-nick" ]
                             [ text
                                 (if String.isEmpty nick then
                                     "No name yet"
@@ -284,14 +290,6 @@ youHub model =
                         , -- v3/account2
                           View.Account2.youStatusBlock model
                         ]
-                    , button
-                        [ type_ "button"
-                        , class "onyx-you-close"
-                        , attribute "aria-label" "Close You"
-                        , attribute "data-testid" "you-close"
-                        , onClick YouHubClose
-                        ]
-                        [ span [ class "onyx-shi", attribute "data-icon" "close", attribute "aria-hidden" "true" ] [] ]
                     ]
                 , nav [ class "onyx-you-settings", attribute "aria-label" "You settings", attribute "data-testid" "you-settings" ]
                     [ p [ class "onyx-you-lede", attribute "role" "note" ]
@@ -304,24 +302,26 @@ youHub model =
                             )
                         ]
                     , group "account" "Account" Nothing
-                        [ if guest then
-                            entry
-                                { testId = "you-keep-name"
-                                , label = "Keep this name"
-                                , hint = "Register the name you are using without reconnecting"
-                                , popup = True
-                                , action = Nav.YouAccount
-                                }
+                        (reclaimEntry model
+                            ++ [ if guest then
+                                    entry
+                                        { testId = "you-keep-name"
+                                        , label = "Keep this name"
+                                        , hint = "Register the name you are using without reconnecting"
+                                        , popup = True
+                                        , action = Nav.YouAccount
+                                        }
 
-                          else
-                            entry
-                                { testId = "you-open-account"
-                                , label = "Account"
-                                , hint = "Identity, protection, and account data"
-                                , popup = True
-                                , action = Nav.YouAccount
-                                }
-                        ]
+                                 else
+                                    entry
+                                        { testId = "you-open-account"
+                                        , label = "Account"
+                                        , hint = "Identity, protection, and account data"
+                                        , popup = True
+                                        , action = Nav.YouAccount
+                                        }
+                               ]
+                        )
                     , group "device" "This device" Nothing
                         [ -- v3/ui-mobile-shell: moved here from the global bar
                           button
@@ -396,6 +396,31 @@ youHub model =
                         ]
                     ]
                 ]
+
+
+{-| v3/rx-sheets — the reclaim dialog's opener where the identity chip
+is not shown (phones): while a reclaim target exists the hub offers to
+take the name back (the settle step closes the hub as it opens). -}
+reclaimEntry : Model -> List (Html Msg)
+reclaimEntry model =
+    case App.reclaimTarget model of
+        Just target ->
+            [ button
+                [ type_ "button"
+                , class "onyx-you-link"
+                , attribute "data-testid" "you-reclaim"
+                , attribute "aria-haspopup" "dialog"
+                , onClick ReclaimOpen
+                ]
+                [ span []
+                    [ strong [] [ text "Take your name back" ]
+                    , small [] [ text (target ++ " is held elsewhere — sign in to take it back") ]
+                    ]
+                ]
+            ]
+
+        Nothing ->
+            []
 
 
 {-| v3/ui-mobile-shell — the connection state (the global pill hides

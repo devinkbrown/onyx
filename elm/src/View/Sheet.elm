@@ -32,8 +32,10 @@ the APG dialog contract in one place:
     `shortcut` port's Escape (`App.escapeMsg`, the ordered overlay
     list) never closes a second overlay for the same key press.
 
-v3/ui-sheets — on phones (under 768px) every light-dismiss sheet is a
-true bottom sheet: a grab handle, a sticky head, internal scroll, the
+v3/ui-sheets — on phones every light-dismiss sheet is a
+true bottom sheet (v3/rx-sheets: under 600px wide; fold-open and
+tablets keep centred dialogs and side panels, short landscape windows
+get nearly full-height dialogs — see `css/ui-sheets.css`): a grab handle, a sticky head, internal scroll, the
 safe-area inset, and swipe-down-to-dismiss. The swipe needs no
 JavaScript: the layer is a `column-reverse` scroll container whose
 first child is the panel and whose last is a full-height spacer (see
@@ -53,14 +55,14 @@ placement, elevation, head and entrance motion come from the shared
 
 import Html exposing (Html, button, div, h2, p, section, span, text)
 import Html.Attributes exposing (attribute, class, id, type_)
-import Html.Events exposing (on, onClick, preventDefaultOn)
+import Html.Events exposing (custom, on, onClick)
 import Json.Decode as Decode
 
 
 {-| Where the panel sits. `Center` is the default dialog; `Side` is a
 right-hand drawer on desktop; `Popover` drops from the top-right of the
 shell (under the global top bar) like a menu panel. All three become
-bottom sheets under 768px.
+bottom sheets under 600px.
 -}
 type Placement
     = Center
@@ -174,7 +176,13 @@ render lightDismiss cfg body =
              , labelAttr cfg.label
              , attribute "data-shortcut-scope" cfg.scope
              , attribute "tabindex" "-1"
-             , preventDefaultOn "keydown" (Decode.map (\m -> ( m, True )) (escapeDecoder cfg.onClose))
+             , -- v3/rx-sheets: Escape closes THIS sheet only. A sheet nested
+               -- in another sheet's DOM (the room desk's member-action
+               -- review) would otherwise let the key bubble to its parent
+               -- panel and close both; the global shortcut port still sees
+               -- `defaultPrevented` and stands aside.
+               custom "keydown"
+                (Decode.map (\m -> { message = m, stopPropagation = True, preventDefault = True }) (escapeDecoder cfg.onClose))
              ]
                 ++ cfg.attrs
             )

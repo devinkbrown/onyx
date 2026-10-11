@@ -332,7 +332,7 @@ timedBlockTests =
                         Expect.equal False (TimedBlock.globMatch (String.repeat 40 "*a" ++ "b") (String.repeat 60 "a"))
                     ]
                     ()
-        , test "submit reviews, edits drop the review, confirm re-checks authority" <|
+        , test "review guards the mask, edits drop the review, confirm re-checks authority" <|
             \_ ->
                 let
                     form m mask =
@@ -346,10 +346,10 @@ timedBlockTests =
                         room (Set.singleton 'o')
 
                     everyone =
-                        after (BanAddSubmit "#c") (form op "*!*@*")
+                        after (BanAddReview "#c") (form op "*!*@*")
 
                     staged =
-                        after (BanAddSubmit "#c") (form op "spam!*@*")
+                        after (BanAddReview "#c") (form op "spam!*@*")
 
                     edited =
                         after (BanAddMask "spam2!*@*") staged
@@ -357,16 +357,17 @@ timedBlockTests =
                     deopped =
                         feed staged ":ann!a@h MODE #c -o me"
 
-                    ( _, deoppedOut ) =
-                        update (GapPeopleMsg GapPeople.TempBanConfirm) deopped
+                    ( deoppedModel, deoppedOut ) =
+                        update (BanAddSubmit "#c") deopped
                 in
                 Expect.all
-                    [ \_ -> Expect.equal Nothing everyone.tempBanReview
+                    [ \_ -> Expect.equal False everyone.banAdd.reviewing
                     , \_ -> Expect.equal "That block would match everyone. Use a more specific address." everyone.banAdd.error
-                    , \_ -> Expect.equal (Just { channel = "#c", mask = "spam!*@*", minutes = 90 }) staged.tempBanReview
-                    , \_ -> query (after ModerationSheetOpen staged) |> Query.find [ testid "ban-add-review" ] |> Query.has [ Selector.text "Block spam!*@* in #c for 90 minutes. This device lifts it automatically when the time is up." ]
-                    , \_ -> Expect.equal Nothing edited.tempBanReview
+                    , \_ -> Expect.equal True staged.banAdd.reviewing
+                    , \_ -> query (after ModerationSheetOpen staged) |> Query.find [ testid "ban-add-review" ] |> Query.has [ Selector.text "Block spam!*@* in #c for 90 minutes?" ]
+                    , \_ -> Expect.equal False edited.banAdd.reviewing
                     , \_ -> Expect.equal [] deoppedOut
+                    , \_ -> Expect.equal "You no longer have moderator permission in this room." deoppedModel.banAdd.error
                     ]
                     ()
         ]

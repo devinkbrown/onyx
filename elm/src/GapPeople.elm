@@ -4,7 +4,6 @@ module GapPeople exposing (Msg(..))
 so the shared `Msg` union gains one constructor.
 
   - `RosterShowMore group` — paint the next window of a roster group.
-  - `TempBanConfirm` / `TempBanCancel` — the timed-block review.
   - `StewardInvite room` — Room care's Invite (closes Room care, opens
     the invite sheet).
   - `StewardAskLeave` / `StewardCancelLeave` / `StewardConfirmLeave room`
@@ -17,8 +16,6 @@ so the shared `Msg` union gains one constructor.
 
 type Msg
     = RosterShowMore String
-    | TempBanConfirm
-    | TempBanCancel
     | StewardInvite String
     | StewardAskLeave
     | StewardCancelLeave

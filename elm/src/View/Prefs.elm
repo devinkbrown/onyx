@@ -86,7 +86,11 @@ categoryNav model =
             , attribute "aria-label" "Reset to defaults"
             , onClick PrefsReset
             ]
-            [ text "Reset to defaults" ]
+            [ -- v3/rx-sheets: phones show the short word (the aria-label
+              -- keeps the full name), so the category chips get the room
+              span [ class "pref-reset-all__full" ] [ text "Reset to defaults" ]
+            , span [ class "pref-reset-all__short", attribute "aria-hidden" "true" ] [ text "Reset" ]
+            ]
         , span
             [ class "sr-only"
             , attribute "role" "status"

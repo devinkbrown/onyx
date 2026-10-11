@@ -86,57 +86,9 @@ banPanel model channel =
 
 addForm : Model -> String -> Bool -> List (Html Msg)
 addForm model channel live =
-    let
-        form =
-            model.banAdd
-    in
-    case model.tempBanReview of
-        Just review ->
-            if String.toLower review.channel == String.toLower channel then
-                timedBlockReview model review live
-
-            else
-                addFormFields model channel live form
-
-        Nothing ->
-            addFormFields model channel live form
-
-
-{-| v3/gap-people — the timed block's review step: what will be
-blocked, where and for how long, with Add block / Back. -}
-timedBlockReview : Model -> { channel : String, mask : String, minutes : Int } -> Bool -> List (Html Msg)
-timedBlockReview _ review live =
-    [ section
-        [ class "moderation-desk__ban-add moderation-desk__ban-review"
-        , attribute "data-testid" "ban-add-form"
-        , attribute "role" "group"
-        , attribute "aria-labelledby" "ban-add-review-title"
-        ]
-        ([ div [ class "moderation-cockpit__head" ]
-            [ h4 [ id "ban-add-review-title" ] [ text "Review timed block" ] ]
-         , p [ class "moderation-desk__review-summary", attribute "data-testid" "ban-add-review" ]
-            [ text (TimedBlock.reviewSummary { mask = review.mask, room = review.channel, minutes = review.minutes }) ]
-         , code [ class "moderation-desk__ban-mask" ] [ text review.mask ]
-         ]
-            ++ List.map (\note -> p [ class "moderation-cockpit__hint" ] [ text note ]) (TimedBlock.notes review.mask)
-            ++ [ div [ class "onyx-steward-actions" ]
-                    [ button
-                        [ class "onyx-steward-btn"
-                        , attribute "data-testid" "ban-add-back"
-                        , onClick (GapPeopleMsg GapPeople.TempBanCancel)
-                        ]
-                        [ text "Back" ]
-                    , button
-                        [ class "onyx-steward-btn onyx-steward-btn-danger"
-                        , attribute "data-testid" "ban-add-confirm"
-                        , disabled (not live)
-                        , onClick (GapPeopleMsg GapPeople.TempBanConfirm)
-                        ]
-                        [ text "Add block" ]
-                    ]
-               ]
-        )
-    ]
+    -- One review step (v3/rx-sheets): the form's own "Review block" row, which
+    -- v3/gap-people extends with the guard and the plain-language notes.
+    addFormFields model channel live model.banAdd
 
 
 addFormFields : Model -> String -> Bool -> App.BanAddForm -> List (Html Msg)
@@ -182,18 +134,84 @@ addFormFields _ channel live form =
                  else
                     p [ class "moderation-cockpit__hint moderation-desk__error", attribute "role" "alert", attribute "data-testid" "ban-add-error" ]
                         [ text form.error ]
-               , div [ class "onyx-steward-actions" ]
-                    [ button
-                        [ class "onyx-steward-btn onyx-steward-btn-primary"
-                        , attribute "data-testid" "ban-add-submit"
-                        , disabled (not live)
-                        , onClick (BanAddSubmit channel)
+               , -- v3/rx-sheets: a block is reviewed before it sends, like
+                 -- the desk's other bans; editing a field re-arms the review.
+                 if form.reviewing then
+                    div
+                        [ class "moderation-review onyx-danger-confirm"
+                        , attribute "role" "group"
+                        , attribute "aria-label" "Confirm timed block"
+                        , attribute "data-testid" "ban-add-review"
                         ]
-                        [ text "Review block" ]
-                    ]
+                        (p [] [ text (banAddReviewCopy form channel) ]
+                            :: List.map (\note -> p [ class "moderation-cockpit__hint" ] [ text note ]) (TimedBlock.notes (banAddTarget form))
+                            ++ [ div [ class "onyx-steward-actions" ]
+                                    [ button
+                                        [ class "onyx-steward-btn onyx-steward-btn-danger"
+                                        , attribute "data-testid" "ban-add-submit"
+                                        , disabled (not live)
+                                        , onClick (BanAddSubmit channel)
+                                        ]
+                                        [ text "Add block" ]
+                                    , button
+                                        [ class "onyx-steward-btn"
+                                        , attribute "data-testid" "ban-add-cancel"
+                                        , onClick BanAddReviewCancel
+                                        ]
+                                        [ text "Cancel" ]
+                                    ]
+                               ]
+                        )
+
+                 else
+                    div [ class "onyx-steward-actions" ]
+                        [ button
+                            [ class "onyx-steward-btn onyx-steward-btn-primary"
+                            , attribute "data-testid" "ban-add-review-open"
+                            , disabled (not live)
+                            , onClick (BanAddReview channel)
+                            ]
+                            [ text "Review block" ]
+                        ]
                ]
         )
     ]
+
+
+{-| The mask a staged timed block will add (the extended ban's preview, or the
+trimmed raw mask). -}
+banAddTarget : BanAddForm -> String
+banAddTarget form =
+    if form.useExtBan then
+        Maybe.withDefault (String.trim form.extPattern) (extPreview form)
+
+    else
+        String.trim form.mask
+
+
+{-| The confirm line for a staged timed block. -}
+banAddReviewCopy : BanAddForm -> String -> String
+banAddReviewCopy form channel =
+    let
+        target =
+            banAddTarget form
+
+        minutes =
+            String.trim form.minutes
+    in
+    "Block "
+        ++ target
+        ++ " in "
+        ++ channel
+        ++ " for "
+        ++ minutes
+        ++ (if minutes == "1" then
+                " minute?"
+
+            else
+                " minutes?"
+           )
+        ++ " It lifts on its own when the time is up."
 
 
 extBuilder : BanAddForm -> List (Html Msg)
@@ -530,6 +548,14 @@ deskBanForm model channel live =
 
 deskMemberForm : Model -> String -> Bool -> List (Html Msg)
 deskMemberForm model channel live =
+    -- v3/rx-sheets + v3/gap-people: no actions, no form (and no empty action
+    -- list). What counts as an action is the room role (`ModAuthority`), which
+    -- the body checks, not the experience mode.
+    deskMemberFormBody model channel live
+
+
+deskMemberFormBody : Model -> String -> Bool -> List (Html Msg)
+deskMemberFormBody model channel live =
     let
         desk =
             model.moderationDesk
