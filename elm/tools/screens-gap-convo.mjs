@@ -270,6 +270,7 @@ export default {
     await page.waitForTimeout(250);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(900);
+    await hop(page, 'lounge'); // /join may or may not take you there; be in #lounge either way
     await page.evaluate(async () => { await window.pasteFiles([new File(['hello'], 'notes.txt', { type: 'text/plain' })]); });
     await page.waitForSelector('.onyx-attach-row');
     await hop(page, 'design');
@@ -294,11 +295,11 @@ export default {
     const bodies = await page.$$eval('.onyx-message .onyx-body', (els) => els.map((e) => e.textContent));
     const hits = bodies.filter((b) => /voice call at/.test(b) && !/Sounds|later at 6/.test(b));
     ok(hits.length === 1 && /seven — bring snacks and chairs/.test(hits[0]), `one row, latest text (got ${JSON.stringify(hits)})`);
-    const toggle = await page.$('.gap-edited-toggle');
-    ok(!!toggle, 'the edited marker is a disclosure');
+    const toggle = await page.$('.onyx-edited-toggle');
+    ok(!!toggle, 'the edited marker is a disclosure once earlier versions are on file');
     await toggle.click();
     await h.settle(page, 400);
-    ok(!!(await page.$('.gap-revisions')), 'earlier versions open');
+    ok(await (await page.$('.onyx-edit-history')).isVisible(), 'earlier versions open');
   },
 
   'gc-collapsed': async (page, h) => {
