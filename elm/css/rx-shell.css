@@ -50,11 +50,12 @@
    ellipsis when the sidebar is narrow instead of being cut mid-word. */
 .onyx-rail .onyx-rail-filter-input { text-overflow: ellipsis; }
 
-/* Room header, any width: the name gives way (ellipsis) before it can
-   run into the buttons, and the facepile steps aside while the column
-   is narrow. `em` follows the reader's own default font size, so a
-   large-text setting drops the facepile sooner. */
-.onyx-frame .onyx-room-header-name { flex: 0 1 auto; min-width: 10ch; white-space: nowrap; }
+/* Room header, any width: the topic gives way first and the name only
+   after it (ellipsis), so neither can run into the buttons; the
+   facepile steps aside while the column is narrow. `em` follows the
+   reader's own default font size, so a large-text setting drops the
+   facepile sooner. */
+.onyx-frame .onyx-room-header-name { flex: 0 0.2 auto; min-width: 0; white-space: nowrap; }
 @media (max-width: 74em) {
   .onyx-frame .onyx-room-header-actions .onyx-facepile { display: none; }
 }
@@ -67,7 +68,7 @@
 .onyx-rail .onyx-rail-entry > .onyx-rail-item { flex: 1 1 auto; min-width: 0; }
 
 /* The overflow control: `…` beside the star. */
-.onyx-rail .onyx-rail-more {
+.onyx-frame .onyx-rail .onyx-rail-more {
   display: inline-grid;
   place-items: center;
   flex: none;
@@ -112,7 +113,7 @@
 /* Touch: the star moves into the row menu; `…` is always there. */
 @media (hover: none) {
   .onyx-rail .onyx-rail-row > .onyx-rail-star { display: none; }
-  .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; color: var(--onyx-dim); }
+  .onyx-frame .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; color: var(--onyx-dim); }
   .onyx-rail .onyx-rail-more .onyx-shi { width: 20px; height: 20px; }
   /* A long press opens the row menu (Android) — never the iOS callout. */
   .onyx-rail :is(.onyx-rail-row, .onyx-rail-entry) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
@@ -175,12 +176,12 @@
 .onyx-railmenu-sub { margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
 .onyx-railmenu .onyx-railmenu-close { margin: 0; }
 
-.onyx-railmenu .onyx-railmenu-item {
+.onyx-frame .onyx-railmenu .onyx-railmenu-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  min-height: 40px;
+  min-height: 34px;
   padding: 0 var(--space-3);
   font: inherit;
   font-size: var(--text-md);
@@ -195,7 +196,7 @@
 .onyx-railmenu .onyx-railmenu-item:hover:not(:disabled) { background: var(--onyx-panel-2); }
 .onyx-railmenu .onyx-railmenu-item:disabled { color: var(--onyx-faint); cursor: default; }
 .onyx-railmenu .onyx-railmenu-item:disabled .onyx-shi { color: var(--onyx-faint); }
-.onyx-railmenu .onyx-railmenu-item--danger { color: var(--onyx-bad); }
+.onyx-frame .onyx-railmenu .onyx-railmenu-item--danger { color: var(--onyx-bad); }
 .onyx-railmenu .onyx-railmenu-item--danger .onyx-shi { color: var(--onyx-bad); }
 .onyx-railmenu .onyx-railmenu-item--danger:hover { background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
 .onyx-railmenu-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -223,7 +224,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.onyx-railmenu-notify .room-notify-seg {
+.onyx-frame .onyx-railmenu-notify .room-notify-seg {
   min-height: 32px;
   padding: 0 var(--space-2);
   font: inherit;
@@ -241,7 +242,7 @@
 .onyx-railmenu-confirm-title { margin: 0; font-size: var(--text-md); font-weight: 650; overflow-wrap: anywhere; }
 .onyx-railmenu-confirm-copy { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
 .onyx-railmenu-confirm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
-.onyx-railmenu-confirm-actions button {
+.onyx-frame .onyx-railmenu-confirm-actions button {
   min-height: 40px;
   padding: 0 var(--space-3);
   font: inherit;
@@ -270,10 +271,10 @@
 
 /* Phones: the bottom sheet's rows are thumb-sized. */
 @media (max-width: 767.98px) {
-  .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
+  .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
   .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
-  .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
-  .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
+  .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
+  .onyx-frame .onyx-railmenu-confirm-actions button { min-height: 48px; font-size: 16px; }
   .onyx-railmenu-head .onyx-railmenu-tile,
   .onyx-railmenu-head .onyx-railmenu-face { width: 44px; height: 44px; }
   .onyx-railmenu-title { font-size: var(--text-lg); }
@@ -310,8 +311,8 @@
 .onyx-rail .onyx-rail-emptystate-title { margin: 0; font-size: var(--text-md); font-weight: 650; color: var(--onyx-text); }
 .onyx-rail .onyx-rail-emptystate .onyx-rail-empty { margin: 0; padding: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-dim); }
 .onyx-rail-emptystate-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.onyx-rail .onyx-rail-emptystate-go,
-.onyx-rail .onyx-rail-emptystate-alt {
+.onyx-frame .onyx-rail .onyx-rail-emptystate-go,
+.onyx-frame .onyx-rail .onyx-rail-emptystate-alt {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -343,14 +344,14 @@
   .onyx-rail .onyx-rail-emptystate-title { font-size: var(--text-lg); }
   .onyx-rail .onyx-rail-emptystate .onyx-rail-empty { font-size: var(--text-md); }
   .onyx-rail-emptystate-actions { justify-content: center; margin-top: var(--space-4); }
-  .onyx-rail .onyx-rail-emptystate-go,
-  .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; padding: 0 var(--space-4); font-size: var(--text-md); }
+  .onyx-frame .onyx-rail .onyx-rail-emptystate-go,
+  .onyx-frame .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; padding: 0 var(--space-4); font-size: var(--text-md); }
   .onyx-rail .onyx-rail-zero { list-style: none; }
 }
 
 /* 3. Topbar compose + nav totals ----------------------------------------- */
 
-.onyx-topbar .onyx-topbar-compose {
+.onyx-frame .onyx-topbar .onyx-topbar-compose {
   display: inline-grid;
   place-items: center;
   width: 36px;
@@ -385,7 +386,7 @@
 
 @media (max-width: 599.98px) {
   /* Phones keep New on the Messages page; the bar stays three glyphs. */
-  .onyx-topbar .onyx-topbar-compose { display: none; }
+  .onyx-frame .onyx-topbar .onyx-topbar-compose { display: none; }
   .onyx-mobile-nav .onyx-nav-badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; line-height: 18px; }
 }
 
@@ -445,41 +446,41 @@
 /* 5. Touch at tablet / desktop widths ------------------------------------ */
 
 @media (min-width: 600px) and (hover: none) {
-  .onyx-rail .onyx-rail-item { min-height: 44px; font-size: var(--text-md); }
-  .onyx-rail .onyx-rail-dm { min-height: 52px; }
-  .onyx-frame .onyx-rail-filter-input { min-height: 40px; font-size: 16px; }
-  .onyx-rail .onyx-rail-filter-unread,
-  .onyx-rail .onyx-rail-filter-clear,
-  .onyx-rail .onyx-rail-filter .onyx-rail-new { min-height: 40px; }
-  .onyx-rail .onyx-rail-new { min-height: 36px; }
-  .onyx-rail .onyx-rail-browse { min-height: 44px; font-size: var(--text-md); }
-  .onyx-rail .onyx-rail-emptystate-go,
-  .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-item { min-height: 44px; font-size: var(--text-md); }
+  .onyx-frame .onyx-rail .onyx-rail-dm { min-height: 52px; }
+  .onyx-frame .onyx-rail-filter-input { min-height: 44px; font-size: 16px; }
+  .onyx-frame .onyx-rail .onyx-rail-filter-unread,
+  .onyx-frame .onyx-rail .onyx-rail-filter-clear,
+  .onyx-frame .onyx-rail .onyx-rail-filter .onyx-rail-new { min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-new { min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-browse { min-height: 44px; font-size: var(--text-md); }
+  .onyx-frame .onyx-rail .onyx-rail-emptystate-go,
+  .onyx-frame .onyx-rail .onyx-rail-emptystate-alt { min-height: 44px; }
   .onyx-rail .onyx-rail-active::before { top: 12px; bottom: 12px; }
 
-  .onyx-primary-nav .onyx-nav-btn { width: 44px; min-height: 48px; }
-  .onyx-topbar .onyx-palette-launcher { min-height: 40px; }
-  .onyx-topbar .shell-ribbon-bell,
-  .onyx-topbar .onyx-topbar-compose { width: 44px; min-height: 44px; }
-  .onyx-topbar .onyx-ident { min-height: 44px; }
-  .onyx-room-header-icon,
+  .onyx-frame .onyx-primary-nav .onyx-nav-btn { width: 44px; min-height: 48px; }
+  .onyx-frame .onyx-topbar .onyx-palette-launcher { min-height: 40px; }
+  .onyx-frame .onyx-topbar .shell-ribbon-bell,
+  .onyx-frame .onyx-topbar .onyx-topbar-compose { width: 44px; min-height: 44px; }
+  .onyx-frame .onyx-topbar .onyx-ident { min-height: 44px; }
+  .onyx-frame .onyx-room-header-icon,
   .onyx-frame .onyx-room-header .onyx-members-toggle { min-width: 44px; min-height: 44px; }
   .onyx-frame .onyx-room-header .onyx-call-join { min-height: 44px; }
   .onyx-frame .onyx-room-topic-toggle { min-height: 32px; }
   .onyx-frame .onyx-room-more-menu > button { min-height: 44px; font-size: var(--text-md); }
-  .onyx-room-more-alerts .room-notify-seg { min-height: 40px; }
+  .onyx-frame .onyx-room-more-alerts .room-notify-seg { min-height: 40px; }
 
-  .onyx-roster .onyx-member,
+  .onyx-frame .onyx-roster .onyx-member,
   .onyx-frame .onyx-roster .onyx-mlist-main { min-height: 44px; }
-  .onyx-roster .onyx-roster-filter-input { min-height: 40px; font-size: 16px; }
+  .onyx-frame .onyx-roster .onyx-roster-filter-input { min-height: 44px; font-size: 16px; }
   .onyx-mlist-find,
   .onyx-mlist-close { width: 44px; height: 44px; }
-  .onyx-mlist-group-head { min-height: 36px; }
+  .onyx-frame .onyx-mlist-group-head { min-height: 36px; }
   .onyx-mlist-group-head > .pt-ico { opacity: 1; }
 
-  .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
-  .onyx-railmenu-notify .room-notify-seg { min-height: 40px; }
-  .onyx-railmenu-confirm-actions button { min-height: 44px; }
+  .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 44px; }
+  .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; }
+  .onyx-frame .onyx-railmenu-confirm-actions button { min-height: 44px; }
 }
 
 /* 6. Short windows (≤520px tall) ----------------------------------------- */
@@ -515,16 +516,16 @@
   .onyx-topbar .onyx-ident-nick,
   .onyx-topbar .onyx-ident-badge { display: none; }
   .onyx-frame .onyx-topbar-search { flex: 1 1 auto; min-width: 0; }
-  .onyx-topbar .onyx-palette-launcher { width: 100%; min-height: 32px; }
+  .onyx-frame .onyx-topbar .onyx-palette-launcher { width: 100%; min-height: 32px; }
   .onyx-frame .onyx-topbar-global { flex: none; gap: 0; }
-  .onyx-topbar .shell-ribbon-bell,
-  .onyx-topbar .onyx-topbar-compose { width: 36px; min-height: 36px; }
-  .onyx-topbar .onyx-ident { min-height: 36px; padding: 0 2px; }
-  .onyx-topbar .onyx-moddesk-toggle { min-height: 32px; padding: 0 var(--space-2); font-size: var(--text-xs); }
+  .onyx-frame .onyx-topbar .shell-ribbon-bell,
+  .onyx-frame .onyx-topbar .onyx-topbar-compose { width: 36px; min-height: 36px; }
+  .onyx-frame .onyx-topbar .onyx-ident { min-height: 36px; padding: 0 2px; }
+  .onyx-frame .onyx-topbar .onyx-moddesk-toggle { min-height: 32px; padding: 0 var(--space-2); font-size: var(--text-xs); }
 
   /* Nav rail: tighter, still 40px targets. */
   .onyx-frame > .onyx-primary-nav { gap: 0; padding: var(--space-1) 0 max(var(--space-1), var(--safe-bottom)); }
-  .onyx-primary-nav .onyx-nav-btn { min-height: 40px; }
+  .onyx-frame .onyx-primary-nav .onyx-nav-btn { min-height: 40px; }
 
   /* Room header: one 44px row. */
   .onyx-frame .onyx-room-header { min-height: 44px; padding-block: 0; }
@@ -561,10 +562,10 @@
 
 /* Short and touch: the two 44px rows still give the thumb 44px. */
 @media (min-width: 600px) and (max-height: 520px) and (hover: none) {
-  .onyx-topbar .shell-ribbon-bell,
-  .onyx-topbar .onyx-topbar-compose { width: 40px; min-height: 44px; }
-  .onyx-topbar .onyx-palette-launcher { min-height: 36px; }
-  .onyx-primary-nav .onyx-nav-btn { min-height: 44px; }
+  .onyx-frame .onyx-topbar .shell-ribbon-bell,
+  .onyx-frame .onyx-topbar .onyx-topbar-compose { width: 40px; min-height: 44px; }
+  .onyx-frame .onyx-topbar .onyx-palette-launcher { min-height: 36px; }
+  .onyx-frame .onyx-primary-nav .onyx-nav-btn { min-height: 44px; }
 }
 
 /* Short phones (landscape SE): a compact bottom nav and bars. */
@@ -644,6 +645,37 @@
 @media (min-width: 2400px) and (min-height: 1300px) {
   html:has(> body .onyx-frame) { font-size: 106.25%; }
   :root { --nav-rail-w: 60px; }
+}
+
+/* 10. Touch floor ---------------------------------------------------------- */
+
+/* app.css gives every frame button `min-height: var(--target-floor)` (24px)
+   at specificity (0,3,0). Rules written with two classes (here and in
+   pol-shell.css) lost to it, so on touch the shell's controls measured
+   24px tall. These restate the sizes at the same weight, later in the
+   cascade. Phones and anything touch get 44px; the section toggles in
+   long lists keep a 36px strip (they are not the thing being aimed at). */
+@media (hover: none), (max-width: 599.98px) {
+  .onyx-frame .onyx-topbar .onyx-palette-launcher,
+  .onyx-frame .onyx-topbar .shell-ribbon-bell,
+  .onyx-frame .onyx-topbar .onyx-ident { min-height: 44px; }
+  .onyx-frame .onyx-topbar .shell-ribbon-bell { min-width: 44px; }
+  .onyx-frame .onyx-room-header .onyx-room-back,
+  .onyx-frame .onyx-room-header .onyx-room-header-btn,
+  .onyx-frame .onyx-room-header .onyx-room-header-icon,
+  .onyx-frame .onyx-room-header .onyx-members-toggle,
+  .onyx-frame .onyx-room-header .onyx-call-join { min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-more { width: 44px; min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-filter-unread,
+  .onyx-frame .onyx-rail .onyx-rail-filter-clear { min-height: 44px; }
+  .onyx-frame .onyx-rail .onyx-rail-browse { min-height: 44px; }
+  .onyx-frame .onyx-roster .onyx-roster-care { min-height: 44px; }
+  .onyx-frame .onyx-room-more-alerts .room-notify-seg { min-height: 44px; }
+}
+@media (hover: none) {
+  /* The facepile's 30px faces are a mouse affordance; on touch the
+     member list is the way in. */
+  .onyx-frame .onyx-room-header-actions .onyx-facepile { display: none; }
 }
 
 /* 9. Motion, forced colours ----------------------------------------------- */

@@ -6,6 +6,8 @@
  *
  *   rail-menu        the sidebar row menu (⋯ / long-press / right-click)
  *   rail-mute        a DM muted from its row menu (the toast)
+ *   rail-leave       Leave room from the row menu: the Stay / Leave confirm
+ *   rail-fav         a room favourited from the row menu (the Favorites group)
  *   busy             unread + mentions waiting in other rooms and a DM
  *                    while a room is open (nav totals on every form)
  *   busy-list        the same, on the collection page / sidebar
@@ -127,6 +129,42 @@ export default {
       }
     }
   },
+  'rail-leave': async (page, h) => {
+    await busyJoin(page, h);
+    if (isPhone(page)) {
+      await clickVisible(page, ['[data-testid="room-back"]'], h);
+      await clickVisible(page, ['.onyx-rail-section--rooms [data-testid="sidebar-row-more"]'], h);
+    } else {
+      const rows = await page.$$('.onyx-rail-section--rooms .onyx-rail-row');
+      const row = rows[1] || rows[0];
+      if (row) {
+        await row.hover();
+        const more = await row.$('[data-testid="sidebar-row-more"]');
+        if (more) await more.click();
+        await h.settle(page);
+      }
+    }
+    await clickVisible(page, ['[data-testid="rail-menu-leave"]'], h);
+  },
+  'rail-fav': async (page, h) => {
+    await busyJoin(page, h);
+    if (isPhone(page)) {
+      await clickVisible(page, ['[data-testid="room-back"]'], h);
+      await clickVisible(page, ['.onyx-rail-section--rooms [data-testid="sidebar-row-more"]'], h);
+    } else {
+      const rows = await page.$$('.onyx-rail-section--rooms .onyx-rail-row');
+      const row = rows[1] || rows[0];
+      if (row) {
+        await row.hover();
+        const more = await row.$('[data-testid="sidebar-row-more"]');
+        if (more) await more.click();
+        await h.settle(page);
+      }
+    }
+    await clickVisible(page, ['[data-testid="rail-menu-favorite"]'], h);
+    await page.mouse.move(700, 500);
+    await h.settle(page, 300);
+  },
   // A DM muted from its row menu: the toast it raises, over the list.
   'rail-mute': async (page, h) => {
     await busyJoin(page, h);
@@ -166,7 +204,7 @@ export default {
     await clickVisible(page, ['[data-testid="members-toggle"]'], h);
     await page.evaluate(() => {
       const r = document.querySelector('.onyx-roster');
-      const box = [r, ...r.querySelectorAll('*')].find((el) => el.scrollHeight > el.clientHeight + 40 && /(auto|scroll)/.test(getComputedStyle(el).overflowY));
+      const box = [r, ...r.querySelectorAll('*')].find((el) => el.scrollHeight > el.clientHeight + 40 && /(auto|scroll)/.test(document.defaultView.getComputedStyle(el).overflowY));
       if (box) box.scrollTop = 700;
     });
     await h.settle(page, 250);

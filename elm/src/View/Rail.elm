@@ -24,9 +24,9 @@ v3/rx-shell — every row has an overflow control (`sidebar-row-more`:
 a quiet `…` on hover / focus with a fine pointer, always shown on
 touch) and answers a context menu (right-click, Android long-press)
 with the same row menu (`railMenu`, mounted with the overlays): for a
-room Favorite, Mark as read, Notifications and Leave; for a DM Mark as
-read and Mute. Pointer opens anchor the menu at the pointer on wide
-screens; keyboard opens and phones get a centred / bottom sheet. Empty
+room Favorite, Mark as read, Notifications and Leave (which asks
+Stay / Leave before it parts); for a DM Mark as read and Mute. Pointer opens anchor the menu at the
+pointer on wide screens; keyboard opens and phones get a centred / bottom sheet. Empty
 Rooms / Messages collections say what they are for and offer the next
 step (Browse rooms / Start a room; New message).
 -}
