@@ -112,16 +112,20 @@
   overflow: hidden;
 }
 .onyx-composer .gap-attach-quality-opt {
+  /* Shrinks and wraps inside a narrow column rather than clipping. */
+  flex: 0 1 auto;
+  min-width: 0;
   min-height: var(--target-floor);
-  padding: 2px var(--space-3);
+  padding: 4px var(--space-3);
   background: transparent;
   border: 0;
   border-radius: 0;
   color: var(--onyx-dim);
   font: inherit;
   font-size: var(--text-sm);
+  line-height: 1.25;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  white-space: normal;
   cursor: pointer;
 }
 .onyx-composer .gap-attach-quality-opt + .gap-attach-quality-opt { border-left: 1px solid var(--onyx-line); }
@@ -309,4 +313,14 @@
     padding-block: var(--space-1);
   }
   .onyx-message-search__body { max-height: none; overflow: visible; }
+}
+
+/* ── Composer measure on wide screens ─────────────────────────────────
+   rx-shell caps the composer at the reading measure and centres it
+   (`align-self: center; max-width`), while pol-thread ALSO pads it by
+   `(100% - measure) / 2` — where % is the column, not the composer — so
+   past ~1500px the bar was squeezed to a ~200px sliver. The cap alone
+   does the centring; the padding stays a plain gutter. */
+@media (min-width: 600px) {
+  .onyx-frame > .onyx-main > .onyx-composer { padding-inline: var(--space-4); }
 }
