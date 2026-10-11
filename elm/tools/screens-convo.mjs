@@ -412,6 +412,150 @@ export default {
     await h.settle(page, 300);
   },
 
+  /* Behaviour, not pixels: focus lands in the dialog and never leaves it
+     on Tab / Shift+Tab, Escape closes it and returns focus to the
+     opener, and on touch a swipe down (the scroll-snap layer carried to
+     its far end) closes it. Throws (-> PROBLEM) when any of it breaks. */
+  'cv-lightbox-behaviour': async (page, h) => {
+    await room(page, h);
+    const open = await page.$('.shell-msg-media-open');
+    if (!open) throw new Error('no inline picture to open');
+    const openAndWait = async () => {
+      await open.scrollIntoViewIfNeeded();
+      await open.click();
+      await page.waitForSelector('.shell-msg-lightbox-dialog', { timeout: 3000 });
+      await h.settle(page, 250);
+    };
+    const inside = () => page.evaluate(() => !!document.activeElement && !!document.activeElement.closest('.shell-msg-lightbox'));
+    await openAndWait();
+    if (!(await inside())) throw new Error('focus did not move into the lightbox');
+    for (let i = 0; i < 6; i += 1) {
+      await page.keyboard.press(i % 2 ? 'Shift+Tab' : 'Tab');
+      if (!(await inside())) throw new Error(`focus left the lightbox on key press ${i + 1}`);
+    }
+    await page.keyboard.press('Escape');
+    await h.settle(page, 300);
+    if (await page.$('.shell-msg-lightbox-dialog')) throw new Error('Escape did not close the lightbox');
+    const back = await page.evaluate(() => !!document.activeElement && document.activeElement.classList.contains('shell-msg-media-open'));
+    if (!back) throw new Error('focus did not return to the picture that opened the lightbox');
+    if (await isTouch(page)) {
+      await openAndWait();
+      await page.evaluate(() => {
+        const layer = document.querySelector('.shell-msg-lightbox');
+        layer.scrollTop = -(layer.scrollHeight - layer.clientHeight);
+      });
+      await h.settle(page, 500);
+      if (await page.$('.shell-msg-lightbox-dialog')) throw new Error('swiping the picture away did not close the lightbox');
+    }
+  },
+
+  /* Touch-target audit (hover: none viewports): every button / link /
+     field in the conversation surfaces — transcript, row toolbar and
+     menu, composer and tools tray, search, thread, media index, pins,
+     lightbox — must be at least 44px on its short side, counting an
+     invisible pseudo-element hit area. The shell's own header controls
+     are out of scope. Throws (-> PROBLEM) listing the offenders. */
+  'cv-targets': async (page, h) => {
+    await room(page, h, { rich: true, op: true, pins: true });
+    if (!(await isTouch(page))) return;
+    const SCOPE = '.onyx-thread, .onyx-composer, .onyx-message-search, .onyx-thread-sheet, .shell-msg-lightbox, .room-media-index, .pins-panel, .onyx-msg-menu, .onyx-react-picker';
+    const measure = () => page.evaluate((scope) => {
+      const bad = [];
+      const reach = (el) => {
+        // the hit box = own box grown by the largest ::before / ::after inset
+        const r = el.getBoundingClientRect();
+        let l = 0, t = 0, rr = 0, b = 0;
+        for (const pseudo of ['::before', '::after']) {
+          const cs = getComputedStyle(el, pseudo);
+          if (cs.content === 'none' || cs.position !== 'absolute') continue;
+          const px = (v) => (v === 'auto' ? 0 : -parseFloat(v) || 0);
+          l = Math.max(l, px(cs.left)); rr = Math.max(rr, px(cs.right)); t = Math.max(t, px(cs.top)); b = Math.max(b, px(cs.bottom));
+        }
+        return { w: r.width + l + rr, h: r.height + t + b };
+      };
+      const sel = 'button, a[href], input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select, summary, [role=menuitem], [role=button]';
+      for (const root of document.querySelectorAll(scope)) {
+        for (const el of root.querySelectorAll(sel)) {
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          if (r.width === 0 || r.height === 0 || cs.visibility === 'hidden' || cs.display === 'none') continue;
+          if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+          if (el.closest('[aria-hidden="true"], [inert]')) continue;
+          // inline links, #channel jumps and spoilers inside running text are exempt (WCAG inline exception)
+          if (el.closest('.shell-msg-text')) continue;
+          const k = reach(el);
+          if (Math.min(k.w, k.h) < 43.5) bad.push(`${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]} ${Math.round(k.w)}x${Math.round(k.h)} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18)}"`);
+        }
+      }
+      return [...new Set(bad)];
+    }, SCOPE);
+    const states = [];
+    const seen = new Set();
+    const note = async (name) => {
+      const fresh = (await measure()).filter((x) => !seen.has(x.replace(/ "[^"]*"$/, '')));
+      for (const x of fresh) seen.add(x.replace(/ "[^"]*"$/, ''));
+      states.push([name, fresh]);
+    };
+    await note('room');
+    const row = await reveal(page, 'projector');
+    if (row) {
+      await note('row-toolbar');
+      if (await rowAction(page, row, 'more')) { await note('row-menu'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+    }
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.settle(page, 300);
+    await note('tools-tray');
+    await page.keyboard.press('Escape');
+    await h.tryClick(page, '.shell-composer-tool--emoji');
+    await h.settle(page, 300);
+    await note('emoji');
+    await page.keyboard.press('Escape');
+    await page.fill('#shell-composer-input', '/');
+    await h.settle(page, 300);
+    await note('slash');
+    await page.fill('#shell-composer-input', '');
+    const rr = await reveal(page, 'Sounds good');
+    if (rr && (await rowAction(page, rr, 'react'))) { await note('react-picker'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+    const rp = await reveal(page, 'photos from the meetup');
+    if (rp && (await rowAction(page, rp, 'reply'))) { await note('reply-context'); await page.keyboard.press('Escape'); await page.waitForTimeout(200); }
+    const ind = await page.$('.onyx-thread-indicator');
+    if (ind) {
+      await ind.scrollIntoViewIfNeeded();
+      await ind.click();
+      await h.settle(page, 500);
+      await note('thread');
+      await page.keyboard.press('Escape');
+      await h.settle(page, 300);
+    }
+    const pic = await page.$('.shell-msg-media-open');
+    if (pic) {
+      await pic.scrollIntoViewIfNeeded();
+      await pic.click();
+      await h.settle(page, 400);
+      await note('lightbox');
+      await page.keyboard.press('Escape');
+      await h.settle(page, 300);
+    }
+    await page.keyboard.press('Control+f');
+    await h.settle(page, 300);
+    await note('search');
+    await page.keyboard.press('Escape');
+    await h.tryClick(page, '[data-testid="room-more"]');
+    await h.tryClick(page, '[data-testid="ribbon-room-media"]');
+    await h.settle(page, 500);
+    await note('media-index');
+    await page.keyboard.press('Escape');
+    await h.settle(page, 200);
+    await h.tryClick(page, '[data-testid="room-more"]');
+    await h.tryClick(page, '[data-testid="ribbon-pins"]');
+    await h.settle(page, 500);
+    await note('pins');
+    await page.keyboard.press('Escape');
+    await h.settle(page, 200);
+    const problems = states.filter(([, b]) => b.length).map(([n, b]) => `${n}: ${b.slice(0, 10).join('; ')}`);
+    if (problems.length) throw new Error(`touch targets under 44px — ${problems.join(' | ')}`);
+  },
+
   'cv-jump': async (page, h) => {
     const inject = await room(page, h);
     await scrollTo(page, 0);

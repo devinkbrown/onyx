@@ -2421,3 +2421,58 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .room-media-index-row:hover { background: transparent; border-color: transparent; }
   .shell-msg-preview:hover { background: var(--onyx-panel); }
 }
+
+/* ── 17. Touch targets (v3/rx-convo) ─────────────────────────────────── */
+
+/* The 44px floor on every touch device at every width — a tablet in
+   landscape is still a finger. `.onyx-frame :where(button)` (app.css)
+   sets a 24px floor with three classes' worth of specificity, so the
+   rules below carry `.onyx-frame` where they size a <button>. The
+   visuals stay quiet: icon buttons simply grow, small pills keep their
+   look and grow an invisible hit area (::after) instead. */
+.onyx-frame .shell-msg-lightbox .shell-msg-lightbox-actions > button { min-width: var(--target-min); min-height: var(--target-min); }
+
+@media (pointer: coarse), (hover: none) {
+  /* Row toolbar + the buttons inside the row */
+  .onyx-row-actions { top: -24px; }
+  .onyx-frame .onyx-row-action,
+  .onyx-frame .onyx-message .onyx-msg-menu-trigger { width: 44px; height: 44px; min-height: 44px; }
+  .onyx-frame .onyx-message .boost-pill,
+  .onyx-frame .onyx-message > .onyx-thread-indicator,
+  .onyx-edited-toggle { position: relative; }
+  .onyx-frame .onyx-message .boost-pill::after { content: ""; position: absolute; inset: -6px -2px; }
+  .onyx-frame .onyx-message--compact .boost-pill::after { inset: -8px -2px; }
+  .onyx-frame .onyx-message > .onyx-thread-indicator::after { content: ""; position: absolute; inset: -4px 0; }
+  .onyx-frame .onyx-message--compact > .onyx-thread-indicator::after { inset: -8px 0; }
+  .onyx-edited-toggle::after { content: ""; position: absolute; inset: -12px -8px; }
+  .onyx-frame .shell-msg-file { align-items: center; min-height: var(--target-min); padding-block: 0; }
+
+  /* Composer: field, bar buttons, popovers, context bar */
+  .onyx-composer .onyx-composer-bar { padding: 1px; }
+  .onyx-composer .onyx-composer-field { min-height: var(--target-min); padding-block: 12px; }
+  .onyx-frame .onyx-composer .onyx-composer-bar > button,
+  .onyx-frame .onyx-composer .onyx-composer-bar > .shell-composer-more-wrap > .shell-composer-tool { width: 44px; height: 44px; min-height: 44px; }
+  .onyx-composer .onyx-composer-bar > .onyx-audience-toggle { position: relative; }
+  .onyx-composer .onyx-composer-bar > .onyx-audience-toggle::after { content: ""; position: absolute; inset: -9px -2px; }
+  .onyx-composer .shell-composer-context-close { position: relative; }
+  .onyx-composer .shell-composer-context-close::after { content: ""; position: absolute; inset: -8px; }
+  .onyx-frame .onyx-composer .shell-composer-tools-action { min-height: var(--target-min); }
+  .onyx-composer .shell-emoji-search { min-height: var(--target-min); font-size: 16px; }
+  .onyx-composer .shell-emoji-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
+  .onyx-frame .onyx-composer .shell-emoji-choice { min-height: var(--target-min); font-size: 24px; }
+
+  /* Search, media index, pins, thread */
+  .onyx-message-search__input { min-height: var(--target-min); }
+  .onyx-frame .onyx-message-search__button { width: var(--target-min); min-width: var(--target-min); height: var(--target-min); min-height: var(--target-min); }
+  .onyx-frame .room-media-index button.room-media-index-filter,
+  .onyx-frame .room-media-index button.room-media-index-jump,
+  .onyx-frame .room-media-index button.room-media-index-close,
+  .onyx-frame .pins-panel button.pins-close,
+  .onyx-frame .pins-panel button.pins-item-unpin,
+  .onyx-frame .onyx-thread-sheet button.onyx-thread-close { min-height: var(--target-min); min-width: var(--target-min); }
+  .onyx-frame .room-media-index button.room-media-index-close,
+  .onyx-frame .pins-panel button.pins-close,
+  .onyx-frame .pins-panel button.pins-item-unpin { width: var(--target-min); height: var(--target-min); }
+  .onyx-frame .pins-item-unpin { margin-top: 0; }
+  .pins-ledger { min-height: var(--target-min); }
+}
