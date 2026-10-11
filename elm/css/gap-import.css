@@ -169,6 +169,7 @@
 
 .hi-review-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -177,6 +178,7 @@
   border-bottom: 1px solid var(--onyx-line);
 }
 .hi-review-bar-title { font-size: var(--text-sm); font-weight: 650; }
+.hi-review-bar .hi-btn { white-space: nowrap; }
 
 .hi-convs { margin: 0; padding: 0; list-style: none; }
 .hi-conv {

@@ -398,7 +398,7 @@ reviewCard model staged =
         , div [ class "hi-tally", attribute "role" "group", attribute "aria-label" "What the import holds" ]
             [ tally "New" (HI.groupThousands sel.fresh) "will be added"
             , tally "Already here" (HI.groupThousands sel.already) "skipped"
-            , tally "Conversations" (String.fromInt sel.conversations ++ " of " ++ String.fromInt total) "selected"
+            , tally "Included" (String.fromInt sel.conversations ++ " of " ++ String.fromInt total) "conversations"
             ]
         , if List.isEmpty leftOut then
             text ""
