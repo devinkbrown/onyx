@@ -16,6 +16,8 @@
  *   ... edit CSS, rebuild ...
  *   node elm/tools/css-regress.mjs shoot --out /tmp/rx/cur
  *   node elm/tools/css-regress.mjs diff /tmp/rx/base /tmp/rx/cur --report /tmp/rx/report
+ *   node elm/tools/css-regress.mjs recheck /tmp/rx/base /tmp/rx/cur --dist elm/dist-elm --noise A B
+ *                                                           # re-shoot the scenarios that differ; flakes vanish
  *   node elm/tools/css-regress.mjs noise --out /tmp/rx/n1   # shoot twice, diff: proves determinism
  *   node elm/tools/css-regress.mjs list                     # the matrix, with shot counts
  *
@@ -120,6 +122,8 @@ async function shoot(out) {
   let jobs = jobsFor(tiers);
   if (only) jobs = jobs.filter((j) => j.scenarios.some((s) => s.includes(only)));
   if (only) jobs = jobs.map((j) => ({ ...j, scenarios: j.scenarios.filter((s) => s.includes(only)) }));
+  const onlyList = flag('--only-list', '') ? flag('--only-list', '').split(',') : null; // exact scenario keys
+  if (onlyList) jobs = jobs.map((j) => ({ ...j, scenarios: j.scenarios.filter((s) => onlyList.includes(s)) })).filter((j) => j.scenarios.length);
   const nJobs = Number(flag('--jobs', Math.max(4, Math.min(14, Math.floor(cpus().length / 3)))));
   if (!has('--keep')) rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -292,6 +296,39 @@ if (cmd === 'shoot') {
   const [a, b] = positional;
   if (!a || !b) { console.error('usage: css-regress.mjs diff BASE CUR [--report DIR] [--tolerance N] [--only substr] [--skip prefix,prefix] [--noise A B]'); process.exit(2); }
   process.exit(diff(resolve(a), resolve(b)) ? 1 : 0);
+} else if (cmd === 'recheck') {
+  // recheck BASE CUR --dist DIST [--noise A B]: re-shoot every scenario that has a differing shot, diff again.
+  // A shot that matches BASE on the second take was a flake (animated scene canvas, a toast that raced).
+  const positional = rest.filter((x, i) => !x.startsWith('--') && !['--dist', '--noise'].includes(rest[i - 1]) && rest[i - 2] !== '--noise');
+  const [a, b] = positional.map((x) => resolve(x));
+  const ni = rest.indexOf('--noise');
+  const noiseArgs = ni >= 0 ? ['--noise', rest[ni + 1], rest[ni + 2]] : [];
+  const sink = []; const origLog = console.log; console.log = (...m) => sink.push(m.join(' '));
+  const n = diff(a, b); console.log = origLog;
+  const files = sink.filter((l) => /^\s+(DIFF|SIZE)/.test(l)).map((l) => l.trim().split(/\s+/)[1].replace(/:$/, ''));
+  if (!n) { console.log('recheck: nothing differs'); process.exit(0); }
+  const cssNames = ['focus-tour-room', 'focus-tour-connect', 'focus-tour-landing', 'hover-room', 'composer-states'];
+  const keys = new Set();
+  for (const f of files) {
+    let k = f.split('--')[0];
+    if (k.startsWith('css__')) { const rest2 = k.slice(5); const hit = cssNames.find((c) => rest2.startsWith(c)); k = hit ? `${hit}__css` : k; }
+    keys.add(k);
+  }
+  console.log(`recheck: ${files.length} differing shot(s) in ${keys.size} scenario(s): ${[...keys].join(', ')}`);
+  const out2 = `${b}-recheck`;
+  const dist2 = resolve(repo, flag('--dist', 'elm/dist-elm'));
+  rmSync(out2, { recursive: true, force: true }); mkdirSync(out2, { recursive: true });
+  const jobs = jobsFor(['core', 'sheets', 'public']).map((j) => ({ ...j, scenarios: j.scenarios.filter((s) => keys.has(s)) })).filter((j) => j.scenarios.length);
+  const queue = [...jobs]; const nJobs = Number(flag('--jobs', 8));
+  await Promise.all(Array.from({ length: Math.min(nJobs, queue.length) }, async () => { while (queue.length) await runJob(queue.shift(), out2, dist2, []); }));
+  // diff only the shots that were re-shot
+  const aSub = `${a}-recheck-base`; rmSync(aSub, { recursive: true, force: true }); mkdirSync(aSub, { recursive: true });
+  for (const f of readdirSync(out2).filter((x) => x.endsWith('.png'))) if (existsSync(join(a, f))) writeFileSync(join(aSub, f), readFileSync(join(a, f)));
+  rest.splice(0, rest.length, ...noiseArgs);
+  const left = diff(aSub, out2);
+  rmSync(aSub, { recursive: true, force: true });
+  console.log(left ? `recheck: ${left} shot(s) still differ after a second take (real change)` : 'recheck: every difference was a flake (identical on the second take)');
+  process.exit(left ? 1 : 0);
 } else if (cmd === 'noise') {
   const out = resolve(flag('--out', '/tmp/css-regress-noise'));
   await shoot(`${out}-a`);
@@ -306,6 +343,6 @@ if (cmd === 'shoot') {
   }
   console.log(`default run (core,sheets,public): ${total} shots (+ extra state shots)`);
 } else {
-  console.error('usage: css-regress.mjs shoot|diff|noise|list   (see the README comment at the top of this file)');
+  console.error('usage: css-regress.mjs shoot|diff|recheck|noise|list   (see the README comment at the top of this file)');
   process.exit(2);
 }

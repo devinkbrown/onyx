@@ -56,6 +56,18 @@ if (cmd === 'probe') {
     const logical = m[1].replace(/\.[0-9a-f]{12}\.css$/, '.css');
     copyFileSync(join(repo, 'elm', logical), join(probeDist, m[1]));
   }
+  // the source declaration texts of every style rule, in rule order: the page maps shorthands to longhands with them
+  const { parseCss, walk } = await import('./css-inert-scan.mjs');
+  const srcMap = {};
+  for (const stem of files) {
+    const dirp = stem === 'app' ? probeDist : join(probeDist, 'css');
+    const hit = readdirSync(dirp).find((n) => new RegExp(`^${stem}\\.[0-9a-f]{12}\\.css$`).test(n));
+    if (!hit) { console.error(`no ${stem}.css in ${dirp}`); process.exit(2); }
+    const list = [];
+    for (const { node } of walk(parseCss(readFileSync(join(dirp, hit), 'utf8')).nodes)) if (node.kind === 'rule') list.push(node.decls.map((d) => `${d.prop}: ${d.value}`));
+    srcMap[stem] = list;
+  }
+  writeFileSync(`${out}-src.json`, JSON.stringify(srcMap));
   const { NAMES } = await import(join(here, 'screens-css-inert.mjs'));
   const names = NAMES.filter((n) => !only || n.includes(only));
   const chunks = [];
@@ -65,7 +77,7 @@ if (cmd === 'probe') {
   const run = (chunk) => new Promise((res) => {
     const args = ['-n', '19', process.execPath, join(here, 'screens.mjs'), '--dist', probeDist, '--out', `${out}/shots`, '--extra', join(here, 'screens-css-inert.mjs'),
       '--only', chunk.join(','), '--vp', vps.join(','), '--freeze', FREEZE, '--stable'];
-    const p = spawn('nice', args, { cwd: repo, env: { ...process.env, TZ: 'UTC', CSS_INERT_OUT: out, CSS_INERT_FILES: files.join(',') } });
+    const p = spawn('nice', args, { cwd: repo, env: { ...process.env, TZ: 'UTC', CSS_INERT_OUT: out, CSS_INERT_FILES: files.join(','), CSS_INERT_SRC: `${out}-src.json` } });
     let log = ''; p.stdout.on('data', (d) => { log += d; }); p.stderr.on('data', (d) => { log += d; });
     p.on('close', () => { done += 1; for (const l of log.split('\n')) if (l.startsWith('PROBLEM') && !/horizontal overflow/.test(l)) problems.push(l); process.stderr.write(`\r${done}/${chunks.length} jobs`); res(); });
   });
@@ -85,40 +97,31 @@ if (cmd === 'probe') {
   const hit = readdirSync(pdir).find((n) => new RegExp(`^${file}\\.[0-9a-f]{12}\\.css$`).test(n));
   const src = readFileSync(hit ? join(pdir, hit) : join(repo, 'elm', rel), 'utf8');
   const rules = []; for (const { node } of walk(parseCss(src).nodes)) if (node.kind === 'rule') rules.push(node);
-  const agg = new Map(); // `${i}|${prop}` -> {pages, eff, ovr, scen:Set}
+  const agg = new Map(); // `${i}|${j}` -> {pages, eff, ovr, scen:Set}
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
     const scen = f.split('--')[0];
     for (const r of JSON.parse(readFileSync(join(dir, f), 'utf8'))) {
       if (r.f !== file) continue;
-      for (const p of r.seen) {
-        const k = `${r.i}|${p}`; const a = agg.get(k) || { pages: 0, eff: 0, ovr: 0, scen: new Set() };
-        a.pages += 1; a.scen.add(scen);
-        if (r.eff.includes(p)) a.eff += 1; else if ((r.ovr || []).includes(p)) a.ovr += 1;
+      for (const [dj, e, o] of r.d) {
+        const k = `${r.i}|${dj}`; const a = agg.get(k) || { pages: 0, eff: 0, ovr: 0, scen: new Set() };
+        a.pages += 1; a.scen.add(scen); a.eff += e; a.ovr += o;
         agg.set(k, a);
       }
     }
   }
   // inert = used on no page (never effective) and OVERRIDDEN with a different value on at least one
-  const inert = []; let seenDecls = 0;
+  const inert = []; const used = []; let seenDecls = 0;
   for (const [k, a] of agg) {
     seenDecls += 1;
-    if (a.eff === 0 && a.ovr >= 1 && a.pages >= minPages && a.scen.size >= 2) {
-      const [i, prop] = k.split('|'); const rule = rules[Number(i)]; if (!rule) continue;
-      const decl = rule.decls.find((d) => d.prop === prop || prop.startsWith(d.prop + '-'));
-      inert.push({ file: rel, line: decl ? decl.line : rule.line, rule: rule.line, sel: rule.selector.replace(/\s+/g, ' ').slice(0, 80), prop, declProp: decl ? decl.prop : prop, pages: a.pages, overridden: a.ovr, scenarios: a.scen.size });
-    }
+    const [i, dj] = k.split('|').map(Number); const rule = rules[i]; const decl = rule && rule.decls[dj];
+    if (!decl) continue;
+    const row = { file: rel, line: decl.line, rule: rule.line, sel: rule.selector.replace(/\s+/g, ' ').slice(0, 80), prop: decl.prop, value: decl.value.slice(0, 40), pages: a.pages, overridden: a.ovr, scenarios: a.scen.size };
+    if (a.eff === 0 && a.ovr >= 1 && a.pages >= minPages && a.scen.size >= 2) inert.push(row); else used.push(row);
   }
-  // whole rules: matched on enough pages, never effective for ANY property, overridden for at least one
-  const byRule = new Map();
-  for (const [k, a] of agg) { const i = Number(k.split('|')[0]); const r = byRule.get(i) || { pages: 0, eff: 0, ovr: 0, scen: new Set(), props: 0 }; r.pages = Math.max(r.pages, a.pages); r.eff += a.eff; r.ovr += a.ovr; for (const s of a.scen) r.scen.add(s); r.props += 1; byRule.set(i, r); }
-  const wholeRules = [];
-  for (const [i, r] of byRule) if (r.eff === 0 && r.ovr >= 1 && r.pages >= minPages && r.scen.size >= 2 && rules[i]) wholeRules.push({ file: rel, line: rules[i].line, sel: rules[i].selector.replace(/\s+/g, ' ').slice(0, 90), decls: rules[i].decls.length, pages: r.pages, scenarios: r.scen.size });
-  console.log(`${file}: ${wholeRules.length} whole rules inert (${wholeRules.reduce((n, r) => n + r.decls, 0)} declarations)`);
-  const wj = flag('--whole-json', ''); if (wj) writeFileSync(wj, JSON.stringify(wholeRules, null, 1));
-  console.log(`${file}: ${rules.length} rules; ${seenDecls} (rule,property) pairs observed; ${inert.length} inert (>= ${minPages} pages, >= 2 scenarios)`);
+  console.log(`${file}: ${rules.length} rules; ${seenDecls} declarations observed; ${inert.length} inert (never used on >= ${minPages} pages in >= 2 scenarios, overridden somewhere)`);
   const j = flag('--json', '');
   if (j) writeFileSync(j, JSON.stringify(inert, null, 1));
-  for (const r of inert.slice(0, Number(flag('--show', 40)))) console.log(`  ${r.file}:${r.line}  ${r.sel}  { ${r.prop} }  (${r.overridden}/${r.pages} pages overridden, ${r.scenarios} scenarios)`);
+  for (const r of inert.slice(0, Number(flag('--show', 40)))) console.log(`  ${r.file}:${r.line}  ${r.sel}  { ${r.prop}: ${r.value} }  (${r.overridden}/${r.pages} pages overridden, ${r.scenarios} scenarios)`);
 } else {
   console.error('usage: css-inert.mjs probe|report   (see the README comment at the top of this file)');
   process.exit(2);

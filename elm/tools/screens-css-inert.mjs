@@ -8,7 +8,7 @@
  * and without it, and the rule is put back. One JSON per page goes to $CSS_INERT_OUT.
  */
 /* global CSS, getComputedStyle */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import appearance from './screens-appearance.mjs';
 import calls from './screens-calls.mjs';
@@ -36,10 +36,15 @@ import watch from './screens-watch.mjs';
 const FILES = { ap: appearance, calls, cv: convo, ga: gapAccount, gauth: gapAuth, cs: gapChanserv, gcl: gapClaim, gcmd: gapCommands, gcv: gapConvo, gi: gapImport, oper: gapOper, gp: gapPeople, gs: gapShell, um: gapUsermodes, msg: messages, org: organize, rx, rxp: rxPublic, rxs: rxSheets, shell, uis: uiSheets, watch };
 const SKIP = /^(ap-(assert|audit|scene)|rx-probe$)/;
 
-/** In-page: returns [{f, i, sel, n, seen, eff, ovr}] for the rules that match something:
-    eff = removing the rule changes the property, ovr = the rule's value loses to a different one. */
-function probe(stems) {
+/** In-page: for each style rule of the chosen sheets that matches something, one record
+    {f, i, n, d:[[j, e, o], ...]} where j is the index of the declaration in the SOURCE rule,
+    e = removing the rule changes a property that declaration sets, o = the declaration's value
+    loses to a different one (a stronger rule wins). `srcMap[file][ordinal]` lists the source
+    declaration texts, so shorthands map to the longhands the browser expands them to. */
+function probe(arg) {
+  const { stems, srcMap } = arg;
   const out = [];
+  const tmp = document.createElement('div').style;
   let ordinal = -1;
   const active = (rule) => {
     for (let p = rule.parentRule; p; p = p.parentRule) {
@@ -56,33 +61,34 @@ function probe(stems) {
       if (t === 'CSSStyleRule') {
         ordinal += 1;
         const idx = ordinal;
-        const act = active(r);
-        if (act !== true) continue;
+        if (active(r) !== true) continue;
+        const texts = (srcMap[file] || [])[idx];
+        if (!texts || !texts.length) continue;
         let els;
         try { els = [...document.querySelectorAll(r.selectorText)]; } catch { continue; }
         if (!els.length) continue;
         if (els.length > 48) { const step = els.length / 48; els = Array.from({ length: 48 }, (_, k) => els[Math.floor(k * step)]); }
-        const decls = [...r.style].filter((p) => !p.startsWith('--'));
-        if (!decls.length) continue;
-        const read = () => els.map((el) => { const cs = getComputedStyle(el); return decls.map((p) => cs.getPropertyValue(p)); });
+        const groups = texts.map((txt) => { tmp.cssText = ''; tmp.cssText = txt; return [...tmp].filter((p) => !p.startsWith('--')); });
+        const props = [...new Set(groups.flat())];
+        if (!props.length) continue;
+        const read = () => els.map((el) => { const cs = getComputedStyle(el); return props.map((p) => cs.getPropertyValue(p)); });
         const before = read();
         const saved = r.style.cssText;
         r.style.cssText = '';
         const after = read();
         // same declarations, every one !important: a property that changes now is one the
         // rule normally LOSES (a stronger rule wins with a different value)
-        const parts = []; let depth = 0; let cur = '';
-        for (const ch of saved) { if (ch === '(') depth += 1; if (ch === ')') depth -= 1; if (ch === ';' && depth === 0) { parts.push(cur); cur = ''; } else cur += ch; }
-        if (cur.trim()) parts.push(cur);
-        r.style.cssText = parts.map((d) => (/!\s*important\s*$/i.test(d) ? d : d.trim() + ' !important')).join(';');
+        r.style.cssText = texts.map((d) => (/!\s*important\s*$/i.test(d) ? d : `${d} !important`)).join(';');
         const imp = read();
         r.style.cssText = saved;
-        const eff = []; const ovr = [];
-        decls.forEach((p, di) => {
-          if (before.some((row, ei) => row[di] !== after[ei][di])) eff.push(p);
-          else if (before.some((row, ei) => row[di] !== imp[ei][di])) ovr.push(p);
+        const eff = new Set(); const ovr = new Set();
+        props.forEach((p, pi) => {
+          if (before.some((row, ei) => row[pi] !== after[ei][pi])) eff.add(p);
+          else if (before.some((row, ei) => row[pi] !== imp[ei][pi])) ovr.add(p);
         });
-        out.push({ f: file, i: idx, sel: r.selectorText, n: els.length, seen: decls, eff, ovr });
+        const d = [];
+        groups.forEach((g, j) => { if (g.length) d.push([j, g.some((p) => eff.has(p)) ? 1 : 0, !g.some((p) => eff.has(p)) && g.some((p) => ovr.has(p)) ? 1 : 0]); });
+        out.push({ f: file, i: idx, n: els.length, d });
       } else if (r.cssRules && t !== 'CSSKeyframesRule') visit(r.cssRules, file);
     }
   };
@@ -98,12 +104,13 @@ function probe(stems) {
 
 const stems = (process.env.CSS_INERT_FILES || 'app').split(',');
 const outDir = process.env.CSS_INERT_OUT;
+const srcMap = process.env.CSS_INERT_SRC ? JSON.parse(readFileSync(process.env.CSS_INERT_SRC, 'utf8')) : {};
 if (outDir) mkdirSync(outDir, { recursive: true });
 
 const wrap = (fn) => async (page, h) => {
   await fn(page, h);
   await h.settle(page, 250);
-  const rows = await page.evaluate(probe, stems);
+  const rows = await page.evaluate(probe, { stems, srcMap });
   return rows;
 };
 
