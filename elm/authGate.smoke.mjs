@@ -66,7 +66,7 @@ function assetRoot() {
 
 function findEsbuild() {
   if (process.env.ESBUILD) return process.env.ESBUILD;
-  let common = "";
+  let common;
   try {
     common = execFileSync("git", ["-C", here, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).trim();
   } catch (err) { common = ""; }
@@ -452,6 +452,81 @@ test("forgot password: request a code, confirm with the code and a new password,
     await tick(dom);
     assert.equal(doc.querySelector('[data-testid="auth-gate"]'), null, "Sign in returns to the connect form");
     assert.equal(q(doc, "#conn-nick").value, "kai", "the account name is prefilled");
+    assert.deepEqual(errors, []);
+  } finally {
+    dom.window.close();
+    root.cleanup();
+  }
+});
+
+/* Passkey sign-in: WEBAUTHN AUTH on a plain connection, the browser
+   ceremony (stubbed — jsdom has no authenticator), AUTH-FINISH, and the
+   server's "identified" notice. */
+test("passkey sign-in: AUTH on a guest connection, assertion → AUTH-FINISH, then identified", async () => {
+  const asked = [];
+  const bytes = (n, fill) => new Uint8Array(n).fill(fill);
+  const { dom, doc, window, errors, log, root } = await boot("/app?ws=" + encodeURIComponent(PIN), (w) => {
+    Object.defineProperty(w, "isSecureContext", { configurable: true, value: true });
+    w.PublicKeyCredential = function PublicKeyCredential() {};
+    Object.defineProperty(w.navigator, "credentials", {
+      configurable: true,
+      value: {
+        create: async () => null,
+        get: async (options) => {
+          asked.push(options.publicKey);
+          return {
+            rawId: bytes(16, 1).buffer,
+            response: {
+              clientDataJSON: bytes(24, 2).buffer,
+              authenticatorData: bytes(37, 3).buffer,
+              signature: bytes(70, 4).buffer,
+            },
+          };
+        },
+      },
+    });
+  });
+  try {
+    q(doc, '[data-testid="conn-mode-signin"]').click();
+    await tick(dom);
+    typeInto(window, q(doc, "#conn-nick"), "kai");
+    await tick(dom);
+    q(doc, '[data-testid="conn-passkey"]').click();
+    await tick(dom);
+    assert.equal(log.sockets.length, 1, "choosing passkey dials a plain connection");
+    const sock = log.sockets[0];
+    sock.serverOpen();
+    await tick(dom);
+    const nickLine = sock.lines().find((l) => l.startsWith("NICK "));
+    assert.match(nickLine, /^NICK Guest\d{5}$/);
+    const guest = nickLine.slice(5);
+    sock.serverSay(":onyx.test CAP * LS :message-tags");
+    await tick(dom);
+    const capReq = sock.lines().find((l) => l.startsWith("CAP REQ"));
+    if (capReq) { sock.serverSay(":onyx.test CAP * ACK :" + capReq.replace(/^CAP REQ :?/, "")); await tick(dom); }
+    sock.serverSay(...welcome(guest));
+    await tick(dom);
+    assert.ok(sock.lines().includes("WEBAUTHN AUTH kai"), "WEBAUTHN AUTH <account>; sent: " + JSON.stringify(sock.lines()));
+    assert.match(q(doc, "#auth-title").textContent, /passkey/i);
+
+    /* The server's challenge and the allowed credential. */
+    sock.serverSay(
+      `:onyx.test EVENT ${guest} WEBAUTHN AUTH-CHALLENGE AAAAAAAAAAAAAAAAAAAAAA onyx.test :kai`,
+      `:onyx.test EVENT ${guest} WEBAUTHN ALLOW-CRED AQEBAQEBAQEBAQEBAQEBAQ`,
+    );
+    await waitUntil(dom, () => asked.length === 1, "the browser ceremony");
+    assert.equal(asked[0].rpId, "onyx.test");
+    assert.deepEqual(Array.from(asked[0].challenge), new Array(16).fill(0));
+    assert.deepEqual(Array.from(asked[0].allowCredentials[0].id), new Array(16).fill(1));
+    await waitUntil(dom, () => sock.lines().some((l) => l.startsWith("WEBAUTHN AUTH-FINISH")), "AUTH-FINISH");
+    const finish = sock.lines().find((l) => l.startsWith("WEBAUTHN AUTH-FINISH")).split(" ");
+    const b64url = (u8) => Buffer.from(u8).toString("base64url");
+    assert.deepEqual(finish.slice(2), [b64url(bytes(16, 1)), b64url(bytes(24, 2)), b64url(bytes(37, 3)), b64url(bytes(70, 4))]);
+    assert.equal(finish[1], "AUTH-FINISH");
+
+    sock.serverSay(`:onyx.test NOTICE ${guest} :You are now identified as kai`);
+    await tick(dom);
+    assert.equal(doc.querySelector('[data-testid="auth-gate"]'), null, "the gate yields once identified");
     assert.deepEqual(errors, []);
   } finally {
     dom.window.close();

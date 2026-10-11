@@ -175,7 +175,7 @@ subsystem names (Cadence, Mooring); memos are `MEMO` only.
 
 | Feature | TS oracle | Elm status |
 |---|---|---|
-| WEBAUTHN REGISTER/AUTH exchanges; NOTE FAIL/WARN codes; fail-closed challenge (b64url, ≥16 bytes, host-label rp_id, ES256/EdDSA only) | `lib/webauthn/passkey.ts`, `store.ts:4710` | **done** — `Passkey` (challenge/rpId/credId/label/uint validators, ceremony arg validation, all REGISTER/AUTH/LIST/REMOVE/RENAME/FINISH builders, full reply fold: context-gated codes, CRED accumulation with dup/cap guards, AUTH settle with malformed allow-list failure, FAIL clearing + rename/feature flags) + **ports** (`navigator.credentials` ceremonies, 80ms ALLOW-CRED tick) |
+| WEBAUTHN REGISTER/AUTH exchanges; NOTE FAIL/WARN codes; fail-closed challenge (b64url, ≥16 bytes, host-label rp_id, ES256/EdDSA only) | `lib/webauthn/passkey.ts`, `store.ts:4710` | **done** — `Passkey` (challenge/rpId/credId/label/uint validators, ceremony arg validation, all REGISTER/AUTH/LIST/REMOVE/RENAME/FINISH builders, full reply fold: context-gated codes, CRED accumulation with dup/cap guards, AUTH settle with malformed allow-list failure, FAIL clearing + rename/feature flags) + **ports** (`navigator.credentials` ceremonies, 80ms ALLOW-CRED tick; v3/gap-auth maps WebAuthn rejections to plain copy); AUTH is started from the connect gate (v3/gap-auth `AuthGate.PasskeyStart`) and `WEBAUTHN STATUS` fills the Account passkeys count |
 
 ## History vault & local-first
 
