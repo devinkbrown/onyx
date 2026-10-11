@@ -246,10 +246,10 @@ async function pageScoreBoxes({ b64, boxes, dpr }) {
     const fgLum = lum(box.fg[0], box.fg[1], box.fg[2]);
     const score = (groundLum) => (Math.max(fgLum, groundLum) + 0.05) / (Math.min(fgLum, groundLum) + 0.05);
     // The typical ground (median pixel) and the worst one for this text
-    // (the 5th / 95th percentile pixel nearest its own luminance, so a lone
-    // star or streak does not decide it).
+    // (the 15th / 85th percentile pixel nearest its own luminance, so a lone
+    // star, streak or antialiased corner does not decide it).
     const median = lums[Math.floor(lums.length * 0.5)];
-    const near = fgLum >= 0.18 ? lums[Math.floor(lums.length * 0.95)] : lums[Math.floor(lums.length * 0.05)];
+    const near = fgLum >= 0.18 ? lums[Math.floor(lums.length * 0.85)] : lums[Math.floor(lums.length * 0.15)];
     out.push({
       text: box.text,
       tag: box.tag,
