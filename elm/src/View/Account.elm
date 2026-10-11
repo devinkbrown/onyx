@@ -20,10 +20,12 @@ import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxl
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
+import AuthGate -- v3/gap-auth
 import Push
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
+import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
 import View.UserModes
 
@@ -79,6 +81,7 @@ accountPanel model =
                             , -- v3/account2
                               View.Account2.portableSection model
                             , sessionSection model
+                            , View.Chanserv.myRoomsSection model -- v3/gap-chanserv
                             , capsSection model
                             , retentionSection model
                             , dataSection model
@@ -1031,10 +1034,20 @@ emailError model =
 
 passwordSection : Model -> Html Msg
 passwordSection model =
+    let
+        -- v3/gap-auth: SETPASS in flight / confirmed.
+        pending =
+            case model.authGate.setPass of
+                AuthGate.SetPassPending _ ->
+                    True
+
+                _ ->
+                    False
+    in
     section [ class "onyx-account-section", id "acct-password-title" ]
         ([ h3 [ class "onyx-account-section__title" ] [ text "Password" ]
          , p [ class "onyx-account-hint" ]
-            [ text "Choose a new password. You'll need your current one to confirm." ]
+            [ text "Choose a new password of 8 to 512 characters. You'll need your current one to confirm." ]
          , form
             [ class "onyx-account-password"
             , onSubmit AccountPasswordSubmitted
@@ -1049,6 +1062,7 @@ passwordSection model =
                 , value model.accountNewPassword
                 , onInput AccountNewPasswordInput
                 , placeholder "new password"
+                , attribute "autocomplete" "new-password"
                 , attribute "data-testid" "account-new-password"
                 ]
                 []
@@ -1061,6 +1075,7 @@ passwordSection model =
                 , value model.accountConfirmPassword
                 , onInput AccountConfirmPasswordInput
                 , placeholder "repeat new password"
+                , attribute "autocomplete" "new-password"
                 , attribute "data-testid" "account-confirm-password"
                 ]
                 []
@@ -1073,6 +1088,7 @@ passwordSection model =
                 , value model.accountCurrentPassword
                 , onInput AccountCurrentPasswordInput
                 , placeholder "current password"
+                , attribute "autocomplete" "current-password"
                 , attribute "data-testid" "account-current-password"
                 ]
                 []
@@ -1081,16 +1097,37 @@ passwordSection model =
                 , class "onyx-account-password-save"
                 , attribute "data-testid" "account-password-save"
                 , disabled
-                    (String.isEmpty model.accountNewPassword
+                    (pending
+                        || String.isEmpty model.accountNewPassword
                         || String.isEmpty model.accountConfirmPassword
                         || String.isEmpty model.accountCurrentPassword
                     )
                 ]
-                [ text "Change password" ]
+                [ text
+                    (if pending then
+                        "Changing…"
+
+                     else
+                        "Change password"
+                    )
+                ]
             ]
          ]
             ++ passwordError model
+            ++ passwordChanged model
         )
+
+
+{-| v3/gap-auth — the server confirmed the SETPASS. -}
+passwordChanged : Model -> List (Html Msg)
+passwordChanged model =
+    if model.authGate.setPass == AuthGate.SetPassDone then
+        [ p [ class "onyx-account-passkey-ok", attribute "role" "status", attribute "data-testid" "account-password-changed" ]
+            [ text "Password changed. Use your new password the next time you sign in." ]
+        ]
+
+    else
+        []
 
 
 passwordError : Model -> List (Html Msg)
@@ -1277,6 +1314,13 @@ passkeysSection model =
         [ h3 [ class "onyx-account-section__title" ] [ text "Passkeys" ]
         , p [ class "onyx-account-hint" ]
             [ text "Sign in without a password using a device passkey — Face ID, a fingerprint, or a security key." ]
+        , -- v3/gap-auth: WEBAUTHN STATUS
+          case model.passkey.statusText of
+            Just status ->
+                p [ class "onyx-account-hint", attribute "data-testid" "passkeys-status" ] [ text (AuthGate.passkeyStatusCopy status) ]
+
+            Nothing ->
+                text ""
         , passkeysBody model
         ]
 

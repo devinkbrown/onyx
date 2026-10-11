@@ -1691,7 +1691,7 @@ Elm: `View/Connect.elm`, `View/Account.elm`, `View/Account2.elm`, `View/GuestCla
 | G25 | Fields lock while dialing; cancel the dial | `Connect.tsx:545` (lock only) | FULL | `View/Connect.elm:80`, `App.elm:37577` | Elm adds a Cancel button |
 | G26 | Shell stays up through a drop (autoReconnect) | `Connect.tsx:1080` (auto) | FULL | `App.elm:24306` | — |
 | G27 | Deliberate disconnect returns to the gate | `Connect.tsx:1047` (UI) | FULL | `App.elm:37596` | — |
-| G28 | Passkey sign-in on Connect | `Connect.tsx:105` PRESENT_PASSKEY_SIGNIN=false (DEAD) | N/A | `Passkey.elm:336` builder; nothing starts it | Hidden in both clients |
+| G28 | Passkey sign-in on Connect | `Connect.tsx:105` PRESENT_PASSKEY_SIGNIN=false (DEAD) | N/A | v3/gap-auth: `View.AuthGate.signInLinks` → `AuthGate.PasskeyStart` → `Passkey.webauthnAuth` on a plain guest connection → AUTH-CHALLENGE/ALLOW-CRED → get ceremony → AUTH-FINISH → `NOTICE … You are now identified as` | Elm now offers it (the server path is complete); Solid still hides it |
 | G29 | Update reload deferred while the form holds typed data | `Connect.tsx:330` (auto) | FULL | `App.elm:46222` | Elm reloads only after the user approves |
 | G30 | bfcache/freeze page restore → reconnectNow, or mark offline | `connectPageLifecycle.ts:34` (auto) | MISSING | no pageshow/freeze listener in `ports.js` | — |
 | G31 | Stale lazy-chunk recovery screen | `StaleChunkRecovery.tsx`, `Connect.tsx:1666` (auto) | N/A | single Elm bundle | Absent by design |
@@ -2472,7 +2472,7 @@ Walked Solid `src/lib/store/store.ts` `_handleMessage` 10432–15569 (pre-switch
 | C99 | 475 → join prompt "Incorrect channel password" (no inbox) | `store.ts:15229` | FULL | `App.elm:17241-17244` | |
 | C100 | 482 → inbox "You need operator privileges in #x" + ban panel error | `store.ts:15243-15259` | FULL | `App.elm:17248-17271` | |
 | C101 | 477 (+R/+a room), 480 (join throttle), 407 → Activity text | default (Activity) | PARTIAL | `App.elm:5671,5720-5730` | Log only; browser waits 8 s, then shows "did not confirm" |
-| C102 | KNOCK replies 710/711/713/714 | default (Activity) | PARTIAL | `App.elm:4673-4690` | Log only (invisible) |
+| C102 | KNOCK replies 710/711/713/714 | default (Activity) | FULL | `Chanserv.elm` `fold` (710 → inbox row with Invite, 711/713/714 → toasts and prompt state); `View/Chanserv.elm` | v3/gap-chanserv: Ask to join on the 471/473/475 prompt; Elm better than the oracle's log line |
 | C103 | 600/601/604/605 WATCH → watch-list online/last-seen | `store.ts:14943-14967` | FULL | `App.elm:5571-5590,25779,25797` | |
 | C104 | 367/368 ban list → ban panel | `store.ts:15044-15092` | FULL | `App.elm:5803-5807,19108,19232` | |
 | C105 | 801–805 ACCESS → Roles access manager | `store.ts:15094-15203` | FULL | `App.elm:5782-5796,8446`; `View/RoomSettings.elm:482` | |

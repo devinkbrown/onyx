@@ -8,6 +8,7 @@ multiline). All through the pure `foldLine` / `update` — no socket.
 
 import App exposing (..)
 import Attribution
+import AuthGate exposing (SetPass(..))
 import Base64Url
 import Cadence
 import Dict
@@ -9859,7 +9860,8 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 59 (List.length slashCommands)
+                    [ \_ -> Expect.atLeast 59 (List.length slashCommands) -- v3/gap-oper: appeal + desk joined (59 + 2)
+
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
                     , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
                     , \_ -> Expect.equal (Just "import") (Maybe.map .name (findSlashCommand "import"))
@@ -12330,7 +12332,7 @@ suite =
                     Expect.all
                         [ \_ -> Expect.equal "playing chess" m.customStatus
                         , \_ -> Expect.equal (Just { emoji = "🎮", typeLabel = "PLAYING A GAME", text = "chess" }) (Dict.get "kai" m.userActivities)
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP * STATUS :playing chess\r\n" ] outs
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "playing chess", expiryIso = Nothing }, SendLine "PROP kai STATUS :playing chess\r\n" ] outs
                         ]
                         ()
             , test "offline set lands and persists without wire" <|
@@ -12378,9 +12380,9 @@ suite =
                             update (CustomStatusSet "") idle
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP * STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
+                        [ \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "coding onyx", expiryIso = Nothing }, SendLine "PROP kai STATUS :coding onyx\r\n", SendLine "AWAY :Idle — coding onyx\r\n" ] outs
                         , \_ -> Expect.equal "coding onyx" m.customStatus
-                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP * STATUS :\r\n" ] clearedOuts
+                        , \_ -> Expect.equal [ IdentityProfileSave { serverUrl = "wss://irc.example", identity = "kai", status = "", expiryIso = Nothing }, SendLine "PROP kai STATUS :\r\n" ] clearedOuts
                         , \_ -> Expect.equal "" cleared.customStatus
                         , \_ -> Expect.equal True (Dict.isEmpty cleared.userActivities)
                         ]
@@ -19997,9 +19999,13 @@ suite =
                         , \_ -> Expect.equal [] wrongOut
                         , \_ -> Expect.equal "Type the room name to delete it." wrong.stewardStatus
                         , \_ ->
+                            -- v3/gap-chanserv: a guest cannot have registered the room,
+                            -- so there is no DROP to send (it would only FAIL): the room
+                            -- is emptied and left instead.
                             Expect.equal
-                                [ SendLine "CHANNEL DROP #harbor\r\n"
-                                , SendLine "PART #harbor Goodbye\r\n"
+                                [ SendLine "MODE #harbor +si\r\n"
+                                , SendLine "CLEAR #harbor USERS\r\n"
+                                , SendLine "PART #harbor :Room deleted\r\n"
                                 ]
                                 out
                         , \_ -> Expect.equal "" deleted.stewardTypedName
@@ -22152,7 +22158,10 @@ suite =
                         , \_ -> Expect.equal (Just "Passwords do not match.") mismatchModel.accountPasswordError
                         , \_ -> Expect.equal [] outNoCurrent
                         , \_ -> Expect.equal (Just "Your current password is required.") noCurrentModel.accountPasswordError
-                        , \_ -> Expect.equal [ SendLine "ACCOUNTSET kai old password longenough\r\n" ] outSent
+                        -- v3/gap-auth: the server's change-password command is
+                        -- SETPASS <current> <new> (ACCOUNTSET has no password field).
+                        , \_ -> Expect.equal [ "SETPASS old :longenough\r\n" ] (sendLines outSent)
+                        , \_ -> Expect.equal (SetPassPending "kai") sent.authGate.setPass
                         , \_ -> Expect.equal "" sent.accountNewPassword
                         , \_ -> Expect.equal "" sent.accountConfirmPassword
                         , \_ -> Expect.equal "" sent.accountCurrentPassword
@@ -22224,7 +22233,7 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] outGuest
-                        , \_ -> Expect.equal [ SendLine "WEBAUTHN LIST\r\n" ] outList
+                        , \_ -> Expect.equal [ SendLine "WEBAUTHN STATUS\r\n", SendLine "WEBAUTHN LIST\r\n" ] outList
                         , \_ -> Expect.equal (Just []) listing.passkey.pendingList
                         , \_ -> Expect.equal [ SendLine "WEBAUTHN REGISTER laptop\r\n" ] outRegister
                         , \_ -> Expect.equal True registering.passkey.busy

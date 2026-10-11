@@ -59,6 +59,7 @@ import Status
 import Media
 -- v3/calls-c1
 import CallUi
+import Chanserv -- v3/gap-chanserv
 -- v3/calls-c6
 import CallDock
 
@@ -83,6 +84,9 @@ import Organizer
 -- v3/moddesk
 import EventReplay
 import OperDesk
+import OperConsole -- v3/gap-oper
+import OperFeed -- v3/gap-oper
+import OperReply -- v3/gap-oper
 import NotifyCenter
 import Outbox
 import Passkey
@@ -94,6 +98,8 @@ import Retention
 import RoomMedia exposing (RoomMediaFilter(..))
 -- v3/roomsettings
 import RoomSettings
+-- v3/gap-auth
+import AuthGate
 import Credentials -- v3/rx-public
 import Remembered -- v3/rx-public
 import UserModes -- v3/gap-usermodes
@@ -426,6 +432,8 @@ type alias Model =
     , operDeskOpen : Bool
     , operDesk : OperDesk.Desk
     , operEventReplay : EventReplay.EventReplayFeed
+    -- v3/gap-oper
+    , operConsole : OperConsole.State
     , isAway : Bool
     , latencyMs : Maybe Int
     , latencyHistory : List Int
@@ -486,6 +494,8 @@ type alias Model =
     , highlightWords : List String
     , channelNotify : Dict String String
     , channelJoinPrompt : Maybe { channel : String, error : String }
+    -- v3/gap-chanserv
+    , chanserv : Chanserv.State
     , firstUnreadId : Dict String Int
     , viewUnreadDividerId : Dict String Int
     -- v3/transcript — scrolled-away state from the `scrollState` bridge.
@@ -963,6 +973,9 @@ type alias Model =
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
 
+    -- v3/gap-auth
+    , authGate : AuthGate.State
+
     -- v3/gap-import
     , historyImport : HistoryImport.State
     , blockKit : BlockKit.State
@@ -1232,6 +1245,9 @@ type Outbound
     | WatchListSave { serverUrl : String, identity : String, entries : Maybe String }
     | CtcpConfigRequest { serverUrl : String, identity : String }
     | CtcpTimeReply { to : String }
+    -- v3/gap-auth: the auth-gate port (PoW solve, held-password
+    -- IDENTIFY, SETPASS credential staging).
+    | AuthGatePort Encode.Value
     -- v3/gap-usermodes — the owner-scoped `onyx:usermodes` slot.
     | UserModesRequest { serverUrl : String, identity : String }
     | UserModesSave { serverUrl : String, identity : String, json : String }
@@ -2725,6 +2741,8 @@ type Msg
     | NodesProbed { wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float }
     | WsOpened { url : String }
     | WsClosed { clean : Bool, reason : String }
+    -- v3/gap-chanserv
+    | ChanservMsg Chanserv.Msg
     | ReconnectNow
     | ReclaimOpen
     | ReclaimClose
@@ -2978,6 +2996,8 @@ type Msg
     | OperDeskCancel
     | OperEventReplayLimit Int
     | OperEventReplayRequested
+    -- v3/gap-oper
+    | OperConsoleMsg OperConsole.Msg
     | OverrideToggleSoftIgnore String
     | OverrideSetNickColor { nick : String, color : String }
     | OverrideClearNickColor String
@@ -3240,6 +3260,8 @@ type Msg
     | CallsChooseRoom
     | CallsReturnToCall String
     | CallJoin { channel : String, video : Bool }
+    -- v3/rx-calls: a guest with an account leaves for the sign-in form
+    | CallGuestSignIn
     | CallLeave
     | CallToggleMute
     | CallHubChanged Media.CallHub
@@ -3389,6 +3411,9 @@ type Msg
     | PortableImportSubmit
     | SessionReclaimDismiss
     | SessionReclaimSignIn
+    -- v3/gap-auth
+    | AuthGateMsg AuthGate.Msg
+    | AuthGatePortIn Decode.Value
     -- v3/rx-public — remembered identities on the join screen.
     | RememberedListed Decode.Value
     | RememberedReady { id : String, nick : String, held : Bool }
@@ -3616,6 +3641,7 @@ init nick url =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -3676,6 +3702,7 @@ init nick url =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -4072,6 +4099,9 @@ init nick url =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-auth
+    , authGate = AuthGate.blank
+
     -- v3/gap-import
     , historyImport = HistoryImport.blank
     , blockKit = BlockKit.blank
@@ -4225,6 +4255,7 @@ blank =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -4285,6 +4316,7 @@ blank =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -4676,6 +4708,9 @@ blank =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-auth
+    , authGate = AuthGate.blank
+
     -- v3/gap-import
     , historyImport = HistoryImport.blank
     , blockKit = BlockKit.blank
@@ -4836,7 +4871,15 @@ foldLine model message =
                     ( model, [] )
 
         "376" ->
-            ( finishMotd model, [] )
+            -- v3/rx-calls: the welcome burst is over — a signed-in
+            -- account enrolls its device key now even without an
+            -- ACCOUNTRESIDENCE token (call E2EE needs it).
+            fireAttribution Attribution.foldRegistered (finishMotd model)
+
+        -- v3/rx-calls: ERR_NOMOTD ends the welcome burst too (still
+        -- logged like any numeric).
+        "422" ->
+            fireAttribution Attribution.foldRegistered (logNumeric model message)
 
         "353" ->
             ( foldNames model message, [] )
@@ -5945,6 +5988,10 @@ foldLine model message =
         "520" ->
             -- v3/gap-shell: `+O`/`+A` operator-only room.
             foldJoinDenied model message
+
+        -- v3/gap-chanserv: `+f` forwarded us; say where
+        "470" ->
+            chanservForwarded model message
 
         "482" ->
             foldErrorNumeric model message
@@ -8743,6 +8790,10 @@ foldEvent model message =
                 , params = params
                 , raw = message.raw
                 }
+
+        -- v3/gap-oper: operator planes feed the desk's live feed.
+        Spine.EventAsFeed draft ->
+            ( { model | operConsole = OperConsole.observeEvent (operConsoleCtx model) draft model.operConsole }, [] )
 
 
 {-| True when a DM peer is designated for E2EE and must never fall
@@ -12418,10 +12469,18 @@ parseSlashLocal text =
         case String.split " " (String.dropLeft 1 text) of
             cmd :: rest ->
                 case String.toLower cmd of
+                    -- v3/gap-oper
+                    "appeal" ->
+                        Just ( "appeal", Nothing )
+
+                    "desk" ->
+                        Just ( "desk", slashNickArg rest )
+
                     "ignore" ->
                         Just ( "ignore", slashNickArg rest )
 
                     "unignore" ->
+
                         Just ( "unignore", slashNickArg rest )
 
                     "read" ->
@@ -15513,6 +15572,8 @@ slashCommands =
     , { name = "history", usage = "/history", description = "Open message search / history tools.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "search", usage = "/search <query>", description = "Open message search with a query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "help", usage = "/help [command]", description = "List every slash command, or describe one.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "appeal", usage = "/appeal [what happened]", description = "Ask the operators for a second look at a ban or mute.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "desk", usage = "/desk [live|bans|silence|abuse|appeals|content|network]", description = "Open the operator desk on a tab (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "broadcast", usage = "/broadcast <text>", description = "Announce to operators subscribed to ANNOUNCE (opers).", kind = SlashIrc, aliases = [ "wallops" ], insertText = Nothing, oper = True }
     , { name = "kill", usage = "/kill <nick> <reason>", description = "Disconnect someone from the network; the reason is recorded (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "rehash", usage = "/rehash", description = "Ask this node to reload its configuration (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
@@ -17658,6 +17719,13 @@ runSlashLocal model target verb nickArg =
 
         ( "event", _ ) ->
             runSlashEvent model target
+
+        -- v3/gap-oper
+        ( "appeal", _ ) ->
+            runSlashAppeal model
+
+        ( "desk", arg ) ->
+            runSlashDesk model (Maybe.withDefault "" arg)
 
         ( "broadcast", _ ) ->
             runSlashOper model "broadcast"
@@ -19844,11 +19912,20 @@ foldErrorNumeric model message =
                             if String.isEmpty third then
                                 "Cannot send to " ++ target
 
+                            else if String.contains "(slowmode)" third then
+                                -- v3/gap-chanserv
+                                Chanserv.slowmodeCopy target
+
                             else
                                 third
                         )
             in
-            ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
+            if String.contains "(slowmode)" third then
+                -- v3/gap-chanserv: honest slow-mode copy, no raw numeric text
+                ( addNotification failed { kind = NotifError, text = Chanserv.slowmodeCopy second, from = Nothing, channel = Just second, topic = Nothing }, [] )
+
+            else
+                ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
 
         "405" ->
             ( error "Too many channels", [] )
@@ -20359,9 +20436,11 @@ dispatchOperDesk command model =
                     | pending = Nothing
                     , lastSent = Just (OperDesk.formatWirePreview command ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs))
                 }
+            , operConsole = OperConsole.armFor (operConsoleCtx model) command.command model.operConsole -- v3/gap-oper
           }
         , [ SendLine (Wire.formatIrcLine command.command command.params) ]
         )
+
 
 
 {-| Bounded structured replay (mirroring `requestOperEventReplay`: oper
@@ -20389,8 +20468,253 @@ requestOperEventReplay model =
         )
 
 
+-- v3/gap-oper
+
+
+{-| `/appeal [text]`: open the appeal sheet, prefilled with whatever
+followed the verb. -}
+runSlashAppeal : Model -> ( Model, List Outbound )
+runSlashAppeal model =
+    let
+        text =
+            String.trim (String.dropLeft 7 (String.trim model.composer))
+
+        ( next, _ ) =
+            OperConsole.update (operConsoleCtx model) OperConsole.OpenUserAppeal model.operConsole
+
+        console =
+            if text == "" then
+                next
+
+            else
+                { next | forms = OperConsole.setField OperConsole.AppealText text next.forms }
+    in
+    ( { model | operConsole = console, composer = "" }, [] )
+
+
+{-| `/desk [tab]`: open the operator desk (opers only). -}
+runSlashDesk : Model -> String -> ( Model, List Outbound )
+runSlashDesk model target =
+    if not model.isOper then
+        ( addToast
+            { variant = ToastError
+            , title = "Operator access required"
+            , description = Just "This network grants operator status from the signed-in account."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            { model | composer = "" }
+        , []
+        )
+
+    else
+        let
+            wanted =
+                OperReply.sections
+                    |> List.filter (\s -> String.toLower (OperReply.sectionLabel s) == String.toLower (String.trim target))
+                    |> List.head
+
+            console =
+                model.operConsole
+
+            opened =
+                { model
+                    | operDeskOpen = True
+                    , composer = ""
+                    , operConsole =
+                        case wanted of
+                            Just section ->
+                                { console | tab = section }
+
+                            Nothing ->
+                                console
+                }
+
+            ( learned, lines ) =
+                OperConsole.update (operConsoleCtx opened) OperConsole.Opened opened.operConsole
+        in
+        ( { opened | operConsole = learned }, List.map SendLine lines )
+
+
+
+{-| What the operator console needs from the model. -}
+operConsoleCtx : Model -> OperConsole.Ctx
+operConsoleCtx model =
+    { live = model.connection == Live
+    , isOper = model.isOper
+    , nowMs = model.nowMs
+    }
+
+
+operConsoleStep : OperConsole.Msg -> Model -> ( Model, List Outbound )
+operConsoleStep consoleMsg model =
+    let
+        ( next, lines ) =
+            OperConsole.update (operConsoleCtx model) consoleMsg model.operConsole
+
+        focus =
+            case consoleMsg of
+                OperConsole.TabKey _ ->
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.SelectTab _ ->
+                    -- Focus brings a tab that was half off the strip into view.
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.Confirm ->
+                    -- The review closes: focus goes back to the tab, not the void.
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                OperConsole.Cancel ->
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                _ ->
+                    -- A change just staged for review: its confirm button takes focus.
+                    if model.operConsole.pending == Nothing && next.pending /= Nothing then
+                        [ PrefsFocus { id = "oc-review-confirm" } ]
+
+                    else
+                        []
+
+    in
+    ( { model | operConsole = next }, List.map SendLine lines ++ focus )
+
+
+{-| The console reads the daemon's replies after every update: opening
+the desk learns which categories this session follows, every inbound
+reply line is offered to the console (it claims only the operator
+patterns and, for a person mid-appeal, their own answer), and a closed
+socket forgets session-scoped state. -}
+settleStepOper : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOper msg prior ( m, outs ) =
+    case msg of
+        OperDeskOpen ->
+            if m.operDeskOpen && not prior.operDeskOpen then
+                let
+                    ( next, lines ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Opened m.operConsole
+                in
+                ( { m | operConsole = next }, outs ++ List.map SendLine lines )
+
+            else
+                ( m, outs )
+
+        WsLineReceived line ->
+            ( observeOperLines [ line ] m, outs )
+
+        WsBatchReceived batch ->
+            ( observeOperLines batch.lines m, outs )
+
+        WsClosed _ ->
+            let
+                ( next, _ ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Disconnected m.operConsole
+            in
+            ( { m | operConsole = next }, outs )
+
+        WsOpened _ ->
+            -- A queued appeal is the one command the daemon takes before
+            -- registration: it goes out ahead of the handshake lines.
+            let
+                ( next, lines ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Connected m.operConsole
+            in
+            ( { m | operConsole = next }, List.map SendLine lines ++ outs )
+
+        Tick _ ->
+
+            if OperConsole.anyLoading m.operConsole then
+                let
+                    ( next, _ ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Settle m.operConsole
+                in
+                ( { m | operConsole = next }, outs )
+
+            else
+                ( m, outs )
+
+        _ ->
+            ( m, outs )
+
+
+observeOperLines
+ : List String -> Model -> Model
+observeOperLines lines m =
+    let
+        asking =
+            m.operConsole.userAppeal == OperConsole.AppealSending
+    in
+    if not (m.isOper || asking) then
+        m
+
+    else
+        let
+            ctx =
+                operConsoleCtx m
+
+            fold line console =
+                if operLineCandidate line then
+                    OperConsole.observeLine ctx (Wire.parseIrcMessage line) console
+
+                else
+                    console
+        in
+        { m | operConsole = List.foldl fold m.operConsole lines }
+
+
+{-| A cheap command-token check so history bursts are not parsed twice:
+only NOTICE, FAIL, MODE and three-digit numerics can be operator
+replies. -}
+operLineCandidate : String -> Bool
+operLineCandidate line =
+    let
+        afterTags =
+            if String.startsWith "@" line then
+                String.dropLeft 1 (dropWord line)
+
+            else
+                line
+
+        afterPrefix =
+            if String.startsWith ":" afterTags then
+                dropWord afterTags
+
+            else
+                afterTags
+
+        command =
+            String.toUpper (String.left 7 (String.trim (String.left 8 afterPrefix)))
+                |> String.words
+                |> List.head
+                |> Maybe.withDefault ""
+    in
+    List.member command [ "NOTICE", "FAIL", "MODE" ]
+        || (String.length command == 3 && String.all Char.isDigit command)
+
+
+dropWord : String -> String
+dropWord text =
+    case String.indexes " " text of
+        i :: _ ->
+            String.dropLeft (i + 1) text
+
+        [] ->
+            ""
+
+
 foldAccountSessionBody : Model -> String -> Maybe ( Model, List Outbound )
 foldAccountSessionBody model body =
+
     case Session.parseSessionListLine body of
         Just row ->
             Just
@@ -22789,7 +23113,9 @@ syncOwnCustomStatusActivity model previousNick =
 {-| Set our custom status (mirroring `setCustomStatus`: invalid text or
 a missing device-memory owner is a silent no-op; the write lands in
 state, persists owner-keyed, projects our activity immediately, and —
-on a live IRCX connection — publishes `PROP * STATUS` plus the
+on a live IRCX connection — publishes `PROP <ournick> STATUS` (v3/gap-auth:
+a user PROP needs the entity to be our own nick, `server.zig propAccess`;
+`*` is refused with 913) plus the
 idle-coupled `AWAY` when our presence is idle and the status is
 non-empty). -}
 setCustomStatus : Model -> String -> ( Model, List Outbound )
@@ -22817,7 +23143,7 @@ setCustomStatus model status =
                         []
 
                     else
-                        SendLine (Wire.formatIrcLine "PROP" [ "*", "STATUS", normalized ])
+                        SendLine (Wire.formatIrcLine "PROP" [ model.ourNick, "STATUS", normalized ])
                             :: (if String.isEmpty normalized || model.userStatus /= StatusIdle then
                                     []
 
@@ -23705,6 +24031,11 @@ foldStandardReply model message =
                         , []
                         )
 
+                    else if List.member (String.toUpper reply.command) [ "CHANNEL", "CS", "SUCCESSOR" ] then
+                        -- v3/gap-chanserv: `settleStepChanserv` folds these
+                        -- (the channel comes from the last CHANNEL line sent).
+                        ( model, [] )
+
                     else if reply.command /= "WEBAUTHN" then
                         -- v3/gap-shell: never silent (inbox for FAIL/WARN,
                         -- Activity for NOTE).
@@ -24264,17 +24595,17 @@ requestStewardDeleteRoom model channel =
             then
                 -- A confirmed delete closes the panel with the room
                 -- (mirroring the oracle sheet close on ok).
-                ( { model
-                    | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
-                    , stewardStatus = ""
-                    , stewardTypedName = ""
-                    , stewardDeleting = False
-                    , stewardRoom = Nothing
-                  }
-                , [ SendLine (Wire.formatIrcLine "CHANNEL" [ "DROP", stewardRoomName model channel ])
-                  , SendLine (Wire.formatIrcLine "PART" [ stewardRoomName model channel, "Goodbye" ])
-                  ]
-                )
+                -- v3/gap-chanserv: registration-aware (INFO, then DROP
+                -- only for a registered room), then empty the room and leave.
+                chanservBeginDelete
+                    { model
+                        | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
+                        , stewardStatus = ""
+                        , stewardTypedName = ""
+                        , stewardDeleting = False
+                        , stewardRoom = Nothing
+                    }
+                    (stewardRoomName model channel)
 
             else
                 stewardRefused model "Type the room name to delete it."
@@ -30115,7 +30446,8 @@ requestPasskeyList model =
                         Passkey.beginList model.passkey
                 in
                 ( { model | passkey = { listed | error = Nothing } }
-                , [ SendLine Passkey.webauthnList ]
+                  -- v3/gap-auth: STATUS reports the server-side passkey count.
+                , [ SendLine Passkey.webauthnStatus, SendLine Passkey.webauthnList ]
                 )
 
 
@@ -30315,42 +30647,69 @@ requestAccountSetEmail model =
                         )
 
 
-{-| `ACCOUNTSET <account> <current> password <new>` (mirrors the
-oracle's password-change submit; all three fields clear on send).
+{-| Change password: `SETPASS <current> :<new>` (the oracle's submit
+sent `ACCOUNTSET … password`, which the Onyx Server refuses; all three
+fields clear on send, and the reply folds through `foldAuthGateLine`).
 -}
 requestAccountSetPassword : Model -> ( Model, List Outbound )
 requestAccountSetPassword model =
+    -- v3/gap-auth: `SETPASS <current> :<new>` (`server.zig handleSetpass`);
+    -- ACCOUNTSET only takes email|flags|secure|enforce (FAIL INVALID_FIELD).
+    -- The new password is staged ports-side and replaces the held SASL
+    -- credential only once the server confirms the change.
     case model.accountName of
         Nothing ->
             ( model, [] )
 
         Just acct ->
+            let
+                gate =
+                    model.authGate
+            in
             if model.connection /= Live then
                 ( model, [] )
 
-            else if String.length model.accountNewPassword < minAccountPasswordLength then
-                ( { model | accountPasswordError = Just ("Use at least " ++ String.fromInt minAccountPasswordLength ++ " characters.") }, [] )
-
-            else if model.accountNewPassword /= model.accountConfirmPassword then
-                ( { model | accountPasswordError = Just "Passwords do not match." }, [] )
-
-            else if String.isEmpty model.accountCurrentPassword then
-                ( { model | accountPasswordError = Just "Your current password is required." }, [] )
+            else if gate.setPass /= AuthGate.SetPassIdle && gate.setPass /= AuthGate.SetPassDone then
+                ( model, [] )
 
             else
-                case Services.accountSet acct model.accountCurrentPassword "password" model.accountNewPassword of
-                    Nothing ->
-                        ( model, [] )
+                case AuthGate.validateNewPassword model.accountNewPassword of
+                    Just problem ->
+                        ( { model | accountPasswordError = Just problem }, [] )
 
-                    Just line ->
-                        ( { model
-                            | accountPasswordError = Nothing
-                            , accountNewPassword = ""
-                            , accountConfirmPassword = ""
-                            , accountCurrentPassword = ""
-                          }
-                        , [ SendLine line ]
-                        )
+                    Nothing ->
+                        if model.accountNewPassword /= model.accountConfirmPassword then
+                            ( { model | accountPasswordError = Just "Passwords do not match." }, [] )
+
+                        else if String.isEmpty model.accountCurrentPassword then
+                            ( { model | accountPasswordError = Just "Your current password is required." }, [] )
+
+                        else if model.accountNewPassword == model.accountCurrentPassword then
+                            ( { model | accountPasswordError = Just "Choose a new password that's different from your current one." }, [] )
+
+                        else
+                            case Services.setPass model.accountCurrentPassword model.accountNewPassword of
+                                Nothing ->
+                                    ( { model | accountPasswordError = Just (AuthGate.setPassFailCopy { code = "UNSAFE_PASSWORD", text = "" }) }, [] )
+
+                                Just line ->
+                                    ( { model
+                                        | accountPasswordError = Nothing
+                                        , accountNewPassword = ""
+                                        , accountConfirmPassword = ""
+                                        , accountCurrentPassword = ""
+                                        , authGate = { gate | setPass = AuthGate.SetPassPending acct }
+                                      }
+                                    , [ SendLine line
+                                      , AuthGatePort
+                                            (Encode.object
+                                                [ ( "kind", Encode.string "stage" )
+                                                , ( "account", Encode.string acct )
+                                                , ( "password", Encode.string model.accountNewPassword )
+                                                ]
+                                            )
+                                      ]
+                                    )
 
 
 {-| The DROP danger gate, mirroring the oracle's `dropReady`: armed,
@@ -39386,12 +39745,14 @@ settleSteps =
     , settleStepCallMedia -- v3/calls-c4
     , settleStepRoomMenu -- v3/frame
     , settleStepRoomSettings -- v3/roomsettings
+    , settleStepChanserv -- v3/gap-chanserv
     , settleStepCallDock -- v3/calls-c6
     , settleStepStage -- v3/calls-c11
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepScene -- v3/gap-appearance
+    , settleStepAuth -- v3/gap-auth
     , settleStepGapImport -- v3/gap-import
     , settleStepOrganize -- v3/gap-organize
     , settleStepGapCommands -- v3/gap-commands
@@ -39399,6 +39760,7 @@ settleSteps =
     , settleStepWatch -- v3/gap-watch
     , settleStepRemembered -- v3/rx-public
     , settleStepUserModes -- v3/gap-usermodes
+    , settleStepOper -- v3/gap-oper
     ]
 
 
@@ -39748,14 +40110,20 @@ callsC6Snapshot raw model =
             else
                 accepted
     in
-    case Maybe.andThen CallDock.codecToast kind of
+    -- v3/rx-calls: every media failure word gets a calm toast
+    case CallDock.mediaToast raw of
         Just toast ->
             addToast
-                { variant = ToastError
+                { variant =
+                    if toast.warn then
+                        ToastWarning
+
+                    else
+                        ToastError
                 , title = toast.title
                 , description = Just toast.description
                 , duration = Nothing
-                , groupKey = Just ("voice-" ++ Maybe.withDefault "" kind)
+                , groupKey = Just toast.group
                 , undo = Nothing
                 }
                 classified.nowMs
@@ -42509,7 +42877,11 @@ updateCore msg model =
                                     ( { edited | editingMessage = Nothing, composer = "", composerDrafts = Dict.remove (String.toLower target) edited.composerDrafts }, out )
 
                         Nothing ->
-                            if not (List.isEmpty model.attachments) then
+                            -- v3/gap-chanserv: slow mode holds the send until the gap passes
+                            if chanservSlowHeld model target then
+                                ( chanservSlowHold model target, [] )
+
+                            else if not (List.isEmpty model.attachments) then
                                 sendWithAttachments model target
 
                             else if String.isEmpty (String.trim model.composer) then
@@ -44674,6 +45046,22 @@ updateCore msg model =
             if model.connection /= Live || String.isEmpty channel then
                 ( model, [] )
 
+            else if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing && CallUi.sameTarget model.calls.channel channel then
+                -- v3/rx-calls: this join is already in flight (a double
+                -- press must not cancel and restart it).
+                ( model, [] )
+
+            else if CallUi.needsAccount model then
+                -- v3/rx-calls: calls are end-to-end encrypted and need an
+                -- account; nothing goes out — the room shows the
+                -- sign-in banner instead (even if it was hidden).
+                ( { model
+                    | callJoinTarget = Just channel
+                    , callBannerDismissed = Set.remove (String.toLower (String.trim channel)) model.callBannerDismissed
+                  }
+                , []
+                )
+
             else
                 let
                     leaveFirst =
@@ -44694,6 +45082,11 @@ updateCore msg model =
                 ( { model
                     | callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8: the stored pref
                     , callJoinTarget = Just channel
+                    -- v3/rx-calls: provisional at once ("Connecting to the
+                    -- call…" + the permission hint) while capture and the
+                    -- device-key enrollment run; the engine snapshot
+                    -- confirms it, a failed join rolls it back to idle.
+                    , calls = { lifecycle = Media.InCall, channel = Just channel, withPeer = "", startedAt = Nothing, outcome = Nothing }
                     -- v3/calls-c4: camera intent from the join verb.
                     , callLocal = { blankCallLocal | camera = video && model.callLocal.cameraSupported, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported, cameraSupported = model.callLocal.cameraSupported }
                     , callMoreOpen = False
@@ -44714,7 +45107,12 @@ updateCore msg model =
             -- `leaveVoiceChannel`'s idle no-op).
             case model.calls.channel of
                 Just current ->
-                    if model.calls.lifecycle /= Media.Idle then
+                    if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing then
+                        -- v3/rx-calls: leaving a join still in flight cancels
+                        -- it; idle at once (the engine confirms quietly).
+                        ( { model | callSelfMuted = False, calls = Media.blankCallHub }, [ VoiceLeave { channel = current } ] )
+
+                    else if model.calls.lifecycle /= Media.Idle then
                         ( { model | callSelfMuted = False }, [ VoiceLeave { channel = current } ] )
 
                     else
@@ -44775,6 +45173,23 @@ updateCore msg model =
 
             else
                 ( { model | callBannerDismissed = Set.insert (String.toLower (String.trim room)) model.callBannerDismissed }, [] )
+
+        -- v3/rx-calls: "Sign in" from the guest call banner — a
+        -- deliberate disconnect back to the connect form, in sign-in
+        -- mode (the guest session cannot become another account).
+        CallGuestSignIn ->
+            if CallUi.needsAccount model then
+                let
+                    ( left, leftOut ) =
+                        updateCore SessionDisconnect model
+
+                    ( moded, modeOut ) =
+                        updateCore (ConnectModeSet ConnectSignIn) left
+                in
+                ( moded, leftOut ++ modeOut )
+
+            else
+                ( model, [] )
 
         CallMoreToggle ->
             ( { model | callMoreOpen = not model.callMoreOpen && model.calls.lifecycle /= Media.Idle }, [] )
@@ -44900,7 +45315,8 @@ updateCore msg model =
         CallToggleShare ->
             case ( callMediaTarget model, CallMedia.requestShare model.callLocal ) of
                 ( Just target, Just ( local, on ) ) ->
-                    ( { model | callLocal = local, callShareOptOut = Nothing }
+                    -- v3/rx-calls: the tool was used — the More tray closes
+                    ( { model | callLocal = local, callShareOptOut = Nothing, callMoreOpen = False }
                     , [ VoiceCommand { verb = "share", on = on, channel = target, tile = "" } ]
                     )
 
@@ -44959,6 +45375,8 @@ updateCore msg model =
             ( { model | callClockMs = max model.callClockMs now }, [] )
 
         CallLayoutToggle ->
+            -- v3/rx-calls: layout and size change what is behind the tray, so
+            -- the tray closes (Deafen stays: its label is its feedback).
             ( { model
                 | callLayout =
                     if model.callLayout == CallMedia.LayoutGrid then
@@ -44966,12 +45384,13 @@ updateCore msg model =
 
                     else
                         CallMedia.LayoutGrid
+                , callMoreOpen = False
               }
             , []
             )
 
         CallStageSizeCycle ->
-            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize }, [] )
+            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize, callMoreOpen = False }, [] )
 
         CallStageSizeSet size ->
             ( { model | callStageSize = size }, [] )
@@ -45293,7 +45712,8 @@ updateCore msg model =
             )
 
         InviteShareOpen channel ->
-            ( { model | inviteShare = Just (InviteShare.open channel) }, [] )
+            -- v3/rx-calls: opened from the call's More tray too — it closes
+            ( { model | inviteShare = Just (InviteShare.open channel), callMoreOpen = False }, [] )
 
         InviteShareClose ->
             ( { model | inviteShare = Nothing }, [] )
@@ -45507,12 +45927,24 @@ updateCore msg model =
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
 
+        -- v3/gap-chanserv
+        ChanservMsg sub ->
+            chanservUpdate sub model
+
+        -- v3/gap-auth
+        AuthGateMsg sub ->
+            authGateUpdate sub model
+
+        AuthGatePortIn value ->
+            authGatePortIn value model
+
         -- v3/gap-import
         HistoryImportMsg sub ->
             historyImportUpdate sub model
 
         BlockKitMsg sub ->
             blockKitUpdate sub model
+
         -- v3/gap-organize
         OrganizeMsg sub ->
             organizeUpdate sub model
@@ -46102,7 +46534,12 @@ updateCore msg model =
         OperEventReplayRequested ->
             requestOperEventReplay model
 
+        -- v3/gap-oper
+        OperConsoleMsg consoleMsg ->
+            operConsoleStep consoleMsg model
+
         OverrideToggleSoftIgnore nick ->
+
             -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
             -- owner-gated, nick-normalized, field toggled, journal
             -- saved; without an owner nothing moves).
@@ -47432,8 +47869,15 @@ foldParsed model parsed =
                         rememberDelivery model parsed
 
                     ( next, outbound ) =
-                        -- v3/gap-usermodes: the user-mode lines fold first
-                        foldLineUserModes filed parsed
+                        -- v3/gap-auth: auth-step lines first (`foldAuthGateLine`)
+                        (case foldAuthGateLine filed parsed of
+                            Just claimed ->
+                                claimed
+
+                            Nothing ->
+                                -- v3/gap-usermodes: the user-mode lines fold first
+                                foldLineUserModes filed parsed
+                        )
                             -- v3/calls-c11
                             |> foldStageWire parsed
                 in
@@ -48880,13 +49324,14 @@ slashHelpGroups oper =
     in
     [ ( "Messages", named [ "me", "msg", "notice", "ctcp", "ping" ] )
     , ( "Rooms", named [ "join", "part", "topic", "invite", "share", "kick", "ban", "unban", "op", "deop", "voice", "devoice", "mode", "modex", "stage", "event", "webhook" ] )
-    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd" ] )
+    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd", "appeal" ] )
     , ( "This device", named [ "read", "star", "unstar", "mute", "unmute", "notify", "autojoin", "unautojoin", "color", "clear", "search", "history", "export", "import", "help" ] )
     , ( "Text", named [ "shrug", "tableflip", "unflip", "lenny", "disapprove" ] )
     , ( "Advanced", named [ "quote" ] )
     ]
         ++ (if oper then
-                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe" ] ) ]
+                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe", "desk" ] ) ]
+
 
             else
                 []
@@ -48950,6 +49395,7 @@ overlayStack model =
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
+        , ( "appeal-sheet", model.operConsole.userAppealOpen, OperConsoleMsg OperConsole.CloseUserAppeal ) -- v3/gap-oper
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
         -- v3/gap-organize: folder picker, row menu, saved messages
         , ( "organize", Organizer.sheetOpen model.organize, OrganizeMsg Organizer.SheetClose )
@@ -49687,6 +50133,341 @@ settleRoomSettings msg model =
 
         _ ->
             { model | roomSettings = settled }
+
+
+-- v3/gap-chanserv
+
+
+{-| The Room settings target as the chanserv core sees it (the same
+room, op and connection facts as `roomSettingsCtx`, plus the account
+and network-oper status).
+-}
+chanservCtx : Model -> Chanserv.Ctx
+chanservCtx model =
+    let
+        rs =
+            roomSettingsCtx model
+    in
+    { room = Maybe.map .name rs.room
+    , live = rs.connected
+    , isOp = rs.isOp
+    , isOper = model.isOper
+    , account = model.accountName
+    , props = Maybe.withDefault Dict.empty (Maybe.map .props rs.room)
+    , modes = Maybe.withDefault "" (Maybe.map .modes rs.room)
+    , nowMs = model.nowMs
+    }
+
+
+chanservFoldCtx : Model -> Chanserv.FoldCtx
+chanservFoldCtx model =
+    { ourNick = model.ourNick
+    , nowMs = model.nowMs
+    , isChannel = isChannelName model
+    , inChannel = \channel -> Dict.member (String.toLower channel) model.channels
+    , groups = model.isupport.chanGroups
+    , prefixModes = Set.fromList (Dict.keys model.isupport.modeToPrefix)
+    }
+
+
+chanservUpdate : Chanserv.Msg -> Model -> ( Model, List Outbound )
+chanservUpdate sub model =
+    let
+        ( state, effects ) =
+            Chanserv.update (chanservCtx model) sub model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
+
+
+chanservEffects : List Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffects effects acc =
+    List.foldl chanservEffect acc effects
+
+
+{-| Interpret one chanserv effect with the existing folds: raw lines go
+out only while live; prop writes reuse the Room settings optimistic
+`writeChannelProp` + `PROP` path; welcome rows are transcript system
+rows; knocks land in the inbox.
+-}
+chanservEffect : Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffect effect ( model, outs ) =
+    case effect of
+        Chanserv.Send line ->
+            if model.connection == Live then
+                ( model, outs ++ [ SendLine line ] )
+
+            else
+                ( model, outs )
+
+        Chanserv.WriteProp p ->
+            let
+                ( written, out ) =
+                    roomSettingsEffect (RoomSettings.WriteProp p) model
+            in
+            ( written, outs ++ out )
+
+        Chanserv.Toast tone title description ->
+            ( addToast
+                { variant =
+                    case tone of
+                        Chanserv.ToneOk ->
+                            ToastSuccess
+
+                        Chanserv.ToneError ->
+                            ToastError
+
+                        Chanserv.ToneInfo ->
+                            ToastInfo
+                , title = title
+                , description = description
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+        Chanserv.Inbox note ->
+            ( addNotification model { kind = NotifSystem, text = note.text, from = note.from, channel = note.channel, topic = Nothing }, outs )
+
+        Chanserv.SystemRow channel text ->
+            if Dict.member (String.toLower channel) model.channels then
+                ( appendLiveRow model channel text (Wire.parseIrcMessage ""), outs )
+
+            else
+                ( model, outs )
+
+        Chanserv.ClearJoinPrompt channel ->
+            ( clearJoinPromptFor model channel, outs )
+
+
+{-| Inbound services replies, list numerics, knocks and welcome
+notices fold here (the core fold leaves them in the service log);
+opening Room settings or Room care asks the server what it knows; every
+line this client sends is watched for slow-mode stamps and for the
+channel a later `FAIL CHANNEL` is about.
+-}
+settleStepChanserv : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepChanserv msg _ ( m, outs ) =
+    let
+        inbound =
+            case msg of
+                WsLineReceived line ->
+                    [ line ]
+
+                WsBatchReceived batch ->
+                    batch.lines
+
+                _ ->
+                    []
+
+        ( folded, foldOut ) =
+            List.foldl
+                (\line ( model, acc ) ->
+                    let
+                        ( state, effects ) =
+                            Chanserv.fold (chanservFoldCtx model) (Wire.parseIrcMessage line) model.chanserv
+                    in
+                    chanservEffects effects ( { model | chanserv = state }, acc )
+                )
+                ( m, [] )
+                inbound
+
+        ( triggered, triggerOut ) =
+            case msg of
+                RoomSettingsMsg RoomSettings.Open ->
+                    if RoomSettings.isOpenFor folded.activeChannel folded.roomSettings then
+                        let
+                            ( state, effects ) =
+                                Chanserv.seed (chanservCtx folded) folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                StewardOpen channel ->
+                    if folded.connection == Live && folded.accountName /= Nothing then
+                        let
+                            ( state, effects ) =
+                                Chanserv.probe channel folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                Tick _ ->
+                    ( { folded | chanserv = Chanserv.tick folded.nowMs folded.chanserv }, [] )
+
+                WsClosed _ ->
+                    ( { folded | chanserv = Chanserv.reset folded.chanserv }, [] )
+
+                _ ->
+                    ( folded, [] )
+
+        allOut =
+            outs ++ foldOut ++ triggerOut
+
+        sent =
+            List.filterMap
+                (\o ->
+                    case o of
+                        SendLine line ->
+                            Just line
+
+                        _ ->
+                            Nothing
+                )
+                allOut
+    in
+    if List.isEmpty sent then
+        ( triggered, allOut )
+
+    else
+        ( { triggered | chanserv = Chanserv.noteSends { gapFor = chanservSlowGap triggered, nowMs = triggered.nowMs } sent triggered.chanserv }
+        , allOut
+        )
+
+
+chanservSelfModes : Model -> String -> List Char
+chanservSelfModes model channel =
+    Dict.get (String.toLower channel) model.channels
+        |> Maybe.andThen (\ch -> Dict.get (String.toLower model.ourNick) ch.members)
+        |> Maybe.map (.modes >> Set.toList)
+        |> Maybe.withDefault []
+
+
+chanservPropsOf : Model -> String -> Dict String String
+chanservPropsOf model channel =
+    Maybe.withDefault Dict.empty (Dict.get (String.toLower channel) model.props.channelProps)
+
+
+{-| This sender's slow-mode gap in `target`, in seconds (0 when off,
+exempt, or not a room).
+-}
+chanservSlowGap : Model -> String -> Int
+chanservSlowGap model target =
+    let
+        props =
+            chanservPropsOf model target
+    in
+    if not (isChannelName model target) || Chanserv.slowExempt { props = props, selfModes = chanservSelfModes model target, isOper = model.isOper } then
+        0
+
+    else
+        Chanserv.slowGapOf props
+
+
+chanservSlowWaitMs : Model -> String -> Int
+chanservSlowWaitMs model target =
+    if isChannelName model target then
+        Chanserv.slowWait
+            { props = chanservPropsOf model target
+            , selfModes = chanservSelfModes model target
+            , isOper = model.isOper
+            , nowMs = model.nowMs
+            }
+            target
+            model.chanserv
+
+    else
+        0
+
+
+{-| A plain message (or `/me`) in a room still inside its slow-mode
+gap. Other slash commands are not channel messages and pass.
+-}
+chanservSlowHeld : Model -> String -> Bool
+chanservSlowHeld model target =
+    let
+        draft =
+            String.toLower (String.trimLeft model.composer)
+
+        command =
+            String.startsWith "/" draft && not (String.startsWith "/me " draft)
+    in
+    not command && chanservSlowWaitMs model target > 0
+
+
+chanservSlowHold : Model -> String -> Model
+chanservSlowHold model target =
+    let
+        secs =
+            (chanservSlowWaitMs model target + 999) // 1000
+    in
+    { model | composerError = Just ("Slow mode is on in " ++ target ++ ". You can send again in " ++ String.fromInt secs ++ "s.") }
+
+
+{-| `470`: the room's `+f` forward sent us elsewhere. Say where. (The
+refusals themselves, 477/480/489/520, are `foldJoinDenied`'s join prompt;
+this module only adds the card's "Ask to join" / key actions on top.)
+-}
+chanservForwarded : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+chanservForwarded base message =
+    let
+        -- The raw numeric stays in the service log; a forward is not an
+        -- error, so no inbox row.
+        model =
+            logNumericQuiet base message
+
+        channel =
+            Maybe.withDefault "" (secondParam message.params)
+
+        target =
+            Maybe.withDefault "" (thirdParam message.params)
+
+        settled =
+            if model.browserPendingJoin == Just (String.toLower channel) then
+                { model | browserPendingJoin = Nothing, browserAttemptedJoin = Nothing, browserJoinPhase = BrowserJoinIdle }
+
+            else
+                model
+    in
+    if isChannelName model channel && isChannelName model target then
+        ( addToast
+            { variant = ToastInfo
+            , title = "You were sent to " ++ target
+            , description = Just (channel ++ " couldn't take you, so it forwarded you to " ++ target ++ ".")
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            settled
+        , []
+        )
+
+    else
+        ( model, [] )
+
+
+{-| Room care "Delete room" (D7): ask the core, which drops a registered
+room first and then empties and leaves it.
+-}
+chanservBeginDelete : Model -> String -> ( Model, List Outbound )
+chanservBeginDelete model room =
+    let
+        members =
+            Dict.get (String.toLower room) model.channels
+                |> Maybe.map (.members >> Dict.values)
+                |> Maybe.withDefault []
+
+        me =
+            String.toLower model.ourNick
+
+        ( state, effects ) =
+            Chanserv.beginDelete
+                { channel = room
+                , signedIn = model.accountName /= Nothing
+                , others = members |> List.filter (\mbr -> String.toLower mbr.nick /= me) |> List.map .nick |> List.sort
+                , founderRank = List.any (\mbr -> String.toLower mbr.nick == me && Set.member 'Q' mbr.modes) members
+                }
+                model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
 
 
 -- v3/dm-key-hold
@@ -51547,3 +52328,694 @@ organizePresetKind model target kind =
 organizeQuietNow : Model -> Bool
 organizeQuietNow model =
     Attention.quietActive model.zone model.nowMs model.organize.quiet
+
+
+-- v3/gap-auth
+
+
+{-| v3/gap-auth — what `AuthGate.update` reads from the model. -}
+authGateCtx : Model -> AuthGate.Ctx
+authGateCtx model =
+    { live = model.connection == Live
+    , socketOpen = model.connection /= Offline || model.connectForm.dialing
+    , signInNick = model.connectForm.nick
+    }
+
+
+authGateUpdate : AuthGate.Msg -> Model -> ( Model, List Outbound )
+authGateUpdate sub model =
+    let
+        ( state, effects ) =
+            AuthGate.update (authGateCtx model) sub model.authGate
+    in
+    runAuthGateEffects effects { model | authGate = state }
+
+
+runAuthGateEffects : List AuthGate.Effect -> Model -> ( Model, List Outbound )
+runAuthGateEffects effects model =
+    List.foldl
+        (\effect ( m, out ) ->
+            let
+                ( m2, out2 ) =
+                    authGateEffect effect m
+            in
+            ( m2, out ++ out2 )
+        )
+        ( model, [] )
+        effects
+
+
+authGatePort : List ( String, Encode.Value ) -> Outbound
+authGatePort fields =
+    AuthGatePort (Encode.object fields)
+
+
+{-| Interpret one auth-gate effect with the existing connect machinery.
+The guest dial never uses the account name (the server refuses a
+registered nick without SASL: 432 + close) and never runs SASL — a
+two-step password stays in the ports-side credential slot, which
+composes the IDENTIFY line itself.
+-}
+authGateEffect : AuthGate.Effect -> Model -> ( Model, List Outbound )
+authGateEffect effect model =
+    case effect of
+        AuthGate.Dial ->
+            dialConnect
+                { model | saslAccount = Nothing, saslPasswordHeld = False, saslClientCert = False }
+                (AuthGate.guestNick model.nowMs)
+
+        AuthGate.Redial ->
+            if model.connection /= Offline || model.connectForm.dialing then
+                ( model, [] )
+
+            else
+                dialConnect model model.ourNick
+
+        AuthGate.Send line ->
+            if model.connection == Offline then
+                ( model, [] )
+
+            else
+                ( model, [ SendLine line ] )
+
+        AuthGate.SolvePow seed ->
+            ( model, [ authGatePort [ ( "kind", Encode.string "solve" ), ( "seed", Encode.string seed ) ] ] )
+
+        AuthGate.IdentifyHeld req ->
+            if model.connection /= Live then
+                ( model, [] )
+
+            else
+                ( { model | identifyReplyAccount = Just req.account, accountActionError = Nothing }
+                , [ authGatePort
+                        [ ( "kind", Encode.string "identify" )
+                        , ( "account", Encode.string req.account )
+                        , ( "code", Encode.string req.code )
+                        ]
+                  ]
+                )
+
+        AuthGate.StartPasskey account ->
+            case ( model.connection == Live, Passkey.webauthnAuth account ) of
+                ( True, Just line ) ->
+                    let
+                        session =
+                            Passkey.beginAuth model.passkey
+                    in
+                    ( { model
+                        | passkey = { session | busy = True, error = Nothing, notice = Nothing, lastAction = Nothing }
+                        , identifyReplyAccount = Just account
+                      }
+                    , [ SendLine line ]
+                    )
+
+                _ ->
+                    ( model, [] )
+
+        AuthGate.Hangup ->
+            ( disarmForGate model
+            , if model.connection /= Offline || model.connectForm.dialing then
+                [ WsDisconnect ]
+
+              else
+                []
+            )
+
+        AuthGate.DisarmReconnect ->
+            ( disarmForGate model, [] )
+
+        AuthGate.ForgetCredential ->
+            ( { model | saslAccount = Nothing, saslPasswordHeld = False, saslClientCert = False }
+            , [ authGatePort [ ( "kind", Encode.string "forget" ) ] ]
+            )
+
+        AuthGate.ToSignIn target ->
+            ( setConnectForm
+                (\f ->
+                    { f
+                        | mode = ConnectSignIn
+                        , nick =
+                            if String.isEmpty target.account then
+                                f.nick
+
+                            else
+                                target.account
+                        , password = ""
+                        , recoveryOpen = target.recovery
+                        , recoveryCode = ""
+                        , passwordError = Nothing
+                        , nickError = Nothing
+                        , attempted = False
+                        , dialing = False
+                    }
+                )
+                model
+            , []
+            )
+
+        AuthGate.ParkJoin ->
+            case model.pendingDeepLinkJoin of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    let
+                        gate =
+                            model.authGate
+                    in
+                    ( { model | pendingDeepLinkJoin = Nothing, authGate = { gate | parkedJoin = Just room } }, [] )
+
+        AuthGate.UnparkJoin ->
+            let
+                gate =
+                    model.authGate
+            in
+            case gate.parkedJoin of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    ( { model | pendingDeepLinkJoin = Just room, authGate = { gate | parkedJoin = Nothing } }, [] )
+
+
+{-| A closed auth step stays on the gate: no auto-reconnect as a guest. -}
+disarmForGate : Model -> Model
+disarmForGate model =
+    { model | autoReconnect = False, connectGate = True, reconnectIn = 0, reconnectDueMs = 0 }
+        |> setConnectForm (\f -> { f | dialing = False, attempted = False })
+
+
+authGateFromServer : Model -> Wire.IrcMessage -> Bool
+authGateFromServer model message =
+    message.nick == Nothing || (model.serverPrefix /= Nothing && message.prefix == model.serverPrefix)
+
+
+{-| Lines the auth steps own, claimed BEFORE `foldLine` (`foldParsed`):
+the pre-001 CHALLENGE notices, the two-factor 904, IDENTIFY/passkey
+login confirmations and refusals for a login this client started,
+SETPASS / RESETPASS replies while one is in flight, and every 913.
+Anything else returns `Nothing` and folds as before.
+-}
+foldAuthGateLine : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldAuthGateLine model message =
+    case message.command of
+        "NOTICE" ->
+            authGateNotice model message
+
+        "904" ->
+            case model.saslAccount of
+                Just account ->
+                    if model.sasl /= SaslIdle && AuthGate.isTwoFactorRefusal (trailingParam message.params) then
+                        let
+                            ( failed, failOut ) =
+                                failSasl model "Two-step sign-in: enter your authentication code."
+
+                            ( state, effects ) =
+                                AuthGate.onTwoFactorRefused account failed.authGate
+
+                            ( final, out ) =
+                                runAuthGateEffects effects { failed | authGate = state }
+                        in
+                        Just ( final, failOut ++ out )
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+        "464" ->
+            if authGateAwaitingLogin model then
+                Just ( authGateLoginFailed { code = "464", text = trailingParam message.params } model, [] )
+
+            else
+                Nothing
+
+        "FAIL" ->
+            Wire.parseStandardReply message
+                |> Maybe.andThen
+                    (\reply ->
+                        authGateReply model { command = reply.command, code = reply.code, text = reply.description }
+                    )
+
+        "WARN" ->
+            Wire.parseStandardReply message
+                |> Maybe.andThen
+                    (\reply ->
+                        authGateReply model { command = reply.command, code = reply.code, text = reply.description }
+                    )
+
+        "RESETPASS" ->
+            -- `:<srv> RESETPASS SUCCESS <account> :Password reset; …`
+            case ( model.authGate.flow, message.params ) of
+                ( AuthGate.Reset _, "SUCCESS" :: _ ) ->
+                    if authGateFromServer model message then
+                        Just ( { model | authGate = AuthGate.onResetSuccess model.authGate }, [] )
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+        "913" ->
+            Just ( authGateNoAccess model message, [] )
+
+        _ ->
+            Nothing
+
+
+authGateAwaitingLogin : Model -> Bool
+authGateAwaitingLogin model =
+    case model.authGate.flow of
+        AuthGate.TwoFactor _ AuthGate.TfaVerifying ->
+            True
+
+        AuthGate.PasskeySignIn _ AuthGate.PkWaiting ->
+            True
+
+        _ ->
+            False
+
+
+authGateLoginFailed : { code : String, text : String } -> Model -> Model
+authGateLoginFailed failure model =
+    let
+        passkey =
+            model.passkey
+    in
+    { model
+        | authGate = AuthGate.onIdentifyFailed failure model.authGate
+        , identifyReplyAccount = Nothing
+        , passkey = { passkey | busy = False, pendingAuth = Nothing }
+    }
+
+
+authGateNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+authGateNotice model message =
+    let
+        body =
+            case message.params of
+                _ :: text :: _ ->
+                    text
+
+                _ ->
+                    ""
+    in
+    if model.connection /= Live then
+        -- Before 001 only the server can address this connection.
+        AuthGate.parseChallengeNotice body
+            |> Maybe.map
+                (\notice ->
+                    let
+                        ( state, effects ) =
+                            AuthGate.onChallengeNotice notice model.authGate
+                    in
+                    runAuthGateEffects effects { model | authGate = state }
+                )
+
+    else if not (authGateFromServer model message) then
+        Nothing
+
+    else
+        case AuthGate.identifiedAccount body of
+            Just account ->
+                authGateIdentified account model message
+
+            Nothing ->
+                if AuthGate.setPassNotice body then
+                    case model.authGate.setPass of
+                        AuthGate.SetPassPending account ->
+                            Just (authGateSetPassChanged account model)
+
+                        _ ->
+                            Nothing
+
+                else if AuthGate.isResetRequestNotice body then
+                    case model.authGate.flow of
+                        AuthGate.Reset _ ->
+                            Just ( { model | authGate = AuthGate.onResetRequested model.authGate }, [] )
+
+                        _ ->
+                            Nothing
+
+                else
+                    -- A client without `standard-replies` gets
+                    -- `NOTICE <me> :FAIL <CMD> <CODE>: <text>`.
+                    AuthGate.noticeStandardReply body
+                        |> Maybe.andThen
+                            (\reply ->
+                                if reply.kind == "NOTE" then
+                                    Nothing
+
+                                else
+                                    authGateReply model { command = reply.command, code = reply.code, text = reply.text }
+                            )
+
+
+authGateReply : Model -> { command : String, code : String, text : String } -> Maybe ( Model, List Outbound )
+authGateReply model reply =
+    let
+        failure =
+            { code = reply.code, text = reply.text }
+    in
+    case String.toUpper reply.command of
+        "SETPASS" ->
+            case model.authGate.setPass of
+                AuthGate.SetPassPending _ ->
+                    let
+                        gate =
+                            model.authGate
+                    in
+                    Just
+                        ( { model
+                            | authGate = { gate | setPass = AuthGate.SetPassIdle }
+                            , accountPasswordError = Just (AuthGate.setPassFailCopy failure)
+                          }
+                        , [ authGatePort [ ( "kind", Encode.string "drop" ) ] ]
+                        )
+
+                _ ->
+                    Nothing
+
+        "RESETPASS" ->
+            case model.authGate.flow of
+                AuthGate.Reset _ ->
+                    Just ( { model | authGate = AuthGate.onResetFail failure model.authGate }, [] )
+
+                _ ->
+                    Nothing
+
+        "IDENTIFY" ->
+            if authGateAwaitingLogin model then
+                Just ( authGateLoginFailed failure model, [] )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+{-| `You are now identified as <account>` for a login this client
+started (`identifyReplyAccount`): the server sends no 900 for
+IDENTIFY or a passkey login, so the 900 arm runs on a synthesized
+RPL_LOGGEDIN (account, publisher, attribution, session commands, nick
+reclaim). A two-step login keeps its SASL credential so a later
+reconnect asks for a fresh code instead of landing as a guest.
+-}
+authGateIdentified : String -> Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+authGateIdentified account model message =
+    let
+        ours =
+            case model.identifyReplyAccount of
+                Just pending ->
+                    String.toLower pending == String.toLower account
+
+                Nothing ->
+                    False
+    in
+    if not ours then
+        Nothing
+
+    else
+        let
+            synthetic =
+                { message
+                    | command = "900"
+                    , params = [ model.ourNick, model.ourNick ++ "!*@*", account, "You are now logged in as " ++ account ]
+                    , nick = Nothing
+                }
+
+            ( twoFactor, passkeyFlow ) =
+                case model.authGate.flow of
+                    AuthGate.TwoFactor _ _ ->
+                        ( True, False )
+
+                    AuthGate.PasskeySignIn _ _ ->
+                        ( False, True )
+
+                    _ ->
+                        ( False, False )
+
+            ( loggedIn, loginOut ) =
+                foldLine model synthetic
+
+            passkey =
+                loggedIn.passkey
+
+            restored =
+                if twoFactor then
+                    { loggedIn | saslAccount = Just account, saslPasswordHeld = True }
+
+                else if passkeyFlow then
+                    { loggedIn | passkey = { passkey | busy = False, pendingAuth = Nothing } }
+
+                else
+                    loggedIn
+
+            ( state, effects ) =
+                AuthGate.onIdentified restored.authGate
+
+            ( settled, out ) =
+                runAuthGateEffects effects { restored | authGate = state }
+
+            ( joined, joinOut ) =
+                if twoFactor || passkeyFlow then
+                    firePendingDeepLinkJoin settled
+
+                else
+                    ( settled, [] )
+        in
+        Just ( joined, loginOut ++ out ++ joinOut )
+
+
+authGateSetPassChanged : String -> Model -> ( Model, List Outbound )
+authGateSetPassChanged account model =
+    let
+        gate =
+            model.authGate
+    in
+    ( addToast
+        { variant = ToastSuccess
+        , title = "Password changed"
+        , description = Just "Use your new password the next time you sign in."
+        , duration = Nothing
+        , groupKey = Just "setpass"
+        , undo = Nothing
+        }
+        model.nowMs
+        { model | authGate = { gate | setPass = AuthGate.SetPassDone }, accountPasswordError = Nothing }
+    , [ authGatePort [ ( "kind", Encode.string "commit" ), ( "account", Encode.string account ) ] ]
+    )
+
+
+{-| 913 ERR_NOACCESS (`:<srv> 913 <me> <entity> :<reason>`). A refused
+write to our own user entity is the custom status PROP; anything else
+is an inbox error instead of the invisible numeric log.
+-}
+authGateNoAccess : Model -> Wire.IrcMessage -> Model
+authGateNoAccess model message =
+    let
+        entity =
+            Maybe.withDefault "" (List.head (List.drop 1 message.params))
+
+        reason =
+            trailingParam message.params
+
+        logged =
+            logNumeric model message
+    in
+    if entity == "*" || String.toLower entity == String.toLower model.ourNick then
+        addToast
+            { variant = ToastError
+            , title = "Your status wasn't saved"
+            , description = Just (boundToastText (orDefault "The server refused the change." reason))
+            , duration = Nothing
+            , groupKey = Just "status-913"
+            , undo = Nothing
+            }
+            model.nowMs
+            { logged | statusError = Just ("The server didn't save your status: " ++ orDefault "access denied" reason) }
+
+    else
+        addNotification logged
+            { kind = NotifError
+            , text =
+                "No access to change "
+                    ++ entity
+                    ++ (if String.isEmpty reason then
+                            "."
+
+                        else
+                            ": " ++ reason
+                       )
+            , from = Nothing
+            , channel =
+                if isChannelName model entity then
+                    Just entity
+
+                else
+                    Nothing
+            , topic = Nothing
+            }
+
+
+orDefault : String -> String -> String
+orDefault fallback value =
+    if String.isEmpty (String.trim value) then
+        fallback
+
+    else
+        value
+
+
+{-| Answers from the `authGateIn` port: a solved proof of work, or a
+held-password IDENTIFY the ports refused to compose. -}
+authGatePortIn : Decode.Value -> Model -> ( Model, List Outbound )
+authGatePortIn value model =
+    let
+        field name =
+            Decode.decodeValue (Decode.field name Decode.string) value |> Result.withDefault ""
+    in
+    case field "kind" of
+        "solved" ->
+            let
+                ( state, effects ) =
+                    AuthGate.onPowSolved (field "seed") (field "answer") model.authGate
+            in
+            runAuthGateEffects effects { model | authGate = state }
+
+        "identifyRefused" ->
+            ( authGateLoginFailed
+                { code =
+                    case field "reason" of
+                        "unsafe" ->
+                            "UNSAFE_PASSWORD"
+
+                        "toolong" ->
+                            "TOO_LONG"
+
+                        _ ->
+                            "NO_PASSWORD"
+                , text = ""
+                }
+                model
+            , []
+            )
+
+        _ ->
+            ( model, [] )
+
+
+{-| v3/gap-auth settle step: a registration (001) passes the challenge
+and sends a dialed auth step's command; a closed socket settles the
+steps that needed it (and an unconfirmed SETPASS); a fresh socket
+starts without a challenge; editing the password fields clears the
+"changed" note.
+-}
+settleStepAuth : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepAuth msg prior acc =
+    let
+        ( settled, outs ) =
+            settleAuthGate msg prior acc
+    in
+    -- A new auth panel (or a step re-enabling after a refusal) moves
+    -- focus to its first field / primary action.
+    case AuthGate.panelFocus settled.authGate of
+        Just target ->
+            if AuthGate.panelFocus prior.authGate /= Just target then
+                ( settled, outs ++ [ PrefsFocus { id = target } ] )
+
+            else
+                ( settled, outs )
+
+        Nothing ->
+            ( settled, outs )
+
+
+settleAuthGate : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleAuthGate msg prior ( next, outs ) =
+    let
+        gate =
+            next.authGate
+    in
+    case msg of
+        WsClosed _ ->
+            let
+                ( state, effects ) =
+                    AuthGate.onClosed gate
+
+                ( unpended, dropOut ) =
+                    case state.setPass of
+                        AuthGate.SetPassPending _ ->
+                            ( { next | accountPasswordError = Just "The connection closed before the server confirmed the change. Sign in again to check which password works." }
+                            , [ authGatePort [ ( "kind", Encode.string "drop" ) ] ]
+                            )
+
+                        _ ->
+                            ( next, [] )
+
+                ( settled, out ) =
+                    runAuthGateEffects effects
+                        { unpended
+                            | authGate =
+                                { state
+                                    | setPass =
+                                        case state.setPass of
+                                            AuthGate.SetPassPending _ ->
+                                                AuthGate.SetPassIdle
+
+                                            other ->
+                                                other
+                                }
+                        }
+            in
+            ( settled, outs ++ dropOut ++ out )
+
+        AccountNewPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        AccountConfirmPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        AccountCurrentPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        _ ->
+            if prior.connection /= Live && next.connection == Live then
+                let
+                    ( state, effects ) =
+                        AuthGate.onRegistered gate
+
+                    ( settled, out ) =
+                        runAuthGateEffects effects { next | authGate = state }
+                in
+                ( settled, outs ++ out )
+
+            else if prior.connection == Offline && next.connection == Registering then
+                case gate.challenge of
+                    AuthGate.NoChallenge ->
+                        ( next, outs )
+
+                    AuthGate.ChallengeStopped _ ->
+                        ( next, outs )
+
+                    _ ->
+                        ( { next | authGate = { gate | challenge = AuthGate.NoChallenge } }, outs )
+
+            else
+                ( next, outs )
+
+
+clearSetPassDone : Model -> Model
+clearSetPassDone model =
+    let
+        gate =
+            model.authGate
+    in
+    if gate.setPass == AuthGate.SetPassDone then
+        { model | authGate = { gate | setPass = AuthGate.SetPassIdle } }
+
+    else
+        model

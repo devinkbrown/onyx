@@ -1,0 +1,448 @@
+/* v3/gap-oper — the operator desk: Live feed, Bans, Silence, Abuse,
+   Appeals, Content, Network.
+
+   One calm surface: a wide side panel on desktop, a bottom sheet on
+   phones (the shared sheet rules), seven tabs, and inside each tab small
+   bordered cards. The accent means one thing here — the current tab, the
+   pressed chip, the primary action. Danger is the existing red border,
+   never a fill. Text stays >= 14px; inputs are 16px on touch so iOS does
+   not zoom; every control is 44px on coarse pointers.
+
+   Linked before ui-sheets.css, so every rule that has to beat a sheet
+   rule carries its own specificity. */
+
+.onyx-sheet-layer[data-placement="side"] > .onyx-moddesk-sheet[data-testid="oper-sheet"] {
+  width: min(680px, 100%);
+}
+@media (min-width: 1700px) {
+.onyx-sheet-layer[data-placement="side"] > .onyx-moddesk-sheet[data-testid="oper-sheet"] {
+    width: min(780px, 100%);
+  }
+}
+
+.oper-desk {
+  --oc-gap: var(--space-3);
+  --oc-fs: 14px;
+  --oc-fs-meta: 13px;
+  min-width: 0;
+  font-size: var(--oc-fs);
+}
+@media (max-width: 400px) {
+.oper-desk { --oc-fs-meta: 14px; }
+}
+
+.oper-desk .oc-rail { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; }
+.oper-desk .oc-rail > div { display: flex; flex-direction: row; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.oper-desk .oc-rail dt { color: var(--onyx-faint); font-size: var(--oc-fs-meta); }
+.oper-desk .oc-rail dt::after { content: ""; }
+.oper-desk .oc-rail dd { margin: 0; font-size: var(--oc-fs); overflow-wrap: anywhere; }
+
+
+/* ---- Tabs ---------------------------------------------------------- */
+
+.oc-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  margin: 0 calc(-1 * var(--sheet-pad, 20px));
+  padding: var(--space-2) calc(var(--sheet-pad, 20px) + 44px) 0 var(--sheet-pad, 20px);
+  background: var(--onyx-panel);
+  border-bottom: 1px solid var(--onyx-line);
+}
+/* The tabs scroll inside their own box, which stops before the close
+   button, so a tab never slides underneath it; a fade at the right edge
+   says there is more. */
+.oc-tablist {
+  display: flex;
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+  padding-right: 28px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-mask-image
+: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.oc-tablist::-webkit-scrollbar { display: none; }
+@media (min-width: 720px) {
+  .oc-tablist { -webkit-mask-image: none; mask-image: none; }
+}
+.onyx-moddesk-sheet .oper-desk .oc-tab {
+  flex: none;
+  scroll-snap-align: start;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--oc-fs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-moddesk-sheet .oper-desk .oc-tab:hover { color: var(--onyx-text); }
+.onyx-moddesk-sheet .oper-desk .oc-tab[aria-selected="true"] {
+  color: var(--onyx-text);
+  border-bottom-color: var(--onyx-accent);
+  background: var(--onyx-panel-2);
+}
+.onyx-moddesk-sheet .oper-desk .oc-tab:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.oc-tabpanel { min-width: 0; outline: none; }
+.oc-tabpanel:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.oc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-gap);
+  min-width: 0;
+  container-type: inline-size;
+  container-name: oc;
+}
+.oc-lede { margin: 0; color: var(--onyx-dim); font-size: var(--oc-fs); line-height: var(--leading-snug); }
+.oc-hint { margin: 0; color: var(--onyx-dim); font-size: var(--oc-fs-meta); line-height: var(--leading-snug); }
+.oc-meta, .oc-meta-inline { margin: 0; color: var(--onyx-faint); font-size: var(--oc-fs-meta); }
+.oc-meta-inline { margin-left: auto; }
+.oc-empty { margin: 0; padding: var(--space-3); border: 1px dashed var(--onyx-line); border-radius: var(--radius); color: var(--onyx-dim); font-size: var(--oc-fs); }
+.oc-faint { color: var(--onyx-faint); }
+.oc-mono, .onyx-moddesk-sheet .oper-desk .oc-input-mono, .oc-wire { font-family: var(--font-mono); }
+.oc-errors { margin: 0; padding-left: 18px; color: var(--onyx-bad); font-size: var(--oc-fs); }
+
+/* ---- Cards and disclosures ------------------------------------------ */
+
+.oc-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-gap);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+}
+.oc-card-head { display: flex; flex-direction: column; gap: 2px; }
+.oc-card-head h3 { margin: 0; font-size: var(--text-md); line-height: var(--leading-snug); }
+
+.oc-more {
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  min-width: 0;
+}
+.oc-more > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3) var(--space-2) 36px;
+  position: relative;
+  cursor: pointer;
+  list-style: none;
+}
+.oc-more > summary::-webkit-details-marker { display: none; }
+.oc-more > summary::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--onyx-i-chevron) center / contain no-repeat;
+  mask: var(--onyx-i-chevron) center / contain no-repeat;
+  transition: transform var(--dur-fast) var(--ease);
+}
+.oc-more[open] > summary::before { transform: rotate(90deg); }
+.oc-more > summary:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.oc-more-title { font-weight: 650; font-size: var(--oc-fs); }
+.oc-more-hint { color: var(--onyx-dim); font-size: var(--oc-fs-meta); }
+.oc-more > :not(summary) { margin: 0 var(--space-3) var(--space-3); }
+.oc-more-inline { background: transparent; }
+
+/* ---- Fields and buttons ---------------------------------------------- */
+
+.oc-form { display: flex; flex-direction: column; gap: var(--oc-gap); min-width: 0; }
+.oc-field { display: flex; flex-direction: column; gap: var(--space-1); flex: 0 0 auto; min-width: 0; }
+.oc-row > .oc-field { flex: 1 1 180px; }
+
+.oc-field > label { font-size: var(--oc-fs); font-weight: 650; }
+.oc-row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: flex-start; min-width: 0; }
+
+.oc-row-tight { gap: var(--space-2); }
+.oc-row-between { align-items: center; justify-content: space-between; }
+.oc-duration { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.oc-sub { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.oc-sub-title { font-size: var(--oc-fs); }
+
+.onyx-moddesk-sheet .oper-desk .oc-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--oc-fs);
+}
+.onyx-moddesk-sheet .oper-desk .oc-input-mono { font-size: 0.8125rem; }
+.onyx-moddesk-sheet .oper-desk .oc-input::placeholder { color: var(--onyx-faint); }
+.onyx-moddesk-sheet .oper-desk .oc-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-accent); }
+.onyx-moddesk-sheet .oper-desk .oc-textarea { min-height: 76px; resize: vertical; line-height: var(--leading-snug); }
+
+.onyx-moddesk-sheet .oper-desk .oc-btn {
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--oc-fs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.onyx-moddesk-sheet .oper-desk .oc-btn:hover:not(:disabled) { border-color: var(--onyx-dim); }
+.onyx-moddesk-sheet .oper-desk .oc-btn:disabled { opacity: 0.45; cursor: default; }
+.onyx-moddesk-sheet .oper-desk .oc-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-primary { background: var(--onyx-accent); border-color: var(--onyx-accent); color: var(--onyx-accent-ink); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-primary:hover:not(:disabled) { border-color: var(--onyx-accent); filter: brightness(1.06); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-danger { background: transparent; border-color: var(--onyx-bad); color: var(--onyx-bad); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-danger:hover:not(:disabled) { border-color: var(--onyx-bad); background: color-mix(in oklab, var(--onyx-bad) 12%, transparent); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-quiet { background: transparent; }
+.onyx-moddesk-sheet .oper-desk .oc-btn-small { min-height: 32px; padding: 0 var(--space-2); }
+.onyx-moddesk-sheet .oper-desk .oc-btn-align { align-self: flex-end; }
+
+@media (pointer: coarse) {
+.onyx-moddesk-sheet .oper-desk .oc-tab, .onyx-moddesk-sheet .oper-desk .oc-btn, .onyx-moddesk-sheet .oper-desk .oc-btn-small, .onyx-moddesk-sheet .oper-desk .oc-chip { min-height: 44px; }
+.onyx-moddesk-sheet .oper-desk .oc-input { min-height: 44px; font-size: 16px; }
+.onyx-moddesk-sheet .oper-desk .oc-input-mono { font-size: 16px; }
+.onyx-moddesk-sheet .oper-desk .oc-textarea { min-height: 96px; }
+}
+
+/* ---- Review -------------------------------------------------------- */
+
+.oc-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--onyx-accent);
+  border-radius: var(--radius);
+  background: var(--onyx-panel-2);
+}
+.oc-review-danger { border-color: var(--onyx-bad); }
+.oc-review-summary { margin: 0; font-size: var(--oc-fs); line-height: var(--leading-snug); }
+.oc-wire {
+  display: block;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Replies ------------------------------------------------------- */
+
+.oc-replies { display: flex; flex-direction: column; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--onyx-line); }
+.oc-replies-head { display: flex; align-items: center; justify-content: space-between; }
+.oc-replies-title { color: var(--onyx-faint); font-size: var(--oc-fs-meta); letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.oc-replies-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.oc-reply { display: flex; gap: var(--space-2); align-items: baseline; font-size: var(--oc-fs); border-left: 2px solid var(--onyx-line); padding: 2px 0 2px var(--space-2); }
+.oc-reply[data-tone="good"] { border-left-color: var(--onyx-accent); }
+.oc-reply[data-tone="warn"] { border-left-color: var(--onyx-warn); }
+.oc-reply[data-tone="bad"] { border-left-color: var(--onyx-bad); color: var(--onyx-bad); }
+.oc-reply-time { flex: none; color: var(--onyx-faint); font: var(--oc-fs-meta) / 1.4 var(--font-mono); }
+.oc-reply-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---- Chips and toolbars --------------------------------------------- */
+
+.oc-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.onyx-moddesk-sheet .oper-desk .oc-chip {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--oc-fs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.onyx-moddesk-sheet .oper-desk .oc-chip:hover:not(:disabled) { color: var(--onyx-text); border-color: var(--onyx-dim); }
+.onyx-moddesk-sheet .oper-desk .oc-chip[aria-pressed="true"] {
+  color: var(--onyx-text);
+  border-color: var(--onyx-accent);
+  background: color-mix(in oklab, var(--onyx-accent) 14%, transparent);
+}
+.onyx-moddesk-sheet .oper-desk .oc-chip:disabled { opacity: 0.5; cursor: default; }
+.onyx-moddesk-sheet .oper-desk .oc-chip:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+.oc-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.oc-filters { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.oc-filters .oc-field { flex: 1 1 150px; }
+
+/* ---- The live feed -------------------------------------------------- */
+
+.oc-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(58dvh, 640px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-panel);
+  scrollbar-width: thin;
+}
+.oc-event {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "time sev cat repeat" "text text text text" "origin origin origin origin";
+  gap: 1px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+  border-left: 2px solid transparent;
+}
+.oc-event:first-child { border-top: 0; }
+.oc-event[data-sev="warn"] { border-left-color: var(--onyx-warn); }
+.oc-event[data-sev="error"], .oc-event[data-sev="critical"] { border-left-color: var(--onyx-bad); }
+.oc-event-time { grid-area: time; color: var(--onyx-faint); font: var(--oc-fs-meta) / 1.5 var(--font-mono); font-variant-numeric: tabular-nums; }
+.oc-event-sev { grid-area: sev; color: var(--onyx-faint); font-size: var(--oc-fs-meta); text-transform: uppercase; letter-spacing: var(--tracking-kicker); line-height: 1.6; }
+.oc-event[data-sev="warn"] .oc-event-sev { color: var(--onyx-warn); }
+.oc-event[data-sev="error"] .oc-event-sev, .oc-event[data-sev="critical"] .oc-event-sev { color: var(--onyx-bad); }
+.oc-event-cat { grid-area: cat; font-size: var(--oc-fs-meta); font-weight: 650; color: var(--onyx-dim); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-event-text { grid-area: text; min-width: 0; font-size: var(--oc-fs); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.oc-event-origin { grid-area: origin; color: var(--onyx-faint); font: var(--oc-fs-meta) / 1.4 var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-event-repeat { grid-area: repeat; justify-self: end; padding: 0 6px; border-radius: 999px; background: var(--onyx-panel-2); color: var(--onyx-dim); font-size: var(--oc-fs-meta); font-variant-numeric: tabular-nums; }
+
+@container oc (min-width: 560px) {
+.oc-event {
+    grid-template-columns: 4.6rem 4.4rem 8rem minmax(0, 1fr) auto auto;
+    grid-template-areas: "time sev cat text origin repeat";
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+.oc-event-origin { max-width: 11rem; }
+}
+
+/* ---- Lists ---------------------------------------------------------- */
+
+.oc-list, .oc-members, .oc-plain, .oc-tags { list-style: none; margin: 0; padding: 0; }
+.oc-list { display: flex; flex-direction: column; border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel); }
+.oc-item { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--onyx-line); min-width: 0; }
+.oc-item:first-child { border-top: 0; }
+.oc-item-compact { align-items: center; }
+.oc-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.oc-item-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); min-width: 0; overflow-wrap: anywhere; }
+.oc-item-sub { margin: 0; color: var(--onyx-dim); font-size: var(--oc-fs-meta); }
+.oc-item-note { margin: 0; font-size: var(--oc-fs); overflow-wrap: anywhere; }
+.oc-tag { display: inline-block; padding: 0 var(--space-2); border: 1px solid var(--onyx-line); border-radius: 999px; color: var(--onyx-dim); font-size: var(--oc-fs-meta); line-height: 1.6; }
+.oc-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+/* ---- Results -------------------------------------------------------- */
+
+.oc-result { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.oc-result-head { margin: 0; font-size: var(--oc-fs); font-weight: 650; line-height: var(--leading-snug); }
+.oc-facts { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: var(--space-1) var(--space-3); margin: 0; font-size: var(--oc-fs); }
+.oc-facts dt { color: var(--onyx-dim); }
+.oc-facts dd { margin: 0; overflow-wrap: anywhere; }
+.oc-facts dd[data-flagged="true"] { color: var(--onyx-warn); font-weight: 650; }
+.oc-group { padding: var(--space-2) var(--space-3); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel); }
+.oc-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); margin: 0 0 var(--space-1); }
+.oc-members { display: flex; flex-direction: column; gap: 2px; font-size: var(--oc-fs); }
+.oc-members li { overflow-wrap: anywhere; }
+.oc-plain { display: flex; flex-direction: column; gap: 2px; color: var(--onyx-dim); font-size: var(--oc-fs-meta); }
+
+.oc-appeals { display: flex; flex-direction: column; gap: var(--space-2); }
+.oc-appeal { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel); min-width: 0; }
+.oc-appeal[data-answered="true"] { opacity: 0.85; }
+.oc-appeal-text { margin: 0; font-size: var(--oc-fs); line-height: var(--leading-body); overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.oc-bars { display: flex; flex-direction: column; gap: var(--space-1); }
+.oc-bar { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 3rem; align-items: center; gap: var(--space-2); font-size: var(--oc-fs-meta); }
+.oc-bar-name { color: var(--onyx-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-bar-track { height: 6px; border-radius: 999px; background: var(--onyx-panel-2); overflow: hidden; }
+.oc-bar-fill { display: block; height: 100%; background: var(--onyx-dim); }
+.oc-bar-n { text-align: right; font-variant-numeric: tabular-nums; }
+.oc-stats { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.oc-report { list-style: none; margin: 0; padding: var(--space-2) var(--space-3); max-height: 280px; overflow: auto; border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-panel); font: 13px / 1.5 var(--font-mono); }
+.oc-report li { overflow-wrap: anywhere; white-space: pre-wrap; }
+.oc-report li[data-tone="bad"] { color: var(--onyx-bad); }
+
+/* ---- Existing desk forms inside the new cards ------------------------ */
+
+.oc-card .onyx-moddesk-form { border-top: 0; padding-top: 0; }
+.oc-card .onyx-moddesk-form label { font-size: var(--oc-fs); }
+.oc-card .onyx-moddesk-hint { font-size: var(--oc-fs-meta); }
+.oc-card .onyx-moddesk-actions button, .oc-card .onyx-moddesk-row button, .oc-more .onyx-moddesk-row button { min-height: 36px; font-size: var(--oc-fs); }
+.oc-more .oper-event-console { border-top: 0; padding-top: 0; }
+.oc-more .onyx-moddesk-form { border-top: 0; padding-top: 0; }
+@media (pointer: coarse) {
+.oper-desk .onyx-moddesk-sheet input, .oper-desk input, .oper-desk select { min-height: 44px; font-size: 16px; }
+.oper-desk .onyx-moddesk-actions button, .oper-desk .onyx-moddesk-row button { min-height: 44px; }
+}
+.oper-desk .onyx-moddesk-review button, .oper-desk .onyx-moddesk-actions button { font-size: var(--oc-fs); }
+.oper-desk .onyx-moddesk-hint, .oper-desk .onyx-moddesk-offline, .oper-desk .onyx-moddesk-errors { font-size: var(--oc-fs); }
+
+.onyx-moddesk-sheet .oper-desk .onyx-moddesk-form :is(input, select), .onyx-moddesk-sheet .oper-desk .onyx-moddesk-row :is(input, select) { font-size: var(--oc-fs); }
+
+/* The close button rides on the sticky tab strip once the head has
+   scrolled away: centre it on the strip's 40px tab row. */
+.onyx-sheet-layer > .onyx-moddesk-sheet[data-testid="oper-sheet"] .onyx-moddesk-bar > .onyx-sheet-close { margin-top: -6px; }
+@media (max-width: 767.98px) {
+  .onyx-sheet-layer > .onyx-moddesk-sheet[data-testid="oper-sheet"] .onyx-moddesk-bar > .onyx-sheet-close { margin-top: -8px; }
+  .oc-tabs { box-shadow: 0 calc(-1 * var(--sheet-grip-zone)) 0 0 var(--onyx-panel); }
+}
+
+/* ---- The person's appeal (connect screen + /appeal sheet) ----------- */
+
+.conn-foot .ap-footlink { display: inline-flex; align-items: center; min-height: var(--target-min); padding: 0; border: 0; background: transparent; color: var(--onyx-faint); font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer; touch-action: manipulation; }
+.conn-foot .ap-footlink:hover, .conn-foot .ap-footlink:active { color: var(--onyx-text); }
+.conn-foot .ap-footlink:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.ap-form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.ap-sheet .ap-form { padding: 0 var(--space-4) var(--space-4); }
+.ap-lede, .ap-hint, .ap-status { margin: 0; font-size: 0.875rem; line-height: var(--leading-snug); color: var(--onyx-dim); }
+.ap-hint { font-size: 0.8125rem; color: var(--onyx-faint); }
+@media (max-width: 400px) { .ap-hint { font-size: 0.875rem; } }
+.ap-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.ap-field > label { font-size: 0.875rem; font-weight: 650; }
+.ap-input { box-sizing: border-box; width: 100%; min-height: 96px; padding: var(--space-2) var(--space-3); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-bg); color: var(--onyx-text); font: inherit; font-size: 16px; line-height: var(--leading-snug); resize: vertical; }
+.ap-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-accent); }
+.ap-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ap-btn { min-height: 44px; padding: 0 var(--space-4); border: 1px solid var(--onyx-accent); border-radius: var(--radius); background: var(--onyx-accent); color: var(--onyx-accent-ink); font: inherit; font-size: 0.875rem; font-weight: 650; cursor: pointer; }
+.ap-btn:disabled { opacity: 0.45; cursor: default; }
+.ap-btn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.ap-status-good { color: var(--onyx-accent); }
+.ap-status-bad { color: var(--onyx-bad); }
+.onyx-sheet-layer > .ap-sheet { width: min(var(--sheet-w-sm, 440px), 100%); }
+
+/* Keep the strip's upward cover (phones) over empty space only. */
+@media (max-width: 767.98px) {
+  .oper-desk .oc-rail { margin-bottom: var(--space-3); }
+}
+
+/* Short windows (landscape phones, split screens): the head gives its
+   height back to the work. */
+@media (max-height: 520px) {
+  .onyx-moddesk-sheet .oper-desk .onyx-moddesk-head { margin-bottom: var(--space-2); padding-top: var(--space-2); padding-bottom: var(--space-2); }
+  .oper-desk .onyx-moddesk-eyebrow { display: none; }
+  .oper-desk .onyx-moddesk-head h2 { font-size: var(--text-md); }
+  .oc-events { max-height: 60dvh; }
+
+}

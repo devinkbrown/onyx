@@ -43,6 +43,7 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
+import View.Appeal
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
@@ -75,8 +76,10 @@ import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
+import View.AuthGate -- v3/gap-auth
 -- v3/gap-organize
 import View.Attention
 import View.Organize
@@ -136,7 +139,13 @@ view model =
                                 View.Roadmap.route model
 
                             _ ->
-                                if App.connectGateVisible model then
+                                -- v3/gap-auth: an auth step (two-step code,
+                                -- challenge question, passkey, password
+                                -- reset) takes over the gate.
+                                if View.AuthGate.takesOver model then
+                                    [ View.AuthGate.gate model ]
+
+                                else if App.connectGateVisible model then
                                     [ connectGate model ]
 
                                 else
@@ -266,6 +275,7 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
@@ -337,6 +347,7 @@ overlays model =
         -- v3/roomsettings
         , View.RoomSettings.roomSettingsSheet model
         , operSheet model
+        , View.Appeal.appealSheet model -- v3/gap-oper
         , personSafetySheet model
         , newMessageSheet model
         , inviteShareSheet model -- v3/dmsafety

@@ -312,6 +312,11 @@ async function main() {
     await Promise.all([signIn(A, base, a, accounts.a.pass), signIn(B, base, b, accounts.b.pass)]);
     check('both signed in with SASL (SCRAM) on the local node', true);
     check('engine mounted (window.OnyxVoiceEngine)', await A.evaluate(() => typeof window.OnyxVoiceEngine?.joinVoice === 'function'));
+    // v3/rx-calls: the node never advertises ACCOUNTRESIDENCE at sign-in, yet
+    // the Elm client enrolls the device key at the end of the welcome burst —
+    // the adapter sees the server's IDENTITY ADDED before anyone joins a call.
+    const preEnrolled = await until(async () => (await stats(A))?.identityEnrolled && (await stats(B))?.identityEnrolled, { timeout: 30000, label: 'sign-in enrollment' }).catch(() => false);
+    check('device key enrolled at sign-in by the Elm client (no ACCOUNTRESIDENCE, before any join)', !!preEnrolled);
 
     // A starts the call from the room header; B joins from the invite banner.
     await A.click('[data-testid="ribbon-join-call"]');
@@ -415,8 +420,18 @@ async function main() {
       () => check('unmute propagates', true),
       (e) => check('unmute propagates', false, e.message));
 
+    // v3/rx-calls: while the engine ships with video switched off (voice
+    // only on the live network) the camera must be absent on both sides
+    // (fail closed) and the video checks below do not apply.
+    const videoOff = await A.evaluate(() => !!(window.OnyxVoiceEngine && window.OnyxVoiceEngine.videoEnabled === false));
+    if (videoOff) {
+      const camA = await A.$('[data-testid="camera-button"]');
+      const camB = await B.$('[data-testid="camera-button"]');
+      const joinVideo = await A.$('[data-testid="call-join-video"]');
+      check('video switched off: no camera control on either side (fail closed)', !camA && !camB && !joinVideo);
+    }
     // Camera: A turns video on → B gets a video peer + bound tile.
-    if (!flag('--skip-video')) {
+    if (!videoOff && !flag('--skip-video')) {
       const cam = await A.$('[data-testid="camera-button"]');
       if (cam) {
         await cam.click();

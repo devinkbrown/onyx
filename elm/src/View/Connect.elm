@@ -31,7 +31,9 @@ import Html.Attributes exposing (attribute, autocomplete, checked, class, classL
 import Html.Events exposing (onCheck, onClick, onInput, onSubmit)
 import Invite
 import Remembered
+import View.Appeal
 import View.PublicFrame exposing (brandMark)
+import View.AuthGate -- v3/gap-auth
 
 
 connectGate : Model -> Html Msg
@@ -146,6 +148,7 @@ connectGate model =
                                         , attribute "data-testid" "conn-status"
                                         ]
                                         [ text (App.connectStatusMessage model) ]
+                                   , View.AuthGate.connectNote model -- v3/gap-auth
                                    , signInOffer model
                                    ]
                             )
@@ -158,7 +161,9 @@ connectGate model =
             , a [ href "/privacy/" ] [ text "Privacy" ]
             , a [ href "/guidelines/" ] [ text "House rules" ]
             , a [ href "/status/" ] [ text "Status" ]
+            , View.Appeal.appealButton -- v3/gap-oper
             ]
+        , View.Appeal.appealSheet model -- v3/gap-oper
         ]
 
 
@@ -573,6 +578,7 @@ fields model invitedRoom busy =
                         "Use a recovery code"
                     )
                 ]
+            , View.AuthGate.signInLinks model busy -- v3/gap-auth
             , field
                 { id_ = "conn-room"
                 , label_ = "Room"

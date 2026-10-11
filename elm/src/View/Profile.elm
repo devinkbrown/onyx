@@ -19,6 +19,7 @@ import PersonSafety
 import Prefs
 import Services
 import Set
+import View.Chanserv -- v3/gap-chanserv
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 import View.UserModes
@@ -825,6 +826,7 @@ moderationControls model nick channel member isSelf =
                    )
                 ++ [ modButton ("Kick " ++ nick ++ " from " ++ channel) "Kick" (propose Moderation.Kick)
                    , modButton ("Ban " ++ nick ++ " from " ++ channel) "Ban" (propose Moderation.Ban)
+                   , View.Chanserv.muteButton model channel nick -- v3/gap-chanserv
                    ]
             )
 
