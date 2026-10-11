@@ -355,6 +355,25 @@ securitySuite =
                     , \_ -> Expect.equal "/quote PRIVMSG bob :secret" one.composer
                     ]
                     ()
+        , test "MEMO SEND is a content verb too: its account is guarded like a destination" <|
+            \_ ->
+                let
+                    ( held, memoOut ) =
+                        send "/memo send bob secret" designated
+
+                    ( _, quoteOut ) =
+                        send "/quote MEMO SEND bob :secret" designated
+
+                    ( _, listOut ) =
+                        send "/memo list" designated
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] (wire memoOut ++ wire quoteOut)
+                    , \_ -> Expect.equal (Just (rawSlashLeakCopy "bob")) held.composerError
+                    , \_ -> Expect.equal [ "MEMO list\u{000D}\n" ] (wire listOut)
+                    , \_ -> Expect.equal ( Just "bob", Nothing, Nothing ) ( rawContentDestination "MEMO" [ "SEND", "bob", "x" ], rawContentDestination "MEMO" [ "LIST" ], rawContentDestination "WHOIS" [ "bob" ] )
+                    ]
+                    ()
         , test "the raw fallthrough is comma-list aware too" <|
             \_ ->
                 Expect.equal [] (wire (Tuple.second (send "/privmsg carol,bob secret" designated)))
