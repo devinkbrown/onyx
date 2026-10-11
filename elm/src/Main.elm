@@ -123,6 +123,7 @@ import Json.Encode as Encode
 import Media
 import Nodes
 import Polish
+import GapShell -- v3/gap-shell
 import Schedule
 import Switcher
 import Task
@@ -557,12 +558,33 @@ port pwaEvent : (Decode.Value -> msg) -> Sub msg
 port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
 
 
+{-| v3/gap-shell — browser lifecycle (`boot`, `offline`, `online`,
+`restored`) from `ports.js` `wireGapShell`, and one whitelisted
+`onyx:*` device value back. -}
+port shellEvent : (Decode.Value -> msg) -> Sub msg
+
+
+port shellStore : { key : String, value : String } -> Cmd msg
+
+
 port searchHotkey : (() -> msg) -> Sub msg
 
 
 {-| v3/switcher — the one global keyboard port: `ports.js` owns the
 scope rules and sends a short shortcut name. -}
 port shortcut : (String -> msg) -> Sub msg
+
+
+{-| v3/gap-commands — the palette recents (per device-memory owner) and
+the single-key shortcuts preference, saved to `localStorage` by
+`ports.js`, which sends the boot snapshot back once at wire time. -}
+port paletteRecentsSave : { owner : String, ids : List String } -> Cmd msg
+
+
+port singleKeysSave : { enabled : Bool } -> Cmd msg
+
+
+port gapPrefsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
@@ -1408,11 +1430,22 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-commands
+        App.PaletteRecentsSave req ->
+            paletteRecentsSave req
+
+        App.SingleKeysSave req ->
+            singleKeysSave req
+
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()
 
         App.PwaUpdateApprove ->
             pwaUpdateApprove ()
+
+        -- v3/gap-shell
+        App.ShellStore req ->
+            shellStore req
 
         App.OfflineMemoNotice req ->
             offlineMemoNotice req
@@ -1678,8 +1711,11 @@ subscriptions model =
         -- v3/polish
         , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
+        , shellEvent (App.GapShellMsg << GapShell.ShellEventReceived) -- v3/gap-shell
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
+        -- v3/gap-commands
+        , gapPrefsLoaded App.GapPrefsLoaded
         , retentionPolicyLoaded App.RetentionPolicyLoaded
         , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived

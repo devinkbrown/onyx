@@ -28,6 +28,7 @@ ctx0 =
     , profileNicks = Set.empty
     , dmPeers = \_ -> []
     , serverPrefix = Nothing
+    , leaks = \_ -> False
     }
 
 
@@ -980,6 +981,23 @@ memoTests =
                     , \_ -> Expect.equal False stored.memoSending
                     , \_ -> Expect.equal "" stored.memoText
                     , \_ -> Expect.equal True (String.contains "alice" (Maybe.withDefault "" (Maybe.map .text stored.memoStatus)))
+                    ]
+                    ()
+        , test "a memo to someone you have an encrypted chat with is never sent in plain text" <|
+            \_ ->
+                let
+                    ( state, effects ) =
+                        upd { ctx0 | leaks = \n -> n == "alice" } U.MemoSend { blank | memoTo = "alice", memoText = "call me" }
+
+                    ( other, sendOther ) =
+                        upd { ctx0 | leaks = \n -> n == "alice" } U.MemoSend { blank | memoTo = "bob", memoText = "call me" }
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [] effects
+                    , \_ -> Expect.equal False state.memoSending
+                    , \_ -> Expect.equal (Just True) (Maybe.map .error state.memoStatus)
+                    , \_ -> Expect.equal [ "MEMO SEND bob :call me\r\n" ] (sent sendOther)
+                    , \_ -> Expect.equal True other.memoSending
                     ]
                     ()
         , test "a forwarded send names the forward target" <|

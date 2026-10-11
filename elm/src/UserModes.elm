@@ -436,6 +436,11 @@ type alias Ctx =
     -- the prefix 001 named as the server (a dotless server name is only
     -- trusted as a server once it did).
     , serverPrefix : Maybe String
+
+    -- would plaintext to this person bypass an encrypted conversation?
+    -- (a memo is plain text stored on the server, so it obeys the same
+    -- guard as a raw `/memo send`.)
+    , leaks : String -> Bool
     }
 
 
@@ -1345,7 +1350,13 @@ update ctx msg state =
                         ( { state | memoStatus = Just { text = "Write a message first (up to " ++ String.fromInt memoMaxLength ++ " characters, one line).", error = True } }, [] )
 
                     ( Just to, Just text ) ->
-                        ( { state | memoSending = True, memoStatus = Nothing }, sends [ memoLine [ "SEND", to, text ] ] )
+                        if ctx.leaks to then
+                            ( { state | memoStatus = Just { text = "You have an encrypted conversation with " ++ to ++ ". Offline messages are plain text the server stores, so Onyx won't send this one. Message them in the conversation instead.", error = True } }
+                            , []
+                            )
+
+                        else
+                            ( { state | memoSending = True, memoStatus = Nothing }, sends [ memoLine [ "SEND", to, text ] ] )
 
         MemoForwardDraft value ->
             ( { state | memoForwardDraft = value }, [] )
@@ -2118,7 +2129,10 @@ foldWire ctx message state =
                 Nothing
 
             else
-                done state
+                -- Observed, not consumed: the server's own words still reach
+                -- the inbox (v3/gap-shell); this adds the plain sentence in
+                -- the conversation that was refused.
+                observe state
                     [ DmNote
                         { peer = target
                         , text = target ++ " only accepts messages from people signed in to an Onyx account. Keep your name with an account to message them."

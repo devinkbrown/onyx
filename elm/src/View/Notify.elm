@@ -352,6 +352,7 @@ dndSection model =
                         "false"
                     )
                 , attribute "data-testid" "notify-dnd-toggle"
+                , attribute "aria-keyshortcuts" "Control+Shift+D Meta+Shift+D" -- v3/gap-commands
                 , onClick NotifyDndToggle
                 ]
                 [ text
