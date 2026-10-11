@@ -9874,10 +9874,9 @@ suite =
                         update ComposerSend { blank | activeChannel = Just "#c", composer = "/help frobnicate" }
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "Local slash commands" ] (List.map .title bare.toasts)
-                    , \_ ->
-                        Expect.equal [ "/clear · /ignore · /read · /star · /mute · /autojoin · /highlight · /snooze · /dnd · /color · /share · /export · /notify · /search · /help" ]
-                            (List.filterMap .description bare.toasts)
+                    -- v3/gap-commands: bare /help opens the full slash-commands sheet.
+                    [ \_ -> Expect.equal [] (List.map .title bare.toasts)
+                    , \_ -> Expect.equal ( True, "" ) ( bare.commandsHelpOpen, bare.composer )
                     , \_ -> Expect.equal [] bareOut
                     , \_ -> Expect.equal [ "/mute [#channel]" ] (List.map .title hit.toasts)
                     , \_ ->
@@ -10503,7 +10502,7 @@ suite =
                     , \_ -> Expect.equal Dict.empty m4.pendingSeals
                     ]
                     ()
-        , test "DmSealFailed with keyChanged flags silently" <|
+        , test "DmSealFailed with keyChanged flags once with the oracle toast and keeps the text" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -10518,8 +10517,11 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal [] (withoutSafetyLoads outbound)
                     , \_ -> Expect.equal True (Set.member "dave" m3.peerKeyChanges)
-                    , \_ -> Expect.equal [] m3.toasts
+                    , -- v3/gap-pwa-safety: `_flagPeerKeyChange` toasts once per change
+                      \_ -> Expect.equal [ "Encryption key changed" ] (List.map .title m3.toasts)
                     , \_ -> Expect.equal Dict.empty m3.pendingSeals
+                    , -- v3/gap-pwa-safety: the held text returns to the draft
+                      \_ -> Expect.equal "hi dave" m3.composer
                     ]
                     ()
         , test "DmSealFailed without keyChanged toasts verbatim" <|
@@ -17544,8 +17546,10 @@ suite =
 
                             ( m7, out7 ) =
                                 -- An aliased 900 reclaims the account
-                                -- nick at once; nothing else may escape
-                                -- this publisher-failure vector.
+                                -- nick at once; nothing else may reach
+                                -- the wire from this publisher-failure
+                                -- vector (v3/gap-pwa-safety: the login's
+                                -- push reconcile is a local browser read).
                                 feed m6 ":irc.example 900 me nick!u@h alice :You are now logged in as alice"
                         in
                         Expect.all
@@ -17556,7 +17560,7 @@ suite =
                             , \_ -> Expect.equal True (List.any isAddLine out5)
                             , \_ -> Expect.equal (Just GroupPublisher.ServerRejected) m6.publisher.failure
                             , \_ -> Expect.equal [] out6
-                            , \_ -> Expect.equal [ SendLine "NICK alice\r\n" ] out7
+                            , \_ -> Expect.equal [ SendLine "NICK alice\r\n", WebPushCheckActive { serverUrl = "wss://irc.example", account = "alice" } ] out7
                             ]
                             ()
                 , test "socket close invalidates the pending publication" <|
@@ -18247,15 +18251,22 @@ suite =
                             Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = text })
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
+                        -- v3/gap-commands: registry verbs Onyx Server has no
+                        -- wire verb for are translated (GapCommandsTest); real
+                        -- server verbs still go out as written.
+                        [ \_ -> Expect.equal [ SendLine "AWAY :Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        -- v3/dm-key-hold: a raw content verb to an unresolved DM peer is refused.
-                        , \_ -> Expect.equal [] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] (send "/nick kai")
+                        , \_ -> Expect.equal [ SendLine "MODE #c +m\r\n" ] (send "/mode #c +m")
+                        -- v3/dm-key-hold: content to an unresolved DM peer never leaves as plaintext.
+                        , \_ -> Expect.equal False (List.any (\o -> o == SendLine "PRIVMSG bob hi\r\n") (send "/msg bob hi"))
                         , \_ ->
-                            Expect.equal [ SendLine "MSG bob hi\r\n" ]
-                                (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
-                        , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
+                            Expect.equal True
+                                (List.member (SendLine "PRIVMSG bob hi\r\n")
+                                    (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
+                                )
+                        , \_ -> Expect.equal [ SendLine "a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
                         ]
                         ()
@@ -19339,7 +19350,7 @@ suite =
                         [ \_ -> Expect.equal [] outbound
                         , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
                         , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        , \_ -> Expect.equal [ "Encryption key changed", "Scheduled admission uncertain" ] (List.map .title m1.toasts)
                         ]
                         ()
             , test "scheduled seal failure holds the claim uncertain" <|
@@ -19383,7 +19394,7 @@ suite =
                         , \_ -> Expect.equal True (Set.member "bob" m1.peerKeyChanges)
                         , \_ -> Expect.equal 1 (List.length m1.scheduledMessages)
                         , \_ -> Expect.equal (Just "tok") (Maybe.andThen .claim (List.head m1.scheduledMessages) |> Maybe.map .token)
-                        , \_ -> Expect.equal [ "Scheduled admission uncertain" ] (List.map .title m1.toasts)
+                        , \_ -> Expect.equal [ "Encryption key changed", "Scheduled admission uncertain" ] (List.map .title m1.toasts)
                         ]
                         ()
             ]
@@ -21018,7 +21029,7 @@ suite =
                         ()
             ]
         , describe "CTCP queries"
-            [ test "inbound ACTION is swallowed with no row and no reply" <|
+            [ test "inbound ACTION files an action row and never replies" <|
                 \_ ->
                     let
                         room =
@@ -21027,9 +21038,16 @@ suite =
                         ( acted, outs ) =
                             feed room ":bob!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
                     in
+                    -- v3/gap-commands: `/me` lines are messages, not queries.
                     Expect.all
-                        [ \_ -> Expect.equal [] (dmMessages acted "#c")
-                        , \_ -> Expect.equal [] outs
+                        [ \_ -> Expect.equal [ ( "bob", "waves", "action" ) ] (List.map (\m -> ( m.from, m.body, m.msgType )) (dmMessages acted "#c"))
+                        , \_ -> Expect.equal [] (List.filter (\o -> case o of
+                                                                    SendLine _ ->
+                                                                        True
+
+                                                                    _ ->
+                                                                        False
+                                                               ) outs)
                         ]
                         ()
             , test "unknown CTCP is swallowed silently" <|
@@ -23458,28 +23476,54 @@ suite =
                         , \_ -> Expect.equal False next.webPushOn
                         ]
                         ()
-            , test "login reconciles push only for opt-ins" <|
+            , test "login reconciles push for every signed-in owner (the bit boots off; ports keep it opt-in)" <|
                 \_ ->
                     let
                         ( signedOut, outSignedOut ) =
                             requestWebPushCheck blank
 
-                        ( optedOut, outOptedOut ) =
+                        ( _, outAfterReload ) =
                             requestWebPushCheck pushLive
 
-                        ( optedIn, outOptedIn ) =
+                        ( _, outOptedIn ) =
                             requestWebPushCheck { pushLive | webPushOn = True }
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] outSignedOut
                         , \_ -> Expect.equal False signedOut.webPushOn
-                        , \_ -> Expect.equal [] outOptedOut
+                        , \_ ->
+                            Expect.equal
+                                [ WebPushCheckActive { serverUrl = "wss://irc.example", account = "kai" } ]
+                                outAfterReload
                         , \_ ->
                             Expect.equal
                                 [ WebPushCheckActive { serverUrl = "wss://irc.example", account = "kai" } ]
                                 outOptedIn
                         ]
                         ()
+            , test "after a reload the active check recovers an opted-in owner silently" <|
+                \_ ->
+                    let
+                        ( next, out ) =
+                            update (WebPushActiveState { active = False, intentDesired = True }) pushLive
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal False next.webPushOn
+                        , \_ ->
+                            case out of
+                                [ WebPushRecover r ] ->
+                                    Expect.equal ( r.serverUrl, r.account ) ( "wss://irc.example", "kai" )
+
+                                other ->
+                                    Expect.fail (Debug.toString other)
+                        ]
+                        ()
+            , test "a browser that still holds this owner's endpoint shows push on after a reload" <|
+                \_ ->
+                    update (WebPushActiveState { active = True, intentDesired = True }) pushLive
+                        |> Tuple.first
+                        |> .webPushOn
+                        |> Expect.equal True
             ]
         , describe "webhooks"
             [ test "create sends WEBHOOK CREATE with the trimmed name" <|

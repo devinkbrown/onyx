@@ -256,10 +256,12 @@ suite =
                     ( _, out2 ) =
                         run "/privmsg bob secret"
                 in
+                -- v3/gap-commands: /notice now rides the composer seal path (it
+                -- seals or refuses — GapCommandsTest), /privmsg stays a raw
+                -- verb and is refused; neither puts content on the wire.
                 Expect.all
                     [ \_ -> Expect.equal [] (List.filter (\o -> o /= SendLine "") out ++ out2 |> List.filter isSend)
                     , \_ -> Expect.equal "/notice bob secret" after.composer
-                    , \_ -> Expect.equal (Just (rawSlashLeakCopy "bob")) after.composerError
                     ]
                     ()
         , test "raw /notice to an unresolved peer is refused too" <|
