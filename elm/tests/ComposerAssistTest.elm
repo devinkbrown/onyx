@@ -326,6 +326,27 @@ suite =
                     composerInput (channelModel |> step ComposerEmojiToggle)
                         |> Event.simulate (Event.custom "keydown" (key "Escape"))
                         |> Event.expect ComposerEmojiClose
+            , -- v3/rx-convo: a keyboard user opens the picker with Enter and
+              -- is still on the toggle: Escape there closes it too.
+              test "Escape on the open picker's toggle closes it" <|
+                \_ ->
+                    render (channelModel |> step ComposerEmojiToggle)
+                        |> Query.find [ Selector.attribute (attrAria "Insert emoji") ]
+                        |> Event.simulate (Event.custom "keydown" (key "Escape"))
+                        |> Event.expect ComposerEmojiClose
+            , test "Escape inside the picker closes it" <|
+                \_ ->
+                    render (channelModel |> step ComposerEmojiToggle)
+                        |> Query.find [ Selector.id "shell-emoji-picker" ]
+                        |> Event.simulate (Event.custom "keydown" (key "Escape"))
+                        |> Event.expect ComposerEmojiClose
+            , test "a closed picker's toggle ignores Escape" <|
+                \_ ->
+                    render channelModel
+                        |> Query.find [ Selector.attribute (attrAria "Insert emoji") ]
+                        |> Event.simulate (Event.custom "keydown" (key "Escape"))
+                        |> Event.toResult
+                        |> Expect.err
             ]
         ]
 
