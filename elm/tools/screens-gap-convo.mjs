@@ -21,6 +21,7 @@
  *   gc-undelivered    a 401 for a labeled DM says so and returns the text
  *   gc-menu-keys      arrow keys rove the message menu
  *   gc-ctrlf          Ctrl+F keeps the draft
+ *   gc-loading        history in flight: placeholders, not "say hi"
  */
 
 const T = (minAgo) => new Date(Date.now() - minAgo * 60000).toISOString();
@@ -44,8 +45,9 @@ async function wire(page, hooks = {}) {
     });
     server.onMessage((m) => {
       const line = String(m);
+      if (hooks.dropServer && hooks.dropServer(line)) return;
       if (hooks.fromServer) hooks.fromServer(line, (l) => ws.send(l));
-      ws.send(line);
+      ws.send(hooks.rewrite ? hooks.rewrite(line) : line);
     });
   });
   return (lines) => { for (const l of lines) if (client) client.send(l); };
@@ -360,6 +362,22 @@ export default {
     const seen = await page.evaluate(() => document.body.innerText);
     ok(/isn't on the network right now/.test(seen), `a not-delivered notice is shown (got ${seen.slice(-300)})`);
     ok((await page.inputValue('#shell-composer-input')) === 'are you there? the call moved to seven', 'the text is back in the composer');
+  },
+
+  'gc-loading': async (page, h) => {
+    // advertise chathistory, hold back #design's seed rows, never answer its history request
+    await room(page, h, {
+      rewrite: (line) => line.replace(/(CAP \* LS :batch labeled-response)/, '$1 chathistory'),
+      dropServer: (line) => /msgid=s\d.*#design/.test(line),
+      fromClient: (line) => /CHATHISTORY \S+ #design/i.test(line),
+    });
+    await page.fill('#shell-composer-input', '/join #design');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(900);
+    await hop(page, 'design');
+    ok(!!(await page.$('[data-testid="history-loading"]')), 'placeholders show while history is in flight');
+    await h.settle(page, 200);
   },
 
   'gc-menu-keys': async (page, h) => {

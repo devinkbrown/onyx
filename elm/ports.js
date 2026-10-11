@@ -10763,12 +10763,12 @@ function fetchPublicFeed(url) {
        different node while its menu is open, so the very button that
        opened the menu may be gone — fall back to the same row's menu
        trigger (or the row itself), found by its stable row key. */
-    var lastPress = { el: null, at: 0 };
+    var lastPress = { el: null, key: null, at: 0 };
     function remember(event) {
       var t = event && event.target;
       if (!t || typeof t.closest !== "function") return;
       var control = t.closest("button, [role='button'], a, input, textarea");
-      if (control) { lastPress.el = control; lastPress.at = Date.now(); }
+      if (control) { lastPress.el = control; lastPress.key = rowKeyOf(control); lastPress.at = Date.now(); }
     }
     function rowKeyOf(el) {
       var row = el && typeof el.closest === "function" ? el.closest("[data-row-key]") : null;
@@ -10798,7 +10798,7 @@ function fetchPublicFeed(url) {
              the last control the user pressed a moment ago. */
           if ((!opener || opener === doc.body) && lastPress.el && Date.now() - lastPress.at < 2000) opener = lastPress.el;
           layer.back = opener && opener !== doc.body ? opener : null;
-          layer.backKey = rowKeyOf(layer.back);
+          layer.backKey = rowKeyOf(layer.back) || (layer.back && layer.back === lastPress.el ? lastPress.key : null);
           if (!node.contains(doc.activeElement)) focusEl(node.querySelector(layer.first));
         } else if (!node && layer.open) {
           layer.open = false;
@@ -11070,6 +11070,7 @@ function fetchPublicFeed(url) {
       sanitizeDrafts: gapSanitizeDrafts,
       createDrafts: createGapDrafts,
       filesFrom: gapFilesFrom,
+      wireComposer: wireGapComposer,
       installFocus: installGapFocus
     },
     /* v3/polish */

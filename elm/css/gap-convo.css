@@ -314,3 +314,46 @@ button.gap-edited-toggle:focus-visible { outline: var(--focus-ring); outline-off
   .onyx-message.gap-landed { animation: none; background: color-mix(in oklab, var(--onyx-accent) 10%, transparent); }
 }
 :root[data-reduce-motion='true'] .onyx-message.gap-landed { animation: none; background: color-mix(in oklab, var(--onyx-accent) 10%, transparent); }
+
+/* ── History on its way ───────────────────────────────────────────────
+   Message-shaped placeholders while CHATHISTORY is in flight for a
+   conversation with nothing yet. Flat bars, one slow pulse; still under
+   reduced motion. */
+.gap-loading { display: grid; gap: var(--space-4); min-width: 0; }
+.gap-skeleton {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 72ch;
+  padding: var(--space-4) var(--space-2) var(--space-2);
+}
+.gap-skeleton-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.gap-skeleton-avatar { width: 2rem; height: 2rem; border-radius: 50%; background: var(--onyx-panel-2); }
+.gap-skeleton-body { display: grid; gap: var(--space-2); min-width: 0; padding-top: 2px; }
+.gap-skeleton-name,
+.gap-skeleton-line { display: block; height: 0.75rem; border-radius: 3px; background: var(--onyx-panel-2); }
+.gap-skeleton-name { width: 7rem; background: var(--onyx-line); }
+.gap-skeleton-line { width: 100%; }
+.gap-skeleton-line--short { width: 58%; }
+.gap-skeleton-row:nth-child(2n) .gap-skeleton-line { width: 92%; }
+.gap-skeleton-row:nth-child(2n) .gap-skeleton-line--short { width: 40%; }
+@keyframes gap-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.gap-skeleton-avatar,
+.gap-skeleton-name,
+.gap-skeleton-line { animation: gap-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .gap-skeleton-avatar,
+  .gap-skeleton-name,
+  .gap-skeleton-line { animation: none; }
+}
+:root[data-reduce-motion='true'] .gap-skeleton-avatar,
+:root[data-reduce-motion='true'] .gap-skeleton-name,
+:root[data-reduce-motion='true'] .gap-skeleton-line { animation: none; }
+@media (max-height: 480px) and (orientation: landscape) {
+  .gap-skeleton { gap: var(--space-3); padding-top: var(--space-2); }
+  .gap-skeleton-row:nth-child(n + 4) { display: none; }
+}
