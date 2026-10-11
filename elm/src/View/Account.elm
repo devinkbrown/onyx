@@ -25,6 +25,7 @@ import Push
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
+import View.GapAccount
 import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
 import View.UserModes
@@ -75,6 +76,9 @@ accountPanel model =
                             , personasSection model
                             , emailSection model
                             , passwordSection model
+                            , -- v3/gap-account
+                              View.GapAccount.protectionSection model
+                            , View.GapAccount.namesSection model
                             , recoverySection model
                             , passkeysSection model
                             , devicesSection model
@@ -92,7 +96,7 @@ accountPanel model =
 sectionNav : Html Msg
 sectionNav =
     nav [ class "onyx-account-nav", attribute "aria-label" "Account sections" ]
-        [ a [ class "onyx-account-nav__item", href "#acct-identity" ] [ text "Overview" ]
+        ([ a [ class "onyx-account-nav__item", href "#acct-identity" ] [ text "Overview" ]
         , View.UserModes.autojoinNavItem -- v3/gap-usermodes
         , a [ class "onyx-account-nav__item", href "#acct-two-factor-authentication-title" ] [ text "Security" ]
         , a [ class "onyx-account-nav__item", href "#acct-certificates-title" ] [ text "Certificates" ]
@@ -101,7 +105,10 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-personas-title" ] [ text "Personas" ]
         , a [ class "onyx-account-nav__item", href "#acct-email-title" ] [ text "Email" ]
         , a [ class "onyx-account-nav__item", href "#acct-password-title" ] [ text "Password" ]
-        , a [ class "onyx-account-nav__item", href "#acct-recovery-title" ] [ text "Recovery" ]
+        ]
+            ++ -- v3/gap-account
+               View.GapAccount.accountNavLinks
+            ++ [ a [ class "onyx-account-nav__item", href "#acct-recovery-title" ] [ text "Recovery" ]
         , a [ class "onyx-account-nav__item", href "#acct-passkeys-title" ] [ text "Passkeys" ]
         , a [ class "onyx-account-nav__item", href "#acct-sessions-title" ] [ text "Devices" ]
         , a [ class "onyx-account-nav__item", href "#acct-portable-title" ] [ text "Residence" ]
@@ -109,7 +116,8 @@ sectionNav =
         , a [ class "onyx-account-nav__item", href "#acct-caps-title" ] [ text "Capabilities" ]
         , a [ class "onyx-account-nav__item", href "#acct-history-title" ] [ text "History" ]
         , a [ class "onyx-account-nav__item", href "#acct-download-store-title" ] [ text "Data" ]
-        ]
+               ]
+        )
 
 
 overviewSection : Model -> Html Msg

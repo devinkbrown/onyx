@@ -1007,28 +1007,63 @@
   var META = "vault_meta";
   var LEDGER_PREFIX = "import-batch:";
 
-  /* v3/gap-import — the ONE place a ledger key is minted (owner scoping
-     lands here when the vault gains owner keys). */
-  function ledgerKey(batchId) { return LEDGER_PREFIX + String(batchId); }
+  /* v3/gap-import — the ONE place a ledger key is minted. v3/gap-account:
+     the vault is owner-scoped (ports.js stamps `owner` on every row and
+     keys it `owner + NUL + id`), so a ledger entry lives under its owner
+     too and every vault-side helper takes the scope: a string reads and
+     writes only that identity's rows; `null` (no scope) sees nothing and
+     writes nothing; omitted (the pure-node smokes) addresses the
+     unscoped legacy shape. */
+  var OWNER_SEP = "\u0000";
+  function ledgerKey(batchId, owner) {
+    return LEDGER_PREFIX + (typeof owner === "string" ? owner + OWNER_SEP : "") + String(batchId);
+  }
+
+  /* Port payload → scope: a non-empty string, else null (fail closed). */
+  function scopeOf(req) {
+    var o = req && req.owner;
+    return typeof o === "string" && o.length > 0 && o.length <= 4096 ? o : null;
+  }
+
+  /* The row's logical id (ports.js keeps it in `rid` once it prefixes
+     the physical key with the owner). */
+  function logicalId(row) {
+    return typeof row.rid === "string" && row.rid ? row.rid : (typeof row.id === "string" ? row.id : "");
+  }
+
+  function ownsRow(row, owner) {
+    return typeof owner !== "string" || row.owner === owner;
+  }
+
+  /* Allow the pre-scope call shape `(db, ..., done)` the smokes use. */
+  function shiftDone(owner, done) {
+    return typeof owner === "function" ? { owner: undefined, done: owner } : { owner: owner, done: done };
+  }
 
   function rowPrint(row) {
     return typeof row.body === "string" ? parsers.fingerprint(typeof row.at === "number" ? row.at : 0, String(row.from || ""), row.body) : "";
   }
 
   /* Every stored row's id and content fingerprint. */
-  function existingIndex(db, done) {
+  function existingIndex(db, ownerArg, doneArg) {
+    var shifted = shiftDone(ownerArg, doneArg);
+    var owner = shifted.owner;
+    var done = shifted.done;
     var ids = new Set();
     var prints = new Set();
-    if (!db) { done(ids, prints); return; }
+    if (!db || owner === null) { done(ids, prints); return; }
     try {
       var cursor = db.transaction(STORE, "readonly").objectStore(STORE).openCursor();
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (!c) { done(ids, prints); return; }
         var row = c.value || {};
-        if (typeof row.id === "string") ids.add(row.id);
-        var p = rowPrint(row);
-        if (p) prints.add(p);
+        if (ownsRow(row, owner)) {
+          var lid = logicalId(row);
+          if (lid) ids.add(lid);
+          var p = rowPrint(row);
+          if (p) prints.add(p);
+        }
         c.continue();
       };
       cursor.onerror = function () { done(ids, prints); };
@@ -1058,11 +1093,15 @@
     } catch (err) { done(false); }
   }
 
-  function ledgerList(db, done) {
-    if (!db) { done([]); return; }
+  function ledgerList(db, ownerArg, doneArg) {
+    var shifted = shiftDone(ownerArg, doneArg);
+    var owner = shifted.owner;
+    var done = shifted.done;
+    if (!db || owner === null) { done([]); return; }
     try {
       var out = [];
-      var range = IDBKeyRange.bound(LEDGER_PREFIX, LEDGER_PREFIX + "\uffff");
+      var lo = typeof owner === "string" ? LEDGER_PREFIX + owner + OWNER_SEP : LEDGER_PREFIX;
+      var range = IDBKeyRange.bound(lo, lo + "\uffff");
       var cursor = db.transaction(META, "readonly").objectStore(META).openCursor(range);
       cursor.onsuccess = function () {
         var c = cursor.result;
@@ -1082,8 +1121,11 @@
   /* Delete a batch's rows — by id, or by fingerprint inside the batch's
      conversations (catching copies re-persisted under other ids) — and
      its ledger entry, in one transaction; reports after commit. */
-  function removeBatch(db, batchId, done) {
-    if (!db) { done(0, false, [], []); return; }
+  function removeBatch(db, batchId, ownerArg, doneArg) {
+    var shifted = shiftDone(ownerArg, doneArg);
+    var owner = shifted.owner;
+    var done = shifted.done;
+    if (!db || owner === null) { done(0, false, [], []); return; }
     var removed = 0;
     var targets = [];
     var removedPrints = [];
@@ -1091,7 +1133,7 @@
       var tx = db.transaction([STORE, META], "readwrite");
       var meta = tx.objectStore(META);
       var store = tx.objectStore(STORE);
-      var get = meta.get(ledgerKey(batchId));
+      var get = meta.get(ledgerKey(batchId, owner));
       get.onsuccess = function () {
         var rec = get.result;
         if (!rec) return;
@@ -1102,8 +1144,10 @@
         var pending = targets.length;
         function finishSweep() {
           // Rows whose conversation moved since (none expected) still go.
-          ids.forEach(function (id) { if (!gone.has(id)) store.delete(id); });
-          meta.delete(ledgerKey(batchId));
+          ids.forEach(function (id) {
+            if (!gone.has(id)) store.delete(typeof owner === "string" ? owner + OWNER_SEP + id : id);
+          });
+          meta.delete(ledgerKey(batchId, owner));
         }
         if (pending === 0) { finishSweep(); return; }
         var index = store.index("by-target");
@@ -1118,9 +1162,10 @@
             }
             var row = c.value || {};
             var print = rowPrint(row);
-            if (ids.has(row.id) || prints.has(print)) {
+            var lid = logicalId(row);
+            if (ownsRow(row, owner) && (ids.has(lid) || prints.has(print))) {
               c.delete();
-              gone.add(row.id);
+              gone.add(lid);
               removed += 1;
               if (print && removedPrints.length < 16384) removedPrints.push(print);
             }
@@ -1214,7 +1259,7 @@
     function send(port, value) { try { if (app.ports[port]) app.ports[port].send(value); } catch (err) { /* port gone */ } }
     function fail(job, message) { delete running[job]; send("historyImportFailed", { job: job, message: message }); }
 
-    function begin(job, kind, picked) {
+    function begin(job, kind, picked, owner) {
       var entries = [];
       for (var i = 0; i < picked.length; i++) {
         var f = picked[i];
@@ -1239,7 +1284,7 @@
           var result = m.result;
           if (!result || result.messages === 0) { fail(job, emptyCopy(kind)); return; }
           send("historyImportProgress", { job: job, phase: "checking", done: total, total: total, files: entries.length });
-          existingIndex(vault(), function (ids, prints) {
+          existingIndex(vault(), owner, function (ids, prints) {
             if (!running[job]) return;
             delete running[job];
             send("historyImportStaged", { job: job, result: markDuplicates(result, ids, prints) });
@@ -1251,6 +1296,7 @@
     app.ports.historyImportPick.subscribe(function (req) {
       var job = req && typeof req.job === "number" ? req.job : 0;
       var kind = req && typeof req.kind === "string" ? req.kind : "";
+      var owner = scopeOf(req);
       var lim = LIMITS[kind];
       if (!lim) { fail(job, "That import source is not available."); return; }
       try {
@@ -1266,7 +1312,7 @@
           var list = picker.files ? Array.prototype.slice.call(picker.files) : [];
           picker.remove();
           if (list.length === 0) { send("historyImportFailed", { job: job, message: "" }); return; }
-          begin(job, kind, list);
+          begin(job, kind, list, owner);
         };
         picker.addEventListener("cancel", function () {
           if (settled) return;
@@ -1293,31 +1339,33 @@
     if (app.ports.historyImportRecord) {
       app.ports.historyImportRecord.subscribe(function (req) {
         var batch = req && req.batch;
-        if (!batch || typeof batch.id !== "string") return;
+        var owner = scopeOf(req);
+        if (!batch || typeof batch.id !== "string" || owner === null) return;
         var record = {
-          id: ledgerKey(batch.id),
+          id: ledgerKey(batch.id, owner),
           kind: "import-batch",
           batch: batch,
           ids: Array.isArray(req.ids) ? req.ids.slice(0, 16384) : [],
           prints: Array.isArray(req.prints) ? req.prints.slice(0, 16384) : []
         };
         ledgerPut(vault(), record, function () {
-          ledgerList(vault(), function (list) { send("historyImportBatches", { batches: list }); });
+          ledgerList(vault(), owner, function (list) { send("historyImportBatches", { batches: list }); });
         });
       });
     }
 
     if (app.ports.historyImportListRequest) {
-      app.ports.historyImportListRequest.subscribe(function () {
-        ledgerList(vault(), function (list) { send("historyImportBatches", { batches: list }); });
+      app.ports.historyImportListRequest.subscribe(function (req) {
+        ledgerList(vault(), scopeOf(req), function (list) { send("historyImportBatches", { batches: list }); });
       });
     }
 
     if (app.ports.historyImportRemove) {
       app.ports.historyImportRemove.subscribe(function (req) {
         var id = req && typeof req.batch === "string" ? req.batch : "";
+        var owner = scopeOf(req);
         if (!id) return;
-        removeBatch(vault(), id, function (removed, ok, targets, prints) {
+        removeBatch(vault(), id, owner, function (removed, ok, targets, prints) {
           // Deletions void the touched conversations' DM privacy proofs
           // exactly like writes do.
           try {
@@ -1325,7 +1373,7 @@
             if (store && store.dmPrivacyInvalidate) targets.forEach(function (t) { store.dmPrivacyInvalidate(t); });
           } catch (err) { /* no ports */ }
           send("historyImportRemoved", { batch: id, removed: removed, ok: ok, targets: targets, prints: prints });
-          ledgerList(vault(), function (list) { send("historyImportBatches", { batches: list }); });
+          ledgerList(vault(), owner, function (list) { send("historyImportBatches", { batches: list }); });
         });
       });
     }
