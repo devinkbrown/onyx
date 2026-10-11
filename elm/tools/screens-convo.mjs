@@ -210,7 +210,7 @@ const auditTargets = (page, scope) => page.evaluate((scope) => {
     const r = el.getBoundingClientRect();
     let l = 0, t = 0, rr = 0, b = 0;
     for (const pseudo of ['::before', '::after']) {
-      const cs = getComputedStyle(el, pseudo);
+      const cs = globalThis.getComputedStyle(el, pseudo);
       if (cs.content === 'none' || cs.position !== 'absolute') continue;
       const px = (v) => (v === 'auto' ? 0 : -parseFloat(v) || 0);
       l = Math.max(l, px(cs.left)); rr = Math.max(rr, px(cs.right)); t = Math.max(t, px(cs.top)); b = Math.max(b, px(cs.bottom));
@@ -221,9 +221,9 @@ const auditTargets = (page, scope) => page.evaluate((scope) => {
   for (const root of document.querySelectorAll(scope)) {
     for (const el of root.querySelectorAll(sel)) {
       const r = el.getBoundingClientRect();
-      const cs = getComputedStyle(el);
+      const cs = globalThis.getComputedStyle(el);
       if (r.width === 0 || r.height === 0 || cs.visibility === 'hidden' || cs.display === 'none') continue;
-      if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+      if (r.bottom < 0 || r.top > globalThis.innerHeight || r.right < 0 || r.left > globalThis.innerWidth) continue;
       if (el.closest('[aria-hidden="true"], [inert], .onyx-call-btn, .shell-msg-text')) continue;
       if (el.matches('.onyx-call-btn')) continue;
       const k = reach(el);
@@ -233,7 +233,7 @@ const auditTargets = (page, scope) => page.evaluate((scope) => {
   return [...new Set(bad)];
 }, scope);
 
-const isTouch = (page) => page.evaluate(() => matchMedia('(hover: none)').matches);
+const isTouch = (page) => page.evaluate(() => globalThis.matchMedia('(hover: none)').matches);
 const isPhone = (page) => (page.viewportSize()?.width ?? 1440) < 768;
 
 /** Close the quiet asks (notifications, Add to Home Screen). */
@@ -522,7 +522,7 @@ export default {
     let step = 'start';
     const tap = async (el, what) => {
       try { await el.click({ timeout: 5000 }); } catch (e) {
-        throw new Error(`could not tap the ${what} while auditing "${step}": ${e.message.split('\n').filter((l) => /intercepts|obscur|not visible|outside/i.test(l)).slice(0, 2).join(' / ') || e.message.split('\n')[0]}`);
+        throw new Error(`could not tap the ${what} while auditing "${step}": ${e.message.split('\n').filter((l) => /intercepts|obscur|not visible|outside/i.test(l)).slice(0, 2).join(' / ') || e.message.split('\n')[0]}`, { cause: e });
       }
     };
     const note = async (name) => {
@@ -660,7 +660,7 @@ export default {
 
   'cv-zoom': async (page, h) => {
     const vp = page.viewportSize();
-    const touch = await page.evaluate(() => matchMedia('(hover: none)').matches).catch(() => false);
+    const touch = await page.evaluate(() => globalThis.matchMedia('(hover: none)').matches).catch(() => false);
     if (!touch && !isPhone(page)) {
       await page.setViewportSize({ width: Math.round(vp.width / 2), height: Math.round(vp.height / 2) });
     } else {
