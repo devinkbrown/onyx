@@ -425,6 +425,10 @@ type alias Ctx =
 
     -- lower-case nicks of the open DM conversations, newest first.
     , dmPeers : List String
+
+    -- the prefix 001 named as the server (a dotless server name is only
+    -- trusted as a server once it did).
+    , serverPrefix : Maybe String
     }
 
 
@@ -1856,6 +1860,9 @@ foldWire ctx message state =
         isMe nick =
             String.toLower nick == String.toLower ctx.nick
 
+        fromServer =
+            message.nick == Nothing || (message.prefix /= Nothing && message.prefix == ctx.serverPrefix)
+
         done s effects =
             Just { state = s, effects = effects, consume = True }
 
@@ -2133,7 +2140,7 @@ foldWire ctx message state =
             failReply (str 0) (str 1) trailing state
 
         "NOTICE" ->
-            if message.nick == Nothing && (isMe (str 0) || str 0 == "*") then
+            if fromServer && (isMe (str 0) || str 0 == "*") then
                 serverNotice ctx trailing state
 
             else
