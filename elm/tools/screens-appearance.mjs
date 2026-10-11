@@ -176,9 +176,39 @@ async function assertScaleDensity(page, h, fontScale, density) {
   if (problems.length) throw new Error(`scale ${fontScale}/${density}: ${problems.join('; ')}`);
 }
 
+/**
+ * The Appearance stage in a real browser: picking a background paints it on
+ * the page behind (the renderer), and Escape drops the unapplied pick and the
+ * scene returns to the saved one (v3/gap-appearance).
+ */
+async function assertEscapePreview(page, h) {
+  await seed(page, {});
+  await page.goto(`${h.base}/appearance`);
+  await h.settle(page, 700);
+  await page.evaluate(() => { document.querySelector('[data-testid="appearance-advanced"]').open = true; });
+  await h.settle(page, 200);
+  const scene = () => page.evaluate(() => {
+    const canvas = document.getElementById('onyx-scene');
+    return { id: canvas ? canvas.dataset.backgroundId : null, surface: document.documentElement.dataset.scene || null };
+  });
+  const before = await scene();
+  if (before.surface !== 'appearance' || before.id !== 'deep-current') throw new Error(`escape-preview: want deep-current on the stage, got ${JSON.stringify(before)}`);
+  await page.click('[data-background-id="ember"]');
+  await h.settle(page, 300);
+  const staged = await scene();
+  if (staged.id !== 'ember') throw new Error(`escape-preview: a staged pick must paint, got ${JSON.stringify(staged)}`);
+  await page.keyboard.press('Escape');
+  await h.settle(page, 400);
+  const after = await scene();
+  const checked = await page.evaluate(() => document.querySelector('[data-background-id="ember"]').getAttribute('aria-checked'));
+  if (after.id !== 'deep-current' || checked !== 'false') throw new Error(`escape-preview: Escape must drop the pick, got ${JSON.stringify(after)} checked=${checked}`);
+  if (process.env.AUDIT_VERBOSE) console.log(`escape-preview @${page.viewportSize()?.width}: ${before.id} -> ${staged.id} -> ${after.id}`);
+}
+
 const SCENE_IDS = ['deep-current', 'bioluminescence', 'caustics', 'aurora', 'pyrite-field', 'gold-veins', 'ember', 'forest', 'resin', 'ink-wash', 'mist', 'frost', 'aurora-ribbons', 'tide-bands', 'obsidian', 'lapis-gradient', 'paper-grain'];
 
 export default {
+  'ap-assert-escape-preview': (page, h) => assertEscapePreview(page, h),
   ...Object.fromEntries(['sm', 'md', 'lg'].flatMap((scale) => ['compact', 'cozy', 'roomy'].map((density) => [`ap-assert-${scale}-${density}`, (page, h) => assertScaleDensity(page, h, scale, density)]))),
   'ap-scene-frost-ember': (page, h) => sceneContrast(page, h, 'frost', 'ember', false),
   'ap-scene-frost-mist': (page, h) => sceneContrast(page, h, 'frost', 'mist', false),

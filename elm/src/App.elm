@@ -48447,6 +48447,9 @@ overlayStack model =
         -- v3/gap-watch: the start editor sheet, then the inline end confirmation
         , ( "watch-start", model.watch.editor /= Nothing, WatchMsg WatchTogether.EditorClose )
         , ( "watch-end-confirm", model.watch.endConfirm /= Nothing, WatchMsg WatchTogether.CancelEnd )
+        -- v3/gap-appearance: Escape drops a staged (unapplied) background pick
+        -- on the Appearance page, like the oracle's dirty-preview Escape.
+        , ( "background-stage", model.route == Route.Appearance && backgroundDirty model, AppearanceCancelBackground )
         ]
 
 

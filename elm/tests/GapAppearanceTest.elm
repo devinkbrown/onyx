@@ -185,6 +185,32 @@ suite =
                             step (AppearanceStageBackground { id = "ember" }) { model | route = Route.Appearance }
                     in
                     Expect.equal { id = "ember", motion = "adaptive", reduceMotion = False, surface = "appearance" } (sceneSpecFor staged)
+            , test "Escape drops a staged background pick and the scene returns to the saved one" <|
+                \_ ->
+                    let
+                        model =
+                            booted "ocean"
+
+                        staged =
+                            step (AppearanceStageBackground { id = "ember" }) { model | route = Route.Appearance }
+
+                        ( cancelled, out ) =
+                            case escapeMsg staged of
+                                Just msg ->
+                                    update msg staged
+
+                                Nothing ->
+                                    ( staged, [] )
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal (Just AppearanceCancelBackground) (escapeMsg staged)
+                        , \_ -> Expect.equal False (backgroundDirty cancelled)
+                        , \_ -> Expect.equal "deep-current" (sceneSpecFor cancelled).id
+                        , \_ -> Expect.equal [ "deep-current" ] (List.map .id (scenes out))
+                        , \_ -> Expect.equal Nothing (escapeMsg cancelled)
+                        , \_ -> Expect.equal Nothing (escapeMsg { staged | route = Route.App })
+                        ]
+                        ()
             ]
         , describe "preferences"
             [ test "the new keys parse and guard like the rest" <|
