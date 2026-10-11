@@ -3616,12 +3616,24 @@ function fetchPublicFeed(url) {
         overlayFocus(restore);
       }
     }
+    /* v3/rx-convo — a docked overlay (one the layout shows as a pane
+       beside live content, e.g. the thread pane on wide screens; its
+       CSS sets `--overlay-docked: 1`) keeps focus-in and return-focus
+       but never traps Tab: the content beside it stays reachable. */
+    function docked(root) {
+      try {
+        var view = root.ownerDocument && root.ownerDocument.defaultView;
+        if (!view || !view.getComputedStyle) return false;
+        return String(view.getComputedStyle(root).getPropertyValue("--overlay-docked")).trim() === "1";
+      } catch (err) { return false; }
+    }
     function trapTab(e) {
       if (!e || e.key !== "Tab" || e.defaultPrevented) return;
       if (lightboxOpen()) return;
       var live = mounted();
       var root = live.length ? live[live.length - 1] : null;
       if (!root) return;
+      if (docked(root)) return;
       var items = overlayFocusables(root);
       if (items.length === 0) {
         try { e.preventDefault(); } catch (err) { /* best-effort */ }

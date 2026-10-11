@@ -61,6 +61,8 @@
   --pt-i-hash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 9h14M5 15h14M10 4 8 20M16 4l-2 16'/%3E%3C/svg%3E");
   --pt-i-people: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0'/%3E%3Cpath d='M15.5 4.7a3.5 3.5 0 0 1 0 6.6M17.5 14.3a6.5 6.5 0 0 1 4 5.7'/%3E%3C/svg%3E");
   --pt-i-message: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 5.5h15a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4.5 3.5v-13.5a1 1 0 0 1 1-1Z'/%3E%3C/svg%3E");
+  --pt-i-zoom-in: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6M11 8v6M8 11h6'/%3E%3C/svg%3E");
+  --pt-i-zoom-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.6-3.6M8 11h6'/%3E%3C/svg%3E");
   --pt-i-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E");
 }
 .pt-ico[data-icon="react"] { --pt-glyph: var(--pt-i-react); }
@@ -90,6 +92,8 @@
 .pt-ico[data-icon="people"] { --pt-glyph: var(--pt-i-people); }
 .pt-ico[data-icon="message"] { --pt-glyph: var(--pt-i-message); }
 .pt-ico[data-icon="lock"] { --pt-glyph: var(--pt-i-lock); }
+.pt-ico[data-icon="zoom-in"] { --pt-glyph: var(--pt-i-zoom-in); }
+.pt-ico[data-icon="zoom-out"] { --pt-glyph: var(--pt-i-zoom-out); }
 
 /* ── 1. Transcript rows ──────────────────────────────────────────────── */
 
@@ -254,6 +258,8 @@
   .onyx-message .onyx-msg-menu-trigger .pt-ico { width: 20px; height: 20px; }
   .onyx-message:hover:not(:focus-within):not(.onyx-message--active) { background: transparent; }
   .onyx-message:hover:not(:focus-within):not(.onyx-message--active) > .onyx-row-actions { opacity: 0; pointer-events: none; }
+  /* v3/rx-convo: a sticky touch :hover never reveals a stamp either. */
+  .onyx-continuation:hover:not(:focus-within):not(.onyx-message--active) > .onyx-ts { opacity: 0; }
 }
 
 /* Reaction picker light-dismiss layer (mirrors .onyx-msg-menu-backdrop). */
@@ -691,8 +697,8 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 }
 /* A fixed height reserves the box before the image loads (no jump in
    a stuck-to-bottom log); width follows the image's aspect ratio. */
-.shell-msg-media-img { width: auto; height: 260px; max-height: none; object-fit: cover; }
-.shell-msg-media-video { max-height: 320px; }
+.shell-msg-media-img { width: auto; height: min(260px, 40dvh); max-height: none; object-fit: cover; }
+.shell-msg-media-video { max-height: min(320px, 50dvh); }
 .shell-msg-media-audio { width: min(360px, 100%); }
 
 .shell-msg-media-consent {
@@ -737,7 +743,16 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   color: var(--onyx-text);
   text-decoration: none;
 }
-.shell-msg-file::before { content: "↓"; flex: none; color: var(--onyx-dim); }
+.shell-msg-file::before {
+  content: "";
+  flex: none;
+  align-self: center;
+  width: 16px;
+  height: 16px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--pt-i-download) center / contain no-repeat;
+  mask: var(--pt-i-download) center / contain no-repeat;
+}
 .shell-msg-file:hover { border-color: var(--pt-seam); background: var(--onyx-panel-2); }
 .shell-msg-file-name {
   min-width: 0;
@@ -804,53 +819,98 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 }
 .shell-msg-preview-consent:hover { color: var(--onyx-text); border-color: var(--onyx-dim); }
 
-/* Lightbox. */
+/* Lightbox (v3/rx-convo): the picture fits the screen inside the
+   safe area under a slim action bar (Zoom · Save · Close); a click on
+   the dark surround closes it, a double click (or Zoom) shows it at
+   full size and the stage pans. Touch: native pinch-zoom
+   stays on, and the layer is a column-reverse scroll-snap sheet (a
+   spacer above the stage) so a swipe down carries the picture away —
+   `lightboxSwipeDecoder` closes it once it has left the screen. */
 .shell-msg-lightbox {
   position: fixed;
   inset: 0;
   z-index: 100;
   display: grid;
-  place-items: center;
-  padding: var(--space-4);
 }
+/* Both layers mount inside the transcript pane; neither takes the
+   pane's content measure. */
+.onyx-main > .onyx-thread-pane > :is(.shell-msg-lightbox, .onyx-thread-pop) { max-width: none; }
 .shell-msg-lightbox-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: color-mix(in srgb, #000 82%, transparent);
-  cursor: zoom-out;
+  background: color-mix(in srgb, #000 88%, transparent);
 }
+.shell-msg-lightbox-spacer { display: none; }
 .shell-msg-lightbox-dialog {
   position: relative;
   z-index: 1;
-  max-width: min(1100px, 100%);
-  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
   animation: onyx-sheet-in var(--dur-fast) var(--ease);
 }
-.shell-msg-lightbox-dialog:focus:not(:focus-visible) { outline: none; }
+.shell-msg-lightbox-dialog:focus { outline: none; }
+.shell-msg-lightbox-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  /* One definite cell, so the picture's 100% caps resolve against it. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding:
+    calc(var(--space-3) + var(--target-min) + var(--space-2) + var(--safe-top))
+    calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-4) + var(--safe-bottom))
+    calc(var(--space-4) + var(--safe-left));
+  overflow: hidden;
+  cursor: zoom-out;
+}
 .shell-msg-lightbox-img {
   display: block;
-  max-width: calc(100vw - 2 * var(--space-4));
-  max-height: calc(100dvh - 2 * var(--space-4));
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   border-radius: var(--radius);
   background: var(--onyx-panel);
+  cursor: zoom-in;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: default;
 }
+.shell-msg-lightbox[data-zoomed="true"] .shell-msg-lightbox-stage {
+  place-items: safe center;
+  overflow: auto;
+  overscroll-behavior: contain;
+  cursor: default;
+}
+/* Zoomed: the picture at its own pixel size (the image-viewer norm:
+   fit ↔ 100%), panned inside the stage; touch keeps native pinch. */
+.shell-msg-lightbox[data-zoomed="true"] .shell-msg-lightbox-img { max-width: none; max-height: none; cursor: zoom-out; }
+
 .shell-msg-lightbox-actions {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  z-index: 2;
+  top: calc(var(--space-3) + var(--safe-top));
+  right: calc(var(--space-3) + var(--safe-right));
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  padding: 2px;
+  background: color-mix(in oklab, var(--onyx-bg) 80%, transparent);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
 }
+.shell-msg-lightbox-zoom,
 .shell-msg-lightbox-save,
 .shell-msg-lightbox-close {
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   min-width: var(--target-min);
   min-height: var(--target-min);
   padding: 0 var(--space-3);
-  border: 1px solid var(--onyx-line);
-  border-radius: var(--radius);
-  background: color-mix(in oklab, var(--onyx-bg) 86%, transparent);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
   color: var(--onyx-text);
   font: inherit;
   font-size: var(--text-sm);
@@ -858,13 +918,59 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   line-height: 1;
   cursor: pointer;
 }
-.shell-msg-lightbox-close { width: var(--target-min); padding: 0; font-size: var(--text-xl); font-weight: 400; }
+.shell-msg-lightbox-zoom,
+.shell-msg-lightbox-close { padding: 0; }
+.shell-msg-lightbox-actions .pt-ico { width: 20px; height: 20px; }
+.shell-msg-lightbox-zoom[aria-pressed="true"] { background: var(--onyx-panel-2); }
+.shell-msg-lightbox-zoom:hover,
 .shell-msg-lightbox-save:hover,
 .shell-msg-lightbox-close:hover { background: var(--onyx-panel-2); }
+.shell-msg-lightbox-actions button:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+@media (max-width: 479.98px) {
+  .shell-msg-lightbox-save { padding: 0; }
+  .shell-msg-lightbox-save-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (pointer: coarse) {
+  .shell-msg-lightbox:not([data-zoomed="true"]) {
+    display: flex;
+    flex-direction: column-reverse;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+  .shell-msg-lightbox:not([data-zoomed="true"])::-webkit-scrollbar { display: none; }
+  .shell-msg-lightbox:not([data-zoomed="true"]) > .shell-msg-lightbox-dialog {
+    flex: 0 0 100%;
+    scroll-snap-align: end;
+  }
+  .shell-msg-lightbox:not([data-zoomed="true"]) > .shell-msg-lightbox-spacer {
+    display: block;
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    pointer-events: none;
+  }
+}
 
 /* ── 5. Message text extras ──────────────────────────────────────────── */
 
 .shell-msg-spoiler-label { letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+/* v3/rx-convo: a closed <details> still lays out its (hidden) content
+   slot as a block, which broke the line after every spoiler; closed,
+   it is one atomic inline box; open, the revealed run stays inline
+   where ::details-content is styleable. */
+.shell-msg-spoiler:not([open]) { display: inline-block; vertical-align: baseline; }
+.shell-msg-spoiler[open]::details-content { display: inline; }
 .shell-msg-spoiler-label:hover { color: var(--onyx-text); }
 .shell-msg-irc { border-radius: 2px; }
 
@@ -1322,7 +1428,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   color: var(--onyx-text);
 }
 .onyx-message-search__surface,
-.onyx-message-search__body { width: min(46rem, 100%); min-width: 0; }
+.onyx-message-search__body { width: min(var(--pt-measure), 100%); min-width: 0; }
 
 .onyx-message-search__surface {
   display: grid;
@@ -1718,7 +1824,11 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   cursor: pointer;
 }
 .room-media-index-row:hover { background: var(--onyx-panel-2); border-color: var(--onyx-line); }
-.room-media-index-row--picture { grid-template-columns: minmax(0, 1fr); align-content: start; gap: var(--space-2); padding: 0; cursor: default; }
+.room-media-index-row--picture { grid-template-columns: minmax(0, 1fr) auto; align-content: start; align-items: center; gap: var(--space-2); padding: 0; cursor: default; }
+/* v3/rx-convo: the picture spans the tile; name + author sit under it
+   with Jump at their right, so a tile reads as one unit. */
+.room-media-index-row--picture > .room-media-index-picture-frame { grid-column: 1 / -1; }
+.room-media-index-row--picture > .room-media-index-jump { align-self: start; }
 .room-media-index-row--picture:hover { background: transparent; border-color: transparent; }
 .room-media-index-row--file { min-width: 0; }
 .room-media-index-row--link { grid-template-columns: minmax(0, 1fr); min-width: 0; }
@@ -1844,13 +1954,20 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   cursor: pointer;
 }
 .pins-item:hover { background: var(--onyx-panel-2); border-color: var(--onyx-line); border-left-color: var(--onyx-dim); }
-.pins-item-main { display: grid; gap: 2px; min-width: 0; }
+.pins-item-main { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); column-gap: var(--space-3); row-gap: 2px; min-width: 0; }
+.pins-item-main > .pins-item-meta,
+.pins-item-main > .pins-item-body { grid-column: 2; }
+.pins-item-face { grid-row: 1 / span 2; padding-top: 2px; line-height: 0; }
+.pins-item-face .onyx-avatar { width: 1.75rem; height: 1.75rem; font-size: 0.6rem; }
 .pins-item-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px var(--space-2); min-width: 0; }
 .pins-item-from { color: var(--onyx-text); font-size: var(--text-sm); font-weight: 650; overflow-wrap: anywhere; }
 .pins-item-when,
 .pins-item-state { color: var(--onyx-dim); font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
 .pins-item-state[data-state='deleted'] { color: var(--onyx-bad); }
 .pins-item-state[data-state='locked'] { color: var(--onyx-warn); }
+/* v3/rx-convo: "Loaded locally" is the normal case — only exceptions
+   (deleted, locked) earn a visible tag; the button's name keeps it. */
+.pins-item-state[data-state='visible'] { display: none; }
 .pins-item-body {
   min-width: 0;
   color: var(--onyx-text);
@@ -1895,7 +2012,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-intro-title { font-size: var(--text-xl); }
   .shell-msg-preview-thumb,
   .shell-msg-preview-consent { width: 56px; height: 56px; }
-  .shell-msg-media-img { height: 200px; }
+  .shell-msg-media-img { height: min(200px, 34dvh); }
   .room-media-index-filter,
   .room-media-index-jump,
   .room-media-index-close,
@@ -1916,4 +2033,391 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-message-search-current { outline: 1px solid Highlight; }
   .onyx-message > .onyx-msg-menu-trigger { opacity: 1; }
   .room-media-index-filter[aria-selected='true'] { outline: 2px solid Highlight; }
+}
+
+/* ── 13. One reading measure at every aspect ratio (v3/rx-convo) ────── */
+
+/* The conversation is one centred column: ~72ch of 15px body text plus
+   the avatar gutter. Rows, dividers, the history header, typing, the
+   composer, its suggestions and the message search all sit on it, so a
+   1920 / 2560 / 3440px screen never draws 2000px lines — the space
+   either side stays the calm page colour. Narrower than the measure,
+   everything simply fills the column. */
+:root {
+  --pt-measure: 46rem;
+  --pt-thread-w: clamp(320px, 28vw, 420px);
+  --pt-compact-ts: 3.25rem;
+}
+
+.onyx-main > .onyx-thread-pane > .onyx-thread-frame > :not(.onyx-jump-latest):not(.onyx-room-intro) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--pt-measure);
+  margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .onyx-main > .onyx-composer { padding-inline: max(var(--space-4), calc((100% - var(--pt-measure)) / 2)); }
+  .onyx-main > .onyx-composer > .shell-composer-popovers {
+    left: max(var(--space-4), calc((100% - var(--pt-measure)) / 2));
+    right: max(var(--space-4), calc((100% - var(--pt-measure)) / 2));
+  }
+}
+
+/* Classic scrollbars: reserve the gutter on both edges so the centred
+   column lines up with the centred composer under it. */
+@media (min-width: 1200px) {
+  .onyx-main > .onyx-thread-pane:has(> .onyx-thread-frame) { scrollbar-gutter: stable both-edges; }
+}
+
+/* Big, dense screens (QHD ultrawide and up): one step up the type
+   ladder for the conversation, and a measure that grows with it. */
+@media (min-width: 2200px) and (min-height: 1200px) {
+  :root { --pt-measure: 50rem; }
+  .onyx-main > .onyx-thread-pane,
+  .onyx-main > .onyx-composer,
+  .onyx-thread-sheet {
+    --text-md: 1rem;
+    --text-sm: 0.875rem;
+    --text-xs: 0.75rem;
+    --text-2xs: 0.8125rem;
+    font-size: var(--text-md);
+  }
+}
+
+/* ── 14. Thread: a docked pane on wide layouts (v3/rx-convo) ───────── */
+
+/* From 1100px the thread is a right-hand pane in the context column
+   (it stands in for the member list while open, like the oracle and
+   every big chat app): no veil, the transcript and composer beside it
+   stay live, and the frame's last column takes the pane's width. The
+   dialog is non-modal there (`--overlay-docked` tells the ports.js
+   focus bridge not to trap Tab). Narrower, it stays a sheet — a side
+   drawer on tablets in portrait, a bottom sheet on phones. */
+@media (min-width: 1100px) {
+  .onyx-frame:has(.onyx-thread-pop) {
+    grid-template-columns: var(--nav-rail-w) var(--sidebar-w) minmax(0, 1fr) var(--pt-thread-w);
+  }
+  .onyx-frame:has(.onyx-thread-pop) > .onyx-roster { display: none; }
+  .onyx-frame > .onyx-main:has(.onyx-thread-pop) { position: relative; }
+
+  .onyx-sheet-layer.onyx-thread-pop {
+    --overlay-docked: 1;
+    position: absolute;
+    inset: 0 auto 0 100%;
+    z-index: 6;
+    display: block;
+    width: var(--pt-thread-w);
+    padding: 0;
+    overflow: visible;
+  }
+  .onyx-sheet-layer.onyx-thread-pop > .onyx-thread-backdrop { display: none; }
+  .onyx-sheet-layer.onyx-thread-pop > .onyx-sheet.onyx-thread-sheet {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    padding: 0;
+    border-width: 0 0 0 1px;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--onyx-panel);
+    animation: none;
+  }
+  .onyx-thread-pop > .onyx-sheet > .onyx-sheet-grip { display: none; }
+}
+
+/* Every placement: the head stays put, replies scroll, Reply is pinned. */
+.onyx-thread-sheet { display: flex; flex-direction: column; min-height: 0; }
+.onyx-thread-sheet .onyx-thread-head { flex: none; }
+.onyx-thread-sheet .onyx-thread-replies { flex: 1 1 auto; }
+.onyx-thread-sheet .onyx-thread-msg-text { min-width: 0; color: var(--onyx-text); }
+.onyx-thread-sheet .onyx-thread-msg-text .shell-msg-file { display: flex; max-width: 100%; }
+.onyx-thread-sheet .onyx-thread-msg-text .shell-msg-codeblock { margin: var(--space-1) 0; }
+.onyx-thread-sheet .onyx-thread-close { width: var(--target-min); height: var(--target-min); margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) 0; }
+.onyx-thread-sheet .onyx-thread-close .pt-ico { width: 20px; height: 20px; }
+.onyx-frame .onyx-thread-sheet .onyx-thread-reply { min-height: var(--target-min); font-size: var(--text-md); }
+
+/* ── 15. Local edit history (roadmap 2.9, v3/rx-convo) ─────────────── */
+
+/* "· edited" opens the earlier versions kept on this device: a native
+   disclosure, so it needs no state and reads as expanded / collapsed.
+   Closed, it is one inline box at the end of the text; open, the list
+   drops in under the message on the panel step, oldest first. */
+.onyx-edited--history { display: inline; }
+.onyx-edited--history:not([open]) { display: inline-block; vertical-align: baseline; }
+.onyx-edited-toggle {
+  display: inline;
+  list-style: none;
+  padding: 2px 3px;
+  margin: -2px -3px;
+  border-radius: 3px;
+  color: var(--onyx-dim);
+  font-size: var(--text-xs);
+  text-decoration: underline dotted;
+  text-decoration-color: var(--onyx-faint);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.onyx-edited-toggle::-webkit-details-marker { display: none; }
+.onyx-edited-toggle::marker { content: ""; }
+.onyx-edited-toggle:hover { color: var(--onyx-text); text-decoration-color: currentColor; }
+.onyx-edited-toggle:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
+.onyx-edited--history[open] > .onyx-edited-toggle { color: var(--onyx-text); text-decoration-style: solid; }
+
+.onyx-edit-history {
+  display: grid;
+  gap: var(--space-1);
+  width: min(36rem, 100%);
+  box-sizing: border-box;
+  margin: var(--space-2) 0 var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-left: 2px solid var(--pt-seam);
+  border-radius: var(--radius);
+  font-style: normal;
+  white-space: normal;
+}
+.onyx-edit-history-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+}
+.onyx-edit-history-note .pt-ico { width: 14px; height: 14px; }
+.onyx-edit-history-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.onyx-edit-history-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 6px 0;
+  border-top: 1px solid var(--onyx-line);
+}
+.onyx-edit-history-item:first-child { border-top: 0; padding-top: 2px; }
+.onyx-edit-history-ts {
+  color: var(--onyx-faint);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.onyx-edit-history-body {
+  min-width: 0;
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+/* Touch: the marker is a comfortable target without moving the text. */
+@media (hover: none) {
+  .onyx-edited-toggle { display: inline-block; padding: 10px 8px; margin: -10px -8px; }
+}
+
+/* ── 16. Compact density, IRC heritage (v3/rx-convo) ───────────────── */
+
+/* One line per message: [time] nick text, with a hanging indent so
+   wrapped lines, code, media, boosts and the thread link line up under
+   the nick and the stamps form a quiet column. A reply is an inline
+   chip before the text, never a line of its own. Under 480px the text
+   wraps back to the left edge (the width is worth more than the column). */
+.onyx-transcript--compact .onyx-thread { gap: 0; }
+.onyx-frame .onyx-message--compact {
+  padding: 1px var(--space-2) 1px calc(var(--space-2) + var(--pt-compact-ts));
+  text-indent: calc(-1 * var(--pt-compact-ts));
+  line-height: var(--leading-snug);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.onyx-message--compact > * { text-indent: 0; }
+.onyx-frame .onyx-message--compact > .onyx-ts {
+  display: inline-block;
+  min-width: var(--pt-compact-ts);
+  margin: 0;
+  color: var(--onyx-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.onyx-message--compact > .onyx-sender { margin-right: var(--space-2); font-size: var(--text-md); }
+.onyx-message--compact > .onyx-body { font-size: var(--text-md); line-height: var(--leading-snug); }
+.onyx-message--compact .shell-msg-reply {
+  display: inline-flex;
+  vertical-align: bottom;
+  max-width: min(22rem, 48%);
+  margin: 0 var(--space-2) 0 0;
+  padding: 0 6px 0 4px;
+  border-radius: 4px;
+  background: var(--onyx-panel);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+.onyx-message--compact .shell-msg-reply-text { text-overflow: ellipsis; }
+.onyx-message--compact .boost-bar { margin: 2px 0 2px; }
+.onyx-frame .onyx-message--compact > .onyx-thread-indicator { min-height: 22px; margin: 0 0 0 var(--space-1); vertical-align: baseline; }
+.onyx-message--compact .shell-msg-media,
+.onyx-message--compact .shell-msg-preview,
+.onyx-message--compact .shell-msg-file { margin-top: 2px; margin-bottom: 2px; }
+.onyx-message--compact .shell-msg-media-img { height: min(180px, 30dvh); }
+.onyx-message--compact .shell-msg-codeblock { margin: 2px 0; }
+.onyx-message--compact.onyx-mention,
+.onyx-message--compact.onyx-message-search-current { box-shadow: inset 2px 0 0 var(--gold); }
+.onyx-message--compact.onyx-message-search-current { box-shadow: inset 2px 0 0 var(--onyx-accent); }
+.onyx-message--compact > .onyx-row-actions { top: -18px; }
+.onyx-transcript--compact .onyx-system { padding-left: calc(var(--space-2) + var(--pt-compact-ts)); font-size: var(--text-sm); }
+.onyx-transcript--compact ~ .onyx-typing { padding-left: calc(var(--space-2) + var(--pt-compact-ts)); }
+.onyx-transcript--compact .onyx-day-divider { margin: var(--space-4) 0 var(--space-1); }
+
+@media (max-width: 479.98px) {
+  .onyx-frame .onyx-message--compact { padding-left: var(--space-1); text-indent: 0; }
+  .onyx-frame .onyx-message--compact > .onyx-ts { min-width: 0; margin-right: var(--space-2); }
+  .onyx-message--compact .shell-msg-reply { max-width: min(14rem, 55%); }
+  .onyx-transcript--compact .onyx-system,
+  .onyx-transcript--compact ~ .onyx-typing { padding-left: var(--space-1); }
+}
+
+/* ── 17. Narrow, short and touch-wide (v3/rx-convo) ────────────────── */
+
+/* Long code and long URLs never widen the page: code scrolls inside its
+   own box, links break anywhere, previews and files clip their text. */
+.onyx-message .onyx-body,
+.onyx-message .shell-msg-text { min-width: 0; max-width: 100%; }
+.shell-msg-codeblock {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  tab-size: 2;
+  white-space: pre;
+}
+.shell-msg-codeblock code { font-family: var(--font-mono); font-size: inherit; }
+/* The language tag is the block's first line, pinned to the left edge
+   while the code scrolls sideways (it never sits on top of the code). */
+.shell-msg-codeblock > .shell-msg-codeblock-lang {
+  position: sticky;
+  top: auto;
+  right: auto;
+  left: 0;
+  display: block;
+  width: max-content;
+  margin: -2px 0 var(--space-1);
+  color: var(--onyx-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+.shell-msg-link { overflow-wrap: anywhere; word-break: break-word; }
+.shell-msg-preview { box-sizing: border-box; min-width: 0; }
+.shell-msg-file { box-sizing: border-box; min-width: 0; }
+
+/* Touch at tablet / desktop widths (iPad, touch laptops): the anchored
+   menu and picker keep 44px rows and the bigger emoji grid. */
+@media (hover: none) and (min-width: 768px) {
+  .onyx-frame .onyx-msg-menu .onyx-msg-menu-item { min-height: var(--target-min); font-size: var(--text-md); }
+  .onyx-msg-menu-pop .onyx-msg-menu { width: 264px; }
+  .onyx-react-pop .onyx-react-picker { width: 352px; }
+  .onyx-react-pop .onyx-react-search { min-height: var(--target-min); font-size: 16px; }
+  .onyx-frame .onyx-react-pop .onyx-react-choice { min-height: var(--target-min); font-size: 24px; }
+  .onyx-frame .onyx-composer .shell-command-item { min-height: var(--target-min); }
+}
+
+/* Touch anywhere: the in-row controls and the window buttons grow to
+   comfortable targets (the visual stays quiet; the hit area grows). */
+@media (pointer: coarse) {
+  .onyx-frame .onyx-message > .onyx-thread-indicator { min-height: 36px; padding-inline: var(--space-2); }
+  .onyx-frame .onyx-message .boost-pill { min-height: 32px; }
+  .onyx-frame .onyx-message .boost-add { width: 40px; }
+  .onyx-frame .onyx-jump-latest { min-height: 40px; padding: 0 var(--space-4); }
+  .onyx-earlier-button,
+  .onyx-latest-button { min-height: var(--target-min); padding-inline: var(--space-4); }
+  .onyx-topic-tools-toggle { min-height: 36px; }
+  /* Compact keeps its one-line rhythm: the in-line thread link and
+     boosts stay short, their hit areas pad out sideways instead. */
+  .onyx-frame .onyx-message--compact > .onyx-thread-indicator { min-height: 28px; }
+  .onyx-frame .onyx-message--compact .boost-pill { min-height: 28px; }
+}
+
+/* Short screens (landscape phones, short laptops): the menu and picker
+   never run off the bottom of the screen; they scroll inside. */
+@media (min-width: 768px) {
+  .onyx-msg-menu-pop .onyx-msg-menu { max-height: min(70dvh, 28rem); overflow-y: auto; overscroll-behavior: contain; }
+  .onyx-react-pop .onyx-react-grid { max-height: min(216px, 36dvh); }
+}
+
+/* Landscape phones (390px tall): a slimmer composer and stamps, the
+   picture cap from the viewport height, the tools tray and suggestions
+   scroll inside what is left above the keyboard. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .onyx-frame .onyx-main > .onyx-composer { padding-top: var(--space-1); padding-bottom: max(var(--space-1), var(--safe-bottom)); }
+  :root[data-kb="open"] .onyx-frame .onyx-main > .onyx-composer { padding-bottom: var(--space-1); }
+  .onyx-composer .onyx-composer-field { max-height: 22dvh; }
+  .onyx-composer .shell-command-menu { max-height: calc(var(--vvh, 100dvh) - var(--composer-h) - var(--space-4)); }
+  .onyx-composer .shell-emoji-grid { max-height: min(30dvh, calc(var(--vvh, 100dvh) - var(--composer-h) - 6rem)); }
+  .onyx-message:not(.onyx-message--compact):not(.onyx-continuation) { margin-top: var(--space-2); }
+  .onyx-day-divider { margin: var(--space-3) 0 var(--space-1); }
+  .onyx-intro { padding-top: var(--space-4); }
+}
+
+/* Anchored menu and picker (where CSS anchor positioning exists): from
+   768px they hang off the open row's toolbar as fixed layers, so the
+   transcript scroller never clips them, and they open upward when the
+   row sits low (`most-height`; capped to half the screen so the larger
+   side always fits). Without it they keep the absolute fallback above. */
+@supports (anchor-name: --pt-row-actions) {
+  @media (min-width: 768px) {
+    .onyx-message--active > .onyx-row-actions { anchor-name: --pt-row-actions; }
+    .onyx-msg-menu-pop,
+    .onyx-react-pop { position: static; }
+    .onyx-msg-menu-pop .onyx-msg-menu,
+    .onyx-react-pop .onyx-react-picker {
+      position: fixed;
+      z-index: 41;
+      position-anchor: --pt-row-actions;
+      top: anchor(bottom);
+      right: anchor(right);
+      margin: 4px 0;
+      position-try-fallbacks: flip-block;
+      position-try-order: most-height;
+      max-height: calc(50dvh - 24px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+  }
+}
+
+/* Touch keyboards at any width (landscape phones, tablets): text fields
+   stay at 16px so iOS never zooms the page when one takes focus. */
+@media (pointer: coarse) {
+  .onyx-composer .onyx-composer-field,
+  .onyx-message-search__input,
+  .onyx-message-search__save-input,
+  .onyx-react-pop .onyx-react-search,
+  .onyx-composer .shell-emoji-search,
+  .shell-topic-create-input { font-size: 16px; }
+}
+
+/* Message search: on phones and short screens the panel never takes
+   more than a third of the height; its sections scroll inside. */
+@media (max-width: 767.98px) {
+  .onyx-message-search__body { max-height: min(32dvh, 22rem); }
+}
+@media (max-height: 500px) {
+  .onyx-message-search { padding-block: var(--space-1); }
+  .onyx-message-search__body { max-height: 26dvh; }
+}
+
+/* Hover feedback only where hover exists (a tap must not leave a pin or
+   media row looking selected). */
+@media (hover: none) {
+  .pins-item:hover { background: transparent; border-color: transparent; border-left-color: var(--onyx-line); }
+  .room-media-index-row:hover { background: transparent; border-color: transparent; }
+  .shell-msg-preview:hover { background: var(--onyx-panel); }
 }
