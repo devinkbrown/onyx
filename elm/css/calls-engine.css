@@ -159,7 +159,7 @@
 /* People row (voice). */
 .onyx-call-people { align-items: flex-start; gap: var(--space-4) var(--space-5); padding: var(--space-4) var(--space-4); }
 .onyx-call-person { justify-content: flex-start; width: 96px; gap: var(--space-1); }
-.onyx-call-avatar-lg { width: 64px; height: 64px; font-size: 22px; }
+.onyx-call-avatar-lg { width: 64px; height: 64px; font-size: 1.375rem; }
 .onyx-call-name { font-size: var(--text-md); }
 .onyx-call-role { margin-top: -2px; font-size: var(--text-2xs); }
 
@@ -173,7 +173,7 @@
 }
 .onyx-call-bar-center { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--space-1); min-width: 0; max-width: 100%; }
 .onyx-cbtn { width: 60px; height: 48px; flex: none; }
-.onyx-cbtn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-cbtn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 .onyx-cbtn-leave { width: 68px; margin-left: var(--space-2); }
 .onyx-call-more-wrap { display: flex; position: static; min-width: 0; }
 
@@ -224,7 +224,7 @@
   .onyx-call-person,
   .onyx-call-people[data-density] .onyx-call-person { flex: none; width: 68px; scroll-snap-align: start; }
   .onyx-call-avatar-lg,
-  .onyx-call-people[data-density] .onyx-call-avatar-lg { width: 48px; height: 48px; font-size: 18px; }
+  .onyx-call-people[data-density] .onyx-call-avatar-lg { width: 48px; height: 48px; font-size: 1.125rem; }
   .onyx-call-ring { padding: 3px; }
   .onyx-call-badge { width: 20px; height: 20px; }
   .onyx-call-badge .onyx-ci { width: 12px; height: 12px; }
@@ -290,7 +290,7 @@
   .onyx-call-people, .onyx-call-people[data-density] { gap: var(--space-2); }
   .onyx-call-name, .onyx-call-people[data-density] .onyx-call-name { max-width: 68px; font-size: var(--text-sm); }
   .onyx-call-avatar-lg,
-  .onyx-call-people[data-density] .onyx-call-avatar-lg { width: 44px; height: 44px; font-size: 17px; }
+  .onyx-call-people[data-density] .onyx-call-avatar-lg { width: 44px; height: 44px; font-size: 1.0625rem; }
   .onyx-call-ring { padding: 3px; }
   .onyx-call-role { display: none; }
   .onyx-call-bar { padding-block: var(--space-1) var(--space-2); }
@@ -392,11 +392,11 @@
   .onyx-thread-pane > .onyx-call-stage[data-size="expanded"] { min-height: max(18rem, calc(100% - 7.5rem)); }
   .onyx-call-stage[data-size="expanded"] > .onyx-call-people { flex: 1 1 auto; align-content: center; gap: var(--space-6) var(--space-7); }
   .onyx-call-stage[data-size="expanded"] .onyx-call-person { width: 128px; }
-  .onyx-call-stage[data-size="expanded"] .onyx-call-avatar-lg { width: 96px; height: 96px; font-size: 32px; }
+  .onyx-call-stage[data-size="expanded"] .onyx-call-avatar-lg { width: 96px; height: 96px; font-size: 2rem; }
   .onyx-call-stage[data-size="expanded"] > .onyx-call-video { flex: 1 1 auto; --grid-h: max(16rem, calc(100dvh - 22rem)); }
   .onyx-call-stage[data-size="expanded"] .onyx-call-video { min-height: 0; }
   .onyx-call-stage[data-size="fullscreen"] > .onyx-call-people { flex: 1 1 auto; align-content: center; }
-  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 112px; height: 112px; font-size: 36px; }
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 112px; height: 112px; font-size: 2.25rem; }
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-person { width: 144px; }
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-video { --grid-h: calc(100dvh - 9rem); }
 }
@@ -428,7 +428,7 @@
   .onyx-call-stage[data-size="expanded"] .onyx-call-people > .onyx-call-person,
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-people > .onyx-call-person { margin: 0; width: 88px; }
   .onyx-call-stage[data-size="expanded"] .onyx-call-avatar-lg,
-  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 72px; height: 72px; font-size: 24px; }
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 72px; height: 72px; font-size: 1.5rem; }
   .onyx-call-stage[data-size="expanded"] .onyx-call-role,
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-role { display: block; }
   .onyx-call-stage[data-size="expanded"] > .onyx-call-video,
@@ -452,7 +452,7 @@
   .onyx-call-stage[data-size="expanded"] .onyx-call-people > .onyx-call-person,
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-people > .onyx-call-person { width: 76px; }
   .onyx-call-stage[data-size="expanded"] .onyx-call-avatar-lg,
-  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 52px; height: 52px; font-size: 19px; }
+  .onyx-call-stage[data-size="fullscreen"] .onyx-call-avatar-lg { width: 52px; height: 52px; font-size: 1.1875rem; }
   .onyx-call-stage[data-size="expanded"] .onyx-call-role,
   .onyx-call-stage[data-size="fullscreen"] .onyx-call-role { display: none; }
   .onyx-call-stage[data-size="expanded"] .onyx-call-bar-center,

@@ -34,7 +34,7 @@
 .a2-textarea { width: 100%; font-family: var(--font-mono); font-size: var(--text-xs); resize: vertical; }
 .a2-input:focus-visible,
 .a2-select:focus-visible,
-.a2-textarea:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.a2-textarea:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance: was an invalid box-shadow (no visible focus) */
 .a2-textarea[aria-invalid="true"] { border-color: var(--onyx-bad); }
 
 .a2-btn,
@@ -54,7 +54,7 @@
 .a2-btn:hover,
 .a2-link:hover { border-color: var(--onyx-dim); }
 .a2-btn:focus-visible,
-.a2-link:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.a2-link:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 .a2-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .a2-btn--primary { border-color: var(--onyx-accent); background: var(--onyx-accent); color: var(--onyx-accent-ink); }
 .a2-btn--danger { border-color: var(--onyx-bad); color: var(--onyx-bad); }
@@ -117,7 +117,7 @@
 .a2-reclaim__signin { border-color: var(--onyx-accent); background: var(--onyx-accent); color: var(--onyx-accent-ink); }
 .a2-reclaim__dismiss { border-color: transparent; color: var(--onyx-dim); }
 .a2-reclaim__signin:focus-visible,
-.a2-reclaim__dismiss:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.a2-reclaim__dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 
 /* You hub status block. */
 .a2-status { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }

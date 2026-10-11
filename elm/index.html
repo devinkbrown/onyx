@@ -14,6 +14,9 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
 <title>Onyx</title>
 <link rel="stylesheet" href="app.css">
+<!-- v3/gap-appearance: theme → shell token bridge, text size, density,
+     width, high contrast, scene veil. Right after app.css. -->
+<link rel="stylesheet" href="css/gap-appearance.css">
 <link rel="stylesheet" href="css/pol-stats.css">
 
 <link rel="stylesheet" href="css/pol-studio.css">
@@ -45,6 +48,8 @@
 
 <link rel="stylesheet" href="css/gap-import.css">
 
+<link rel="stylesheet" href="css/gap-people.css">
+
 <!-- v3/gap-organize: folders, saved messages, notes, quiet hours, reader mode -->
 <link rel="stylesheet" href="css/gap-organize.css">
 
@@ -74,6 +79,9 @@
 <!-- Calls: mounts window.OnyxVoiceEngine (the Cadence media engine) before
      ports.js wires the voice ports to it. -->
 <script src="voice.js"></script>
+<!-- v3/gap-appearance: mounts window.OnyxBackdrop (the background scene
+     renderer) before ports.js forwards the backgroundScene port to it. -->
+<script src="backdrop.js"></script>
 <!-- v3/gap-import: history importers (worker-backed parsers + the batch
      ledger); ports.js wires them to the historyImport* ports. -->
 <script src="historyImport.js"></script>

@@ -34,7 +34,7 @@ suite =
                         Expect.equal True
                             (List.all (\meta -> List.length meta.swatch == 3 && not (String.isEmpty meta.signatureBg)) themeMeta)
                     , \_ ->
-                        Expect.equal [ "#65adf5", "#b4bfca", "#343b43" ]
+                        Expect.equal [ "#46c08a", "#b4bfca", "#181e27" ]
                             (themeMeta |> List.filter (\meta -> meta.id == "ocean") |> List.head |> Maybe.map .swatch |> Maybe.withDefault [])
                     , \_ ->
                         Expect.equal [ "#2bb4f0", "#d8b96a", "#0f2740" ]

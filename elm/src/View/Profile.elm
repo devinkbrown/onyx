@@ -16,7 +16,7 @@ import Json.Decode as Decode
 import Modes
 import Moderation
 import PersonSafety
-import Prefs
+import PeerAccount
 import Services
 import Set
 import View.Chanserv -- v3/gap-chanserv
@@ -455,16 +455,27 @@ cardFor model nick channel =
             Maybe.map .away member |> Maybe.withDefault False
 
         account =
-            case Maybe.andThen .account profile of
-                Just stored ->
-                    if String.isEmpty (String.trim stored) then
-                        Maybe.andThen .account info
+            -- v3/gap-people: live account knowledge (extended-join,
+            -- account-notify, account-tag, WHOX) wins; WHOIS and the
+            -- cached profile fill in when the peer is unknown.
+            case App.peerKnowledge model nick of
+                PeerAccount.SignedIn known ->
+                    Just known
 
-                    else
-                        Just (String.trim stored)
+                PeerAccount.Guest ->
+                    Nothing
 
-                Nothing ->
-                    Maybe.andThen .account info
+                PeerAccount.Unknown ->
+                    case Maybe.andThen .account profile of
+                        Just stored ->
+                            if String.isEmpty (String.trim stored) then
+                                Maybe.andThen .account info
+
+                            else
+                                Just (String.trim stored)
+
+                        Nothing ->
+                            Maybe.andThen .account info
 
         cardId =
             "people-card-" ++ slug nick ++ "-" ++ slug channel
@@ -494,7 +505,13 @@ cardFor model nick channel =
             []
         , div
             ([ class "onyx-member-card"
-             , attribute "role" "region"
+             , -- v3/rx-sheets: a modal card over its veil, so it is a
+               -- named dialog in the shared focus scope (initial focus
+               -- inside, Tab wraps, focus returns to the row it came from).
+               attribute "role" "dialog"
+             , attribute "aria-modal" "true"
+             , attribute "data-shortcut-scope" "member-card"
+             , attribute "tabindex" "-1"
              , attribute "aria-labelledby" (cardId ++ "-name")
              , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) cardEscapeDecoder)
              ]
@@ -506,7 +523,8 @@ cardFor model nick channel =
                             []
                    )
             )
-            [ div [ class "onyx-member-identity" ]
+            [ Sheet.closeButton { label = "Close profile for " ++ nick, onClose = App.UserProfileClosed, testId = Just "member-card-close", extraClass = "onyx-member-card-close" }
+            , div [ class "onyx-member-identity" ]
                 [ Avatar.view { name = displayName, owner = False, size = Avatar.Md, extraClass = "", hidden = True }
                 , div [ class "onyx-member-copy" ]
                     ([ p [ class "onyx-member-name", attribute "id" (cardId ++ "-name") ] [ text displayName ] ]
@@ -610,13 +628,6 @@ cardFor model nick channel =
                         , onClick (App.SafetyOpenReport { nick = nick, guest = account == Nothing })
                         ]
                         [ text "Report" ]
-                    , button
-                        [ attribute "type" "button"
-                        , class "onyx-member-action"
-                        , attribute "aria-label" ("Close profile for " ++ nick)
-                        , onClick App.UserProfileClosed
-                        ]
-                        [ text "Close" ]
                     ]
             , -- v3/gap-usermodes: not in this room -> when were they last here
               if not isSelf && member == Nothing && App.isChannelName model channel then
@@ -777,28 +788,45 @@ cardEscapeDecoder =
             )
 
 
-{-| Card moderation controls (mirroring the oracle `showRoomModeration`
-/ `showIrcRoleControls` gates: room op, not self, and the experience
-mode publishing kick (room actions) or op (role controls)). -}
+{-| Card moderation controls — v3/gap-people: gated on the room role
+the server enforces (`ModAuthority`), not on a local experience level.
+Room moderators see the role toggles that fit the person's current
+state plus Remove / Block, for people at or below their own rank;
+everyone else sees nothing. Every control stages a review. -}
 moderationControls : Model -> String -> String -> Maybe App.Member -> Bool -> Html Msg
-moderationControls model nick channel member isSelf =
+moderationControls model nick channel _ isSelf =
     let
         kinds =
-            Moderation.kindsForMode (Prefs.experienceModeToString model.prefs.experienceMode)
+            if isSelf then
+                []
 
-        canModerate =
-            App.isChannelOp model channel
-
-        modes =
-            Maybe.map .modes member |> Maybe.withDefault Set.empty
+            else
+                App.moderationCardKinds model channel nick
 
         propose kind =
             App.ModerationPropose { kind = kind, channel = channel, target = Just nick, mask = Nothing, reason = Nothing }
-    in
-    if not canModerate || isSelf then
-        text ""
 
-    else if not (List.member Moderation.Kick kinds) then
+        control kind =
+            case kind of
+                Moderation.Op ->
+                    modButton ("Make " ++ nick ++ " a moderator") (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Deop ->
+                    modButton ("Remove moderator from " ++ nick) (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Voice ->
+                    modButton ("Let " ++ nick ++ " speak") (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Devoice ->
+                    modButton ("Remove speak from " ++ nick) (Moderation.kindLabel kind) False (propose kind)
+
+                Moderation.Kick ->
+                    modButton ("Remove " ++ nick ++ " from " ++ channel) "Remove from room" True (propose kind)
+
+                _ ->
+                    modButton ("Block " ++ nick ++ " from " ++ channel) "Block from room" True (propose kind)
+    in
+    if List.isEmpty kinds then
         text ""
 
     else
@@ -807,36 +835,23 @@ moderationControls model nick channel member isSelf =
             , attribute "role" "group"
             , attribute "aria-label" ("Moderate " ++ nick)
             ]
-            ([]
-                ++ (if List.member Moderation.Op kinds then
-                        [ if Set.member 'o' modes then
-                            modButton ("Remove op from " ++ nick) "Deop" (propose Moderation.Deop)
-
-                          else
-                            modButton ("Give op to " ++ nick) "Op" (propose Moderation.Op)
-                        , if Set.member 'v' modes then
-                            modButton ("Remove voice from " ++ nick) "Devoice" (propose Moderation.Devoice)
-
-                          else
-                            modButton ("Give voice to " ++ nick) "Voice" (propose Moderation.Voice)
-                        ]
-
-                    else
-                        []
-                   )
-                ++ [ modButton ("Kick " ++ nick ++ " from " ++ channel) "Kick" (propose Moderation.Kick)
-                   , modButton ("Ban " ++ nick ++ " from " ++ channel) "Ban" (propose Moderation.Ban)
-                   , View.Chanserv.muteButton model channel nick -- v3/gap-chanserv
-                   ]
-            )
+            [ p [ class "onyx-member-mod-title", attribute "aria-hidden" "true" ] [ text "Room moderation" ]
+            , div [ class "onyx-member-mod-row" ] (List.map control kinds ++ [ View.Chanserv.muteButton model channel nick ]) -- v3/gap-chanserv: Mute next to Kick/Ban
+            ]
 
 
 {-| One moderation control button. -}
-modButton : String -> String -> Msg -> Html Msg
-modButton label visible msg =
+modButton : String -> String -> Bool -> Msg -> Html Msg
+modButton label visible danger msg =
     button
         [ attribute "type" "button"
-        , class "onyx-member-action"
+        , class
+            (if danger then
+                "onyx-member-action onyx-member-action--danger"
+
+             else
+                "onyx-member-action"
+            )
         , attribute "aria-label" label
         , onClick msg
         ]
@@ -888,7 +903,8 @@ moderationReview model =
                         Just "You no longer have moderator permission in this room."
 
                     else
-                        Nothing
+                        -- v3/gap-people: the server's rank rule.
+                        App.moderationRefusal model draft
 
                 canSend =
                     review /= Nothing && blockedReason == Nothing
@@ -917,7 +933,11 @@ moderationReview model =
                 , backdropClass = "onyx-profile-backdrop"
                 , layerAttrs = []
                 , modal = True
-                , attrs = [ attribute "aria-describedby" "moderation-review-desc" ]
+                , attrs =
+                    [ attribute "aria-describedby" "moderation-review-desc"
+                    , -- v3/rx-sheets: kick / ban confirm as destructive
+                      attribute "data-kind" (Moderation.kindToString draft.kind)
+                    ]
                 }
                     [ h2 [ class "onyx-moderation-title" ] [ text title ]
                     , p [ class "onyx-moderation-desc", attribute "id" "moderation-review-desc" ]
@@ -1077,7 +1097,11 @@ safetyShell kind title body guest extra dismissLabel dismissMsg confirmLabel con
         , modal = True
         , attrs = [ attribute "aria-describedby" "person-safety-body", attribute "data-kind" kind ]
         }
-            ([ h2 [ attribute "id" "person-safety-title", class "person-safety__title" ] [ text title ]
+            ([ -- v3/rx-sheets: the shared pinned head and its close.
+               Sheet.headerWith
+                (Sheet.head { scope = "person-safety", title = title, closeLabel = "Close", onClose = dismissMsg }
+                    |> (\h -> { h | titleId = Just "person-safety-title", titleClass = "person-safety__title" })
+                )
              , p [ attribute "id" "person-safety-body", class "person-safety__body" ] [ text body ]
              ]
                 ++ (if guest then

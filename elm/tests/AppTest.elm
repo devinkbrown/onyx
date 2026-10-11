@@ -31,6 +31,7 @@ import Isupport
 import Prefs exposing (ExperienceMode(..), ReactionDensity(..))
 import PrefsPanel
 import RoomMedia exposing (RoomMediaFilter(..))
+import GapPeople
 import Moderation
 import Session
 import Set
@@ -1106,7 +1107,7 @@ suite =
                     [ \_ ->
                         Expect.equal
                             [ SendLine "CHATHISTORY LATEST #c * 50\r\n"
-                            , SendLine "WHO #c\r\n"
+                            , SendLine "WHO #c %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
                             ]
                             out
@@ -1116,12 +1117,12 @@ suite =
                         Expect.equal
                             [ SendLine "MARKREAD #c\r\n"
                             , SendLine "CHATHISTORY LATEST #c * 50\r\n"
-                            , SendLine "WHO #c\r\n"
+                            , SendLine "WHO #c %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #c\r\n"
                             ]
                             fullOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] bufferedOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] cappedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] bufferedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] cappedOut
                     ]
                     ()
         , test "self-JOIN rejoins with messages still refetch" <|
@@ -1162,8 +1163,8 @@ suite =
                 Expect.all
                     [ \_ -> Expect.equal True (Set.member "#c" capped.historyExhausted)
                     , \_ -> Expect.equal False (Set.member "#c" capped.historyLoading)
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] reOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] reOut
                     , \_ -> Expect.equal True (Set.member "#c" rejoined.historyExhausted)
                     ]
                     ()
@@ -1180,7 +1181,7 @@ suite =
                         feed { base | historyMerging = True, historyLoading = Set.empty } ":me!u@h JOIN #c"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
+                    [ \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] out
                     , \_ -> Expect.equal [] mergingOut
                     ]
                     ()
@@ -1232,7 +1233,7 @@ suite =
                     , \_ ->
                         Expect.equal
                             [ SendLine "CHATHISTORY LATEST #r7 * 50\r\n"
-                            , SendLine "WHO #r7\r\n"
+                            , SendLine "WHO #r7 %tcnfa,616\r\n"
                             , SendLine "ACTIVITY SUBSCRIBE #r7\r\n"
                             ]
                             knownOut
@@ -1429,9 +1430,9 @@ suite =
                             ":me!u@h JOIN #c"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] loadingOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] exhaustedOut
-                    , \_ -> Expect.equal [ SendLine "WHO #c\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] searchedOut
+                    [ \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] loadingOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] exhaustedOut
+                    , \_ -> Expect.equal [ SendLine "WHO #c %tcnfa,616\r\n", SendLine "ACTIVITY SUBSCRIBE #c\r\n" ] searchedOut
                     , \_ -> Expect.equal True (Set.member "#c" loading.historyLoading)
                     ]
                     ()
@@ -4813,7 +4814,7 @@ suite =
                         Expect.equal
                             [ "MARKREAD #a\r\n"
                             , "CHATHISTORY LATEST #a * 50\r\n"
-                            , "WHO #a\r\n"
+                            , "WHO #a %tcnfa,616\r\n"
                             , "ACTIVITY SUBSCRIBE #a\r\n"
                             ]
                             (List.map sendLineText joinOut)
@@ -12031,22 +12032,30 @@ suite =
                         ()
             ]
         , describe "ban-add form"
-            [ test "raw submit sends +b and clears the form" <|
+            [ test "raw review then confirm sends +b and clears the form" <|
                 \_ ->
                     let
                         base =
                             blankBanAdd
 
+                        -- v3/rx-sheets + v3/gap-people: the form reviews first
+                        -- (nothing sent), the confirm sends.
                         live =
-                            { blank | connection = Live, banAdd = { base | mask = " *!*@* ", minutes = "10" } }
+                            { stewardLive | banAdd = { base | mask = " spam!*@* ", minutes = "10" } }
+
+                        ( staged, stagedOut ) =
+                            update (BanAddReview "#harbor") live
 
                         ( m, outs ) =
-                            update (BanAddSubmit "#c") live
+                            update (BanAddSubmit "#harbor") staged
                     in
                     Expect.all
-                        [ \_ ->
+                        [ \_ -> Expect.equal [] stagedOut
+                        , \_ -> Expect.equal True staged.banAdd.reviewing
+                        , \_ ->
                             Expect.equal True
-                                (List.member (SendLine "MODE #c +b *!*@*\r\n") outs)
+                                (List.member (SendLine "MODE #harbor +b spam!*@*\r\n") outs)
+                        , \_ -> Expect.equal False m.banAdd.reviewing
                         , \_ -> Expect.equal "" m.banAdd.mask
                         , \_ -> Expect.equal "" m.banAdd.error
                         , \_ -> Expect.equal "10" m.banAdd.minutes
@@ -12059,18 +12068,20 @@ suite =
                             blankBanAdd
 
                         live =
-                            { blank
-                                | connection = Live
-                                , banAdd = { base | useExtBan = True, extType = "a", extPattern = "alice", minutes = "30" }
+                            { stewardLive
+                                | banAdd = { base | useExtBan = True, extType = "a", extPattern = "mallory", minutes = "30" }
                             }
 
+                        ( staged, _ ) =
+                            update (BanAddReview "#harbor") live
+
                         ( m, outs ) =
-                            update (BanAddSubmit "#c") live
+                            update (BanAddSubmit "#harbor") staged
                     in
                     Expect.all
                         [ \_ ->
                             Expect.equal True
-                                (List.member (SendLine "MODE #c +b $a:alice\r\n") outs)
+                                (List.member (SendLine "MODE #harbor +b $a:mallory\r\n") outs)
                         , \_ -> Expect.equal "" m.banAdd.error
                         ]
                         ()
@@ -19929,8 +19940,10 @@ suite =
             , test "transfer waits for accept before any owner rank" <|
                 \_ ->
                     let
+                        -- v3/gap-people: the offer and the accept travel as
+                        -- tagged TAGMSGs (message-tags relays them).
                         ( offered, offerOut ) =
-                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew", caps = [ "message-tags" ] }
 
                         ( early, earlyOut ) =
                             update (StewardGrantTransfer "#harbor") offered
@@ -19942,11 +19955,11 @@ suite =
                             update (StewardGrantTransfer "#harbor") { accepted | ourNick = "alice" }
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [] offerOut
+                        [ \_ -> Expect.equal [ SendLine "@+onyx/room=#harbor;+onyx/room-transfer=offer TAGMSG drew\r\n" ] offerOut
                         , \_ -> Expect.equal False (Maybe.withDefault True (Maybe.map .accepted (stewardOfferFor offered "#harbor")))
                         , \_ -> Expect.equal [] earlyOut
                         , \_ -> Expect.equal "They have to accept before the room changes hands." early.stewardStatus
-                        , \_ -> Expect.equal [] acceptOut
+                        , \_ -> Expect.equal [ SendLine "@+onyx/room=#harbor;+onyx/room-transfer=accept TAGMSG alice\r\n" ] acceptOut
                         , \_ -> Expect.equal True (Maybe.withDefault False (Maybe.map .accepted (stewardOfferFor accepted "#harbor")))
                         , \_ ->
                             Expect.equal
@@ -19961,7 +19974,7 @@ suite =
                 \_ ->
                     let
                         ( offered, _ ) =
-                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew" }
+                            update (StewardOfferTransfer "#harbor") { stewardLive | stewardSuccessor = "drew", caps = [ "message-tags" ] }
 
                         ( stranger, strangerOut ) =
                             update (StewardAcceptTransfer "#harbor") { offered | ourNick = "erin" }
@@ -23631,14 +23644,21 @@ suite =
                         ( offline, offlineOut ) =
                             update (WebhookList "#harbor") { stewardLive | connection = Offline }
 
+                        -- v3/gap-people: any room host may manage webhooks
+                        -- (bob, an op, now can); a plain member cannot.
                         ( stranger, strangerOut ) =
+                            update (WebhookList "#harbor") { stewardLive | ourNick = "drew" }
+
+                        ( helper, helperOut ) =
                             update (WebhookList "#harbor") { stewardLive | ourNick = "bob" }
                     in
                     Expect.all
                         [ \_ -> Expect.equal [] offlineOut
-                        , \_ -> Expect.equal "Reconnect to change this room." offline.stewardStatus
+                        , \_ -> Expect.equal "Reconnect to manage webhooks." offline.webhookStatus
                         , \_ -> Expect.equal [] strangerOut
-                        , \_ -> Expect.equal "Only the owner can do that." stranger.stewardStatus
+                        , \_ -> Expect.equal "Only room hosts can manage webhooks." stranger.webhookStatus
+                        , \_ -> Expect.equal [ SendLine "WEBHOOK LIST #harbor\r\n" ] helperOut
+                        , \_ -> Expect.equal "" helper.webhookStatus
                         ]
                         ()
             , test "WEBHOOK: notice lands in the service log, not chat" <|
