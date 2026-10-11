@@ -50,11 +50,14 @@ import Sidebar
 import View.CallDock -- v3/calls-c6
 import View.CallPresence
 import View.DmSafety
+import View.GapShell -- v3/gap-shell
 import View.ModDesk
+import View.Organize -- v3/gap-organize
 import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
 import View.Roster
+import View.WatchTogether -- v3/gap-watch
 
 
 roomHeader : Model -> Html Msg
@@ -278,8 +281,11 @@ moreMenu model name isRoom channel =
                                , mediaToggle model
                                , jumpToggle model
                                , View.Polish.scrubberToggle model -- v3/polish
+                               , View.WatchTogether.menuItem model -- v3/gap-watch
                                ]
                             ++ View.ModDesk.moderationToggle model
+                            ++ View.Organize.roomMoreItems model name isRoom -- v3/gap-organize
+                            ++ View.GapShell.roomMoreItems model name isRoom -- v3/gap-shell
                         )
                     ]
 

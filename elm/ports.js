@@ -3450,12 +3450,23 @@
         sendPort(batch);
       }
     });
+    /* v3/gap-shell: ONE wsClosed per socket. A failed socket fires
+       `error` and then `close` in the same task, which reached Elm as two
+       closes (two "Disconnected" rows, and a second close could undo a
+       redial). `close` reports (it carries the reason); `error` is only a
+       next-task fallback. */
+    var closeReported = false;
+    function reportClose(payload) {
+      if (closeReported) return;
+      closeReported = true;
+      app.ports.wsClosed.send(payload);
+    }
     socket.addEventListener("close", function (event) {
-      app.ports.wsClosed.send({ clean: event.wasClean, reason: event.reason || "" });
+      reportClose({ clean: event.wasClean, reason: event.reason || "" });
       if (onClose) { try { onClose(); } catch (err) {} }
     });
     socket.addEventListener("error", function () {
-      app.ports.wsClosed.send({ clean: false, reason: "error" });
+      setTimeout(function () { reportClose({ clean: false, reason: "error" }); }, 0);
     });
     return {
       send: function (line) {
@@ -3713,6 +3724,63 @@ function fetchPublicFeed(url) {
         return { key: key, atBottom: state.atBottom, attached: !!log };
       }
     };
+  }
+
+  /* v3/gap-organize — organize memory + attention prefs. Elm owns every
+     shape, bound and owner-scoped key name (`Organize`, `Attention`,
+     `Organizer`); the bridge only reads and writes whole localStorage
+     values for an allow-listed set of keys:
+       owner-scoped  onyx:{room-folders,hidden-rooms,closed-conversations,
+                     bookmarks,user-notes,smart-mute}:owner:<enc>
+       read-only     onyx:channel-navigation:owner:<enc> (the oracle's
+                     record, read once to bring its folders across)
+       device-wide   onyx:dnd-quiet-{start,end,enabled}, onyx:calm
+     A `null` value removes the key. Reads answer with `null` for a
+     missing key (never "") so Elm can tell "unset" from "empty". */
+  var ORGANIZE_OWNED = /^onyx:(room-folders|hidden-rooms|closed-conversations|bookmarks|user-notes|smart-mute|channel-navigation):owner:[A-Za-z0-9%._~!*'()-]{1,8192}$/;
+  var ORGANIZE_DEVICE = /^onyx:(dnd-quiet-start|dnd-quiet-end|dnd-quiet-enabled|calm)$/;
+  var ORGANIZE_MAX_VALUE = 2 * 1024 * 1024;
+  function organizeReadable(key) {
+    return typeof key === "string" && (ORGANIZE_OWNED.test(key) || ORGANIZE_DEVICE.test(key));
+  }
+  function organizeWritable(key) {
+    return organizeReadable(key) && key.indexOf("onyx:channel-navigation:") !== 0;
+  }
+  function wireOrganize(app, env) {
+    var storage = function () {
+      try {
+        var store = (env && env.storage) || (typeof window !== "undefined" ? window.localStorage : null);
+        return store && typeof store.getItem === "function" ? store : null;
+      } catch (err) { return null; }
+    };
+    if (app.ports.organizeStore) {
+      app.ports.organizeStore.subscribe(function (req) {
+        if (!req || !organizeWritable(req.key)) return;
+        var store = storage();
+        if (!store) return;
+        try {
+          if (req.value === null || req.value === undefined) {
+            store.removeItem(req.key);
+          } else if (typeof req.value === "string" && req.value.length <= ORGANIZE_MAX_VALUE) {
+            store.setItem(req.key, req.value);
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.organizeLoad && app.ports.organizeLoaded) {
+      app.ports.organizeLoad.subscribe(function (req) {
+        if (!req || typeof req.tag !== "string" || !Array.isArray(req.keys)) return;
+        var store = storage();
+        var values = {};
+        req.keys.slice(0, 32).forEach(function (key) {
+          if (!organizeReadable(key)) return;
+          var raw = null;
+          try { raw = store ? store.getItem(key) : null; } catch (err) { raw = null; }
+          values[key] = (typeof raw === "string" && raw.length <= ORGANIZE_MAX_VALUE) ? raw : null;
+        });
+        try { app.ports.organizeLoaded.send({ tag: req.tag, values: values }); } catch (err) { /* app gone */ }
+      });
+    }
   }
 
   function wireTranscriptScroll(app, env) {
@@ -6887,6 +6955,8 @@ function fetchPublicFeed(url) {
        `queueMicrotask`; missing chips (stale emits) no-op. */
     /* v3/transcript — scroll anchoring bridge. */
     wireTranscriptScroll(app);
+    /* v3/gap-organize — organize memory + attention prefs. */
+    wireOrganize(app);
 
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
@@ -7739,6 +7809,7 @@ function fetchPublicFeed(url) {
 
     /* v3/polish */
     wirePolish(app, { registration: swRegistration });
+    wireGapShell(app); /* v3/gap-shell */
 
     /* v3/gap-pwa-safety: a bfcache restore / freeze resume probes the
        socket at once (a dead one closes into the reconnect path) and
@@ -11014,6 +11085,159 @@ function fetchPublicFeed(url) {
     try { installViewportInsets(global); } catch (err) { /* layout falls back to 100dvh */ }
   }
 
+  /* ── v3/gap-shell: browser connectivity, one device value, roving keys ──
+     Mirrors the oracle's OS network listeners (`store.ts` `offline` /
+     `online`): each becomes one `shellEvent` for Elm, which owns the
+     policy (drop the socket while offline so sends queue, reconnect at
+     once when back). Page restore (bfcache / freeze) is v3/gap-pwa-safety's
+     `installPageLifecycle` + `pageRestored`. The boot event also carries
+     `navigator.onLine`, the stored MOTD dismissal and the Start-a-room
+     "next hang" label (next Saturday 4 pm, localized — the oracle
+     `formatHangLabel(nextSaturdayHang())`).
+
+     Roving keys (oracle `ChannelSidebar` / `PresenceRibbon` menus):
+     ArrowUp/ArrowDown/Home/End move focus between the sidebar's rows and
+     between the room More menu's items; a keyboard-opened More menu
+     focuses its first item. Tab order is untouched. */
+  var GAP_SHELL_STORE_KEYS = { "motd-dismissed-at": "onyx:motd-dismissed-at" };
+
+  function gapShellNextSaturdayHang(now) {
+    var c = new Date(now.getTime());
+    c.setDate(c.getDate() + ((6 - c.getDay() + 7) % 7));
+    c.setHours(16, 0, 0, 0);
+    if (c.getTime() <= now.getTime()) c.setDate(c.getDate() + 7);
+    return c;
+  }
+
+  function gapShellHangLabel(now) {
+    try {
+      return gapShellNextSaturdayHang(now || new Date())
+        .toLocaleString(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
+    } catch (e) { return ""; }
+  }
+
+  function gapShellReadMs(storage, key) {
+    try {
+      var n = Number(storage && storage.getItem(key));
+      return isFinite(n) && n > 0 ? n : null;
+    } catch (e) { return null; }
+  }
+
+  function gapShellLocalStorage(win) {
+    try { return (win && win.localStorage) || null; } catch (e) { return null; }
+  }
+
+  function gapShellOnline(nav) {
+    try { return !(nav && nav.onLine === false); } catch (e) { return true; }
+  }
+
+  function gapShellVisible(el) {
+    try { return !!(el && el.getClientRects && el.getClientRects().length); } catch (e) { return false; }
+  }
+
+  var GAP_SHELL_MENU_ITEMS = "#onyx-room-more-menu > button:not([disabled]), #onyx-room-more-menu > a[href]";
+
+  function gapShellRovingItems(target) {
+    if (!target || typeof target.closest !== "function") return null;
+    var root = null;
+    var selector = null;
+    if (target.closest("#onyx-room-more-menu")) {
+      root = target.ownerDocument || null;
+      selector = GAP_SHELL_MENU_ITEMS;
+    } else if (typeof target.matches === "function" && target.matches(".onyx-rail-item")) {
+      root = target.closest(".onyx-rail");
+      selector = ".onyx-rail-item";
+    }
+    if (!root || !selector) return null;
+    var list;
+    try { list = Array.prototype.slice.call(root.querySelectorAll(selector)); } catch (e) { return null; }
+    return list.filter(gapShellVisible);
+  }
+
+  /* Returns the element focused, or null when the key is not ours. */
+  function gapShellRovingKey(e) {
+    if (!e || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+    if (e.isComposing) return null;
+    var key = e.key;
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return null;
+    var target = e.target;
+    /* The More toggle: ArrowDown into an open menu. */
+    if (target && typeof target.closest === "function" && target.closest(".onyx-room-more-toggle")) {
+      if (key !== "ArrowDown" || target.getAttribute("aria-expanded") !== "true") return null;
+      var doc = target.ownerDocument;
+      var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+      if (!first) return null;
+      first.focus();
+      e.preventDefault();
+      return first;
+    }
+    var items = gapShellRovingItems(target);
+    if (!items || items.length === 0) return null;
+    var at = items.indexOf(target);
+    if (at < 0) return null;
+    var n = items.length;
+    var next = key === "Home" ? 0
+      : key === "End" ? n - 1
+      : key === "ArrowDown" ? (at + 1) % n
+      : (at - 1 + n) % n;
+    items[next].focus();
+    e.preventDefault();
+    return items[next];
+  }
+
+  /* A keyboard click (detail 0) on the More toggle that opens the menu
+     focuses its first item once Elm has painted it. */
+  function gapShellMenuOpenFocus(e, win) {
+    var target = e && e.target;
+    if (!target || typeof target.closest !== "function") return;
+    var toggle = target.closest(".onyx-room-more-toggle");
+    if (!toggle || e.detail !== 0) return;
+    var raf = (win && win.requestAnimationFrame) ? win.requestAnimationFrame.bind(win) : function (f) { return setTimeout(f, 16); };
+    raf(function () {
+      raf(function () {
+        if (toggle.getAttribute("aria-expanded") !== "true") return;
+        var doc = toggle.ownerDocument;
+        var first = doc && doc.querySelector(GAP_SHELL_MENU_ITEMS);
+        if (first) first.focus();
+      });
+    });
+  }
+
+  function wireGapShell(app, env) {
+    env = env || {};
+    if (!app || !app.ports) return null;
+    var win = env.window || (typeof window !== "undefined" ? window : undefined);
+    var doc = env.document || (typeof document !== "undefined" ? document : undefined);
+    var nav = env.navigator || (typeof navigator !== "undefined" ? navigator : undefined);
+    var local = gapShellLocalStorage(win);
+    function send(event) {
+      try { if (app.ports.shellEvent) app.ports.shellEvent.send(event); } catch (e) { /* port gone */ }
+    }
+    var online = gapShellOnline(nav);
+    send({
+      event: "boot",
+      online: online,
+      hangLabel: gapShellHangLabel(env.now ? new Date(env.now) : new Date()),
+      motdDismissedAt: gapShellReadMs(local, GAP_SHELL_STORE_KEYS["motd-dismissed-at"])
+    });
+    if (app.ports.shellStore) {
+      app.ports.shellStore.subscribe(function (req) {
+        var key = req && GAP_SHELL_STORE_KEYS[req.key];
+        if (!key) return;
+        try { if (local) local.setItem(key, String(req.value).slice(0, 32)); } catch (e) { /* private mode */ }
+      });
+    }
+    if (win && typeof win.addEventListener === "function") {
+      win.addEventListener("offline", function () { send({ event: "offline", online: false }); });
+      win.addEventListener("online", function () { send({ event: "online", online: true }); });
+    }
+    if (doc && typeof doc.addEventListener === "function") {
+      doc.addEventListener("keydown", function (e) { gapShellRovingKey(e); });
+      doc.addEventListener("click", function (e) { gapShellMenuOpenFocus(e, win); });
+    }
+    return { send: send };
+  }
+
   global.OnyxPorts = {
     vaultStore: {
       put: vaultPut,
@@ -11135,6 +11359,7 @@ function fetchPublicFeed(url) {
     installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
+    wireOrganize: wireOrganize, /* v3/gap-organize */
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,
@@ -11174,7 +11399,15 @@ function fetchPublicFeed(url) {
     registerServiceWorker: registerServiceWorker,
     installPageLifecycle: installPageLifecycle,
     swUrl: SW_URL,
-    memKV: memKV
+    memKV: memKV,
+    /* v3/gap-shell */
+    gapShell: {
+      wire: wireGapShell,
+      rovingKey: gapShellRovingKey,
+      hangLabel: gapShellHangLabel,
+      nextSaturdayHang: gapShellNextSaturdayHang,
+      storeKeys: GAP_SHELL_STORE_KEYS
+    }
   };
   if (typeof module !== "undefined" && module.exports) {
     module.exports.OnyxPorts = global.OnyxPorts;

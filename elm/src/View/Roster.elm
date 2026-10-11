@@ -307,6 +307,11 @@ rosterRow model channel groupKey entry =
             [ type_ "button"
             , class "onyx-mlist-main"
             , attribute "aria-label" ("View member card for " ++ member.nick)
+            , -- v3/gap-organize: on phones the list is a top-layer popover, which
+              -- would sit over the card this opens; choosing someone closes it
+              -- (the browser's own hide action; a no-op where the list is in flow)
+              attribute "popovertarget" sheetId
+            , attribute "popovertargetaction" "hide"
             , onClick (App.UserProfileOpened { nick = member.nick, channel = channel })
             ]
             [ span [ class "onyx-member-avatar-slot" ]

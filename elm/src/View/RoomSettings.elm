@@ -45,6 +45,7 @@ import Stats
 import Stewardship
 import Time
 import View.Chanserv -- v3/gap-chanserv
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -113,6 +114,7 @@ roomSettingsSheet model =
                 , topicSection model ctx room
                 , notifySection model room
                 , View.Chanserv.paceSection model ctx room -- v3/gap-chanserv
+                , View.Organize.roomSettingsSection model room.name -- v3/gap-organize
                 , details [ class "rset-advanced" ]
                     [ summary [] [ text "Advanced" ]
                     , p [ class "rset-hint" ] [ text "Room rules, roles, registration, insights, and integrations. Everyday alerts stay above." ]
@@ -160,7 +162,7 @@ contextLine ctx =
 notPorted : Html Msg
 notPorted =
     p [ class "rset-hint rset-footnote", attribute "data-testid" "chset-not-ported" ]
-        [ text "Invite links live on the room header (Invite friends). Transcript export, hide and leave are not in this sheet yet." ]
+        [ text "Invite links live on the room header (Invite friends). Transcript export and leave are not in this sheet yet." ]
 
 
 sectionWith : String -> String -> List (Html Msg) -> Html Msg

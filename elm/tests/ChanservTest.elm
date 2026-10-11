@@ -263,6 +263,7 @@ builders =
                     [ \_ -> Expect.equal ( "#c needs a secure connection", "This room only accepts encrypted (TLS) connections, and this connection doesn't qualify." ) (copy "489" "")
                     , \_ -> Expect.equal ( "#c is for network operators", "Only Onyx network operators can join." ) (copy "520" "Cannot join channel (+O) - IRC operator required")
                     , \_ -> Expect.equal ( "#c is for network administrators", "Only Onyx network administrators can join." ) (copy "520" "Cannot join channel (+A) - server administrator required")
+                    , \_ -> Expect.equal ( "#c is for network administrators", "Only Onyx network administrators can join." ) (copy "520A" "")
                     , \_ -> Expect.equal ( "#c is for signed-in accounts", "Sign in to your Onyx account to join." ) (copy "477" "")
                     , \_ -> Expect.equal ( "#c is busy", "Too many people are joining right now. Try again in a moment." ) (copy "480" "")
                     , \_ -> Expect.equal ( "#c is invite-only", "A host has to invite you." ) (copy "473" "")
@@ -1116,7 +1117,7 @@ stewardRoomBase =
 joinRefusals : Test
 joinRefusals =
     describe "join refusals say why (D9)"
-        [ test "489 TLS-only becomes the join prompt and an inbox row, in words" <|
+        [ test "489 TLS-only becomes the join prompt and an inbox row; the card keeps the code" <|
             \_ ->
                 let
                     ( after, _ ) =
@@ -1124,42 +1125,54 @@ joinRefusals =
                 in
                 Expect.all
                     [ \_ -> Expect.equal (Just "#secure") (Maybe.map .channel after.channelJoinPrompt)
-                    , \_ -> Expect.equal (Just "This room only accepts encrypted (TLS) connections, and this connection doesn't qualify") (Maybe.map .error after.channelJoinPrompt)
-                    , \_ -> Expect.equal [ "#secure needs a secure connection. This room only accepts encrypted (TLS) connections, and this connection doesn't qualify." ] (List.map .text after.notifications)
+                    , \_ -> Expect.equal (Just "This room only allows secure connections.") (Maybe.map .error after.channelJoinPrompt)
+                    , \_ -> Expect.equal [ "#secure: This room only allows secure connections." ] (List.map .text after.notifications)
                     , \_ -> Expect.equal (Just "489") (Dict.get "#secure" after.chanserv.refusal)
                     ]
                     ()
-        , test "520 names operators or administrators" <|
+        , test "520 keeps operators-only and administrators-only apart for the card" <|
             \_ ->
                 let
-                    refuse text =
-                        feed blank (":srv.test 520 me #staff :" ++ text) |> Tuple.first |> .notifications |> List.map .text
+                    refusal text =
+                        feed blank (":srv.test 520 me #staff :" ++ text) |> Tuple.first |> .chanserv |> .refusal |> Dict.get "#staff"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "#staff is for network operators. Only Onyx network operators can join." ] (refuse "Cannot join channel (+O) - IRC operator required")
-                    , \_ -> Expect.equal [ "#staff is for network administrators. Only Onyx network administrators can join." ] (refuse "Cannot join channel (+A) - server administrator required")
+                    [ \_ -> Expect.equal (Just "520") (refusal "Cannot join channel (+O) - IRC operator required")
+                    , \_ -> Expect.equal (Just "520A") (refusal "Cannot join channel (+A) - server administrator required")
                     ]
                     ()
-        , test "477 for a room asks to sign in; 477 for a DM says the person takes signed-in messages only" <|
+        , test "477 for a room asks to sign in; the card remembers it" <|
             \_ ->
                 let
-                    notes line =
-                        feed blank line |> Tuple.first |> .notifications |> List.map .text
+                    ( after, _ ) =
+                        feed blank ":srv.test 477 me #c :Cannot join channel (+a) - you must be authenticated"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "#c is for signed-in accounts. Sign in to your Onyx account to join." ] (notes ":srv.test 477 me #c :Cannot join channel (+a) - you must be authenticated")
-                    , \_ -> Expect.equal [ "bob only takes messages from signed-in accounts. Sign in to message them." ] (notes ":srv.test 477 me bob :Cannot message this user (+R: identify to a registered account)")
+                    [ \_ -> Expect.equal (Just "#c") (Maybe.map .channel after.channelJoinPrompt)
+                    , \_ -> Expect.equal (Just "477") (Dict.get "#c" after.chanserv.refusal)
                     ]
                     ()
-        , test "480 join throttle says to try again; the raw numeric stays in the service log" <|
+        , test "480 join throttle answers the join prompt; the raw numeric stays in the service log" <|
             \_ ->
                 let
                     ( after, _ ) =
                         feed blank ":srv.test 480 me #c :Cannot join channel (+j) - join rate exceeded, try again shortly"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "#c is busy. Too many people are joining right now. Try again in a moment." ] (List.map .text after.notifications)
+                    [ \_ -> Expect.equal (Just "#c") (Maybe.map .channel after.channelJoinPrompt)
+                    , \_ -> Expect.equal (Just "480") (Dict.get "#c" after.chanserv.refusal)
                     , \_ -> Expect.equal [ "#c Cannot join channel (+j) - join rate exceeded, try again shortly" ] (List.take 1 after.serviceLog)
+                    ]
+                    ()
+        , test "a refusal for someone who is not a room (a +R direct message) never becomes a join card" <|
+            \_ ->
+                let
+                    ( after, _ ) =
+                        feed blank ":srv.test 477 me bob :Cannot message this user (+R: identify to a registered account)"
+                in
+                Expect.all
+                    [ \_ -> Expect.equal Nothing after.channelJoinPrompt
+                    , \_ -> Expect.equal Nothing (Dict.get "bob" after.chanserv.refusal)
                     ]
                     ()
         , test "470 forwarded: a toast names where the server sent us" <|

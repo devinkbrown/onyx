@@ -39,6 +39,8 @@ import ThemeTokens
 import Attribution
 import GroupControl
 import Polish
+-- v3/gap-shell
+import GapShell
 import Push
 import Stewardship
 import GroupDirectory
@@ -75,6 +77,9 @@ import MessageWindow
 import Multiline
 import Nav
 import Notify
+-- v3/gap-organize
+import Attention
+import Organizer
 -- v3/moddesk
 import EventReplay
 import OperDesk
@@ -109,6 +114,8 @@ import Transcript
 -- v3/transcript
 import TranscriptRows
 import VaultImport
+-- v3/gap-watch
+import WatchTogether
 import Webhook
 import Wire
 
@@ -439,6 +446,8 @@ type alias Model =
     , typingLastSent : Dict String Float
     , access : Ircx.AccessState
     , props : Ircx.PropState
+    -- v3/gap-watch: Watch Together UI state + shared-clock anchors
+    , watch : WatchTogether.Model
     , passkey : Passkey.PasskeySession
     , media : Media.MediaState
     , mediaAvailable : Bool
@@ -928,6 +937,9 @@ type alias Model =
     -- v3/frame
     , roomMenuOpen : Bool
 
+    -- v3/gap-shell
+    , gapShell : GapShell.Model
+
     -- v3/account2
     , peopleOpen : Bool
     , peopleFriendDraft : String
@@ -946,6 +958,9 @@ type alias Model =
 
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
+
+    -- v3/gap-organize
+    , organize : Organizer.State
 
     -- v3/rx-public — remembered identities + "Stay signed in" (metadata only).
     , rememberedIds : Remembered.State
@@ -1168,11 +1183,16 @@ type Outbound
     | NotifyPermissionRequest
       -- v3/polish
     | PolishFlagSave { key : String }
+      -- v3/gap-organize: organize memory + attention prefs (one key each;
+      -- reads leave from `Main` via `Organizer.ownerRead`)
+    | OrganizeStore { key : String, value : Maybe String }
     -- v3/gap-commands
     | PaletteRecentsSave { owner : String, ids : List String }
     | SingleKeysSave { enabled : Bool }
     | PwaInstallPrompt
     | PwaUpdateApprove
+      -- v3/gap-shell: one `onyx:*` device value (the MOTD dismissal)
+    | ShellStore { key : String, value : String }
     | OfflineMemoNotice { channel : String, count : Int, firstMsgId : Int }
     | TempBanTimerStart { key : String, delayMs : Int }
     | WhoisTimeoutStart { nick : String, gen : Int, delayMs : Int }
@@ -3127,6 +3147,8 @@ type Msg
     | PrefsDraftsDiscardCancel
     | PrefsDraftsDiscardConfirm
     | PrefsFocusDone
+    -- v3/gap-watch
+    | WatchMsg WatchTogether.Msg
     | PrefsSegmentKey { focusId : String } Msg
     | AppearanceSetTheme { id : String }
     | AppearanceStageBackground { id : String }
@@ -3264,8 +3286,12 @@ type Msg
     -- v3/frame
     | RoomMenuToggle
     | RoomMenuClose
+    -- v3/gap-shell
+    | GapShellMsg GapShell.Msg
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
+    -- v3/gap-organize
+    | OrganizeMsg Organizer.Msg
     -- v3/switcher
     | PaletteOpen
     | PaletteClose
@@ -3562,6 +3588,8 @@ init nick url =
     , typingLastSent = Dict.empty
     , access = Ircx.blankAccessState
     , props = Ircx.blankPropState
+    -- v3/gap-watch
+    , watch = WatchTogether.blank
     , passkey = Passkey.blankPasskeySession
     , media = Media.blankMediaState
     , mediaAvailable = False
@@ -3969,6 +3997,9 @@ init nick url =
     -- v3/frame
     , roomMenuOpen = False
 
+    -- v3/gap-shell
+    , gapShell = GapShell.init
+
     -- v3/account2
     , peopleOpen = False
     , peopleFriendDraft = ""
@@ -3987,6 +4018,9 @@ init nick url =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-organize
+    , organize = Organizer.init
 
     -- v3/rx-public
     , rememberedIds = Remembered.blank
@@ -4156,6 +4190,8 @@ blank =
     , typingLastSent = Dict.empty
     , access = Ircx.blankAccessState
     , props = Ircx.blankPropState
+    -- v3/gap-watch
+    , watch = WatchTogether.blank
     , passkey = Passkey.blankPasskeySession
     , media = Media.blankMediaState
     , mediaAvailable = False
@@ -4558,6 +4594,9 @@ blank =
     -- v3/frame
     , roomMenuOpen = False
 
+    -- v3/gap-shell
+    , gapShell = GapShell.init
+
     -- v3/account2
     , peopleOpen = False
     , peopleFriendDraft = ""
@@ -4576,6 +4615,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-organize
+    , organize = Organizer.init
 
     -- v3/rx-public
     , rememberedIds = Remembered.blank
@@ -5102,7 +5144,13 @@ foldLine model message =
         "ERROR" ->
             -- The oracle surfaces these as connection errors, never
             -- silently. The trailing param carries the reason.
-            ( logService model ("Server error: " ++ trailingParam message.params), [] )
+            -- v3/gap-shell: inbox row, banner/gate reason, and kills or
+            -- bans stop auto-reconnect.
+            ( foldServerError model (trailingParam message.params), [] )
+
+        "KILL" ->
+            -- v3/gap-shell: `:<oper> KILL <you> :<reason>`.
+            ( foldKill model message, [] )
 
         "001" ->
             -- Registration enters IRCX mode first (before any
@@ -5586,15 +5634,16 @@ foldLine model message =
         "904" ->
             -- ERR_SASLFAIL (and its 905 sibling) only while an
             -- exchange is in flight; otherwise ordinary numerics.
+            -- v3/gap-shell: the server's reason (two-step, storage) is kept.
             if model.sasl /= SaslIdle then
-                failSasl model "SASL authentication failed"
+                failSasl model (saslFailReason message)
 
             else
                 ( logNumeric model message, [] )
 
         "905" ->
             if model.sasl /= SaslIdle then
-                failSasl model "SASL authentication failed"
+                failSasl model (saslFailReason message)
 
             else
                 ( logNumeric model message, [] )
@@ -5812,25 +5861,27 @@ foldLine model message =
             foldErrorNumeric model message
 
         "477" ->
-            -- Account-only room (`+a`) or a DM to a `+R` person. v3/gap-chanserv:
-            -- `foldErrorNumeric` explains it (join prompt / inbox row) and
-            -- the raw line still reaches the service log.
-            foldErrorNumeric model message
+            -- Registered/account-only room (`+a`/`+R`): the oracle
+            -- has no 477 path either (generic numeric log).
+            -- v3/gap-shell: a room denial now answers the join prompt.
+            foldJoinDenied model message
 
         "480" ->
-            -- Join throttle (`+j`). v3/gap-chanserv: explained as a join
-            -- prompt ("busy, try again"); the raw line stays in the log.
-            foldErrorNumeric model message
-
-        -- v3/gap-chanserv: refusals the server explains in words
-        "470" ->
-            chanservJoinRefusal model message
+            -- Join throttle (`+j`, contract §11): no oracle path.
+            -- v3/gap-shell: a room denial now answers the join prompt.
+            foldJoinDenied model message
 
         "489" ->
-            chanservJoinRefusal model message
+            -- v3/gap-shell: `+S` TLS-only room.
+            foldJoinDenied model message
 
         "520" ->
-            chanservJoinRefusal model message
+            -- v3/gap-shell: `+O`/`+A` operator-only room.
+            foldJoinDenied model message
+
+        -- v3/gap-chanserv: `+f` forwarded us; say where
+        "470" ->
+            chanservForwarded model message
 
         "482" ->
             foldErrorNumeric model message
@@ -9774,6 +9825,13 @@ isServerNumeric command =
 
 logNumeric : Model -> Wire.IrcMessage -> Model
 logNumeric model message =
+    -- v3/gap-shell: an error-class numeric no fold claims is also an
+    -- inbox error row (it used to land only in the unrendered log).
+    routeErrorNumeric (logNumericQuiet model message) message
+
+
+logNumericQuiet : Model -> Wire.IrcMessage -> Model
+logNumericQuiet model message =
     let
         text =
             boundSystemEventText (String.trim (String.join " " (List.drop 1 message.params)))
@@ -9897,7 +9955,11 @@ failSasl model reason =
         ( logService model reason, [] )
 
     else
-        ( logService { model | sasl = SaslIdle } reason
+        -- v3/gap-shell: the refusal reaches the inbox and the connect
+        -- gate, and auto-reconnect disarms (retrying the same rejected
+        -- credential only burns the backoff, mirroring the oracle's
+        -- `authFatal` close).
+        ( failSignIn { model | sasl = SaslIdle } reason
         , [ SaslTimerCleared, WsDisconnect ]
         )
 
@@ -10251,6 +10313,18 @@ inbox only once the list is exhausted — pre- and post-registration
 alike. Post-registration numerics otherwise only log. -}
 foldNickError : Model -> Wire.IrcMessage -> ( Model, List Outbound )
 foldNickError model message =
+    -- v3/gap-shell: a nick error while registering (or in onyx-server's
+    -- post-001 registration tail) retries, or fails with a clear reason.
+    case foldRegistrationNickError model message of
+        Just handled ->
+            handled
+
+        Nothing ->
+            foldNickErrorLive model message
+
+
+foldNickErrorLive : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldNickErrorLive model message =
     let
         -- Nick-error surfaces land in the inbox like the oracle's
         -- `addNotification` call sites, which are not
@@ -10262,7 +10336,13 @@ foldNickError model message =
                 "432" ->
                     addNotification model
                         { kind = NotifError
-                        , text = "Erroneous nickname: " ++ Maybe.withDefault "" (secondParam message.params)
+                        , text =
+                            -- v3/gap-shell: say a registered name is registered
+                            if isRegisteredNickText (trailingParam message.params) then
+                                "“" ++ Maybe.withDefault "" (secondParam message.params) ++ "” belongs to an account. Sign in as it to use that name."
+
+                            else
+                                "Erroneous nickname: " ++ Maybe.withDefault "" (secondParam message.params)
                         , from = Nothing
                         , channel = Nothing
                         , topic = Nothing
@@ -10311,7 +10391,7 @@ foldNickError model message =
                         }
                 in
                 if model.connection /= Registering then
-                    ( logNumeric rotated message
+                    ( logNumericQuiet rotated message
                     , [ SendLine (Wire.formatIrcLine "NICK" [ alias ]) ]
                     )
 
@@ -10321,10 +10401,10 @@ foldNickError model message =
                     )
 
             Nothing ->
-                ( logNumeric { withNotice | nickAliasTryIdx = 0 } message, [] )
+                ( logNumericQuiet { withNotice | nickAliasTryIdx = 0 } message, [] )
 
     else if model.connection /= Registering then
-        ( logNumeric withNotice message, [] )
+        ( logNumericQuiet withNotice message, [] )
 
     else if message.command == "432" && isRegisteredNickText (trailingParam message.params) then
         ( logService withNotice "That nickname is registered. Sign in as its account before using it."
@@ -10332,7 +10412,1150 @@ foldNickError model message =
         )
 
     else
-        ( logNumeric withNotice message, [] )
+        ( logNumericQuiet withNotice message, [] )
+
+
+-- v3/gap-shell ---------------------------------------------------------
+--
+-- Sign-in failures, the Activity log, connection lifecycle and the room
+-- actions of `elm/design/CLIENT_PARITY_MAP.md` (Shell and navigation,
+-- Account and security item 1). State lives in `GapShell`; the Activity,
+-- leave-confirm, More items, join field and MOTD card in
+-- `View.GapShell`. Post-update logic runs in `settleStepGapShell`.
+
+
+setGapShell : (GapShell.Model -> GapShell.Model) -> Model -> Model
+setGapShell f model =
+    { model | gapShell = f model.gapShell }
+
+
+{-| The 904/905 reason the server gave, else the generic refusal. -}
+saslFailReason : Wire.IrcMessage -> String
+saslFailReason message =
+    let
+        trailing =
+            String.trim (trailingParam (List.drop 1 message.params))
+    in
+    if String.isEmpty trailing then
+        "SASL authentication failed"
+
+    else
+        trailing
+
+
+{-| An explicit sign-in was refused: log it, put the reason in the inbox
+and on the connect gate, and disarm auto-reconnect (mirroring the
+oracle's `onError` inbox row plus its `authFatal` close). -}
+failSignIn : Model -> String -> Model
+failSignIn model reason =
+    let
+        failure =
+            GapShell.classifySasl reason
+    in
+    addNotification
+        (logService
+            ({ model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+                |> setGapShell (\g -> { g | connectFailure = Just failure, redialOnClose = False })
+            )
+            reason
+        )
+        { kind = NotifError
+        , text = "Sign-in failed. " ++ GapShell.failureCopy failure
+        , from = Nothing
+        , channel = Nothing
+        , topic = Nothing
+        }
+
+
+{-| End with a full stop unless the text already ends a sentence. -}
+gapSentence : String -> String
+gapSentence text =
+    if List.any (\p -> String.endsWith p text) [ ".", "!", "?", "…" ] then
+        text
+
+    else
+        text ++ "."
+
+
+{-| `ERROR :<reason>`: the reason reaches the inbox, the reconnect
+banner and the connect gate; kills, bans and denials stop
+auto-reconnect (the shell stays with the reason when a session had
+been live). The `Server error:` log line stays the last write. -}
+foldServerError : Model -> String -> Model
+foldServerError model raw =
+    let
+        gs =
+            model.gapShell
+
+        reason =
+            GapShell.closeReason raw
+
+        stopped =
+            if reason.fatal then
+                { model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+
+            else
+                model
+
+        noticed =
+            if gs.killed then
+                -- The KILL line already said so.
+                stopped
+
+            else
+                addNotification stopped
+                    { kind = NotifError
+                    , text = gapSentence reason.text
+                    , from = Nothing
+                    , channel = Nothing
+                    , topic = Nothing
+                    }
+
+        toasted =
+            if reason.fatal && gs.everLive && not gs.killed then
+                addToast
+                    { variant = ToastError
+                    , title = "Disconnected by the server"
+                    , description = Just (gapSentence reason.text)
+                    , duration = Just 0
+                    , groupKey = Just "gap-shell-close"
+                    , undo = Nothing
+                    }
+                    noticed.nowMs
+                    noticed
+
+            else
+                noticed
+    in
+    logService
+        (setGapShell
+            (\g ->
+                { g
+                    | closeReason = Just (gapSentence reason.text)
+                    , connectFailure = Just (GapShell.FailServer (gapSentence reason.text))
+                    , halt =
+                        if reason.fatal && g.everLive then
+                            Just (gapSentence reason.text)
+
+                        else
+                            g.halt
+                    , redialOnClose = g.redialOnClose && not reason.fatal
+                }
+            )
+            toasted
+        )
+        ("Server error: " ++ raw)
+
+
+{-| `:<oper> KILL <you> :<reason>` — onyx-server delivers it before the
+`ERROR :Closing Link` close. A KILL naming anyone else is ignored. -}
+foldKill : Model -> Wire.IrcMessage -> Model
+foldKill model message =
+    case message.params of
+        victim :: rest ->
+            if String.isEmpty victim || String.toLower victim /= String.toLower model.ourNick then
+                model
+
+            else
+                let
+                    killer =
+                        Maybe.withDefault (Maybe.withDefault "the server" message.prefix) message.nick
+
+                    why =
+                        String.trim (Maybe.withDefault "" (List.head (List.reverse rest)))
+
+                    reason =
+                        GapShell.closeReason ("Killed (" ++ killer ++ " (" ++ why ++ "))")
+
+                    copy =
+                        gapSentence reason.text
+
+                    logged =
+                        logService { model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0 }
+                            ("Removed from Onyx by "
+                                ++ killer
+                                ++ (if String.isEmpty why then
+                                        ""
+
+                                    else
+                                        ": " ++ why
+                                   )
+                            )
+
+                    noticed =
+                        addNotification logged
+                            { kind = NotifError
+                            , text = copy
+                            , from = Nothing
+                            , channel = Nothing
+                            , topic = Nothing
+                            }
+
+                    toasted =
+                        if model.gapShell.everLive then
+                            addToast
+                                { variant = ToastError
+                                , title = "Disconnected by an operator"
+                                , description = Just copy
+                                , duration = Just 0
+                                , groupKey = Just "gap-shell-close"
+                                , undo = Nothing
+                                }
+                                noticed.nowMs
+                                noticed
+
+                        else
+                            noticed
+                in
+                setGapShell
+                    (\g ->
+                        { g
+                            | killed = True
+                            , closeReason = Just copy
+                            , connectFailure = Just (GapShell.FailServer copy)
+                            , halt =
+                                if g.everLive then
+                                    Just copy
+
+                                else
+                                    g.halt
+                            , redialOnClose = False
+                        }
+                    )
+                    toasted
+
+        [] ->
+            model
+
+
+{-| The connect gate's error line for this attempt, if this slice knows
+it: the attempt's own failure, else an offline browser. -}
+gapShellConnectCopy : Model -> Maybe String
+gapShellConnectCopy model =
+    case model.gapShell.connectFailure of
+        Just failure ->
+            Just (GapShell.failureCopy failure)
+
+        Nothing ->
+            if model.gapShell.browserOffline then
+                Just "You’re offline. Connect to the internet, then try again."
+
+            else
+                Nothing
+
+
+{-| Nick errors while registering — or, on onyx-server, in the
+registration tail: the server sends 001…005 first and only then checks
+the name (`completeLiveRegistration` → `registerConnNick`), answering a
+taken name with `433 <nick> <nick>` and closing the socket. A 433/437
+for the name we hold, before the welcome settles, is therefore a
+registration collision, never a NICK change.
+
+  - a registered name (432 `Nickname is registered…`) fails with
+    "sign in" guidance and stops auto-reconnect;
+  - 433/437 rotate the nick aliases, then retry `nick_` up to four
+    times (on the same socket while registering; by redialing after a
+    tail collision), then fail;
+  - any other 432 fails with the server's reason.
+
+`Nothing` hands the line to the post-registration fold. -}
+foldRegistrationNickError : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldRegistrationNickError model message =
+    let
+        rejected =
+            String.trim (Maybe.withDefault "" (secondParam message.params))
+
+        target =
+            String.trim (Maybe.withDefault "" (List.head message.params))
+
+        same a b =
+            String.toLower a == String.toLower b
+
+        tail =
+            model.connection
+                == Live
+                && not (String.isEmpty rejected)
+                && same target rejected
+                && same rejected model.ourNick
+
+        named =
+            if String.isEmpty rejected then
+                model.ourNick
+
+            else
+                rejected
+
+        base =
+            Maybe.withDefault named model.gapShell.nickRetryBase
+    in
+    if model.connection /= Registering && not tail then
+        Nothing
+
+    else if message.command == "432" && isRegisteredNickText (trailingParam message.params) then
+        Just
+            (failRegistrationNick model
+                (GapShell.FailRegisteredNick named)
+                "That nickname is registered. Sign in as its account before using it."
+            )
+
+    else if GapShell.isRetryableNickError message.command then
+        Just (retryRegistrationNick model tail named base)
+
+    else
+        let
+            failure =
+                if model.gapShell.nickRetries > 0 then
+                    GapShell.FailNickTaken base
+
+                else
+                    GapShell.FailNickRefused named
+                        (let
+                            why =
+                                String.trim (trailingParam (List.drop 2 message.params))
+                         in
+                         if String.isEmpty why then
+                            "not allowed"
+
+                         else
+                            why
+                        )
+        in
+        Just (failRegistrationNick model failure (GapShell.failureCopy failure))
+
+
+failRegistrationNick : Model -> GapShell.ConnectFailure -> String -> ( Model, List Outbound )
+failRegistrationNick model failure text =
+    ( addNotification
+        (logService
+            ({ model | autoReconnect = False, reconnectIn = 0, reconnectDueMs = 0, nickAliasTryIdx = 0 }
+                |> setGapShell
+                    (\g ->
+                        { g
+                            | connectFailure = Just failure
+                            , nickRetries = 0
+                            , nickRetryBase = Nothing
+                            , redialOnClose = False
+                        }
+                    )
+            )
+            text
+        )
+        { kind = NotifError
+        , text = text
+        , from = Nothing
+        , channel = Nothing
+        , topic = Nothing
+        }
+    , [ WsDisconnect ]
+    )
+
+
+retryRegistrationNick : Model -> Bool -> String -> String -> ( Model, List Outbound )
+retryRegistrationNick model tail named base =
+    let
+        gs =
+            model.gapShell
+
+        budget =
+            GapShell.maxNickRetries + List.length model.nickAliases
+
+        counted m =
+            setGapShell
+                (\g ->
+                    { g
+                        | nickRetries = g.nickRetries + 1
+                        , nickRetryBase = Just (Maybe.withDefault named g.nickRetryBase)
+                    }
+                )
+                m
+
+        go next m =
+            if tail then
+                -- The server is closing this socket: redial as `next`.
+                -- A first connect keeps the connect gate up meanwhile.
+                ( setGapShell (\g -> { g | redialOnClose = True })
+                    { m
+                        | ourNick = next
+                        , autoReconnect =
+                            if gs.everLive then
+                                m.autoReconnect
+
+                            else
+                                False
+                    }
+                , [ WsDisconnect ]
+                )
+
+            else
+                ( { m | ourNick = next }
+                , [ SendLine (Wire.formatIrcLine "NICK" [ next ]) ]
+                )
+    in
+    if gs.nickRetries >= budget then
+        failRegistrationNick model (GapShell.FailNickTaken base) (GapShell.failureCopy (GapShell.FailNickTaken base))
+
+    else
+        case nextNickAlias model.nickAliases model.nickAliasTryIdx model.ourNick named of
+            Just ( alias, idx ) ->
+                go alias
+                    (counted
+                        { model
+                            | nickAliasTryIdx = idx
+                            , currentNickIsAlias =
+                                if String.isEmpty model.ourNick then
+                                    model.currentNickIsAlias
+
+                                else
+                                    True
+                        }
+                    )
+
+            Nothing ->
+                let
+                    underscores =
+                        String.length (String.filter (\c -> c == '_') model.ourNick)
+                            - String.length (String.filter (\c -> c == '_') base)
+                in
+                if underscores >= GapShell.maxNickRetries then
+                    failRegistrationNick model (GapShell.FailNickTaken base) (GapShell.failureCopy (GapShell.FailNickTaken base))
+
+                else
+                    let
+                        next =
+                            GapShell.retryNick model.ourNick
+                    in
+                    go next
+                        (counted
+                            (logService model
+                                ("“" ++ model.ourNick ++ "” is taken right now; trying “" ++ next ++ "”.")
+                            )
+                        )
+
+
+{-| Error-class numerics (4xx, 5xx, and the IRCX 9xx errors — not the
+SASL/IRCX replies 900/901/903/908) that no fold claims. -}
+isErrorNumeric : String -> Bool
+isErrorNumeric command =
+    case String.toInt command of
+        Just n ->
+            String.length command
+                == 3
+                && ((n >= 400 && n < 600)
+                        || (n >= 900 && n < 1000 && not (List.member n [ 900, 901, 903, 908 ]))
+                   )
+
+        Nothing ->
+            False
+
+
+routeErrorNumeric : Model -> Wire.IrcMessage -> Model
+routeErrorNumeric model message =
+    if isErrorNumeric message.command then
+        addNotification model
+            { kind = NotifError
+            , text = boundSystemEventText (String.trim (String.join " " (List.drop 1 message.params)))
+            , from = Nothing
+            , channel = Nothing
+            , topic = Nothing
+            }
+
+    else
+        model
+
+
+{-| A standard reply no fold claims: FAIL/WARN become inbox errors,
+NOTE goes to Activity — never silently dropped. -}
+foldUnknownStandardReply : Model -> Wire.IrcMessage -> Wire.StandardReply -> Model
+foldUnknownStandardReply model _ reply =
+    let
+        description =
+            String.trim reply.description
+
+        -- FAIL / WARN read as "<CMD> failed: …" / "<CMD> warning: …" so
+        -- Activity files them under Problems; a NOTE stays "<CMD>: …".
+        lead =
+            case reply.kind of
+                Wire.Fail ->
+                    reply.command ++ " failed: "
+
+                Wire.Warn ->
+                    reply.command ++ " warning: "
+
+                Wire.Note ->
+                    reply.command ++ ": "
+
+        line =
+            boundSystemEventText
+                (lead
+                    ++ (if String.isEmpty description then
+                            reply.code
+
+                        else if String.isEmpty reply.code || reply.code == "*" then
+                            description
+
+                        else
+                            description ++ " (" ++ reply.code ++ ")"
+                       )
+                )
+    in
+    case reply.kind of
+        Wire.Note ->
+            logService model line
+
+        _ ->
+            addNotification (logService model line)
+                { kind = NotifError
+                , text = line
+                , from = Nothing
+                , channel = Nothing
+                , topic = Nothing
+                }
+
+
+{-| 477 (`+a` sign-in only), 480 (`+j` join throttle), 489 (`+S`
+TLS-only) and 520 (`+O`/`+A` operators only) naming a room answer the
+join prompt (no 8 s browser wait) with plain copy. 477 also refuses
+DMs to `+R` people; that one stays a plain inbox error. -}
+foldJoinDenied : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+foldJoinDenied model message =
+    let
+        room =
+            Maybe.withDefault "" (secondParam message.params)
+
+        prompt =
+            case message.command of
+                "477" ->
+                    "Sign in to an account to join this room."
+
+                "480" ->
+                    "This room is letting people in slowly right now. Try again in a moment."
+
+                "489" ->
+                    "This room only allows secure connections."
+
+                _ ->
+                    "Only network operators can join this room."
+    in
+    if isChannelName model room then
+        ( setChannelJoinPrompt
+            (addNotification (logNumericQuiet model message)
+                { kind = NotifError
+                , text = room ++ ": " ++ prompt
+                , from = Nothing
+                , channel = Just room
+                , topic = Nothing
+                }
+            )
+            room
+            prompt
+        , []
+        )
+
+    else
+        foldErrorNumeric model message
+
+
+{-| Offline, a server halt, and a known close reason speak first. -}
+gapShellBanner : Model -> Maybe ReconnectBanner
+gapShellBanner model =
+    let
+        gs =
+            model.gapShell
+    in
+    if model.connection == Live then
+        Nothing
+
+    else if gs.browserOffline then
+        Just
+            { title = "You’re offline"
+            , detail = "You’re offline. Messages wait on this device."
+            , online = False
+            }
+
+    else
+        case ( gs.halt, model.connection ) of
+            ( Just reason, Offline ) ->
+                Just
+                    { title = "Disconnected by the server"
+                    , detail = reason
+                    , online = False
+                    }
+
+            _ ->
+                case gs.closeReason of
+                    Just reason ->
+                        if model.connection == Offline && (model.reconnectDueMs > 0 || model.reconnectIn > 0) then
+                            Just
+                                { title = "Reconnecting…"
+                                , detail =
+                                    reason
+                                        ++ (if model.reconnectIn > 0 then
+                                                " Retrying in " ++ String.fromInt model.reconnectIn ++ "s."
+
+                                            else
+                                                " Trying to restore your session."
+                                           )
+                                , online = False
+                                }
+
+                        else
+                            Nothing
+
+                    Nothing ->
+                        Nothing
+
+
+{-| A self-PART line for a room (the offline Leave path). -}
+selfPartLine : Model -> String -> Wire.IrcMessage
+selfPartLine model room =
+    { tags = Dict.empty
+    , prefix = Just (model.ourNick ++ "!local@local")
+    , nick = Just model.ourNick
+    , host = Nothing
+    , command = "PART"
+    , params = [ room ]
+    , raw = ""
+    }
+
+
+updateGapShell : GapShell.Msg -> Model -> ( Model, List Outbound )
+updateGapShell msg model =
+    let
+        gs =
+            model.gapShell
+
+        set g =
+            { model | gapShell = g }
+    in
+    case msg of
+        GapShell.ActivityOpen ->
+            ( { model
+                | youHubOpen = False
+                , roomMenuOpen = False
+                , gapShell = { gs | activityOpen = True, activitySeenAt = model.nowMs }
+              }
+            , []
+            )
+
+        GapShell.ActivityClose ->
+            ( set { gs | activityOpen = False, activitySeenAt = model.nowMs }, [] )
+
+        GapShell.ActivityFilterSet filter ->
+            ( set { gs | activityFilter = filter }, [] )
+
+        GapShell.LeaveAsk room ->
+            if isChannelName model room then
+                ( { model | roomMenuOpen = False, gapShell = { gs | leaveAsk = Just room } }, [] )
+
+            else
+                ( model, [] )
+
+        GapShell.LeaveCancel ->
+            ( set { gs | leaveAsk = Nothing }, [] )
+
+        GapShell.LeaveConfirm ->
+            case gs.leaveAsk of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    let
+                        cleared =
+                            set { gs | leaveAsk = Nothing }
+
+                        toasted m =
+                            addToast
+                                { variant = ToastInfo
+                                , title = "Left " ++ room
+                                , description = Just "History stays on this device."
+                                , duration = Nothing
+                                , groupKey = Nothing
+                                , undo = Nothing
+                                }
+                                m.nowMs
+                                m
+                    in
+                    if model.connection == Live then
+                        -- The server's PART echo drops the room
+                        -- (mirroring the oracle `partChannel`).
+                        ( toasted cleared, [ SendLine (Wire.formatIrcLine "PART" [ room, "Goodbye" ]) ] )
+
+                    else
+                        -- Offline: drop it here, so the reconnect
+                        -- rejoin storm never brings it back.
+                        ( toasted (Tuple.first (foldPart cleared (selfPartLine cleared room))), [] )
+
+        GapShell.MarkRead room ->
+            let
+                ( marked, out ) =
+                    recordLocalReadMarker model room
+            in
+            ( addToast
+                { variant = ToastInfo
+                , title = "Marked read"
+                , description = Just ("Unread badges for " ++ room ++ " were cleared on this device.")
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                { marked | roomMenuOpen = False }
+            , out
+            )
+
+        GapShell.ExportTranscript room ->
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower room) then
+                let
+                    ( exported, out ) =
+                        runSlashExport model "txt"
+                in
+                -- `/export` clears the composer it was typed into; the
+                -- menu path keeps the draft.
+                ( { exported | composer = model.composer, roomMenuOpen = False }, out )
+
+            else
+                ( model, [] )
+
+        GapShell.JoinNameInput value ->
+            ( set { gs | joinName = String.left 80 value, joinError = Nothing }, [] )
+
+        GapShell.JoinNameSubmit ->
+            case GapShell.normalizeJoinName gs.joinName of
+                Err why ->
+                    ( set { gs | joinError = Just why }, [] )
+
+                Ok room ->
+                    let
+                        cleared =
+                            set { gs | joinName = "", joinError = Nothing }
+                    in
+                    case Dict.get (String.toLower room) model.channels of
+                        Just channel ->
+                            updateCore (ChannelSelect channel.name) cleared
+
+                        Nothing ->
+                            if model.connection /= Live then
+                                ( set { gs | joinError = Just "You’re offline. Join when you’re back online." }, [] )
+
+                            else
+                                ( setGapShell (\g -> { g | focusJoins = String.toLower room :: List.filter (\k -> k /= String.toLower room) g.focusJoins }) cleared
+                                , [ SendLine (Wire.formatIrcLine "JOIN" [ room ]) ]
+                                )
+
+        GapShell.MotdDismiss ->
+            ( closeMotd (set { gs | motdDismissedAt = model.nowMs, motdExpanded = False, welcomePack = [] })
+            , [ ShellStore { key = "motd-dismissed-at", value = String.fromInt (round model.nowMs) } ]
+            )
+
+        GapShell.MotdToggle ->
+            ( set { gs | motdExpanded = not gs.motdExpanded }, [] )
+
+        GapShell.ShellEventReceived value ->
+            case GapShell.decodeShellEvent value of
+                Nothing ->
+                    ( model, [] )
+
+                Just event ->
+                    foldShellEvent model event
+
+
+{-| Browser connectivity from `ports.js` `wireGapShell` (mirroring the
+oracle's `online`/`offline` listeners). Page restore is
+v3/gap-pwa-safety's `PageRestored`. -}
+foldShellEvent : Model -> GapShell.ShellEvent -> ( Model, List Outbound )
+foldShellEvent model event =
+    let
+        gs =
+            model.gapShell
+
+        canRedial =
+            model.autoReconnect && gs.halt == Nothing
+    in
+    case event.event of
+        "boot" ->
+            ( { model
+                | gapShell =
+                    { gs
+                        | browserOffline = event.online == Just False
+                        , motdDismissedAt = Maybe.withDefault gs.motdDismissedAt event.motdDismissedAt
+                    }
+                , createHangLabel =
+                    case ( String.isEmpty (String.trim model.createHangLabel), event.hangLabel ) of
+                        ( True, Just label ) ->
+                            String.left 64 (String.trim label)
+
+                        _ ->
+                            model.createHangLabel
+              }
+            , []
+            )
+
+        "offline" ->
+            -- The OS knows at once; the keepalive would take ~40 s. Drop
+            -- the socket so sends queue to the outbox instead of
+            -- vanishing (the reconnect countdown waits for `online`).
+            ( logService { model | gapShell = { gs | browserOffline = True } } "This device went offline."
+            , if model.connection /= Offline then
+                [ WsDisconnect ]
+
+              else
+                []
+            )
+
+        "online" ->
+            let
+                back =
+                    logService { model | gapShell = { gs | browserOffline = False } } "This device is back online."
+            in
+            if gs.browserOffline && model.connection == Offline && canRedial then
+                reconnectNow back
+
+            else
+                ( back, [] )
+
+        _ ->
+            ( model, [] )
+
+
+{-| v3/gap-shell post-update: stamp new log lines into Activity (and the
+welcome pack), follow the connection lifecycle (registration settled,
+redial after a nick collision or page restore, reset per attempt), and
+focus rooms the person asked to join once their JOIN echo lands. -}
+settleStepGapShell : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapShell msg prior ( next, outs ) =
+    let
+        stamped =
+            stampActivity prior next
+
+        ( lived, lifeOut ) =
+            settleGapLifecycle msg prior stamped
+
+        ( focused, focusOut ) =
+            settleJoinFocus msg prior lived outs
+    in
+    ( focused, outs ++ lifeOut ++ focusOut )
+
+
+stampActivity : Model -> Model -> Model
+stampActivity prior next =
+    if next.serviceLog == prior.serviceLog then
+        next
+
+    else
+        let
+            fresh =
+                GapShell.newLogEntries maxServiceLog prior.serviceLog next.serviceLog
+
+            welcome =
+                List.filterMap GapShell.takeWelcomeLine (List.reverse fresh)
+
+            gs =
+                next.gapShell
+        in
+        { next
+            | gapShell =
+                { gs
+                    | activity = GapShell.recordEntries next.nowMs fresh gs.activity
+                    , welcomePack =
+                        List.take 40
+                            (List.foldl
+                                (\line acc ->
+                                    if List.member line acc then
+                                        acc
+
+                                    else
+                                        acc ++ [ line ]
+                                )
+                                gs.welcomePack
+                                welcome
+                            )
+                }
+        }
+
+
+{-| Whether an inbound message carries an end-of-welcome numeric (376
+end of MOTD, 422 no MOTD): onyx-server sends LUSERS + MOTD only after
+the name check, so either one means registration really settled. -}
+welcomeSettled : Msg -> Bool
+welcomeSettled msg =
+    let
+        isEnd line =
+            (String.contains " 376 " line || String.contains " 422 " line)
+                && List.member (Wire.parseIrcMessage line).command [ "376", "422" ]
+    in
+    case msg of
+        WsLineReceived line ->
+            isEnd line
+
+        WsBatchReceived batch ->
+            List.any isEnd batch.lines
+
+        _ ->
+            False
+
+
+settleGapLifecycle : Msg -> Model -> Model -> ( Model, List Outbound )
+settleGapLifecycle msg prior m =
+    let
+        gs =
+            m.gapShell
+
+        wentLive =
+            prior.connection /= Live && m.connection == Live
+
+        -- Registration that survived its tail: the welcome settled, or
+        -- the session has been live a while (a server with no MOTD).
+        settled =
+            m.connection
+                == Live
+                && (welcomeSettled msg || (gs.liveSinceMs > 0 && m.nowMs - gs.liveSinceMs >= 5000))
+
+        base =
+            if wentLive then
+                { gs
+                    | liveSinceMs = m.nowMs
+                    , halt = Nothing
+                    , killed = False
+                    , closeReason = Nothing
+                    , connectFailure = Nothing
+                    , redialing = False
+                }
+
+            else if m.connection /= Live then
+                { gs | liveSinceMs = 0 }
+
+            else
+                gs
+
+        retried =
+            -- A taken name settled on a suffix: say so once.
+            case ( settled, base.nickRetryBase ) of
+                ( True, Just original ) ->
+                    if String.toLower original /= String.toLower m.ourNick then
+                        addToast
+                            { variant = ToastInfo
+                            , title = "“" ++ original ++ "” is taken right now"
+                            , description =
+                                Just
+                                    ("You joined as “"
+                                        ++ m.ourNick
+                                        ++ "”. "
+                                        ++ (if m.accountName == Nothing then
+                                                "Try the name again later, or pick another from You."
+
+                                            else
+                                                "Onyx will take your name back when it frees up."
+                                           )
+                                    )
+                            , duration = Nothing
+                            , groupKey = Just "gap-shell-nick"
+                            , undo = Nothing
+                            }
+                            m.nowMs
+                            m
+
+                    else
+                        m
+
+                _ ->
+                    m
+
+        withBase =
+            { retried
+                | gapShell =
+                    if settled then
+                        { base | everLive = True, nickRetries = 0, nickRetryBase = Nothing }
+
+                    else
+                        base
+            }
+    in
+    case msg of
+        WsOpened _ ->
+            ( setGapShell (\g -> { g | redialing = False }) withBase, [] )
+
+        WsClosed _ ->
+            let
+                g0 =
+                    withBase.gapShell
+
+                closed =
+                    { g0 | focusJoins = [], redialing = False }
+            in
+            if g0.redialOnClose then
+                case withBase.endpoint of
+                    Just url ->
+                        if String.isEmpty (String.trim url) then
+                            ( { withBase | gapShell = { closed | redialOnClose = False } }, [] )
+
+                        else
+                            ( { withBase
+                                | reconnectIn = 0
+                                , reconnectDueMs = 0
+                                , gapShell = { closed | redialOnClose = False, redialing = True }
+                              }
+                            , [ WsConnect { url = url } ]
+                            )
+
+                    Nothing ->
+                        ( { withBase | gapShell = { closed | redialOnClose = False } }, [] )
+
+            else
+                ( { withBase | gapShell = closed }, [] )
+
+        ConnectSubmit ->
+            -- A fresh attempt owns its own failure.
+            ( setGapShell
+                (\g ->
+                    { g
+                        | connectFailure = Nothing
+                        , nickRetries = 0
+                        , nickRetryBase = Nothing
+                        , halt = Nothing
+                        , killed = False
+                        , closeReason = Nothing
+                        , redialOnClose = False
+                        , redialing = False
+                    }
+                )
+                withBase
+            , []
+            )
+
+        ConnectCancel ->
+            ( setGapShell (\g -> { g | redialOnClose = False, redialing = False }) withBase, [] )
+
+        SessionDisconnect ->
+            ( setGapShell (\g -> { g | halt = Nothing, killed = False, closeReason = Nothing, redialOnClose = False, redialing = False }) withBase, [] )
+
+        ReconnectNow ->
+            ( setGapShell (\g -> { g | halt = Nothing }) withBase, [] )
+
+        _ ->
+            ( withBase, [] )
+
+
+{-| The first channel each JOIN line in `outs` names. -}
+joinTargets : List Outbound -> List String
+joinTargets outs =
+    List.filterMap
+        (\out ->
+            case out of
+                SendLine line ->
+                    let
+                        parsed =
+                            Wire.parseIrcMessage line
+                    in
+                    if parsed.command == "JOIN" then
+                        List.head parsed.params
+                            |> Maybe.andThen (String.split "," >> List.head)
+                            |> Maybe.map String.trim
+                            |> Maybe.andThen
+                                (\c ->
+                                    if String.isEmpty c then
+                                        Nothing
+
+                                    else
+                                        Just c
+                                )
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+        )
+        outs
+
+
+{-| Rooms the person asked for open once their JOIN echo lands
+(`/join`, accepting an invite, the rail's join field) — mirroring the
+oracle's self-JOIN `activeView` switch, but never for reconnect
+rejoins, server-forced joins or history replay. A room already joined
+opens at once. -}
+settleJoinFocus : Msg -> Model -> Model -> List Outbound -> ( Model, List Outbound )
+settleJoinFocus msg prior m outs =
+    let
+        ( asked, askOut ) =
+            case msg of
+                ComposerSend ->
+                    ( List.take 1 (joinTargets outs), [] )
+
+                NotificationActivated id ->
+                    case List.filter (\n -> n.id == id) prior.notifications of
+                        note :: _ ->
+                            case note.channel of
+                                Just room ->
+                                    if note.kind == NotifSystem && String.contains " invited you to " note.text && isChannelName m room then
+                                        if Dict.member (String.toLower room) m.channels || m.connection /= Live then
+                                            ( [ room ], [] )
+
+                                        else
+                                            ( [ room ], [ SendLine (Wire.formatIrcLine "JOIN" [ room ]) ] )
+
+                                    else
+                                        ( [], [] )
+
+                                Nothing ->
+                                    ( [], [] )
+
+                        [] ->
+                            ( [], [] )
+
+                _ ->
+                    ( [], [] )
+
+        ( known, pending ) =
+            List.partition (\room -> Dict.member (String.toLower room) prior.channels) asked
+
+        queued =
+            setGapShell
+                (\g ->
+                    { g
+                        | focusJoins =
+                            List.take 8
+                                (List.map String.toLower pending
+                                    ++ List.filter (\k -> not (List.member k (List.map String.toLower pending))) g.focusJoins
+                                )
+                    }
+                )
+                m
+
+        arrived =
+            List.filter
+                (\key -> Dict.member key queued.channels && not (Dict.member key prior.channels))
+                queued.gapShell.focusJoins
+
+        target =
+            case ( known, arrived ) of
+                ( room :: _, _ ) ->
+                    Just room
+
+                ( [], key :: _ ) ->
+                    Just key
+
+                _ ->
+                    Nothing
+
+        dropped =
+            setGapShell (\g -> { g | focusJoins = List.filter (\k -> not (List.member k arrived)) g.focusJoins }) queued
+    in
+    case target of
+        Just room ->
+            let
+                name =
+                    Dict.get (String.toLower room) dropped.channels
+                        |> Maybe.map .name
+                        |> Maybe.withDefault room
+
+                ( selected, selectOut ) =
+                    updateCore (ChannelSelect name) dropped
+            in
+            ( selected, askOut ++ selectOut )
+
+        Nothing ->
+            ( dropped, askOut )
+
 
 
 {-| Record a channel join rejection for the join surface (mirroring
@@ -10445,6 +11668,11 @@ fireReconnect model =
 
     else if model.connection /= Offline || not model.autoReconnect then
         ( { model | reconnectIn = 0, reconnectDueMs = 0 }, [] )
+
+    else if model.gapShell.browserOffline then
+        -- v3/gap-shell: no attempts burn while the browser is offline;
+        -- `online` reconnects at once.
+        ( model, [] )
 
     else if model.nowMs < model.reconnectDueMs then
         ( { model | reconnectIn = max 0 (ceiling ((model.reconnectDueMs - model.nowMs) / 1000)) }, [] )
@@ -14704,6 +15932,194 @@ writeChannelProp channel key value props =
                 props
 
 
+-- v3/gap-watch
+
+
+{-| Watch Together reads the model through `WatchTogether.context`;
+writing needs a live IRCX link (and, server-side, channel operator
+status — the context carries that too). -}
+watchCtx : Model -> WatchTogether.Ctx
+watchCtx model =
+    WatchTogether.context (model.connection == Live && model.isupport.ircx) model
+
+
+{-| `WatchMsg`: run the feature update, then turn its effects into
+outbound `PROP` lines, focus moves, the preference write and toasts. -}
+watchUpdate : WatchTogether.Msg -> Model -> ( Model, List Outbound )
+watchUpdate sub model =
+    let
+        ( next, effects ) =
+            WatchTogether.update (watchCtx model) sub model.watch
+    in
+    watchEffects effects ( { model | watch = next }, [] )
+
+
+watchEffects : List WatchTogether.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+watchEffects effects acc =
+    List.foldl watchEffect acc effects
+
+
+watchEffect : WatchTogether.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+watchEffect effect ( model, outs ) =
+    case effect of
+        WatchTogether.Publish channel value ->
+            ( model, outs ++ [ SendLine (Wire.formatIrcLine "PROP" [ channel, WatchTogether.propKey, value ]) ] )
+
+        WatchTogether.Remove channel ->
+            -- An empty trailing value deletes (`PROP <#room> ocean.watch :`).
+            ( model, outs ++ [ SendLine (Wire.formatIrcLine "PROP" [ channel, WatchTogether.propKey, "" ]) ] )
+
+        WatchTogether.LocalDelete channel ->
+            ( { model | props = watchDeleteLocal channel model.props }, outs )
+
+        WatchTogether.Focus target ->
+            ( model, outs ++ [ PrefsFocus { id = target } ] )
+
+        WatchTogether.SetEnabled on ->
+            let
+                ( next, more ) =
+                    updateCore
+                        (AppearanceSetPref
+                            { key = "watchTogether"
+                            , value =
+                                if on then
+                                    "true"
+
+                                else
+                                    "false"
+                            }
+                        )
+                        model
+            in
+            ( next, outs ++ more )
+
+        WatchTogether.Toast tone title description ->
+            ( addToast
+                { variant =
+                    case tone of
+                        WatchTogether.Info ->
+                            ToastInfo
+
+                        WatchTogether.Problem ->
+                            ToastError
+                , title = title
+                , description = Just description
+                , duration = Nothing
+                , groupKey = Just "watch-together"
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+
+{-| Drop a room's `ocean.watch` row (any key case) after the server
+confirmed our delete with `819` — the setter gets no `PROP` echo. -}
+watchDeleteLocal : String -> Ircx.PropState -> Ircx.PropState
+watchDeleteLocal channel props =
+    let
+        key =
+            String.toLower channel
+    in
+    case Dict.get key props.channelProps of
+        Just entries ->
+            let
+                pruned =
+                    Dict.filter (\k _ -> String.toLower k /= WatchTogether.propKey) entries
+            in
+            { props
+                | channelProps =
+                    if Dict.isEmpty pruned then
+                        Dict.remove key props.channelProps
+
+                    else
+                        Dict.insert key pruned props.channelProps
+            }
+
+        Nothing ->
+            props
+
+
+{-| Every room's raw `ocean.watch` value. -}
+watchRaws : Model -> List ( String, String )
+watchRaws model =
+    Dict.foldl
+        (\channel entries acc ->
+            case WatchTogether.rawIn entries of
+                Just raw ->
+                    ( channel, raw ) :: acc
+
+                Nothing ->
+                    acc
+        )
+        []
+        model.props.channelProps
+
+
+{-| Post-update: fold server answers into the in-flight change (`818`
+/ `819` / `913` / `461`), time it out, retire room-scoped state when
+the room or its value changes, close the More menu after its Watch
+together entry, and anchor the shared clock of every newly seen value.
+-}
+settleStepWatch : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepWatch msg prior ( m, outs ) =
+    let
+        ctx =
+            watchCtx m
+
+        lines =
+            if m.watch.pending == Nothing then
+                []
+
+            else
+                case msg of
+                    WsLineReceived line ->
+                        [ Wire.parseIrcMessage line ]
+
+                    WsBatchReceived batch ->
+                        List.map Wire.parseIrcMessage batch.lines
+
+                    _ ->
+                        []
+
+        ( afterLines, lineFx ) =
+            List.foldl (WatchTogether.settleLine ctx) ( m.watch, [] ) lines
+
+        ticked =
+            case msg of
+                Tick _ ->
+                    WatchTogether.settleTick ctx afterLines
+
+                _ ->
+                    afterLines
+
+        ( roomed, roomFx ) =
+            WatchTogether.settleRoom
+                { channel = prior.activeChannel
+                , raw = prior.activeChannel |> Maybe.andThen (watchCtx prior).rawFor
+                }
+                ctx
+                ticked
+
+        menuClosed =
+            case msg of
+                WatchMsg (WatchTogether.MenuSelect _) ->
+                    { m | roomMenuOpen = False, watch = roomed }
+
+                _ ->
+                    { m | watch = roomed }
+
+        ( applied, settledOuts ) =
+            watchEffects (lineFx ++ roomFx) ( menuClosed, outs )
+    in
+    if prior.props.channelProps == applied.props.channelProps then
+        ( applied, settledOuts )
+
+    else
+        ( { applied | watch = WatchTogether.reconcile applied.nowMs (watchRaws applied) applied.watch }, settledOuts )
+
+
 {-| Cap on pinned msgids per channel (mirrors the `slice(-50)` in
 `pinMessage`). -}
 maxChannelPins : Int
@@ -18049,6 +19465,18 @@ type alias ReconnectBanner =
 
 reconnectBanner : Model -> Maybe ReconnectBanner
 reconnectBanner model =
+    -- v3/gap-shell: offline, a server halt and a known close reason
+    -- speak first.
+    case gapShellBanner model of
+        Just banner ->
+            Just banner
+
+        Nothing ->
+            reconnectBannerBase model
+
+
+reconnectBannerBase : Model -> Maybe ReconnectBanner
+reconnectBannerBase model =
     case model.connection of
         Live ->
             if model.backOnlineAt > 0 && model.nowMs - model.backOnlineAt < backOnlineNoticeMs then
@@ -18432,13 +19860,6 @@ foldErrorNumeric model message =
         "476" ->
             ( error ("Bad channel mask: " ++ second), [] )
 
-        -- v3/gap-chanserv
-        "477" ->
-            chanservJoinRefusal model message
-
-        "480" ->
-            chanservJoinRefusal model message
-
         "482" ->
             let
                 marked =
@@ -18645,7 +20066,18 @@ foldSessionReply model message reply =
             ( revoked, outbound )
 
         else
-            ( logged, [] )
+            -- v3/gap-shell: any other FAIL SESSION (LIST/DROP refused…)
+            -- is an inbox error, as in the oracle; the two resume
+            -- refusals above stay calm (the app just signs in afresh).
+            ( addNotification logged
+                { kind = NotifError
+                , text = boundSystemEventText errText
+                , from = Nothing
+                , channel = Nothing
+                , topic = Nothing
+                }
+            , []
+            )
 
 
 {-| Current-server NOTICE credential envelopes
@@ -22192,7 +23624,9 @@ foldStandardReply model message =
                         ( model, [] )
 
                     else if reply.command /= "WEBAUTHN" then
-                        ( model, [] )
+                        -- v3/gap-shell: never silent (inbox for FAIL/WARN,
+                        -- Activity for NOTE).
+                        ( foldUnknownStandardReply model message reply, [] )
 
                     else
                         foldPasskeyReply model reply
@@ -25518,6 +26952,9 @@ connectGateVisible model =
         && model.connection
         /= Live
         && not model.autoReconnect
+        -- v3/gap-shell: a kill/ban keeps the shell with its reason
+        && model.gapShell.halt
+        == Nothing
 
 
 {-| Mirrors the oracle `formPhase`: a dial in flight (probe or
@@ -25525,7 +26962,7 @@ handshake) is connecting; a closed socket after an attempt is an error.
 -}
 connectPhase : Model -> ConnectPhase
 connectPhase model =
-    if model.connectForm.dialing || model.connection == Registering then
+    if model.connectForm.dialing || model.connection == Registering || model.gapShell.redialing then
         ConnectConnecting
 
     else if model.connection == Offline && model.connectForm.attempted then
@@ -25606,17 +27043,24 @@ connectStatusMessage model =
             "Connecting to Onyx."
 
         ConnectError ->
-            if matches "nickname is registered|registered nickname requires authentication" then
-                "That name belongs to an account. Sign in to use it."
+            -- v3/gap-shell: this attempt's own failure first, then an
+            -- offline browser, then the oracle's text heuristics.
+            case gapShellConnectCopy model of
+                Just copy ->
+                    copy
 
-            else if nickInUse model then
-                "That name is already in use. Reclaim it, or pick another."
+                Nothing ->
+                    if matches "nickname is registered|registered nickname requires authentication" then
+                        "That name belongs to an account. Sign in to use it."
 
-            else if model.saslAccount /= Nothing && matches "password|auth|login|incorrect|credential|464|sasl" then
-                "That password was not accepted. Check it and sign in again."
+                    else if nickInUse model then
+                        "That name is already in use. Reclaim it, or pick another."
 
-            else
-                "Couldn’t reach Onyx just now. Try again in a moment."
+                    else if model.saslAccount /= Nothing && matches "password|auth|login|incorrect|credential|464|sasl" then
+                        "That password was not accepted. Check it and sign in again."
+
+                    else
+                        "Couldn’t reach Onyx just now. Try again in a moment."
 
         ConnectIdle ->
             case model.connectForm.mode of
@@ -33338,19 +34782,21 @@ alertForDelivery model target sender body highlight topic =
     else
         let
             kind =
-                if not channelTarget then
-                    Just Notify.Dm
+                -- v3/gap-organize: the Calm / Regular / Power preset
+                organizePresetKind model target <|
+                    if not channelTarget then
+                        Just Notify.Dm
 
-                else if highlight then
-                    Just Notify.Mention
+                    else if highlight then
+                        Just Notify.Mention
 
-                else
-                    case followNotifyTopic model target topic of
-                        Just _ ->
-                            Just Notify.Follow
+                    else
+                        case followNotifyTopic model target topic of
+                            Just _ ->
+                                Just Notify.Follow
 
-                        Nothing ->
-                            Nothing
+                            Nothing ->
+                                Nothing
         in
         case kind of
             Nothing ->
@@ -33370,10 +34816,13 @@ alertForDelivery model target sender body highlight topic =
                             { kind = alertKind
                             , isSelf = False
                             , muted = muted
-                            , smartMuted = Set.member (String.toLower sender) model.ignoredUsers
+                            , smartMuted =
+                                Set.member (String.toLower sender) model.ignoredUsers
+                                    -- v3/gap-organize
+                                    || Attention.smartMuted (Organizer.current (deviceMemoryOwner model) model.organize).smartMute { text = body, from = sender }
                             , pushEnabled = model.pushEnabled
                             , soundEnabled = model.soundEnabled
-                            , dnd = notifyDndActive model
+                            , dnd = notifyDndActive model || organizeQuietNow model -- v3/gap-organize
                             , permission = model.notifyPermission
                             , pageVisible = model.pageVisible
                             , appFocused = model.appFocused
@@ -37845,7 +39294,8 @@ parallel slices then merge as adjacent one-line additions.
 -}
 settleSteps : List (Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound ))
 settleSteps =
-    [ settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
+    [ settleStepGapShell -- v3/gap-shell (first: nav/menu steps see its room focus)
+    , settleStepConnect -- connect gate (+ v3/dm-key-hold socket close)
     , settleStepNav -- v3/nav
     , settleStepDmSafety -- v3/dmsafety
     , settleStepDmKeyWatch -- v3/gap-pwa-safety
@@ -37859,7 +39309,10 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepOrganize -- v3/gap-organize
     , settleStepGapCommands -- v3/gap-commands
+
+    , settleStepWatch -- v3/gap-watch
     , settleStepRemembered -- v3/rx-public
     ]
 
@@ -42295,6 +43748,10 @@ updateCore msg model =
         PrefsFocusDone ->
             ( model, [] )
 
+        -- v3/gap-watch
+        WatchMsg sub ->
+            watchUpdate sub model
+
         PrefsSegmentKey { focusId } inner ->
             -- Roving radio groups: run the selection, then move focus
             -- to the newly checked radio (mirroring `Segmented`).
@@ -43888,6 +45345,10 @@ updateCore msg model =
         RoomMenuClose ->
             ( { model | roomMenuOpen = False }, [] )
 
+        -- v3/gap-shell
+        GapShellMsg sub ->
+            updateGapShell sub model
+
         -- v3/roomsettings
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
@@ -43895,6 +45356,10 @@ updateCore msg model =
         -- v3/gap-chanserv
         ChanservMsg sub ->
             chanservUpdate sub model
+
+        -- v3/gap-organize
+        OrganizeMsg sub ->
+            organizeUpdate sub model
 
         -- v3/switcher
         PaletteOpen ->
@@ -46910,10 +48375,15 @@ overlayStack model =
         , ( "call-leave-confirm", model.callLeaveConfirm && model.calls.lifecycle /= Media.Idle, CallLeaveConfirmClose )
         , ( "stage-hands", stageHandsSheetOpen model, StageHandsClose )
         , ( "reclaim", model.reclaimOpen, ReclaimClose )
+        -- v3/gap-shell
+        , ( "leave-room", model.gapShell.leaveAsk /= Nothing, GapShellMsg GapShell.LeaveCancel )
+        , ( "activity", model.gapShell.activityOpen, GapShellMsg GapShell.ActivityClose )
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
+        -- v3/gap-organize: folder picker, row menu, saved messages
+        , ( "organize", Organizer.sheetOpen model.organize, OrganizeMsg Organizer.SheetClose )
         , ( "member-card", model.userProfileCard /= Nothing, UserProfileClosed )
         -- v3/roomsettings
         , ( "room-settings", RoomSettings.isOpenFor model.activeChannel model.roomSettings, RoomSettingsMsg RoomSettings.Close )
@@ -46944,6 +48414,9 @@ overlayStack model =
         , ( "time-scrubber", model.polish.scrubber.open && polishScrubberRoom model /= Nothing, PolishMsg Polish.ScrubberClose )
         , ( "composer-tools", model.polish.toolsOpen, PolishMsg Polish.ToolsClose )
         , ( "schedule", model.scheduleOpen, ScheduleClose )
+        -- v3/gap-watch: the start editor sheet, then the inline end confirmation
+        , ( "watch-start", model.watch.editor /= Nothing, WatchMsg WatchTogether.EditorClose )
+        , ( "watch-end-confirm", model.watch.endConfirm /= Nothing, WatchMsg WatchTogether.CancelEnd )
         ]
 
 
@@ -47039,6 +48512,10 @@ prefsBoolValue key prefs =
 
         "readerMode" ->
             Just prefs.readerMode
+
+        -- v3/gap-watch
+        "watchTogether" ->
+            Just prefs.watchTogether
 
         _ ->
             Nothing
@@ -47897,93 +49374,47 @@ chanservSlowHold model target =
     { model | composerError = Just ("Slow mode is on in " ++ target ++ ". You can send again in " ++ String.fromInt secs ++ "s.") }
 
 
-{-| Join refusals and the `+f` forward, in words (D9): `470` says where
-the server sent us, `477`/`480`/`489`/`520` become the join prompt plus
-an inbox row like `471`/`473`/`474`.
+{-| `470`: the room's `+f` forward sent us elsewhere. Say where. (The
+refusals themselves, 477/480/489/520, are `foldJoinDenied`'s join prompt;
+this module only adds the card's "Ask to join" / key actions on top.)
 -}
-chanservJoinRefusal : Model -> Wire.IrcMessage -> ( Model, List Outbound )
-chanservJoinRefusal base message =
+chanservForwarded : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+chanservForwarded base message =
     let
-        -- The raw numeric stays in the service log (power users, tests).
+        -- The raw numeric stays in the service log; a forward is not an
+        -- error, so no inbox row.
         model =
-            logNumeric base message
+            logNumericQuiet base message
 
         channel =
             Maybe.withDefault "" (secondParam message.params)
 
-        serverText =
-            trailingParam message.params
+        target =
+            Maybe.withDefault "" (thirdParam message.params)
+
+        settled =
+            if model.browserPendingJoin == Just (String.toLower channel) then
+                { model | browserPendingJoin = Nothing, browserAttemptedJoin = Nothing, browserJoinPhase = BrowserJoinIdle }
+
+            else
+                model
     in
-    case message.command of
-        "470" ->
-            let
-                target =
-                    Maybe.withDefault "" (thirdParam message.params)
+    if isChannelName model channel && isChannelName model target then
+        ( addToast
+            { variant = ToastInfo
+            , title = "You were sent to " ++ target
+            , description = Just (channel ++ " couldn't take you, so it forwarded you to " ++ target ++ ".")
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            settled
+        , []
+        )
 
-                settled =
-                    if model.browserPendingJoin == Just (String.toLower channel) then
-                        { model | browserPendingJoin = Nothing, browserAttemptedJoin = Nothing, browserJoinPhase = BrowserJoinIdle }
-
-                    else
-                        model
-            in
-            if isChannelName model channel && isChannelName model target then
-                ( addToast
-                    { variant = ToastInfo
-                    , title = "You were sent to " ++ target
-                    , description = Just (channel ++ " couldn't take you, so it forwarded you to " ++ target ++ ".")
-                    , duration = Nothing
-                    , groupKey = Nothing
-                    , undo = Nothing
-                    }
-                    model.nowMs
-                    settled
-                , []
-                )
-
-            else
-                ( model, [] )
-
-        code ->
-            if isChannelName model channel && (code /= "477" || String.startsWith "Cannot join" serverText) then
-                let
-                    ( title, body ) =
-                        Chanserv.joinRefusalCopy code channel serverText
-
-                    reason =
-                        if String.endsWith "." body then
-                            String.dropRight 1 body
-
-                        else
-                            body
-                in
-                ( setChannelJoinPrompt
-                    (addNotification model { kind = NotifError, text = title ++ ". " ++ body, from = Nothing, channel = Just channel, topic = Nothing })
-                    channel
-                    reason
-                , []
-                )
-
-            else if code == "477" && not (String.isEmpty serverText) then
-                -- A direct message to someone who only takes messages from
-                -- signed-in accounts (`+R`).
-                ( addNotification model
-                    { kind = NotifError
-                    , text =
-                        if String.contains "(+R" serverText then
-                            channel ++ " only takes messages from signed-in accounts. Sign in to message them."
-
-                        else
-                            serverText
-                    , from = Nothing
-                    , channel = Nothing
-                    , topic = Nothing
-                    }
-                , []
-                )
-
-            else
-                ( model, [] )
+    else
+        ( model, [] )
 
 
 {-| Room care "Delete room" (D7): ask the core, which drops a registered
@@ -49293,3 +50724,308 @@ rawContentDestination command params =
 rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
+
+
+
+-- v3/gap-organize
+
+
+{-| The organize feature's view of the app (`Organizer.Ctx`). -}
+organizeCtx : Model -> Organizer.Ctx
+organizeCtx model =
+    { owner = deviceMemoryOwner model
+    , nowMs = model.nowMs
+    , active = model.activeChannel
+    }
+
+
+{-| `OrganizeMsg`: run the pure feature update, then perform its
+effects (storage, toasts, navigation) in order. -}
+organizeUpdate : Organizer.Msg -> Model -> ( Model, List Outbound )
+organizeUpdate sub model =
+    let
+        ( state, effects ) =
+            Organizer.update (organizeCtx model) sub model.organize
+    in
+    List.foldl organizeEffect ( { model | organize = state }, [] ) effects
+
+
+organizeEffect : Organizer.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+organizeEffect effect ( model, outs ) =
+    let
+        andThen ( next, more ) =
+            ( next, outs ++ more )
+    in
+    case effect of
+        Organizer.Store key value ->
+            ( model, outs ++ [ OrganizeStore { key = key, value = value } ] )
+
+        Organizer.Toast title description ->
+            ( addToast
+                { variant = ToastInfo
+                , title = title
+                , description = description
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+        Organizer.OpenConversation name ->
+            andThen (updateCore (ChannelSelect name) model)
+
+        Organizer.JumpToMessage target msgid ->
+            andThen (organizeJumpTo target msgid model)
+
+        Organizer.JumpFirstUnread name ->
+            let
+                key =
+                    String.toLower name
+
+                firstMsgid =
+                    Dict.get key model.firstUnreadId
+                        |> Maybe.andThen
+                            (\rowId ->
+                                Dict.get key model.channels
+                                    |> Maybe.andThen (\ch -> List.filter (\m -> m.id == rowId) ch.messages |> List.head)
+                                    |> Maybe.andThen .msgid
+                            )
+
+                ( opened, out ) =
+                    updateCore (ChannelSelect name) model
+            in
+            case firstMsgid of
+                Just msgid ->
+                    ( focusMessage opened msgid, outs ++ out )
+
+                Nothing ->
+                    ( opened, outs ++ out )
+
+        Organizer.LeaveConversation nick ->
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower nick) then
+                ( { model
+                    | activeChannel = Nothing
+                    , navSection = Nav.Messages
+                    , navDrawerOpen = True
+                    , messageMenu = Nothing
+                    , reactionPicker = Nothing
+                  }
+                , outs
+                )
+
+            else
+                ( model, outs )
+
+
+{-| Open a saved message: switch to its conversation, then land on the
+row (loaded rows focus at once; a room asks history for the window;
+an unloaded DM row says so instead of failing silently). -}
+organizeJumpTo : String -> String -> Model -> ( Model, List Outbound )
+organizeJumpTo target msgid model =
+    let
+        ( opened, openOut ) =
+            updateCore (ChannelSelect target) model
+    in
+    case reactionRow opened target msgid of
+        Just _ ->
+            ( focusMessage opened msgid, openOut )
+
+        Nothing ->
+            let
+                ( requested, historyOut ) =
+                    if isChannelName opened target then
+                        requestPinnedMessage opened target msgid
+
+                    else
+                        ( opened, [] )
+            in
+            if List.isEmpty historyOut then
+                ( addToast
+                    { variant = ToastInfo
+                    , title = "Saved message not loaded"
+                    , description = Just "It is older than what this device has loaded. Scroll back in the conversation to find it."
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    requested.nowMs
+                    requested
+                , openOut
+                )
+
+            else
+                ( requested, openOut ++ historyOut )
+
+
+{-| Settle: reopen closed DMs that were opened or got a new line from
+the other person, bring hidden rooms back on a mention or your own
+line, and close the menus an organize action was run from. (Owner
+reads leave from `Main.update`, never from here, so an unrelated
+update never changes the model or its outbound list.) -}
+settleStepOrganize : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOrganize msg prior ( m, outs ) =
+    let
+        live =
+            deviceMemoryOwner m
+
+        ( reopened, reopenFx ) =
+            Organizer.reopenWhere live (organizeShouldReopen prior m) m.organize
+
+        ( revealed, revealFx ) =
+            Organizer.revealWhere live (organizeShouldReveal prior m) reopened
+
+        ( settled, fxOut ) =
+            List.foldl organizeEffect ( organizeCloseMenus msg { m | organize = revealed }, [] ) (reopenFx ++ revealFx)
+    in
+    ( settled, outs ++ fxOut )
+
+
+{-| A closed DM comes back when you open it, when its unread count
+rises, or when a new row from the other person lands after it was
+closed (history replays of older rows never reopen it). -}
+organizeShouldReopen : Model -> Model -> String -> Float -> Bool
+organizeShouldReopen prior m key closedAt =
+    let
+        before =
+            Dict.get key prior.channels
+    in
+    if Maybe.map String.toLower m.activeChannel == Just key then
+        True
+
+    else
+        case Dict.get key m.channels of
+            Nothing ->
+                False
+
+            Just now ->
+                let
+                    unreadBefore =
+                        Maybe.map .unread before |> Maybe.withDefault 0
+
+                    headBefore =
+                        before |> Maybe.andThen (.messages >> List.head) |> Maybe.map .id
+                in
+                now.unread > unreadBefore
+                    || (case List.head now.messages of
+                            Just row ->
+                                Just row.id /= headBefore
+                                    && String.toLower row.from /= String.toLower m.ourNick
+                                    && toFloat row.at > closedAt
+
+                            Nothing ->
+                                False
+                       )
+
+
+{-| A hidden room comes back on a new mention, or when you post in it
+(a fresh row of yours, never an old one replayed from history). -}
+organizeShouldReveal : Model -> Model -> String -> Bool
+organizeShouldReveal prior m key =
+    case ( Dict.get key prior.channels, Dict.get key m.channels ) of
+        ( Just before, Just now ) ->
+            now.highlights > before.highlights
+                || (case List.head now.messages of
+                        Just row ->
+                            Just row.id /= Maybe.map .id (List.head before.messages)
+                                && String.toLower row.from == String.toLower m.ourNick
+                                && toFloat row.at > m.nowMs - 120000
+
+                        Nothing ->
+                            False
+                   )
+
+        _ ->
+            False
+
+
+{-| Running an organize action from the room More menu, a message menu
+or the You hub closes that surface; muting from the row menu closes
+the row menu. -}
+organizeCloseMenus : Msg -> Model -> Model
+organizeCloseMenus msg m =
+    let
+        organize =
+            m.organize
+
+        rowMenuOpen =
+            case organize.sheet of
+                Just (Organizer.RowMenu _) ->
+                    True
+
+                _ ->
+                    False
+    in
+    case msg of
+        OrganizeMsg (Organizer.Loaded _) ->
+            m
+
+        OrganizeMsg (Organizer.BookmarkSave _) ->
+            { m | messageMenu = Nothing, roomMenuOpen = False }
+
+        OrganizeMsg Organizer.BookmarksOpen ->
+            { m | youHubOpen = False, roomMenuOpen = False }
+
+        OrganizeMsg _ ->
+            { m | roomMenuOpen = False }
+
+        MuteDm _ ->
+            { m
+                | roomMenuOpen = False
+                , organize =
+                    if rowMenuOpen then
+                        { organize | sheet = Nothing }
+
+                    else
+                        organize
+            }
+
+        UnmuteDm _ ->
+            { m
+                | roomMenuOpen = False
+                , organize =
+                    if rowMenuOpen then
+                        { organize | sheet = Nothing }
+
+                    else
+                        organize
+            }
+
+        PrefsTogglePref "readerMode" ->
+            { m | roomMenuOpen = False }
+
+        _ ->
+            m
+
+
+{-| Gate an alert kind through the notification preset. Power also
+lets plain lines in rooms set to All alert (as a follow-style alert);
+Calm drops followed-topic alerts. -}
+organizePresetKind : Model -> String -> Maybe Notify.NotifyKind -> Maybe Notify.NotifyKind
+organizePresetKind model target kind =
+    let
+        preset =
+            model.organize.preset
+    in
+    case kind of
+        Just k ->
+            if Attention.allowsAlert preset { dm = k == Notify.Dm, mention = k == Notify.Mention, followed = k == Notify.Follow } then
+                Just k
+
+            else
+                Nothing
+
+        Nothing ->
+            if preset == Attention.Power && isChannelName model target && notifyLevel model target == "all" then
+                Just Notify.Follow
+
+            else
+                Nothing
+
+
+{-| Inside today's quiet-hours window (local clock). -}
+organizeQuietNow : Model -> Bool
+organizeQuietNow model =
+    Attention.quietActive model.zone model.nowMs model.organize.quiet

@@ -1098,6 +1098,9 @@ joinRefusalCopy code channel serverText =
         "489" ->
             ( channel ++ " needs a secure connection", "This room only accepts encrypted (TLS) connections, and this connection doesn't qualify." )
 
+        "520A" ->
+            ( channel ++ " is for network administrators", "Only Onyx network administrators can join." )
+
         "520" ->
             if String.contains "(+A)" serverText then
                 ( channel ++ " is for network administrators", "Only Onyx network administrators can join." )
@@ -2268,9 +2271,19 @@ fold ctx m state =
         _ ->
             if List.member m.command [ "471", "473", "474", "475", "477", "480", "489", "520" ] then
                 case m.params of
-                    _ :: channel :: _ ->
+                    _ :: channel :: rest ->
                         if ctx.isChannel channel then
-                            ( { state | refusal = Dict.insert (key channel) m.command state.refusal }, [] )
+                            let
+                                -- `520` is operators-only (`+O`) or administrators-only
+                                -- (`+A`); the text says which.
+                                code =
+                                    if m.command == "520" && List.any (String.contains "(+A)") rest then
+                                        "520A"
+
+                                    else
+                                        m.command
+                            in
+                            ( { state | refusal = Dict.insert (key channel) code state.refusal }, [] )
 
                         else
                             ( state, [] )
