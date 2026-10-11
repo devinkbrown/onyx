@@ -41,6 +41,9 @@ async function boot(page, h, opts = {}) {
   await page.routeWebSocket(/\/ws/, (ws) => {
     const server = ws.connectToServer();
     client = ws;
+    // A dropped socket shows up as "Retrying" in the shot; say why.
+    ws.onClose((code, reason) => console.log(`NOTE page socket closed ${code} ${reason || ''}`));
+    server.onClose((code, reason) => console.log(`NOTE fake server closed ${code} ${reason || ''}`));
     ws.onMessage((m) => {
       const line = String(m);
       const who = /^WHO (\S+) %tcnfa,(\S+)/.exec(line);
@@ -52,6 +55,18 @@ async function boot(page, h, opts = {}) {
           const away = opts.big ? i % 7 === 0 : bare === 'lark' || bare === 'rue';
           const flags = (away ? 'G' : 'H') + (entry.match(/^[~&@%+]+/)?.[0] ?? '');
           ws.send(`:${NET} 354 ${nick} ${WHOX_TOKEN} ${who[1]} ${bare} ${flags} ${accountFor(bare, i)}`);
+        });
+      }
+      // A server without WHOX support (and the pre-WHOX client) gets the
+      // plain 352 roster, so the two builds process the same row count.
+      const plain = /^WHO (\S+)\s*$/.exec(line);
+      if (plain) {
+        roster.forEach((entry, i) => {
+          const bare = entry.replace(/^[~&@%+]+/, '');
+          if (bare === nick) return;
+          const away = opts.big ? i % 7 === 0 : bare === 'lark' || bare === 'rue';
+          const flags = (away ? 'G' : 'H') + (entry.match(/^[~&@%+]+/)?.[0] ?? '');
+          ws.send(`:${NET} 352 ${nick} ${plain[1]} u h ${NET} ${bare} ${flags} :0 ${bare}`);
         });
       }
       server.send(m);
