@@ -10582,7 +10582,8 @@ suite =
                     ( _, outbound ) =
                         feed blank ":s 001 me :welcome"
                 in
-                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                -- v3/gap-usermodes: a fresh registration also asks for the user modes.
+                Expect.equal [ SendLine "IRCX\r\n", DmPublishKey, OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "selecting an unknown DM fetches its key" <|
             \_ ->
                 let
@@ -10600,7 +10601,7 @@ suite =
                 -- sealable plaintext (refusal gates), so flushing is
                 -- pref-independent. IRCX mode entry is pref-independent
                 -- too.
-                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n" ] outbound
+                Expect.equal [ SendLine "IRCX\r\n", OutboxFlush { labeled = False }, SendLine "EVENT ADD MEDIA *\r\n", SendLine "LUSERS\r\n", SendLine "MODE me\r\n" ] outbound
         , test "DM select skips key fetch when e2eeDms is off" <|
             \_ ->
                 let
@@ -12460,6 +12461,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22newkai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "newkai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "newkai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "newkai" }) m.identityProfileOwner
@@ -12498,6 +12500,7 @@ suite =
                                     , displayNamesKey = Just "onyx:display-names:owner:%5B%22wss%3A%2F%2Firc.example%22%2C%22kai%22%5D"
                                     }
                                 , TopicReadRequest { serverUrl = "wss://irc.example", identity = "kai" }
+                                , UserModesRequest { serverUrl = "wss://irc.example", identity = "kai" }
                                 ]
                                 outs
                         , \_ -> Expect.equal (Just { serverUrl = "wss://irc.example", identity = "kai" }) m.identityProfileOwner
@@ -12663,7 +12666,9 @@ suite =
                         , \_ -> Expect.equal (Just "No profile was found for ghost. They may have left the network.") (Maybe.andThen .error entry)
                         , \_ -> Expect.equal [ "No such nick: ghost" ] (List.take 1 m.serviceLog)
                         , \_ -> Expect.equal 2 m.whoisTimerGen
-                        , \_ -> Expect.equal [] outs
+                        -- v3/gap-usermodes: an open profile that is offline asks
+                        -- WHOWAS (the only line this fold sends).
+                        , \_ -> Expect.equal [ SendLine "WHOWAS ghost 1\r\n" ] outs
                         ]
                         ()
             , test "401 off the active sheet lands nothing" <|
