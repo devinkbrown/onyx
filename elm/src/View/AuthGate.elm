@@ -37,14 +37,26 @@ gate model =
         state =
             model.authGate
     in
+    let
+        current =
+            panel model state
+    in
     main_ [ class "conn ga", attribute "data-testid" "auth-gate" ]
         [ div [ class "conn-card" ]
-            (a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
-                [ brandMark "conn-brand-mark"
-                , span [ class "conn-brand-name" ] [ text "Onyx" ]
+            [ -- One column normally; two side by side on a short
+              -- landscape window (css/gap-auth.css), so the field and
+              -- its button stay on screen.
+              div [ class "ga-grid" ]
+                [ div [ class "ga-head" ]
+                    (a [ class "conn-brand", href "/", attribute "aria-label" "Onyx home" ]
+                        [ brandMark "conn-brand-mark"
+                        , span [ class "conn-brand-name" ] [ text "Onyx" ]
+                        ]
+                        :: current.head
+                    )
+                , div [ class "ga-body" ] current.body
                 ]
-                :: panel model state
-            )
+            ]
         , nav [ class "conn-foot", attribute "aria-label" "About Onyx" ]
             [ a [ href "/about/" ] [ text "About" ]
             , a [ href "/privacy/" ] [ text "Privacy" ]
@@ -53,7 +65,13 @@ gate model =
         ]
 
 
-panel : Model -> AuthGate.State -> List (Html Msg)
+{-| One step of the gate: the words (`head`: title, lede, the question)
+and what the person does about them (`body`: form, buttons, links). -}
+type alias Step =
+    { head : List (Html Msg), body : List (Html Msg) }
+
+
+panel : Model -> AuthGate.State -> Step
 panel model state =
     case state.challenge of
         QuestionAsked asked ->
@@ -74,7 +92,7 @@ panel model state =
                     resetPanel state phase
 
                 NoFlow ->
-                    []
+                    { head = [], body = [] }
 
 
 
@@ -225,15 +243,18 @@ alt items =
 -- CHALLENGE
 
 
-questionPanel : AuthGate.State -> { question : String, error : Maybe String, sent : Bool } -> List (Html Msg)
+questionPanel : AuthGate.State -> { question : String, error : Maybe String, sent : Bool } -> Step
 questionPanel state asked =
-    [ title "One quick question"
-    , lede [ text "Onyx is asking new connections to answer a question before they join. It keeps automated sign-ups out during busy moments." ]
-    , div [ class "ga-question", attribute "data-testid" "auth-challenge-question" ]
-        [ span [ class "ga-question-label" ] [ text "Question" ]
-        , p [ class "ga-question-text" ] [ text asked.question ]
+    { head =
+        [ title "One quick question"
+        , lede [ text "Onyx is asking new connections to answer a question before they join. It keeps automated sign-ups out during busy moments." ]
+        , div [ class "ga-question", attribute "data-testid" "auth-challenge-question" ]
+            [ span [ class "ga-question-label" ] [ text "Question" ]
+            , p [ class "ga-question-text" ] [ text asked.question ]
+            ]
         ]
-    , form [ class "conn-form", attribute "aria-label" "Answer the question", attribute "novalidate" "", onSubmit (msg AuthGate.AnswerSubmit) ]
+    , body =
+    [ form [ class "conn-form", attribute "aria-label" "Answer the question", attribute "novalidate" "", onSubmit (msg AuthGate.AnswerSubmit) ]
         [ field
             { id_ = "auth-answer"
             , label_ = "Your answer"
@@ -268,9 +289,10 @@ questionPanel state asked =
             asked.sent
         ]
     ]
+    }
 
 
-stoppedPanel : ChallengeStop -> List (Html Msg)
+stoppedPanel : ChallengeStop -> Step
 stoppedPanel stop =
     let
         ( heading, body ) =
@@ -285,33 +307,34 @@ stoppedPanel stop =
                     , "The question has to be answered soon after connecting, and the connection timed out first. Try again for a fresh one."
                     )
     in
-    [ title heading
-    , lede [ text body ]
-    , div [ class "conn-actions ga-actions" ]
-        [ button
-            [ type_ "button"
-            , class "conn-submit"
-            , id "auth-retry"
-            , onClick (msg AuthGate.ChallengeRetry)
-            , attribute "data-testid" "auth-retry"
+    { head = [ title heading, lede [ text body ] ]
+    , body =
+        [ div [ class "conn-actions ga-actions" ]
+            [ button
+                [ type_ "button"
+                , class "conn-submit"
+                , id "auth-retry"
+                , onClick (msg AuthGate.ChallengeRetry)
+                , attribute "data-testid" "auth-retry"
+                ]
+                [ text "Try again" ]
+            , button
+                [ type_ "button"
+                , class "conn-cancel"
+                , onClick (msg AuthGate.ChallengeDismiss)
+                , attribute "data-testid" "auth-cancel"
+                ]
+                [ text "Back" ]
             ]
-            [ text "Try again" ]
-        , button
-            [ type_ "button"
-            , class "conn-cancel"
-            , onClick (msg AuthGate.ChallengeDismiss)
-            , attribute "data-testid" "auth-cancel"
-            ]
-            [ text "Back" ]
         ]
-    ]
+    }
 
 
 
 -- TWO-STEP
 
 
-twoFactorPanel : AuthGate.State -> String -> TwoFactorPhase -> List (Html Msg)
+twoFactorPanel : AuthGate.State -> String -> TwoFactorPhase -> Step
 twoFactorPanel state account phase =
     let
         busy =
@@ -328,13 +351,16 @@ twoFactorPanel state account phase =
                 TfaVerifying ->
                     ( "Checking…", "Checking your code." )
     in
-    [ title "Two-step sign-in"
-    , lede
-        [ text "Open your authenticator app and enter the 6-digit code for "
-        , strong [] [ text account ]
-        , text "."
+    { head =
+        [ title "Two-step sign-in"
+        , lede
+            [ text "Open your authenticator app and enter the code for "
+            , strong [] [ text account ]
+            , text "."
+            ]
         ]
-    , form [ class "conn-form", attribute "aria-label" "Authentication code", attribute "novalidate" "", onSubmit (msg AuthGate.CodeSubmit) ]
+    , body =
+    [ form [ class "conn-form", attribute "aria-label" "Authentication code", attribute "novalidate" "", onSubmit (msg AuthGate.CodeSubmit) ]
         [ field
             { id_ = "auth-code"
             , label_ = "Authentication code"
@@ -358,13 +384,14 @@ twoFactorPanel state account phase =
         ]
     , alt [ linkButton "auth-use-recovery" "Use a recovery code instead" AuthGate.UseRecoveryCode busy ]
     ]
+    }
 
 
 
 -- PASSKEY
 
 
-passkeyPanel : Model -> AuthGate.State -> String -> PasskeyPhase -> List (Html Msg)
+passkeyPanel : Model -> AuthGate.State -> String -> PasskeyPhase -> Step
 passkeyPanel model state account phase =
     let
         problem =
@@ -396,13 +423,16 @@ passkeyPanel model state account phase =
         canRetry =
             problem /= Nothing || phase == PkStopped
     in
-    [ title "Sign in with a passkey"
-    , lede
-        [ text "Use the passkey saved for "
-        , strong [] [ text account ]
-        , text ". Your browser or phone will ask you to confirm it's you."
+    { head =
+        [ title "Sign in with a passkey"
+        , lede
+            [ text "Use the passkey saved for "
+            , strong [] [ text account ]
+            , text ". Your browser or phone will ask you to confirm it's you."
+            ]
         ]
-    , case problem of
+    , body =
+    [ case problem of
         Just err ->
             p [ class "conn-error ga-problem", attribute "role" "alert", attribute "data-testid" "auth-passkey-error" ] [ text err ]
 
@@ -443,13 +473,14 @@ passkeyPanel model state account phase =
     , status statusCopy (statusCopy /= "")
     , alt [ linkButton "auth-passkey-password" "Use your password instead" AuthGate.Cancel False ]
     ]
+    }
 
 
 
 -- RESET
 
 
-resetPanel : AuthGate.State -> ResetPhase -> List (Html Msg)
+resetPanel : AuthGate.State -> ResetPhase -> Step
 resetPanel state phase =
     case phase of
         ResetAsk ->
@@ -465,30 +496,37 @@ resetPanel state phase =
             resetEnterPanel state True
 
         ResetDone ->
-            [ title "Password changed"
-            , lede
-                [ text "You can now sign in to "
-                , strong [] [ text state.resetAccount ]
-                , text " with your new password."
-                ]
-            , div [ class "conn-actions ga-actions" ]
-                [ button
-                    [ type_ "button"
-                    , class "conn-submit"
-                    , id "auth-done"
-                    , onClick (msg AuthGate.DoneSignIn)
-                    , attribute "data-testid" "auth-done"
+            { head =
+                [ title "Password changed"
+                , lede
+                    [ text "You can now sign in to "
+                    , strong [] [ text state.resetAccount ]
+                    , text " with your new password."
                     ]
-                    [ text "Sign in" ]
                 ]
-            ]
+            , body =
+                [ div [ class "conn-actions ga-actions" ]
+                    [ button
+                        [ type_ "button"
+                        , class "conn-submit"
+                        , id "auth-done"
+                        , onClick (msg AuthGate.DoneSignIn)
+                        , attribute "data-testid" "auth-done"
+                        ]
+                        [ text "Sign in" ]
+                    ]
+                ]
+            }
 
 
-resetAskPanel : AuthGate.State -> Bool -> List (Html Msg)
+resetAskPanel : AuthGate.State -> Bool -> Step
 resetAskPanel state busy =
-    [ title "Reset your password"
-    , lede [ text "Enter your account name. If the account has a verified email address, we'll send a reset code to it." ]
-    , form [ class "conn-form", attribute "aria-label" "Request a reset code", attribute "novalidate" "", onSubmit (msg AuthGate.ResetRequestSubmit) ]
+    { head =
+        [ title "Reset your password"
+        , lede [ text "Enter your account name. If the account has a verified email address, we'll send a reset code to it." ]
+        ]
+    , body =
+    [ form [ class "conn-form", attribute "aria-label" "Request a reset code", attribute "novalidate" "", onSubmit (msg AuthGate.ResetRequestSubmit) ]
         [ field
             { id_ = "auth-reset-account"
             , label_ = "Account name"
@@ -524,9 +562,10 @@ resetAskPanel state busy =
         ]
     , alt [ linkButton "auth-reset-have-code" "I already have a code" AuthGate.ResetHaveCode busy ]
     ]
+    }
 
 
-resetEnterPanel : AuthGate.State -> Bool -> List (Html Msg)
+resetEnterPanel : AuthGate.State -> Bool -> Step
 resetEnterPanel state busy =
     let
         ready =
@@ -537,13 +576,16 @@ resetEnterPanel state busy =
                 && state.resetPassword
                 == state.resetConfirm
     in
-    [ title "Check your email"
-    , lede
-        [ text "If "
-        , strong [] [ text state.resetAccount ]
-        , text " has a verified email address, a reset code is on its way. It expires in 15 minutes."
+    { head =
+        [ title "Check your email"
+        , lede
+            [ text "If "
+            , strong [] [ text state.resetAccount ]
+            , text " has a verified email address, a reset code is on its way. It expires in 15 minutes."
+            ]
         ]
-    , form [ class "conn-form", attribute "aria-label" "Set a new password", attribute "novalidate" "", onSubmit (msg AuthGate.ResetConfirmSubmit) ]
+    , body =
+    [ form [ class "conn-form", attribute "aria-label" "Set a new password", attribute "novalidate" "", onSubmit (msg AuthGate.ResetConfirmSubmit) ]
         [ field
             { id_ = "auth-reset-code"
             , label_ = "Reset code"
@@ -577,12 +619,21 @@ resetEnterPanel state busy =
             , auto = "new-password"
             , placeholder_ = "re-enter the new password"
             , value_ = state.resetConfirm
-            , error = state.error
+            , error = Nothing
             , hint = Nothing
             , busy = busy
             , extra = []
             , onInput_ = AuthGate.ResetConfirmInput
             }
+        , -- The reason is about the whole form (a wrong code, a
+          -- mismatch, a refused password), so it sits above the button
+          -- rather than under one field.
+          case state.error of
+            Just err ->
+                p [ id "auth-reset-error", class "conn-error", attribute "role" "alert", attribute "data-testid" "auth-reset-error" ] [ text err ]
+
+            Nothing ->
+                text ""
         , submitRow
             { label_ =
                 if busy then
@@ -605,6 +656,7 @@ resetEnterPanel state busy =
         ]
     , alt [ linkButton "auth-reset-again" "Send a new code" AuthGate.ResetAgain busy ]
     ]
+    }
 
 
 

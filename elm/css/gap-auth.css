@@ -82,6 +82,10 @@
   .ga-signin-links .conn-link { min-height: var(--target-min); }
 }
 
+/* The card holds a head (brand, title, lede, question) and a body
+   (form, buttons, links): one column by default. */
+.ga-grid { display: block; }
+
 /* Landscape phones and other short windows: tighten the card so the
    code field and its button stay on screen above the keyboard. */
 @media (max-height: 480px) {
@@ -96,4 +100,21 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .ga-otp { transition: border-color var(--dur-fast) var(--ease); }
+}
+
+/* A short window that is also wide (a phone on its side): head and body
+   sit side by side, so the whole step fits without scrolling. */
+@media (max-height: 480px) and (min-width: 600px) {
+  .ga .conn-card { max-width: 800px; }
+  .ga-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    column-gap: var(--space-8);
+    align-items: start;
+  }
+  .ga-head .conn-body { margin-bottom: 0; }
+  .ga-head .ga-question { margin-top: var(--space-3); margin-bottom: 0; }
+  .ga-body { padding-top: var(--space-1); }
+  .ga-body .conn-actions { margin-top: 0; }
+  .ga-body .ga-alt { margin-top: var(--space-3); padding-top: var(--space-2); }
 }

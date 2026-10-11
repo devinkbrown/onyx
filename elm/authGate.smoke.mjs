@@ -218,18 +218,6 @@ const waitUntil = async (dom, pred, label, ms = 3000) => {
   assert.fail("timed out waiting for " + label);
 };
 
-/* Play CAP LS → ACK → END and welcome for `nick` on `sock`. */
-async function register(dom, sock, nick, caps = "message-tags server-time") {
-  sock.serverOpen();
-  await tick(dom);
-  sock.serverSay(`:onyx.test CAP * LS :${caps}`);
-  await tick(dom);
-  const capReq = sock.lines().find((l) => l.startsWith("CAP REQ"));
-  assert.ok(capReq, "CAP REQ; sent: " + JSON.stringify(sock.lines()));
-  sock.serverSay(":onyx.test CAP * ACK :" + capReq.replace(/^CAP REQ :?/, ""));
-  await tick(dom);
-}
-
 const welcome = (nick) => [`:onyx.test 001 ${nick} :Welcome to Onyx ${nick}`, `:onyx.test 376 ${nick} :End of MOTD`];
 
 async function submitGuest(dom, window, doc, nick) {

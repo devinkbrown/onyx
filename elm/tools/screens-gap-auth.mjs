@@ -179,8 +179,16 @@ async function bootAccount(page, h) {
     await page.keyboard.press('Escape');
     await h.settle(page, 250);
   }
-  await h.tryClick(page, '[data-testid="you-open"]');
-  await h.tryClick(page, '[data-testid="you-open-account"]');
+  const clickVisible = async (sels) => {
+    for (const sel of sels) {
+      for (const el of await page.$$(sel)) {
+        if (await el.isVisible()) { await el.click().catch(() => {}); await h.settle(page, 400); return true; }
+      }
+    }
+    return false;
+  };
+  await clickVisible(['[data-testid="you-open"]', '.onyx-mobile-nav [data-testid="nav-you"]']);
+  await clickVisible(['[data-testid="you-open-account"]']);
   await h.settle(page, 400);
   return inject;
 }
@@ -302,7 +310,7 @@ export default {
     await page.fill('#auth-reset-password', 'a better passphrase');
     await page.fill('#auth-reset-confirm', 'a better passphrase');
     await page.click('[data-testid="auth-reset-confirm-submit"]');
-    await waitFor(page, '#auth-reset-confirm-error');
+    await waitFor(page, '#auth-reset-error');
     await h.settle(page, 300);
   },
   'ga-reset-done': async (page, h) => {

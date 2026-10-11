@@ -1535,6 +1535,19 @@ viewTests =
                 , \_ -> viewOf (at ResetDone) |> Query.has [ Selector.id "auth-done" ]
                 ]
                 ()
+    , test "a reset failure is one alert above the button, not tied to a single field" <|
+        \_ ->
+            withGate (\g -> { g | flow = Reset ResetEnter, resetAccount = "kai", error = Just "That code isn't right. Check the email and try again." }) offlineKai
+                |> viewOf
+                |> Expect.all
+                    [ Query.find [ Selector.id "auth-reset-error" ] >> Query.has [ Selector.text "That code isn't right." ]
+                    , Query.findAll [ Selector.attribute (Html.Attributes.attribute "role" "alert") ] >> Query.count (Expect.equal 1)
+                    ]
+    , test "the two-step code step does not insist on a digit count in its copy" <|
+        \_ ->
+            withGate (\g -> { g | flow = TwoFactor "kai" TfaCode }) offlineKai
+                |> viewOf
+                |> Query.has [ Selector.text "enter the code for" ]
     , test "passwords are never rendered as readable values" <|
         \_ ->
             withGate (\g -> { g | flow = Reset ResetEnter, resetAccount = "kai" }) offlineKai
