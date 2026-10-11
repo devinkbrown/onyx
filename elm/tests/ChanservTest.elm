@@ -1535,7 +1535,7 @@ slowMode =
                     , \_ -> Expect.equal [] (twice strict)
                     ]
                     ()
-        , test "slash commands are not channel messages and are never held" <|
+        , test "slash commands are not channel messages and are never held; /me is" <|
             \_ ->
                 let
                     slow =
@@ -1544,10 +1544,15 @@ slowMode =
                     first =
                         update (ComposerInput "hello") slow |> Tuple.first |> update ComposerSend |> Tuple.first
 
-                    ( _, out ) =
-                        update (ComposerInput "/topic") { first | nowMs = 6000 } |> Tuple.first |> update ComposerSend
+                    run text =
+                        update (ComposerInput text) { first | nowMs = 6000 } |> Tuple.first |> update ComposerSend
                 in
-                Expect.equal False (List.isEmpty out)
+                Expect.all
+                    [ \_ -> Expect.equal [ wire "JOIN #other" ] (lines (Tuple.second (run "/join #other")))
+                    , \_ -> Expect.equal [] (lines (Tuple.second (run "/me waves")))
+                    , \_ -> Expect.equal (Just "Slow mode is on in #c. You can send again in 29s.") (Tuple.first (run "/me waves")).composerError
+                    ]
+                    ()
         ]
 
 
