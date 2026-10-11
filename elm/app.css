@@ -3140,12 +3140,9 @@ html, body {
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
-:root[data-high-contrast='true'] {
-  --onyx-line: #5a6675;
-  --onyx-dim: #c9d0d7;
-  --onyx-faint: #9aa3ad;
-}
-/* v3/gap-appearance: high contrast thickens the one focus ring (--focus-width, css/gap-appearance.css). */
+/* v3/gap-appearance: high contrast (the switch AND prefers-contrast: more)
+   re-derives the --onyx-* palette per theme and thickens the one focus ring
+   in css/gap-appearance.css — the old fixed 3-token block is gone. */
 :root[data-reduce-transparency='true'] .onyx-sheet-backdrop,
 :root[data-reduce-transparency='true'] .onyx-spotlight-backdrop { background: var(--onyx-bg); }
 :root[data-reduce-transparency='true'] * { backdrop-filter: none !important; }

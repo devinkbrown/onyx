@@ -82,6 +82,12 @@
 
 :root[data-high-contrast='true'] { --focus-width: 3px; }
 
+/* Placeholders follow the theme too (the browser's own grey is a fixed
+   #757575: too faint on a light shell, off-palette everywhere, and it
+   ignored high contrast). `faint` clears 3:1 on every surface (4.5:1 under
+   high contrast); controls that style their own placeholder keep it. */
+::placeholder { color: var(--onyx-faint); opacity: 1; }
+
 /* ── 4. Theme Studio tokens that drive the shell ──────────────────────
    Radius: the base radius (--r-0) plus the mean of small / medium
    (Ocean 0 + (4 + 8) / 2 = the house 6px). Duration: the theme's --dur is
@@ -162,6 +168,18 @@ html { font-size: 100%; }
 }
 :root[data-density='roomy'] .onyx-message--compact { padding-block: 4px; line-height: 1.6; }
 :root[data-density='roomy'] .onyx-day-divider { margin-block: var(--space-6); }
+
+/* The avatar gutter follows the density too (the oracle's 28 / 40 px
+   avatar columns), so a Compact feed is genuinely denser, not just
+   shorter-lined. --pt-gutter is the one number the row, its avatar slot
+   and the continuation time share. */
+:root[data-density='compact'] { --pt-gutter: calc(1.5rem + var(--space-2) + var(--space-2)); }
+:root[data-density='compact'] .onyx-row-avatar .onyx-avatar { width: 1.5rem; height: 1.5rem; font-size: 0.625rem; }
+:root[data-density='compact'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation) { min-height: calc(1.5rem + var(--space-1)); }
+
+:root[data-density='roomy'] { --pt-gutter: calc(2.5rem + var(--space-2) + var(--space-3)); }
+:root[data-density='roomy'] .onyx-row-avatar .onyx-avatar { width: 2.5rem; height: 2.5rem; font-size: 0.8125rem; }
+:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation) { min-height: calc(2.5rem + var(--space-2)); }
 
 @media (hover: hover) and (pointer: fine) {
   :root[data-density='compact'] .onyx-rail .onyx-rail-item { min-height: 28px; padding-block: 2px; }
