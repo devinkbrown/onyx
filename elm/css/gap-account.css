@@ -83,9 +83,9 @@
 .gap-list-text {
   flex: 1 1 8ch;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Masks are security settings: wrap, never ellipsize them away. */
+  overflow-wrap: anywhere;
+  padding-block: var(--space-1);
   font-size: var(--text-sm, 13px);
   font-family: var(--font-mono, ui-monospace, monospace);
 }
