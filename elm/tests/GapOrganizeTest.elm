@@ -27,6 +27,7 @@ import Test.Html.Event as Event
 import Test.Html.Query as Query
 import Test.Html.Selector as Selector
 import View
+import View.Attention
 import View.Organize
 
 
@@ -190,6 +191,7 @@ suite =
         , notifications
         , settling
         , alertDecision
+        , sinceYouLeft
         ]
 
 
@@ -1035,4 +1037,72 @@ alertDecision =
                         loadDevice [ ( "onyx:calm", "power" ) ] { away | mutedDMs = Set.fromList [ "mara" ] }
                 in
                 alertsFor ":mara!u@h PRIVMSG kn :hi" power |> Expect.equal []
+        ]
+
+
+
+-- SINCE YOU LEFT
+
+
+sinceYouLeft : Test
+sinceYouLeft =
+    let
+        news =
+            world
+                |> feed "@time=2026-07-25T11:50:00.000Z;msgid=a1 :iris!u@h PRIVMSG #design :kn can you check the release headings?"
+                |> feed "@time=2026-07-25T11:52:00.000Z;msgid=a2 :theo!u@h PRIVMSG #design :release headings look tighter now"
+                |> feed "@time=2026-07-25T11:55:00.000Z;msgid=a3 :mara!u@h PRIVMSG #elm :compiler bump landed"
+
+        home m =
+            view { m | activeChannel = Nothing }
+    in
+    describe "Home: since you left"
+        [ test "Home heads the catch-up with who wrote and when" <|
+            \_ ->
+                home news
+                    |> Query.find [ testid "home-digest" ]
+                    |> Expect.all
+                        [ Query.has [ Selector.text "Since you left" ]
+                        , Query.has [ Selector.containing [ Selector.text "people wrote" ] ]
+                        ]
+        , test "each conversation's row carries who, when and what about" <|
+            \_ ->
+                home news
+                    |> Query.findAll [ testid "home-digest-line" ]
+                    |> Query.count (Expect.atLeast 2)
+        , test "a row jumps to the first unread line, not just the room" <|
+            \_ ->
+                home news
+                    |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Open #design at your first unread message, 2 unread, 1 mention") ]
+                    |> Event.simulate Event.click
+                    |> Event.expect (OrganizeMsg (Organizer.DigestJump "#design"))
+        , test "the jump opens the room and lands on the first unread row" <|
+            \_ ->
+                let
+                    ( landed, _ ) =
+                        stepOut (OrganizeMsg (Organizer.DigestJump "#design")) news
+                in
+                Expect.equal ( landed.activeChannel, landed.historyLanding ) ( Just "#design", Just "a1" )
+        , test "a muted room stays out of the digest; a muted DM too" <|
+            \_ ->
+                let
+                    quieted =
+                        { news | channelNotify = Dict.fromList [ ( "#elm", "none" ) ], mutedDMs = Set.fromList [ "jun" ] }
+
+                    names m =
+                        View.Attention.digest m |> .rows |> List.map .name |> List.sort
+                in
+                Expect.equal ( names news, names quieted )
+                    ( [ "#design", "#elm", "jun", "mara" ], [ "#design", "mara" ] )
+        , test "nothing unread, nothing to say" <|
+            \_ ->
+                home (base |> feed ":kn!u@h JOIN #lounge" |> loadOwner [])
+                    |> Query.hasNot [ testid "home-digest" ]
+        , test "offline, Home says what this device is holding" <|
+            \_ ->
+                home { news | connection = Offline }
+                    |> Query.has [ testid "home-memory" ]
+        , test "online, that note is not shown" <|
+            \_ ->
+                home news |> Query.hasNot [ testid "home-memory" ]
         ]
