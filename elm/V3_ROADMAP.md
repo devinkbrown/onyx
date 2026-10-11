@@ -28,8 +28,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|---|
 | 0.1 | Connect gate: guest / sign in / create account / recovery code, room field, status copy, Cancel | `app/Connect.tsx` | **done** (`c18b9591`) |
 | 0.2 | Leave / disconnect returns to the gate | `ServerRail` disconnect | **done** (`c18b9591`) |
-| 0.3 | Remembered identities + "Stay signed in" (needs a ports listing seam over `onyx:credentials`) | `Connect.tsx`, `lib/credentials.ts` | todo |
-| 0.4 | Invite preview aside when arriving via `?join=` | `Connect.tsx` `conn-context` | todo |
+| 0.3 | Remembered identities + "Stay signed in" (needs a ports listing seam over `onyx:credentials`) | `Connect.tsx`, `lib/credentials.ts` | **done** (v3/rx-public) — `credentialsRequest`/`credentialsListed`/`credentialsReady` ports (metadata only; `use` arms the SASL holder ports-side), `Remembered` + `View.Connect` "Welcome back" panel, Stay signed in on the password sign-in path; Solid v2 store read + carried through writes; `rememberedIdentities.smoke.mjs`, `RememberedTest` |
+| 0.4 | Invite preview aside when arriving via `?join=` | `Connect.tsx` `conn-context` | **done** (v3/rx-public) — `conn-context` aside: room, inviter (`by`), topic, company (`with`), access-rules note |
 | 0.5 | Session-expired "Sign in again" banner | `SessionReclaimBanner` | **done** (v3/account2: four-phase banner in the shell notices strip) |
 
 ## Phase 1 — Shell skeleton that feels like Onyx
@@ -49,8 +49,8 @@ component, by copy/aria/testid). Each row below names the oracle file.
 | 1.4 | Home briefing: welcome, first-room prompt, invite friends, recaps, Mark all caught up | `home/HomeBriefingView`, `HomeView` | L |
 | 1.5 | Sectioned sidebar: Favorites (starred), Rooms, DMs with previews, filter, unread/mention badges, New conversation | `ChannelSidebar` | **done** (v3/sidebar) |
 | 1.6 | New conversation (DM starter) sheet | `NewMessageSheet` | **done** (v3/sidebar) |
-| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; no recents / time grammar) |
-| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port, rows narrowed to handled chords) |
+| 1.7 | Quick switch (Ctrl+K) → action palette | `chat/spotlight/Spotlight`, `RoomSwitcherSheet` | **done** (v3/switcher: rooms + DMs + shell actions, fuzzy rank, combobox; v3/gap-commands adds People, recents, the oracle action rows and the `#room` / `mute N` grammar; no time grammar) |
+| 1.8 | Keyboard shortcuts overlay (`?`) | `ShortcutsOverlay` | **done** (v3/switcher: one `shortcut` port; v3/gap-commands adds the shell chords, J/K, `g h` / `g d`, the single-key switch; the overlay lists exactly the chords this client handles) |
 | 1.9 | First-hour coach + first-run notifications prompt | `FirstHourCoach`, `FirstRunNotifyPrompt` | **done** (v3/home coach; v3/polish: dismissal persisted in `onyx:first-hour-seen`, quiet notify sheet after the first send) |
 | 1.10 | Empty-room intro ("Say hi") | `MessageView` intro | **done** (v3/home) |
 
@@ -126,7 +126,7 @@ component, by copy/aria/testid). Each row below names the oracle file.
 |---|---|---|
 | 7.1 | Focus traps + Escape + focus restore on every overlay (shared helper in ports) | M · **done** via 1.0 (v3/frame) except the image lightbox, which keeps its background-isolating helper |
 | 7.2 | Responsive pass: 375px layouts for every sheet, safe-area insets | M · partly via 1.0 (every `View.Sheet` becomes a bottom sheet <768px; no fixed widths over 375px; bottom nav honours the safe-area inset) — browser verification pending |
-| 7.3 | PWA: install sheet, update-available banner | S · **done** (v3/polish): Add to Home Screen sheet over a captured `beforeinstallprompt` (iOS: Share copy), update strip over an existing Onyx service worker — the Elm build registers none, so detection is an honest no-op without one |
+| 7.3 | PWA: install sheet, update-available banner | S · **done** (v3/polish): Add to Home Screen sheet over a captured `beforeinstallprompt` (iOS: Share copy), update strip over the Onyx service worker (v3/gap-pwa-safety: `ports.js` now registers the deployed `/sw.js` — https/loopback only, after load, HEAD-probed, silent on failure — and announces only updates found after the page's own boot check) |
 | 7.4 | Browser e2e for the Elm build (Playwright against a static server) incl. connect → join → send | M · **partial** (v3/ship): the ship-bar path runs without a browser — `ShipFlowTest` (elm-program-test 4.0.1, 6 keyboard-only flows over `App.init`/`update`/`View.view` with simulated ports) + `bundleBoot.smoke.mjs` (jsdom boots `index.html` + a fresh `--optimize` bundle + real `ports.js`; gate → Enter → stub WebSocket dial → registration → Home → browse/join → Enter-send → inbound DM). **Pending:** Playwright itself (bundled Chromium is glibc, host is musl) |
 | 7.5 | Build + deploy path for the Elm bundle (`elm make --optimize`, hashed asset, CSP) | M · **partial** (v3/ship): `elm/tools/build.sh` → `elm/dist-elm/` (gitignored): `--optimize` build, index.html + app.css + css/*.css + ports.js, 12-hex sha256 names for every local script/stylesheet with the tags rewritten; smoke the output with `ONYX_ELM_DIST=elm/dist-elm node --test elm/bundleBoot.smoke.mjs`. **Pending:** deploy path (deliberately none — production stays `deploy.sh`-only), minification (no uglify/esbuild resolvable from the repo root), CSP (index.html still has an inline boot script needing a hash or extraction) |
 | 7.6 | Visual regression screenshots per surface | M |

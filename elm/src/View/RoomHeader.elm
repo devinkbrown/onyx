@@ -55,6 +55,7 @@ import View.Notify
 import View.Polish -- v3/polish
 import View.RoomSettings
 import View.Roster
+import View.WatchTogether -- v3/gap-watch
 
 
 roomHeader : Model -> Html Msg
@@ -204,6 +205,7 @@ searchToggle model =
         , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
         , attribute "aria-pressed" (boolAttr model.searchOpen)
         , attribute "title" "Search messages"
+        , attribute "aria-keyshortcuts" "Control+F Meta+F" -- v3/gap-commands
         , disabled (model.activeChannel == Nothing)
         , onClick SearchOpen
         ]
@@ -277,6 +279,7 @@ moreMenu model name isRoom channel =
                                , mediaToggle model
                                , jumpToggle model
                                , View.Polish.scrubberToggle model -- v3/polish
+                               , View.WatchTogether.menuItem model -- v3/gap-watch
                                ]
                             ++ View.ModDesk.moderationToggle model
                         )

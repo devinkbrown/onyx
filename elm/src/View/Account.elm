@@ -20,6 +20,7 @@ import Html.Attributes exposing (attribute, class, disabled, for, href, id, maxl
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import Passkey exposing (PasskeyCredential, maxLabelLength)
+import Push
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
@@ -497,23 +498,7 @@ pushRow model =
 
 pushStatusCopy : Model -> String
 pushStatusCopy model =
-    if model.webPushBusy && not model.webPushOn then
-        "Turning on…"
-
-    else if model.webPushBusy then
-        "Turning off…"
-
-    else
-        case model.webPushError of
-            Just reason ->
-                reason
-
-            Nothing ->
-                if model.webPushOn then
-                    "Push is on for this browser."
-
-                else
-                    "Push is off."
+    Push.statusCopy { busy = model.webPushBusy, on = model.webPushOn, error = model.webPushError }
 
 
 securitySection : Model -> Html Msg

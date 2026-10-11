@@ -556,6 +556,18 @@ scope rules and sends a short shortcut name. -}
 port shortcut : (String -> msg) -> Sub msg
 
 
+{-| v3/gap-commands — the palette recents (per device-memory owner) and
+the single-key shortcuts preference, saved to `localStorage` by
+`ports.js`, which sends the boot snapshot back once at wire time. -}
+port paletteRecentsSave : { owner : String, ids : List String } -> Cmd msg
+
+
+port singleKeysSave : { enabled : Bool } -> Cmd msg
+
+
+port gapPrefsLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
 
 port mediaSave : { href : String, name : String } -> Cmd msg
@@ -613,6 +625,27 @@ port httpResult : ({ key : String, ok : Bool, status : Int, body : String } -> m
 port sessionTokenStore : { kind : String, token : String, expiresAt : Maybe Int, server : String, nick : String } -> Cmd msg
 
 port sessionTokensClear : { server : String, nick : String } -> Cmd msg
+
+
+{-| v3/rx-public — remembered identities: one request port (`op` = list |
+select | use | forget | remember; ids and slot names only), a sanitized
+metadata listing back, and the `use` answer (`held` = a stored password
+is now armed in the ports-side SASL holder; the password never crosses).
+-}
+port credentialsRequest : { op : String, id : String, server : String, nick : String, display : String, remember : Bool } -> Cmd msg
+
+
+port credentialsListed : (Decode.Value -> msg) -> Sub msg
+
+
+port credentialsReady : ({ id : String, nick : String, held : Bool } -> msg) -> Sub msg
+
+
+{-| v3/rx-public — public page navigation: `fragment = ""` scrolls to
+the top; otherwise the `#fragment` target scrolls into view and takes
+focus (the skip link, section navs, roadmap cards).
+-}
+port pageNavigated : { fragment : String } -> Cmd msg
 
 port reclaimTimerStart : { stage : String } -> Cmd msg
 
@@ -726,19 +759,36 @@ port dmPublishKey : () -> Cmd msg
 port e2eeDeviceIdentityRequest : () -> Cmd msg
 
 
-{-| v3/dmsafety — safety evidence over the pinned and presented peer
-key sets (`current` / `pending`), echoing the requested key set. -}
+{-| v3/dmsafety — safety evidence: `current` over the pinned set,
+`pending` over only the presented keys not pinned yet (`pendingKeys`),
+echoing the requested key set. -}
 port dmSafetyRequest : { peer : String, keys : List String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
 
 
-port dmSafetyResult : ({ peer : String, keys : List String, current : Maybe String, pending : Maybe String } -> msg) -> Sub msg
+port dmSafetyResult : ({ peer : String, keys : List String, current : Maybe String, pending : Maybe String, pendingKeys : List String } -> msg) -> Sub msg
 
 
-{-| v3/dmsafety — explicit key-change acceptance: re-pin the exact set. -}
-port dmKeyAcceptRequest : { peer : String, keys : List String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
+{-| v3/dmsafety — explicit key-change acceptance. v3/gap-pwa-safety:
+trusts only the reviewed `pendingKeys`, bound to the exact `pending`
+number the user compared; `trusted` says whether every presented key is
+pinned afterwards. -}
+port dmKeyAcceptRequest : { peer : String, keys : List String, pendingKeys : List String, pending : String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
 
 
-port dmKeyAccepted : ({ peer : String, keys : List String, ok : Bool } -> msg) -> Sub msg
+port dmKeyAccepted : ({ peer : String, keys : List String, pendingKeys : List String, ok : Bool, trusted : Bool } -> msg) -> Sub msg
+
+
+{-| v3/gap-pwa-safety — pin verdict for a peer whose directory entry
+changed (`changed` / `unchanged` / `first-use` / `unreadable`). -}
+port dmKeyCheckRequest : { peer : String, keys : List String, owner : Maybe { serverUrl : String, identity : String } } -> Cmd msg
+
+
+port dmKeyChecked : ({ peer : String, keys : List String, status : String } -> msg) -> Sub msg
+
+
+{-| v3/gap-pwa-safety — the page came back from the back/forward cache
+or a freeze. -}
+port pageRestored : ({ online : Bool } -> msg) -> Sub msg
 
 
 port e2eeDeviceIdentity : ({ deviceId : String, publicKey : String } -> msg) -> Sub msg
@@ -1092,10 +1142,12 @@ init rawFlags url key =
                     }
         , savedSearchesList ()
         , guidesProgressRequest ()
+        , credentialsRequest { op = "list", id = "", server = "", nick = "", display = "", remember = False } -- v3/rx-public
         , appearanceRequest ()
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
         , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
+        , Task.perform (always (App.RouteEntered url)) (Task.succeed ()) -- v3/rx-public
         ]
     )
         |> (\( model, cmds ) ->
@@ -1387,6 +1439,13 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-commands
+        App.PaletteRecentsSave req ->
+            paletteRecentsSave req
+
+        App.SingleKeysSave req ->
+            singleKeysSave req
+
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()
 
@@ -1474,6 +1533,12 @@ perform key outbound =
 
         App.SessionTokensCleared req ->
             sessionTokensClear req
+
+        App.CredentialsRequest req ->
+            credentialsRequest req
+
+        App.PageNavigated req ->
+            pageNavigated req
 
         App.ReclaimTimerStarted req ->
             reclaimTimerStart req
@@ -1569,6 +1634,10 @@ perform key outbound =
 
         App.DmKeyAcceptRequested args ->
             dmKeyAcceptRequest args
+
+        -- v3/gap-pwa-safety
+        App.DmKeyCheckRequested args ->
+            dmKeyCheckRequest args
 
         App.RoomSealRequested args ->
             roomSealRequest args
@@ -1753,6 +1822,8 @@ subscriptions model =
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
+        -- v3/gap-commands
+        , gapPrefsLoaded App.GapPrefsLoaded
         , retentionPolicyLoaded App.RetentionPolicyLoaded
         , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived
@@ -1817,6 +1888,9 @@ subscriptions model =
         , mediaBinaryReceived App.MediaBinaryReceived
         , httpResult App.HttpResult
         , reclaimTimerFired App.ReclaimTimerFired
+        -- v3/rx-public
+        , credentialsListed App.RememberedListed
+        , credentialsReady App.RememberedReady
         , saslPayload App.SaslPayload
         , saslFailed App.SaslFailed
         , saslTimeout (\_ -> App.SaslTimeout)
@@ -1843,6 +1917,9 @@ subscriptions model =
         -- v3/dmsafety
         , dmSafetyResult App.DmSafetyResult
         , dmKeyAccepted App.DmKeyAccepted
+        -- v3/gap-pwa-safety
+        , dmKeyChecked App.DmKeyChecked
+        , pageRestored App.PageRestored
         , roomSealed App.RoomSealed
         , roomSealFailed App.RoomSealFailed
         , roomOpened App.RoomOpenResult

@@ -50,9 +50,10 @@ test("ctrl+k and cmd+k toggle the palette, even inside inputs", () => {
   assert.deepEqual(classifyShortcut(key({ metaKey: true, target: editable }), noModal), { name: "palette-toggle", prevent: true });
 });
 
-test("ctrl+k with shift/alt, plain k, composing or claimed never fires", () => {
+test("ctrl+k with shift/alt, composing or claimed never toggles the palette", () => {
+  /* v3/gap-commands: plain K is message navigation now (gapShortcuts.smoke.mjs). */
+  assert.notEqual(classifyShortcut(key({}), noModal)?.name, "palette-toggle");
   for (const e of [
-    key({}),
     key({ ctrlKey: true, shiftKey: true }),
     key({ ctrlKey: true, altKey: true }),
     key({ ctrlKey: true, isComposing: true }),
@@ -112,7 +113,8 @@ test("the foreign-modal probe excludes our own scoped overlays", () => {
 });
 
 test("unrelated keys are ignored", () => {
-  for (const k of ["a", "Enter", "ArrowDown", "Tab"]) {
+  /* v3/gap-commands: Enter now focuses the composer (gapShortcuts.smoke.mjs). */
+  for (const k of ["a", "ArrowDown", "Tab", "x", "1"]) {
     assert.equal(classifyShortcut(key({ key: k }), noModal), null);
   }
 });
