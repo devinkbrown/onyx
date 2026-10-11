@@ -108,6 +108,8 @@ import Transcript
 -- v3/transcript
 import TranscriptRows
 import VaultImport
+-- v3/gap-watch
+import WatchTogether
 import Webhook
 import Wire
 
@@ -438,6 +440,8 @@ type alias Model =
     , typingLastSent : Dict String Float
     , access : Ircx.AccessState
     , props : Ircx.PropState
+    -- v3/gap-watch: Watch Together UI state + shared-clock anchors
+    , watch : WatchTogether.Model
     , passkey : Passkey.PasskeySession
     , media : Media.MediaState
     , mediaAvailable : Bool
@@ -3122,6 +3126,8 @@ type Msg
     | PrefsDraftsDiscardCancel
     | PrefsDraftsDiscardConfirm
     | PrefsFocusDone
+    -- v3/gap-watch
+    | WatchMsg WatchTogether.Msg
     | PrefsSegmentKey { focusId : String } Msg
     | AppearanceSetTheme { id : String }
     | AppearanceStageBackground { id : String }
@@ -3557,6 +3563,8 @@ init nick url =
     , typingLastSent = Dict.empty
     , access = Ircx.blankAccessState
     , props = Ircx.blankPropState
+    -- v3/gap-watch
+    , watch = WatchTogether.blank
     , passkey = Passkey.blankPasskeySession
     , media = Media.blankMediaState
     , mediaAvailable = False
@@ -4150,6 +4158,8 @@ blank =
     , typingLastSent = Dict.empty
     , access = Ircx.blankAccessState
     , props = Ircx.blankPropState
+    -- v3/gap-watch
+    , watch = WatchTogether.blank
     , passkey = Passkey.blankPasskeySession
     , media = Media.blankMediaState
     , mediaAvailable = False
@@ -14685,6 +14695,194 @@ writeChannelProp channel key value props =
 
             _ ->
                 props
+
+
+-- v3/gap-watch
+
+
+{-| Watch Together reads the model through `WatchTogether.context`;
+writing needs a live IRCX link (and, server-side, channel operator
+status — the context carries that too). -}
+watchCtx : Model -> WatchTogether.Ctx
+watchCtx model =
+    WatchTogether.context (model.connection == Live && model.isupport.ircx) model
+
+
+{-| `WatchMsg`: run the feature update, then turn its effects into
+outbound `PROP` lines, focus moves, the preference write and toasts. -}
+watchUpdate : WatchTogether.Msg -> Model -> ( Model, List Outbound )
+watchUpdate sub model =
+    let
+        ( next, effects ) =
+            WatchTogether.update (watchCtx model) sub model.watch
+    in
+    watchEffects effects ( { model | watch = next }, [] )
+
+
+watchEffects : List WatchTogether.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+watchEffects effects acc =
+    List.foldl watchEffect acc effects
+
+
+watchEffect : WatchTogether.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+watchEffect effect ( model, outs ) =
+    case effect of
+        WatchTogether.Publish channel value ->
+            ( model, outs ++ [ SendLine (Wire.formatIrcLine "PROP" [ channel, WatchTogether.propKey, value ]) ] )
+
+        WatchTogether.Remove channel ->
+            -- An empty trailing value deletes (`PROP <#room> ocean.watch :`).
+            ( model, outs ++ [ SendLine (Wire.formatIrcLine "PROP" [ channel, WatchTogether.propKey, "" ]) ] )
+
+        WatchTogether.LocalDelete channel ->
+            ( { model | props = watchDeleteLocal channel model.props }, outs )
+
+        WatchTogether.Focus target ->
+            ( model, outs ++ [ PrefsFocus { id = target } ] )
+
+        WatchTogether.SetEnabled on ->
+            let
+                ( next, more ) =
+                    updateCore
+                        (AppearanceSetPref
+                            { key = "watchTogether"
+                            , value =
+                                if on then
+                                    "true"
+
+                                else
+                                    "false"
+                            }
+                        )
+                        model
+            in
+            ( next, outs ++ more )
+
+        WatchTogether.Toast tone title description ->
+            ( addToast
+                { variant =
+                    case tone of
+                        WatchTogether.Info ->
+                            ToastInfo
+
+                        WatchTogether.Problem ->
+                            ToastError
+                , title = title
+                , description = Just description
+                , duration = Nothing
+                , groupKey = Just "watch-together"
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+
+{-| Drop a room's `ocean.watch` row (any key case) after the server
+confirmed our delete with `819` — the setter gets no `PROP` echo. -}
+watchDeleteLocal : String -> Ircx.PropState -> Ircx.PropState
+watchDeleteLocal channel props =
+    let
+        key =
+            String.toLower channel
+    in
+    case Dict.get key props.channelProps of
+        Just entries ->
+            let
+                pruned =
+                    Dict.filter (\k _ -> String.toLower k /= WatchTogether.propKey) entries
+            in
+            { props
+                | channelProps =
+                    if Dict.isEmpty pruned then
+                        Dict.remove key props.channelProps
+
+                    else
+                        Dict.insert key pruned props.channelProps
+            }
+
+        Nothing ->
+            props
+
+
+{-| Every room's raw `ocean.watch` value. -}
+watchRaws : Model -> List ( String, String )
+watchRaws model =
+    Dict.foldl
+        (\channel entries acc ->
+            case WatchTogether.rawIn entries of
+                Just raw ->
+                    ( channel, raw ) :: acc
+
+                Nothing ->
+                    acc
+        )
+        []
+        model.props.channelProps
+
+
+{-| Post-update: fold server answers into the in-flight change (`818`
+/ `819` / `913` / `461`), time it out, retire room-scoped state when
+the room or its value changes, close the More menu after its Watch
+together entry, and anchor the shared clock of every newly seen value.
+-}
+settleStepWatch : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepWatch msg prior ( m, outs ) =
+    let
+        ctx =
+            watchCtx m
+
+        lines =
+            if m.watch.pending == Nothing then
+                []
+
+            else
+                case msg of
+                    WsLineReceived line ->
+                        [ Wire.parseIrcMessage line ]
+
+                    WsBatchReceived batch ->
+                        List.map Wire.parseIrcMessage batch.lines
+
+                    _ ->
+                        []
+
+        ( afterLines, lineFx ) =
+            List.foldl (WatchTogether.settleLine ctx) ( m.watch, [] ) lines
+
+        ticked =
+            case msg of
+                Tick _ ->
+                    WatchTogether.settleTick ctx afterLines
+
+                _ ->
+                    afterLines
+
+        ( roomed, roomFx ) =
+            WatchTogether.settleRoom
+                { channel = prior.activeChannel
+                , raw = prior.activeChannel |> Maybe.andThen (watchCtx prior).rawFor
+                }
+                ctx
+                ticked
+
+        menuClosed =
+            case msg of
+                WatchMsg (WatchTogether.MenuSelect _) ->
+                    { m | roomMenuOpen = False, watch = roomed }
+
+                _ ->
+                    { m | watch = roomed }
+
+        ( applied, settledOuts ) =
+            watchEffects (lineFx ++ roomFx) ( menuClosed, outs )
+    in
+    if prior.props.channelProps == applied.props.channelProps then
+        ( applied, settledOuts )
+
+    else
+        ( { applied | watch = WatchTogether.reconcile applied.nowMs (watchRaws applied) applied.watch }, settledOuts )
 
 
 {-| Cap on pinned msgids per channel (mirrors the `slice(-50)` in
@@ -37821,6 +38019,8 @@ settleSteps =
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepGapCommands -- v3/gap-commands
+
+    , settleStepWatch -- v3/gap-watch
     , settleStepRemembered -- v3/rx-public
     ]
 
@@ -42251,6 +42451,10 @@ updateCore msg model =
 
         PrefsFocusDone ->
             ( model, [] )
+
+        -- v3/gap-watch
+        WatchMsg sub ->
+            watchUpdate sub model
 
         PrefsSegmentKey { focusId } inner ->
             -- Roving radio groups: run the selection, then move focus
@@ -46897,6 +47101,9 @@ overlayStack model =
         , ( "time-scrubber", model.polish.scrubber.open && polishScrubberRoom model /= Nothing, PolishMsg Polish.ScrubberClose )
         , ( "composer-tools", model.polish.toolsOpen, PolishMsg Polish.ToolsClose )
         , ( "schedule", model.scheduleOpen, ScheduleClose )
+        -- v3/gap-watch: the start editor sheet, then the inline end confirmation
+        , ( "watch-start", model.watch.editor /= Nothing, WatchMsg WatchTogether.EditorClose )
+        , ( "watch-end-confirm", model.watch.endConfirm /= Nothing, WatchMsg WatchTogether.CancelEnd )
         ]
 
 
@@ -46992,6 +47199,10 @@ prefsBoolValue key prefs =
 
         "readerMode" ->
             Just prefs.readerMode
+
+        -- v3/gap-watch
+        "watchTogether" ->
+            Just prefs.watchTogether
 
         _ ->
             Nothing
