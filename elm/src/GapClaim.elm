@@ -805,7 +805,7 @@ outcomeText account outcome =
                             else
                                 ""
                            )
-                        ++ " It shows in device search now, and in each conversation as you open it."
+                        ++ " It\u{2019}s searchable now, and appears in each conversation\u{2019}s earlier messages as they load."
 
             else
                 case outcome.reason of

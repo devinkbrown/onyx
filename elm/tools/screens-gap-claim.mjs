@@ -238,6 +238,12 @@ export default {
     await reveal(page, h, HOME_CARD);
   },
   'gc-home-failed': async (page, h) => {
+    // The injected storage fault surfaces as one uncaught exception in an
+    // IndexedDB request handler (that is what aborts the transaction, like
+    // a real quota error). Expect exactly that; anything else still fails.
+    const unexpected = [];
+    page.removeAllListeners('pageerror');
+    page.on('pageerror', (e) => { if (!/quota/i.test(e.message)) unexpected.push(e.message); });
     await page.addInitScript(() => {
       const orig = IDBObjectStore.prototype.put;
       let n = 0;
@@ -254,6 +260,23 @@ export default {
     await h.settle(page, 300);
     const counts = await vaultCounts(page);
     if (counts.unstamped === 0 || counts.unstamped === 1284) throw new Error(`expected a partial attach, got ${counts.unstamped} unstamped`);
+    if (unexpected.length) throw new Error(`unexpected page error: ${unexpected[0]}`);
+    await reveal(page, h, HOME_CARD);
+  },
+  // Browser zoom 200% at a laptop viewport is a 640x360 CSS-pixel window.
+  'gc-home-zoom200': async (page, h) => {
+    await boot(page, h, { rows: 1284, targets: 17, login: true, others: 12 });
+    await page.waitForSelector(HOME_CARD, { timeout: 6000 });
+    await page.setViewportSize({ width: 640, height: 360 });
+    await h.settle(page, 500);
+    await reveal(page, h, HOME_CARD);
+  },
+  // A large default font size (24px root) on a phone-sized window.
+  'gc-home-bigfont': async (page, h) => {
+    await boot(page, h, { rows: 1284, targets: 17, login: true });
+    await page.waitForSelector(HOME_CARD, { timeout: 6000 });
+    await page.evaluate(() => { document.documentElement.style.fontSize = '24px'; });
+    await h.settle(page, 500);
     await reveal(page, h, HOME_CARD);
   },
   'gc-home-notnow': async (page, h) => {

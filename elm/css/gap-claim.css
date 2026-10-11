@@ -49,7 +49,7 @@
   overflow-wrap: anywhere;
 }
 .gc-lead:focus { outline: none; }
-.gc-lead--bad { color: var(--onyx-bad); }
+.gc-lead--bad { color: var(--onyx-warn); }
 
 .gc-facts {
   margin: 0;
