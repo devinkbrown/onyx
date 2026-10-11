@@ -31,9 +31,20 @@
   --rx-surround: color-mix(in oklab, var(--onyx-bg) 72%, #000);
 }
 
+/* Rooms and Messages were two near-identical speech bubbles: Rooms takes
+   the channel hash, Messages keeps the bubble, so the two collections
+   read apart on every nav form (rail, bottom nav, You hub). */
+.onyx-nav-icon[data-icon="rooms"] { --onyx-nav-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 4 7.5 20M16.5 4l-2 16M4.5 9h15M4 15h15'/%3E%3C/svg%3E"); }
+
 .onyx-shi[data-icon="check"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); }
 .onyx-shi[data-icon="leave"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4.5H6.5a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1H14M10.5 12H20M16.5 8.5 20 12l-3.5 3.5'/%3E%3C/svg%3E"); }
 .onyx-shi[data-icon="bell-off"] { --shi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 5.2A6 6 0 0 1 18 11v4M6 11v5.5L4.5 18H17M10 20.5a2 2 0 0 0 4 0M4 4l16 16'/%3E%3C/svg%3E"); }
+
+/* The room header's facepile: each face overlapped the previous one far
+   enough to cut its second initial ("M/"). A shallower overlap with a
+   ring in the surface colour keeps every pair of letters whole. */
+.onyx-facepile-face + .onyx-facepile-face { margin-left: -0.3rem; }
+.onyx-facepile-face .onyx-avatar { font-size: 0.66rem; box-shadow: 0 0 0 2px var(--onyx-bg); }
 
 /* 1. Sidebar rows -------------------------------------------------------- */
 
@@ -320,8 +331,8 @@
 /* Totals stay legible on the rail: an 11px figure on a 18px pill that
    clears the glyph, the mention pill in the accent. */
 .onyx-primary-nav .onyx-nav-badge {
-  top: -7px;
-  left: calc(100% - 9px);
+  top: -9px;
+  left: calc(100% - 3px);
   min-width: 18px;
   height: 18px;
   padding: 0 5px;

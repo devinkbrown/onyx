@@ -447,6 +447,12 @@
 }
 .onyx-roster .onyx-mlist-groups { gap: var(--space-2); }
 
+/* Grid tracks default to `auto`, which grows to the widest row: a very
+   long nick pushed the whole column past the rail and lost its ellipsis.
+   One shrinkable track keeps every row inside the column. */
+.onyx-roster .onyx-mlist-groups,
+.onyx-roster .onyx-mlist-rows { grid-template-columns: minmax(0, 1fr); }
+
 @media (hover: none), (max-width: 599.98px) {
   .onyx-roster { --rs-head: 44px; }
   .onyx-roster:has(.onyx-roster-filter--open),

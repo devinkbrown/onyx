@@ -11,6 +11,7 @@
  *   busy-list        the same, on the collection page / sidebar
  *   busy-home        the same, on Home (the catch-up)
  *   crowd            a 64-member room with the member list open
+ *   crowd-scroll     the same, scrolled into the Online section (pinned head, filter, heading)
  *   empty-rooms      the empty Rooms collection
  *   empty-messages   the empty Messages collection
  *   new-convo        New conversation from inside a room
@@ -157,6 +158,18 @@ export default {
     await h.joinRoom(page);
     await dismissAsks(page, h);
     await clickVisible(page, ['[data-testid="members-toggle"]'], h);
+  },
+  'crowd-scroll': async (page, h) => {
+    await tap(page, (l) => (/ 353 /.test(l) ? [`${l} ${CROWD.join(' ')}`] : [l]));
+    await h.joinRoom(page);
+    await dismissAsks(page, h);
+    await clickVisible(page, ['[data-testid="members-toggle"]'], h);
+    await page.evaluate(() => {
+      const r = document.querySelector('.onyx-roster');
+      const box = [r, ...r.querySelectorAll('*')].find((el) => el.scrollHeight > el.clientHeight + 40 && /(auto|scroll)/.test(getComputedStyle(el).overflowY));
+      if (box) box.scrollTop = 700;
+    });
+    await h.settle(page, 250);
   },
   'empty-rooms': async (page, h) => {
     await h.joinRoom(page, 'kn', '');
