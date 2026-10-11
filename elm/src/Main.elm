@@ -122,6 +122,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Media
 import Nodes
+import Organizer -- v3/gap-organize
 import Polish
 import GapShell -- v3/gap-shell
 import Schedule
@@ -535,6 +536,19 @@ port notifyPermissionChanged : (String -> msg) -> Sub msg
 port polishFlagSave : { key : String } -> Cmd msg
 
 
+-- v3/gap-organize: one localStorage key per write (`value = Nothing`
+-- removes it) and one batched read answered on `organizeLoaded`.
+
+
+port organizeStore : { key : String, value : Maybe String } -> Cmd msg
+
+
+port organizeLoad : { tag : String, keys : List String } -> Cmd msg
+
+
+port organizeLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port pwaInstallPrompt : () -> Cmd msg
 
 
@@ -928,6 +942,7 @@ type alias Flags =
 type alias Model =
     { app : App.Model
     , navKey : Nav.Key
+    , organizeOwner : Maybe App.DeviceMemoryOwner -- v3/gap-organize: last owner read
     }
 
 
@@ -1099,6 +1114,7 @@ init rawFlags url key =
                     }
             }
       , navKey = key
+      , organizeOwner = Nothing
       }
     , Cmd.batch
         [ case ( bootNick, wsPin ) of
@@ -1127,6 +1143,7 @@ init rawFlags url key =
         , retentionPolicyRequest ()
         , Task.perform App.ZoneReceived Time.here
         , Task.perform (always App.IdentityOverridesReload) (Task.succeed ())
+        , organizeLoad Organizer.deviceRead -- v3/gap-organize
         , Task.perform (always (App.RouteEntered url)) (Task.succeed ()) -- v3/rx-public
         ]
     )
@@ -1413,6 +1430,10 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-organize
+        App.OrganizeStore req ->
+            organizeStore req
+
         -- v3/gap-commands
         App.PaletteRecentsSave req ->
             paletteRecentsSave req
@@ -1664,14 +1685,26 @@ update msg model =
     let
         ( app, outbound ) =
             App.update msg model.app
+
+        -- v3/gap-organize: read the owner's organize memory when the
+        -- device-memory owner changes (outside App.update's outbound list)
+        owner =
+            App.deviceMemoryOwner app
+
+        organizeReads =
+            if owner == model.organizeOwner then
+                []
+
+            else
+                List.filterMap identity [ Maybe.andThen Organizer.ownerRead owner ]
     in
-    ( { model | app = app }
+    ( { model | app = app, organizeOwner = owner }
       -- v3/ship: elm/core 1.0.5 gathers a batch's commands per port by
       -- consing (`_Platform_insert`), so commands for ONE port reach
       -- ports.js in reverse batch order. Reversing here keeps the wire in
       -- `App.update` order (CAP LS before NICK/USER, so SASL can run
       -- pre-registration); bundleBoot.smoke.mjs pins this on the real bundle.
-    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound))
+    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound) ++ List.map organizeLoad organizeReads)
     )
 
 
@@ -1693,6 +1726,7 @@ subscriptions model =
         , notifyPermissionChanged App.NotifyPermissionChanged
         -- v3/polish
         , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
+        , organizeLoaded (App.OrganizeMsg << Organizer.Loaded) -- v3/gap-organize
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , shellEvent (App.GapShellMsg << GapShell.ShellEventReceived) -- v3/gap-shell
         , searchHotkey (\_ -> App.SearchHotkey)

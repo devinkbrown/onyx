@@ -76,6 +76,9 @@ import MessageWindow
 import Multiline
 import Nav
 import Notify
+-- v3/gap-organize
+import Attention
+import Organizer
 -- v3/moddesk
 import EventReplay
 import OperDesk
@@ -953,6 +956,9 @@ type alias Model =
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
 
+    -- v3/gap-organize
+    , organize : Organizer.State
+
     -- v3/rx-public — remembered identities + "Stay signed in" (metadata only).
     , rememberedIds : Remembered.State
     }
@@ -1174,6 +1180,9 @@ type Outbound
     | NotifyPermissionRequest
       -- v3/polish
     | PolishFlagSave { key : String }
+      -- v3/gap-organize: organize memory + attention prefs (one key each;
+      -- reads leave from `Main` via `Organizer.ownerRead`)
+    | OrganizeStore { key : String, value : Maybe String }
     -- v3/gap-commands
     | PaletteRecentsSave { owner : String, ids : List String }
     | SingleKeysSave { enabled : Bool }
@@ -3276,6 +3285,8 @@ type Msg
     | GapShellMsg GapShell.Msg
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
+    -- v3/gap-organize
+    | OrganizeMsg Organizer.Msg
     -- v3/switcher
     | PaletteOpen
     | PaletteClose
@@ -4002,6 +4013,9 @@ init nick url =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-organize
+    , organize = Organizer.init
+
     -- v3/rx-public
     , rememberedIds = Remembered.blank
     }
@@ -4594,6 +4608,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-organize
+    , organize = Organizer.init
 
     -- v3/rx-public
     , rememberedIds = Remembered.blank
@@ -34740,19 +34757,21 @@ alertForDelivery model target sender body highlight topic =
     else
         let
             kind =
-                if not channelTarget then
-                    Just Notify.Dm
+                -- v3/gap-organize: the Calm / Regular / Power preset
+                organizePresetKind model target <|
+                    if not channelTarget then
+                        Just Notify.Dm
 
-                else if highlight then
-                    Just Notify.Mention
+                    else if highlight then
+                        Just Notify.Mention
 
-                else
-                    case followNotifyTopic model target topic of
-                        Just _ ->
-                            Just Notify.Follow
+                    else
+                        case followNotifyTopic model target topic of
+                            Just _ ->
+                                Just Notify.Follow
 
-                        Nothing ->
-                            Nothing
+                            Nothing ->
+                                Nothing
         in
         case kind of
             Nothing ->
@@ -34772,10 +34791,13 @@ alertForDelivery model target sender body highlight topic =
                             { kind = alertKind
                             , isSelf = False
                             , muted = muted
-                            , smartMuted = Set.member (String.toLower sender) model.ignoredUsers
+                            , smartMuted =
+                                Set.member (String.toLower sender) model.ignoredUsers
+                                    -- v3/gap-organize
+                                    || Attention.smartMuted (Organizer.current (deviceMemoryOwner model) model.organize).smartMute { text = body, from = sender }
                             , pushEnabled = model.pushEnabled
                             , soundEnabled = model.soundEnabled
-                            , dnd = notifyDndActive model
+                            , dnd = notifyDndActive model || organizeQuietNow model -- v3/gap-organize
                             , permission = model.notifyPermission
                             , pageVisible = model.pageVisible
                             , appFocused = model.appFocused
@@ -39261,6 +39283,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepOrganize -- v3/gap-organize
     , settleStepGapCommands -- v3/gap-commands
 
     , settleStepWatch -- v3/gap-watch
@@ -45300,6 +45323,10 @@ updateCore msg model =
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
 
+        -- v3/gap-organize
+        OrganizeMsg sub ->
+            organizeUpdate sub model
+
         -- v3/switcher
         PaletteOpen ->
             switcherUpdate msg model
@@ -48321,6 +48348,8 @@ overlayStack model =
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
+        -- v3/gap-organize: folder picker, row menu, saved messages
+        , ( "organize", Organizer.sheetOpen model.organize, OrganizeMsg Organizer.SheetClose )
         , ( "member-card", model.userProfileCard /= Nothing, UserProfileClosed )
         -- v3/roomsettings
         , ( "room-settings", RoomSettings.isOpenFor model.activeChannel model.roomSettings, RoomSettingsMsg RoomSettings.Close )
@@ -50326,3 +50355,308 @@ rawContentDestination command params =
 rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
+
+
+
+-- v3/gap-organize
+
+
+{-| The organize feature's view of the app (`Organizer.Ctx`). -}
+organizeCtx : Model -> Organizer.Ctx
+organizeCtx model =
+    { owner = deviceMemoryOwner model
+    , nowMs = model.nowMs
+    , active = model.activeChannel
+    }
+
+
+{-| `OrganizeMsg`: run the pure feature update, then perform its
+effects (storage, toasts, navigation) in order. -}
+organizeUpdate : Organizer.Msg -> Model -> ( Model, List Outbound )
+organizeUpdate sub model =
+    let
+        ( state, effects ) =
+            Organizer.update (organizeCtx model) sub model.organize
+    in
+    List.foldl organizeEffect ( { model | organize = state }, [] ) effects
+
+
+organizeEffect : Organizer.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+organizeEffect effect ( model, outs ) =
+    let
+        andThen ( next, more ) =
+            ( next, outs ++ more )
+    in
+    case effect of
+        Organizer.Store key value ->
+            ( model, outs ++ [ OrganizeStore { key = key, value = value } ] )
+
+        Organizer.Toast title description ->
+            ( addToast
+                { variant = ToastInfo
+                , title = title
+                , description = description
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+        Organizer.OpenConversation name ->
+            andThen (updateCore (ChannelSelect name) model)
+
+        Organizer.JumpToMessage target msgid ->
+            andThen (organizeJumpTo target msgid model)
+
+        Organizer.JumpFirstUnread name ->
+            let
+                key =
+                    String.toLower name
+
+                firstMsgid =
+                    Dict.get key model.firstUnreadId
+                        |> Maybe.andThen
+                            (\rowId ->
+                                Dict.get key model.channels
+                                    |> Maybe.andThen (\ch -> List.filter (\m -> m.id == rowId) ch.messages |> List.head)
+                                    |> Maybe.andThen .msgid
+                            )
+
+                ( opened, out ) =
+                    updateCore (ChannelSelect name) model
+            in
+            case firstMsgid of
+                Just msgid ->
+                    ( focusMessage opened msgid, outs ++ out )
+
+                Nothing ->
+                    ( opened, outs ++ out )
+
+        Organizer.LeaveConversation nick ->
+            if Maybe.map String.toLower model.activeChannel == Just (String.toLower nick) then
+                ( { model
+                    | activeChannel = Nothing
+                    , navSection = Nav.Messages
+                    , navDrawerOpen = True
+                    , messageMenu = Nothing
+                    , reactionPicker = Nothing
+                  }
+                , outs
+                )
+
+            else
+                ( model, outs )
+
+
+{-| Open a saved message: switch to its conversation, then land on the
+row (loaded rows focus at once; a room asks history for the window;
+an unloaded DM row says so instead of failing silently). -}
+organizeJumpTo : String -> String -> Model -> ( Model, List Outbound )
+organizeJumpTo target msgid model =
+    let
+        ( opened, openOut ) =
+            updateCore (ChannelSelect target) model
+    in
+    case reactionRow opened target msgid of
+        Just _ ->
+            ( focusMessage opened msgid, openOut )
+
+        Nothing ->
+            let
+                ( requested, historyOut ) =
+                    if isChannelName opened target then
+                        requestPinnedMessage opened target msgid
+
+                    else
+                        ( opened, [] )
+            in
+            if List.isEmpty historyOut then
+                ( addToast
+                    { variant = ToastInfo
+                    , title = "Saved message not loaded"
+                    , description = Just "It is older than what this device has loaded. Scroll back in the conversation to find it."
+                    , duration = Nothing
+                    , groupKey = Nothing
+                    , undo = Nothing
+                    }
+                    requested.nowMs
+                    requested
+                , openOut
+                )
+
+            else
+                ( requested, openOut ++ historyOut )
+
+
+{-| Settle: reopen closed DMs that were opened or got a new line from
+the other person, bring hidden rooms back on a mention or your own
+line, and close the menus an organize action was run from. (Owner
+reads leave from `Main.update`, never from here, so an unrelated
+update never changes the model or its outbound list.) -}
+settleStepOrganize : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOrganize msg prior ( m, outs ) =
+    let
+        live =
+            deviceMemoryOwner m
+
+        ( reopened, reopenFx ) =
+            Organizer.reopenWhere live (organizeShouldReopen prior m) m.organize
+
+        ( revealed, revealFx ) =
+            Organizer.revealWhere live (organizeShouldReveal prior m) reopened
+
+        ( settled, fxOut ) =
+            List.foldl organizeEffect ( organizeCloseMenus msg { m | organize = revealed }, [] ) (reopenFx ++ revealFx)
+    in
+    ( settled, outs ++ fxOut )
+
+
+{-| A closed DM comes back when you open it, when its unread count
+rises, or when a new row from the other person lands after it was
+closed (history replays of older rows never reopen it). -}
+organizeShouldReopen : Model -> Model -> String -> Float -> Bool
+organizeShouldReopen prior m key closedAt =
+    let
+        before =
+            Dict.get key prior.channels
+    in
+    if Maybe.map String.toLower m.activeChannel == Just key then
+        True
+
+    else
+        case Dict.get key m.channels of
+            Nothing ->
+                False
+
+            Just now ->
+                let
+                    unreadBefore =
+                        Maybe.map .unread before |> Maybe.withDefault 0
+
+                    headBefore =
+                        before |> Maybe.andThen (.messages >> List.head) |> Maybe.map .id
+                in
+                now.unread > unreadBefore
+                    || (case List.head now.messages of
+                            Just row ->
+                                Just row.id /= headBefore
+                                    && String.toLower row.from /= String.toLower m.ourNick
+                                    && toFloat row.at > closedAt
+
+                            Nothing ->
+                                False
+                       )
+
+
+{-| A hidden room comes back on a new mention, or when you post in it
+(a fresh row of yours, never an old one replayed from history). -}
+organizeShouldReveal : Model -> Model -> String -> Bool
+organizeShouldReveal prior m key =
+    case ( Dict.get key prior.channels, Dict.get key m.channels ) of
+        ( Just before, Just now ) ->
+            now.highlights > before.highlights
+                || (case List.head now.messages of
+                        Just row ->
+                            Just row.id /= Maybe.map .id (List.head before.messages)
+                                && String.toLower row.from == String.toLower m.ourNick
+                                && toFloat row.at > m.nowMs - 120000
+
+                        Nothing ->
+                            False
+                   )
+
+        _ ->
+            False
+
+
+{-| Running an organize action from the room More menu, a message menu
+or the You hub closes that surface; muting from the row menu closes
+the row menu. -}
+organizeCloseMenus : Msg -> Model -> Model
+organizeCloseMenus msg m =
+    let
+        organize =
+            m.organize
+
+        rowMenuOpen =
+            case organize.sheet of
+                Just (Organizer.RowMenu _) ->
+                    True
+
+                _ ->
+                    False
+    in
+    case msg of
+        OrganizeMsg (Organizer.Loaded _) ->
+            m
+
+        OrganizeMsg (Organizer.BookmarkSave _) ->
+            { m | messageMenu = Nothing, roomMenuOpen = False }
+
+        OrganizeMsg Organizer.BookmarksOpen ->
+            { m | youHubOpen = False, roomMenuOpen = False }
+
+        OrganizeMsg _ ->
+            { m | roomMenuOpen = False }
+
+        MuteDm _ ->
+            { m
+                | roomMenuOpen = False
+                , organize =
+                    if rowMenuOpen then
+                        { organize | sheet = Nothing }
+
+                    else
+                        organize
+            }
+
+        UnmuteDm _ ->
+            { m
+                | roomMenuOpen = False
+                , organize =
+                    if rowMenuOpen then
+                        { organize | sheet = Nothing }
+
+                    else
+                        organize
+            }
+
+        PrefsTogglePref "readerMode" ->
+            { m | roomMenuOpen = False }
+
+        _ ->
+            m
+
+
+{-| Gate an alert kind through the notification preset. Power also
+lets plain lines in rooms set to All alert (as a follow-style alert);
+Calm drops followed-topic alerts. -}
+organizePresetKind : Model -> String -> Maybe Notify.NotifyKind -> Maybe Notify.NotifyKind
+organizePresetKind model target kind =
+    let
+        preset =
+            model.organize.preset
+    in
+    case kind of
+        Just k ->
+            if Attention.allowsAlert preset { dm = k == Notify.Dm, mention = k == Notify.Mention, followed = k == Notify.Follow } then
+                Just k
+
+            else
+                Nothing
+
+        Nothing ->
+            if preset == Attention.Power && isChannelName model target && notifyLevel model target == "all" then
+                Just Notify.Follow
+
+            else
+                Nothing
+
+
+{-| Inside today's quiet-hours window (local clock). -}
+organizeQuietNow : Model -> Bool
+organizeQuietNow model =
+    Attention.quietActive model.zone model.nowMs model.organize.quiet
