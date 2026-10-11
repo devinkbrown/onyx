@@ -7312,7 +7312,7 @@ suite =
                     , \_ -> Expect.equal 3 m3.nickAliasTryIdx
                     ]
                     ()
-        , test "433 with no aliases left errors and resets the index" <|
+        , test "433 with no aliases left retries nick_ on the same socket (v3/gap-shell)" <|
             \_ ->
                 let
                     ( m1, _ ) =
@@ -7325,12 +7325,11 @@ suite =
                         feed { m1 | nickAliases = [ "kai" ], nickAliasTryIdx = 1 } ":s 433 me me :Nickname is already in use"
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [] outbound
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m2.notifications)
-                    , \_ -> Expect.equal 1 (List.length m2.serviceLog)
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text m3.notifications)
-                    , \_ -> Expect.equal 0 m3.nickAliasTryIdx
-                    , \_ -> Expect.equal [] outbound3
+                    [ \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound
+                    , \_ -> Expect.equal "me_" m2.ourNick
+                    , \_ -> Expect.equal [] m2.notifications
+                    , \_ -> Expect.equal 1 m2.gapShell.nickRetries
+                    , \_ -> Expect.equal [ SendLine "NICK me_\r\n" ] outbound3
                     ]
                     ()
         , test "433 after registration rotates, then logs when exhausted" <|
@@ -7339,17 +7338,19 @@ suite =
                     live =
                         { blank | nickAliases = [ "kai" ] }
 
+                    -- A NICK change refused after registration names the
+                    -- wanted nick, not the one we hold.
                     ( rotated, outbound ) =
-                        feed live ":s 433 me me :Nickname is already in use"
+                        feed live ":s 433 me taken :Nickname is already in use"
 
                     ( bare, bareOut ) =
-                        feed blank ":s 433 me me :Nickname is already in use"
+                        feed blank ":s 433 me taken :Nickname is already in use"
                 in
                 Expect.all
                     [ \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] outbound
                     , \_ -> Expect.equal "kai" rotated.ourNick
                     , \_ -> Expect.equal [] bareOut
-                    , \_ -> Expect.equal [ "Nickname in use: me" ] (List.map .text bare.notifications)
+                    , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text bare.notifications)
                     ]
                     ()
         , test "error numerics record verbatim inbox rows" <|
@@ -15772,9 +15773,13 @@ suite =
                             feed { blank | connection = Live } ":s 433 me taken :In use"
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ "Erroneous nickname: bad!nick" ] (List.map .text bad.notifications)
-                        , \_ -> Expect.equal [ "Nick/channel temporarily unavailable" ] (List.map .text unavailable.notifications)
-                        , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text exhausted.notifications)
+                        -- v3/gap-shell: a refused name while registering fails
+                        -- with the reason; 433/437 retry `nick_` instead of erroring.
+                        [ \_ -> Expect.equal [ "“bad!nick” can’t be used here (Erroneous). Pick another name." ] (List.map .text bad.notifications)
+                        , \_ -> Expect.equal [] unavailable.notifications
+                        , \_ -> Expect.equal "me_" unavailable.ourNick
+                        , \_ -> Expect.equal [] exhausted.notifications
+                        , \_ -> Expect.equal "me_" exhausted.ourNick
                         , \_ -> Expect.equal [] retrying.notifications
                         , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] retryOut
                         , \_ -> Expect.equal [ "Nickname in use: taken" ] (List.map .text live.notifications)

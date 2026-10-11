@@ -124,6 +124,7 @@ import HistoryImport -- v3/gap-import
 import Media
 import Nodes
 import Polish
+import GapShell -- v3/gap-shell
 import Schedule
 import Switcher
 import Task
@@ -579,6 +580,15 @@ port pwaEvent : (Decode.Value -> msg) -> Sub msg
 
 
 port visibilityChanged : ({ visible : Bool, focused : Bool } -> msg) -> Sub msg
+
+
+{-| v3/gap-shell — browser lifecycle (`boot`, `offline`, `online`,
+`restored`) from `ports.js` `wireGapShell`, and one whitelisted
+`onyx:*` device value back. -}
+port shellEvent : (Decode.Value -> msg) -> Sub msg
+
+
+port shellStore : { key : String, value : String } -> Cmd msg
 
 
 port searchHotkey : (() -> msg) -> Sub msg
@@ -1467,6 +1477,10 @@ perform key outbound =
         App.PwaUpdateApprove ->
             pwaUpdateApprove ()
 
+        -- v3/gap-shell
+        App.ShellStore req ->
+            shellStore req
+
         App.OfflineMemoNotice req ->
             offlineMemoNotice req
 
@@ -1731,6 +1745,7 @@ subscriptions model =
         -- v3/polish
         , pwaEvent (App.PolishMsg << Polish.PwaEventReceived)
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
+        , shellEvent (App.GapShellMsg << GapShell.ShellEventReceived) -- v3/gap-shell
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
         -- v3/gap-commands
