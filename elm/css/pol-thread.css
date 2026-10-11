@@ -1505,6 +1505,9 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 .onyx-message-search__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* Rows never squeeze below their content (a scrolling chip line has
+     an automatic minimum of 0): the body scrolls instead. */
+  grid-auto-rows: max-content;
   align-items: center;
   gap: var(--space-2);
   max-height: min(50vh, 28rem);
@@ -2411,11 +2414,15 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 /* Message search: on phones and short screens the panel never takes
    more than a third of the height; its sections scroll inside. */
 @media (max-width: 767.98px) {
-  .onyx-message-search__body { max-height: min(32dvh, 22rem); }
+  .onyx-message-search__body { max-height: min(26dvh, 18rem); }
+  /* Recall terms are one swipeable line, not a wrapped block. */
+  .onyx-message-search__recall { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .onyx-message-search__recall::-webkit-scrollbar { display: none; }
+  .onyx-message-search__recall > * { flex: none; }
 }
 @media (max-height: 500px) {
-  .onyx-message-search { padding-block: var(--space-1); }
-  .onyx-message-search__body { max-height: 26dvh; }
+  .onyx-message-search { padding-block: var(--space-1); gap: var(--space-1); }
+  .onyx-message-search__body { max-height: 15dvh; }
 }
 /* The count also reads in the status line; under 400px the find row
    gives its width to the query. With the keyboard up the body keeps to
@@ -2423,7 +2430,7 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
 @media (max-width: 399.98px) {
   .onyx-message-search__count { display: none; }
 }
-:root[data-kb="open"] .onyx-message-search__body { max-height: calc(var(--vvh, 100dvh) * 0.2); }
+:root[data-kb="open"] .onyx-message-search__body { max-height: max(3.5rem, calc(var(--vvh, 100dvh) * 0.2)); }
 
 /* Hover feedback only where hover exists (a tap must not leave a pin or
    media row looking selected). */
@@ -2500,4 +2507,97 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   .onyx-frame .onyx-message-search button.onyx-message-search__saved-delete,
   .onyx-frame .onyx-message-search button.onyx-message-search__saved-run,
   .onyx-frame .onyx-message-search button.onyx-message-search__server-row { min-height: var(--target-min); }
+}
+
+/* ── 18. Named conversations: Topics ─────────────────────────────────── */
+
+/* The filter chips, the "Topics" disclosure, the create form, the
+   Forum / Follow pills and the forum cards read as one calm family:
+   14px text, 32px quiet pills, accent only on the pressed state. The
+   legacy rules in app.css set 12px type and 24px pills. */
+.onyx-thread-pane .topic-filter-bar { gap: var(--space-2); padding: var(--space-1) 0; }
+.onyx-frame .onyx-thread-pane button.topic-chip,
+.onyx-frame .onyx-thread-pane button.shell-topic-action,
+.onyx-frame .onyx-thread-pane button.shell-topic-follow,
+.onyx-frame .onyx-thread-pane button.shell-topic-card-follow {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--r-pill);
+  color: var(--onyx-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.onyx-frame .onyx-thread-pane button.topic-chip { gap: 3px; }
+.onyx-frame .onyx-thread-pane button.topic-chip:hover,
+.onyx-frame .onyx-thread-pane button.shell-topic-action:hover:not(:disabled),
+.onyx-frame .onyx-thread-pane button.shell-topic-follow:hover,
+.onyx-frame .onyx-thread-pane button.shell-topic-card-follow:hover { color: var(--onyx-text); background: var(--onyx-panel-2); border-color: var(--onyx-dim); }
+.onyx-frame .onyx-thread-pane button.topic-chip.is-active,
+.onyx-frame .onyx-thread-pane button.shell-topic-action.is-active,
+.onyx-frame .onyx-thread-pane button.shell-topic-follow.is-active,
+.onyx-frame .onyx-thread-pane button.shell-topic-card-follow.is-active { color: var(--onyx-text); border-color: var(--onyx-accent); }
+.onyx-frame .onyx-thread-pane button.shell-topic-card-follow { margin: 0 var(--space-3) var(--space-3); }
+.topic-chip__unread { min-width: 18px; padding: 0 5px; font-size: var(--text-2xs); line-height: 16px; text-align: center; }
+
+.onyx-topic-tools { gap: var(--space-2); }
+/* The open disclosure's content sits in the browser's own content slot
+   (block flow), so each group is a full-width row with its own gap. */
+.shell-topic-create { display: flex; flex: 1 1 100%; width: 100%; min-width: 0; gap: var(--space-2); margin: 0 0 var(--space-2); }
+.shell-topic-create-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.shell-topic-create-input::placeholder { color: var(--onyx-faint); }
+.shell-topic-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-2); }
+.shell-topic-forum { gap: var(--space-2); padding: var(--space-1) 0 var(--space-3); }
+.shell-topic-card { background: var(--onyx-panel); border: 1px solid var(--onyx-line); border-radius: var(--radius); }
+.shell-topic-card:hover { border-color: var(--pt-seam); }
+.onyx-frame .onyx-thread-pane button.shell-topic-card-main { padding: var(--space-3); gap: var(--space-1); font-size: var(--text-md); border-radius: var(--radius); }
+.shell-topic-card-title { font-size: var(--text-md); overflow-wrap: anywhere; }
+.shell-topic-card-meta,
+.shell-topic-card-preview { font-size: var(--text-sm); }
+.shell-topic-card-meta { color: var(--onyx-dim); flex-wrap: wrap; }
+.shell-topic-card-preview { color: var(--onyx-dim); min-width: 0; }
+.shell-topic-card-preview > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-topic-card-author { color: var(--onyx-text); }
+
+/* Phones: the chips are one swipeable line instead of a wrapped block. */
+@media (max-width: 767.98px) {
+  .onyx-thread-pane .topic-filter-bar { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin-inline: calc(var(--space-3) * -1); padding-inline: var(--space-3); }
+  .onyx-thread-pane .topic-filter-bar::-webkit-scrollbar { display: none; }
+  .onyx-thread-pane .topic-filter-bar > * { flex: none; }
+}
+
+@media (pointer: coarse), (hover: none) {
+  .onyx-topic-tools-toggle { min-height: var(--target-min); }
+  .onyx-topic-tools-toggle:hover { color: var(--onyx-dim); background: transparent; }
+  .shell-topic-create-input { min-height: var(--target-min); font-size: 16px; }
+  .onyx-frame .onyx-thread-pane button.topic-chip,
+  .onyx-frame .onyx-thread-pane button.shell-topic-action,
+  .onyx-frame .onyx-thread-pane button.shell-topic-follow,
+  .onyx-frame .onyx-thread-pane button.shell-topic-card-follow { position: relative; min-height: 36px; }
+  .onyx-thread-pane .topic-chip::after,
+  .onyx-thread-pane .shell-topic-action::after,
+  .onyx-thread-pane .shell-topic-follow::after,
+  .onyx-thread-pane .shell-topic-card-follow::after { content: ""; position: absolute; inset: -4px -2px; }
+  .onyx-thread-pane .topic-filter-bar,
+  .shell-topic-actions { gap: var(--space-2); }
+  .onyx-frame .onyx-thread-pane button.shell-topic-card-main { min-height: var(--target-min); }
+  /* The thread's own floating and load controls. */
+  .onyx-frame .onyx-thread-pane button.onyx-jump-latest,
+  .onyx-frame .onyx-thread-pane button.onyx-earlier-button,
+  .onyx-frame .onyx-thread-pane button.onyx-latest-button { min-height: var(--target-min); }
+  /* The quick-start card's dismiss (an icon in a 32px hit box). */
+  .onyx-thread-pane .onyx-coach-dismiss::after { content: ""; position: absolute; inset: -6px; }
 }

@@ -185,6 +185,54 @@ async function wire(page, h, opts = {}) {
   return (lines) => { for (const l of lines) if (client) client.send(l); };
 }
 
+/* Label a few fresh rows with the `onyx/topic` tag so the filter chips,
+   the Forum cards and the per-topic unread counts have something to show. */
+async function topicRows(inject, h, page) {
+  const at = (m) => new Date(Date.now() - m * 1000).toISOString();
+  inject([
+    `@time=${at(50)};msgid=tp1;onyx/topic=design :nova!n@onyx.test PRIVMSG ${ROOM} :crit notes are in the doc — three open questions on the connect step`,
+    `@time=${at(40)};msgid=tp2;onyx/topic=design :kip!k@onyx.test PRIVMSG ${ROOM} :I'll take the first two`,
+    `@time=${at(30)};msgid=tp3;onyx/topic=release :mara!m@onyx.test PRIVMSG ${ROOM} :cutting the candidate at five, freeze after that`,
+    `@time=${at(20)};msgid=tp4;onyx/topic=release-notes-and-changelog-for-autumn :iris!i@onyx.test PRIVMSG ${ROOM} :draft is up, please add anything user-facing`,
+    `@time=${at(10)};msgid=tp5;onyx/topic=design :lark!l@onyx.test PRIVMSG ${ROOM} :photos from the meetup are in the shared folder`,
+  ]);
+  await h.settle(page, 400);
+}
+
+/* Touch-target audit: names every button / link / field inside `scope`
+   whose hit box (its own box grown by an absolutely positioned
+   ::before / ::after) is under 44px on its short side. Inline links,
+   #channel jumps and spoilers in running text are exempt (WCAG's inline
+   exception), as is the calls slice's own stage strip. */
+const auditTargets = (page, scope) => page.evaluate((scope) => {
+  const bad = [];
+  const reach = (el) => {
+    const r = el.getBoundingClientRect();
+    let l = 0, t = 0, rr = 0, b = 0;
+    for (const pseudo of ['::before', '::after']) {
+      const cs = getComputedStyle(el, pseudo);
+      if (cs.content === 'none' || cs.position !== 'absolute') continue;
+      const px = (v) => (v === 'auto' ? 0 : -parseFloat(v) || 0);
+      l = Math.max(l, px(cs.left)); rr = Math.max(rr, px(cs.right)); t = Math.max(t, px(cs.top)); b = Math.max(b, px(cs.bottom));
+    }
+    return { w: r.width + l + rr, h: r.height + t + b };
+  };
+  const sel = 'button, a[href], input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select, summary, [role=menuitem], [role=button]';
+  for (const root of document.querySelectorAll(scope)) {
+    for (const el of root.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      if (r.width === 0 || r.height === 0 || cs.visibility === 'hidden' || cs.display === 'none') continue;
+      if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
+      if (el.closest('[aria-hidden="true"], [inert], .onyx-call-btn, .shell-msg-text')) continue;
+      if (el.matches('.onyx-call-btn')) continue;
+      const k = reach(el);
+      if (Math.min(k.w, k.h) < 43.5) bad.push(`${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]} ${Math.round(k.w)}x${Math.round(k.h)} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18)}"`);
+    }
+  }
+  return [...new Set(bad)];
+}, scope);
+
 const isTouch = (page) => page.evaluate(() => matchMedia('(hover: none)').matches);
 const isPhone = (page) => (page.viewportSize()?.width ?? 1440) < 768;
 
@@ -458,37 +506,8 @@ export default {
   'cv-targets': async (page, h) => {
     await room(page, h, { rich: true, op: true, pins: true });
     if (!(await isTouch(page))) return;
-    const SCOPE = '.onyx-thread, .onyx-composer, .onyx-message-search, .onyx-thread-sheet, .shell-msg-lightbox, .room-media-index, .pins-panel, .onyx-msg-menu, .onyx-react-picker';
-    const measure = () => page.evaluate((scope) => {
-      const bad = [];
-      const reach = (el) => {
-        // the hit box = own box grown by the largest ::before / ::after inset
-        const r = el.getBoundingClientRect();
-        let l = 0, t = 0, rr = 0, b = 0;
-        for (const pseudo of ['::before', '::after']) {
-          const cs = getComputedStyle(el, pseudo);
-          if (cs.content === 'none' || cs.position !== 'absolute') continue;
-          const px = (v) => (v === 'auto' ? 0 : -parseFloat(v) || 0);
-          l = Math.max(l, px(cs.left)); rr = Math.max(rr, px(cs.right)); t = Math.max(t, px(cs.top)); b = Math.max(b, px(cs.bottom));
-        }
-        return { w: r.width + l + rr, h: r.height + t + b };
-      };
-      const sel = 'button, a[href], input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select, summary, [role=menuitem], [role=button]';
-      for (const root of document.querySelectorAll(scope)) {
-        for (const el of root.querySelectorAll(sel)) {
-          const r = el.getBoundingClientRect();
-          const cs = getComputedStyle(el);
-          if (r.width === 0 || r.height === 0 || cs.visibility === 'hidden' || cs.display === 'none') continue;
-          if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) continue;
-          if (el.closest('[aria-hidden="true"], [inert]')) continue;
-          // inline links, #channel jumps and spoilers inside running text are exempt (WCAG inline exception)
-          if (el.closest('.shell-msg-text')) continue;
-          const k = reach(el);
-          if (Math.min(k.w, k.h) < 43.5) bad.push(`${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]} ${Math.round(k.w)}x${Math.round(k.h)} "${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18)}"`);
-        }
-      }
-      return [...new Set(bad)];
-    }, SCOPE);
+    const SCOPE = '.onyx-thread-pane, .onyx-thread, .onyx-intro, .onyx-composer, .onyx-message-search, .onyx-thread-sheet, .shell-msg-lightbox, .room-media-index, .pins-panel, .onyx-msg-menu, .onyx-react-picker';
+    const measure = () => auditTargets(page, SCOPE);
     const skipped = [];
     const rowTap = async (row, key) => {
       const btn = await row.$(`[data-row-action="${key}"]`);
@@ -513,6 +532,9 @@ export default {
       states.push([name, fresh]);
     };
     await note('room');
+    await scrollTo(page, 0);
+    await note('top-of-room');
+    await scrollTo(page, 1);
     const row = await reveal(page, 'projector');
     if (row) {
       await note('row-toolbar');
@@ -574,6 +596,35 @@ export default {
     const problems = states.filter(([, b]) => b.length).map(([n, b]) => `${n}: ${b.slice(0, 10).join('; ')}`);
     if (skipped.length) problems.push(`skipped: ${skipped.join('; ')}`);
     if (problems.length) throw new Error(`touch targets under 44px — ${problems.join(' | ')}`);
+  },
+
+  /* The empty-room intro on touch: its actions are 44px targets too. */
+  'cv-targets-empty': async (page, h) => {
+    await room(page, h, { drop: (r) => r === '#quiet', room: '#quiet' });
+    if (!(await isTouch(page))) return;
+    const bad = await auditTargets(page, '.onyx-thread-pane, .onyx-composer');
+    if (bad.length) throw new Error(`touch targets under 44px in the empty room — ${bad.join('; ')}`);
+  },
+
+  /* Named conversations (the Topics preference): the quiet "Topics"
+     disclosure opened, with filter chips from labelled rows. */
+  'cv-topics': async (page, h) => {
+    const inject = await room(page, h);
+    await topicRows(inject, h, page);
+    await h.tryClick(page, '.onyx-topic-tools-toggle');
+    await page.fill('#shell-topic-create-input', 'weekend-plans');
+    await scrollTo(page, 0);
+    await h.settle(page, 300);
+  },
+
+  /* The same, with the Forum switch on: one card per topic. */
+  'cv-topics-forum': async (page, h) => {
+    const inject = await room(page, h);
+    await topicRows(inject, h, page);
+    await h.tryClick(page, '.onyx-topic-tools-toggle');
+    await h.tryClick(page, '.shell-topic-actions .shell-topic-action');
+    await scrollTo(page, 0);
+    await h.settle(page, 400);
   },
 
   'cv-jump': async (page, h) => {
