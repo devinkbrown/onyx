@@ -19,6 +19,7 @@ import Notify exposing (Permission(..))
 import NotifyCenter exposing (NotifyMode(..))
 import Push
 import Set
+import View.Attention -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -121,7 +122,11 @@ notifySheet model =
                     )
                 , desktopSection model
                 , dndSection model
+                -- v3/gap-organize
+                , View.Attention.quietSection model
+                , View.Attention.presetSection model
                 , keywordsSection model
+                , View.Attention.smartMuteSection model -- v3/gap-organize
                 , ignoredSection model
                 ]
 

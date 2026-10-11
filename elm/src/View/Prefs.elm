@@ -25,6 +25,7 @@ import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
 import View.HistoryImport -- v3/gap-import
+import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
 
 
@@ -175,6 +176,14 @@ panelBody model category =
                 , current = Prefs.clockToString model.prefs.clock
                 , onSelect = \value -> AppearanceSetPref { key = "clock", value = value }
                 }
+            -- v3/gap-organize
+            , toggle
+                { key = "readerMode"
+                , legend = "Reader mode"
+                , title = "Read without the side panels"
+                , description = "Conversations open as a calm, single column: the lists, member panel and top bar step aside and the words lead. Exit from the bar at the top."
+                , value = model.prefs.readerMode
+                }
             ]
 
         Conversation ->
@@ -209,6 +218,7 @@ panelBody model category =
                 [ h3 [ class "pref-label" ] [ text "Link previews and encrypted DMs" ]
                 , p [ class "pref-desc" ] [ text "Preview, HTTPS-only, and end-to-end encryption switches live in Appearance under Privacy." ]
                 ]
+            , View.Organize.prefsOrganize model -- v3/gap-organize
             ]
 
         History ->

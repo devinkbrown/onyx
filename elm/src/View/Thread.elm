@@ -35,6 +35,7 @@ import View.MessageText exposing (messageText)
 import View.CallStage
 -- v3/calls-c11
 import View.StageMode
+import View.Organize -- v3/gap-organize
 -- v3/gap-watch
 import View.WatchTogether
 import View.Sheet as Sheet
@@ -1788,6 +1789,7 @@ messageMenuPanel model target m =
 
                                   else
                                     Nothing
+                                , View.Organize.bookmarkMenuItem model target m msgid -- v3/gap-organize
                                 , if caps.canIgnore then
                                     let
                                         nick =

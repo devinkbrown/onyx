@@ -3726,6 +3726,63 @@ function fetchPublicFeed(url) {
     };
   }
 
+  /* v3/gap-organize — organize memory + attention prefs. Elm owns every
+     shape, bound and owner-scoped key name (`Organize`, `Attention`,
+     `Organizer`); the bridge only reads and writes whole localStorage
+     values for an allow-listed set of keys:
+       owner-scoped  onyx:{room-folders,hidden-rooms,closed-conversations,
+                     bookmarks,user-notes,smart-mute}:owner:<enc>
+       read-only     onyx:channel-navigation:owner:<enc> (the oracle's
+                     record, read once to bring its folders across)
+       device-wide   onyx:dnd-quiet-{start,end,enabled}, onyx:calm
+     A `null` value removes the key. Reads answer with `null` for a
+     missing key (never "") so Elm can tell "unset" from "empty". */
+  var ORGANIZE_OWNED = /^onyx:(room-folders|hidden-rooms|closed-conversations|bookmarks|user-notes|smart-mute|channel-navigation):owner:[A-Za-z0-9%._~!*'()-]{1,8192}$/;
+  var ORGANIZE_DEVICE = /^onyx:(dnd-quiet-start|dnd-quiet-end|dnd-quiet-enabled|calm)$/;
+  var ORGANIZE_MAX_VALUE = 2 * 1024 * 1024;
+  function organizeReadable(key) {
+    return typeof key === "string" && (ORGANIZE_OWNED.test(key) || ORGANIZE_DEVICE.test(key));
+  }
+  function organizeWritable(key) {
+    return organizeReadable(key) && key.indexOf("onyx:channel-navigation:") !== 0;
+  }
+  function wireOrganize(app, env) {
+    var storage = function () {
+      try {
+        var store = (env && env.storage) || (typeof window !== "undefined" ? window.localStorage : null);
+        return store && typeof store.getItem === "function" ? store : null;
+      } catch (err) { return null; }
+    };
+    if (app.ports.organizeStore) {
+      app.ports.organizeStore.subscribe(function (req) {
+        if (!req || !organizeWritable(req.key)) return;
+        var store = storage();
+        if (!store) return;
+        try {
+          if (req.value === null || req.value === undefined) {
+            store.removeItem(req.key);
+          } else if (typeof req.value === "string" && req.value.length <= ORGANIZE_MAX_VALUE) {
+            store.setItem(req.key, req.value);
+          }
+        } catch (err) { /* storage unavailable / quota — non-fatal */ }
+      });
+    }
+    if (app.ports.organizeLoad && app.ports.organizeLoaded) {
+      app.ports.organizeLoad.subscribe(function (req) {
+        if (!req || typeof req.tag !== "string" || !Array.isArray(req.keys)) return;
+        var store = storage();
+        var values = {};
+        req.keys.slice(0, 32).forEach(function (key) {
+          if (!organizeReadable(key)) return;
+          var raw = null;
+          try { raw = store ? store.getItem(key) : null; } catch (err) { raw = null; }
+          values[key] = (typeof raw === "string" && raw.length <= ORGANIZE_MAX_VALUE) ? raw : null;
+        });
+        try { app.ports.organizeLoaded.send({ tag: req.tag, values: values }); } catch (err) { /* app gone */ }
+      });
+    }
+  }
+
   function wireTranscriptScroll(app, env) {
     if (!app.ports.scrollPolicy && !app.ports.scrollState) return null;
     var e = env || {};
@@ -6918,6 +6975,8 @@ function fetchPublicFeed(url) {
        `queueMicrotask`; missing chips (stale emits) no-op. */
     /* v3/transcript — scroll anchoring bridge. */
     wireTranscriptScroll(app);
+    /* v3/gap-organize — organize memory + attention prefs. */
+    wireOrganize(app);
 
     if (app.ports.topicChipFocus) {
       app.ports.topicChipFocus.subscribe(function () {
@@ -11320,6 +11379,7 @@ function fetchPublicFeed(url) {
     installViewportInsets: installViewportInsets,
     createTranscriptScroller: createTranscriptScroller,
     wireTranscriptScroll: wireTranscriptScroll,
+    wireOrganize: wireOrganize, /* v3/gap-organize */
     VAULT_KEEP: VAULT_KEEP,
     createE2ee: createE2ee,
     wireE2ee: wireE2ee,
