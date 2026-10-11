@@ -345,7 +345,7 @@ twoFactorPanel state account phase =
             , error = state.error
             , hint = Just "The code changes every 30 seconds."
             , busy = busy
-            , extra = [ class "ga-code", attribute "inputmode" "numeric", attribute "pattern" "[0-9 ]*", maxlength 10 ]
+            , extra = [ class "ga-code ga-otp", attribute "inputmode" "numeric", attribute "pattern" "[0-9 ]*", maxlength 10 ]
             , onInput_ = AuthGate.CodeInput
             }
         , submitRow

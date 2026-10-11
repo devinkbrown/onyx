@@ -7393,6 +7393,22 @@ function fetchPublicFeed(url) {
     );
   }
 
+  /* v3/gap-auth: a WebAuthn rejection in plain words. The browser's own
+     message ("This is an invalid domain.", "The operation either timed
+     out or was not allowed…") reads like a fault; the DOMException name
+     says what happened. Unknown names fall back to a calm line rather
+     than a raw engine string. */
+  function passkeyErrorCopy(err, ceremony) {
+    var name = err && err.name ? String(err.name) : "";
+    var verb = ceremony === "create" ? "Passkey creation" : "Passkey sign-in";
+    if (name === "NotAllowedError") return verb + " was cancelled or timed out. Try again when you're ready.";
+    if (name === "AbortError") return verb + " was cancelled.";
+    if (name === "SecurityError") return "This passkey can't be used from this site address. Open Onyx at its usual address and try again.";
+    if (name === "InvalidStateError") return "This device already has a passkey for that account.";
+    if (name === "NotSupportedError") return "This device can't use that kind of passkey.";
+    return "Couldn't use a passkey here. Try again, or use your password.";
+  }
+
   function runCreate(app, req) {
     if (!passkeySupported()) {
       app.ports.passkeyError.send({ message: "Passkeys are not available in this browser." });
@@ -7426,7 +7442,7 @@ function fetchPublicFeed(url) {
         authData: bytesToB64url(new Uint8Array(response.getAuthenticatorData()))
       });
     }).catch(function (err) {
-      app.ports.passkeyError.send({ message: String((err && err.message) || err) });
+      app.ports.passkeyError.send({ message: passkeyErrorCopy(err, "create") });
     });
   }
 
@@ -7461,7 +7477,7 @@ function fetchPublicFeed(url) {
         signature: bytesToB64url(new Uint8Array(response.signature))
       });
     }).catch(function (err) {
-      app.ports.passkeyError.send({ message: String((err && err.message) || err) });
+      app.ports.passkeyError.send({ message: passkeyErrorCopy(err, "get") });
     });
   }
 
