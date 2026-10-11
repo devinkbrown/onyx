@@ -6,9 +6,9 @@ verbatim status strings, mask rows with setters, and a confirm step
 that re-checks authority before the lift sends `MODE -b`).
 
 v3/moddesk: the panel is the body of the room-desk sheet
-(`View.ModDesk.moderationSheet`), opened from the op-gated Moderation
-button rather than rendered inline in the main column; non-moderators
-get the read-only fallback.
+(`View.ModDesk.moderationSheet`), opened from the room header's More menu
+(Moderation for moderators, Room safety for members) rather than rendered
+inline in the main column; non-moderators get the read-only fallback.
 -}
 
 import App exposing (BanAddForm, BanEntry, BanListView(..), ConnectionState(..), Model, Msg(..), UnbanReview, banListViewFor, isChannelOp)

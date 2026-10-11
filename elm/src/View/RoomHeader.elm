@@ -26,8 +26,8 @@ v3/ui-mobile-shell — ONE row on every viewport:
 The More disclosure (`aria-expanded`, `aria-controls`; an anchored
 menu on desktop, a bottom action sheet on phones) holds the room's
 alert level (`room-notify`), Invite friends (`room-invite-friends`),
-Room settings, Pins, Media, Jump to date, the time scrubber and — for
-room moderators — Moderation. Running an action closes it
+Room settings, Pins, Media, Jump to date, the time scrubber, Watch together,
+Moderation / Room safety and the organize and gap-shell rows. Running an action closes it
 (`App.settleRoomMenu`); Escape closes it through the one ordered
 overlay list (`App.escapeMsg`); a click outside closes it through the
 scrim. The 3.8 room state (scheduled event, bridge badge, group-control

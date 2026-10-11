@@ -25,9 +25,9 @@ module Credentials exposing
 Elm owns validation, key derivation, picker ids, display labels, access
 classification, catalogue order, and the 12-entry keep-set. Everything
 that touches secrets or `localStorage` (`readStore`/`writeStore`,
-`saveCredentials`, token stores/clears, handoff import/export, and all
-`Date.parse` timestamp/expiry reads) stays behind `ports.js`, which
-already owns the `onyx:credentials` slot.
+`saveCredentials`, token stores/clears, and all `Date.parse`
+timestamp/expiry reads) stays behind `ports.js`, which owns the
+`onyx:credentials` slot (account handoff import/export is not ported).
 
 Known divergences (documented, exotic-only): `identityId` iterates
 UTF-16 code units in JS but Elm code points, so astral-plane keys hash

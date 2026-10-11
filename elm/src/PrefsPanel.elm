@@ -35,8 +35,8 @@ import Dict exposing (Dict)
 
 
 {-| Preference categories ported from `PREFERENCE_CATEGORIES`
-(narrowed: `App & tools` is not ported — no PWA/extension surfaces in
-the Elm client yet).
+(narrowed: there is no `App & tools` tab — the PWA pieces live
+elsewhere, e.g. closed-tab alerts in `View.Notify`).
 -}
 type Category
     = Display

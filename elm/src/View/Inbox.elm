@@ -7,7 +7,7 @@ filters with counts, verbatim empty copy, glyph + label + context per
 row, click-to-open marking read and jumping, per-row dismiss, and
 mark-all-read).
 
-Focus-trap/Escape handling stays with the ports layer's DOM concerns;
+Focus trap and Escape come from `View.Sheet` (v3/ui-sheets, below);
 follow-topic pins stay ahead (the room opens without the topic jump).
 
 v3/ui-sheets — the bell stays in the top bar; the panel itself is a

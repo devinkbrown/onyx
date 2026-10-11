@@ -18,7 +18,7 @@ module View.Account2 exposing
     `shell/SessionsDevicesSection.tsx`; the oracle's `window.confirm`
     becomes an inline confirm row.
   - `portableSection` mirrors `shell/PortableIdentitySection.tsx`
-    (favorites only: this client has no room folders or quiet hours).
+    (favorites only: room folders and quiet hours are not carried).
   - `themeShareSheet` mirrors `shell/ThemeImportDialog.tsx`.
   - `peopleSheet`, `youStatusBlock`, `youEntries` and `friendPresence`
     surface the friends / watch list, custom status (+ expiry),

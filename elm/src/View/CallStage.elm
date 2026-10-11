@@ -18,12 +18,12 @@ the left; the security chip on the right. v3/calls-c4 adds Camera and
 Share to the centre (Share moves into More <768px), Deafen / layout /
 stage size to More, the connection pip to the right zone, the
 quality prompt above the bar and the video stage (`View.CallVideo`);
-hand / react / captions arrive with C8.
+hand / react / captions came with C8.
 
 Narrowings: icons are CSS-mask glyphs (`.onyx-ci`); the stage is
-docked in the message column (not a fixed mobile bottom bar); the
-connection-quality pip waits for C4's `qualityTier`; keyboard chords
-and `aria-keyshortcuts` land with C12 (v3/calls-c11).
+docked in the message column (not a fixed mobile bottom bar). The
+pip is `View.CallVideo.qualityPip`; chords and `aria-keyshortcuts`
+shipped with C12 (v3/calls-c11, `View.StageMode`).
 
 -}
 
@@ -625,8 +625,8 @@ moreItem attrs icon label =
     button ([ type_ "button", class "onyx-call-more-item" ] ++ attrs) [ callIcon icon, text label ]
 
 
-{-| More call tools (§2.4) — v1 carries the Settings stub only; the
-seam for deafen / record / invite / layout / stage size (C4/C5/C9).
+{-| More call tools (§2.4) — Deafen, Share (where a screen picker exists),
+React, layout, stage size, Invite people (rooms only) and Settings.
 -}
 moreTools : Model -> Html Msg
 moreTools model =

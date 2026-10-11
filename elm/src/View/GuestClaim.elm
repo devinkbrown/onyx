@@ -12,8 +12,8 @@ when `ClaimVerifying` or `verifyRequired`), verbatim copy and error
 precedence (local error, then `registerError`, then the IDENTIFY
 `accountActionError`), busy gating (submit disabled + close refused
 while pending or identifying), and the `data-testid` hooks. Focus
-trap/Escape stay with the ports layer's DOM concerns, as with the
-reclaim dialog.
+trap/Escape come from `View.Sheet`, as with the reclaim dialog (focus
+is managed by `installOverlayFocus` in ports.js).
 -}
 
 import App exposing (GuestClaimPhase(..), Model, Msg(..), guestClaimMinPassword, guestClaimVisible, isGuestClaimBusy)

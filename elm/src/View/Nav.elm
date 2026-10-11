@@ -14,8 +14,8 @@ dialog (with the `YouHubNav` workspace links): identity (nick, guest vs
 signed in), Account (signed in → the account panel; guest → "Keep this
 name", the guest-claim sheet), This device → Appearance (the
 `/appearance` route), Help (guides, about, status) and Leave. It is
-available to guests and accounts alike. Narrowed: the device toggles,
-language tools and Advanced group live in later slices (4.1).
+available to guests and accounts alike. "This device" also lists
+Notifications, Preferences, voice settings, organize and people doors.
 
 -}
 

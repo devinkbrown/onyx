@@ -18,8 +18,8 @@ phone menu adds the secondary destinations under the primary pair.
 `SceneAtmosphere` stays a CSS concern (the `public-atmosphere`
 landmark is rendered for it to hydrate).
 
-Narrowings: the mobile focus-trap and toggle refocus are JS
-behaviours with no pure equivalent — the toggle keeps full ARIA
+The phone menu's focus trap and toggle refocus are JS (`installPublicMenuFocus`
+in `ports.js`, v3/rx-public); Elm owns the state — the toggle keeps full ARIA
 semantics (`aria-expanded` / `aria-controls` / labelled), closes on
 navigation, and closes on Escape (wired in `Main.subscriptions`).
 -}

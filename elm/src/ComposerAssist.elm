@@ -36,8 +36,8 @@ Pure: no `App` import (App's `Model` holds an `Assist`), so the
 command registry is taken as any record carrying the fields the
 suggestion layer reads.
 
-Narrowing: Elm does not track the caret, so every caret-dependent
-oracle path runs with the caret at the end of the draft.
+Narrowing: this module does not track the caret (`GapConvo` does, for
+emoji), so nick completion runs with the caret at the end of the draft.
 
 -}
 
