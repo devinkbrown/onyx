@@ -481,7 +481,9 @@ const sheets = {
     await boot(page, h);
     const open = () => openMemberCard(page, h);
     await open();
-    await audit(page, h, 'member-card', open);
+    // On phones the members list is a top-layer popover that closes as the
+    // card opens (v3/gap-organize), so focus returns to its Members button.
+    await audit(page, h, 'member-card', open, { openerMayGo: true });
   },
   // From the member card: Report (the safety sheet).
   'rx-person-safety': async (page, h) => {

@@ -1562,8 +1562,17 @@ html:has(.onyx-overlays [data-shortcut-scope]) .onyx-roster:popover-open { visib
     border-radius: 0;
     font-weight: 600;
     color: var(--onyx-text);
+    /* A long menu scrolls; Cancel stays pinned at the sheet's foot. */
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--onyx-panel);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .onyx-frame .onyx-room-more .onyx-room-more-menu > .onyx-room-more-cancel::before { display: none; }
+  /* The pinned Cancel row sits flush with the sheet's foot: the menu's own
+     bottom padding would hold it above the edge (sticky respects padding). */
+  .onyx-frame .onyx-room-more .onyx-room-more-menu { padding-bottom: 0; }
 }
 
 /* Member-card moderation review: Remove (kick) and Ban confirm solid
