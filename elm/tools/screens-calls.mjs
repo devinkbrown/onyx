@@ -70,7 +70,7 @@ async function tap(page, { signedIn = true } = {}) {
     Serialised into the page by addInitScript (no closures over module
     scope). */
 function fakeEngine(opts) {
-  const { video, peers } = opts;
+  const { video, peers, joinDelay } = opts;
   const subs = [];
   const emit = (ev) => { for (const p of subs) { try { p(ev); } catch { /* */ } } };
   const local = (fields) => { for (const p of subs) { try { if (p.local) p.local(fields); } catch { /* */ } } };
@@ -99,6 +99,8 @@ function fakeEngine(opts) {
     subscribe(push) { subs.push(push); },
     joinVoice(ch, o) {
       channel = ch;
+      // joinDelay: a join that stays in flight (capture / enrolment).
+      if (joinDelay) return new Promise(() => {});
       setTimeout(() => {
         emit({ state: 'in_call', nick: '', channel: ch, shareSupported: true, e2eeActive: true, localFingerprint: '4821 9930 1177 5042 8813 2290' });
         emit({ peers: peers.map((p) => ({ nick: p.nick, kind: p.video ? 'video' : 'voice', hasVideo: !!p.video, speaking: !!p.speaking, muted: !!p.muted })) });
@@ -125,6 +127,8 @@ function fakeEngine(opts) {
       return i >= 0 && peers[i].video ? canvasStream(tile, i) : null;
     },
     ring(nick) { emit({ state: 'ringing_in', nick, channel: null }); },
+    // Confirmed local fields on the live call (media failures ride here).
+    __local: local,
     get channel() { return channel; },
   };
   window.OnyxVoiceEngine = eng;
@@ -146,9 +150,9 @@ const VIDEO_PEERS = [
 ];
 const MANY_PEERS = ['mara', 'jun', 'iris', 'theo', 'sol', 'ash', 'nova', 'kip'].map((nick, i) => ({ nick, video: i !== 3, speaking: i === 0, muted: i === 2 }));
 
-async function setup(page, h, { video = false, peers = VOICE_PEERS, signedIn = true, room = '#lounge' } = {}) {
+async function setup(page, h, { video = false, peers = VOICE_PEERS, signedIn = true, room = '#lounge', joinDelay = false } = {}) {
   const t = await tap(page, { signedIn });
-  await page.addInitScript(fakeEngine, { video, peers });
+  await page.addInitScript(fakeEngine, { video, peers, joinDelay });
   await page.addInitScript(() => {
     try { localStorage.setItem('onyx:preferences', JSON.stringify({ e2eeDms: false })); } catch { /* */ }
   });
@@ -282,6 +286,49 @@ export default {
     await setup(page, h);
     await page.evaluate(() => window.OnyxVoiceEngine.ring('mara'));
     await h.settle(page, 600);
+  },
+  // The join in flight: provisional stage + the permission hint.
+  'call-joining': async (page, h) => {
+    const t = await setup(page, h, { joinDelay: true });
+    roster(t, '#lounge', VOICE_PEERS.slice(0, 3));
+    await h.settle(page, 300);
+    await clickVisible(page, ['[data-testid="call-join-voice"]', '[data-testid="ribbon-join-call"]'], h, 600);
+  },
+  // Media failures are never silent: a calm toast over the live call.
+  'call-toast': async (page, h) => {
+    await inCall(page, h);
+    await page.evaluate(() => window.OnyxVoiceEngine.__local({ errorKind: 'media' }));
+    await h.settle(page, 500);
+  },
+  // A peer's media key changed: the DM key-change language, as a warning toast.
+  'call-toast-key': async (page, h) => {
+    await inCall(page, h);
+    await page.evaluate(() => window.OnyxVoiceEngine.__local({ errorKind: 'peer_key', errorPeer: 'mara' }));
+    await h.settle(page, 500);
+  },
+  // Invite with the room link, from the More tray.
+  'call-invite': async (page, h) => {
+    await inCall(page, h);
+    await clickVisible(page, ['[data-testid="call-more"]'], h, 300);
+    await clickVisible(page, ['[data-testid="call-invite"]'], h, 600);
+    if (await page.$('[data-testid="call-more-tools"]')) throw new Error('More stayed open behind the invite sheet');
+  },
+  // Tap / click outside closes More (the scrim); fails the shot when it does not.
+  'call-more-dismiss': async (page, h) => {
+    await inCall(page, h);
+    await clickVisible(page, ['[data-testid="call-more"]'], h, 300);
+    if (!(await page.$('[data-testid="call-more-tools"]'))) throw new Error('More did not open');
+    const vp = page.viewportSize();
+    await page.mouse.click(Math.round(vp.width / 2), 8);
+    await h.settle(page, 300);
+    if (await page.$('[data-testid="call-more-tools"]')) throw new Error('More did not close on an outside tap');
+  },
+  // A guest on the Calls hub: sign in, never a join.
+  'call-guest-hub': async (page, h) => {
+    const t = await setup(page, h, { signedIn: false });
+    roster(t, '#lounge', VOICE_PEERS.slice(0, 2));
+    await h.settle(page, 200);
+    await openCalls(page, h);
   },
   // A DM: the More menu says direct calls are not available yet.
   'call-dm': async (page, h) => {

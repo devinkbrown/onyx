@@ -407,12 +407,17 @@ guestCard model cfg =
                 , onClick GuestClaimOpen
                 ]
                 [ callIcon "key"
-                , text
+                , span [ class "onyx-call-btn-label" ]
                     (if String.isEmpty nick then
-                        "Create an account"
+                        [ text "Create an account" ]
 
                      else
-                        "Keep the name " ++ nick
+                        -- "Keep the name kn"; narrow banners drop "the name "
+                        -- visually (it stays in the accessible name).
+                        [ text "Keep "
+                        , span [ class "onyx-call-btn-long" ] [ text "the name " ]
+                        , text nick
+                        ]
                     )
                 ]
             ]

@@ -331,7 +331,7 @@ guests =
                 in
                 Expect.all
                     [ \_ -> banner |> Query.has [ Selector.text "2 people are in voice. Sign in to join." ]
-                    , \_ -> banner |> Query.find [ testid "call-guest-claim" ] |> Query.has [ Selector.text "Keep the name odalys" ]
+                    , \_ -> banner |> Query.find [ testid "call-guest-claim" ] |> Query.has [ Selector.text "Keep ", Selector.text "the name ", Selector.text "odalys" ]
                     , \_ -> banner |> Query.find [ testid "call-guest-claim" ] |> Event.simulate Event.click |> Event.expect GuestClaimOpen
                     , \_ -> banner |> Query.find [ testid "call-guest-signin" ] |> Event.simulate Event.click |> Event.expect CallGuestSignIn
                     , \_ -> banner |> Query.findAll [ testid "call-join-voice" ] |> Query.count (Expect.equal 0)
@@ -570,4 +570,37 @@ stageAnatomy =
                     , \_ -> query inCall |> Query.findAll [ testid "call-more-scrim" ] |> Query.count (Expect.equal 0)
                     ]
                     ()
+        , test "More closes once a tool is used (layout, size, share, invite); Deafen keeps it open" <|
+            \_ ->
+                let
+                    open =
+                        let
+                            local =
+                                inCall.callLocal
+                        in
+                        step CallMoreToggle { inCall | callLocal = { local | shareSupported = True } }
+                in
+                Expect.all
+                    [ \_ -> open.callMoreOpen |> Expect.equal True
+                    , \_ -> (step CallLayoutToggle open).callMoreOpen |> Expect.equal False
+                    , \_ -> (step CallStageSizeCycle open).callMoreOpen |> Expect.equal False
+                    , \_ -> (step (InviteShareOpen "#harbor") open).callMoreOpen |> Expect.equal False
+                    , \_ -> (step CallToggleShare open).callMoreOpen |> Expect.equal False
+                    , \_ -> (step CallToggleDeafen open).callMoreOpen |> Expect.equal True
+                    ]
+                    ()
+        , test "the guest claim button keeps 'the name' out of a narrow banner but not out of its name" <|
+            \_ ->
+                let
+                    q =
+                        query (step (CallJoin { channel = "#harbor", video = False }) { guest | connection = Live })
+                in
+                q
+                    |> Query.find [ testid "call-guest-claim" ]
+                    |> Expect.all
+                        [ Query.has [ Selector.text "Keep " ]
+                        , Query.has [ Selector.text "the name " ]
+                        , Query.has [ Selector.text "odalys" ]
+                        , Query.has [ Selector.class "onyx-call-btn-label" ]
+                        ]
         ]

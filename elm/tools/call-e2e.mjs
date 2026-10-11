@@ -420,8 +420,18 @@ async function main() {
       () => check('unmute propagates', true),
       (e) => check('unmute propagates', false, e.message));
 
+    // v3/rx-calls: while the engine ships with video switched off (voice
+    // only on the live network) the camera must be absent on both sides
+    // (fail closed) and the video checks below do not apply.
+    const videoOff = await A.evaluate(() => !!(window.OnyxVoiceEngine && window.OnyxVoiceEngine.videoEnabled === false));
+    if (videoOff) {
+      const camA = await A.$('[data-testid="camera-button"]');
+      const camB = await B.$('[data-testid="camera-button"]');
+      const joinVideo = await A.$('[data-testid="call-join-video"]');
+      check('video switched off: no camera control on either side (fail closed)', !camA && !camB && !joinVideo);
+    }
     // Camera: A turns video on → B gets a video peer + bound tile.
-    if (!flag('--skip-video')) {
+    if (!videoOff && !flag('--skip-video')) {
       const cam = await A.$('[data-testid="camera-button"]');
       if (cam) {
         await cam.click();

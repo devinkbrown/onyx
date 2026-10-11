@@ -87,7 +87,8 @@
   border: 1px solid var(--onyx-line); border-radius: 50%; color: var(--onyx-dim);
 }
 .onyx-call-guest-icon .onyx-ci { width: 16px; height: 16px; }
-.onyx-call-btn .onyx-ci { width: 16px; height: 16px; }
+.onyx-call-btn .onyx-ci { width: 16px; height: 16px; flex: none; }
+.onyx-call-btn-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @container onyx-banner (max-width: 600px) {
   .onyx-join-banner-copy { flex: 1 1 0; padding-right: 36px; }
   .onyx-join-banner-actions { flex: 1 1 100%; display: flex; flex-direction: row; gap: var(--space-2); }
@@ -97,6 +98,8 @@
 @container onyx-banner (max-width: 420px) {
   /* Narrow: the title says it; the why moves to the buttons' labels. */
   .onyx-call-guest .onyx-join-banner-copy span { display: none; }
+  /* "Keep the name kn" -> "Keep kn" (the full name stays in the accessible name). */
+  .onyx-call-btn-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 @container onyx-banner (max-width: 300px) {
   .onyx-join-banner-actions { flex-direction: column; }
@@ -260,6 +263,15 @@
   }
   .onyx-call-more-item .onyx-ci { width: 20px; height: 20px; }
 }
+@media (max-height: 500px) {
+  /* Landscape phones: two columns so every tool is in view. */
+  .onyx-call-more {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--space-2);
+    max-width: 640px; max-height: calc(100dvh - var(--space-3));
+  }
+  .onyx-call-more::before { grid-column: 1 / -1; margin-bottom: var(--space-1); }
+  .onyx-call-stage .onyx-call-more .onyx-call-more-item { min-height: var(--target-min); }
+}
 @keyframes onyx-call-sheet-in { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ---------- short screens (<= 620px tall: laptops, landscape) ---------- */
@@ -273,7 +285,9 @@
   .onyx-call-people > .onyx-call-person:first-child { margin-left: auto; }
   .onyx-call-people > .onyx-call-person:last-child { margin-right: auto; }
   .onyx-call-person,
-  .onyx-call-people[data-density] .onyx-call-person { flex: none; width: 76px; }
+  .onyx-call-people[data-density] .onyx-call-person { flex: none; width: 68px; }
+  .onyx-call-people, .onyx-call-people[data-density] { gap: var(--space-2); }
+  .onyx-call-name, .onyx-call-people[data-density] .onyx-call-name { max-width: 68px; font-size: var(--text-sm); }
   .onyx-call-avatar-lg,
   .onyx-call-people[data-density] .onyx-call-avatar-lg { width: 44px; height: 44px; font-size: 17px; }
   .onyx-call-ring { padding: 3px; }
@@ -287,8 +301,11 @@
 @media (max-height: 500px) {
   .onyx-call-stage { flex-flow: row wrap; align-items: center; column-gap: var(--space-2); }
   .onyx-call-stage > * { flex: 1 1 100%; order: 3; }
-  .onyx-call-stage > .onyx-call-stage-head { flex: 1 1 15rem; order: 1; min-height: 44px; padding: var(--space-1) 0 var(--space-1) var(--space-3); }
-  .onyx-call-stage > .onyx-call-bar { flex: 1 1 16rem; order: 2; justify-content: center; padding: var(--space-1) var(--space-2); border-top: 0; background: transparent; }
+  .onyx-call-stage > .onyx-call-stage-head { flex: 1 1 8rem; order: 1; min-height: 44px; padding: var(--space-1) 0 var(--space-1) var(--space-3); }
+  .onyx-call-stage > .onyx-call-bar { flex: 0 1 auto; order: 2; justify-content: center; padding: var(--space-1) var(--space-2); border-top: 0; background: transparent; }
+  /* One row: Share and React ride in More here (as on phones). */
+  .onyx-cbtn-share, .onyx-cbtn-react { display: none; }
+  .onyx-call-more-share, .onyx-call-more-react { display: block; }
   .onyx-call-stage > .onyx-call-people {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
   }
@@ -345,8 +362,9 @@
   .onyx-tile .onyx-tile-btn[aria-pressed="true"] { opacity: 1; }
 }
 
-@media (max-width: 640px) {
-  /* Docked on a phone: 16:9 tiles, two up, at most two rows in view. */
+@media (max-width: 767px) {
+  /* Docked on a phone / unfolded foldable: 16:9 tiles, two up, at most
+     two rows in view (calls-c4 sets 3:4 tiles up to 767px; this wins). */
   .onyx-call-grid,
   .onyx-call-grid[data-columns="1"] { width: 100%; }
   .onyx-call-grid[data-columns="2"],
@@ -443,6 +461,12 @@
 }
 
 /* ---------- Calls hub ---------- */
+.onyx-calls { align-self: flex-start; }
+@media (max-width: 640px) {
+  /* Phones: the hub starts under the header, not in a 78px void. */
+  .onyx-calls { padding: var(--space-3) var(--space-3) var(--space-6); }
+  .onyx-calls-title { font-size: 1.5rem; line-height: 1.2; }
+}
 .onyx-main-calls .onyx-call-stage { margin: var(--space-5) 0 0; }
 .onyx-calls .onyx-call-guest { margin: var(--space-4) 0 0; }
 

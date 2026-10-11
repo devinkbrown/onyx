@@ -41442,7 +41442,8 @@ updateCore msg model =
         CallToggleShare ->
             case ( callMediaTarget model, CallMedia.requestShare model.callLocal ) of
                 ( Just target, Just ( local, on ) ) ->
-                    ( { model | callLocal = local, callShareOptOut = Nothing }
+                    -- v3/rx-calls: the tool was used — the More tray closes
+                    ( { model | callLocal = local, callShareOptOut = Nothing, callMoreOpen = False }
                     , [ VoiceCommand { verb = "share", on = on, channel = target, tile = "" } ]
                     )
 
@@ -41501,6 +41502,8 @@ updateCore msg model =
             ( { model | callClockMs = max model.callClockMs now }, [] )
 
         CallLayoutToggle ->
+            -- v3/rx-calls: layout and size change what is behind the tray, so
+            -- the tray closes (Deafen stays: its label is its feedback).
             ( { model
                 | callLayout =
                     if model.callLayout == CallMedia.LayoutGrid then
@@ -41508,12 +41511,13 @@ updateCore msg model =
 
                     else
                         CallMedia.LayoutGrid
+                , callMoreOpen = False
               }
             , []
             )
 
         CallStageSizeCycle ->
-            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize }, [] )
+            ( { model | callStageSize = CallMedia.nextStageSize model.callStageSize, callMoreOpen = False }, [] )
 
         CallStageSizeSet size ->
             ( { model | callStageSize = size }, [] )
@@ -41814,7 +41818,8 @@ updateCore msg model =
             )
 
         InviteShareOpen channel ->
-            ( { model | inviteShare = Just (InviteShare.open channel) }, [] )
+            -- v3/rx-calls: opened from the call's More tray too — it closes
+            ( { model | inviteShare = Just (InviteShare.open channel), callMoreOpen = False }, [] )
 
         InviteShareClose ->
             ( { model | inviteShare = Nothing }, [] )
