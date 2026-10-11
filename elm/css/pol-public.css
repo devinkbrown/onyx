@@ -491,10 +491,11 @@
 }
 
 /* ---------- Landing (inside the frame) ----------
-   app.css carries the original .onyx-land-* base; these rules re-cut
-   it to the frame measure (they load later at equal specificity). */
+   The whole landing lives here (the old app.css .onyx-land-* base was
+   removed in v3/rx-public; the frame owns measure and gutters). */
 
 .public-frame__main .onyx-landing { max-width: none; margin: 0; padding: 0; }
+.onyx-land-h1 span { display: block; }
 
 .onyx-land-hero {
   display: grid;
@@ -1677,4 +1678,151 @@
   .public-frame__nav a[aria-current="page"],
   .onyxos-console__tabs button[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
   .guides-progress__meter { border: 1px solid CanvasText; }
+}
+
+/* ---------- v3/rx-public: every aspect ratio ----------
+   1. Wide screens scale the rem ladder instead of stretching lines:
+      past ~1700px the root grows with the viewport (user font size is
+      the floor, 125% the ceiling) and the measure widens a step, so a
+      hero on fhd / ultrawide reads as a page, not a postage stamp.
+      The join screen and /appearance ride the same scale. */
+@media (min-width: 1700px) {
+  html:has(.public-frame),
+  html:has(.conn),
+  html:has(.ap) { font-size: clamp(100%, calc(62.5% + 0.35vw), 125%); }
+  .public-frame { --pub-measure: 76rem; --pub-header-h: 4.25rem; }
+  .public-frame__mark { width: 2rem; height: 2rem; }
+  .public-frame__open,
+  .public-frame__footer-open { min-height: 2.75rem; }
+}
+@media (min-width: 2400px) {
+  .public-frame { --pub-measure: 80rem; }
+}
+
+/* 2. One primary action per page: when the page body carries its own
+      accent action, the header's "Open Onyx" steps down to the quiet
+      outline (pages without one keep it as their primary). */
+.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-button--primary, .guides-hero-actions .guides-action)) .public-frame__open {
+  color: var(--onyx-text);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--onyx-line);
+}
+.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-button--primary, .guides-hero-actions .guides-action)) .public-frame__open:hover {
+  background: var(--onyx-panel);
+  box-shadow: inset 0 0 0 1px var(--onyx-dim);
+}
+.public-frame:has(.public-frame__main :is(.r-btn.primary, .onyx-land-open, .not-found-page__action, .onyxos-button--primary, .guides-hero-actions .guides-action)) .public-frame__open:active {
+  background: var(--onyx-panel-2);
+}
+
+/* 3. Reading pages (trust + public contract): the article keeps its
+      measure and an "Also on Onyx" list sits beside it on wide screens
+      (sticky under the header), after it on phones. */
+.public-related { min-width: 0; margin-top: var(--space-7); }
+.public-related__title {
+  margin: 0 0 var(--space-2);
+  color: var(--onyx-faint);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+}
+.public-related__list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--onyx-line); }
+.public-related__list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--target-min);
+  border-bottom: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+.public-related__list a::after {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--onyx-faint);
+  -webkit-mask: var(--pub-i-chevron) center / contain no-repeat;
+  mask: var(--pub-i-chevron) center / contain no-repeat;
+}
+.public-related__list a:hover { color: var(--onyx-text); }
+.public-related__list a[aria-current="page"] { color: var(--onyx-text); box-shadow: inset 2px 0 0 var(--onyx-accent); padding-left: var(--space-3); }
+.public-related__list a[aria-current="page"]::after { display: none; }
+@media (min-width: 1100px) {
+  /* Only pages that carry the rail (Guides shares .public-info-page). */
+  .trust-page:has(> .public-related),
+  .public-info-page:has(> .public-related) {
+    display: grid;
+    grid-template-columns: minmax(0, 46rem) minmax(12rem, 16rem);
+    justify-content: space-between;
+    column-gap: 64px;
+    align-items: start;
+  }
+  .trust-page:has(> .public-related) > section,
+  .public-info-page:has(> .public-related) > section { grid-column: 1; }
+  .trust-page > .public-related,
+  .public-info-page > .public-related {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: calc(var(--pub-header-h) + var(--space-6));
+    margin-top: 56px;
+  }
+}
+
+/* 4. Short + wide (landscape phones, 200% zoom on a laptop): a
+      compact header, tighter hero rhythm, and the landing hero keeps
+      its two columns so the primary action is above the fold. */
+@media (max-height: 520px) and (min-width: 521px) {
+  .public-frame { --pub-header-h: 52px; }
+  .public-frame__open { min-height: 40px; }
+  .public-frame__context { padding-block: 2px; }
+  .public-frame__footer { margin-top: 48px; }
+  .public-frame__footer-inner { padding-top: 32px; padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+  .data-hero { padding-block: var(--space-7) var(--space-4); }
+  .r h1,
+  .not-found-page__body h1 { font-size: 2rem; }
+  .onyx-land-hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: start;
+    gap: var(--space-6) var(--space-7);
+    padding-block: var(--space-6) var(--space-8);
+  }
+  .onyx-land-copy { max-width: none; }
+  .onyx-land-h1 { font-size: 2.375rem; }
+  .onyx-land-lede { margin-top: var(--space-3); font-size: var(--text-md); }
+  .onyx-land-cta { flex-direction: row; margin-top: var(--space-5); }
+  .onyx-land-open,
+  .onyx-land-link { width: auto; min-height: var(--target-min); padding: 0 var(--space-5); }
+  .onyx-land-note { margin-top: var(--space-3); }
+  .onyx-land-sketch { max-width: none; }
+  .onyx-land-sketch-log { gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+  .onyx-land-sketch-avatar { width: 28px; height: 28px; }
+  .onyx-land-sketch-event { margin-left: 40px; }
+  .onyx-land-sketch-composer { margin: 0 var(--space-4) var(--space-3); }
+  .not-found-page { min-height: 0; }
+}
+
+/* Landscape notch: the footer gutters respect the side insets too. */
+.public-frame__footer-inner {
+  padding-left: max(var(--pub-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--pub-gutter), env(safe-area-inset-right));
+}
+
+/* Fragment targets clear the sticky header (skip link, section navs,
+   roadmap cards — ports.js focuses them on navigation). */
+.public-frame [id] { scroll-margin-top: calc(var(--pub-header-h) + env(safe-area-inset-top) + var(--space-4)); }
+.public-frame__main:focus-visible { outline: none; }
+
+/* Tablet portrait (721-860px): the landing hero keeps copy and sketch
+   side by side instead of a stretched phone column. */
+@media (min-width: 721px) and (max-width: 860px) {
+  .onyx-land-hero { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: var(--space-7) 40px; padding-block: 64px 72px; }
+  .onyx-land-copy { max-width: none; }
+  .onyx-land-sketch { max-width: none; }
+  .onyx-land-h1 { font-size: clamp(2.5rem, 1rem + 3.6vw, 3rem); }
 }

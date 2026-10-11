@@ -124,6 +124,7 @@ composer model =
                  , preventDefaultOn "keydown" (keyDecoder model)
                  , disabled (not ready)
                  , attribute "id" "shell-composer-input"
+                 , attribute "aria-keyshortcuts" "Alt+Enter" -- v3/gap-commands
                  , class "onyx-composer-field"
                  ]
                     ++ assistAria model
@@ -364,6 +365,7 @@ attachButton model =
         , disabled (protected || model.activeChannel == Nothing)
         , title hint
         , attribute "aria-label" "Attach files"
+        , attribute "aria-keyshortcuts" "Control+Shift+U Meta+Shift+U" -- v3/gap-commands
         , onClick AttachPick
         ]
         [ icon "attach" ]

@@ -54,8 +54,17 @@ test("every chord maps to its call-<name> and preventDefaults", () => {
   }
 });
 
-test("no live call, typing, a foreign modal or IME composition keeps the browser key", () => {
-  assert.equal(classifyShortcut(key(), doc({ live: false })), null);
+test("no live call, typing, a foreign modal or IME composition never sends a call chord", () => {
+  /* v3/gap-commands: outside a call Ctrl/Cmd+Shift+M is the shell's
+     mute-room chord (oracle `mute.channel`), never the microphone. */
+  assert.deepEqual(classifyShortcut(key(), doc({ live: false })), { name: "room-mute", prevent: true });
+  for (const [k, name] of [["E", "mark-read"], ["L", "schedule"]]) {
+    assert.deepEqual(classifyShortcut(key({ key: k }), doc({ live: false })), { name, prevent: true });
+    assert.deepEqual(classifyShortcut(key({ key: k }), doc()), { name: "call-" + (k === "E" ? "camera" : "leave"), prevent: true });
+  }
+  for (const k of ["H", "G", "F", "S", "C"]) {
+    assert.equal(classifyShortcut(key({ key: k }), doc({ live: false })), null);
+  }
   assert.equal(classifyShortcut(key({ target: input }), doc()), null);
   assert.equal(classifyShortcut(key(), doc({ modal: true })), null);
   assert.equal(classifyShortcut(key({ isComposing: true }), doc()), null);

@@ -902,166 +902,8 @@ html, body {
   margin: 16px 0 0;
 }
 
-/* Public landing */
-
-.onyx-landing {
-  margin: 0 auto;
-  max-width: 880px;
-  padding: 64px 24px 96px;
-}
-
-.onyx-land-h1 {
-  font-size: 2.75rem;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  margin: 0;
-}
-
-.onyx-land-h1 span { display: block; }
-
-.onyx-land-lede {
-  color: var(--onyx-dim);
-  font-size: 1.0625rem;
-  margin: 16px 0 0;
-  max-width: 52ch;
-}
-
-.onyx-land-cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  margin-top: 28px;
-}
-
-.onyx-land-open {
-  background: var(--onyx-accent);
-  border-radius: 6px;
-  color: var(--onyx-accent-ink);
-  font-weight: 650;
-  padding: 10px 22px;
-  text-decoration: none;
-}
-
-.onyx-land-link {
-  align-self: center;
-  color: var(--onyx-text);
-  font-weight: 600;
-}
-
-.onyx-land-note {
-  color: var(--onyx-faint);
-  font-size: 0.8125rem;
-  margin: 16px 0 0;
-}
-
-.onyx-land-trust { margin-top: 64px; }
-
-.onyx-land-h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0 0 16px;
-}
-
-.onyx-land-claims {
-  display: grid;
-  gap: 16px;
-  margin: 0;
-}
-
-.onyx-land-claims dt { font-weight: 650; }
-.onyx-land-claims dd { color: var(--onyx-dim); margin: 2px 0 0; }
-
-.onyx-land-detail { color: var(--onyx-dim); margin: 16px 0 0; }
-.onyx-land-detail a { color: var(--onyx-text); }
-
-.onyx-land-board { margin-top: 64px; }
-
-.onyx-land-board-head p {
-  color: var(--onyx-dim);
-  margin: 8px 0 0;
-  max-width: 62ch;
-}
-
-.onyx-land-tabs {
-  display: flex;
-  gap: 8px;
-  margin-top: 20px;
-}
-
-.onyx-land-tabs button {
-  background: transparent;
-  border: 1px solid var(--onyx-line);
-  border-radius: 6px;
-  color: var(--onyx-dim);
-  cursor: pointer;
-  font: inherit;
-  padding: 8px 16px;
-}
-
-.onyx-land-tabs button[aria-selected="true"] {
-  border-color: var(--onyx-accent);
-  color: var(--onyx-text);
-}
-
-.onyx-land-panel {
-  border-top: 1px solid var(--onyx-line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24px 48px;
-  margin-top: 20px;
-  padding-top: 20px;
-}
-
-.onyx-land-panel-copy { flex: 1 1 320px; }
-.onyx-land-panel-copy p { color: var(--onyx-dim); }
-
-.onyx-land-h3 {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  margin: 0 0 8px;
-}
-
-.onyx-land-action {
-  color: var(--onyx-accent);
-  display: inline-block;
-  font-weight: 650;
-  margin-top: 12px;
-}
-
-.onyx-land-panel-note { font-size: 0.8125rem; }
-
-.onyx-land-links {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 200px;
-}
-
-.onyx-land-links a { color: var(--onyx-text); }
-
-.onyx-land-footnote { color: var(--onyx-faint); font-size: 0.8125rem; }
-.onyx-land-footnote a { color: var(--onyx-text); }
-
-.onyx-land-shelf { margin-top: 64px; }
-
-.onyx-land-shelf-label {
-  color: var(--onyx-faint);
-  font-size: 0.8125rem;
-  font-weight: 650;
-  margin: 0 0 12px;
-}
-
-.onyx-land-shelf-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.onyx-land-shelf-list a { color: var(--onyx-text); }
+/* Public landing: styled entirely in css/pol-public.css (v3/rx-public
+   removed the pre-frame .onyx-land-* base that it overrode). */
 
 .onyx-toaster {
   position: fixed;
@@ -1880,10 +1722,19 @@ html, body {
 }
 
 /* Connect gate (mirrors src/app/connect.css structure).
-   v3/ui-public: the front door. Desktop = one calm card centred on the
-   ground; phone (<=520px) = full-bleed column from the top, 48px fields
-   at 16px (no iOS zoom), and inputs keep the Join button in view when
-   the keyboard scrolls them (scroll-margin). */
+   v3/ui-public: the front door. v3/rx-public: a two-part stage — the
+   destination (`.conn-context`: brand, the h1, an invite preview) and
+   the form card. Layout by viewport:
+     - phone portrait (<=520px): one full-bleed column from the top,
+       48px fields at 16px (no iOS zoom); --kb-inset lifts it above the
+       keyboard and inputs keep Join in view (scroll-margin).
+     - mid (521-959px): one calm card centred on the ground.
+     - desktop (>=960px): destination left, form card right, centred.
+     - landscape phone / 200% zoom (short + wide): two compact columns
+       from the top, so the fields and Join sit beside the title instead
+       of under it.
+   Wide screens scale the rem ladder (html:has(.conn) in pol-public.css)
+   rather than stretching the form. */
 
 .conn {
   min-height: 100vh;
@@ -1893,19 +1744,21 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: var(--space-5);
-  padding: max(var(--space-8), env(safe-area-inset-top)) var(--space-5) max(var(--space-6), env(safe-area-inset-bottom));
+  padding: max(var(--space-8), env(safe-area-inset-top)) max(var(--space-5), env(safe-area-inset-right)) max(var(--space-6), env(safe-area-inset-bottom)) max(var(--space-5), env(safe-area-inset-left));
   background: var(--onyx-bg);
   color: var(--onyx-text);
 }
-.conn-card {
+.conn-stage {
   width: 100%;
-  max-width: 440px;
+  max-width: 27.5rem;
   background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
   border-radius: 10px;
   box-shadow: var(--elev-2);
   padding: 36px 40px 32px;
 }
+.conn-context { min-width: 0; }
+.conn-card { min-width: 0; }
 .conn-brand {
   display: inline-flex;
   align-items: center;
@@ -1926,8 +1779,185 @@ html, body {
   letter-spacing: -0.02em;
   line-height: 1.15;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
-.conn-body { margin: var(--space-2) 0 var(--space-6); color: var(--onyx-dim); font-size: var(--text-md); line-height: var(--leading-body); }
+.conn-body { margin: var(--space-2) 0 var(--space-6); color: var(--onyx-dim); font-size: var(--text-md); line-height: var(--leading-body); text-wrap: pretty; }
+
+/* Invite preview: what the link itself says — room, who sent it, the
+   topic it carries — never who is online. */
+.conn-invite {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: calc(-1 * var(--space-2)) 0 var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+}
+.conn-room-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: var(--onyx-dim);
+  background: var(--onyx-panel-2);
+  font-size: 1.25rem;
+  font-weight: 750;
+  line-height: 1;
+}
+.conn-invite-copy { min-width: 0; }
+.conn-invite-copy p { margin: 0; overflow-wrap: anywhere; }
+.conn-invite-room { font-weight: 700; font-size: var(--text-md); }
+.conn-invite-desc { margin-top: 2px; color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-snug); }
+.conn-invite-copy .conn-invite-topic {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--onyx-line);
+  color: var(--onyx-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.conn-invite-copy .conn-invite-faces { margin-top: var(--space-2); color: var(--onyx-faint); font-size: var(--text-sm); }
+.conn-context-note { display: none; margin: 0; color: var(--onyx-faint); font-size: var(--text-sm); line-height: var(--leading-snug); max-width: 40ch; }
+
+/* Guest door facts: desktop only, beside the form (phones keep the
+   form high on the screen). */
+.conn-points { display: none; margin: 0; padding: 0; list-style: none; }
+.conn-point { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px var(--space-3); padding: var(--space-4) 0; border-top: 1px solid var(--onyx-line); }
+.conn-point:last-child { border-bottom: 1px solid var(--onyx-line); }
+.conn-point-icon {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  background: var(--onyx-dim);
+  -webkit-mask: var(--conn-i) center / contain no-repeat;
+  mask: var(--conn-i) center / contain no-repeat;
+}
+.conn-point-icon--guest { --conn-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M4 21a8 8 0 0116 0'/%3E%3C/svg%3E"); }
+.conn-point-icon--claim { --conn-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z'/%3E%3Cpath d='M9 12l2 2 4-4'/%3E%3C/svg%3E"); }
+.conn-point-icon--device { --conn-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='2.5' width='10' height='19' rx='2.5'/%3E%3Cpath d='M11 18h2'/%3E%3C/svg%3E"); }
+.conn-point-title { font-size: var(--text-md); font-weight: 650; }
+.conn-point-text { color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-snug); }
+
+/* Remembered identities ("Welcome back"): metadata only; one primary
+   action for the selected identity, the form below steps down. */
+.conn-identities { margin: 0 0 var(--space-5); }
+.conn-identities-head { min-width: 0; }
+.conn-identities-eyebrow { margin: 0 0 2px; color: var(--onyx-faint); font-size: var(--text-xs); font-weight: 650; letter-spacing: var(--tracking-kicker); text-transform: uppercase; }
+.conn-identities-title { margin: 0; font-size: var(--text-lg); font-weight: 700; line-height: var(--leading-tight); }
+.conn-identities-list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-height: calc(4 * 57px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.conn-identity { display: flex; align-items: center; min-width: 0; background: var(--onyx-bg); }
+.conn-identity + .conn-identity { border-top: 1px solid var(--onyx-line); }
+.conn-identity[data-selected="true"] { background: var(--onyx-panel-2); box-shadow: inset 2px 0 0 var(--onyx-accent); }
+.conn-identity-select {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  color: var(--onyx-text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.conn-identity-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--onyx-panel-2);
+  color: var(--onyx-text);
+  font-size: var(--text-sm);
+  font-weight: 750;
+}
+.conn-identity[data-selected="true"] .conn-identity-avatar { background: var(--onyx-line); }
+.conn-identity-text { display: flex; flex-direction: column; min-width: 0; }
+.conn-identity-nick { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.conn-identity-status { color: var(--onyx-dim); font-size: var(--text-sm); }
+.conn-identity[data-access="resume"] .conn-identity-status { color: var(--onyx-text); }
+.conn-identity-forget {
+  flex: none;
+  min-height: var(--target-min);
+  margin-right: var(--space-1);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--onyx-dim);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.conn-identity-forget:hover:not(:disabled) { color: var(--onyx-text); background: var(--onyx-panel); }
+.conn-identities-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.conn-identities-go {
+  flex: 1 1 auto;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--onyx-accent-ink);
+  background: var(--onyx-accent);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+.conn-identities-go:hover:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 88%, var(--onyx-text)); }
+.conn-identities-go:disabled { color: color-mix(in oklab, var(--onyx-text) 50%, transparent); background: color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2)); cursor: not-allowed; }
+.conn-identities-dismiss {
+  flex: none;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.conn-identities-dismiss:hover { border-color: var(--onyx-dim); }
+.conn-identities-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  color: var(--onyx-faint);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.conn-identities-or::before,
+.conn-identities-or::after { content: ""; flex: 1; border-top: 1px solid var(--onyx-line); }
+
 .conn-form { display: flex; flex-direction: column; gap: var(--space-4); }
 .conn-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .conn-label { font-size: var(--text-sm); font-weight: 650; color: var(--onyx-text); }
@@ -1935,7 +1965,7 @@ html, body {
   width: 100%;
   min-height: 48px;
   font: inherit;
-  font-size: 1rem;
+  font-size: max(1rem, 16px);
   color: var(--onyx-text);
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
@@ -1968,6 +1998,64 @@ html, body {
   text-underline-offset: 0.2em;
 }
 .conn-link:hover:not(:disabled) { color: var(--onyx-text); }
+
+/* "Sign in as X" after a guest join hit an account's name. */
+.conn-offer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--onyx-line); border-radius: var(--radius); background: var(--onyx-bg); }
+.conn-offer-text { flex: 1 1 14rem; margin: 0; color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-snug); overflow-wrap: anywhere; }
+.conn-offer-btn {
+  flex: none;
+  max-width: 100%;
+  min-height: var(--target-min);
+  padding: 0 var(--space-4);
+  overflow: hidden;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  color: var(--onyx-text);
+  background: var(--onyx-panel-2);
+  font: inherit;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.conn-offer-btn:hover { border-color: var(--onyx-dim); }
+.conn-offer-btn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+
+/* "Stay signed in": label + explanation, a switch on the right. */
+.conn-toggle { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-3) 0; border-block: 1px solid var(--onyx-line); }
+.conn-toggle-body { flex: 1 1 auto; min-width: 0; }
+.conn-toggle-label { display: block; font-size: var(--text-md); font-weight: 650; cursor: pointer; }
+.conn-toggle-description { margin: 2px 0 0; color: var(--onyx-dim); font-size: var(--text-sm); line-height: var(--leading-snug); }
+.conn-switch {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  margin: 9px 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: 13px;
+  background: var(--onyx-panel-2);
+  cursor: pointer;
+}
+.conn-switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--onyx-dim);
+}
+/* Monochrome like the /appearance switches: "on" is the bright track,
+   never the accent (the accent is the Sign in button's). */
+.conn-switch:checked { border-color: var(--onyx-text); background: var(--onyx-text); }
+.conn-switch:checked::before { left: 21px; background: var(--onyx-bg); }
+.conn-switch:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-switch:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .conn-strength { display: flex; align-items: center; gap: var(--space-2); margin-top: calc(-1 * var(--space-2)); font-size: var(--text-2xs); color: var(--onyx-dim); }
 .conn-strength-bar { display: flex; gap: 3px; flex: 1; }
 .conn-strength-seg { flex: 1; height: 4px; border-radius: 2px; background: var(--onyx-line); }
@@ -2000,6 +2088,11 @@ html, body {
   background: color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2));
   cursor: not-allowed;
 }
+/* The remembered panel owns the primary action: the form submit steps
+   down to the secondary outline. */
+.conn-submit--quiet,
+.conn-submit--quiet:hover:not(:disabled) { color: var(--onyx-text); background: transparent; box-shadow: inset 0 0 0 1px var(--onyx-line); }
+.conn-submit--quiet:disabled { color: var(--onyx-faint); background: transparent; }
 .conn-cancel, .conn-alt-btn, .onyx-leave {
   font: inherit;
   color: var(--onyx-text);
@@ -2016,7 +2109,10 @@ html, body {
 .conn-alt-btn { min-height: var(--target-min); padding: 0 var(--space-3); background: transparent; font-weight: 650; }
 .conn-alt-btn:hover:not(:disabled) { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
 .conn-alt-btn:disabled { opacity: 0.5; cursor: default; }
-.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-brand:focus-visible, .conn-foot a:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
+/* v3/gap-appearance: one focus ring (--focus-ring); the identity picker rows sit flush, so theirs is inset. */
+.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-brand:focus-visible, .conn-foot a:focus-visible,
+.conn-identity-forget:focus-visible, .conn-identities-go:focus-visible, .conn-identities-dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); }
+.conn-identity-select:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .conn-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--space-5); }
 .conn-foot a {
   display: inline-flex;
@@ -2029,19 +2125,50 @@ html, body {
 }
 .conn-foot a:hover { color: var(--onyx-text); }
 .conn :where(a, button, input, label) { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-.conn-submit:active:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 80%, var(--onyx-bg)); }
-.conn-alt-btn:active:not(:disabled), .conn-cancel:active { background: var(--onyx-panel-2); }
+.conn-submit:active:not(:disabled), .conn-identities-go:active:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 80%, var(--onyx-bg)); }
+.conn-alt-btn:active:not(:disabled), .conn-cancel:active, .conn-identity-select:active:not(:disabled), .conn-identities-dismiss:active { background: var(--onyx-panel-2); }
 .conn-link:active, .conn-foot a:active { color: var(--onyx-text); }
+@media (hover: hover) { .conn-identity-select:hover:not(:disabled) { background: color-mix(in oklab, var(--onyx-panel-2) 60%, transparent); } }
+
+/* Desktop: destination beside the form card. */
+@media (min-width: 960px) and (min-height: 521px) {
+  .conn-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 27.5rem);
+    align-items: center;
+    gap: 72px;
+    max-width: 66rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .conn-context { max-width: 32rem; }
+  .conn-brand { margin-bottom: var(--space-8); }
+  .conn-title { font-size: clamp(2.25rem, 1.1rem + 2.2vw, 3.25rem); line-height: 1.05; letter-spacing: -0.03em; }
+  .conn-body { margin: var(--space-4) 0 var(--space-7); font-size: var(--text-lg); max-width: 34ch; }
+  .conn-invite { margin: 0 0 var(--space-5); padding: var(--space-4) var(--space-5); background: var(--onyx-panel); }
+  .conn-context-note { display: block; }
+  .conn-points { display: block; max-width: 30rem; }
+  .conn-card {
+    background: var(--onyx-panel);
+    border: 1px solid var(--onyx-line);
+    border-radius: 10px;
+    box-shadow: var(--elev-2);
+    padding: 32px 36px 28px;
+  }
+}
+
 @media (max-width: 520px) {
-  /* --kb-inset (written by the shell) lifts the column above the iOS
-     keyboard so the focused field and Join stay reachable. */
   .conn { justify-content: flex-start; gap: var(--space-6); padding: max(var(--space-3), env(safe-area-inset-top)) 0 calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px)); }
   .conn-input { scroll-margin-bottom: calc(168px + var(--kb-inset, 0px)); }
   .conn-link { min-height: var(--target-min); }
-  .conn-card { max-width: none; padding: 0 var(--space-5); background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+  .conn-stage { max-width: none; padding: 0 max(var(--space-5), env(safe-area-inset-right)) 0 max(var(--space-5), env(safe-area-inset-left)); background: transparent; border: 0; border-radius: 0; box-shadow: none; }
   .conn-brand { margin: 0 0 var(--space-8) -4px; }
   .conn-title { font-size: 2rem; }
   .conn-foot { margin-top: auto; padding: 0 var(--space-5); }
+  .conn-identities-actions { flex-wrap: wrap; }
 }
 @media (max-width: 520px) and (max-height: 600px) {
   .conn-brand { margin-bottom: var(--space-3); }
@@ -2049,8 +2176,54 @@ html, body {
   .conn-body { margin-bottom: var(--space-4); }
   .conn-form { gap: var(--space-3); }
 }
+@media (max-width: 359px) {
+  .conn-stage { padding-inline: var(--space-4); }
+  .conn-alt-row { grid-auto-flow: row; }
+  .conn-identity-forget { padding: 0 var(--space-2); }
+}
+
+/* Landscape phone / 200% zoom: short and wide. Two compact columns
+   from the top; the footer folds into one quiet row. */
+@media (max-height: 520px) and (min-width: 521px) {
+  .conn {
+    justify-content: flex-start;
+    gap: var(--space-4);
+    padding-top: max(var(--space-4), env(safe-area-inset-top));
+    padding-bottom: calc(max(var(--space-3), env(safe-area-inset-bottom)) + var(--kb-inset, 0px));
+  }
+  .conn-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-4) var(--space-7);
+    max-width: 52rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .conn-context { position: sticky; top: max(var(--space-4), env(safe-area-inset-top)); }
+  .conn-brand { margin: -6px 0 var(--space-3) -4px; }
+  .conn-brand .conn-brand-mark { width: 28px; height: 28px; }
+  .conn-title { font-size: 1.625rem; }
+  .conn-body { margin: var(--space-2) 0 var(--space-4); }
+  .conn-invite { margin: 0; padding: var(--space-3); }
+  .conn-room-mark { width: 32px; height: 32px; font-size: 1rem; }
+  .conn-form { gap: var(--space-3); }
+  .conn-input { scroll-margin-block: var(--space-3) calc(72px + var(--kb-inset, 0px)); }
+  .conn-alt { margin-top: var(--space-4); padding-top: var(--space-4); }
+  .conn-foot { gap: 0 var(--space-4); }
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .conn-input, .conn-submit, .conn-alt-btn, .conn-foot a { transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .conn-input, .conn-submit, .conn-alt-btn, .conn-foot a, .conn-identity-select, .conn-identities-go { transition: border-color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+  .conn-switch, .conn-switch::before { transition: left var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+}
+@media (forced-colors: active) {
+  .conn-identity[data-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .conn-switch { border-color: ButtonText; }
+  .conn-switch:checked::before { background: Highlight; }
 }
 .onyx-leave { padding: var(--space-1) 10px; font-size: var(--text-2xs); }
 

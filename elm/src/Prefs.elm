@@ -747,6 +747,10 @@ updatePreference prefs key value =
         "readerMode" ->
             { prefs | readerMode = value == "true" }
 
+        -- v3/gap-watch
+        "watchTogether" ->
+            { prefs | watchTogether = value == "true" }
+
         "width" ->
             { prefs | width = widthFromString value |> Maybe.withDefault prefs.width }
 

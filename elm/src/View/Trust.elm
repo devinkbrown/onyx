@@ -13,7 +13,7 @@ import App exposing (Model, Msg)
 import Html exposing (Html, a, article, div, h1, h2, li, ol, p, section, text)
 import Html.Attributes exposing (attribute, class, href, id, rel, target)
 import Route exposing (Route)
-import View.PublicFrame exposing (frame)
+import View.PublicFrame exposing (frame, relatedNav)
 
 
 {-| The three trust pages. -}
@@ -229,6 +229,7 @@ view page =
             ]
         , section [ class "r-wrap r-section trust-reading", attribute "aria-labelledby" ("trust-" ++ key ++ "-body-heading") ]
             [ body ]
+        , relatedNav ("/" ++ key ++ "/")
         ]
 
 

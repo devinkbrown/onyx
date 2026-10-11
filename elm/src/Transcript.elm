@@ -199,9 +199,13 @@ transcriptToText doc =
         row message =
             "["
                 ++ message.time
-                ++ "] <"
-                ++ message.from
-                ++ "> "
+                ++ (if message.type_ == "action" then
+                        -- v3/gap-commands: `/me` lines export IRC style.
+                        "] * " ++ message.from ++ " "
+
+                    else
+                        "] <" ++ message.from ++ "> "
+                   )
                 ++ message.text
                 ++ (if message.edited then
                         " (edited)"

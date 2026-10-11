@@ -231,6 +231,14 @@ panelBody model category =
                 , description = "Named-conversation filters, forum cards and follow buttons in rooms."
                 , value = model.prefs.topicTools
                 }
+            , -- v3/gap-watch
+              toggle
+                { key = "watchTogether"
+                , legend = "Watch together"
+                , title = "Show watch-together activities"
+                , description = "Shows a room's shared watch clock above the conversation. Onyx shares a title, a link and a play/pause clock; it never streams or controls the video."
+                , value = model.prefs.watchTogether
+                }
             , blockedHostsGroup model
             , section [ class "pref-group" ]
                 [ h3 [ class "pref-label" ] [ text "Alerts" ]
