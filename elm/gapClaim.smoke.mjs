@@ -193,6 +193,18 @@ test("scan counts other identities on the device without naming them", async () 
   assert.equal(asNobody.otherOwners, 3);
 });
 
+test("the guest scope is not counted as another identity (everyone starts as a guest)", async () => {
+  const db = fakeIdb();
+  seedLegacy(db);
+  await put(db, [row("#c:1", "#c", "a", 5)], KAI);
+  await put(db, [row("#c:1", "#c", "g", 5)], GUEST);
+  assert.equal((await scan(db, { scope: KAI })).otherOwners, 1);
+  assert.equal((await scan(db, { scope: KAI, guest: GUEST })).otherOwners, 0);
+  await put(db, [row("#c:1", "#c", "b", 5)], LEE);
+  assert.equal((await scan(db, { scope: KAI, guest: GUEST })).otherOwners, 1);
+  assert.equal((await scan(db, { scope: GUEST, guest: GUEST })).otherOwners, 2, "a guest sees the accounts");
+});
+
 test("scan of a clean or empty vault finds nothing, and keys are only returned on request", async () => {
   const db = fakeIdb();
   const empty = await scan(db, { scope: KAI });
@@ -592,7 +604,7 @@ test("bridge: scan answers with counts, the device decision and the scope it is 
   seedLegacy(db);
   const h = await bridge(db, { [STATE_KEY]: JSON.stringify({ v: 1, dismissed: true }), "onyx:preferences": JSON.stringify({ localHistory: true }) });
   try {
-    h.send({ op: "scan", scope: KAI });
+    h.send({ op: "scan", scope: KAI, guest: GUEST });
     await until(() => h.answers.length >= 1);
     const a = h.answers[0];
     assert.equal(a.kind, "scan");

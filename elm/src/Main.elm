@@ -1002,7 +1002,7 @@ port gapNotifyClicked : ({ tag : String } -> msg) -> Sub msg
 -- settled scope, delete, or remember "Not now" (ports.js `gapClaim`).
 
 
-port gapClaimRequest : { op : String, scope : String } -> Cmd msg
+port gapClaimRequest : { op : String, scope : String, guest : String } -> Cmd msg
 
 
 port gapClaimAnswer : (Decode.Value -> msg) -> Sub msg

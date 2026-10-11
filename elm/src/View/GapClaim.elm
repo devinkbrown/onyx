@@ -101,7 +101,7 @@ card place model =
 
                 Prefs ->
                     div [ class "pref-group-head" ]
-                        [ h3 [ class "pref-label", id titleId ] [ text "Earlier history on this device" ]
+                        [ h3 [ class "pref-label", id titleId ] [ text "Earlier history" ]
                         , case summary of
                             Just s ->
                                 span [ class "pref-count" ] [ text (HistoryImport.countLabel s.rows "message") ]
@@ -199,7 +199,10 @@ prompt place model summary confirming =
                 "History from before this update is stored on this device."
     in
     [ p [ class "gc-lead" ] [ text lead ]
-    , p [ class "gc-facts", attribute "data-testid" "claim-facts" ] [ text (GapClaim.factsLine model.zone summary) ]
+    , p [ class "gc-facts", attribute "data-testid" "claim-facts" ]
+        [ span [ class "gc-facts-counts" ] [ text (GapClaim.countsLine summary) ]
+        , span [ class "gc-facts-range" ] [ text (GapClaim.rangeLabel model.zone summary) ]
+        ]
     , p [ class "gc-ask" ] [ text (GapClaim.question st.interrupted account) ]
     , div [ class "gc-notes" ]
         (List.map (\line -> p [ class "gc-note" ] [ text line ]) (GapClaim.explainLines { account = account, shared = shared })

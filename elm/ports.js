@@ -8320,6 +8320,7 @@ function fetchPublicFeed(url) {
       app.ports.gapClaimRequest.subscribe(function (req) {
         var op = req && typeof req.op === "string" ? req.op : "";
         var scope = req && typeof req.scope === "string" ? req.scope : "";
+        var guest = req && typeof req.guest === "string" && req.guest.length <= VAULT_OWNER_MAX ? req.guest : "";
         function answer(payload) {
           payload.scope = scope;
           try { app.ports.gapClaimAnswer.send(payload); } catch (err) { /* port gone */ }
@@ -8339,7 +8340,7 @@ function fetchPublicFeed(url) {
           /* Deferred a moment so the sweep stays out of the way of boot. */
           setTimeout(function () {
             claimEnqueue(function (release) {
-              claimScan(vault, { scope: scope }, function (r) {
+              claimScan(vault, { scope: scope, guest: guest }, function (r) {
                 var store = claimStorage();
                 var st = claimReadState(store);
                 if (r.ok && r.rows === 0 && st.interrupted) claimWriteState(store, { attach: null });
@@ -12325,6 +12326,9 @@ function fetchPublicFeed(url) {
   var CLAIM_OWNERS_CAP = 256;
   var CLAIM_ROUNDS_MAX = 64;
   var CLAIM_SCAN_DELAY_MS = 800;
+  /* Pause between batches (ms). 0 = just yield to the event loop; the
+     screenshot harness slows it to catch the progress state. */
+  var claimTuning = { pauseMs: 0 };
 
   function claimStorage() {
     try {
@@ -12375,11 +12379,13 @@ function fetchPublicFeed(url) {
   }
 
   /* Walk the store once. `scope` (the scope being asked about) only keeps
-     it out of the `otherOwners` count; `keys` also collects the primary
+     it (and the `guest` scope, which says nothing about who else uses
+     the device) out of the `otherOwners` count; `keys` also collects the primary
      keys of the unstamped rows. Message text is never read. */
   function claimScan(db, opts, onDone) {
     var wantKeys = !!(opts && opts.keys);
     var scope = (opts && typeof opts.scope === "string") ? opts.scope : null;
+    var spare = (opts && typeof opts.guest === "string" && opts.guest) ? opts.guest : null;
     var result = { ok: false, rows: 0, conversations: 0, oldest: null, newest: null, undated: 0, otherOwners: 0, truncated: false, keys: [] };
     var finished = false;
     function done(ok) {
@@ -12431,7 +12437,7 @@ function fetchPublicFeed(url) {
           if (result.oldest === null || at < result.oldest) result.oldest = at;
           if (result.newest === null || at > result.newest) result.newest = at;
         }
-      } else if (stamp !== scope) {
+      } else if (stamp !== scope && stamp !== spare) {
         var okey = "o" + stamp;
         if (!Object.prototype.hasOwnProperty.call(owners, okey) && nOwners < CLAIM_OWNERS_CAP) {
           owners[okey] = true;
@@ -12571,7 +12577,7 @@ function fetchPublicFeed(url) {
             if (hooks && typeof hooks.progress === "function") {
               try { hooks.progress(processed(), totals.total); } catch (err) { /* observer only */ }
             }
-            setTimeout(nextBatch, 0);
+            setTimeout(nextBatch, claimTuning.pauseMs);
           });
         }
         nextBatch();
@@ -12660,7 +12666,8 @@ function fetchPublicFeed(url) {
       writeState: claimWriteState,
       stateKey: CLAIM_STATE_KEY,
       batchSize: CLAIM_BATCH,
-      scanCap: CLAIM_SCAN_CAP
+      scanCap: CLAIM_SCAN_CAP,
+      tuning: claimTuning
     },
     vaultStore: {
       put: vaultPut,

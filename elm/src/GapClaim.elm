@@ -13,6 +13,7 @@ module GapClaim exposing
     , attachLabel
     , blank
     , busy
+    , countsLine
     , decodeAnswer
     , elementId
     , explainLines
@@ -102,6 +103,7 @@ type alias State =
     , phase : Phase
     , dismissed : Bool
     , interrupted : Bool
+    , guest : String
     }
 
 
@@ -112,6 +114,7 @@ blank =
     , phase = Resting
     , dismissed = False
     , interrupted = False
+    , guest = ""
     }
 
 
@@ -119,6 +122,7 @@ blank =
 the App settled, and whether local history is on. -}
 type alias Ctx =
     { scope : Maybe String
+    , guest : String
     , localHistory : Bool
     }
 
@@ -138,7 +142,7 @@ type Msg
 (the vault changed under the open conversations: drop DM privacy
 proofs, hydrate empty buffers). -}
 type Effect
-    = Request { op : String, scope : String }
+    = Request { op : String, scope : String, guest : String }
     | HistoryChanged
 
 
@@ -301,26 +305,33 @@ decodeAnswer value =
 -- STATE MACHINE
 
 
-request : String -> String -> Effect
-request op scope =
-    Request { op = op, scope = scope }
+{-| `guest` is the guest scope of the same network: a scan leaves it
+out of the "other identities on this device" count (everyone starts as a
+guest, so it says nothing about who else uses the device). -}
+request : State -> String -> String -> Effect
+request state op scope =
+    Request { op = op, scope = scope, guest = state.guest }
 
 
 {-| The scope the App settled moved (an identity change, or the first
 scope after registration). Everything per-scope resets; the device-wide
 "Not now" stays; the new scope is scanned. -}
-scopeChanged : Maybe String -> State -> ( State, List Effect )
-scopeChanged scope state =
-    if scope == state.scope then
-        ( state, [] )
+scopeChanged : { scope : Maybe String, guest : String } -> State -> ( State, List Effect )
+scopeChanged input state =
+    if input.scope == state.scope then
+        ( { state | guest = input.guest }, [] )
 
     else
-        case scope of
+        case input.scope of
             Just key ->
-                ( { blank | scope = Just key, scan = Scanning, dismissed = state.dismissed }, [ request "scan" key ] )
+                let
+                    next =
+                        { blank | scope = Just key, scan = Scanning, dismissed = state.dismissed, guest = input.guest }
+                in
+                ( next, [ request next "scan" key ] )
 
             Nothing ->
-                ( { blank | dismissed = state.dismissed }, [] )
+                ( { blank | dismissed = state.dismissed, guest = input.guest }, [] )
 
 
 {-| Attach or delete may start from rest, or again after a failure. -}
@@ -355,12 +366,15 @@ attachBlocker localHistory =
         Nothing
 
     else
-        Just "Local history is off, so older history can't be attached. Turn it on in History & data first, or delete it."
+        Just "Local history is off, so older history can\u{2019}t be attached. Turn it on in History & data first, or delete it."
 
 
 update : Ctx -> Msg -> State -> ( State, List Effect )
-update ctx msg state =
+update ctx msg state0 =
     let
+        state =
+            { state0 | guest = ctx.guest }
+
         live =
             case ( ctx.scope, state.scope ) of
                 ( Just a, Just b ) ->
@@ -378,7 +392,7 @@ update ctx msg state =
             case ( live, foundSummary state ) of
                 ( Just scope, Just summary ) ->
                     if canStart state && ctx.localHistory then
-                        ( { state | phase = Working Attach { done = 0, total = summary.rows } }, [ request "attach" scope ] )
+                        ( { state | phase = Working Attach { done = 0, total = summary.rows } }, [ request state "attach" scope ] )
 
                     else
                         ( state, [] )
@@ -390,7 +404,7 @@ update ctx msg state =
             case ( live, foundSummary state ) of
                 ( Just scope, Just _ ) ->
                     if state.phase == Resting then
-                        ( { state | dismissed = True }, [ request "dismiss" scope ] )
+                        ( { state | dismissed = True }, [ request state "dismiss" scope ] )
 
                     else
                         ( state, [] )
@@ -421,7 +435,7 @@ update ctx msg state =
             case ( live, foundSummary state ) of
                 ( Just scope, Just summary ) ->
                     if state.phase == ConfirmingDelete then
-                        ( { state | phase = Working Delete { done = 0, total = summary.rows } }, [ request "delete" scope ] )
+                        ( { state | phase = Working Delete { done = 0, total = summary.rows } }, [ request state "delete" scope ] )
 
                     else
                         ( state, [] )
@@ -445,7 +459,7 @@ update ctx msg state =
                             ( state, [] )
 
                         _ ->
-                            ( { state | scan = Scanning }, [ request "scan" scope ] )
+                            ( { state | scan = Scanning }, [ request state "scan" scope ] )
 
                 Nothing ->
                     ( state, [] )
@@ -553,7 +567,7 @@ applyAnswer answer state =
                                 else
                                     case state.scope of
                                         Just scope ->
-                                            [ request "scan" scope ]
+                                            [ request state "scan" scope ]
 
                                         Nothing ->
                                             []
@@ -668,8 +682,8 @@ rangeLabel zone summary =
 
 {-| `1,284 messages in 17 conversations`. A scan that hit its cap says
 "more than". -}
-factsLine : Time.Zone -> Summary -> String
-factsLine zone summary =
+countsLine : Summary -> String
+countsLine summary =
     (if summary.truncated then
         "More than "
 
@@ -679,8 +693,12 @@ factsLine zone summary =
         ++ HistoryImport.countLabel summary.rows "message"
         ++ " in "
         ++ HistoryImport.countLabel summary.conversations "conversation"
-        ++ " \u{00B7} "
-        ++ rangeLabel zone summary
+
+
+{-| Counts and dates on one line (the view splits them on narrow cards). -}
+factsLine : Time.Zone -> Summary -> String
+factsLine zone summary =
+    countsLine summary ++ " \u{00B7} " ++ rangeLabel zone summary
 
 
 {-| Is this device used by more than one identity? Other owner stamps

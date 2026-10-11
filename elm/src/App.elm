@@ -1268,7 +1268,7 @@ type Outbound
     | GapAccountFx GapAccount.Effect
       -- v3/gap-claim: scan / attach / delete / dismiss for history that
       -- predates owner scoping (ports `gapClaimRequest`).
-    | GapClaimFx { op : String, scope : String }
+    | GapClaimFx { op : String, scope : String, guest : String }
     -- v3/gap-auth: the auth-gate port (PoW solve, held-password
     -- IDENTIFY, SETPASS credential staging).
     | AuthGatePort Encode.Value
@@ -54414,8 +54414,17 @@ gapGroupVerb verb nick model =
 gapClaimCtx : Model -> GapClaim.Ctx
 gapClaimCtx model =
     { scope = model.gapAccount.scope
+    , guest = gapClaimGuestScope model
     , localHistory = model.prefs.localHistory
     }
+
+
+{-| The guest scope key of the endpoint's network ("" before one is known). -}
+gapClaimGuestScope : Model -> String
+gapClaimGuestScope model =
+    AccountScope.scopeFor { endpoint = model.endpoint, account = Nothing }
+        |> Maybe.map AccountScope.scopeKey
+        |> Maybe.withDefault ""
 
 
 {-| Fold claim effects: port requests become outbounds; a changed vault
@@ -54498,7 +54507,7 @@ settleStepGapClaim : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List O
 settleStepGapClaim msg _ ( m0, outs0 ) =
     let
         ( s1, fx1 ) =
-            GapClaim.scopeChanged m0.gapAccount.scope m0.gapClaim
+            GapClaim.scopeChanged { scope = m0.gapAccount.scope, guest = gapClaimGuestScope m0 } m0.gapClaim
 
         ( s2, fx2 ) =
             case msg of
