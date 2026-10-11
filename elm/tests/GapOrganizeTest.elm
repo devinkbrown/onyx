@@ -361,17 +361,17 @@ lists =
 rowMenu : Test
 rowMenu =
     describe "row menu and folder picker"
-        [ test "every row has an organize control that opens its menu" <|
+        [ test "every row has one overflow control that opens its menu (the rx-shell row menu carries the organize entries)" <|
             \_ ->
                 view world
-                    |> Query.findAll [ testid "sidebar-organize-more" ]
+                    |> Query.findAll [ testid "sidebar-row-more" ]
                     |> Query.count (Expect.atLeast 5)
         , test "the control names its conversation" <|
             \_ ->
                 view world
-                    |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Organize #lounge") ]
+                    |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Room options for #lounge") ]
                     |> Event.simulate Event.click
-                    |> Event.expect (OrganizeMsg (Organizer.RowMenuOpen "#lounge"))
+                    |> Event.expect (RailMenuOpen { name = "#lounge", x = 0, y = 0, vw = 0, vh = 0 })
         , test "a room menu offers Move to folder and Hide" <|
             \_ ->
                 view (step (OrganizeMsg (Organizer.RowMenuOpen "#lounge")) world)

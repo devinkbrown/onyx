@@ -3593,8 +3593,10 @@ suite =
                             Query.find [ Selector.class "onyx-toast--danger" ] q
                                 |> Query.has [ Selector.text "Send failed", Selector.text "The wire dropped it." ]
                         , \_ ->
+                            -- v3/rx-shell: the dismiss glyph is a mask icon, never a font character
                             Query.find [ Selector.attribute (Attr.attribute "aria-label" "Dismiss Send failed") ] q
-                                |> Query.has [ Selector.text "×" ]
+                                |> Query.find [ Selector.class "onyx-shi" ]
+                                |> Query.has [ Selector.attribute (Attr.attribute "data-icon" "close") ]
                         ]
                         ()
             , test "undo row offers an Undo control" <|

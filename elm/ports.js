@@ -4242,8 +4242,15 @@ function fetchPublicFeed(url) {
     }
 
     function attach(found) {
+      var prev = pane;
       detach();
-      if (!found) return;
+      if (!found) {
+        /* v3/rx-shell: the pane is shared with Home (no transcript): a
+           reader who scrolled a conversation to its bottom must not
+           land on Home scrolled past its masthead. */
+        if (prev) prev.scrollTop = 0;
+        return;
+      }
       log = found;
       pane = paneOf(found);
       key = found.getAttribute("data-transcript-key") || "";
