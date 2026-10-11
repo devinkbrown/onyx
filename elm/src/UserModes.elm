@@ -1219,16 +1219,7 @@ update ctx msg state =
         ServerIgnoreSet on ->
             ( { state
                 | serverIgnore = on
-                , silenceStatus =
-                    Just
-                        { text =
-                            if on then
-                                "New blocks also go to the server."
-
-                            else
-                                "New blocks stay on this device. Server blocks below stay until you remove them."
-                        , error = False
-                        }
+                , silenceStatus = Nothing
               }
             , Persist
                 :: (if on && ctx.live && not state.silenceKnown then
@@ -2464,8 +2455,19 @@ failReply command code description state =
                 }
 
         "AUTOJOIN" ->
+            let
+                text =
+                    if code == "ACCOUNT_REQUIRED" then
+                        "Sign in to keep rooms on your account."
+
+                    else if String.isEmpty description then
+                        "The server refused that (" ++ code ++ ")."
+
+                    else
+                        description
+            in
             Just
-                { state = { state | autojoinListing = False, autojoinStatus = Just { text = "Sign in to keep rooms on your account.", error = True } }
+                { state = { state | autojoinListing = False, autojoinStatus = Just { text = text, error = True } }
                 , effects = []
                 , consume = True
                 }

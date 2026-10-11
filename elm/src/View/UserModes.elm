@@ -790,6 +790,7 @@ serverBlocks model =
                         ]
                     , span [ class "pref-switch", attribute "aria-hidden" "true" ] []
                     ]
+                , statusLine "um-silence-status" state.silenceStatus
                 , if state.serverIgnore && not (List.isEmpty missing) then
                     div [ class "um-actions" ]
                         [ button
@@ -810,6 +811,11 @@ serverBlocks model =
                   else
                     div [ class "um-blocks__extra" ]
                         [ h4 [ class "um-blocks__title" ] [ text "Also blocked on the server" ]
+                        , if state.serverIgnore then
+                            text ""
+
+                          else
+                            p [ class "um-hint" ] [ text "These stay until you unblock them here." ]
                         , ul [ class "um-list", attribute "aria-label" "Blocked on the server", testid "um-silence-list" ]
                             (List.map
                                 (\mask ->
@@ -828,7 +834,6 @@ serverBlocks model =
                                 extra
                             )
                         ]
-                , statusLine "um-silence-status" state.silenceStatus
                 ]
 
 

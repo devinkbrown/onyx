@@ -244,8 +244,10 @@ export default {
   'um-dm-note': async (page, h) => {
     const inject = await boot(page, h, { account: 'kn' });
     await dm(page, h, inject, 'mira', 'hey - are you around?');
+    if (isPhone(page)) await clickVisible(page, ['[data-testid="room-back"]'], h);
+    await clickVisible(page, ['.onyx-mobile-nav [data-testid="nav-messages"]', '[data-testid="nav-messages"]'], h);
     await page.evaluate(() => {
-      const el = [...document.querySelectorAll('button, a, li')].find((b) => /mira/.test(b.textContent || '') && !/Message requests/.test(b.textContent || '') && b.offsetParent);
+      const el = [...document.querySelectorAll('button, a')].find((b) => /mira/.test(b.textContent || '') && b.offsetParent);
       if (el) el.click();
     });
     await h.settle(page, 500);
