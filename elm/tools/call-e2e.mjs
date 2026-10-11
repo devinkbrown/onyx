@@ -312,6 +312,11 @@ async function main() {
     await Promise.all([signIn(A, base, a, accounts.a.pass), signIn(B, base, b, accounts.b.pass)]);
     check('both signed in with SASL (SCRAM) on the local node', true);
     check('engine mounted (window.OnyxVoiceEngine)', await A.evaluate(() => typeof window.OnyxVoiceEngine?.joinVoice === 'function'));
+    // v3/rx-calls: the node never advertises ACCOUNTRESIDENCE at sign-in, yet
+    // the Elm client enrolls the device key at the end of the welcome burst —
+    // the adapter sees the server's IDENTITY ADDED before anyone joins a call.
+    const preEnrolled = await until(async () => (await stats(A))?.identityEnrolled && (await stats(B))?.identityEnrolled, { timeout: 30000, label: 'sign-in enrollment' }).catch(() => false);
+    check('device key enrolled at sign-in by the Elm client (no ACCOUNTRESIDENCE, before any join)', !!preEnrolled);
 
     // A starts the call from the room header; B joins from the invite banner.
     await A.click('[data-testid="ribbon-join-call"]');

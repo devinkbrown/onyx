@@ -2197,7 +2197,10 @@
      `acceptFailed` (the engine's accept promise rejected) and
      `errorKind` (classified getUserMedia / codec failure) are
      validated fail-closed in Elm (CallDock). */
-  var VOICE_RING_FIELDS = ["acceptFailed", "errorKind"];
+  var VOICE_RING_FIELDS = ["acceptFailed", "errorKind",
+    /* v3/rx-calls: media failure detail (voice-core.ts onError /
+       onDecodeError / peerKeyChanged); Elm bounds and validates. */
+    "mediaError", "errorPeer", "errorMedia"];
 
   /* Map a getUserMedia / engine error to the spec §2.15 classes. */
   function voiceErrorKind(err) {
@@ -2241,9 +2244,15 @@
       if (ev.joinFailed) outcome = "failed";
       else if (ev.rejoinPending) outcome = "dropped";
       else if (feed.sawEstablished) outcome = "ended";
+      /* v3/rx-calls: the adapter's follow-up idle after a removal / a
+         failed capture rejoin keeps an honest outcome (the first idle
+         already reset the feed). */
+      else if (ev.errorKind === "removed") outcome = "ended";
+      else if (ev.errorKind === "capture") outcome = "failed";
       var idleSnapshot = { state: "idle", nick: "", channel: null, startedAt: null, outcome: outcome };
       /* v3/calls-c6 */
       if (typeof ev.errorKind === "string") idleSnapshot.errorKind = ev.errorKind;
+      if (typeof ev.mediaError === "string") idleSnapshot.mediaError = ev.mediaError.slice(0, 200);
       return {
         snapshot: idleSnapshot,
         feed: voiceFeedBlank()
@@ -2415,6 +2424,8 @@
       try {
         if (app.ports.voiceCallHub) app.ports.voiceCallHub.send(snapshot);
       } catch (err) { /* port gone */ }
+      /* v3/rx-calls: keep the screen awake + OS call controls while live */
+      try { voiceSessionAssist(app).update(snapshot); } catch (err) { /* assist is best-effort */ }
     }
     /* Re-send the live call with confirmed local-media fields (command
        outcomes). Dropped while idle — nothing to confirm. */
@@ -2550,6 +2561,104 @@
       bindNow: bindNow,
       disconnect: function () { if (observer) observer.disconnect(); }
     };
+  }
+
+  /* v3/rx-calls — call session assist (oracle `screenWakeLock.ts` +
+     `callMediaSession.ts`): while a call is live, hold a screen wake
+     lock (re-acquired when the page is visible again; released on
+     idle) and register OS media-session call controls — the
+     microphone toggle and hang-up go through the SAME `shortcut` port
+     names as the Ctrl+Shift chords (`call-mute`, `call-leave`), so Elm
+     keeps every rule (leave confirmation included). Neutral metadata:
+     the room name, never message content. Everything feature-detected
+     and best-effort; created once per app. */
+  var voiceSessionAssists = (typeof WeakMap === "function") ? new WeakMap() : null;
+  function createVoiceSessionAssist(app, win) {
+    var nav = win && win.navigator;
+    var lock = null;
+    var pending = false;
+    var live = false;
+    var room = "";
+    function send(name) {
+      try { if (app.ports && app.ports.shortcut) app.ports.shortcut.send(name); } catch (err) { /* port gone */ }
+    }
+    function acquire() {
+      if (!live || lock || pending || !nav || !nav.wakeLock || typeof nav.wakeLock.request !== "function") return;
+      try { if (win.document && win.document.visibilityState === "hidden") return; } catch (err) { /* assume visible */ }
+      pending = true;
+      var req;
+      try { req = nav.wakeLock.request("screen"); } catch (err) { pending = false; return; }
+      Promise.resolve(req).then(function (sentinel) {
+        pending = false;
+        if (!sentinel) return;
+        if (!live) { try { sentinel.release(); } catch (err) { /* already released */ } return; }
+        lock = sentinel;
+        try { sentinel.addEventListener("release", function () { if (lock === sentinel) lock = null; }); } catch (err) { /* old API */ }
+      }, function () { pending = false; });
+    }
+    function release() {
+      var held = lock;
+      lock = null;
+      if (held) { try { held.release(); } catch (err) { /* already released */ } }
+    }
+    function sessionHandlers(on) {
+      var ms = nav && nav.mediaSession;
+      if (!ms || typeof ms.setActionHandler !== "function") return;
+      var set = function (action, fn) { try { ms.setActionHandler(action, fn); } catch (err) { /* unsupported action */ } };
+      set("togglemicrophone", on ? function () { send("call-mute"); } : null);
+      set("hangup", on ? function () { send("call-leave"); } : null);
+      try {
+        if (on && typeof win.MediaMetadata === "function") {
+          ms.metadata = new win.MediaMetadata({ title: room ? "Call in " + room : "Onyx call", artist: "Onyx" });
+        } else if (!on) {
+          ms.metadata = null;
+        }
+      } catch (err) { /* metadata is cosmetic */ }
+    }
+    try {
+      if (win.document && win.document.addEventListener) {
+        win.document.addEventListener("visibilitychange", function () {
+          if (win.document.visibilityState === "visible") acquire();
+        });
+      }
+    } catch (err) { /* no document events */ }
+    return {
+      update: function (snapshot) {
+        var state = snapshot && snapshot.state;
+        var nowLive = state === "in_call";
+        var nextRoom = (snapshot && typeof snapshot.channel === "string") ? snapshot.channel : "";
+        if (nowLive && (!live || nextRoom !== room)) {
+          live = true;
+          room = nextRoom;
+          sessionHandlers(true);
+          acquire();
+        } else if (!nowLive && live) {
+          live = false;
+          room = "";
+          sessionHandlers(false);
+          release();
+        }
+      },
+      setMicrophoneActive: function (active) {
+        var ms = nav && nav.mediaSession;
+        if (!live || !ms || typeof ms.setMicrophoneActive !== "function") return;
+        try { ms.setMicrophoneActive(!!active); } catch (err) { /* unsupported */ }
+      },
+      held: function () { return !!lock; }
+    };
+  }
+  function voiceSessionAssist(app) {
+    var win = (typeof window !== "undefined") ? window : null;
+    var noop = { update: function () {}, setMicrophoneActive: function () {}, held: function () { return false; } };
+    if (!win || !app) return noop;
+    if (voiceSessionAssists) {
+      var have = voiceSessionAssists.get(app);
+      if (have) return have;
+      var made = createVoiceSessionAssist(app, win);
+      voiceSessionAssists.set(app, made);
+      return made;
+    }
+    return noop;
   }
 
   function runVoiceEngine(call, ok, fail) {
@@ -4123,7 +4232,13 @@ function fetchPublicFeed(url) {
         try {
           var done = engine.joinVoice(channel, { video: video });
           if (done && typeof done.then === "function") {
-            done.then(null, function (reason) { voiceFailed(channel, reason); });
+            done.then(null, function (reason) {
+              /* v3/rx-calls: Leave during the join cancels it — idle, not failed */
+              var cancelled;
+              try { cancelled = !!reason && reason.name === "AbortError"; } catch (err) { cancelled = false; }
+              if (cancelled) voicePush({ state: "idle", nick: "", channel: null });
+              else voiceFailed(channel, reason);
+            });
           }
         } catch (err) {
           voiceFailed(channel, err);
@@ -4141,6 +4256,8 @@ function fetchPublicFeed(url) {
     }
     if (app.ports.voiceMute) {
       app.ports.voiceMute.subscribe(function (req) {
+        /* v3/rx-calls: the OS call controls show the microphone state */
+        try { voiceSessionAssist(app).setMicrophoneActive(!(req && req.muted)); } catch (err) { /* best-effort */ }
         var engine = voiceEngine();
         if (!engine || typeof engine.setMuted !== "function") return;
         try { engine.setMuted(!!(req && req.muted)); } catch (err) { /* mute is best-effort */ }
@@ -10119,6 +10236,7 @@ function fetchPublicFeed(url) {
       blank: voiceFeedBlank,
       next: voiceFeedNext
     },
+    createVoiceSessionAssist: createVoiceSessionAssist, /* v3/rx-calls */
     voiceTiles: {
       createBinder: createVoiceTileBinder,
       resolve: voiceTileStream,

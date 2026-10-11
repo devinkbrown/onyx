@@ -36316,14 +36316,20 @@ callsC6Snapshot raw model =
             else
                 accepted
     in
-    case Maybe.andThen CallDock.codecToast kind of
+    -- v3/rx-calls: every media failure word gets a calm toast
+    case CallDock.mediaToast raw of
         Just toast ->
             addToast
-                { variant = ToastError
+                { variant =
+                    if toast.warn then
+                        ToastWarning
+
+                    else
+                        ToastError
                 , title = toast.title
                 , description = Just toast.description
                 , duration = Nothing
-                , groupKey = Just ("voice-" ++ Maybe.withDefault "" kind)
+                , groupKey = Just toast.group
                 , undo = Nothing
                 }
                 classified.nowMs
@@ -41167,6 +41173,11 @@ updateCore msg model =
             if model.connection /= Live || String.isEmpty channel then
                 ( model, [] )
 
+            else if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing && CallUi.sameTarget model.calls.channel channel then
+                -- v3/rx-calls: this join is already in flight (a double
+                -- press must not cancel and restart it).
+                ( model, [] )
+
             else if CallUi.needsAccount model then
                 -- v3/rx-calls: calls are end-to-end encrypted and need an
                 -- account; nothing goes out — the room shows the
@@ -41198,6 +41209,11 @@ updateCore msg model =
                 ( { model
                     | callSelfMuted = model.voicePrefs.muteOnJoin -- v3/calls-c8: the stored pref
                     , callJoinTarget = Just channel
+                    -- v3/rx-calls: provisional at once ("Connecting to the
+                    -- call…" + the permission hint) while capture and the
+                    -- device-key enrollment run; the engine snapshot
+                    -- confirms it, a failed join rolls it back to idle.
+                    , calls = { lifecycle = Media.InCall, channel = Just channel, withPeer = "", startedAt = Nothing, outcome = Nothing }
                     -- v3/calls-c4: camera intent from the join verb.
                     , callLocal = { blankCallLocal | camera = video && model.callLocal.cameraSupported, shareSupported = model.callLocal.shareSupported, pipSupported = model.callLocal.pipSupported, cameraSupported = model.callLocal.cameraSupported }
                     , callMoreOpen = False
@@ -41218,7 +41234,12 @@ updateCore msg model =
             -- `leaveVoiceChannel`'s idle no-op).
             case model.calls.channel of
                 Just current ->
-                    if model.calls.lifecycle /= Media.Idle then
+                    if model.calls.lifecycle == Media.InCall && model.calls.startedAt == Nothing then
+                        -- v3/rx-calls: leaving a join still in flight cancels
+                        -- it; idle at once (the engine confirms quietly).
+                        ( { model | callSelfMuted = False, calls = Media.blankCallHub }, [ VoiceLeave { channel = current } ] )
+
+                    else if model.calls.lifecycle /= Media.Idle then
                         ( { model | callSelfMuted = False }, [ VoiceLeave { channel = current } ] )
 
                     else

@@ -7,10 +7,14 @@ engine bridge, which lands with the engine itself).
 Hard rules, mirroring the oracle:
 
   - Opening this hub never joins, accepts, starts, or otherwise mutates
-    a call. The only controls are "Choose a room" (reveals the rail)
-    and "Return to call" (navigates, voice untouched).
+    a call. "Choose a room" reveals the rail and "Return to call"
+    navigates (voice untouched); an idle hub with an open room offers
+    an explicit "Join call in #room" (and video only while the engine
+    reports a camera).
+  - v3/rx-calls: calls need an account, so a guest gets the "Sign in to
+    join calls" card instead of any join control.
   - Ringing and provisional states are never labeled established.
-  - No join / accept / start control exists for any presentation.
+  - No accept / start control exists for any presentation.
   - The last-call outcome renders only while idle; a live call always
     wins over history, and the hub never invents it.
 

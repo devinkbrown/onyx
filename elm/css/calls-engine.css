@@ -29,6 +29,8 @@
 /* ---------- glyphs ---------- */
 .onyx-ci[data-icon="key"] { --ci: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='15' r='4'/%3E%3Cpath d='M11 12l8.5-8.5M16 7l2.5 2.5M13.5 9.5l2 2'/%3E%3C/svg%3E"); }
 
+.onyx-ci[data-icon="link"] { --ci: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'/%3E%3C/svg%3E"); }
+
 /* ---------- room header: presence chip + Call ---------- */
 .onyx-header-voice { flex: 0 1 auto; min-width: 0; }
 .onyx-voice-chip { flex: 0 1 auto; min-width: 0; max-width: 24rem; height: 32px; overflow: hidden; }
@@ -44,22 +46,37 @@
 @media (hover: none) {
   .onyx-voice-chip, .onyx-call-join { min-height: var(--target-min); height: var(--target-min); }
   .onyx-call-join { min-width: var(--target-min); justify-content: center; }
+  .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); }
+  .onyx-call-stage .onyx-call-more .onyx-call-more-item { min-height: var(--target-min); }
 }
 
 /* ---------- docking in the conversation scroller ---------- */
 .onyx-thread-pane > .onyx-call-stage,
 .onyx-thread-pane > .onyx-join-banner {
   position: sticky; top: 0; z-index: 6; flex: none;
+  /* Inline alignment follows the transcript column rule (app.css
+     `.onyx-main > .onyx-thread-pane > *`), so the dock lines up with
+     the messages however that column is placed. */
+  width: 100%; max-width: var(--shell-measure);
+  /* Wider than the measure (fhd, ultrawide) the transcript would slide
+     past the docked surface's sides: two same-colour copies each side
+     (one measure apart) mask it. Ink overflow only — never scrollable,
+     clipped by the scroller, nothing above or below is covered. */
+  box-shadow:
+    calc(-1 * var(--shell-measure)) 0 0 0 var(--onyx-bg),
+    var(--shell-measure) 0 0 0 var(--onyx-bg),
+    calc(-2 * var(--shell-measure)) 0 0 0 var(--onyx-bg),
+    calc(2 * var(--shell-measure)) 0 0 0 var(--onyx-bg);
 }
 
 /* ---------- pre-join banner (invite / failed / guest) ---------- */
 .onyx-join-banner {
   container: onyx-banner / inline-size;
-  position: relative; flex-wrap: nowrap; align-items: center; gap: var(--space-3);
+  position: relative; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
   margin: var(--space-2) 0 var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   background: var(--onyx-panel);
 }
-.onyx-join-banner-copy { flex: 1 1 auto; min-width: 0; }
+.onyx-join-banner-copy { flex: 1 1 14rem; min-width: 0; }
 .onyx-join-banner-copy strong { font-size: var(--text-md); line-height: var(--leading-snug, 1.35); }
 .onyx-join-banner-copy span { display: block; font-size: var(--text-sm); line-height: var(--leading-snug, 1.35); }
 .onyx-join-banner-actions { align-items: center; }
@@ -77,15 +94,25 @@
   .onyx-join-banner-actions .onyx-call-btn { flex: 1 1 0; min-width: 0; min-height: var(--target-min); padding: 0 var(--space-2); }
   .onyx-join-banner-hide { position: absolute; top: 2px; right: 2px; width: var(--target-min); height: var(--target-min); }
 }
-@container onyx-banner (max-width: 360px) {
+@container onyx-banner (max-width: 420px) {
+  /* Narrow: the title says it; the why moves to the buttons' labels. */
+  .onyx-call-guest .onyx-join-banner-copy span { display: none; }
+}
+@container onyx-banner (max-width: 300px) {
   .onyx-join-banner-actions { flex-direction: column; }
   .onyx-join-banner-actions .onyx-call-btn { flex: none; width: 100%; }
 }
 @media (max-width: 640px) {
   .onyx-join-banner { flex-direction: row; flex-wrap: wrap; align-items: center; margin: var(--space-1) 0 var(--space-2); }
   .onyx-join-banner-copy { min-width: 0; }
-  .onyx-join-banner-copy span { font-size: var(--text-md); }
+  .onyx-join-banner { align-items: flex-start; }
+  .onyx-join-banner > .onyx-call-faces, .onyx-join-banner > .onyx-call-guest-icon { margin-top: 2px; }
   .onyx-join-banner[data-variant="invite"] .onyx-join-banner-copy span { display: none; }
+}
+@media (max-height: 500px) {
+  /* Landscape phones: one quiet line of copy. */
+  .onyx-join-banner { margin-block: var(--space-1); padding-block: var(--space-1); }
+  .onyx-join-banner-copy span { display: none; }
 }
 /* A guest's banner offers an account, quietly. */
 .onyx-call-guest { border-color: var(--onyx-line); }
@@ -110,7 +137,14 @@
 .onyx-call-meta .onyx-call-timer { color: var(--onyx-text); font-variant-numeric: tabular-nums; }
 .onyx-call-meta .onyx-call-where { display: none; }
 .onyx-main-calls .onyx-call-meta .onyx-call-where { display: inline; min-width: 0; max-width: 14rem; color: var(--onyx-text); }
-.onyx-call-meta .onyx-sec-chip { height: 32px; overflow: hidden; text-overflow: ellipsis; }
+.onyx-call-meta .onyx-sec-chip { width: 32px; height: 32px; padding: 0; justify-content: center; overflow: hidden; }
+/* The status line already names the protection; the chip is its icon
+   and the door to the privacy sheet (its aria-label carries the words). */
+.onyx-call-meta .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+.onyx-call-meta .onyx-sec-chip[data-tone="ok"] { color: var(--onyx-dim); }
+.onyx-call-meta .onyx-sec-chip:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
 .onyx-call-head-faces { display: none; align-items: center; flex: none; }
 .onyx-call-head-faces .onyx-call-avatar { margin-left: -4px; border-color: var(--onyx-bg); }
 .onyx-call-head-faces .onyx-call-avatar:first-child { margin-left: 0; }
@@ -124,6 +158,9 @@
 .onyx-call-avatar-lg { width: 64px; height: 64px; font-size: 22px; }
 .onyx-call-name { font-size: var(--text-md); }
 .onyx-call-role { margin-top: -2px; font-size: var(--text-2xs); }
+
+/* The join in flight: one quiet line under the people. */
+.onyx-call-joining { margin: 0 var(--space-3) var(--space-2); text-align: center; font-size: var(--text-sm); color: var(--onyx-dim); }
 
 /* Controls: one centred row; More's tools wrap under it. */
 .onyx-call-bar {
@@ -144,22 +181,12 @@
   flex: 1 1 100%; min-width: 0; margin: 0; padding: var(--space-2) 0 0;
   border: 0; border-top: 1px solid var(--onyx-line); border-radius: 0; background: var(--onyx-panel);
 }
-.onyx-call-more > .onyx-call-more-item,
-.onyx-call-more > .onyx-call-more-share > .onyx-call-more-item,
-.onyx-call-more > .onyx-call-more-react > .onyx-call-more-item {
+.onyx-call-stage .onyx-call-more .onyx-call-more-item {
   width: auto; min-height: 36px; padding: 0 var(--space-3); border: 1px solid var(--onyx-line); white-space: nowrap;
 }
 .onyx-call-more-item:hover { background: var(--onyx-panel-2); }
 .onyx-call-more-item:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 .onyx-call-more-item .onyx-ci { width: 16px; height: 16px; }
-
-/* Medium stage: the chip keeps its icon (its aria-label carries the words). */
-@container onyx-call (max-width: 820px) {
-  .onyx-call-meta .onyx-sec-chip { width: 32px; padding: 0; justify-content: center; }
-  .onyx-call-meta .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-  }
-}
 
 /* Narrow stage: icon-only controls in one even row. */
 @container onyx-call (max-width: 600px) {
@@ -178,10 +205,7 @@
   .onyx-call-stage { margin: var(--space-1) 0 var(--space-2); }
   .onyx-call-stage-head { gap: var(--space-2); min-height: 36px; padding: var(--space-1) var(--space-3) 0; }
   .onyx-call-people-count { display: none; }
-  .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); padding: 0; justify-content: center; }
-  .onyx-call-meta .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-  }
+  .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); }
 
   /* People: one scrolling strip, names kept, roles dropped. */
   .onyx-call-people,
@@ -231,9 +255,7 @@
     content: ""; display: block; width: 36px; height: 4px; margin: 0 auto var(--space-2);
     border-radius: 2px; background: var(--onyx-line);
   }
-  .onyx-call-more > .onyx-call-more-item,
-  .onyx-call-more > .onyx-call-more-share > .onyx-call-more-item,
-  .onyx-call-more > .onyx-call-more-react > .onyx-call-more-item {
+  .onyx-call-stage .onyx-call-more .onyx-call-more-item {
     width: 100%; min-height: 48px; padding: 0 var(--space-3); border: 0; font-size: var(--text-md);
   }
   .onyx-call-more-item .onyx-ci { width: 20px; height: 20px; }
@@ -266,18 +288,15 @@
   .onyx-call-stage { flex-flow: row wrap; align-items: center; column-gap: var(--space-2); }
   .onyx-call-stage > * { flex: 1 1 100%; order: 3; }
   .onyx-call-stage > .onyx-call-stage-head { flex: 1 1 15rem; order: 1; min-height: 44px; padding: var(--space-1) 0 var(--space-1) var(--space-3); }
-  .onyx-call-stage > .onyx-call-bar { flex: 1 1 16rem; order: 2; justify-content: flex-end; padding: var(--space-1) var(--space-2); border-top: 0; background: transparent; }
+  .onyx-call-stage > .onyx-call-bar { flex: 1 1 16rem; order: 2; justify-content: center; padding: var(--space-1) var(--space-2); border-top: 0; background: transparent; }
   .onyx-call-stage > .onyx-call-people {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
   }
   .onyx-call-head-faces { display: inline-flex; }
   .onyx-call-stage-status .onyx-call-pip { display: none; }
   .onyx-call-people-count { display: none; }
-  .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); padding: 0; justify-content: center; }
-  .onyx-call-meta .onyx-sec-chip > span[aria-hidden="true"]:not(.onyx-ci) {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-  }
-  .onyx-call-bar-center { width: auto; flex: 1 1 auto; justify-content: flex-end; gap: var(--space-1); }
+  .onyx-call-meta .onyx-sec-chip { width: var(--target-min); height: var(--target-min); }
+  .onyx-call-bar-center { width: auto; flex: 1 1 auto; justify-content: center; gap: var(--space-1); }
   .onyx-call-bar-center > .onyx-cbtn,
   .onyx-call-more-wrap { flex: 0 1 52px; min-width: var(--target-min); max-width: 56px; }
   .onyx-call-more-wrap > .onyx-cbtn,
@@ -311,6 +330,20 @@
 .onyx-call-primary { display: flex; justify-content: center; }
 .onyx-call-primary > .onyx-tile { aspect-ratio: 16 / 9; height: auto; min-height: 0; width: min(100%, calc(var(--grid-h) * 16 / 9)); }
 .onyx-tile-nick { font-size: var(--text-sm); }
+/* Tile chrome scales with the tile: small tiles keep the name and icon
+   badges; the per-tile buttons wait for hover / focus on desktop. */
+.onyx-tile { container: onyx-tile / inline-size; }
+@container onyx-tile (max-width: 240px) {
+  .onyx-tile-tag-text { display: none; }
+  .onyx-tile-tag { padding: 0 var(--space-1); }
+  .onyx-tile-nick { height: 22px; padding: 0 6px; }
+}
+@media (hover: hover) {
+  .onyx-tile .onyx-tile-btn { opacity: 0; transition: opacity var(--dur-fast, 160ms) ease; }
+  .onyx-tile:hover .onyx-tile-btn,
+  .onyx-tile:focus-within .onyx-tile-btn,
+  .onyx-tile .onyx-tile-btn[aria-pressed="true"] { opacity: 1; }
+}
 
 @media (max-width: 640px) {
   /* Docked on a phone: 16:9 tiles, two up, at most two rows in view. */
@@ -323,7 +356,15 @@
     max-height: calc((100vw - 2 * var(--space-3) - var(--space-2)) / 2 * 9 / 16 * 2 + var(--space-2) + 4px);
     overflow-y: auto; overscroll-behavior: contain;
   }
+  .onyx-call-grid { grid-auto-rows: max-content; }
   .onyx-call-grid > .onyx-tile { aspect-ratio: 16 / 9; }
+  /* Five or more: two rows that scroll sideways (2 x 2 in view). */
+  .onyx-call-grid:has(> .onyx-tile:nth-child(5)) {
+    grid-auto-flow: column; grid-template-columns: none; grid-template-rows: repeat(2, max-content);
+    grid-auto-columns: calc((100% - var(--space-2)) / 2);
+    max-height: none; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none;
+  }
+  .onyx-call-grid:has(> .onyx-tile:nth-child(5)) > .onyx-tile { scroll-snap-align: start; }
   .onyx-call-grid > .onyx-tile .onyx-tile-btn { display: none; }
 }
 
@@ -408,9 +449,9 @@
 /* ---------- DM: direct calls are not available yet ---------- */
 .onyx-call-dm-unavailable {
   display: flex; align-items: flex-start; gap: var(--space-3); min-height: var(--target-min);
-  padding: var(--space-2) var(--space-3); color: var(--onyx-dim);
+  padding: var(--space-2) var(--space-3); color: var(--onyx-dim); white-space: normal;
 }
-.onyx-call-dm-unavailable > .onyx-ci { margin-top: 2px; }
+.onyx-call-dm-unavailable > .onyx-ci { margin-top: 2px; width: 20px; height: 20px; }
 .onyx-call-dm-unavailable-copy { display: grid; gap: 2px; min-width: 0; }
 .onyx-call-dm-unavailable-copy strong { color: var(--onyx-text); font-weight: 650; }
 .onyx-call-dm-unavailable-copy span { font-size: var(--text-sm); }
@@ -418,6 +459,29 @@
 /* ---------- sheets: one grip (the sheet primitive draws it) ---------- */
 @media (max-width: 640px) {
   .onyx-sheet.onyx-call-sheet::before { content: none; }
+}
+
+/* ---------- PiP on desktop: bottom corners clear the composer ---------- */
+@media (min-width: 768px) and (min-height: 501px) {
+  .onyx-call-pip-card[data-corner="bottom-right"],
+  .onyx-call-pip-card[data-corner="bottom-left"] {
+    bottom: min(calc(var(--pip-iy, 12px) + var(--composer-h, 64px) + var(--space-5)), calc(100vh - 182px));
+  }
+}
+
+/* ---------- PiP on phones: under the room header, one row of actions ---------- */
+@media (max-width: 767px) {
+  .onyx-call-pip-card,
+  .onyx-call-pip-card[data-corner] {
+    top: calc(env(safe-area-inset-top, 0px) + 64px);
+    right: max(var(--space-3), env(safe-area-inset-right, 0px));
+    width: min(320px, calc(100vw - 2 * var(--space-3)));
+  }
+  .onyx-call-pip-body { flex-wrap: nowrap; padding: var(--space-2); gap: var(--space-2); }
+  .onyx-call-pip-faces { flex: 1 1 auto; flex-basis: auto; min-width: 0; overflow: hidden; }
+  .onyx-call-pip-btn { min-height: var(--target-min); padding: 0 var(--space-3); font-size: var(--text-sm); }
+  .onyx-call-pip-btn .onyx-ci { width: 18px; height: 18px; }
+  .onyx-call-pip-handle { min-height: 36px; }
 }
 
 /* ---------- PiP: landscape phones dock it top-right, small ---------- */
@@ -432,6 +496,14 @@
   .onyx-call-pip-btn { min-height: 32px; padding: 0 var(--space-2); }
 }
 
+/* ---------- smallest phones (SE / folded): no call text under 14px ---------- */
+@media (max-width: 344px) {
+  .onyx-call-stage-status, .onyx-call-meta, .onyx-join-banner-copy span,
+  .onyx-call-dm-unavailable-copy span, .onyx-call-ring-meta, .onyx-call-ring-sub,
+  .onyx-call-joining, .onyx-call-name { font-size: 0.875rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .onyx-call-more { transition: none; animation: none; }
+  .onyx-tile .onyx-tile-btn { transition: none; }
 }

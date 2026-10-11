@@ -89,7 +89,7 @@ function fakeEngine(opts) {
       g.fillRect(200, 240, 240, 140);
     };
     paint();
-    setInterval(paint, 200);
+    window.setInterval(paint, 200);
     streams[tile] = c.captureStream(5);
     return streams[tile];
   }
@@ -171,9 +171,10 @@ function roster(t, room, peers, { self = false } = {}) {
 async function joinCall(page, h, t, { room = '#lounge', peers = VOICE_PEERS, video = false } = {}) {
   roster(t, room, peers);
   await h.settle(page, 300);
-  const sel = video ? ['[data-testid="call-join-video"]'] : ['[data-testid="call-join-voice"]', '[data-testid="ribbon-join-call"]'];
-  await clickVisible(page, sel, h, 400);
+  await clickVisible(page, ['[data-testid="call-join-voice"]', '[data-testid="ribbon-join-call"]'], h, 400);
   roster(t, room, [], { self: true });
+  // The camera is offered only once the engine reports it (fails closed).
+  if (video) await clickVisible(page, ['[data-testid="camera-button"]'], h, 300);
   t.inject(`:${NET} NOTE MEDIA ${room} HAND theo up`);
   await h.settle(page, 600);
 }
@@ -253,6 +254,28 @@ export default {
     roster(t, '#lounge', VOICE_PEERS.slice(0, 2));
     await h.settle(page, 200);
     await openCalls(page, h);
+  },
+  // Browser zoom 200% on a laptop: the same CSS viewport as 640x360.
+  'call-zoom200': async (page, h) => {
+    await inCall(page, h);
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+      await page.setViewportSize({ width: 640, height: 360 });
+      await h.settle(page, 500);
+    }
+  },
+  'call-zoom200-more': async (page, h) => {
+    await inCall(page, h);
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+      await page.setViewportSize({ width: 640, height: 360 });
+      await h.settle(page, 400);
+    }
+    await clickVisible(page, ['[data-testid="call-more"]'], h, 400);
+  },
+  // A large default font size (browser setting): rem-based sizes grow.
+  'call-bigfont': async (page, h) => {
+    await inCall(page, h);
+    await page.evaluate(() => { document.documentElement.style.fontSize = '125%'; });
+    await h.settle(page, 400);
   },
   // Incoming DM ring (the engine reports ringing_in).
   'call-ring': async (page, h) => {

@@ -271,7 +271,7 @@ joinBanner model room =
                 , attribute "data-variant" "invite"
                 , attribute "role" "status"
                 ]
-                [ faces (List.take 1 names)
+                [ faces (List.take 3 names)
                 , div [ class "onyx-join-banner-copy" ]
                     [ strong [] [ text (CallUi.inviteTitle count) ]
                     , span [] [ text "Join to listen; your microphone starts off until you unmute." ]
@@ -335,7 +335,16 @@ joinBanner model room =
                 ]
                 [ span [ class "onyx-join-banner-warn" ] [ callIcon "warn" ]
                 , div [ class "onyx-join-banner-copy" ]
-                    [ strong [] [ text "Couldn't join. Try again." ]
+                    [ strong []
+                        [ text
+                            (if model.callJoinError == Just CallDock.CaptureLost then
+                                -- v3/rx-calls: the call ended under us
+                                "Your microphone stopped."
+
+                             else
+                                "Couldn't join. Try again."
+                            )
+                        ]
                     , span [ attribute "data-testid" "call-join-failed-sub" ] [ text (CallDock.failedSub model.callJoinError room) ] -- v3/calls-c6
                     ]
                 , div [ class "onyx-join-banner-actions" ]
@@ -380,7 +389,7 @@ guestCard model cfg =
             faces cfg.faces
         , div [ class "onyx-join-banner-copy" ]
             [ strong [] [ text cfg.title ]
-            , span [] [ text "Calls are end-to-end encrypted, so they need an Onyx account. Keeping your name takes a moment and you stay connected." ]
+            , span [] [ text "Calls are end-to-end encrypted and need an Onyx account. Keep your name in a moment \u{2014} you stay connected." ]
             ]
         , div [ class "onyx-join-banner-actions" ]
             [ button

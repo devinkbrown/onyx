@@ -12,8 +12,10 @@ module View.CallDock exposing
 
   - C6 incoming / outgoing DM ring dialogs through `View.Sheet`
     (`viewPinned`: the backdrop is a no-op, Escape declines / cancels
-    via `App.overlayStack`, initial focus on Decline / Cancel), plus
-    the DM "Call" entry in the room header's More menu;
+    via `App.overlayStack`, initial focus on Decline / Cancel); the
+    DM entry in the room header's More menu now says "Direct calls
+    aren't available yet" (v3/rx-calls — the server has no DM media
+    target);
   - C7 the mini voice view (PiP) shown while viewing another target:
     corner cycle, arrow / drag nudges, Return / Mute / Leave;
   - C10 the "Connection lost." stage banner and the polite

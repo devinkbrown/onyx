@@ -265,6 +265,13 @@ voiceStage model =
                         )
                     ]
                     (List.map personCell everyone)
+        -- v3/rx-calls: the join is in flight (capture + device key)
+        , if presentation == HubProvisional && not (View.CallDock.reconnectingNow model) then
+            p [ class "onyx-call-joining", attribute "data-testid" "call-joining-hint" ]
+                [ text "Allow the microphone if your browser asks. Setting up encryption can take a few seconds." ]
+
+          else
+            text ""
         , View.StageMode.audienceLine model -- v3/calls-c11
         -- v3/calls-c8: reaction chips + live captions, docked above
         -- the bar (never over a control)
@@ -678,6 +685,18 @@ moreTools model =
             ]
             "expand"
             (CallMedia.stageSizeLabel model.callStageSize)
+        -- v3/rx-calls: invite with the room link (rooms only)
+        , case model.calls.channel of
+            Just room ->
+                moreItem
+                    [ attribute "data-testid" "call-invite"
+                    , onClick (InviteShareOpen room)
+                    ]
+                    "link"
+                    "Invite people"
+
+            Nothing ->
+                text ""
         -- v3/calls-c8: the live settings entry (was a disabled stub)
         , View.CallOverlays.settingsItem
         ]

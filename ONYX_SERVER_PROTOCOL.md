@@ -449,7 +449,8 @@ Evidence paths below are in the Onyx Server repo.
 5. **Channel:** `JOIN #room`. MEDIA targets are **channels only**: a nick or DM
    target gets `403` (§12.3), so there are no DM or 1:1 calls yet.
 6. **Join the call:** `MEDIA JOIN #room voice` returns a caller-only
-   `EVENT <you> MEDIA MACKEY #room <base64>`, and the room sees
+   `EVENT <you> MEDIA MACKEY #room <base64>` (only when the node runs with
+   `[media] ws_media_relay` on, §12.2), and the room sees
    `MEDIA JOIN #room <you> voice`. `MEDIA OFFER #room cadencevox,cadencevis` is
    optional for browsers.
 7. **Handshake:** send `MEDIA E2EE-HANDSHAKE #room :<base64>` **after** the JOIN,
