@@ -88,6 +88,8 @@ import Retention
 import RoomMedia exposing (RoomMediaFilter(..))
 -- v3/roomsettings
 import RoomSettings
+-- v3/gap-auth
+import AuthGate
 import Route exposing (Route)
 import SavedSearches
 import Schedule
@@ -918,6 +920,9 @@ type alias Model =
 
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
+
+    -- v3/gap-auth
+    , authGate : AuthGate.State
     }
 
 
@@ -1155,6 +1160,9 @@ type Outbound
     | WatchListSave { serverUrl : String, identity : String, entries : Maybe String }
     | CtcpConfigRequest { serverUrl : String, identity : String }
     | CtcpTimeReply { to : String }
+    -- v3/gap-auth: the auth-gate port (PoW solve, held-password
+    -- IDENTIFY, SETPASS credential staging).
+    | AuthGatePort Encode.Value
 
 
 {-| One vault row. `id` is `lower-target ++ ":" ++ seq` where `seq` is
@@ -3256,6 +3264,9 @@ type Msg
     | PortableImportSubmit
     | SessionReclaimDismiss
     | SessionReclaimSignIn
+    -- v3/gap-auth
+    | AuthGateMsg AuthGate.Msg
+    | AuthGatePortIn Decode.Value
 
 
 {-| In-memory message cap per channel. Mirrors `VAULT_KEEP = 400` so the
@@ -3905,6 +3916,9 @@ init nick url =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-auth
+    , authGate = AuthGate.blank
     }
 
 
@@ -4485,6 +4499,9 @@ blank =
 
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
+
+    -- v3/gap-auth
+    , authGate = AuthGate.blank
     }
 
 
@@ -20097,7 +20114,9 @@ syncOwnCustomStatusActivity model previousNick =
 {-| Set our custom status (mirroring `setCustomStatus`: invalid text or
 a missing device-memory owner is a silent no-op; the write lands in
 state, persists owner-keyed, projects our activity immediately, and —
-on a live IRCX connection — publishes `PROP * STATUS` plus the
+on a live IRCX connection — publishes `PROP <ournick> STATUS` (v3/gap-auth:
+a user PROP needs the entity to be our own nick, `server.zig propAccess`;
+`*` is refused with 913) plus the
 idle-coupled `AWAY` when our presence is idle and the status is
 non-empty). -}
 setCustomStatus : Model -> String -> ( Model, List Outbound )
@@ -20125,7 +20144,7 @@ setCustomStatus model status =
                         []
 
                     else
-                        SendLine (Wire.formatIrcLine "PROP" [ "*", "STATUS", normalized ])
+                        SendLine (Wire.formatIrcLine "PROP" [ model.ourNick, "STATUS", normalized ])
                             :: (if String.isEmpty normalized || model.userStatus /= StatusIdle then
                                     []
 
@@ -26936,7 +26955,8 @@ requestPasskeyList model =
                         Passkey.beginList model.passkey
                 in
                 ( { model | passkey = { listed | error = Nothing } }
-                , [ SendLine Passkey.webauthnList ]
+                  -- v3/gap-auth: STATUS reports the server-side passkey count.
+                , [ SendLine Passkey.webauthnStatus, SendLine Passkey.webauthnList ]
                 )
 
 
@@ -27141,37 +27161,63 @@ oracle's password-change submit; all three fields clear on send).
 -}
 requestAccountSetPassword : Model -> ( Model, List Outbound )
 requestAccountSetPassword model =
+    -- v3/gap-auth: `SETPASS <current> :<new>` (`server.zig handleSetpass`);
+    -- ACCOUNTSET only takes email|flags|secure|enforce (FAIL INVALID_FIELD).
+    -- The new password is staged ports-side and replaces the held SASL
+    -- credential only once the server confirms the change.
     case model.accountName of
         Nothing ->
             ( model, [] )
 
         Just acct ->
+            let
+                gate =
+                    model.authGate
+            in
             if model.connection /= Live then
                 ( model, [] )
 
-            else if String.length model.accountNewPassword < minAccountPasswordLength then
-                ( { model | accountPasswordError = Just ("Use at least " ++ String.fromInt minAccountPasswordLength ++ " characters.") }, [] )
-
-            else if model.accountNewPassword /= model.accountConfirmPassword then
-                ( { model | accountPasswordError = Just "Passwords do not match." }, [] )
-
-            else if String.isEmpty model.accountCurrentPassword then
-                ( { model | accountPasswordError = Just "Your current password is required." }, [] )
+            else if gate.setPass /= AuthGate.SetPassIdle && gate.setPass /= AuthGate.SetPassDone then
+                ( model, [] )
 
             else
-                case Services.accountSet acct model.accountCurrentPassword "password" model.accountNewPassword of
-                    Nothing ->
-                        ( model, [] )
+                case AuthGate.validateNewPassword model.accountNewPassword of
+                    Just problem ->
+                        ( { model | accountPasswordError = Just problem }, [] )
 
-                    Just line ->
-                        ( { model
-                            | accountPasswordError = Nothing
-                            , accountNewPassword = ""
-                            , accountConfirmPassword = ""
-                            , accountCurrentPassword = ""
-                          }
-                        , [ SendLine line ]
-                        )
+                    Nothing ->
+                        if model.accountNewPassword /= model.accountConfirmPassword then
+                            ( { model | accountPasswordError = Just "Passwords do not match." }, [] )
+
+                        else if String.isEmpty model.accountCurrentPassword then
+                            ( { model | accountPasswordError = Just "Your current password is required." }, [] )
+
+                        else if model.accountNewPassword == model.accountCurrentPassword then
+                            ( { model | accountPasswordError = Just "Choose a new password that's different from your current one." }, [] )
+
+                        else
+                            case Services.setPass model.accountCurrentPassword model.accountNewPassword of
+                                Nothing ->
+                                    ( { model | accountPasswordError = Just (AuthGate.setPassFailCopy { code = "UNSAFE_PASSWORD", text = "" }) }, [] )
+
+                                Just line ->
+                                    ( { model
+                                        | accountPasswordError = Nothing
+                                        , accountNewPassword = ""
+                                        , accountConfirmPassword = ""
+                                        , accountCurrentPassword = ""
+                                        , authGate = { gate | setPass = AuthGate.SetPassPending acct }
+                                      }
+                                    , [ SendLine line
+                                      , AuthGatePort
+                                            (Encode.object
+                                                [ ( "kind", Encode.string "stage" )
+                                                , ( "account", Encode.string acct )
+                                                , ( "password", Encode.string model.accountNewPassword )
+                                                ]
+                                            )
+                                      ]
+                                    )
 
 
 {-| The DROP danger gate, mirroring the oracle's `dropReady`: armed,
@@ -36165,6 +36211,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepAuth -- v3/gap-auth
     ]
 
 
@@ -41965,6 +42012,13 @@ updateCore msg model =
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
 
+        -- v3/gap-auth
+        AuthGateMsg sub ->
+            authGateUpdate sub model
+
+        AuthGatePortIn value ->
+            authGatePortIn value model
+
         -- v3/switcher
         PaletteOpen ->
             switcherUpdate msg model
@@ -43458,7 +43512,14 @@ foldParsed model parsed =
                         rememberDelivery model parsed
 
                     ( next, outbound ) =
-                        foldLine filed parsed
+                        -- v3/gap-auth: auth-step lines first (`foldAuthGateLine`)
+                        (case foldAuthGateLine filed parsed of
+                            Just claimed ->
+                                claimed
+
+                            Nothing ->
+                                foldLine filed parsed
+                        )
                             -- v3/calls-c11
                             |> foldStageWire parsed
                 in
@@ -46247,3 +46308,691 @@ rawContentVerbs =
 rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
+
+
+
+-- v3/gap-auth
+
+
+{-| v3/gap-auth — what `AuthGate.update` reads from the model. -}
+authGateCtx : Model -> AuthGate.Ctx
+authGateCtx model =
+    { live = model.connection == Live
+    , socketOpen = model.connection /= Offline || model.connectForm.dialing
+    , signInNick = model.connectForm.nick
+    }
+
+
+authGateUpdate : AuthGate.Msg -> Model -> ( Model, List Outbound )
+authGateUpdate sub model =
+    let
+        ( state, effects ) =
+            AuthGate.update (authGateCtx model) sub model.authGate
+    in
+    runAuthGateEffects effects { model | authGate = state }
+
+
+runAuthGateEffects : List AuthGate.Effect -> Model -> ( Model, List Outbound )
+runAuthGateEffects effects model =
+    List.foldl
+        (\effect ( m, out ) ->
+            let
+                ( m2, out2 ) =
+                    authGateEffect effect m
+            in
+            ( m2, out ++ out2 )
+        )
+        ( model, [] )
+        effects
+
+
+authGatePort : List ( String, Encode.Value ) -> Outbound
+authGatePort fields =
+    AuthGatePort (Encode.object fields)
+
+
+{-| Interpret one auth-gate effect with the existing connect machinery.
+The guest dial never uses the account name (the server refuses a
+registered nick without SASL: 432 + close) and never runs SASL — a
+two-step password stays in the ports-side credential slot, which
+composes the IDENTIFY line itself.
+-}
+authGateEffect : AuthGate.Effect -> Model -> ( Model, List Outbound )
+authGateEffect effect model =
+    case effect of
+        AuthGate.Dial ->
+            dialConnect
+                { model | saslAccount = Nothing, saslPasswordHeld = False, saslClientCert = False }
+                (AuthGate.guestNick model.nowMs)
+
+        AuthGate.Redial ->
+            if model.connection /= Offline || model.connectForm.dialing then
+                ( model, [] )
+
+            else
+                dialConnect model model.ourNick
+
+        AuthGate.Send line ->
+            if model.connection == Offline then
+                ( model, [] )
+
+            else
+                ( model, [ SendLine line ] )
+
+        AuthGate.SolvePow seed ->
+            ( model, [ authGatePort [ ( "kind", Encode.string "solve" ), ( "seed", Encode.string seed ) ] ] )
+
+        AuthGate.IdentifyHeld req ->
+            if model.connection /= Live then
+                ( model, [] )
+
+            else
+                ( { model | identifyReplyAccount = Just req.account, accountActionError = Nothing }
+                , [ authGatePort
+                        [ ( "kind", Encode.string "identify" )
+                        , ( "account", Encode.string req.account )
+                        , ( "code", Encode.string req.code )
+                        ]
+                  ]
+                )
+
+        AuthGate.StartPasskey account ->
+            case ( model.connection == Live, Passkey.webauthnAuth account ) of
+                ( True, Just line ) ->
+                    let
+                        session =
+                            Passkey.beginAuth model.passkey
+                    in
+                    ( { model
+                        | passkey = { session | busy = True, error = Nothing, notice = Nothing, lastAction = Nothing }
+                        , identifyReplyAccount = Just account
+                      }
+                    , [ SendLine line ]
+                    )
+
+                _ ->
+                    ( model, [] )
+
+        AuthGate.Hangup ->
+            ( disarmForGate model
+            , if model.connection /= Offline || model.connectForm.dialing then
+                [ WsDisconnect ]
+
+              else
+                []
+            )
+
+        AuthGate.DisarmReconnect ->
+            ( disarmForGate model, [] )
+
+        AuthGate.ForgetCredential ->
+            ( { model | saslAccount = Nothing, saslPasswordHeld = False, saslClientCert = False }
+            , [ authGatePort [ ( "kind", Encode.string "forget" ) ] ]
+            )
+
+        AuthGate.ToSignIn target ->
+            ( setConnectForm
+                (\f ->
+                    { f
+                        | mode = ConnectSignIn
+                        , nick =
+                            if String.isEmpty target.account then
+                                f.nick
+
+                            else
+                                target.account
+                        , password = ""
+                        , recoveryOpen = target.recovery
+                        , recoveryCode = ""
+                        , passwordError = Nothing
+                        , nickError = Nothing
+                        , attempted = False
+                        , dialing = False
+                    }
+                )
+                model
+            , []
+            )
+
+        AuthGate.ParkJoin ->
+            case model.pendingDeepLinkJoin of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    let
+                        gate =
+                            model.authGate
+                    in
+                    ( { model | pendingDeepLinkJoin = Nothing, authGate = { gate | parkedJoin = Just room } }, [] )
+
+        AuthGate.UnparkJoin ->
+            let
+                gate =
+                    model.authGate
+            in
+            case gate.parkedJoin of
+                Nothing ->
+                    ( model, [] )
+
+                Just room ->
+                    ( { model | pendingDeepLinkJoin = Just room, authGate = { gate | parkedJoin = Nothing } }, [] )
+
+
+{-| A closed auth step stays on the gate: no auto-reconnect as a guest. -}
+disarmForGate : Model -> Model
+disarmForGate model =
+    { model | autoReconnect = False, connectGate = True, reconnectIn = 0, reconnectDueMs = 0 }
+        |> setConnectForm (\f -> { f | dialing = False, attempted = False })
+
+
+authGateFromServer : Model -> Wire.IrcMessage -> Bool
+authGateFromServer model message =
+    message.nick == Nothing || (model.serverPrefix /= Nothing && message.prefix == model.serverPrefix)
+
+
+{-| Lines the auth steps own, claimed BEFORE `foldLine` (`foldParsed`):
+the pre-001 CHALLENGE notices, the two-factor 904, IDENTIFY/passkey
+login confirmations and refusals for a login this client started,
+SETPASS / RESETPASS replies while one is in flight, and every 913.
+Anything else returns `Nothing` and folds as before.
+-}
+foldAuthGateLine : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+foldAuthGateLine model message =
+    case message.command of
+        "NOTICE" ->
+            authGateNotice model message
+
+        "904" ->
+            case model.saslAccount of
+                Just account ->
+                    if model.sasl /= SaslIdle && AuthGate.isTwoFactorRefusal (trailingParam message.params) then
+                        let
+                            ( failed, failOut ) =
+                                failSasl model "Two-step sign-in: enter your authentication code."
+
+                            ( state, effects ) =
+                                AuthGate.onTwoFactorRefused account failed.authGate
+
+                            ( final, out ) =
+                                runAuthGateEffects effects { failed | authGate = state }
+                        in
+                        Just ( final, failOut ++ out )
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+        "464" ->
+            if authGateAwaitingLogin model then
+                Just ( authGateLoginFailed { code = "464", text = trailingParam message.params } model, [] )
+
+            else
+                Nothing
+
+        "FAIL" ->
+            Wire.parseStandardReply message
+                |> Maybe.andThen
+                    (\reply ->
+                        authGateReply model { command = reply.command, code = reply.code, text = reply.description }
+                    )
+
+        "WARN" ->
+            Wire.parseStandardReply message
+                |> Maybe.andThen
+                    (\reply ->
+                        authGateReply model { command = reply.command, code = reply.code, text = reply.description }
+                    )
+
+        "RESETPASS" ->
+            -- `:<srv> RESETPASS SUCCESS <account> :Password reset; …`
+            case ( model.authGate.flow, message.params ) of
+                ( AuthGate.Reset _, "SUCCESS" :: _ ) ->
+                    if authGateFromServer model message then
+                        Just ( { model | authGate = AuthGate.onResetSuccess model.authGate }, [] )
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+        "913" ->
+            Just ( authGateNoAccess model message, [] )
+
+        _ ->
+            Nothing
+
+
+authGateAwaitingLogin : Model -> Bool
+authGateAwaitingLogin model =
+    case model.authGate.flow of
+        AuthGate.TwoFactor _ AuthGate.TfaVerifying ->
+            True
+
+        AuthGate.PasskeySignIn _ AuthGate.PkWaiting ->
+            True
+
+        _ ->
+            False
+
+
+authGateLoginFailed : { code : String, text : String } -> Model -> Model
+authGateLoginFailed failure model =
+    let
+        passkey =
+            model.passkey
+    in
+    { model
+        | authGate = AuthGate.onIdentifyFailed failure model.authGate
+        , identifyReplyAccount = Nothing
+        , passkey = { passkey | busy = False, pendingAuth = Nothing }
+    }
+
+
+authGateNotice : Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+authGateNotice model message =
+    let
+        body =
+            case message.params of
+                _ :: text :: _ ->
+                    text
+
+                _ ->
+                    ""
+    in
+    if model.connection /= Live then
+        -- Before 001 only the server can address this connection.
+        AuthGate.parseChallengeNotice body
+            |> Maybe.map
+                (\notice ->
+                    let
+                        ( state, effects ) =
+                            AuthGate.onChallengeNotice notice model.authGate
+                    in
+                    runAuthGateEffects effects { model | authGate = state }
+                )
+
+    else if not (authGateFromServer model message) then
+        Nothing
+
+    else
+        case AuthGate.identifiedAccount body of
+            Just account ->
+                authGateIdentified account model message
+
+            Nothing ->
+                if AuthGate.setPassNotice body then
+                    case model.authGate.setPass of
+                        AuthGate.SetPassPending account ->
+                            Just (authGateSetPassChanged account model)
+
+                        _ ->
+                            Nothing
+
+                else if AuthGate.isResetRequestNotice body then
+                    case model.authGate.flow of
+                        AuthGate.Reset _ ->
+                            Just ( { model | authGate = AuthGate.onResetRequested model.authGate }, [] )
+
+                        _ ->
+                            Nothing
+
+                else
+                    -- A client without `standard-replies` gets
+                    -- `NOTICE <me> :FAIL <CMD> <CODE>: <text>`.
+                    AuthGate.noticeStandardReply body
+                        |> Maybe.andThen
+                            (\reply ->
+                                if reply.kind == "NOTE" then
+                                    Nothing
+
+                                else
+                                    authGateReply model { command = reply.command, code = reply.code, text = reply.text }
+                            )
+
+
+authGateReply : Model -> { command : String, code : String, text : String } -> Maybe ( Model, List Outbound )
+authGateReply model reply =
+    let
+        failure =
+            { code = reply.code, text = reply.text }
+    in
+    case String.toUpper reply.command of
+        "SETPASS" ->
+            case model.authGate.setPass of
+                AuthGate.SetPassPending _ ->
+                    let
+                        gate =
+                            model.authGate
+                    in
+                    Just
+                        ( { model
+                            | authGate = { gate | setPass = AuthGate.SetPassIdle }
+                            , accountPasswordError = Just (AuthGate.setPassFailCopy failure)
+                          }
+                        , [ authGatePort [ ( "kind", Encode.string "drop" ) ] ]
+                        )
+
+                _ ->
+                    Nothing
+
+        "RESETPASS" ->
+            case model.authGate.flow of
+                AuthGate.Reset _ ->
+                    Just ( { model | authGate = AuthGate.onResetFail failure model.authGate }, [] )
+
+                _ ->
+                    Nothing
+
+        "IDENTIFY" ->
+            if authGateAwaitingLogin model then
+                Just ( authGateLoginFailed failure model, [] )
+
+            else
+                Nothing
+
+        _ ->
+            Nothing
+
+
+{-| `You are now identified as <account>` for a login this client
+started (`identifyReplyAccount`): the server sends no 900 for
+IDENTIFY or a passkey login, so the 900 arm runs on a synthesized
+RPL_LOGGEDIN (account, publisher, attribution, session commands, nick
+reclaim). A two-step login keeps its SASL credential so a later
+reconnect asks for a fresh code instead of landing as a guest.
+-}
+authGateIdentified : String -> Model -> Wire.IrcMessage -> Maybe ( Model, List Outbound )
+authGateIdentified account model message =
+    let
+        ours =
+            case model.identifyReplyAccount of
+                Just pending ->
+                    String.toLower pending == String.toLower account
+
+                Nothing ->
+                    False
+    in
+    if not ours then
+        Nothing
+
+    else
+        let
+            synthetic =
+                { message
+                    | command = "900"
+                    , params = [ model.ourNick, model.ourNick ++ "!*@*", account, "You are now logged in as " ++ account ]
+                    , nick = Nothing
+                }
+
+            ( twoFactor, passkeyFlow ) =
+                case model.authGate.flow of
+                    AuthGate.TwoFactor _ _ ->
+                        ( True, False )
+
+                    AuthGate.PasskeySignIn _ _ ->
+                        ( False, True )
+
+                    _ ->
+                        ( False, False )
+
+            ( loggedIn, loginOut ) =
+                foldLine model synthetic
+
+            passkey =
+                loggedIn.passkey
+
+            restored =
+                if twoFactor then
+                    { loggedIn | saslAccount = Just account, saslPasswordHeld = True }
+
+                else if passkeyFlow then
+                    { loggedIn | passkey = { passkey | busy = False, pendingAuth = Nothing } }
+
+                else
+                    loggedIn
+
+            ( state, effects ) =
+                AuthGate.onIdentified restored.authGate
+
+            ( settled, out ) =
+                runAuthGateEffects effects { restored | authGate = state }
+
+            ( joined, joinOut ) =
+                if twoFactor || passkeyFlow then
+                    firePendingDeepLinkJoin settled
+
+                else
+                    ( settled, [] )
+        in
+        Just ( joined, loginOut ++ out ++ joinOut )
+
+
+authGateSetPassChanged : String -> Model -> ( Model, List Outbound )
+authGateSetPassChanged account model =
+    let
+        gate =
+            model.authGate
+    in
+    ( addToast
+        { variant = ToastSuccess
+        , title = "Password changed"
+        , description = Just "Use your new password the next time you sign in."
+        , duration = Nothing
+        , groupKey = Just "setpass"
+        , undo = Nothing
+        }
+        model.nowMs
+        { model | authGate = { gate | setPass = AuthGate.SetPassDone }, accountPasswordError = Nothing }
+    , [ authGatePort [ ( "kind", Encode.string "commit" ), ( "account", Encode.string account ) ] ]
+    )
+
+
+{-| 913 ERR_NOACCESS (`:<srv> 913 <me> <entity> :<reason>`). A refused
+write to our own user entity is the custom status PROP; anything else
+is an inbox error instead of the invisible numeric log.
+-}
+authGateNoAccess : Model -> Wire.IrcMessage -> Model
+authGateNoAccess model message =
+    let
+        entity =
+            Maybe.withDefault "" (List.head (List.drop 1 message.params))
+
+        reason =
+            trailingParam message.params
+
+        logged =
+            logNumeric model message
+    in
+    if entity == "*" || String.toLower entity == String.toLower model.ourNick then
+        addToast
+            { variant = ToastError
+            , title = "Your status wasn't saved"
+            , description = Just (boundToastText (orDefault "The server refused the change." reason))
+            , duration = Nothing
+            , groupKey = Just "status-913"
+            , undo = Nothing
+            }
+            model.nowMs
+            { logged | statusError = Just ("The server didn't save your status: " ++ orDefault "access denied" reason) }
+
+    else
+        addNotification logged
+            { kind = NotifError
+            , text =
+                "No access to change "
+                    ++ entity
+                    ++ (if String.isEmpty reason then
+                            "."
+
+                        else
+                            ": " ++ reason
+                       )
+            , from = Nothing
+            , channel =
+                if isChannelName model entity then
+                    Just entity
+
+                else
+                    Nothing
+            , topic = Nothing
+            }
+
+
+orDefault : String -> String -> String
+orDefault fallback value =
+    if String.isEmpty (String.trim value) then
+        fallback
+
+    else
+        value
+
+
+{-| Answers from the `authGateIn` port: a solved proof of work, or a
+held-password IDENTIFY the ports refused to compose. -}
+authGatePortIn : Decode.Value -> Model -> ( Model, List Outbound )
+authGatePortIn value model =
+    let
+        field name =
+            Decode.decodeValue (Decode.field name Decode.string) value |> Result.withDefault ""
+    in
+    case field "kind" of
+        "solved" ->
+            let
+                ( state, effects ) =
+                    AuthGate.onPowSolved (field "seed") (field "answer") model.authGate
+            in
+            runAuthGateEffects effects { model | authGate = state }
+
+        "identifyRefused" ->
+            ( authGateLoginFailed
+                { code =
+                    if field "reason" == "unsafe" then
+                        "UNSAFE_PASSWORD"
+
+                    else
+                        "NO_PASSWORD"
+                , text = ""
+                }
+                model
+            , []
+            )
+
+        _ ->
+            ( model, [] )
+
+
+{-| v3/gap-auth settle step: a registration (001) passes the challenge
+and sends a dialed auth step's command; a closed socket settles the
+steps that needed it (and an unconfirmed SETPASS); a fresh socket
+starts without a challenge; editing the password fields clears the
+"changed" note.
+-}
+settleStepAuth : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepAuth msg prior acc =
+    let
+        ( settled, outs ) =
+            settleAuthGate msg prior acc
+    in
+    -- A new auth panel (or a step re-enabling after a refusal) moves
+    -- focus to its first field / primary action.
+    case AuthGate.panelFocus settled.authGate of
+        Just target ->
+            if AuthGate.panelFocus prior.authGate /= Just target then
+                ( settled, outs ++ [ PrefsFocus { id = target } ] )
+
+            else
+                ( settled, outs )
+
+        Nothing ->
+            ( settled, outs )
+
+
+settleAuthGate : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleAuthGate msg prior ( next, outs ) =
+    let
+        gate =
+            next.authGate
+    in
+    case msg of
+        WsClosed _ ->
+            let
+                ( state, effects ) =
+                    AuthGate.onClosed gate
+
+                ( unpended, dropOut ) =
+                    case state.setPass of
+                        AuthGate.SetPassPending _ ->
+                            ( { next | accountPasswordError = Just "The connection closed before the server confirmed the change. Sign in again to check which password works." }
+                            , [ authGatePort [ ( "kind", Encode.string "drop" ) ] ]
+                            )
+
+                        _ ->
+                            ( next, [] )
+
+                ( settled, out ) =
+                    runAuthGateEffects effects
+                        { unpended
+                            | authGate =
+                                { state
+                                    | setPass =
+                                        case state.setPass of
+                                            AuthGate.SetPassPending _ ->
+                                                AuthGate.SetPassIdle
+
+                                            other ->
+                                                other
+                                }
+                        }
+            in
+            ( settled, outs ++ dropOut ++ out )
+
+        AccountNewPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        AccountConfirmPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        AccountCurrentPasswordInput _ ->
+            ( clearSetPassDone next, outs )
+
+        _ ->
+            if prior.connection /= Live && next.connection == Live then
+                let
+                    ( state, effects ) =
+                        AuthGate.onRegistered gate
+
+                    ( settled, out ) =
+                        runAuthGateEffects effects { next | authGate = state }
+                in
+                ( settled, outs ++ out )
+
+            else if prior.connection == Offline && next.connection == Registering then
+                case gate.challenge of
+                    AuthGate.NoChallenge ->
+                        ( next, outs )
+
+                    AuthGate.ChallengeStopped _ ->
+                        ( next, outs )
+
+                    _ ->
+                        ( { next | authGate = { gate | challenge = AuthGate.NoChallenge } }, outs )
+
+            else
+                ( next, outs )
+
+
+clearSetPassDone : Model -> Model
+clearSetPassDone model =
+    let
+        gate =
+            model.authGate
+    in
+    if gate.setPass == AuthGate.SetPassDone then
+        { model | authGate = { gate | setPass = AuthGate.SetPassIdle } }
+
+    else
+        model

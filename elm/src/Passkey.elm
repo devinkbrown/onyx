@@ -26,6 +26,7 @@ module Passkey exposing
     , webauthnRegisterFinish
     , webauthnRemove
     , webauthnRename
+    , webauthnStatus
     )
 
 {-| WebAuthn passkeys — Elm port of `lib/webauthn/passkey.ts`
@@ -115,6 +116,7 @@ type alias PasskeySession =
     , notice : Maybe String
     , supported : Maybe Bool
     , renameUnsupported : Bool
+    , statusText : Maybe String
     }
 
 
@@ -137,6 +139,7 @@ blankPasskeySession =
     , notice = Nothing
     , supported = Nothing
     , renameUnsupported = False
+    , statusText = Nothing
     }
 
 
@@ -341,6 +344,14 @@ webauthnAuth account =
 webauthnList : String
 webauthnList =
     Wire.formatIrcLine "WEBAUTHN" [ "LIST" ]
+
+
+{-| v3/gap-auth — `WEBAUTHN STATUS` → `STATUS :<n> passkey(s) registered`
+(`server.zig webauthnStatus`; logged-in accounts only).
+-}
+webauthnStatus : String
+webauthnStatus =
+    Wire.formatIrcLine "WEBAUTHN" [ "STATUS" ]
 
 
 webauthnRemove : String -> Maybe String
@@ -687,7 +698,7 @@ foldPasskeyCode session reply =
                         )
 
         "STATUS" ->
-            ( { session | supported = Just True }, NoEffect )
+            ( { session | supported = Just True, statusText = nonEmpty reply.description }, NoEffect )
 
         "AUTH-CHALLENGE" ->
             case session.pendingAuth of

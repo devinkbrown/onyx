@@ -698,6 +698,18 @@ port passkeyError : ({ message : String } -> msg) -> Sub msg
 port passkeySettle : (() -> msg) -> Sub msg
 
 
+{-| v3/gap-auth — the auth-gate port: `{ kind: "solve", seed }` (pre-001
+CHALLENGE proof of work), `{ kind: "identify", account, code }` (the
+ports compose `IDENTIFY` with the held SASL password),
+`{ kind: "stage" | "commit" | "drop", … }` (SETPASS credential staging)
+and `{ kind: "forget" }`. Answers come back on `authGateIn`.
+-}
+port authGateOut : Encode.Value -> Cmd msg
+
+
+port authGateIn : (Decode.Value -> msg) -> Sub msg
+
+
 port passkeySupport : ({ supported : Bool } -> msg) -> Sub msg
 
 
@@ -1249,6 +1261,10 @@ perform key outbound =
         App.CtcpTimeReply req ->
             ctcpTimeReply req
 
+        -- v3/gap-auth
+        App.AuthGatePort value ->
+            authGateOut value
+
         App.GuestClaimDismissSave req ->
             guestClaimDismissSave req
 
@@ -1720,6 +1736,8 @@ subscriptions model =
         , webPushActiveState App.WebPushActiveState
         , webPushRecoveryHint (\_ -> App.WebPushRecoveryHint)
         , groupWelcomeOpened App.GroupWelcomeOpened
+        -- v3/gap-auth
+        , authGateIn App.AuthGatePortIn
         ]
 
 

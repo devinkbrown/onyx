@@ -52,6 +52,7 @@ module Services exposing
     , saslInfo
     , seen
     , setName
+    , setPass
     , setUserProfileOn
     , sheetChannels
     , silenceEntry
@@ -905,6 +906,32 @@ accountInfo account =
 accountSet : String -> String -> String -> String -> Maybe String
 accountSet account password field value =
     build "ACCOUNTSET" [ wireToken account, wireToken password, wireToken field, wireText value ]
+
+
+{-| v3/gap-auth — `SETPASS <current> :<new>` (`server.zig handleSetpass`;
+the server answers `NOTICE :SETPASS: your password has been changed` or
+`FAIL SETPASS <code>`). The current password rides a middle parameter,
+so one with a space or control character (or a leading colon) cannot
+be sent and yields `Nothing`; the new password is always the trailing
+parameter (spaces allowed, never CR/LF/NUL or other controls).
+-}
+setPass : String -> String -> Maybe String
+setPass current new =
+    let
+        control c =
+            Char.toCode c < 32 || Char.toCode c == 127
+    in
+    if String.isEmpty current || String.isEmpty new then
+        Nothing
+
+    else if String.startsWith ":" current || String.any (\c -> c == ' ' || control c) current then
+        Nothing
+
+    else if String.any control new then
+        Nothing
+
+    else
+        Just ("SETPASS " ++ current ++ " :" ++ new ++ "\r\n")
 
 
 saslInfo : String
