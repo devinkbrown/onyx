@@ -41,12 +41,28 @@
     return "q" + Date.now().toString(36) + outboxLabelCounter.toString(36);
   }
 
-  function openVault(onReady) {
+  /* v3/gap-account: the deprecated SolidJS client used the same
+     `onyx-vault` name at schema v6 (compound keys, different stores).
+     Opening it at v3 fails with VersionError, which left the whole
+     vault (history, outbox, schedule) unavailable for anyone who used
+     the old client on this origin. Fall back to a separate Elm-owned
+     database instead — Solid's rows are never read, migrated or
+     touched. */
+  var DB_FALLBACK_NAME = "onyx-elm-vault";
+
+  function openVault(onReady, nameOverride) {
     if (!("indexedDB" in global)) {
       onReady(null);
       return;
     }
-    var req = global.indexedDB.open(DB_NAME, DB_VERSION);
+    var name = nameOverride || DB_NAME;
+    var req;
+    try {
+      req = global.indexedDB.open(name, DB_VERSION);
+    } catch (err) {
+      onReady(null);
+      return;
+    }
     req.onupgradeneeded = function () {
       var db = req.result;
       if (!db.objectStoreNames.contains(STORE)) {
@@ -69,7 +85,15 @@
       }
     };
     req.onsuccess = function () { onReady(req.result); };
-    req.onerror = function () { onReady(null); };
+    req.onerror = function (event) {
+      var err = req.error;
+      if (!nameOverride && err && err.name === "VersionError") {
+        try { if (event && event.preventDefault) event.preventDefault(); } catch (e) {}
+        openVault(onReady, DB_FALLBACK_NAME);
+        return;
+      }
+      onReady(null);
+    };
   }
 
   var VAULT_EXPORT_MAX_TOTAL = 16 * 1024;
@@ -94,7 +118,7 @@
     var rowType = typeof row.rowType === "string" ? row.rowType : "";
     var reply = row.replyTo && typeof row.replyTo === "object" ? row.replyTo : null;
     return {
-      id: String(row.id || ""),
+      id: String((typeof row.rid === "string" && row.rid) ? row.rid : (row.id || "")),
       target: String(row.target || ""),
       from: String(row.from || ""),
       body: String(row.body || ""),
@@ -117,6 +141,58 @@
      mirroring the `!r.deleted && !r.redacted` read filters. */
   function vaultTombstoned(row) {
     return !!(row && (row.deleted || row.redacted));
+  }
+
+  /* v3/gap-account — device-memory owner scope. Every vault and outbox
+     row written through a port carries the owner scope key Elm settled
+     (`["onyx","account","kai"]`, `["onyx","guest"]`, …) and every read
+     filters on it, so a second identity on this browser never sees the
+     first one's history, search recall or queued sends. Owned rows key
+     physically as `owner + "\0" + id` (two identities' ids can never
+     collide); `rid` keeps the logical id. Port payloads always carry
+     `owner` (a string, or null = no scope → reads answer empty, writes
+     refuse). Rows written before scoping have no owner and stay
+     quarantined: never shown, searched, exported, sent or claimed by
+     whoever opens the app next — only an explicit Clear (or retention
+     age) removes them. A direct call that omits `owner` entirely (the
+     node smokes) addresses only those ownerless rows. */
+  var VAULT_OWNER_MAX = 4096;
+
+  function ownerArg(req) {
+    if (!req || typeof req !== "object" || !Object.prototype.hasOwnProperty.call(req, "owner")) return undefined;
+    var o = req.owner;
+    return (typeof o === "string" && o.length > 0 && o.length <= VAULT_OWNER_MAX) ? o : null;
+  }
+
+  function portOwner(req) {
+    var o = ownerArg(req);
+    return o === undefined ? null : o;
+  }
+
+  function vaultRowOwner(raw) {
+    return (raw && typeof raw.owner === "string" && raw.owner) ? raw.owner : null;
+  }
+
+  function vaultRowOwned(raw, owner) {
+    var stamp = vaultRowOwner(raw);
+    if (owner === undefined) return stamp === null;
+    return owner !== null && stamp === owner;
+  }
+
+  /* Defense in depth for the local-history opt-out: Elm already stops
+     sending writes, and the bridge re-reads the stored preference so a
+     stale write can never land after the user turned history off. */
+  function localHistoryEnabled() {
+    try {
+      var store = (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+      if (!store) return true;
+      var raw = store.getItem("onyx:preferences");
+      if (!raw) return true;
+      var parsed = JSON.parse(raw);
+      return !(parsed && parsed.localHistory === false);
+    } catch (err) {
+      return true;
+    }
   }
 
   /* Vault retention policy — structurally-identical mirror of the pure
@@ -201,8 +277,12 @@
     return ordered.filter(function (entry) { return drop[entry.id]; }).map(function (entry) { return entry.id; });
   }
 
-  function vaultPut(db, rows, onDone) {
+  function vaultPut(db, rows, onDone, owner) {
     if (db === null) {
+      onDone(0);
+      return;
+    }
+    if (owner !== undefined && (owner === null || !localHistoryEnabled())) {
       onDone(0);
       return;
     }
@@ -215,6 +295,11 @@
       if (!row.at) row.at = now;
       row.deleted = !!row.deleted;
       row.redacted = !!row.redacted;
+      if (typeof owner === "string") {
+        row.rid = String(row.id || "");
+        row.owner = owner;
+        row.id = owner + "\u0000" + row.rid;
+      }
       store.put(row);
       // Any write voids the target's proof (mirroring
       // `invalidateVaultDmSearchPrivacy`): the proof is re-earned by a
@@ -243,22 +328,29 @@
     var index = store.index("by-target");
     var pending = names.length;
     names.forEach(function (target) {
-      var seen = [];
+      // Retention applies per owner scope (legacy ownerless rows are
+      // their own bucket, so their age cutoff still prunes them).
+      var seenByOwner = {};
       var cursor = index.openCursor(IDBKeyRange.only(target));
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c) {
           var plain = vaultPlainRow(c.value);
-          seen.push({ key: c.primaryKey, id: plain.id, at: plain.at });
+          var bucket = vaultRowOwner(c.value) || "";
+          if (!seenByOwner[bucket]) seenByOwner[bucket] = [];
+          seenByOwner[bucket].push({ key: c.primaryKey, id: plain.id, at: plain.at });
           c.continue();
         } else {
           var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
           if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
-          var prune = selectPruneIds(seen, channelPolicy, now);
-          var keyById = {};
-          seen.forEach(function (entry) { keyById[entry.id] = entry.key; });
-          prune.forEach(function (id) {
-            if (keyById[id] !== undefined) { try { store.delete(keyById[id]); } catch (err) {} }
+          Object.keys(seenByOwner).forEach(function (bucket) {
+            var seen = seenByOwner[bucket];
+            var prune = selectPruneIds(seen, channelPolicy, now);
+            var keyById = {};
+            seen.forEach(function (entry) { keyById[entry.id] = entry.key; });
+            prune.forEach(function (id) {
+              if (keyById[id] !== undefined) { try { store.delete(keyById[id]); } catch (err) {} }
+            });
           });
           pending -= 1;
         }
@@ -282,6 +374,22 @@
 
   function vaultDmPrivacyInvalidate(target) {
     delete vaultDmPrivacyCache[vaultDmPrivacyCacheKey(target)];
+  }
+
+  /* Per-target proofs are additionally per owner scope: one identity's
+     plain verdict never answers for another's rows. */
+  function vaultDmPrivacyCached(target, owner) {
+    var slot = vaultDmPrivacyCache[vaultDmPrivacyCacheKey(target)];
+    if (!slot || typeof slot !== "object") return null;
+    var verdict = slot[owner === undefined ? "" : String(owner)];
+    return (verdict === "plain" || verdict === "encrypted") ? verdict : null;
+  }
+
+  function vaultDmPrivacyRemember(target, owner, verdict) {
+    var key = vaultDmPrivacyCacheKey(target);
+    var slot = vaultDmPrivacyCache[key];
+    if (!slot || typeof slot !== "object") slot = vaultDmPrivacyCache[key] = {};
+    slot[owner === undefined ? "" : String(owner)] = verdict;
   }
 
   function vaultDmPrivacyTextEncrypted(text) {
@@ -311,17 +419,23 @@
     return "plain";
   }
 
-  function classifyVaultDm(db, target, onDone) {
-    var key = vaultDmPrivacyCacheKey(target);
-    if (vaultDmPrivacyCache[key]) {
-      onDone(vaultDmPrivacyCache[key]);
+  function classifyVaultDm(db, target, onDone, owner) {
+    var cached = vaultDmPrivacyCached(target, owner);
+    if (cached) {
+      onDone(cached);
       return;
     }
     if (db === null) {
       // No IndexedDB on this host: nothing retained, so nothing to
       // protect — mirroring the no-IDB `plain` commit.
-      vaultDmPrivacyCache[key] = "plain";
+      vaultDmPrivacyRemember(target, owner, "plain");
       onDone("plain");
+      return;
+    }
+    if (owner === null) {
+      // No owner scope: this identity has no rows to prove anything
+      // about, and another identity's rows must not answer for it.
+      onDone("unknown");
       return;
     }
     var collected = [];
@@ -338,6 +452,10 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (!c) return;
+        if (!vaultRowOwned(c.value, owner)) {
+          c.continue();
+          return;
+        }
         if (vaultDmPrivacyRowEncrypted(c.value)) {
           collected = [{ encrypted: true }];
           return;
@@ -355,16 +473,20 @@
         return;
       }
       var verdict = classifyVaultDmRows(collected);
-      vaultDmPrivacyCache[key] = verdict;
+      vaultDmPrivacyRemember(target, owner, verdict);
       onDone(verdict);
     };
     tx.onerror = function () { onDone("unknown"); };
     tx.onabort = function () { onDone("unknown"); };
   }
 
-  function vaultGet(db, target, limit, onRows) {
+  function vaultGet(db, target, limit, onRows, owner) {
     if (db === null) {
       onRows([], "unavailable");
+      return;
+    }
+    if (owner === null) {
+      onRows([], "ok");
       return;
     }
     var tx = db.transaction(STORE, "readonly");
@@ -374,7 +496,7 @@
     cursor.onsuccess = function () {
       var c = cursor.result;
       if (c && rows.length < limit) {
-        rows.push(vaultPlainRow(c.value));
+        if (vaultRowOwned(c.value, owner)) rows.push(vaultPlainRow(c.value));
         c.continue();
       } else {
         onRows(rows.reverse(), "ok");
@@ -653,6 +775,11 @@
       onRows([], "unavailable");
       return;
     }
+    var searchOwner = (opts && Object.prototype.hasOwnProperty.call(opts, "owner")) ? opts.owner : undefined;
+    if (searchOwner === null) {
+      onRows([], "ok");
+      return;
+    }
     var tx;
     try {
       tx = db.transaction(STORE, "readonly");
@@ -663,7 +790,7 @@
     var req = tx.objectStore(STORE).getAll();
     req.onsuccess = function () {
       try {
-        var rows = req.result || [];
+        var rows = (req.result || []).filter(function (raw) { return vaultRowOwned(raw, searchOwner); });
         var o = opts || {};
         if (mode === "semantic") onRows(vaultSearchRowsSemantic(rows, query, o.limit, o.minScore), "ok");
         else if (mode === "hybrid") onRows(vaultSearchRowsHybrid(rows, query, o), "ok");
@@ -697,9 +824,13 @@
     return ranked;
   }
 
-  function vaultGetAround(db, target, atMs, limit, onRows) {
+  function vaultGetAround(db, target, atMs, limit, onRows, owner) {
     if (db === null) {
       onRows([], "unavailable");
+      return;
+    }
+    if (owner === null) {
+      onRows([], "ok");
       return;
     }
     try {
@@ -710,7 +841,7 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c && collected.length < VAULT_EXPORT_MAX_TOTAL) {
-          collected.push(vaultPlainRow(c.value));
+          if (vaultRowOwned(c.value, owner)) collected.push(vaultPlainRow(c.value));
           c.continue();
         } else {
           onRows(vaultAroundWindow(collected, atMs, limit), "ok");
@@ -753,11 +884,11 @@
     return { kind: "onyx-vault", version: 1, exportedAt: exportedAt, targets: targets };
   }
 
-  function vaultExportAll(db, onSnapshot) {
+  function vaultExportAll(db, onSnapshot, owner) {
     var stamped = (typeof Date !== "undefined" && Date.prototype.toISOString)
       ? new Date().toISOString()
       : "";
-    if (db === null) {
+    if (db === null || owner === null) {
       onSnapshot(vaultExportSnapshot([], stamped));
       return;
     }
@@ -769,7 +900,7 @@
       cursor.onsuccess = function () {
         var c = cursor.result;
         if (c && collected.length < VAULT_EXPORT_MAX_TOTAL) {
-          collected.push(c.value);
+          if (vaultRowOwned(c.value, owner)) collected.push(c.value);
           c.continue();
         } else {
           onSnapshot(vaultExportSnapshot(collected, stamped));
@@ -837,13 +968,16 @@
      rows a discard request deletes (only ids that exist) and which rows
      stay listed. Listed rows are the still-unsent ones: wire-admitted rows
      (on the wire, awaiting prune) and unaddressable rows never list. */
-  function outboxReviewPlan(rows, discard) {
+  function outboxReviewPlan(rows, discard, owner) {
     var wanted = {};
     (discard || []).forEach(function (id) {
       if (typeof id === "string" && id) wanted[id] = true;
     });
     var plan = { remove: [], keep: [] };
     (rows || []).forEach(function (raw) {
+      // v3/gap-account: another identity's (or an ownerless legacy)
+      // queued send is neither listed nor deletable from this scope.
+      if (!vaultRowOwned(raw, owner)) return;
       var row = outboxPlainEntry(raw);
       if (!row.id) return;
       if (wanted[row.id]) {
@@ -863,10 +997,12 @@
      verified delete, never an optimistic one. */
   function outboxReview(db, req, onReport) {
     var tag = req && typeof req.tag === "string" ? req.tag : "refresh";
+    var owner = ownerArg(req);
     function report(removed, rows, ok) {
       try { onReport({ removed: removed, rows: rows, ok: ok, tag: tag }); } catch (err) {}
     }
     if (db === null) { report([], [], false); return; }
+    if (owner === null) { report([], [], true); return; }
     var tx;
     try { tx = db.transaction(OUTBOX, "readwrite"); } catch (err) { report([], [], false); return; }
     var plan = { remove: [], keep: [] };
@@ -874,7 +1010,7 @@
       var store = tx.objectStore(OUTBOX);
       var all = store.getAll();
       all.onsuccess = function () {
-        plan = outboxReviewPlan(all.result || [], req && req.discard);
+        plan = outboxReviewPlan(all.result || [], req && req.discard, owner);
         plan.remove.forEach(function (id) {
           try { store.delete(id); } catch (err) {}
         });
@@ -894,8 +1030,9 @@
   function outboxQueue(db, req, onQueued, onFailed) {
     var target = req && req.target;
     var text = req && req.text;
+    var owner = ownerArg(req);
     function fail() { try { onFailed(String(target || "")); } catch (err) {} }
-    if (db === null || !isOutboxTarget(target) || typeof text !== "string" || text.length === 0) {
+    if (db === null || owner === null || !isOutboxTarget(target) || typeof text !== "string" || text.length === 0) {
       fail();
       return;
     }
@@ -907,6 +1044,7 @@
       text: text,
       queued_at: now
     };
+    if (typeof owner === "string") entry.owner = owner;
     var tx;
     try {
       tx = db.transaction(OUTBOX, "readwrite");
@@ -959,7 +1097,7 @@
      a minted `@label=` and the report maps row ids to labels under
      `sentLabels` so Elm can correlate the server's echo/ACK/FAIL —
      mirroring the oracle's outbox flush stamping. */
-  function outboxFlush(db, sock, onReport, labeled) {
+  function outboxFlush(db, sock, onReport, labeled, owner) {
     /* Rows still durable when the walk ends (`waiting`) and rows the walk
        could not prune after admission/expiry (`pruneFailed`) — the pure
        terminal decision (`decideOutboxFlushTerminal` oracle) consumes both.
@@ -993,7 +1131,7 @@
        the oracle's flush catch marks delivery failed instead. */
     function failed() { finish({ sent: [], uncertain: [], dropped: [], rows: [], walkOk: false }); }
     function ids(rows) { return rows.map(function (r) { return r.id; }); }
-    if (db === null) {
+    if (db === null || owner === null) {
       empty();
       return;
     }
@@ -1017,9 +1155,22 @@
       var cursor = event.target.result;
       if (!cursor) return;
       var row = outboxPlainEntry(cursor.value);
+      /* v3/gap-account: only this owner scope's rows are sent or
+         counted. Every expired/corrupt row is still pruned (hygiene),
+         but another identity's live rows — and ownerless legacy rows —
+         are never sent under this identity. */
+      var mine = vaultRowOwned(cursor.value, owner);
+      /* The owner stamp rides the walked row so the durable wire-admitted
+         mark below re-puts it still owned (an ownerless re-put would
+         orphan the row if its prune then failed). */
+      row.ownerStamp = vaultRowOwner(cursor.value);
       if (!row.id || !isOutboxTarget(row.target) || !row.text || row.queuedAt < cutoff) {
-        if (row.id) dropped.push(row.id);
-        try { cursor.delete(); } catch (err) { expiredPruneFailed += 1; pruneFailed += 1; unprunedDropped += 1; }
+        if (row.id && mine) dropped.push(row.id);
+        try { cursor.delete(); } catch (err) {
+          if (mine) { expiredPruneFailed += 1; pruneFailed += 1; unprunedDropped += 1; }
+        }
+      } else if (!mine) {
+        /* not this scope's: leave it untouched and uncounted */
       } else if (row.wireAdmitted || outboxWireAdmitted[row.id]) {
         /* Already on the wire in a prior walk: never re-admit, only retry
            the prune (silently — the placeholder already settled when the
@@ -1061,14 +1212,16 @@
       try {
         storeM = txM.objectStore(OUTBOX);
         rows.forEach(function (row) {
-          storeM.put({
+          var marked = {
             id: row.id,
             target_key: row.target.toLowerCase(),
             target: row.target,
             text: row.text,
             queued_at: row.queuedAt,
             wire_admitted: true
-          });
+          };
+          if (row.ownerStamp) marked.owner = row.ownerStamp;
+          storeM.put(marked);
         });
       } catch (err) {
         try { if (txM.abort) txM.abort(); } catch (abortErr) {}
@@ -6874,7 +7027,7 @@ function fetchPublicFeed(url) {
               app.ports.vaultDmPrivacyClassified.send({ target: target, privacy: privacy });
             }
           } catch (err) { /* port gone */ }
-        });
+        }, ownerArg(req));
       });
     }
     /* Desktop/sound alerts (mirroring browser.ts): the Notification
@@ -6928,6 +7081,12 @@ function fetchPublicFeed(url) {
           note.onclick = function () {
             try { window.focus(); } catch (e) {}
             try { note.close(); } catch (e) {}
+            /* v3/gap-account: open the conversation the alert is about.
+               Elm only navigates when the alert was raised for the
+               identity that is signed in now. */
+            try {
+              if (app.ports.gapNotifyClicked) app.ports.gapNotifyClicked.send({ tag: String(req.tag || "") });
+            } catch (e) { /* port gone */ }
           };
         } catch (e) { /* alert is best-effort */ }
       });
@@ -7173,65 +7332,6 @@ function fetchPublicFeed(url) {
     if (app.ports.retentionPolicyRequest) {
       app.ports.retentionPolicyRequest.subscribe(function () { sendRetentionPolicy(); });
       sendRetentionPolicy();
-    }
-    function pruneAllTargets(db, onDone) {
-      var seen = [];
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readonly");
-      } catch (err) { onDone(0); return; }
-      var cursor;
-      try {
-        cursor = tx.objectStore(STORE).openCursor();
-      } catch (err) { onDone(0); return; }
-      cursor.onsuccess = function () {
-        var c = cursor.result;
-        if (c) {
-          var plain = vaultPlainRow(c.value);
-          seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at });
-          c.continue();
-        } else {
-          pruneCollectedTargets(db, seen, onDone);
-        }
-      };
-      cursor.onerror = function () { onDone(0); };
-    }
-    function pruneCollectedTargets(db, seen, onDone) {
-      var policy = readRetentionPolicy();
-      var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
-      var byTarget = {};
-      seen.forEach(function (entry) {
-        if (!entry.target) return;
-        (byTarget[entry.target] = byTarget[entry.target] || []).push(entry);
-      });
-      var targets = Object.keys(byTarget);
-      if (targets.length === 0) { onDone(0); return; }
-      var tx;
-      try {
-        tx = db.transaction(STORE, "readwrite");
-      } catch (err) { onDone(0); return; }
-      var store = tx.objectStore(STORE);
-      var deleted = 0;
-      var finished = false;
-      function finish(count) {
-        if (finished) return;
-        finished = true;
-        onDone(count);
-      }
-      tx.oncomplete = function () { finish(deleted); };
-      tx.onerror = function () { finish(deleted); };
-      targets.forEach(function (target) {
-        var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
-        if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
-        var prune = selectPruneIds(byTarget[target], channelPolicy, now);
-        var keyById = {};
-        byTarget[target].forEach(function (entry) { keyById[entry.id] = entry.key; });
-        prune.forEach(function (id) {
-          if (keyById[id] !== undefined) {
-            try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
-          }
-        });
-      });
     }
     if (app.ports.retentionPolicySave) {
       app.ports.retentionPolicySave.subscribe(function (req) {
@@ -7991,29 +8091,32 @@ function fetchPublicFeed(url) {
       socket.close();
     });
 
+    /* v3/gap-account: every vault/outbox port names its owner scope
+       (null = none → reads empty, writes refused). */
     app.ports.vaultPut.subscribe(function (req) {
-      vaultPut(vault, req.rows, function (stored) {
+      vaultPut(vault, (req && Array.isArray(req.rows)) ? req.rows : [], function (stored) {
         app.ports.vaultStored.send({ target: req.target, stored: stored });
-      });
+      }, portOwner(req));
     });
 
     app.ports.vaultGet.subscribe(function (req) {
       vaultGet(vault, req.target, req.limit, function (rows, status) {
         app.ports.vaultRows.send({ target: req.target, rows: rows, status: status });
-      });
+      }, portOwner(req));
     });
 
     if (app.ports.vaultGetAround) {
       app.ports.vaultGetAround.subscribe(function (req) {
         vaultGetAround(vault, req.target, req.at, req.limit, function (rows, status) {
           app.ports.vaultRowsAround.send({ target: req.target, at: req.at, rows: rows, status: status });
-        });
+        }, portOwner(req));
       });
     }
 
     if (app.ports.outboxQueue) {
       app.ports.outboxQueue.subscribe(function (req) {
-        outboxQueue(vault, req, function (entry) {
+        var scoped = { target: req && req.target, text: req && req.text, owner: portOwner(req) };
+        outboxQueue(vault, scoped, function (entry) {
           app.ports.outboxQueued.send(entry);
         }, function (target) {
           app.ports.outboxQueueFailed.send({ target: target });
@@ -8024,7 +8127,8 @@ function fetchPublicFeed(url) {
     /* v3/prefs — Preferences queued-send review/discard. */
     if (app.ports.outboxReview) {
       app.ports.outboxReview.subscribe(function (req) {
-        outboxReview(vault, req, function (report) {
+        var scoped = { discard: req && req.discard, tag: req && req.tag, owner: portOwner(req) };
+        outboxReview(vault, scoped, function (report) {
           if (app.ports.outboxReviewed) app.ports.outboxReviewed.send(report);
         });
       });
@@ -8035,7 +8139,7 @@ function fetchPublicFeed(url) {
         var labeled = !!(req && req.labeled);
         outboxFlush(vault, socket, function (report) {
           app.ports.outboxFlushed.send(report);
-        }, labeled);
+        }, labeled, portOwner(req));
       });
     }
 
@@ -8097,7 +8201,8 @@ function fetchPublicFeed(url) {
           limit: limit,
           activeTarget: req ? req.activeTarget : null,
           selfNick: req ? req.selfNick : null,
-          nowMs: req ? req.nowMs : undefined
+          nowMs: req ? req.nowMs : undefined,
+          owner: portOwner(req)
         };
         vaultSearchMode(vault, query, mode, scanOpts, function (rows, status) {
           try { app.ports.vaultSearched.send({ rows: rows, status: status, seq: seq, mode: mode }); } catch (err) { /* port gone */ }
@@ -8106,7 +8211,7 @@ function fetchPublicFeed(url) {
     }
 
     if (app.ports.vaultExportRequest) {
-      app.ports.vaultExportRequest.subscribe(function () {
+      app.ports.vaultExportRequest.subscribe(function (req) {
         vaultExportAll(vault, function (snapshot) {
           var targets = snapshot.targets.length;
           var messages = 0;
@@ -8125,7 +8230,7 @@ function fetchPublicFeed(url) {
             // Download unsupported here: counts are still reported.
           }
           app.ports.vaultExported.send({ targets: targets, messages: messages });
-        });
+        }, portOwner(req));
       });
     }
 
@@ -8136,6 +8241,7 @@ function fetchPublicFeed(url) {
     if (app.ports.deviceHistoryCopyRequest) {
       app.ports.deviceHistoryCopyRequest.subscribe(function (req) {
         var seq = (req && typeof req.seq === "number") ? req.seq : 0;
+        var copyOwner = portOwner(req);
         vaultExportAll(vault, function (snapshot) {
           try {
             var targets = (snapshot.targets || []).map(function (entry) {
@@ -8159,7 +8265,7 @@ function fetchPublicFeed(url) {
           } catch (err) {
             app.ports.deviceHistoryCopyRows.send({ seq: seq, exportedAt: "", json: "[]" });
           }
-        });
+        }, copyOwner);
       });
     }
 
@@ -8187,6 +8293,38 @@ function fetchPublicFeed(url) {
           picker.click();
         } catch (err) { /* no DOM file picker here */ }
       });
+    }
+
+    /* v3/gap-account — per-scope device lists, the verified vault
+       erase, the installed-app badge, and desktop-alert clicks. */
+    if (app.ports.gapScopedListsRequest) {
+      app.ports.gapScopedListsRequest.subscribe(function (req) {
+        var answer = loadScopedLists(scopedListsStorage(), req);
+        if (!answer) return;
+        try {
+          if (app.ports.gapScopedListsLoaded) app.ports.gapScopedListsLoaded.send(answer);
+        } catch (err) { /* port gone */ }
+      });
+    }
+    if (app.ports.gapScopedListsSave) {
+      app.ports.gapScopedListsSave.subscribe(function (req) {
+        saveScopedLists(scopedListsStorage(), req);
+      });
+    }
+    if (app.ports.gapVaultClear) {
+      app.ports.gapVaultClear.subscribe(function () {
+        clearVaultMessages(vault, function (ok) {
+          try {
+            if (app.ports.gapVaultCleared) app.ports.gapVaultCleared.send({ ok: !!ok });
+          } catch (err) { /* port gone */ }
+        });
+      });
+    }
+    var badge = createAppBadge(typeof navigator !== "undefined" ? navigator : null);
+    /* A stale OS badge from an earlier session never outlives a reload. */
+    badge.set(0);
+    if (app.ports.gapAppBadge) {
+      app.ports.gapAppBadge.subscribe(function (count) { badge.set(count); });
     }
 
     /* Upload picker + send wiring (bridge functions live at top
@@ -11908,7 +12046,302 @@ function fetchPublicFeed(url) {
     return { send: send };
   }
 
+  /* v3/gap-account — scoped device lists. A scope's slot is
+     `<base>:scope:<encodeURIComponent(scope)>`. The first load of a
+     scope seeds it ONCE from the union of the old device-global plain
+     key and (accounts only) the SolidJS owner slots
+     `<base>:owner:<encodeURIComponent(JSON.stringify([endpoint,account]))>`.
+     Sources are copied, never deleted, so no identity loses a block it
+     had before the split; an emptied list is written as `[]`/`{}` so a
+     scope never re-seeds what its owner removed. Every value is
+     re-validated in Elm on load. */
+  var SCOPED_LIST_SPECS = [
+    { name: "ignored", base: "onyx:ignored-users", kind: "list", max: 512 },
+    { name: "muted", base: "onyx:muted-dms", kind: "list", max: 512 },
+    { name: "highlights", base: "onyx:highlight-words", kind: "list", max: 128 },
+    { name: "notify", base: "onyx:channel-notify", kind: "map", max: 256 }
+  ];
+  var SCOPED_LIST_MAX_CHARS = 128 * 1024;
+  var SCOPED_SCOPE_MAX = 4096;
+  var SCOPED_SOLID_OWNERS_MAX = 16;
+
+  function scopedListsStorage() {
+    try {
+      return (typeof global.localStorage !== "undefined") ? global.localStorage : null;
+    } catch (err) { return null; }
+  }
+
+  function scopedListKey(base, scope) {
+    return base + ":scope:" + encodeURIComponent(scope);
+  }
+
+  function solidOwnerListKey(base, ownerJson) {
+    return base + ":owner:" + encodeURIComponent(ownerJson);
+  }
+
+  function readScopedRaw(store, key) {
+    try {
+      var raw = store.getItem(key);
+      if (typeof raw !== "string") return { present: false, value: null };
+      if (raw.length > SCOPED_LIST_MAX_CHARS) return { present: true, value: null };
+      return { present: true, value: JSON.parse(raw) };
+    } catch (err) {
+      return { present: true, value: null };
+    }
+  }
+
+  function scopedListValues(spec, value) {
+    var out = [];
+    if (spec.kind === "list") {
+      if (!Array.isArray(value)) return out;
+      for (var i = 0; i < value.length && out.length < spec.max * 4; i++) {
+        if (typeof value[i] === "string") out.push(value[i]);
+      }
+      return out;
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return out;
+    var keys = Object.keys(value);
+    for (var j = 0; j < keys.length && out.length < spec.max * 4; j++) {
+      if (typeof value[keys[j]] === "string") out.push({ channel: keys[j], level: value[keys[j]] });
+    }
+    return out;
+  }
+
+  function scopedUnion(spec, lists) {
+    if (spec.kind === "list") {
+      var seen = {};
+      var merged = [];
+      lists.forEach(function (list) {
+        list.forEach(function (v) {
+          var k = String(v).trim().toLowerCase();
+          if (!k || seen[k]) return;
+          seen[k] = true;
+          merged.push(v);
+        });
+      });
+      return merged;
+    }
+    /* maps: later sources (the account-specific Solid slots) win */
+    var byChannel = {};
+    var order = [];
+    lists.forEach(function (list) {
+      list.forEach(function (entry) {
+        var k = String(entry.channel).trim().toLowerCase();
+        if (!k) return;
+        if (!Object.prototype.hasOwnProperty.call(byChannel, k)) order.push(k);
+        byChannel[k] = entry;
+      });
+    });
+    return order.map(function (k) { return byChannel[k]; });
+  }
+
+  function scopedSerialize(spec, values) {
+    if (spec.kind === "list") return JSON.stringify(values.filter(function (v) { return typeof v === "string"; }).slice(0, spec.max));
+    var obj = {};
+    values.slice(0, spec.max).forEach(function (entry) {
+      if (entry && typeof entry.channel === "string" && typeof entry.level === "string") obj[entry.channel] = entry.level;
+    });
+    return JSON.stringify(obj);
+  }
+
+  function loadScopedLists(store, req) {
+    var scope = req && typeof req.scope === "string" ? req.scope : "";
+    if (!scope || scope.length > SCOPED_SCOPE_MAX) return null;
+    var owners = (req && Array.isArray(req.solidOwners) ? req.solidOwners : [])
+      .filter(function (o) { return typeof o === "string" && o.length > 0 && o.length <= SCOPED_SCOPE_MAX; })
+      .slice(0, SCOPED_SOLID_OWNERS_MAX);
+    var answer = { scope: scope, seeded: [] };
+    SCOPED_LIST_SPECS.forEach(function (spec) {
+      if (!store) { answer[spec.name] = []; return; }
+      var key = scopedListKey(spec.base, scope);
+      var own = readScopedRaw(store, key);
+      if (own.present && own.value !== null) {
+        answer[spec.name] = scopedListValues(spec, own.value);
+        return;
+      }
+      /* Absent (never seeded) or unreadable: seed from the legacy
+         sources so nothing is lost, then write the scope's own slot. */
+      var sources = [scopedListValues(spec, readScopedRaw(store, spec.base).value)];
+      owners.forEach(function (ownerJson) {
+        sources.push(scopedListValues(spec, readScopedRaw(store, solidOwnerListKey(spec.base, ownerJson)).value));
+      });
+      var seeded = scopedUnion(spec, sources);
+      try { store.setItem(key, scopedSerialize(spec, seeded)); } catch (err) { /* quota: still answer */ }
+      answer.seeded.push(spec.name);
+      answer[spec.name] = seeded;
+    });
+    return answer;
+  }
+
+  function saveScopedLists(store, req) {
+    var scope = req && typeof req.scope === "string" ? req.scope : "";
+    var lists = req && req.lists;
+    if (!store || !scope || scope.length > SCOPED_SCOPE_MAX || !lists || typeof lists !== "object") return false;
+    var ok = true;
+    SCOPED_LIST_SPECS.forEach(function (spec) {
+      if (!Object.prototype.hasOwnProperty.call(lists, spec.name)) return;
+      var values = lists[spec.name];
+      if (!Array.isArray(values)) return;
+      var clean = spec.kind === "list"
+        ? values.filter(function (v) { return typeof v === "string"; })
+        : values.filter(function (e) { return e && typeof e.channel === "string" && typeof e.level === "string"; });
+      try { store.setItem(scopedListKey(spec.base, scope), scopedSerialize(spec, clean)); } catch (err) { ok = false; }
+    });
+    return ok;
+  }
+
+  /* Verified erase of the local history store (every scope, including
+     quarantined ownerless rows): clear, then re-count in a fresh
+     transaction; only a proven-empty store reports ok. The outbox and
+     the schedule are pending sends, not history — they keep their own
+     controls. */
+  function clearVaultMessages(db, onDone) {
+    function done(ok) { try { onDone(!!ok); } catch (err) {} }
+    if (db === null) {
+      /* No store: nothing persisted on a host without IndexedDB; a host
+         that has IndexedDB but failed to open cannot be verified. */
+      done(!(typeof global.indexedDB !== "undefined" && global.indexedDB));
+      return;
+    }
+    var tx;
+    try { tx = db.transaction(STORE, "readwrite"); } catch (err) { done(false); return; }
+    try { tx.objectStore(STORE).clear(); } catch (err) { done(false); return; }
+    tx.onerror = function () { done(false); };
+    tx.onabort = function () { done(false); };
+    tx.oncomplete = function () {
+      vaultDmPrivacyCache = {};
+      var verify;
+      try { verify = db.transaction(STORE, "readonly"); } catch (err) { done(false); return; }
+      var count = null;
+      try {
+        var req = verify.objectStore(STORE).count();
+        req.onsuccess = function () { count = req.result; };
+      } catch (err) { done(false); return; }
+      verify.oncomplete = function () { done(count === 0); };
+      verify.onerror = function () { done(false); };
+      verify.onabort = function () { done(false); };
+    };
+  }
+
+  /* Installed-app badge (navigator.setAppBadge where supported): writes
+     are serialized so a slow platform call can never overwrite a newer
+     count, and every failure is silent (ambient enhancement). */
+  function createAppBadge(nav) {
+    var requested = 0;
+    var applied = -1;
+    var busy = false;
+    function apply(count) {
+      try {
+        if (!nav) return Promise.resolve();
+        if (count > 0 && typeof nav.setAppBadge === "function") return Promise.resolve(nav.setAppBadge(count));
+        if (count === 0 && typeof nav.clearAppBadge === "function") return Promise.resolve(nav.clearAppBadge());
+        if (count === 0 && typeof nav.setAppBadge === "function") return Promise.resolve(nav.setAppBadge(0));
+      } catch (err) { /* unsupported */ }
+      return Promise.resolve();
+    }
+    function flush() {
+      if (busy || applied === requested) return;
+      busy = true;
+      var next = requested;
+      apply(next).then(null, function () {}).then(function () {
+        applied = next;
+        busy = false;
+        flush();
+      });
+    }
+    return {
+      set: function (count) {
+        var n = (typeof count === "number" && isFinite(count) && count > 0) ? Math.min(Math.floor(count), 99999) : 0;
+        requested = n;
+        flush();
+      },
+      state: function () { return { requested: requested, applied: applied, busy: busy }; }
+    };
+  }
+
+  /* Retention re-applied across every target at once (policy save). Moved
+     to module level so it can be smoke-tested; per target AND per owner
+     scope (see `pruneCollectedTargets`). */
+  function pruneAllTargets(db, onDone) {
+    var seen = [];
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readonly");
+    } catch (err) { onDone(0); return; }
+    var cursor;
+    try {
+      cursor = tx.objectStore(STORE).openCursor();
+    } catch (err) { onDone(0); return; }
+    cursor.onsuccess = function () {
+      var c = cursor.result;
+      if (c) {
+        var plain = vaultPlainRow(c.value);
+        seen.push({ key: c.primaryKey, target: plain.target, id: plain.id, at: plain.at, bucket: vaultRowOwner(c.value) || "" });
+        c.continue();
+      } else {
+        pruneCollectedTargets(db, seen, onDone);
+      }
+    };
+    cursor.onerror = function () { onDone(0); };
+  }
+  function pruneCollectedTargets(db, seen, onDone) {
+    var policy = readRetentionPolicy();
+    var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
+    /* v3/gap-account: retention is per target AND per owner scope (two
+       identities' rows share logical ids and must never evict each
+       other); legacy ownerless rows are their own bucket. */
+    var byTarget = {};
+    seen.forEach(function (entry) {
+      if (!entry.target) return;
+      var group = entry.target + "\u0001" + entry.bucket;
+      (byTarget[group] = byTarget[group] || []).push(entry);
+    });
+    var targets = Object.keys(byTarget);
+    if (targets.length === 0) { onDone(0); return; }
+    var tx;
+    try {
+      tx = db.transaction(STORE, "readwrite");
+    } catch (err) { onDone(0); return; }
+    var store = tx.objectStore(STORE);
+    var deleted = 0;
+    var finished = false;
+    function finish(count) {
+      if (finished) return;
+      finished = true;
+      onDone(count);
+    }
+    tx.oncomplete = function () { finish(deleted); };
+    tx.onerror = function () { finish(deleted); };
+    targets.forEach(function (group) {
+      var target = byTarget[group][0].target;
+      var channelPolicy = { keep: retentionEffectiveKeep(policy, target) };
+      if (typeof policy.maxAgeDays === "number") channelPolicy.maxAgeDays = policy.maxAgeDays;
+      var prune = selectPruneIds(byTarget[group], channelPolicy, now);
+      var keyById = {};
+      byTarget[group].forEach(function (entry) { keyById[entry.id] = entry.key; });
+      prune.forEach(function (id) {
+        if (keyById[id] !== undefined) {
+          try { store.delete(keyById[id]); deleted += 1; } catch (err) {}
+        }
+      });
+    });
+  }
+
   global.OnyxPorts = {
+    /* v3/gap-account */
+    gapAccount: {
+      loadScopedLists: loadScopedLists,
+      saveScopedLists: saveScopedLists,
+      scopedListKey: scopedListKey,
+      solidOwnerListKey: solidOwnerListKey,
+      clearVaultMessages: clearVaultMessages,
+      createAppBadge: createAppBadge,
+      ownerArg: ownerArg,
+      rowOwned: vaultRowOwned,
+      localHistoryEnabled: localHistoryEnabled,
+      openVault: openVault,
+      pruneAllTargets: pruneAllTargets
+    },
     vaultStore: {
       put: vaultPut,
       get: vaultGet,
@@ -11931,6 +12364,7 @@ function fetchPublicFeed(url) {
       exportAll: vaultExportAll,
       aroundWindow: vaultAroundWindow,
       classifyDmRows: classifyVaultDmRows,
+      classifyDm: classifyVaultDm,
       dmPrivacyRowEncrypted: vaultDmPrivacyRowEncrypted,
       dmPrivacyInvalidate: vaultDmPrivacyInvalidate,
       exportSnapshot: vaultExportSnapshot,
@@ -11949,6 +12383,7 @@ function fetchPublicFeed(url) {
       plainEntry: outboxPlainEntry,
       flushPlan: outboxFlushPlan,
       flush: outboxFlush,
+      queue: outboxQueue,
       reviewPlan: outboxReviewPlan,
       review: outboxReview,
       maxEntries: OUTBOX_MAX_ENTRIES,

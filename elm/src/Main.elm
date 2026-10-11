@@ -132,6 +132,8 @@ import Task
 import Time
 import Url
 import View
+-- v3/gap-account
+import GapAccount
 -- v3/calls-c8
 import VoiceSettings
 
@@ -190,10 +192,10 @@ port wsOpened : ({ url : String } -> msg) -> Sub msg
 port wsClosed : ({ clean : Bool, reason : String } -> msg) -> Sub msg
 
 
-port vaultPut : { target : String, rows : List App.VaultRow } -> Cmd msg
+port vaultPut : { target : String, rows : List App.VaultRow, owner : String } -> Cmd msg
 
 
-port vaultGet : { target : String, limit : Int } -> Cmd msg
+port vaultGet : { target : String, limit : Int, owner : Maybe String } -> Cmd msg
 
 
 port vaultStored : ({ target : String, stored : Int } -> msg) -> Sub msg
@@ -202,7 +204,7 @@ port vaultStored : ({ target : String, stored : Int } -> msg) -> Sub msg
 port vaultRows : ({ target : String, rows : List App.VaultRow, status : String } -> msg) -> Sub msg
 
 
-port vaultSearch : { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float } -> Cmd msg
+port vaultSearch : { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float, owner : Maybe String } -> Cmd msg
 
 
 port vaultSearchModeSave : { mode : String } -> Cmd msg
@@ -220,7 +222,7 @@ port retentionPolicyLoaded : (Encode.Value -> msg) -> Sub msg
 port retentionPolicyApplied : ({ saved : Bool, pruned : Bool } -> msg) -> Sub msg
 
 
-port vaultClassifyDm : { target : String } -> Cmd msg
+port vaultClassifyDm : { target : String, owner : Maybe String } -> Cmd msg
 
 
 port voiceJoin : { channel : String, video : Bool } -> Cmd msg
@@ -267,13 +269,13 @@ port vaultSearched : ({ rows : List App.VaultRow, status : String, seq : Int, mo
 port vaultDmPrivacyClassified : ({ target : String, privacy : String } -> msg) -> Sub msg
 
 
-port vaultGetAround : { target : String, at : Int, limit : Int } -> Cmd msg
+port vaultGetAround : { target : String, at : Int, limit : Int, owner : Maybe String } -> Cmd msg
 
 
 port vaultRowsAround : ({ target : String, at : Int, rows : List App.VaultRow, status : String } -> msg) -> Sub msg
 
 
-port vaultExportRequest : () -> Cmd msg
+port vaultExportRequest : { owner : Maybe String } -> Cmd msg
 
 
 port vaultExported : ({ targets : Int, messages : Int } -> msg) -> Sub msg
@@ -287,19 +289,19 @@ port vaultImportFile : ({ json : String } -> msg) -> Sub msg
 -- results and batch lists arrive as raw JSON and are decoded strictly.
 
 
-port historyImportPick : { job : Int, kind : String } -> Cmd msg
+port historyImportPick : { job : Int, kind : String, owner : Maybe String } -> Cmd msg
 
 
 port historyImportCancel : { job : Int } -> Cmd msg
 
 
-port historyImportRecord : { batch : HistoryImport.Batch, ids : List String, prints : List String } -> Cmd msg
+port historyImportRecord : { batch : HistoryImport.Batch, ids : List String, prints : List String, owner : Maybe String } -> Cmd msg
 
 
-port historyImportListRequest : () -> Cmd msg
+port historyImportListRequest : { owner : Maybe String } -> Cmd msg
 
 
-port historyImportRemove : { batch : String } -> Cmd msg
+port historyImportRemove : { batch : String, owner : Maybe String } -> Cmd msg
 
 
 port historyImportProgress : ({ job : Int, phase : String, done : Float, total : Float, files : Int } -> msg) -> Sub msg
@@ -316,9 +318,9 @@ port historyImportBatches : (Decode.Value -> msg) -> Sub msg
 
 port historyImportRemoved : ({ batch : String, removed : Int, ok : Bool, targets : List String, prints : List String } -> msg) -> Sub msg
 
-port outboxQueue : { target : String, text : String } -> Cmd msg
+port outboxQueue : { target : String, text : String, owner : Maybe String } -> Cmd msg
 
-port outboxFlush : { labeled : Bool } -> Cmd msg
+port outboxFlush : { labeled : Bool, owner : Maybe String } -> Cmd msg
 
 port outboxQueued : ({ id : String, target : String, text : String, queuedAt : Float } -> msg) -> Sub msg
 
@@ -334,7 +336,7 @@ port outboxRetryFired : (() -> msg) -> Sub msg
 {-| v3/prefs — read the durable outbox (optionally deleting `discard`
 ids first); `tag` is echoed back so the fold knows which request settled.
 -}
-port outboxReview : { discard : List String, tag : String } -> Cmd msg
+port outboxReview : { discard : List String, tag : String, owner : Maybe String } -> Cmd msg
 
 
 port outboxReviewed : ({ removed : List String, rows : List { id : String, target : String, text : String, queuedAt : Float }, ok : Bool, tag : String } -> msg) -> Sub msg
@@ -757,7 +759,7 @@ port savedSearchesDownload : { filename : String, json : String } -> Cmd msg
 
 port accountDownload : { filename : String, json : String } -> Cmd msg
 
-port deviceHistoryCopyRequest : { seq : Int } -> Cmd msg
+port deviceHistoryCopyRequest : { seq : Int, owner : Maybe String } -> Cmd msg
 
 port deviceHistoryCopyRows : ({ seq : Int, exportedAt : String, json : String } -> msg) -> Sub msg
 
@@ -972,6 +974,31 @@ port groupWelcomeOpen : { key : String, room : String, fromAccount : String, fro
 
 
 port groupWelcomeOpened : ({ key : String, room : String, epoch : Int, ok : Bool, reason : String } -> msg) -> Sub msg
+
+
+-- v3/gap-account: per-scope device lists, the vault erase, the app badge,
+-- and desktop-alert clicks.
+
+
+port gapScopedListsRequest : { scope : String, solidOwners : List String } -> Cmd msg
+
+
+port gapScopedListsSave : { scope : String, lists : Encode.Value } -> Cmd msg
+
+
+port gapScopedListsLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port gapVaultClear : () -> Cmd msg
+
+
+port gapVaultCleared : ({ ok : Bool } -> msg) -> Sub msg
+
+
+port gapAppBadge : Int -> Cmd msg
+
+
+port gapNotifyClicked : ({ tag : String } -> msg) -> Sub msg
 
 
 type alias Flags =
@@ -1290,52 +1317,56 @@ perform key outbound =
                 , maxConcurrency = Nodes.defaultMaxConcurrency
                 }
 
-        App.VaultPersist req ->
-            vaultPut req
+        -- v3/gap-account: without the model there is no owner scope, so
+        -- these fail closed here; `performIn` is the real path.
+        App.VaultPersist _ ->
+            Cmd.none
 
         App.VaultFetch req ->
-            vaultGet req
+            vaultGet { target = req.target, limit = req.limit, owner = Nothing }
 
         App.VaultSearch req ->
-            vaultSearch req
+            vaultSearch (vaultSearchFor Nothing req)
 
         App.VaultFetchAround req ->
-            vaultGetAround req
+            vaultGetAround { target = req.target, at = req.at, limit = req.limit, owner = Nothing }
 
         App.VaultExportRequest ->
-            vaultExportRequest ()
+            vaultExportRequest { owner = Nothing }
 
         App.VaultImportPick ->
             vaultImportPick ()
 
         -- v3/gap-import
+        -- v3/gap-account: no model, no owner scope — the bridge reads and
+        -- records nothing (`performIn` is the real path).
         App.HistoryImportPick req ->
-            historyImportPick req
+            historyImportPick { job = req.job, kind = req.kind, owner = Nothing }
 
         App.HistoryImportCancel req ->
             historyImportCancel req
 
         App.HistoryImportRecord req ->
-            historyImportRecord req
+            historyImportRecord { batch = req.batch, ids = req.ids, prints = req.prints, owner = Nothing }
 
         App.HistoryImportListRequest ->
-            historyImportListRequest ()
+            historyImportListRequest { owner = Nothing }
 
         App.HistoryImportRemove req ->
-            historyImportRemove req
+            historyImportRemove { batch = req.batch, owner = Nothing }
 
         App.OutboxQueue req ->
-            outboxQueue req
+            outboxQueue { target = req.target, text = req.text, owner = Nothing }
 
         App.OutboxFlush { labeled } ->
-            outboxFlush { labeled = labeled }
+            outboxFlush { labeled = labeled, owner = Nothing }
 
         App.OutboxRetryTimer req ->
             outboxRetryStart req.delayMs
 
         -- v3/prefs
         App.OutboxReview req ->
-            outboxReview req
+            outboxReview { discard = req.discard, tag = req.tag, owner = Nothing }
 
         App.PrefsFocus { id } ->
             Task.attempt (\_ -> App.PrefsFocusDone) (Browser.Dom.focus id)
@@ -1364,8 +1395,12 @@ perform key outbound =
         App.AppearanceStorePrefs req ->
             appearanceStorePrefs req
 
-        App.BlocklistsSave req ->
-            blocklistsSave req
+        -- v3/gap-account: the device-global list writers are retired —
+        -- block/mute lists, keywords and per-room alert levels persist
+        -- per account scope (App `settleStepGapAccount` →
+        -- `GapAccountFx ScopedListsSave`), so these intents write nothing.
+        App.BlocklistsSave _ ->
+            Cmd.none
 
         App.IdentityProfileSave req ->
             identityProfileSave req
@@ -1426,7 +1461,7 @@ perform key outbound =
             vaultSearchModeSave req
 
         App.ClassifyVaultDm req ->
-            vaultClassifyDm req
+            vaultClassifyDm { target = req.target, owner = Nothing }
 
         App.VoiceJoin req ->
             voiceJoin req
@@ -1454,8 +1489,8 @@ perform key outbound =
         App.FollowedSave req ->
             followedSave req
 
-        App.HighlightWordsSave req ->
-            highlightWordsSave req
+        App.HighlightWordsSave _ ->
+            Cmd.none
 
         App.DndSave req ->
             dndSave req
@@ -1466,8 +1501,8 @@ perform key outbound =
         App.NotifySoundSave req ->
             notifySoundSave req
 
-        App.ChannelNotifySave req ->
-            channelNotifySave req
+        App.ChannelNotifySave _ ->
+            Cmd.none
 
         App.StarredSave req ->
             starredSave req
@@ -1677,7 +1712,11 @@ perform key outbound =
             accountDownload req
 
         App.DeviceHistoryCopyRequest req ->
-            deviceHistoryCopyRequest req
+            deviceHistoryCopyRequest { seq = req.seq, owner = Nothing }
+
+        -- v3/gap-account
+        App.GapAccountFx fx ->
+            performGapAccount fx
 
         App.PasskeyCreate args ->
             passkeyCreate
@@ -1772,6 +1811,110 @@ perform key outbound =
             groupWelcomeOpen args
 
 
+-- v3/gap-account
+
+
+{-| Perform with the post-update model in hand: every vault and outbox
+operation carries the device-memory owner scope the App settled for
+this update (`gapAccount.scope`). No scope → reads answer empty
+ports-side and writes are never sent; local history off → no vault
+write leaves Elm at all. -}
+performIn : App.Model -> Nav.Key -> App.Outbound -> Cmd App.Msg
+performIn app key outbound =
+    let
+        owner =
+            app.gapAccount.scope
+    in
+    case outbound of
+        App.VaultPersist req ->
+            case owner of
+                Just scope ->
+                    if app.prefs.localHistory then
+                        vaultPut { target = req.target, rows = req.rows, owner = scope }
+
+                    else
+                        Cmd.none
+
+                Nothing ->
+                    Cmd.none
+
+        App.VaultFetch req ->
+            vaultGet { target = req.target, limit = req.limit, owner = owner }
+
+        App.VaultSearch req ->
+            vaultSearch (vaultSearchFor owner req)
+
+        App.VaultFetchAround req ->
+            vaultGetAround { target = req.target, at = req.at, limit = req.limit, owner = owner }
+
+        App.VaultExportRequest ->
+            vaultExportRequest { owner = owner }
+
+        App.ClassifyVaultDm req ->
+            vaultClassifyDm { target = req.target, owner = owner }
+
+        App.DeviceHistoryCopyRequest req ->
+            deviceHistoryCopyRequest { seq = req.seq, owner = owner }
+
+        App.OutboxQueue req ->
+            outboxQueue { target = req.target, text = req.text, owner = owner }
+
+        App.OutboxFlush { labeled } ->
+            outboxFlush { labeled = labeled, owner = owner }
+
+        App.OutboxReview req ->
+            outboxReview { discard = req.discard, tag = req.tag, owner = owner }
+
+        -- v3/gap-import: the duplicate index, the batch ledger and the
+        -- undo all act on this scope's rows only.
+        App.HistoryImportPick req ->
+            historyImportPick { job = req.job, kind = req.kind, owner = owner }
+
+        App.HistoryImportRecord req ->
+            historyImportRecord { batch = req.batch, ids = req.ids, prints = req.prints, owner = owner }
+
+        App.HistoryImportListRequest ->
+            historyImportListRequest { owner = owner }
+
+        App.HistoryImportRemove req ->
+            historyImportRemove { batch = req.batch, owner = owner }
+
+        _ ->
+            perform key outbound
+
+
+vaultSearchFor :
+    Maybe String
+    -> { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float }
+    -> { query : String, limit : Int, seq : Int, mode : String, activeTarget : Maybe String, selfNick : String, nowMs : Float, owner : Maybe String }
+vaultSearchFor owner req =
+    { query = req.query
+    , limit = req.limit
+    , seq = req.seq
+    , mode = req.mode
+    , activeTarget = req.activeTarget
+    , selfNick = req.selfNick
+    , nowMs = req.nowMs
+    , owner = owner
+    }
+
+
+performGapAccount : GapAccount.Effect -> Cmd App.Msg
+performGapAccount fx =
+    case fx of
+        GapAccount.ScopedListsRequest req ->
+            gapScopedListsRequest req
+
+        GapAccount.ScopedListsSave req ->
+            gapScopedListsSave req
+
+        GapAccount.VaultClear ->
+            gapVaultClear ()
+
+        GapAccount.AppBadge count ->
+            gapAppBadge count
+
+
 update : App.Msg -> Model -> ( Model, Cmd App.Msg )
 update msg model =
     let
@@ -1796,7 +1939,18 @@ update msg model =
       -- ports.js in reverse batch order. Reversing here keeps the wire in
       -- `App.update` order (CAP LS before NICK/USER, so SASL can run
       -- pre-registration); bundleBoot.smoke.mjs pins this on the real bundle.
-    , Cmd.batch (List.map (perform model.navKey) (List.reverse outbound) ++ List.map organizeLoad organizeReads)
+    , Cmd.batch
+        (List.map (performIn app model.navKey) (List.reverse outbound)
+            ++ List.map organizeLoad organizeReads
+            -- v3/gap-account: the installed-app badge follows the
+            -- attention count the App settled (mentions + unread DMs).
+            ++ (if app.gapAccount.badge /= model.app.gapAccount.badge then
+                    [ performGapAccount (GapAccount.AppBadge app.gapAccount.badge) ]
+
+                else
+                    []
+               )
+        )
     )
 
 
@@ -1945,6 +2099,10 @@ subscriptions model =
         , webPushActiveState App.WebPushActiveState
         , webPushRecoveryHint (\_ -> App.WebPushRecoveryHint)
         , groupWelcomeOpened App.GroupWelcomeOpened
+        -- v3/gap-account
+        , gapScopedListsLoaded (App.GapAccountMsg << GapAccount.ScopedListsLoaded)
+        , gapVaultCleared (App.GapAccountMsg << GapAccount.VaultCleared)
+        , gapNotifyClicked (App.GapAccountMsg << GapAccount.NotifyClicked)
         -- v3/gap-auth
         , authGateIn App.AuthGatePortIn
         ]

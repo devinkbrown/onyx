@@ -30,6 +30,7 @@ import Html.Events exposing (onCheck, onClick, onInput, preventDefaultOn)
 import Json.Decode as Decode
 import PrefsPanel
 import Retention
+import View.GapAccount
 
 
 transfer : Model -> List (Html Msg)
@@ -659,7 +660,8 @@ vaultCard model =
         , p [ class "pref-desc" ]
             [ text "Export this device's local message history as portable JSON, or bring a vault file back in (you review it first). Passwords, session tokens, and decrypted DM plaintext are not exported." ]
         , div [ class "pref-actions" ]
-            [ button [ type_ "button", class "hi-btn", onClick PrefsVaultExport ] [ text "Export vault" ]
+            [ -- v3/gap-account: asks for the export review first
+              View.GapAccount.exportButton "hi-btn" model
             , button
                 [ type_ "button"
                 , class "hi-btn"
@@ -669,6 +671,7 @@ vaultCard model =
                 ]
                 [ text "Import portable JSON" ]
             ]
+        , View.GapAccount.exportReview model
         , case model.prefsTransferStatus of
             Just status ->
                 p [ class "pref-status", attribute "role" "status" ] [ text status ]
