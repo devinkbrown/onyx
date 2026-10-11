@@ -165,6 +165,7 @@ type Reply
     | HoldDone { released : Bool, count : Int }
     | PolicyGenerations { ward : Int, filter : Int, class : Int, ban : Int }
     | PolicyRolled String
+    | SecondOperator
     | EventCategories { subscribed : List String, minSeverity : String }
     | EventSeverityIs String
     | EventStatsText String
@@ -346,6 +347,9 @@ classifyNotice text =
 
     else if String.startsWith "KILL:" text then
         Just (Said { section = Network, text = text })
+
+    else if text == "waiting for a second operator" then
+        Just SecondOperator
 
     else
         Nothing
@@ -802,6 +806,9 @@ sectionOf reply =
         PolicyRolled _ ->
             Content
 
+        SecondOperator ->
+            Network
+
         EventCategories _ ->
             Live
 
@@ -908,6 +915,9 @@ toneOf reply =
 
         PolicyRolled _ ->
             Good
+
+        SecondOperator ->
+            Warn
 
         RehashDone _ ->
             Good
@@ -1059,6 +1069,10 @@ describe reply =
 
         PolicyRolled text ->
             String.dropLeft 8 text
+
+        SecondOperator ->
+            "Waiting for a second operator to repeat this command."
+
 
         EventCategories e ->
             if List.isEmpty e.subscribed then

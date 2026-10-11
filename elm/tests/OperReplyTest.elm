@@ -227,7 +227,12 @@ suite =
                         [ Just (Said { section = Content, text = "CHALLENGE method set" }), Just (Said { section = Content, text = "CHALLENGE question set" }) ]
                         [ read (notice "CHALLENGE method set"), read (notice "CHALLENGE question set") ]
             ]
+        , describe "two-person rule"
+            [ test "a mesh ward waits for a second operator" <|
+                \_ -> expectReply SecondOperator (notice "waiting for a second operator")
+            ]
         , describe "event spine commands"
+
             [ test "EVENT LIST category line" <|
                 \_ ->
                     Expect.equal
