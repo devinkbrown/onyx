@@ -89,7 +89,7 @@ quietSection model =
         [ h3 [ class "notify-group-title" ] [ text "Quiet hours" ]
         , div [ class "notify-row" ]
             [ div [ class "notify-row-copy" ]
-                [ span [ class "notify-row-title" ] [ text "Silence alerts every day" ]
+                [ span [ class "notify-row-title" ] [ text "Quiet on a schedule" ]
                 , span [ class "notify-row-hint", attribute "data-testid" "notify-quiet-status", attribute "role" "status" ]
                     [ text (Attention.quietStatus (twelveHour model) model.zone model.nowMs quiet) ]
                 ]

@@ -404,6 +404,19 @@ digest =
                     , Attention.digestHeadline (Attention.buildDigest cfg [])
                     , Attention.digestSpan clock d
                     ]
+        , test "a one-to-one conversation leaves the person out of its line" <|
+            \_ ->
+                let
+                    clock t =
+                        String.fromInt (t // 1000)
+
+                    dm =
+                        { name = "jun", unread = 1, highlights = 1, rows = [ row "jun" 4000 True (Just "release notes ready") ] }
+                in
+                Attention.buildDigest cfg [ dm ]
+                    |> .rows
+                    |> List.map (Attention.digestRowLine clock)
+                    |> Expect.equal [ "at 4 · notes, ready, release" ]
         , test "a row line reads who · when · what about" <|
             \_ ->
                 let

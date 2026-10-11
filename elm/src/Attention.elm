@@ -837,7 +837,8 @@ windowLabel clock row =
         clock row.firstAt ++ "–" ++ clock row.lastAt
 
 
-{-| "mara, jun +2 · 9:01–9:30 · release, staging". -}
+{-| "mara, jun +2 · 9:01–9:30 · release, staging" (a DM leaves the
+person out: the row is already their name). -}
 digestRowLine : (Int -> String) -> DigestRow -> String
 digestRowLine clock row =
     let
@@ -845,6 +846,14 @@ digestRowLine clock row =
             case row.people of
                 [] ->
                     ""
+
+                -- a one-to-one conversation is already named for them
+                [ only ] ->
+                    if String.toLower only == String.toLower row.name && row.morePeople == 0 then
+                        ""
+
+                    else
+                        only
 
                 names ->
                     String.join ", " names
