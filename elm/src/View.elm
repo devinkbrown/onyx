@@ -64,6 +64,7 @@ import View.Media exposing (mediaPanel)
 import View.Notify exposing (notifySheet)
 import View.DmSafety exposing (inviteShareSheet)
 import View.Prefs exposing (prefsSheet)
+import View.BlockKit -- v3/gap-import
 import View.Pins exposing (pinsDrawer)
 import View.Profile exposing ( moderationReview, personSafetySheet, profileCard, profileSheet )
 import View.Thread exposing (thread)
@@ -78,6 +79,7 @@ import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
 -- v3/gap-organize
@@ -300,15 +302,10 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
-                ++ (if model.searchOpen then
-                        [ panel model ]
-
-                    else
-                        []
-                   )
             )
          ]
             ++ (if model.callsOpen then
@@ -319,11 +316,22 @@ appFrame model =
                 else
                     [ rail model
                     , main_ [ class "onyx-main" ]
-                        [ roomHeader model
-                        , View.Polish.timeScrubber model -- v3/polish
-                        , thread model
-                        , composer model
-                        ]
+                        ([ roomHeader model ]
+                            -- v3/rx-convo: message search belongs to the conversation it
+                            -- searches: it opens under the room header, in the main column
+                            -- (it used to sit in the full-width notices row and pushed the
+                            -- room list and the roster down with it).
+                            ++ (if model.searchOpen then
+                                    [ panel model ]
+
+                                else
+                                    []
+                               )
+                            ++ [ View.Polish.timeScrubber model -- v3/polish
+                               , thread model
+                               , composer model
+                               ]
+                        )
                     , roster model
                     ]
                )
@@ -392,6 +400,7 @@ overlays model =
         -- v3/switcher
         , View.Switcher.palette model
         , View.Switcher.shortcutsOverlay model
+        , View.BlockKit.overlay model -- v3/gap-import
         , View.GapCommands.commandsHelp model -- v3/gap-commands
         -- v3/calls-c6: the DM ring is modal over everything
         , View.CallDock.recoveryAnnouncer model

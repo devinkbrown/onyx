@@ -649,7 +649,7 @@ Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/
 | E13 | Queued/pending marker | `MessageView.tsx:2285` (auto) | FULL | `View/Thread.elm:576-583` | Elm adds "delivery uncertain" |
 | E14 | Mention/keyword row highlight | `MessageView.tsx:2238` (auto) | FULL | `View/Thread.elm:560` | |
 | E15 | Edited marker | `MessageView.tsx:2288` (auto) | FULL | `View/Thread.elm:584` | |
-| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | PARTIAL | `View/Thread.elm:2150` | Only a title tooltip with "N revisions"; no list of prior bodies |
+| E16 | Local edit history: expandable list of prior versions kept on this device | `MessageView.tsx:649-711` (UI) | FULL | `View/Thread.elm` `editedMarker` / `revisionItem` | v3/rx-convo: "· edited" on a row we edited on this device is a native `details` disclosure (keyboard operable, announced expanded / collapsed) listing the earlier bodies oldest first with the time each was replaced, "kept on this device only"; without local history it stays a quiet label with the revision-count title |
 | E17 | Reply-context line (sanitized, clipped to 80 chars) | `MessageView.tsx:2292` (auto) | FULL | `View/Thread.elm:2279` | |
 | E18 | Thread indicator opens the thread panel | `MessageView.tsx:576,2306`; `threadIndex.ts` (UI) | FULL | `View/Thread.elm:699`, `App.elm:42666` | |
 | E19 | Thread panel: parent, replies log, missing-parent and empty states | `MessageView.tsx:735-807` (UI) | FULL | `View/Thread.elm:722-860` | Elm adds a reply count |
@@ -734,10 +734,10 @@ Elm checked: `View/Thread.elm` (whole file), `View/Composer.elm` (whole), `View/
 | E98 | Image lightbox (focus trap, Escape, Save, Close) | `MessageText.tsx:145` (UI) | FULL | `View/Thread.elm:2484-2528`, `App.elm:38456` | |
 | E99 | Open Graph link-preview card for the first link | `MessageText.tsx:1063,1176`; `preview/linkPreview.ts` (pref) | PARTIAL | `View/Thread.elm:2535-2658`, `App.elm:35935,36944` | Fetched at fold time; rows restored from the vault never fetch a card |
 | E100 | Preview thumbnail: consent click, hide on error | `MessageText.tsx:1131-1158` (UI) | PARTIAL | `View/Thread.elm:2648` | Consent works; a broken thumbnail is not hidden |
-| E101 | BlockKit-lite message block (title/text/fields/selects/buttons, safety hint) | `MessageText.tsx:535`; `integrations/blockKitLite.ts:64` (auto) | MISSING | — | `[onyx:block]` payload renders as raw text |
-| E102 | BlockKit URL buttons and copy-value buttons (Copied/failed) | `MessageText.tsx:404-503` (UI) | MISSING | — | |
-| E103 | BlockKit actions: origin-scoped review dialog, then send | `MessageText.tsx:619-673`; `BlockKitActionConfirmation.tsx:32` (UI) | MISSING | — | |
-| E104 | BlockKit modal block ("Inspect structured data") | `message/BlockKitModal.tsx:186` (UI) | MISSING | — | |
+| E101 | BlockKit-lite message block (title/text/fields/selects/buttons, safety hint) | `MessageText.tsx:535`; `integrations/blockKitLite.ts:64` (auto) | FULL | `View/BlockKit.elm` (cards), `BlockKit.elm` (strict decoder), `View/Thread.elm` `messageBody` | Strict decoder: payload ≤ 4 KiB, field/option/button caps, no truncation, unsafe/invisible characters refused; invalid blocks stay plain text (v3/gap-import) |
+| E102 | BlockKit URL buttons and copy-value buttons (Copied/failed) | `MessageText.tsx:404-503` (UI) | FULL | `View/BlockKit.elm` `buttonView` | http(s)-only URL buttons show their destination host and open `noopener noreferrer`; copy buttons report Copied / Copy failed (v3/gap-import) |
+| E103 | BlockKit actions: origin-scoped review dialog, then send | `MessageText.tsx:619-673`; `BlockKitActionConfirmation.tsx:32` (UI) | FULL | `BlockKit.elm` `Stage`/`ConfirmSend`, `View/BlockKit.elm` `reviewDialog`, `App.elm` `blockKitSend` | Origin-scoped (target must be the conversation the block is in; others render disabled); review shows exact destination + plaintext; re-validated at confirm; one message out as the user (v3/gap-import) |
+| E104 | BlockKit modal block ("Inspect structured data") | `message/BlockKitModal.tsx:186` (UI) | FULL | `View/BlockKit.elm` `inspectDialog` | "Inspect structured data" dialog lists every field, option and destination, with the exact text each control would send (v3/gap-import) |
 | E105 | Extension client actions (open-url/copy-text manifest, audit) | `extensions/clientActions.ts`; `PreferencesPanel.tsx:2522` (UI) | MISSING | — | Preferences/palette surface; listed for completeness |
 | E106 | Textarea: Enter sends, Shift+Enter newline, auto-grow | `Composer.tsx:697,902,1742` (UI) | FULL | `View/Composer.elm:98,628` | |
 | E107 | Destination and offline state in placeholder and accessible name | `Composer.tsx:368-383` (UI) | PARTIAL | `View/Composer.elm:100-119` | aria-label is just "Message"; DMs don't get the "@" prefix |
@@ -1867,19 +1867,19 @@ Elm checked: `VaultImport`, `Retention`, `Outbox`, `SavedSearches`, `Transcript`
 | V42 | Export compressed vault (.json.gz) | `PreferencesPanel.tsx:1164` (UI) | MISSING | — | — |
 | V43 | Save vault (plain / gzip) to file via File System Access | `PreferencesPanel.tsx:1175`, `:1185` (UI) | MISSING | — | — |
 | V44 | Share vault file (Web Share) | `PreferencesPanel.tsx:1200` (UI) | MISSING | — | — |
-| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | PARTIAL | `View/Prefs.elm:229`, `App.elm:37003`, `ports.js:6882` | Merges immediately; no 64 MiB guard; result only in service log; non-vault sections ignored |
-| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | MISSING | — | Picker accepts `.json` only |
-| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | MISSING | — | — |
-| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | MISSING | — | — |
+| V45 | Import portable JSON | `PreferencesPanel.tsx:972`, `:1206` (UI) | FULL | `View/HistoryImport.elm`, `HistoryImport.elm`, `historyImport.js` (portable kind) | 64 MiB file guard before reading; parsed in a worker; staged for review before any write (v3/gap-import) |
+| V46 | Import compressed (.json.gz) | `PreferencesPanel.tsx:1003` (UI) | FULL | `historyImport.js` `readText` | `.json.gz` opened through `DecompressionStream`, 64 MiB expanded cap (v3/gap-import) |
+| V47 | Staged import review (counts) + Import reviewed / Cancel | `PreferencesPanel.tsx:1219` (UI) | FULL | `View/HistoryImport.elm` `reviewCard` | Counts (new / already here / left out), per-conversation include + destination, Cancel / Import (v3/gap-import) |
+| V48 | Cross-tab import lock + owner-change abort | `PreferencesPanel.tsx:1096`, `portableImportLock.ts:27` (auto) | PARTIAL | `App.elm` `settleStepGapImport`, `HistoryImport.ownerChanged` | Owner change aborts a running or staged import (v3/gap-import); the cross-tab import lock is not ported |
 | V49 | Import applies prefs, scene motion, retention handoff | `portableTransfer.ts:228` (UI) | MISSING | — | `preferenceHandoff` ignored |
 | V50 | Saved sign-in targets (account handoffs) transfer | `portableTransfer.ts:167` (UI) | MISSING | — | — |
 | V51 | Export result echo | `PreferencesPanel.tsx:867` (UI) | FULL | `App.elm:36989` | Counts messages/conversations only |
-| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/Prefs.elm:221` | Only Portable vault route |
-| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | MISSING | — | — |
-| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | MISSING | — | — |
+| V52 | Import & export route picker (6 tools, roving keys) | `PreferencesPanel.tsx:3237` (UI) | PARTIAL | `View/HistoryImport.elm` | Portable vault + four third-party sources (radiogroup with arrow keys) + past imports; the Discord bot-token route (V55) and the other tools are not ported |
+| V53 | Discord JSON (DiscordChatExporter) multi-file import + review | `shell/HistoryImportControls.tsx:372` (UI) | FULL | `historyImport.js` `addDiscordExport`, `View/HistoryImport.elm` | Multi-file / paginated exports merge by message id; replies, attachments (http(s) only); review step; chunked + worker, progress + cancel (v3/gap-import) |
+| V54 | Discord data-package folder import + review | `HistoryImportControls.tsx:439` (UI) | FULL | `historyImport.js` `discordPackage` | JSON and CSV message files, DMs; review step (v3/gap-import) |
 | V55 | Discord bot-token server import (proxy consent, progress, cancel, pins) | `HistoryImportControls.tsx:635`, `:834` (UI) | MISSING | — | Uses `/discord-import` proxy |
-| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | MISSING | — | — |
-| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | MISSING | — | — |
+| V56 | Slack workspace JSON import + review | `HistoryImportControls.tsx:893` (UI) | FULL | `historyImport.js` `slackExport` | Real per-day export layout and the bundle shapes Solid read; Slack markup decoded; review step (v3/gap-import) |
+| V57 | Classic IRC log (weechat/irssi/mIRC) into a named room + review | `HistoryImportControls.tsx:928` (UI) | FULL | `historyImport.js` `ircLog` | WeeChat, irssi, mIRC, ZNC, HexChat logs; the room is chosen in the review, not before parsing (v3/gap-import) |
 | V58 | Import byte/count limits with copy | `shell/importFileLimits.ts:6` (UI) | MISSING | `VaultImport.elm:22` row ceilings only | No file-size gate before FileReader |
 | V59 | `/export [txt\|json]` local transcript | `store.ts:8400` (slash) | FULL | `App.elm:19339`, `Transcript.elm` | Toast says "Export started" even if download fails |
 | V60 | Room More → Export local transcript | `shell/PresenceRibbon.tsx:1216` (UI) | MISSING | — | — |
@@ -2472,7 +2472,7 @@ Walked Solid `src/lib/store/store.ts` `_handleMessage` 10432–15569 (pre-switch
 | C99 | 475 → join prompt "Incorrect channel password" (no inbox) | `store.ts:15229` | FULL | `App.elm:17241-17244` | |
 | C100 | 482 → inbox "You need operator privileges in #x" + ban panel error | `store.ts:15243-15259` | FULL | `App.elm:17248-17271` | |
 | C101 | 477 (+R/+a room), 480 (join throttle), 407 → Activity text | default (Activity) | PARTIAL | `App.elm:5671,5720-5730` | Log only; browser waits 8 s, then shows "did not confirm" |
-| C102 | KNOCK replies 710/711/713/714 | default (Activity) | PARTIAL | `App.elm:4673-4690` | Log only (invisible) |
+| C102 | KNOCK replies 710/711/713/714 | default (Activity) | FULL | `Chanserv.elm` `fold` (710 → inbox row with Invite, 711/713/714 → toasts and prompt state); `View/Chanserv.elm` | v3/gap-chanserv: Ask to join on the 471/473/475 prompt; Elm better than the oracle's log line |
 | C103 | 600/601/604/605 WATCH → watch-list online/last-seen | `store.ts:14943-14967` | FULL | `App.elm:5571-5590,25779,25797` | |
 | C104 | 367/368 ban list → ban panel | `store.ts:15044-15092` | FULL | `App.elm:5803-5807,19108,19232` | |
 | C105 | 801–805 ACCESS → Roles access manager | `store.ts:15094-15203` | FULL | `App.elm:5782-5796,8446`; `View/RoomSettings.elm:482` | |
@@ -2741,4 +2741,4 @@ clauses. All of them are listed here, keyed to the COVERAGE.md line of the row. 
 - Phase 1 lists rows 1.1–1.7 twice and Phase 2 lists 2.4–2.6 twice and Phase 3 lists 3.4–3.7 twice with conflicting statuses (one copy "done", the other blank/size-only).
 - The C1–C12 summary is duplicated with contradicting flags (C4/C5 "**done**" in one line, plain in the other; C6/C7/C10 the reverse).
 - 1.3 says "in-shell sheet not built" (still true); 1.4a "Land on Home… absorbs the catch-up digest" has no status but catch-up (2.7) is not built.
-- Still-open rows with no Elm work at all: 0.3 remembered identities, 0.4 invite aside, 2.7 catch-up digest, 2.8 BlockKit, 2.9 edit-history view, 3.9 Harbor confirm, 4.2 smart mute + folders, 4.5 history import, 6.7 Watch Together, 7.6 visual regression baselines.
+- Still-open rows with no Elm work at all: 0.3 remembered identities, 0.4 invite aside, 2.7 catch-up digest, 2.8 BlockKit, 3.9 Harbor confirm, 4.2 smart mute + folders, 4.5 history import, 6.7 Watch Together, 7.6 visual regression baselines.

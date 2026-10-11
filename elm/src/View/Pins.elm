@@ -5,6 +5,8 @@ against the loaded buffer, with jump-to-message and op-gated unpin.
 -}
 
 import App exposing (Model, Msg(..))
+import Avatar
+import BlockKit -- v3/gap-import
 import Html exposing (Html, a, button, div, li, p, span, strong, text, ul)
 import Html.Attributes exposing (attribute, class, href)
 import Html.Events exposing (onClick)
@@ -155,7 +157,7 @@ pinRow model channel id =
         label =
             case row of
                 Just message ->
-                    "Jump to pinned message from " ++ message.from ++ ": " ++ clip (App.displayBody message)
+                    "Jump to pinned message from " ++ message.from ++ ": " ++ clip (BlockKit.summary (App.displayBody message))
 
                 Nothing ->
                     "Load pinned message " ++ id
@@ -178,7 +180,10 @@ pinRow model channel id =
                             App.pinnedMessageState message
                     in
                     span [ class "pins-item-main" ]
-                        [ span [ class "pins-item-meta" ]
+                        [ -- v3/rx-convo: the author's face, like the transcript row
+                          span [ class "pins-item-face", attribute "aria-hidden" "true" ]
+                            [ Avatar.view { name = message.from, owner = False, size = Avatar.Sm, extraClass = "", hidden = True } ]
+                        , span [ class "pins-item-meta" ]
                             [ strong [ class "pins-item-from" ] [ text message.from ]
                             , span [ class "pins-item-when" ] [ text (App.formatRowClock model.zone model.prefs.clock message.at) ]
                             , span
@@ -187,7 +192,7 @@ pinRow model channel id =
                                 ]
                                 [ text (App.pinnedMessageStateLabel state) ]
                             ]
-                        , span [ class (pinBodyClass state) ] [ text (App.displayBody message) ]
+                        , span [ class (pinBodyClass state) ] [ text (BlockKit.summary (App.displayBody message)) ]
                         ]
             ]
         , if App.isChannelOp model channel then

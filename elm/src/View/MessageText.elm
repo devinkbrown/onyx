@@ -22,7 +22,61 @@ import MessageText exposing (InlineToken(..), Token(..))
 
 messageText : String -> String -> Html Msg
 messageText selfNick raw =
-    span [ class "shell-msg-text" ] (List.concatMap (renderToken selfNick) (MessageText.parseMessage raw))
+    span [ class "shell-msg-text" ] (List.concatMap (renderToken selfNick) (tidyBlocks False (MessageText.parseMessage raw)))
+
+
+{-| v3/rx-convo — a code block or quote already sits on its own lines,
+so the line break that separated it from the neighbouring text would
+paint an empty line (`> quote\nreply` drew a blank line under the
+quote). Drop one leading newline from the text right after a block
+and one trailing newline from the text right before one.
+-}
+tidyBlocks : Bool -> List Token -> List Token
+tidyBlocks afterBlock tokens =
+    case tokens of
+        [] ->
+            []
+
+        tok :: rest ->
+            case tok of
+                Inline (Text t) ->
+                    let
+                        beforeBlock =
+                            case rest of
+                                (Inline _) :: _ ->
+                                    False
+
+                                [] ->
+                                    False
+
+                                _ ->
+                                    True
+
+                        lead =
+                            if afterBlock && String.startsWith "\n" t then
+                                String.dropLeft 1 t
+
+                            else
+                                t
+
+                        tidy =
+                            if beforeBlock && String.endsWith "\n" lead then
+                                String.dropRight 1 lead
+
+                            else
+                                lead
+                    in
+                    if String.isEmpty tidy then
+                        tidyBlocks afterBlock rest
+
+                    else
+                        Inline (Text tidy) :: tidyBlocks False rest
+
+                Inline _ ->
+                    tok :: tidyBlocks False rest
+
+                _ ->
+                    tok :: tidyBlocks True rest
 
 
 renderToken : String -> Token -> List (Html Msg)

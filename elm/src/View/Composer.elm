@@ -15,6 +15,7 @@ a nested form, so Enter in the composer still sends.
 -}
 
 import App exposing (Model, Msg(..))
+import BlockKit -- v3/gap-import
 import ComposerAssist
 import Dict
 import Emoji
@@ -26,6 +27,7 @@ import Json.Decode as Decode
 import Outbox
 import Polish
 import Schedule
+import View.Chanserv -- v3/gap-chanserv
 import View.Icon exposing (icon)
 import View.Polish
 import View.UserModes -- v3/gap-usermodes
@@ -81,6 +83,7 @@ composer model =
         -- wide: [attach] [field] [emoji] [tools] [send]. The tools tray
         -- (View.Polish) also carries Attach, so phones drop the
         -- separate attach button.
+        , View.Chanserv.slowNote model -- v3/gap-chanserv
         , div [ class "onyx-composer-bar" ]
             [ attachButton model
             , if App.composerAudienceOffered model then
@@ -139,7 +142,7 @@ composer model =
                 [ type_ "submit"
                 , class "onyx-composer-send"
                 , classList [ ( "onyx-composer-send--ready", ready && canSaveOrSend && hasDraft ) ]
-                , disabled (not ready || not canSaveOrSend)
+                , disabled (not ready || not canSaveOrSend || (editingNow == Nothing && View.Chanserv.composerSlowWaiting model)) -- v3/gap-chanserv
                 , attribute "aria-label"
                     (if editingNow /= Nothing then
                         "Save edit"
@@ -317,7 +320,7 @@ replyBar model =
                     in
                     div [ class "shell-composer-context", attribute "role" "status", attribute "aria-live" "polite" ]
                         [ span [ class "shell-composer-context-label" ] [ text ("Replying to " ++ shown.from) ]
-                        , span [ class "shell-composer-context-text" ] [ text (clippedText shown.preview) ]
+                        , span [ class "shell-composer-context-text" ] [ text (clippedText (BlockKit.summary shown.preview)) ]
                         , button
                             [ type_ "button"
                             , class "shell-composer-context-close"
@@ -762,6 +765,25 @@ assistPopovers model =
         ]
 
 
+{-| v3/rx-convo — Escape closes the emoji picker from anywhere in it
+and from the toggle that opened it (a keyboard user who opens the
+picker with Enter or Space stays on the button until they Tab in; the
+field's own handler never sees that Escape). -}
+emojiEscape : Html.Attribute Msg
+emojiEscape =
+    custom "keydown"
+        (Decode.field "key" Decode.string
+            |> Decode.andThen
+                (\key ->
+                    if key == "Escape" then
+                        Decode.succeed { message = ComposerEmojiClose, stopPropagation = True, preventDefault = True }
+
+                    else
+                        Decode.fail "not-escape"
+                )
+        )
+
+
 emojiPicker : Model -> Html Msg
 emojiPicker model =
     div
@@ -770,17 +792,7 @@ emojiPicker model =
         , attribute "role" "dialog"
         , attribute "aria-modal" "false"
         , attribute "aria-label" "Emoji picker"
-        , custom "keydown"
-            (Decode.field "key" Decode.string
-                |> Decode.andThen
-                    (\key ->
-                        if key == "Escape" then
-                            Decode.succeed { message = ComposerEmojiClose, stopPropagation = True, preventDefault = True }
-
-                        else
-                            Decode.fail "not-escape"
-                    )
-            )
+        , emojiEscape
         ]
         [ label [ class "sr-only", attribute "for" "shell-emoji-search" ] [ text "Search emoji" ]
         , input
@@ -824,7 +836,7 @@ emojiButton model ready =
          , onClick ComposerEmojiToggle
          ]
             ++ (if model.composerAssist.emojiOpen then
-                    [ attribute "aria-controls" "shell-emoji-picker" ]
+                    [ attribute "aria-controls" "shell-emoji-picker", emojiEscape ]
 
                 else
                     []

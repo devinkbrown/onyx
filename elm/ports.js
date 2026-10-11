@@ -4169,12 +4169,24 @@ function fetchPublicFeed(url) {
         overlayFocus(restore);
       }
     }
+    /* v3/rx-convo — a docked overlay (one the layout shows as a pane
+       beside live content, e.g. the thread pane on wide screens; its
+       CSS sets `--overlay-docked: 1`) keeps focus-in and return-focus
+       but never traps Tab: the content beside it stays reachable. */
+    function docked(root) {
+      try {
+        var view = root.ownerDocument && root.ownerDocument.defaultView;
+        if (!view || !view.getComputedStyle) return false;
+        return String(view.getComputedStyle(root).getPropertyValue("--overlay-docked")).trim() === "1";
+      } catch (err) { return false; }
+    }
     function trapTab(e) {
       if (!e || e.key !== "Tab" || e.defaultPrevented) return;
       if (lightboxOpen()) return;
       var live = mounted();
       var root = live.length ? live[live.length - 1] : null;
       if (!root) return;
+      if (docked(root)) return;
       var items = overlayFocusables(root);
       if (items.length === 0) {
         try { e.preventDefault(); } catch (err) { /* best-effort */ }
@@ -4602,6 +4614,26 @@ function fetchPublicFeed(url) {
     var keepalive = null;
 
     openVault(function (db) { vault = db; });
+
+    /* v3/gap-import: third-party history import (historyImport.js, loaded
+       before this file). The module reads the vault through this accessor
+       so owner scoping, when the vault gains it, changes one place. With
+       the module missing every pick fails closed with a visible reason. */
+    if (app.ports.historyImportPick) {
+      var historyImport = global.OnyxHistoryImport;
+      if (historyImport && typeof historyImport.wire === "function") {
+        historyImport.wire(app, { vault: function () { return vault; } });
+      } else {
+        app.ports.historyImportPick.subscribe(function (req) {
+          try {
+            app.ports.historyImportFailed.send({
+              job: req && typeof req.job === "number" ? req.job : 0,
+              message: "History import is unavailable in this build."
+            });
+          } catch (err) { /* port gone */ }
+        });
+      }
+    }
 
     /* v3/calls-engine: the mounted voice engine shares this socket. */
     var voiceSeam = createVoiceSeam({

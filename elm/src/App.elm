@@ -58,6 +58,7 @@ import Status
 import Media
 -- v3/calls-c1
 import CallUi
+import Chanserv -- v3/gap-chanserv
 -- v3/calls-c6
 import CallDock
 
@@ -117,6 +118,9 @@ import VaultImport
 -- v3/gap-watch
 import WatchTogether
 import Webhook
+-- v3/gap-import
+import BlockKit
+import HistoryImport
 import Wire
 
 
@@ -400,6 +404,8 @@ type alias Model =
     , linkPreviewInflight : Set String
     , previewMediaFailed : Set String
     , mediaLightbox : Maybe String
+      -- v3/rx-convo: the lightbox shows the picture at full size (panning)
+    , mediaLightboxZoomed : Bool
     , mediaIndexOpen : Bool
     , mediaIndexFilter : RoomMediaFilter
     , mediaIndexTarget : String
@@ -489,6 +495,8 @@ type alias Model =
     , highlightWords : List String
     , channelNotify : Dict String String
     , channelJoinPrompt : Maybe { channel : String, error : String }
+    -- v3/gap-chanserv
+    , chanserv : Chanserv.State
     , firstUnreadId : Dict String Int
     , viewUnreadDividerId : Dict String Int
     -- v3/transcript — scrolled-away state from the `scrollState` bridge.
@@ -969,6 +977,10 @@ type alias Model =
     -- v3/roomsettings
     , roomSettings : RoomSettings.State
 
+    -- v3/gap-import
+    , historyImport : HistoryImport.State
+    , blockKit : BlockKit.State
+
     -- v3/gap-organize
     , organize : Organizer.State
 
@@ -1075,6 +1087,12 @@ type Outbound
     | VoicePrefsSave { json : String }
     | VaultExportRequest
     | VaultImportPick
+    -- v3/gap-import: third-party history import + the staged vault review
+    | HistoryImportPick { job : Int, kind : String }
+    | HistoryImportCancel { job : Int }
+    | HistoryImportRecord { batch : HistoryImport.Batch, ids : List String, prints : List String }
+    | HistoryImportListRequest
+    | HistoryImportRemove { batch : String }
     | RetentionPolicyRequest
     | RetentionPolicySave { json : String }
     | OutboxQueue { target : String, text : String }
@@ -2696,6 +2714,8 @@ type Msg
     | NodesProbed { wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float }
     | WsOpened { url : String }
     | WsClosed { clean : Bool, reason : String }
+    -- v3/gap-chanserv
+    | ChanservMsg Chanserv.Msg
     | ReconnectNow
     | ReclaimOpen
     | ReclaimClose
@@ -3033,6 +3053,8 @@ type Msg
     | PreviewMediaFailed String
     | MediaLightboxOpen String
     | MediaLightboxClose
+      -- v3/rx-convo
+    | MediaLightboxZoom Bool
     | MediaSave String
     | MessageCopyMoment { target : String, at : Int }
     | MessageQuote { target : String, from : String, body : String }
@@ -3310,6 +3332,9 @@ type Msg
     | GapShellMsg GapShell.Msg
     -- v3/roomsettings
     | RoomSettingsMsg RoomSettings.Msg
+    -- v3/gap-import
+    | HistoryImportMsg HistoryImport.Msg
+    | BlockKitMsg BlockKit.Msg
     -- v3/gap-organize
     | OrganizeMsg Organizer.Msg
     -- v3/switcher
@@ -3563,6 +3588,7 @@ init nick url =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -3645,6 +3671,7 @@ init nick url =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -4044,6 +4071,9 @@ init nick url =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-import
+    , historyImport = HistoryImport.blank
+    , blockKit = BlockKit.blank
     -- v3/gap-organize
     , organize = Organizer.init
 
@@ -4171,6 +4201,7 @@ blank =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -4253,6 +4284,7 @@ blank =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -4647,6 +4679,9 @@ blank =
     -- v3/roomsettings
     , roomSettings = RoomSettings.blank
 
+    -- v3/gap-import
+    , historyImport = HistoryImport.blank
+    , blockKit = BlockKit.blank
     -- v3/gap-organize
     , organize = Organizer.init
 
@@ -5913,6 +5948,10 @@ foldLine model message =
         "520" ->
             -- v3/gap-shell: `+O`/`+A` operator-only room.
             foldJoinDenied model message
+
+        -- v3/gap-chanserv: `+f` forwarded us; say where
+        "470" ->
+            chanservForwarded model message
 
         "482" ->
             foldErrorNumeric model message
@@ -9773,6 +9812,7 @@ quarantineOwnerChange model =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -17246,10 +17286,10 @@ runSlashLocal model target verb nickArg =
             runSlashExport model (Maybe.withDefault "txt" formatArg)
 
         ( "import", _ ) ->
-            -- Snapshot import trigger (new surface: the `VaultImportPick`
-            -- port has had no UI until now — the validated merge path
-            -- behind it mirrors `importVault`).
-            ( { model | composer = "" }, [ VaultImportPick ] )
+            -- Snapshot import trigger. v3/gap-import: the file is read
+            -- and staged for review in Preferences → Import & export,
+            -- which opens so the progress and review are visible.
+            historyImportOpen { model | composer = "" }
 
         ( "read", _ ) ->
             let
@@ -19811,11 +19851,20 @@ foldErrorNumeric model message =
                             if String.isEmpty third then
                                 "Cannot send to " ++ target
 
+                            else if String.contains "(slowmode)" third then
+                                -- v3/gap-chanserv
+                                Chanserv.slowmodeCopy target
+
                             else
                                 third
                         )
             in
-            ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
+            if String.contains "(slowmode)" third then
+                -- v3/gap-chanserv: honest slow-mode copy, no raw numeric text
+                ( addNotification failed { kind = NotifError, text = Chanserv.slowmodeCopy second, from = Nothing, channel = Just second, topic = Nothing }, [] )
+
+            else
+                ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
 
         "405" ->
             ( error "Too many channels", [] )
@@ -23672,6 +23721,11 @@ foldStandardReply model message =
                         , []
                         )
 
+                    else if List.member (String.toUpper reply.command) [ "CHANNEL", "CS", "SUCCESSOR" ] then
+                        -- v3/gap-chanserv: `settleStepChanserv` folds these
+                        -- (the channel comes from the last CHANNEL line sent).
+                        ( model, [] )
+
                     else if reply.command /= "WEBAUTHN" then
                         -- v3/gap-shell: never silent (inbox for FAIL/WARN,
                         -- Activity for NOTE).
@@ -24231,17 +24285,17 @@ requestStewardDeleteRoom model channel =
             then
                 -- A confirmed delete closes the panel with the room
                 -- (mirroring the oracle sheet close on ok).
-                ( { model
-                    | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
-                    , stewardStatus = ""
-                    , stewardTypedName = ""
-                    , stewardDeleting = False
-                    , stewardRoom = Nothing
-                  }
-                , [ SendLine (Wire.formatIrcLine "CHANNEL" [ "DROP", stewardRoomName model channel ])
-                  , SendLine (Wire.formatIrcLine "PART" [ stewardRoomName model channel, "Goodbye" ])
-                  ]
-                )
+                -- v3/gap-chanserv: registration-aware (INFO, then DROP
+                -- only for a registered room), then empty the room and leave.
+                chanservBeginDelete
+                    { model
+                        | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
+                        , stewardStatus = ""
+                        , stewardTypedName = ""
+                        , stewardDeleting = False
+                        , stewardRoom = Nothing
+                    }
+                    (stewardRoomName model channel)
 
             else
                 stewardRefused model "Type the room name to delete it."
@@ -39353,12 +39407,14 @@ settleSteps =
     , settleStepCallMedia -- v3/calls-c4
     , settleStepRoomMenu -- v3/frame
     , settleStepRoomSettings -- v3/roomsettings
+    , settleStepChanserv -- v3/gap-chanserv
     , settleStepCallDock -- v3/calls-c6
     , settleStepStage -- v3/calls-c11
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepRxShell -- v3/rx-shell
+    , settleStepGapImport -- v3/gap-import
     , settleStepOrganize -- v3/gap-organize
     , settleStepGapCommands -- v3/gap-commands
     , settleStepWatch -- v3/gap-watch
@@ -40454,35 +40510,30 @@ updateCore msg model =
                                 ( logService model "Vault import file held no valid vault snapshot.", [] )
 
                             Just snap ->
-                                let
-                                    persists =
-                                        List.filterMap
-                                            (\importedTarget ->
-                                                case List.map importVaultRow importedTarget.messages of
-                                                    [] ->
-                                                        Nothing
+                                -- v3/gap-import: validated rows are staged for
+                                -- review (V47) instead of merging at once; the
+                                -- confirm writes through `historyImportPersist`.
+                                case HistoryImport.fromVaultSnapshot 0 snap of
+                                    Nothing ->
+                                        ( logService model "Vault import file held no importable messages.", [] )
 
-                                                    rows ->
-                                                        Just (VaultPersist { target = importedTarget.target, rows = rows })
+                                    Just staged ->
+                                        let
+                                            ( opened, openOut ) =
+                                                historyImportShowTransfer model
+
+                                            ( reviewed, reviewOut ) =
+                                                historyImportUpdate (HistoryImport.GotSnapshot staged) opened
+                                        in
+                                        ( logService reviewed
+                                            ("Vault import file staged for review ("
+                                                ++ String.fromInt (List.sum (List.map .count staged.conversations))
+                                                ++ " messages, "
+                                                ++ String.fromInt (List.length staged.conversations)
+                                                ++ " conversations)."
                                             )
-                                            snap.targets
-
-                                    messageCount =
-                                        List.sum (List.map (List.length << .messages) snap.targets)
-                                in
-                                if List.isEmpty persists then
-                                    ( logService model "Vault import file held no importable messages.", [] )
-
-                                else
-                                    ( logService model
-                                        ("Importing "
-                                            ++ String.fromInt messageCount
-                                            ++ " messages into "
-                                            ++ String.fromInt (List.length persists)
-                                            ++ " conversations."
+                                        , openOut ++ reviewOut
                                         )
-                                    , persists
-                                    )
 
         OutboxQueued entry ->
             if List.any (\row -> row.id == entry.id) model.outbox then
@@ -41887,10 +41938,14 @@ updateCore msg model =
             ( { model | previewMediaFailed = Set.insert url model.previewMediaFailed }, [] )
 
         MediaLightboxOpen url ->
-            ( { model | mediaLightbox = Just url }, [] )
+            ( { model | mediaLightbox = Just url, mediaLightboxZoomed = False }, [] )
 
         MediaLightboxClose ->
-            ( { model | mediaLightbox = Nothing }, [] )
+            ( { model | mediaLightbox = Nothing, mediaLightboxZoomed = False }, [] )
+
+        -- v3/rx-convo: fit ↔ full size (only while a picture is open)
+        MediaLightboxZoom zoomed ->
+            ( { model | mediaLightboxZoomed = zoomed && model.mediaLightbox /= Nothing }, [] )
 
         MediaIndexOpen ->
             case model.activeChannel of
@@ -42476,7 +42531,11 @@ updateCore msg model =
                                     ( { edited | editingMessage = Nothing, composer = "", composerDrafts = Dict.remove (String.toLower target) edited.composerDrafts }, out )
 
                         Nothing ->
-                            if not (List.isEmpty model.attachments) then
+                            -- v3/gap-chanserv: slow mode holds the send until the gap passes
+                            if chanservSlowHeld model target then
+                                ( chanservSlowHold model target, [] )
+
+                            else if not (List.isEmpty model.attachments) then
                                 sendWithAttachments model target
 
                             else if String.isEmpty (String.trim model.composer) then
@@ -43815,7 +43874,8 @@ updateCore msg model =
             ( { model | prefsTransferStatus = Just "Preparing export…" }, [ VaultExportRequest ] )
 
         PrefsVaultImport ->
-            ( model, [ VaultImportPick ] )
+            -- v3/gap-import: read, review, then merge (V45-V47)
+            historyImportUpdate (HistoryImport.Choose HistoryImport.Portable) model
 
         PrefsOutboxRemove id ->
             if model.prefsOutboxBusy || not (List.any (\row -> row.id == id) model.outbox) then
@@ -45491,6 +45551,17 @@ updateCore msg model =
         -- v3/roomsettings
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
+
+        -- v3/gap-chanserv
+        ChanservMsg sub ->
+            chanservUpdate sub model
+
+        -- v3/gap-import
+        HistoryImportMsg sub ->
+            historyImportUpdate sub model
+
+        BlockKitMsg sub ->
+            blockKitUpdate sub model
 
         -- v3/gap-organize
         OrganizeMsg sub ->
@@ -48903,6 +48974,7 @@ overlayStack model =
           ( "call-ring-in", model.calls.lifecycle == Media.RingingIn, CallDecline )
         , ( "call-ring-out", model.calls.lifecycle == Media.RingingOut, CallCancel )
         , ( "media-lightbox", model.mediaLightbox /= Nothing, MediaLightboxClose )
+        , ( "blockkit", BlockKit.isOpen model.blockKit, BlockKitMsg BlockKit.Escape ) -- v3/gap-import
         , ( "shortcuts", model.shortcutsOpen, ShortcutsClose )
         -- v3/gap-commands
         , ( "commands-help", model.commandsHelpOpen, CommandsHelpClose )
@@ -49657,6 +49729,341 @@ settleRoomSettings msg model =
 
         _ ->
             { model | roomSettings = settled }
+
+
+-- v3/gap-chanserv
+
+
+{-| The Room settings target as the chanserv core sees it (the same
+room, op and connection facts as `roomSettingsCtx`, plus the account
+and network-oper status).
+-}
+chanservCtx : Model -> Chanserv.Ctx
+chanservCtx model =
+    let
+        rs =
+            roomSettingsCtx model
+    in
+    { room = Maybe.map .name rs.room
+    , live = rs.connected
+    , isOp = rs.isOp
+    , isOper = model.isOper
+    , account = model.accountName
+    , props = Maybe.withDefault Dict.empty (Maybe.map .props rs.room)
+    , modes = Maybe.withDefault "" (Maybe.map .modes rs.room)
+    , nowMs = model.nowMs
+    }
+
+
+chanservFoldCtx : Model -> Chanserv.FoldCtx
+chanservFoldCtx model =
+    { ourNick = model.ourNick
+    , nowMs = model.nowMs
+    , isChannel = isChannelName model
+    , inChannel = \channel -> Dict.member (String.toLower channel) model.channels
+    , groups = model.isupport.chanGroups
+    , prefixModes = Set.fromList (Dict.keys model.isupport.modeToPrefix)
+    }
+
+
+chanservUpdate : Chanserv.Msg -> Model -> ( Model, List Outbound )
+chanservUpdate sub model =
+    let
+        ( state, effects ) =
+            Chanserv.update (chanservCtx model) sub model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
+
+
+chanservEffects : List Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffects effects acc =
+    List.foldl chanservEffect acc effects
+
+
+{-| Interpret one chanserv effect with the existing folds: raw lines go
+out only while live; prop writes reuse the Room settings optimistic
+`writeChannelProp` + `PROP` path; welcome rows are transcript system
+rows; knocks land in the inbox.
+-}
+chanservEffect : Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffect effect ( model, outs ) =
+    case effect of
+        Chanserv.Send line ->
+            if model.connection == Live then
+                ( model, outs ++ [ SendLine line ] )
+
+            else
+                ( model, outs )
+
+        Chanserv.WriteProp p ->
+            let
+                ( written, out ) =
+                    roomSettingsEffect (RoomSettings.WriteProp p) model
+            in
+            ( written, outs ++ out )
+
+        Chanserv.Toast tone title description ->
+            ( addToast
+                { variant =
+                    case tone of
+                        Chanserv.ToneOk ->
+                            ToastSuccess
+
+                        Chanserv.ToneError ->
+                            ToastError
+
+                        Chanserv.ToneInfo ->
+                            ToastInfo
+                , title = title
+                , description = description
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+        Chanserv.Inbox note ->
+            ( addNotification model { kind = NotifSystem, text = note.text, from = note.from, channel = note.channel, topic = Nothing }, outs )
+
+        Chanserv.SystemRow channel text ->
+            if Dict.member (String.toLower channel) model.channels then
+                ( appendLiveRow model channel text (Wire.parseIrcMessage ""), outs )
+
+            else
+                ( model, outs )
+
+        Chanserv.ClearJoinPrompt channel ->
+            ( clearJoinPromptFor model channel, outs )
+
+
+{-| Inbound services replies, list numerics, knocks and welcome
+notices fold here (the core fold leaves them in the service log);
+opening Room settings or Room care asks the server what it knows; every
+line this client sends is watched for slow-mode stamps and for the
+channel a later `FAIL CHANNEL` is about.
+-}
+settleStepChanserv : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepChanserv msg _ ( m, outs ) =
+    let
+        inbound =
+            case msg of
+                WsLineReceived line ->
+                    [ line ]
+
+                WsBatchReceived batch ->
+                    batch.lines
+
+                _ ->
+                    []
+
+        ( folded, foldOut ) =
+            List.foldl
+                (\line ( model, acc ) ->
+                    let
+                        ( state, effects ) =
+                            Chanserv.fold (chanservFoldCtx model) (Wire.parseIrcMessage line) model.chanserv
+                    in
+                    chanservEffects effects ( { model | chanserv = state }, acc )
+                )
+                ( m, [] )
+                inbound
+
+        ( triggered, triggerOut ) =
+            case msg of
+                RoomSettingsMsg RoomSettings.Open ->
+                    if RoomSettings.isOpenFor folded.activeChannel folded.roomSettings then
+                        let
+                            ( state, effects ) =
+                                Chanserv.seed (chanservCtx folded) folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                StewardOpen channel ->
+                    if folded.connection == Live && folded.accountName /= Nothing then
+                        let
+                            ( state, effects ) =
+                                Chanserv.probe channel folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                Tick _ ->
+                    ( { folded | chanserv = Chanserv.tick folded.nowMs folded.chanserv }, [] )
+
+                WsClosed _ ->
+                    ( { folded | chanserv = Chanserv.reset folded.chanserv }, [] )
+
+                _ ->
+                    ( folded, [] )
+
+        allOut =
+            outs ++ foldOut ++ triggerOut
+
+        sent =
+            List.filterMap
+                (\o ->
+                    case o of
+                        SendLine line ->
+                            Just line
+
+                        _ ->
+                            Nothing
+                )
+                allOut
+    in
+    if List.isEmpty sent then
+        ( triggered, allOut )
+
+    else
+        ( { triggered | chanserv = Chanserv.noteSends { gapFor = chanservSlowGap triggered, nowMs = triggered.nowMs } sent triggered.chanserv }
+        , allOut
+        )
+
+
+chanservSelfModes : Model -> String -> List Char
+chanservSelfModes model channel =
+    Dict.get (String.toLower channel) model.channels
+        |> Maybe.andThen (\ch -> Dict.get (String.toLower model.ourNick) ch.members)
+        |> Maybe.map (.modes >> Set.toList)
+        |> Maybe.withDefault []
+
+
+chanservPropsOf : Model -> String -> Dict String String
+chanservPropsOf model channel =
+    Maybe.withDefault Dict.empty (Dict.get (String.toLower channel) model.props.channelProps)
+
+
+{-| This sender's slow-mode gap in `target`, in seconds (0 when off,
+exempt, or not a room).
+-}
+chanservSlowGap : Model -> String -> Int
+chanservSlowGap model target =
+    let
+        props =
+            chanservPropsOf model target
+    in
+    if not (isChannelName model target) || Chanserv.slowExempt { props = props, selfModes = chanservSelfModes model target, isOper = model.isOper } then
+        0
+
+    else
+        Chanserv.slowGapOf props
+
+
+chanservSlowWaitMs : Model -> String -> Int
+chanservSlowWaitMs model target =
+    if isChannelName model target then
+        Chanserv.slowWait
+            { props = chanservPropsOf model target
+            , selfModes = chanservSelfModes model target
+            , isOper = model.isOper
+            , nowMs = model.nowMs
+            }
+            target
+            model.chanserv
+
+    else
+        0
+
+
+{-| A plain message (or `/me`) in a room still inside its slow-mode
+gap. Other slash commands are not channel messages and pass.
+-}
+chanservSlowHeld : Model -> String -> Bool
+chanservSlowHeld model target =
+    let
+        draft =
+            String.toLower (String.trimLeft model.composer)
+
+        command =
+            String.startsWith "/" draft && not (String.startsWith "/me " draft)
+    in
+    not command && chanservSlowWaitMs model target > 0
+
+
+chanservSlowHold : Model -> String -> Model
+chanservSlowHold model target =
+    let
+        secs =
+            (chanservSlowWaitMs model target + 999) // 1000
+    in
+    { model | composerError = Just ("Slow mode is on in " ++ target ++ ". You can send again in " ++ String.fromInt secs ++ "s.") }
+
+
+{-| `470`: the room's `+f` forward sent us elsewhere. Say where. (The
+refusals themselves, 477/480/489/520, are `foldJoinDenied`'s join prompt;
+this module only adds the card's "Ask to join" / key actions on top.)
+-}
+chanservForwarded : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+chanservForwarded base message =
+    let
+        -- The raw numeric stays in the service log; a forward is not an
+        -- error, so no inbox row.
+        model =
+            logNumericQuiet base message
+
+        channel =
+            Maybe.withDefault "" (secondParam message.params)
+
+        target =
+            Maybe.withDefault "" (thirdParam message.params)
+
+        settled =
+            if model.browserPendingJoin == Just (String.toLower channel) then
+                { model | browserPendingJoin = Nothing, browserAttemptedJoin = Nothing, browserJoinPhase = BrowserJoinIdle }
+
+            else
+                model
+    in
+    if isChannelName model channel && isChannelName model target then
+        ( addToast
+            { variant = ToastInfo
+            , title = "You were sent to " ++ target
+            , description = Just (channel ++ " couldn't take you, so it forwarded you to " ++ target ++ ".")
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            settled
+        , []
+        )
+
+    else
+        ( model, [] )
+
+
+{-| Room care "Delete room" (D7): ask the core, which drops a registered
+room first and then empties and leaves it.
+-}
+chanservBeginDelete : Model -> String -> ( Model, List Outbound )
+chanservBeginDelete model room =
+    let
+        members =
+            Dict.get (String.toLower room) model.channels
+                |> Maybe.map (.members >> Dict.values)
+                |> Maybe.withDefault []
+
+        me =
+            String.toLower model.ourNick
+
+        ( state, effects ) =
+            Chanserv.beginDelete
+                { channel = room
+                , signedIn = model.accountName /= Nothing
+                , others = members |> List.filter (\mbr -> String.toLower mbr.nick /= me) |> List.map .nick |> List.sort
+                , founderRank = List.any (\mbr -> String.toLower mbr.nick == me && Set.member 'Q' mbr.modes) members
+                }
+                model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
 
 
 -- v3/dm-key-hold
@@ -50941,6 +51348,278 @@ rawSlashLeakCopy : String -> String
 rawSlashLeakCopy dest =
     "That command would send to " ++ dest ++ " without encryption. Open the conversation and send from the composer instead."
 
+
+
+-- v3/gap-import
+
+
+historyImportCtx : Model -> HistoryImport.Ctx
+historyImportCtx model =
+    { nowMs = model.nowMs
+    , owner = Maybe.map (\o -> o.serverUrl ++ "|" ++ o.identity) (deviceMemoryOwner model)
+    , keepFor = Retention.effectiveKeep model.retentionPolicy
+    , maxAgeDays = model.retentionPolicy.maxAgeDays
+    }
+
+
+{-| Run one history-import message and interpret its effects. A
+confirmed removal also drops the removed rows from open buffers (rows
+hydrated from the vault carry no msgid, so they match by fingerprint).
+-}
+historyImportUpdate : HistoryImport.Msg -> Model -> ( Model, List Outbound )
+historyImportUpdate sub model =
+    let
+        ( next, effects ) =
+            HistoryImport.update (historyImportCtx model) sub model.historyImport
+
+        pruned =
+            case sub of
+                HistoryImport.Removed r ->
+                    if r.ok && model.historyImport.removing == Just r.batch then
+                        dropImportedRows r.targets (Set.fromList r.prints) model
+
+                    else
+                        model
+
+                _ ->
+                    model
+    in
+    List.foldl historyImportEffect ( { pruned | historyImport = next }, [] ) effects
+
+
+historyImportEffect : HistoryImport.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+historyImportEffect effect ( model, outs ) =
+    case effect of
+        HistoryImport.Pick req ->
+            ( model, outs ++ [ HistoryImportPick req ] )
+
+        HistoryImport.CancelJob req ->
+            ( model, outs ++ [ HistoryImportCancel req ] )
+
+        HistoryImport.Persist req ->
+            ( model, outs ++ [ historyImportPersist req.target req.rows ] )
+
+        HistoryImport.Record req ->
+            ( model, outs ++ [ HistoryImportRecord req ] )
+
+        HistoryImport.ListBatches ->
+            ( model, outs ++ [ HistoryImportListRequest ] )
+
+        HistoryImport.RemoveBatch req ->
+            ( model, outs ++ [ HistoryImportRemove req ] )
+
+        HistoryImport.Touched { targets } ->
+            let
+                ( touched, fetches ) =
+                    historyImportTouched targets model
+            in
+            ( touched, outs ++ fetches )
+
+        HistoryImport.Focus id ->
+            ( model, outs ++ [ PrefsFocus { id = id } ] )
+
+
+{-| THE vault write for imported history: every imported row reaches
+the vault through the normal `VaultPersist` port (whose trim applies
+the destination's retention policy). Vault owner scoping lands here. -}
+historyImportPersist : String -> List HistoryImport.Row -> Outbound
+historyImportPersist target rows =
+    VaultPersist
+        { target = target
+        , rows =
+            List.map
+                (\row ->
+                    { id = row.id
+                    , target = target
+                    , from = row.from
+                    , body = row.body
+                    , at = row.at
+                    , rowType = row.rowType
+                    , deleted = False
+                    , redacted = False
+                    , replyTo = Maybe.map sanitizeReplyRef row.replyTo
+                    }
+                )
+                rows
+        }
+
+
+{-| Conversations an import or removal touched: their DM privacy proof
+is void (like any vault write), and an open, still-empty buffer
+hydrates so the history shows without a reload. -}
+historyImportTouched : List String -> Model -> ( Model, List Outbound )
+historyImportTouched targets model =
+    let
+        keys =
+            List.map String.toLower targets
+    in
+    ( { model | vaultDmPrivacy = List.foldl Dict.remove model.vaultDmPrivacy keys }
+    , List.filterMap
+        (\key ->
+            case Dict.get key model.channels of
+                Just channel ->
+                    if List.isEmpty channel.messages then
+                        Just (VaultFetch { target = key, limit = keepMessages })
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+        )
+        keys
+    )
+
+
+dropImportedRows : List String -> Set String -> Model -> Model
+dropImportedRows targets prints model =
+    if Set.isEmpty prints then
+        model
+
+    else
+        List.foldl
+            (\key m ->
+                if Dict.member key m.channels then
+                    updateChannel m
+                        key
+                        (\c ->
+                            { c
+                                | messages =
+                                    List.filter
+                                        (\row -> row.msgid /= Nothing || not (Set.member (HistoryImport.fingerprint row.at row.from row.body) prints))
+                                        c.messages
+                            }
+                        )
+
+                else
+                    m
+            )
+            model
+            (List.map String.toLower targets)
+
+
+{-| Preferences, on Import & export (the review lives there). -}
+historyImportShowTransfer : Model -> ( Model, List Outbound )
+historyImportShowTransfer model =
+    let
+        ( opened, out ) =
+            if model.prefsOpen then
+                ( model, [] )
+
+            else
+                prefsOpen model
+    in
+    ( { opened | prefsCategory = PrefsPanel.Transfer }, out )
+
+
+historyImportOpen : Model -> ( Model, List Outbound )
+historyImportOpen model =
+    let
+        ( opened, openOut ) =
+            historyImportShowTransfer model
+
+        ( chosen, chooseOut ) =
+            historyImportUpdate (HistoryImport.Choose HistoryImport.Portable) opened
+    in
+    ( chosen, openOut ++ chooseOut )
+
+
+blockKitUpdate : BlockKit.Msg -> Model -> ( Model, List Outbound )
+blockKitUpdate sub model =
+    let
+        ( next, effects ) =
+            BlockKit.update model.nowMs sub model.blockKit
+    in
+    List.foldl blockKitEffect ( { model | blockKit = next }, [] ) effects
+
+
+blockKitEffect : BlockKit.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+blockKitEffect effect ( model, outs ) =
+    case effect of
+        BlockKit.CopyText req ->
+            ( model, outs ++ [ ClipboardCopy req ] )
+
+        BlockKit.SendText prepared ->
+            let
+                ( sent, out ) =
+                    blockKitSend model prepared
+            in
+            ( sent, outs ++ out )
+
+        BlockKit.FocusId id ->
+            ( model, outs ++ [ PrefsFocus { id = id } ] )
+
+
+{-| Send one reviewed structured-control message as the user, through
+the normal composer send (labels, echo, E2EE sealing, offline queue)
+without touching the visible composer, its draft, reply or audience.
+-}
+blockKitSend : Model -> BlockKit.Prepared -> ( Model, List Outbound )
+blockKitSend model prepared =
+    let
+        ( sent, out ) =
+            sendComposerText { model | composer = prepared.text, composerAudience = Nothing, replyingTo = Nothing } prepared.target
+    in
+    ( { sent
+        | composer = model.composer
+        , composerAudience = model.composerAudience
+        , replyingTo = model.replyingTo
+        , composerDrafts = model.composerDrafts
+      }
+    , out
+    )
+
+
+{-| Post-update: BlockKit copy results and their expiry; an owner change
+aborts a running or staged import (V48); entering Import & export
+refreshes the imported-batch list. -}
+settleStepGapImport : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapImport msg prior ( m, outs ) =
+    let
+        ( copied, copyOut ) =
+            case msg of
+                ClipboardResult r ->
+                    if String.startsWith BlockKit.copyTagPrefix r.tag then
+                        blockKitUpdate (BlockKit.CopyResult r) m
+
+                    else
+                        ( m, [] )
+
+                Tick _ ->
+                    if Dict.isEmpty m.blockKit.copies then
+                        ( m, [] )
+
+                    else
+                        blockKitUpdate (BlockKit.Tick m.nowMs) m
+
+                _ ->
+                    ( m, [] )
+
+        priorOwner =
+            (historyImportCtx prior).owner
+
+        ( guarded, ownerOut ) =
+            if priorOwner /= Nothing && priorOwner /= (historyImportCtx copied).owner then
+                let
+                    ( state, effects ) =
+                        HistoryImport.ownerChanged copied.historyImport
+                in
+                List.foldl historyImportEffect ( { copied | historyImport = state }, [] ) effects
+
+            else
+                ( copied, [] )
+
+        onTransfer model =
+            model.prefsOpen && model.prefsCategory == PrefsPanel.Transfer
+
+        listOut =
+            if onTransfer guarded && not (onTransfer prior) then
+                [ HistoryImportListRequest ]
+
+            else
+                []
+    in
+    ( guarded, outs ++ copyOut ++ ownerOut ++ listOut )
 
 
 -- v3/gap-organize
