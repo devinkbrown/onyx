@@ -76,7 +76,6 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 1040px;
   margin: 0 auto;
   padding: clamp(28px, 6vw, 72px) clamp(16px, 5vw, 48px) 14vh;
 }
@@ -91,11 +90,7 @@
 }
 
 .ap-lede {
-  margin: var(--space-3) 0 0;
   max-width: 52ch;
-  font-size: var(--text-lg);
-  line-height: var(--leading-body);
-  color: var(--onyx-dim);
 }
 
 /* "This device" label + reassurance, set off by a neutral seam. */
@@ -406,7 +401,6 @@
 
 .ap-studio {
   margin-top: clamp(32px, 5vw, 56px);
-  min-width: 0;
   background: var(--onyx-panel);
   border: 1px solid var(--onyx-line);
   border-radius: var(--radius);

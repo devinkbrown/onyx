@@ -107,7 +107,7 @@
   .onyx-join-banner-actions .onyx-call-btn { flex: none; width: 100%; }
 }
 @media (max-width: 640px) {
-  .onyx-join-banner { flex-direction: row; flex-wrap: wrap; align-items: center; margin: var(--space-1) 0 var(--space-2); }
+  .onyx-join-banner { flex-direction: row; flex-wrap: wrap; margin: var(--space-1) 0 var(--space-2); }
   .onyx-join-banner-copy { min-width: 0; }
   .onyx-join-banner { align-items: flex-start; }
   .onyx-join-banner > .onyx-call-faces, .onyx-join-banner > .onyx-call-guest-icon { margin-top: 2px; }
@@ -280,7 +280,7 @@
   .onyx-call-stage-head { min-height: 36px; padding-top: var(--space-1); }
   .onyx-call-people,
   .onyx-call-people[data-density] {
-    flex-wrap: nowrap; justify-content: flex-start; gap: var(--space-3);
+    flex-wrap: nowrap; justify-content: flex-start;
     padding: var(--space-2) var(--space-3); overflow-x: auto; scrollbar-width: thin;
   }
   .onyx-call-people > .onyx-call-person:first-child { margin-left: auto; }
@@ -504,7 +504,7 @@
   }
   .onyx-call-pip-body { flex-wrap: nowrap; padding: var(--space-2); gap: var(--space-2); }
   .onyx-call-pip-faces { flex: 1 1 auto; flex-basis: auto; min-width: 0; overflow: hidden; }
-  .onyx-call-pip-btn { min-height: var(--target-min); padding: 0 var(--space-3); font-size: var(--text-sm); }
+  .onyx-call-pip-btn { padding: 0 var(--space-3); font-size: var(--text-sm); }
   .onyx-call-pip-btn .onyx-ci { width: 18px; height: 18px; }
   .onyx-call-pip-handle { min-height: 36px; }
 }
@@ -514,7 +514,7 @@
   .onyx-call-pip-card,
   .onyx-call-pip-card[data-corner] {
     top: calc(var(--space-2) + env(safe-area-inset-top, 0px)); right: max(var(--space-3), env(safe-area-inset-right, 0px));
-    bottom: auto; left: auto; width: 220px;
+    bottom: auto; left: auto;
   }
   .onyx-call-pip-corner, .onyx-call-pip-live { display: none; }
   /* One row: faces | mute (icon) | Return | Leave. */

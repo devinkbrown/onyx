@@ -113,19 +113,6 @@
 
 /* ── 4. Room desk ───────────────────────────────────────────────────── */
 
-.moderation-desk__ban-review {
-  border-color: color-mix(in oklab, var(--onyx-bad) 40%, var(--onyx-line));
-}
-.moderation-desk__review-summary {
-  margin: 0;
-  color: var(--onyx-text);
-  line-height: 1.45;
-}
-.moderation-desk__ban-review .moderation-desk__ban-mask {
-  display: block;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
 /* The timed-block form's checkboxes share the sheet's label rhythm
    (the browse-rooms `.chb-check` is a sibling pattern). */
 .moderation-desk__ban-add .chb-check {

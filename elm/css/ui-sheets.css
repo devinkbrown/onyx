@@ -246,10 +246,7 @@
 .onyx-sheet .onyx-sheet-close,
 .onyx-sheet .jump-to-date-close,
 .onyx-sheet-close,
-.onyx-you-close,
-.notif-center__close,
-.onyx-spotlight-close,
-.onyx-shortcuts-close {
+.onyx-spotlight-close {
   flex: none;
   display: inline-grid;
   place-items: center;
@@ -268,9 +265,7 @@
   cursor: pointer;
 }
 .onyx-sheet-close:focus-visible,
-.onyx-you-close:focus-visible,
-.onyx-spotlight-close:focus-visible,
-.onyx-shortcuts-close:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.onyx-spotlight-close:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 
 /* Glyph-based closes elsewhere (✕ / ×): hide the glyph, draw the mask. */
 :is(.onyx-you-close, .onyx-shortcuts-close, .jump-to-date-close) > span { display: none; }
@@ -339,7 +334,6 @@
     max-height: var(--sheet-max-h);
     border-width: 1px 0 0;
     border-radius: 12px 12px 0 0;
-    padding-bottom: calc(var(--sheet-pad) + env(safe-area-inset-bottom, 0px));
     animation: ui-sheet-rise var(--dur-base) var(--ease);
   }
 
@@ -819,7 +813,6 @@
   .onyx-toaster {
     left: var(--space-3);
     right: var(--space-3);
-    bottom: calc(var(--mobile-nav-h) + var(--composer-h) + env(safe-area-inset-bottom, 0px) + var(--space-3));
     max-width: none;
     align-items: stretch;
   }
@@ -990,7 +983,6 @@
     top: auto;
     left: 0;
     right: 0;
-    bottom: 0;
     z-index: 61;
     min-width: 0;
     padding: var(--sheet-grip-zone) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
@@ -1024,10 +1016,7 @@
   .onyx-sheet .onyx-sheet-close:hover,
   .onyx-sheet .jump-to-date-close:hover,
   .onyx-sheet-close:hover,
-  .onyx-you-close:hover,
-  .notif-center__close:hover,
-  .onyx-spotlight-close:hover,
-  .onyx-shortcuts-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
+  .onyx-spotlight-close:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
   .onyx-you .onyx-you-link:hover { background: color-mix(in oklab, var(--onyx-panel-2) 70%, var(--onyx-line)); border-color: var(--onyx-line); }
   .onyx-you .onyx-you-leave:hover { background: color-mix(in oklab, var(--onyx-bad) 10%, transparent); }
   .onyx-account .onyx-account-nav__item:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
@@ -1415,8 +1404,7 @@
   background: color-mix(in oklab, var(--onyx-bad) 5%, transparent);
 }
 .onyx-sheet .onyx-danger-zone + .onyx-danger-zone { margin-top: var(--space-3); }
-.onyx-sheet .onyx-danger-zone > :is(h3, .onyx-steward-label:first-child),
-.onyx-sheet .onyx-moddesk-form--danger > label:first-of-type { color: var(--onyx-bad); }
+.onyx-sheet .onyx-danger-zone > :is(h3, .onyx-steward-label:first-child) { color: var(--onyx-bad); }
 .onyx-sheet .onyx-danger-zone > .onyx-account-section__title { color: var(--onyx-bad); }
 
 .onyx-sheet :is(.onyx-account-drop-arm, .onyx-account-drop-go, .onyx-steward-btn-danger, .onyx-moddesk-danger, .pref-reset--danger) {

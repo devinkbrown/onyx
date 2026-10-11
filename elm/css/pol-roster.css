@@ -40,12 +40,10 @@
 /* ── 2. Header: title, count, folded filter ─────────────────────────── */
 
 .onyx-roster .onyx-roster-head {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   justify-content: flex-start;
-  min-height: 32px;
   padding: 0 var(--space-1) 0 var(--space-2);
 }
 
@@ -91,7 +89,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: var(--space-1) var(--space-1) var(--space-2);
   padding: 0 var(--space-2);
   background: var(--onyx-bg);
   border: 1px solid var(--onyx-line);
@@ -102,7 +99,6 @@
 .onyx-roster .onyx-roster-filter-input {
   flex: 1;
   min-width: 0;
-  min-height: 30px;
   padding: 0;
   background: transparent;
   border: 0;

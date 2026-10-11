@@ -104,7 +104,7 @@
   font-weight: 650;
 }
 
-.onyx-stage-hand-row .onyx-call-btn { min-height: var(--target-floor); padding: 0 var(--space-2); font-size: var(--text-sm); }
+.onyx-stage-hand-row .onyx-call-btn { padding: 0 var(--space-2); font-size: var(--text-sm); }
 
 .onyx-stage-hands-open { display: none; }
 

@@ -492,7 +492,6 @@
 }
 
 .onyx-system { padding: 2px var(--space-2) 2px var(--pt-gutter); line-height: var(--leading-snug); }
-.onyx-transcript--compact .onyx-system { padding-left: 0; }
 
 .onyx-intro {
   display: grid;
@@ -579,7 +578,6 @@
   -webkit-mask: var(--pt-i-more) center / contain no-repeat;
   mask: var(--pt-i-more) center / contain no-repeat;
 }
-.onyx-transcript--compact ~ .onyx-typing { padding-left: 0; }
 
 /* Jump to latest: a floating pill at the bottom centre of the log. */
 .onyx-frame .onyx-jump-latest {
@@ -998,8 +996,6 @@ details.onyx-topic-tools[open] > .onyx-topic-tools-toggle { flex-basis: 100%; }
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
   min-height: 0;
   padding: 0;
   background: transparent;

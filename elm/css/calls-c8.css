@@ -69,7 +69,7 @@
 .onyx-call-captions-source { color: var(--onyx-dim); }
 .onyx-call-captions-source[data-live="false"] { color: var(--onyx-warn); }
 .onyx-call-captions-copy, .onyx-call-caption-translate {
-  min-height: var(--target-floor); padding: 0 var(--space-2); margin-left: auto;
+  padding: 0 var(--space-2); margin-left: auto;
   border: 1px solid var(--onyx-line); border-radius: var(--radius); background: transparent;
   color: var(--onyx-text); font: inherit; font-size: var(--text-2xs); font-weight: 600; cursor: pointer;
 }
@@ -115,7 +115,6 @@
   border: 1px solid var(--onyx-line); border-radius: var(--radius); font-family: var(--font-mono);
 }
 .onyx-vs-key[data-capturing="true"] { border-color: var(--onyx-text); }
-.onyx-vs-btn { min-height: 36px; }
 .onyx-call-sheet-layer .onyx-voice-settings .onyx-call-sheet-head h2 { font-size: var(--text-lg); }
 
 /* 375px: React moves into More, captions show one line, the sheet's
@@ -129,5 +128,5 @@
   .onyx-call-ptt { display: none; }
   .onyx-vs-key-row { align-items: stretch; }
   .onyx-vs-key-display { flex: 1 1 100%; }
-  .onyx-vs-btn { flex: 1 1 0; min-height: var(--target-min); }
+  .onyx-vs-btn { flex: 1 1 0; }
 }

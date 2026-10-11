@@ -338,8 +338,6 @@
 }
 .onyx-reconnect { align-items: center; }
 
-.gs-conn-signin { align-self: flex-start; margin-top: var(--space-1); }
-
 /* ---------- 7. Touch: 44px targets at any width ------------------------- */
 
 @media (hover: none) and (pointer: coarse) {

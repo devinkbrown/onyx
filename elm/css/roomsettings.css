@@ -127,8 +127,6 @@
 .rset { display: flex; flex-direction: column; gap: var(--space-3); }
 .rset > .onyx-sheet-head { margin-bottom: 0; }
 
-.rset-room { margin: 0; font-size: var(--text-sm); color: var(--onyx-dim); }
-
 .rset-context {
   display: flex;
   justify-content: space-between;
