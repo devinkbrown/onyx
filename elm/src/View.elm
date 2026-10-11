@@ -16,6 +16,7 @@ the conversation).
 
 -}
 
+import AccountScope
 import App exposing (Model, Msg, inviteCard)
 import Dict
 import Sidebar
@@ -213,36 +214,15 @@ documentTitle model =
                             "Onyx roadmap — rooms, calls, catch-up"
 
                         _ ->
-                            waitingPrefix model
-                                ++ (case model.activeChannel of
-                                        Just name ->
-                                            name ++ " — Onyx"
+                            -- v3/gap-account: "(N) …" while mentions / DMs wait
+                            AccountScope.attentionTitle model.gapAccount.badge
+                                (case model.activeChannel of
+                                    Just name ->
+                                        name ++ " — Onyx"
 
-                                        Nothing ->
-                                            "Onyx"
-                                   )
-
-
-{-| v3/rx-shell — the tab says how many other conversations are
-waiting (`(3) #lounge — Onyx`), so the total reads even when the
-window is a background tab. -}
-waitingPrefix : Model -> String
-waitingPrefix model =
-    let
-        active =
-            Maybe.map String.toLower model.activeChannel
-
-        waiting =
-            model.channels
-                |> Dict.values
-                |> List.filter (\c -> Sidebar.hasAttention c && Just (String.toLower c.name) /= active)
-                |> List.length
-    in
-    if waiting > 0 then
-        "(" ++ String.fromInt waiting ++ ") "
-
-    else
-        ""
+                                    Nothing ->
+                                        "Onyx"
+                                )
 
 
 {-| v3/frame — the ONE app frame grid (see `.onyx-frame` in app.css):

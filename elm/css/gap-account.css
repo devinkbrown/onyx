@@ -1,0 +1,151 @@
+/* v3/gap-account — Account protection / names, Preferences data
+   controls (local history, saved searches, portable-vault review).
+   Linked before ui-sheets.css so sheet-level polish still wins. Uses
+   only the shared tokens: near-black surfaces, one accent for the
+   primary action and focus, 6px radii, 44px targets on touch. */
+
+/* ---------- shared bits ---------- */
+
+.gap-status {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs, 12px);
+  color: var(--onyx-dim);
+  overflow-wrap: anywhere;
+}
+.gap-status--error { color: var(--onyx-bad); }
+.pref-status--error { color: var(--onyx-bad); }
+.gap-status-block { margin-top: var(--space-2); }
+
+.gap-btn {
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--onyx-text);
+  background: transparent;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius, 6px);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gap-btn:disabled { color: var(--onyx-faint); cursor: not-allowed; }
+.gap-btn--primary,
+.pref-reset.gap-btn--primary {
+  color: var(--onyx-accent-ink, var(--onyx-bg));
+  background: var(--onyx-accent);
+  border-color: var(--onyx-accent);
+  font-weight: 600;
+}
+.gap-btn--primary:disabled { color: var(--onyx-faint); background: transparent; border-color: var(--onyx-line); }
+.gap-btn--quiet { border-color: transparent; color: var(--onyx-dim); }
+.gap-btn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+
+/* ---------- Account: Protection / Names ---------- */
+
+.gap-acct { container-type: inline-size; container-name: gap-acct; }
+.gap-acct .onyx-account-field { width: 100%; min-height: 36px; box-sizing: border-box; }
+.gap-switches { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0 var(--space-1); }
+.gap-switch[aria-checked="mixed"] .pref-switch { border-style: dashed; }
+.gap-switch[aria-busy="true"] { opacity: 0.7; }
+
+.gap-subsection {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--onyx-line);
+}
+.gap-acct > .gap-subsection:first-of-type { margin-top: var(--space-2); border-top: 0; padding-top: 0; }
+.gap-subhead { display: block; margin: 0 0 var(--space-1); font-size: var(--text-sm, 13px); font-weight: 600; }
+.gap-subhead-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.gap-subhead-row .gap-subhead { margin: 0; }
+
+.gap-inline-form { margin: var(--space-2) 0 0; }
+.gap-inline-row { display: flex; gap: var(--space-2); align-items: stretch; }
+.gap-inline-row > .onyx-account-field { flex: 1; min-width: 0; }
+.gap-actions { flex-wrap: wrap; }
+
+.gap-empty { margin: var(--space-1) 0; font-size: var(--text-sm, 13px); color: var(--onyx-dim); }
+.gap-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius, 6px);
+}
+.gap-list-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  min-height: 40px;
+  padding: 2px var(--space-1) 2px var(--space-3);
+}
+.gap-list-row + .gap-list-row { border-top: 1px solid var(--onyx-line); }
+.gap-list-text {
+  flex: 1 1 8ch;
+  min-width: 0;
+  /* Masks are security settings: wrap, never ellipsize them away. */
+  overflow-wrap: anywhere;
+  padding-block: var(--space-1);
+  font-size: var(--text-sm, 13px);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.gap-list-actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.gap-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  font-family: inherit;
+  font-size: var(--text-2xs, 11px);
+  font-weight: 600;
+  color: var(--onyx-dim);
+  border: 1px solid var(--onyx-line);
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+
+/* Narrow sheet (phones, folds, split view): stack the form row, full
+   width actions, nothing ellipsized into nothing. */
+@container gap-acct (max-width: 420px) {
+  .gap-inline-row { flex-direction: column; }
+  .gap-actions > .gap-btn { flex: 1 1 140px; }
+  /* A row with two actions puts the name on its own line so neither the
+     name nor a button is squeezed; one-action rows stay on one line. */
+  .gap-list-row--multi .gap-list-text { flex-basis: 100%; padding-top: var(--space-1); }
+  .gap-list-row--multi .gap-list-actions { margin-left: calc(var(--space-2) * -1); }
+}
+@container gap-acct (max-width: 300px) {
+  .gap-list-text { flex-basis: 100%; padding-top: var(--space-1); }
+  .gap-list-actions { margin-left: calc(var(--space-2) * -1); }
+}
+
+/* ---------- Preferences: review panels ---------- */
+
+.gap-history .pref-toggle[aria-busy="true"] { opacity: 0.7; }
+.gap-review { display: flex; flex-direction: column; gap: var(--space-2); }
+.gap-review-title { font-size: var(--text-sm, 13px); }
+.gap-review-facts {
+  margin: 0;
+  padding-left: 1.1em;
+  font-size: var(--text-xs, 12px);
+  color: var(--onyx-dim);
+  line-height: 1.5;
+}
+.gap-review .pref-actions { margin-top: 0; }
+
+/* ---------- touch: 44px targets, 16px inputs (no iOS zoom) ---------- */
+
+@media (hover: none), (pointer: coarse) {
+  .gap-btn,
+  .gap-review .pref-reset,
+  .pref-group .pref-reset.gap-btn--primary { min-height: var(--target-min, 44px); }
+  .gap-acct .onyx-account-field { min-height: var(--target-min, 44px); font-size: 16px; }
+  .gap-list-row { min-height: var(--target-min, 44px); }
+}
+@media (max-width: 767.98px) {
+  .gap-acct .onyx-account-field { min-height: var(--target-min, 44px); font-size: 16px; }
+  .gap-btn { min-height: var(--target-min, 44px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gap-switch .pref-switch::after { transition: none; }
+}

@@ -24,6 +24,7 @@ import Nav
 import Prefs
 import PrefsPanel exposing (Category(..))
 import Retention
+import View.GapAccount
 import View.HistoryImport -- v3/gap-import
 import View.Organize -- v3/gap-organize
 import View.Sheet as Sheet
@@ -237,14 +238,19 @@ panelBody model category =
                 , onSelect = \value -> SetVaultSearchMode (App.parseVaultSearchMode value)
                 }
             , retentionCard model
-            , queuedCard model
-            , draftsCard model
             ]
+                -- v3/gap-account: local history on/off, verified clear, saved searches
+                ++ View.GapAccount.historyCards model
+                ++ [ queuedCard model
+                   , draftsCard model
+                   ]
 
         Transfer ->
             -- v3/gap-import: import review, sources, portable vault, past imports
             sectionHead "Import & export" "Move conversation history into or out of this browser."
                 :: View.HistoryImport.transfer model
+                -- v3/gap-account: saved-search export / import
+                ++ View.GapAccount.transferCards model
 
         Accessibility ->
             [ sectionHead "Accessibility" "Motion, transparency, contrast, and verified access surfaces on this device."

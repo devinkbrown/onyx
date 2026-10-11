@@ -14,6 +14,7 @@ import Cadence
 import Dict
 import DmCipher
 import Expect
+import GapAccount
 import GroupCommit
 import GroupControl
 import GroupDirectory
@@ -24439,3 +24440,13 @@ withoutSafetyLoads =
                 _ ->
                     True
         )
+
+
+isPersist : Outbound -> Bool
+isPersist out =
+    case out of
+        VaultPersist _ ->
+            True
+
+        _ ->
+            False
