@@ -29,6 +29,7 @@ import Polish
 import Schedule
 import View.Icon exposing (icon)
 import View.Polish
+import View.UserModes -- v3/gap-usermodes
 
 
 composer : Model -> Html Msg
@@ -522,6 +523,8 @@ schedulePopover model =
                 ]
                 [ icon "x" ]
             ]
+        , -- v3/gap-usermodes: on this device (cancellable) or on the server
+          View.UserModes.scheduleWhere model
         , div [ class "onyx-schedule-presets" ]
             (List.indexedMap (schedulePreset model) Schedule.schedulePresets)
         , div [ class "onyx-schedule-custom" ]

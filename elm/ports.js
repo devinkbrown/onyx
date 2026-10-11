@@ -6293,6 +6293,61 @@ function fetchPublicFeed(url) {
         } catch (err) { /* Elm tore down — non-fatal */ }
       });
     }
+    /* v3/gap-usermodes: the owner-scoped `onyx:usermodes:owner:<owner>` slot.
+       Elm owns the shape and validates on load (unknown mode letters, bad
+       rows and oversize text all drop), so the bridge stores the verbatim
+       JSON string Elm hands back and returns the parsed object — capped at
+       64 KiB like the other owner slots. A missing, oversize or unparsable
+       slot resolves to null (Elm keeps its defaults). Only the latest
+       requested owner resolves, so a late load after an account or nick
+       switch can never apply the old owner's wishes. Nothing secret is ever
+       kept here: modes the browser re-applies, a server-ignore opt-in, the
+       real name and the (public) text of sends the server already holds. */
+    var USERMODES_BASE_KEY = "onyx:usermodes";
+    var USERMODES_MAX_CHARS = 64 * 1024;
+    var userModesPendingKey = null;
+    function userModesOwnerKey(serverUrl, identity) {
+      if (typeof serverUrl !== "string" || !serverUrl) return null;
+      if (typeof identity !== "string" || !identity) return null;
+      try {
+        return USERMODES_BASE_KEY + ":owner:" + encodeURIComponent(JSON.stringify([serverUrl, identity]));
+      } catch (err) { return null; }
+    }
+    if (app.ports.userModesRequest) {
+      app.ports.userModesRequest.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || !app.ports.userModesLoaded) return;
+        userModesPendingKey = key;
+        var raw = null;
+        try {
+          if (typeof window !== "undefined" && window.localStorage) {
+            raw = window.localStorage.getItem(key);
+          }
+        } catch (err) { raw = null; }
+        if (userModesPendingKey !== key) return;
+        userModesPendingKey = null;
+        var payload = null;
+        try {
+          if (typeof raw === "string" && raw.length > 0 && raw.length <= USERMODES_MAX_CHARS) {
+            payload = JSON.parse(raw);
+          }
+        } catch (err) { payload = null; }
+        try {
+          app.ports.userModesLoaded.send(payload);
+        } catch (err) { /* Elm tore down — non-fatal */ }
+      });
+    }
+    if (app.ports.userModesSave) {
+      app.ports.userModesSave.subscribe(function (req) {
+        var key = (req && userModesOwnerKey(req.serverUrl, req.identity)) || null;
+        if (!key || typeof req.json !== "string") return;
+        try {
+          if (typeof window === "undefined" || !window.localStorage) return;
+          if (req.json.length > USERMODES_MAX_CHARS) return;
+          window.localStorage.setItem(key, req.json);
+        } catch (err) { /* storage unavailable or full — non-fatal */ }
+      });
+    }
     /* CTCP TIME query reply (mirroring the oracle's
        `new Date().toString()` body): the clock lives ports-side, so
        Elm hands over the validated target and the bridge sends the
