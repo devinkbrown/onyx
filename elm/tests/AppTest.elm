@@ -9860,7 +9860,8 @@ suite =
         , test "slash registry resolves names aliases and opers" <|
             \_ ->
                 Expect.all
-                    [ \_ -> Expect.equal 59 (List.length slashCommands)
+                    [ \_ -> Expect.atLeast 59 (List.length slashCommands) -- v3/gap-oper: appeal + desk joined (59 + 2)
+
                     , \_ -> Expect.equal (Just "Join a room.") (Maybe.map .description (findSlashCommand "join"))
                     , \_ -> Expect.equal (Just "modex") (Maybe.map .name (findSlashCommand "modex"))
                     , \_ -> Expect.equal (Just "import") (Maybe.map .name (findSlashCommand "import"))
@@ -19998,9 +19999,13 @@ suite =
                         , \_ -> Expect.equal [] wrongOut
                         , \_ -> Expect.equal "Type the room name to delete it." wrong.stewardStatus
                         , \_ ->
+                            -- v3/gap-chanserv: a guest cannot have registered the room,
+                            -- so there is no DROP to send (it would only FAIL): the room
+                            -- is emptied and left instead.
                             Expect.equal
-                                [ SendLine "CHANNEL DROP #harbor\r\n"
-                                , SendLine "PART #harbor Goodbye\r\n"
+                                [ SendLine "MODE #harbor +si\r\n"
+                                , SendLine "CLEAR #harbor USERS\r\n"
+                                , SendLine "PART #harbor :Room deleted\r\n"
                                 ]
                                 out
                         , \_ -> Expect.equal "" deleted.stewardTypedName

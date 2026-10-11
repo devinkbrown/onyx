@@ -44,6 +44,7 @@ import View.Landing exposing (landing)
 import View.NotFound exposing (notFound)
 import View.PublicFrame exposing (frame)
 import View.PublicInfo exposing (pageForRoute, pageTitle, route)
+import View.Appeal
 import View.ModDesk exposing (moderationSheet, operSheet)
 import View.Boost exposing (jumpToDateSheet)
 import View.Stewardship exposing (stewardPanel)
@@ -76,6 +77,7 @@ import Nav
 import View.Topbar exposing (reclaimDialog, reconnectBanner, topbar)
 import View.RoomHeader exposing (roomHeader)
 -- v3/roomsettings
+import View.Chanserv -- v3/gap-chanserv
 import View.RoomSettings
 import View.Polish -- v3/polish
 -- v3/gap-organize
@@ -270,15 +272,10 @@ appFrame model =
             ([ reconnectBanner model
              , -- v3/account2
                View.Account2.reclaimBanner model
+             , View.Chanserv.joinPromptCard model -- v3/gap-chanserv
 
              -- v3/ui-mobile-shell: the guest "Keep the name" chip moved to Home
              ]
-                ++ (if model.searchOpen then
-                        [ panel model ]
-
-                    else
-                        []
-                   )
             )
          ]
             ++ (if model.callsOpen then
@@ -289,11 +286,22 @@ appFrame model =
                 else
                     [ rail model
                     , main_ [ class "onyx-main" ]
-                        [ roomHeader model
-                        , View.Polish.timeScrubber model -- v3/polish
-                        , thread model
-                        , composer model
-                        ]
+                        ([ roomHeader model ]
+                            -- v3/rx-convo: message search belongs to the conversation it
+                            -- searches: it opens under the room header, in the main column
+                            -- (it used to sit in the full-width notices row and pushed the
+                            -- room list and the roster down with it).
+                            ++ (if model.searchOpen then
+                                    [ panel model ]
+
+                                else
+                                    []
+                               )
+                            ++ [ View.Polish.timeScrubber model -- v3/polish
+                               , thread model
+                               , composer model
+                               ]
+                        )
                     , roster model
                     ]
                )
@@ -336,6 +344,7 @@ overlays model =
         -- v3/roomsettings
         , View.RoomSettings.roomSettingsSheet model
         , operSheet model
+        , View.Appeal.appealSheet model -- v3/gap-oper
         , personSafetySheet model
         , newMessageSheet model
         , inviteShareSheet model -- v3/dmsafety

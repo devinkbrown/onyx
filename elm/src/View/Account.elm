@@ -25,6 +25,7 @@ import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
 import View.GapAccount
+import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
 import View.UserModes
 
@@ -83,6 +84,7 @@ accountPanel model =
                             , -- v3/account2
                               View.Account2.portableSection model
                             , sessionSection model
+                            , View.Chanserv.myRoomsSection model -- v3/gap-chanserv
                             , capsSection model
                             , retentionSection model
                             , dataSection model

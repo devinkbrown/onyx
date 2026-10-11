@@ -58,6 +58,7 @@ import Status
 import Media
 -- v3/calls-c1
 import CallUi
+import Chanserv -- v3/gap-chanserv
 -- v3/calls-c6
 import CallDock
 
@@ -82,6 +83,9 @@ import Organizer
 -- v3/moddesk
 import EventReplay
 import OperDesk
+import OperConsole -- v3/gap-oper
+import OperFeed -- v3/gap-oper
+import OperReply -- v3/gap-oper
 import NotifyCenter
 import Outbox
 import Passkey
@@ -397,6 +401,8 @@ type alias Model =
     , linkPreviewInflight : Set String
     , previewMediaFailed : Set String
     , mediaLightbox : Maybe String
+      -- v3/rx-convo: the lightbox shows the picture at full size (panning)
+    , mediaLightboxZoomed : Bool
     , mediaIndexOpen : Bool
     , mediaIndexFilter : RoomMediaFilter
     , mediaIndexTarget : String
@@ -426,6 +432,8 @@ type alias Model =
     , operDeskOpen : Bool
     , operDesk : OperDesk.Desk
     , operEventReplay : EventReplay.EventReplayFeed
+    -- v3/gap-oper
+    , operConsole : OperConsole.State
     , isAway : Bool
     , latencyMs : Maybe Int
     , latencyHistory : List Int
@@ -486,6 +494,8 @@ type alias Model =
     , highlightWords : List String
     , channelNotify : Dict String String
     , channelJoinPrompt : Maybe { channel : String, error : String }
+    -- v3/gap-chanserv
+    , chanserv : Chanserv.State
     , firstUnreadId : Dict String Int
     , viewUnreadDividerId : Dict String Int
     -- v3/transcript — scrolled-away state from the `scrollState` bridge.
@@ -2704,6 +2714,8 @@ type Msg
     | NodesProbed { wss : String, sessionToken : Maybe String, meshToken : Maybe String, meshExpiresAtMs : Maybe Float }
     | WsOpened { url : String }
     | WsClosed { clean : Bool, reason : String }
+    -- v3/gap-chanserv
+    | ChanservMsg Chanserv.Msg
     | ReconnectNow
     | ReclaimOpen
     | ReclaimClose
@@ -2957,6 +2969,8 @@ type Msg
     | OperDeskCancel
     | OperEventReplayLimit Int
     | OperEventReplayRequested
+    -- v3/gap-oper
+    | OperConsoleMsg OperConsole.Msg
     | OverrideToggleSoftIgnore String
     | OverrideSetNickColor { nick : String, color : String }
     | OverrideClearNickColor String
@@ -3041,6 +3055,8 @@ type Msg
     | PreviewMediaFailed String
     | MediaLightboxOpen String
     | MediaLightboxClose
+      -- v3/rx-convo
+    | MediaLightboxZoom Bool
     | MediaSave String
     | MessageCopyMoment { target : String, at : Int }
     | MessageQuote { target : String, from : String, body : String }
@@ -3572,6 +3588,7 @@ init nick url =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -3594,6 +3611,7 @@ init nick url =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -3654,6 +3672,7 @@ init nick url =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -4182,6 +4201,7 @@ blank =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -4204,6 +4224,7 @@ blank =
     , operDeskOpen = False
     , operDesk = OperDesk.blankDesk
     , operEventReplay = EventReplay.emptyEventReplayFeed
+    , operConsole = OperConsole.blank -- v3/gap-oper
     , isAway = False
     , latencyMs = Nothing
     , latencyHistory = []
@@ -4264,6 +4285,7 @@ blank =
     , highlightWords = []
     , channelNotify = Dict.empty
     , channelJoinPrompt = Nothing
+    , chanserv = Chanserv.blank -- v3/gap-chanserv
     , firstUnreadId = Dict.empty
     , viewUnreadDividerId = Dict.empty
     -- v3/transcript
@@ -5926,6 +5948,10 @@ foldLine model message =
         "520" ->
             -- v3/gap-shell: `+O`/`+A` operator-only room.
             foldJoinDenied model message
+
+        -- v3/gap-chanserv: `+f` forwarded us; say where
+        "470" ->
+            chanservForwarded model message
 
         "482" ->
             foldErrorNumeric model message
@@ -8725,6 +8751,10 @@ foldEvent model message =
                 , raw = message.raw
                 }
 
+        -- v3/gap-oper: operator planes feed the desk's live feed.
+        Spine.EventAsFeed draft ->
+            ( { model | operConsole = OperConsole.observeEvent (operConsoleCtx model) draft model.operConsole }, [] )
+
 
 {-| True when a DM peer is designated for E2EE and must never fall
 through to a plaintext send — the `isDmE2eeDesignated` predicate over
@@ -9786,6 +9816,7 @@ quarantineOwnerChange model =
     , previewImagesAllowed = Set.empty
     , previewMediaFailed = Set.empty
     , mediaLightbox = Nothing
+    , mediaLightboxZoomed = False -- v3/rx-convo
     , mediaIndexOpen = False
     , mediaIndexFilter = RoomMedia.Pictures
     , mediaIndexTarget = ""
@@ -12398,10 +12429,18 @@ parseSlashLocal text =
         case String.split " " (String.dropLeft 1 text) of
             cmd :: rest ->
                 case String.toLower cmd of
+                    -- v3/gap-oper
+                    "appeal" ->
+                        Just ( "appeal", Nothing )
+
+                    "desk" ->
+                        Just ( "desk", slashNickArg rest )
+
                     "ignore" ->
                         Just ( "ignore", slashNickArg rest )
 
                     "unignore" ->
+
                         Just ( "unignore", slashNickArg rest )
 
                     "read" ->
@@ -15493,6 +15532,8 @@ slashCommands =
     , { name = "history", usage = "/history", description = "Open message search / history tools.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "search", usage = "/search <query>", description = "Open message search with a query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "help", usage = "/help [command]", description = "List every slash command, or describe one.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "appeal", usage = "/appeal [what happened]", description = "Ask the operators for a second look at a ban or mute.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "desk", usage = "/desk [live|bans|silence|abuse|appeals|content|network]", description = "Open the operator desk on a tab (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "broadcast", usage = "/broadcast <text>", description = "Announce to operators subscribed to ANNOUNCE (opers).", kind = SlashIrc, aliases = [ "wallops" ], insertText = Nothing, oper = True }
     , { name = "kill", usage = "/kill <nick> <reason>", description = "Disconnect someone from the network; the reason is recorded (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "rehash", usage = "/rehash", description = "Ask this node to reload its configuration (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
@@ -17638,6 +17679,13 @@ runSlashLocal model target verb nickArg =
 
         ( "event", _ ) ->
             runSlashEvent model target
+
+        -- v3/gap-oper
+        ( "appeal", _ ) ->
+            runSlashAppeal model
+
+        ( "desk", arg ) ->
+            runSlashDesk model (Maybe.withDefault "" arg)
 
         ( "broadcast", _ ) ->
             runSlashOper model "broadcast"
@@ -19824,11 +19872,20 @@ foldErrorNumeric model message =
                             if String.isEmpty third then
                                 "Cannot send to " ++ target
 
+                            else if String.contains "(slowmode)" third then
+                                -- v3/gap-chanserv
+                                Chanserv.slowmodeCopy target
+
                             else
                                 third
                         )
             in
-            ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
+            if String.contains "(slowmode)" third then
+                -- v3/gap-chanserv: honest slow-mode copy, no raw numeric text
+                ( addNotification failed { kind = NotifError, text = Chanserv.slowmodeCopy second, from = Nothing, channel = Just second, topic = Nothing }, [] )
+
+            else
+                ( addNotification failed { kind = NotifError, text = "Cannot send to " ++ second ++ ": " ++ third, from = Nothing, channel = Nothing, topic = Nothing }, [] )
 
         "405" ->
             ( error "Too many channels", [] )
@@ -20339,9 +20396,11 @@ dispatchOperDesk command model =
                     | pending = Nothing
                     , lastSent = Just (OperDesk.formatWirePreview command ++ " · " ++ formatRowClock model.zone model.prefs.clock (floor model.nowMs))
                 }
+            , operConsole = OperConsole.armFor (operConsoleCtx model) command.command model.operConsole -- v3/gap-oper
           }
         , [ SendLine (Wire.formatIrcLine command.command command.params) ]
         )
+
 
 
 {-| Bounded structured replay (mirroring `requestOperEventReplay`: oper
@@ -20369,8 +20428,253 @@ requestOperEventReplay model =
         )
 
 
+-- v3/gap-oper
+
+
+{-| `/appeal [text]`: open the appeal sheet, prefilled with whatever
+followed the verb. -}
+runSlashAppeal : Model -> ( Model, List Outbound )
+runSlashAppeal model =
+    let
+        text =
+            String.trim (String.dropLeft 7 (String.trim model.composer))
+
+        ( next, _ ) =
+            OperConsole.update (operConsoleCtx model) OperConsole.OpenUserAppeal model.operConsole
+
+        console =
+            if text == "" then
+                next
+
+            else
+                { next | forms = OperConsole.setField OperConsole.AppealText text next.forms }
+    in
+    ( { model | operConsole = console, composer = "" }, [] )
+
+
+{-| `/desk [tab]`: open the operator desk (opers only). -}
+runSlashDesk : Model -> String -> ( Model, List Outbound )
+runSlashDesk model target =
+    if not model.isOper then
+        ( addToast
+            { variant = ToastError
+            , title = "Operator access required"
+            , description = Just "This network grants operator status from the signed-in account."
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            { model | composer = "" }
+        , []
+        )
+
+    else
+        let
+            wanted =
+                OperReply.sections
+                    |> List.filter (\s -> String.toLower (OperReply.sectionLabel s) == String.toLower (String.trim target))
+                    |> List.head
+
+            console =
+                model.operConsole
+
+            opened =
+                { model
+                    | operDeskOpen = True
+                    , composer = ""
+                    , operConsole =
+                        case wanted of
+                            Just section ->
+                                { console | tab = section }
+
+                            Nothing ->
+                                console
+                }
+
+            ( learned, lines ) =
+                OperConsole.update (operConsoleCtx opened) OperConsole.Opened opened.operConsole
+        in
+        ( { opened | operConsole = learned }, List.map SendLine lines )
+
+
+
+{-| What the operator console needs from the model. -}
+operConsoleCtx : Model -> OperConsole.Ctx
+operConsoleCtx model =
+    { live = model.connection == Live
+    , isOper = model.isOper
+    , nowMs = model.nowMs
+    }
+
+
+operConsoleStep : OperConsole.Msg -> Model -> ( Model, List Outbound )
+operConsoleStep consoleMsg model =
+    let
+        ( next, lines ) =
+            OperConsole.update (operConsoleCtx model) consoleMsg model.operConsole
+
+        focus =
+            case consoleMsg of
+                OperConsole.TabKey _ ->
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.SelectTab _ ->
+                    -- Focus brings a tab that was half off the strip into view.
+                    if next.tab /= model.operConsole.tab then
+                        [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                    else
+                        []
+
+                OperConsole.Confirm ->
+                    -- The review closes: focus goes back to the tab, not the void.
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                OperConsole.Cancel ->
+                    [ PrefsFocus { id = OperConsole.tabId next.tab } ]
+
+                _ ->
+                    -- A change just staged for review: its confirm button takes focus.
+                    if model.operConsole.pending == Nothing && next.pending /= Nothing then
+                        [ PrefsFocus { id = "oc-review-confirm" } ]
+
+                    else
+                        []
+
+    in
+    ( { model | operConsole = next }, List.map SendLine lines ++ focus )
+
+
+{-| The console reads the daemon's replies after every update: opening
+the desk learns which categories this session follows, every inbound
+reply line is offered to the console (it claims only the operator
+patterns and, for a person mid-appeal, their own answer), and a closed
+socket forgets session-scoped state. -}
+settleStepOper : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepOper msg prior ( m, outs ) =
+    case msg of
+        OperDeskOpen ->
+            if m.operDeskOpen && not prior.operDeskOpen then
+                let
+                    ( next, lines ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Opened m.operConsole
+                in
+                ( { m | operConsole = next }, outs ++ List.map SendLine lines )
+
+            else
+                ( m, outs )
+
+        WsLineReceived line ->
+            ( observeOperLines [ line ] m, outs )
+
+        WsBatchReceived batch ->
+            ( observeOperLines batch.lines m, outs )
+
+        WsClosed _ ->
+            let
+                ( next, _ ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Disconnected m.operConsole
+            in
+            ( { m | operConsole = next }, outs )
+
+        WsOpened _ ->
+            -- A queued appeal is the one command the daemon takes before
+            -- registration: it goes out ahead of the handshake lines.
+            let
+                ( next, lines ) =
+                    OperConsole.update (operConsoleCtx m) OperConsole.Connected m.operConsole
+            in
+            ( { m | operConsole = next }, List.map SendLine lines ++ outs )
+
+        Tick _ ->
+
+            if OperConsole.anyLoading m.operConsole then
+                let
+                    ( next, _ ) =
+                        OperConsole.update (operConsoleCtx m) OperConsole.Settle m.operConsole
+                in
+                ( { m | operConsole = next }, outs )
+
+            else
+                ( m, outs )
+
+        _ ->
+            ( m, outs )
+
+
+observeOperLines
+ : List String -> Model -> Model
+observeOperLines lines m =
+    let
+        asking =
+            m.operConsole.userAppeal == OperConsole.AppealSending
+    in
+    if not (m.isOper || asking) then
+        m
+
+    else
+        let
+            ctx =
+                operConsoleCtx m
+
+            fold line console =
+                if operLineCandidate line then
+                    OperConsole.observeLine ctx (Wire.parseIrcMessage line) console
+
+                else
+                    console
+        in
+        { m | operConsole = List.foldl fold m.operConsole lines }
+
+
+{-| A cheap command-token check so history bursts are not parsed twice:
+only NOTICE, FAIL, MODE and three-digit numerics can be operator
+replies. -}
+operLineCandidate : String -> Bool
+operLineCandidate line =
+    let
+        afterTags =
+            if String.startsWith "@" line then
+                String.dropLeft 1 (dropWord line)
+
+            else
+                line
+
+        afterPrefix =
+            if String.startsWith ":" afterTags then
+                dropWord afterTags
+
+            else
+                afterTags
+
+        command =
+            String.toUpper (String.left 7 (String.trim (String.left 8 afterPrefix)))
+                |> String.words
+                |> List.head
+                |> Maybe.withDefault ""
+    in
+    List.member command [ "NOTICE", "FAIL", "MODE" ]
+        || (String.length command == 3 && String.all Char.isDigit command)
+
+
+dropWord : String -> String
+dropWord text =
+    case String.indexes " " text of
+        i :: _ ->
+            String.dropLeft (i + 1) text
+
+        [] ->
+            ""
+
+
 foldAccountSessionBody : Model -> String -> Maybe ( Model, List Outbound )
 foldAccountSessionBody model body =
+
     case Session.parseSessionListLine body of
         Just row ->
             Just
@@ -23685,6 +23989,11 @@ foldStandardReply model message =
                         , []
                         )
 
+                    else if List.member (String.toUpper reply.command) [ "CHANNEL", "CS", "SUCCESSOR" ] then
+                        -- v3/gap-chanserv: `settleStepChanserv` folds these
+                        -- (the channel comes from the last CHANNEL line sent).
+                        ( model, [] )
+
                     else if reply.command /= "WEBAUTHN" then
                         -- v3/gap-shell: never silent (inbox for FAIL/WARN,
                         -- Activity for NOTE).
@@ -24244,17 +24553,17 @@ requestStewardDeleteRoom model channel =
             then
                 -- A confirmed delete closes the panel with the room
                 -- (mirroring the oracle sheet close on ok).
-                ( { model
-                    | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
-                    , stewardStatus = ""
-                    , stewardTypedName = ""
-                    , stewardDeleting = False
-                    , stewardRoom = Nothing
-                  }
-                , [ SendLine (Wire.formatIrcLine "CHANNEL" [ "DROP", stewardRoomName model channel ])
-                  , SendLine (Wire.formatIrcLine "PART" [ stewardRoomName model channel, "Goodbye" ])
-                  ]
-                )
+                -- v3/gap-chanserv: registration-aware (INFO, then DROP
+                -- only for a registered room), then empty the room and leave.
+                chanservBeginDelete
+                    { model
+                        | roomTransfers = Stewardship.writeTransfer Nothing channel model.roomTransfers
+                        , stewardStatus = ""
+                        , stewardTypedName = ""
+                        , stewardDeleting = False
+                        , stewardRoom = Nothing
+                    }
+                    (stewardRoomName model channel)
 
             else
                 stewardRefused model "Type the room name to delete it."
@@ -39387,6 +39696,7 @@ settleSteps =
     , settleStepCallMedia -- v3/calls-c4
     , settleStepRoomMenu -- v3/frame
     , settleStepRoomSettings -- v3/roomsettings
+    , settleStepChanserv -- v3/gap-chanserv
     , settleStepCallDock -- v3/calls-c6
     , settleStepStage -- v3/calls-c11
     , settleStepPolish -- v3/polish
@@ -39400,6 +39710,7 @@ settleSteps =
     , settleStepWatch -- v3/gap-watch
     , settleStepRemembered -- v3/rx-public
     , settleStepUserModes -- v3/gap-usermodes
+    , settleStepOper -- v3/gap-oper
     ]
 
 
@@ -41851,10 +42162,14 @@ updateCore msg model =
             ( { model | previewMediaFailed = Set.insert url model.previewMediaFailed }, [] )
 
         MediaLightboxOpen url ->
-            ( { model | mediaLightbox = Just url }, [] )
+            ( { model | mediaLightbox = Just url, mediaLightboxZoomed = False }, [] )
 
         MediaLightboxClose ->
-            ( { model | mediaLightbox = Nothing }, [] )
+            ( { model | mediaLightbox = Nothing, mediaLightboxZoomed = False }, [] )
+
+        -- v3/rx-convo: fit ↔ full size (only while a picture is open)
+        MediaLightboxZoom zoomed ->
+            ( { model | mediaLightboxZoomed = zoomed && model.mediaLightbox /= Nothing }, [] )
 
         MediaIndexOpen ->
             case model.activeChannel of
@@ -42440,7 +42755,11 @@ updateCore msg model =
                                     ( { edited | editingMessage = Nothing, composer = "", composerDrafts = Dict.remove (String.toLower target) edited.composerDrafts }, out )
 
                         Nothing ->
-                            if not (List.isEmpty model.attachments) then
+                            -- v3/gap-chanserv: slow mode holds the send until the gap passes
+                            if chanservSlowHeld model target then
+                                ( chanservSlowHold model target, [] )
+
+                            else if not (List.isEmpty model.attachments) then
                                 sendWithAttachments model target
 
                             else if String.isEmpty (String.trim model.composer) then
@@ -45442,12 +45761,17 @@ updateCore msg model =
         RoomSettingsMsg sub ->
             roomSettingsUpdate sub model
 
+        -- v3/gap-chanserv
+        ChanservMsg sub ->
+            chanservUpdate sub model
+
         -- v3/gap-import
         HistoryImportMsg sub ->
             historyImportUpdate sub model
 
         BlockKitMsg sub ->
             blockKitUpdate sub model
+
         -- v3/gap-organize
         OrganizeMsg sub ->
             organizeUpdate sub model
@@ -46037,7 +46361,12 @@ updateCore msg model =
         OperEventReplayRequested ->
             requestOperEventReplay model
 
+        -- v3/gap-oper
+        OperConsoleMsg consoleMsg ->
+            operConsoleStep consoleMsg model
+
         OverrideToggleSoftIgnore nick ->
+
             -- Soft-ignore toggle (mirroring `toggleSoftIgnore`:
             -- owner-gated, nick-normalized, field toggled, journal
             -- saved; without an owner nothing moves).
@@ -48815,13 +49144,14 @@ slashHelpGroups oper =
     in
     [ ( "Messages", named [ "me", "msg", "notice", "ctcp", "ping" ] )
     , ( "Rooms", named [ "join", "part", "topic", "invite", "share", "kick", "ban", "unban", "op", "deop", "voice", "devoice", "mode", "modex", "stage", "event", "webhook" ] )
-    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd" ] )
+    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd", "appeal" ] )
     , ( "This device", named [ "read", "star", "unstar", "mute", "unmute", "notify", "autojoin", "unautojoin", "color", "clear", "search", "history", "export", "import", "help" ] )
     , ( "Text", named [ "shrug", "tableflip", "unflip", "lenny", "disapprove" ] )
     , ( "Advanced", named [ "quote" ] )
     ]
         ++ (if oper then
-                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe" ] ) ]
+                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe", "desk" ] ) ]
+
 
             else
                 []
@@ -48885,6 +49215,7 @@ overlayStack model =
         , ( "room-invite-share", model.inviteShare /= Nothing, InviteShareClose )
         , ( "new-message", model.newMessageOpen, NewMessageClose )
         , ( "oper-sheet", model.operDeskOpen, OperDeskClose )
+        , ( "appeal-sheet", model.operConsole.userAppealOpen, OperConsoleMsg OperConsole.CloseUserAppeal ) -- v3/gap-oper
         , ( "moderation-cockpit", model.moderationOpen, ModerationSheetClose )
         -- v3/gap-organize: folder picker, row menu, saved messages
         , ( "organize", Organizer.sheetOpen model.organize, OrganizeMsg Organizer.SheetClose )
@@ -49612,6 +49943,341 @@ settleRoomSettings msg model =
 
         _ ->
             { model | roomSettings = settled }
+
+
+-- v3/gap-chanserv
+
+
+{-| The Room settings target as the chanserv core sees it (the same
+room, op and connection facts as `roomSettingsCtx`, plus the account
+and network-oper status).
+-}
+chanservCtx : Model -> Chanserv.Ctx
+chanservCtx model =
+    let
+        rs =
+            roomSettingsCtx model
+    in
+    { room = Maybe.map .name rs.room
+    , live = rs.connected
+    , isOp = rs.isOp
+    , isOper = model.isOper
+    , account = model.accountName
+    , props = Maybe.withDefault Dict.empty (Maybe.map .props rs.room)
+    , modes = Maybe.withDefault "" (Maybe.map .modes rs.room)
+    , nowMs = model.nowMs
+    }
+
+
+chanservFoldCtx : Model -> Chanserv.FoldCtx
+chanservFoldCtx model =
+    { ourNick = model.ourNick
+    , nowMs = model.nowMs
+    , isChannel = isChannelName model
+    , inChannel = \channel -> Dict.member (String.toLower channel) model.channels
+    , groups = model.isupport.chanGroups
+    , prefixModes = Set.fromList (Dict.keys model.isupport.modeToPrefix)
+    }
+
+
+chanservUpdate : Chanserv.Msg -> Model -> ( Model, List Outbound )
+chanservUpdate sub model =
+    let
+        ( state, effects ) =
+            Chanserv.update (chanservCtx model) sub model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
+
+
+chanservEffects : List Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffects effects acc =
+    List.foldl chanservEffect acc effects
+
+
+{-| Interpret one chanserv effect with the existing folds: raw lines go
+out only while live; prop writes reuse the Room settings optimistic
+`writeChannelProp` + `PROP` path; welcome rows are transcript system
+rows; knocks land in the inbox.
+-}
+chanservEffect : Chanserv.Effect -> ( Model, List Outbound ) -> ( Model, List Outbound )
+chanservEffect effect ( model, outs ) =
+    case effect of
+        Chanserv.Send line ->
+            if model.connection == Live then
+                ( model, outs ++ [ SendLine line ] )
+
+            else
+                ( model, outs )
+
+        Chanserv.WriteProp p ->
+            let
+                ( written, out ) =
+                    roomSettingsEffect (RoomSettings.WriteProp p) model
+            in
+            ( written, outs ++ out )
+
+        Chanserv.Toast tone title description ->
+            ( addToast
+                { variant =
+                    case tone of
+                        Chanserv.ToneOk ->
+                            ToastSuccess
+
+                        Chanserv.ToneError ->
+                            ToastError
+
+                        Chanserv.ToneInfo ->
+                            ToastInfo
+                , title = title
+                , description = description
+                , duration = Nothing
+                , groupKey = Nothing
+                , undo = Nothing
+                }
+                model.nowMs
+                model
+            , outs
+            )
+
+        Chanserv.Inbox note ->
+            ( addNotification model { kind = NotifSystem, text = note.text, from = note.from, channel = note.channel, topic = Nothing }, outs )
+
+        Chanserv.SystemRow channel text ->
+            if Dict.member (String.toLower channel) model.channels then
+                ( appendLiveRow model channel text (Wire.parseIrcMessage ""), outs )
+
+            else
+                ( model, outs )
+
+        Chanserv.ClearJoinPrompt channel ->
+            ( clearJoinPromptFor model channel, outs )
+
+
+{-| Inbound services replies, list numerics, knocks and welcome
+notices fold here (the core fold leaves them in the service log);
+opening Room settings or Room care asks the server what it knows; every
+line this client sends is watched for slow-mode stamps and for the
+channel a later `FAIL CHANNEL` is about.
+-}
+settleStepChanserv : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepChanserv msg _ ( m, outs ) =
+    let
+        inbound =
+            case msg of
+                WsLineReceived line ->
+                    [ line ]
+
+                WsBatchReceived batch ->
+                    batch.lines
+
+                _ ->
+                    []
+
+        ( folded, foldOut ) =
+            List.foldl
+                (\line ( model, acc ) ->
+                    let
+                        ( state, effects ) =
+                            Chanserv.fold (chanservFoldCtx model) (Wire.parseIrcMessage line) model.chanserv
+                    in
+                    chanservEffects effects ( { model | chanserv = state }, acc )
+                )
+                ( m, [] )
+                inbound
+
+        ( triggered, triggerOut ) =
+            case msg of
+                RoomSettingsMsg RoomSettings.Open ->
+                    if RoomSettings.isOpenFor folded.activeChannel folded.roomSettings then
+                        let
+                            ( state, effects ) =
+                                Chanserv.seed (chanservCtx folded) folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                StewardOpen channel ->
+                    if folded.connection == Live && folded.accountName /= Nothing then
+                        let
+                            ( state, effects ) =
+                                Chanserv.probe channel folded.chanserv
+                        in
+                        chanservEffects effects ( { folded | chanserv = state }, [] )
+
+                    else
+                        ( folded, [] )
+
+                Tick _ ->
+                    ( { folded | chanserv = Chanserv.tick folded.nowMs folded.chanserv }, [] )
+
+                WsClosed _ ->
+                    ( { folded | chanserv = Chanserv.reset folded.chanserv }, [] )
+
+                _ ->
+                    ( folded, [] )
+
+        allOut =
+            outs ++ foldOut ++ triggerOut
+
+        sent =
+            List.filterMap
+                (\o ->
+                    case o of
+                        SendLine line ->
+                            Just line
+
+                        _ ->
+                            Nothing
+                )
+                allOut
+    in
+    if List.isEmpty sent then
+        ( triggered, allOut )
+
+    else
+        ( { triggered | chanserv = Chanserv.noteSends { gapFor = chanservSlowGap triggered, nowMs = triggered.nowMs } sent triggered.chanserv }
+        , allOut
+        )
+
+
+chanservSelfModes : Model -> String -> List Char
+chanservSelfModes model channel =
+    Dict.get (String.toLower channel) model.channels
+        |> Maybe.andThen (\ch -> Dict.get (String.toLower model.ourNick) ch.members)
+        |> Maybe.map (.modes >> Set.toList)
+        |> Maybe.withDefault []
+
+
+chanservPropsOf : Model -> String -> Dict String String
+chanservPropsOf model channel =
+    Maybe.withDefault Dict.empty (Dict.get (String.toLower channel) model.props.channelProps)
+
+
+{-| This sender's slow-mode gap in `target`, in seconds (0 when off,
+exempt, or not a room).
+-}
+chanservSlowGap : Model -> String -> Int
+chanservSlowGap model target =
+    let
+        props =
+            chanservPropsOf model target
+    in
+    if not (isChannelName model target) || Chanserv.slowExempt { props = props, selfModes = chanservSelfModes model target, isOper = model.isOper } then
+        0
+
+    else
+        Chanserv.slowGapOf props
+
+
+chanservSlowWaitMs : Model -> String -> Int
+chanservSlowWaitMs model target =
+    if isChannelName model target then
+        Chanserv.slowWait
+            { props = chanservPropsOf model target
+            , selfModes = chanservSelfModes model target
+            , isOper = model.isOper
+            , nowMs = model.nowMs
+            }
+            target
+            model.chanserv
+
+    else
+        0
+
+
+{-| A plain message (or `/me`) in a room still inside its slow-mode
+gap. Other slash commands are not channel messages and pass.
+-}
+chanservSlowHeld : Model -> String -> Bool
+chanservSlowHeld model target =
+    let
+        draft =
+            String.toLower (String.trimLeft model.composer)
+
+        command =
+            String.startsWith "/" draft && not (String.startsWith "/me " draft)
+    in
+    not command && chanservSlowWaitMs model target > 0
+
+
+chanservSlowHold : Model -> String -> Model
+chanservSlowHold model target =
+    let
+        secs =
+            (chanservSlowWaitMs model target + 999) // 1000
+    in
+    { model | composerError = Just ("Slow mode is on in " ++ target ++ ". You can send again in " ++ String.fromInt secs ++ "s.") }
+
+
+{-| `470`: the room's `+f` forward sent us elsewhere. Say where. (The
+refusals themselves, 477/480/489/520, are `foldJoinDenied`'s join prompt;
+this module only adds the card's "Ask to join" / key actions on top.)
+-}
+chanservForwarded : Model -> Wire.IrcMessage -> ( Model, List Outbound )
+chanservForwarded base message =
+    let
+        -- The raw numeric stays in the service log; a forward is not an
+        -- error, so no inbox row.
+        model =
+            logNumericQuiet base message
+
+        channel =
+            Maybe.withDefault "" (secondParam message.params)
+
+        target =
+            Maybe.withDefault "" (thirdParam message.params)
+
+        settled =
+            if model.browserPendingJoin == Just (String.toLower channel) then
+                { model | browserPendingJoin = Nothing, browserAttemptedJoin = Nothing, browserJoinPhase = BrowserJoinIdle }
+
+            else
+                model
+    in
+    if isChannelName model channel && isChannelName model target then
+        ( addToast
+            { variant = ToastInfo
+            , title = "You were sent to " ++ target
+            , description = Just (channel ++ " couldn't take you, so it forwarded you to " ++ target ++ ".")
+            , duration = Nothing
+            , groupKey = Nothing
+            , undo = Nothing
+            }
+            model.nowMs
+            settled
+        , []
+        )
+
+    else
+        ( model, [] )
+
+
+{-| Room care "Delete room" (D7): ask the core, which drops a registered
+room first and then empties and leaves it.
+-}
+chanservBeginDelete : Model -> String -> ( Model, List Outbound )
+chanservBeginDelete model room =
+    let
+        members =
+            Dict.get (String.toLower room) model.channels
+                |> Maybe.map (.members >> Dict.values)
+                |> Maybe.withDefault []
+
+        me =
+            String.toLower model.ourNick
+
+        ( state, effects ) =
+            Chanserv.beginDelete
+                { channel = room
+                , signedIn = model.accountName /= Nothing
+                , others = members |> List.filter (\mbr -> String.toLower mbr.nick /= me) |> List.map .nick |> List.sort
+                , founderRank = List.any (\mbr -> String.toLower mbr.nick == me && Set.member 'Q' mbr.modes) members
+                }
+                model.chanserv
+    in
+    chanservEffects effects ( { model | chanserv = state }, [] )
 
 
 -- v3/dm-key-hold
