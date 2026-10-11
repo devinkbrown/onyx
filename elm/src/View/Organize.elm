@@ -84,6 +84,12 @@ isRoomName model name =
     App.isChannelName model name
 
 
+{-| The list's text filter is in use (it searches everything). -}
+searching : Model -> Bool
+searching model =
+    not (String.isEmpty (String.trim model.sidebarFilter))
+
+
 {-| Ready to write: an owner is known and its memory has loaded. -}
 ready : Model -> Bool
 ready model =
@@ -95,20 +101,26 @@ ready model =
 
 
 {-| Conversations the lists show: hidden rooms and closed DMs step out
-(the open one always stays, so you never lose your place). -}
+(the open one always stays, so you never lose your place). Typing in
+the list's filter searches everything, hidden or closed included, so a
+person or room you tucked away is one search from coming back. -}
 listed : Model -> List Channel -> List Channel
 listed model channels =
-    List.filter
-        (\c ->
-            isActive model c.name
-                || (if isRoomName model c.name then
-                        not (Organizer.isHidden c.name (orgOf model))
-
-                    else
-                        Organizer.closedVisible c.name (orgOf model)
-                   )
-        )
+    if searching model then
         channels
+
+    else
+        List.filter
+            (\c ->
+                isActive model c.name
+                    || (if isRoomName model c.name then
+                            not (Organizer.isHidden c.name (orgOf model))
+
+                        else
+                            Organizer.closedVisible c.name (orgOf model)
+                       )
+            )
+            channels
 
 
 {-| Rooms that sit in no folder (the plain Rooms section). -}
@@ -217,7 +229,7 @@ hiddenFooter model =
         count =
             List.length joined
     in
-    if count == 0 then
+    if count == 0 || searching model then
         text ""
 
     else
@@ -288,7 +300,7 @@ closedFooter model =
         count =
             List.length closed
     in
-    if count == 0 then
+    if count == 0 || searching model then
         text ""
 
     else

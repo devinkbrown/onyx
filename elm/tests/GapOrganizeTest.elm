@@ -302,6 +302,25 @@ lists =
                     |> Query.find [ testid "sidebar-reopen" ]
                     |> Event.simulate Event.click
                     |> Event.expect (OrganizeMsg (Organizer.Reopen "jun"))
+        , test "typing in the list filter searches hidden rooms and closed DMs too" <|
+            \_ ->
+                let
+                    names m =
+                        View.Organize.listed m (Dict.values m.channels) |> List.map .name |> List.sort
+                in
+                Expect.equal
+                    ( names organized, names { organized | sidebarFilter = "e" }, names { organized | sidebarFilter = "   " } )
+                    ( [ "#design", "#lounge", "mara" ]
+                    , [ "#design", "#elm", "#lounge", "jun", "mara" ]
+                    , [ "#design", "#lounge", "mara" ]
+                    )
+        , test "while searching, the hidden / closed footers step aside (the results already include them)" <|
+            \_ ->
+                view { organized | sidebarFilter = "e" }
+                    |> Expect.all
+                        [ Query.hasNot [ testid "sidebar-hidden" ]
+                        , Query.hasNot [ testid "sidebar-closed" ]
+                        ]
         , test "hidden rooms and closed DMs stay reachable from the palette" <|
             \_ ->
                 Switcher.entries (isChannelName organized) organized.activeChannel (Dict.values organized.channels)
