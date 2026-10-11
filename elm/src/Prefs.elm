@@ -754,5 +754,18 @@ updatePreference prefs key value =
         "width" ->
             { prefs | width = widthFromString value |> Maybe.withDefault prefs.width }
 
+        -- v3/gap-appearance — Conversation keys.
+        "voiceEntry" ->
+            { prefs | voiceEntry = value == "true" }
+
+        "topicTools" ->
+            { prefs | topicTools = value == "true" }
+
+        "reactionDensity" ->
+            { prefs | reactionDensity = reactionDensityFromString value |> Maybe.withDefault prefs.reactionDensity }
+
+        "blockedHosts" ->
+            { prefs | blockedHosts = parseBlockedHosts (Encode.string value) }
+
         _ ->
             prefs

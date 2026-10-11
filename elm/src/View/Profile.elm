@@ -505,7 +505,13 @@ cardFor model nick channel =
             []
         , div
             ([ class "onyx-member-card"
-             , attribute "role" "region"
+             , -- v3/rx-sheets: a modal card over its veil, so it is a
+               -- named dialog in the shared focus scope (initial focus
+               -- inside, Tab wraps, focus returns to the row it came from).
+               attribute "role" "dialog"
+             , attribute "aria-modal" "true"
+             , attribute "data-shortcut-scope" "member-card"
+             , attribute "tabindex" "-1"
              , attribute "aria-labelledby" (cardId ++ "-name")
              , Html.Events.preventDefaultOn "keydown" (Json.Decode.map (\escMsg -> ( escMsg, True )) cardEscapeDecoder)
              ]
@@ -517,7 +523,8 @@ cardFor model nick channel =
                             []
                    )
             )
-            [ div [ class "onyx-member-identity" ]
+            [ Sheet.closeButton { label = "Close profile for " ++ nick, onClose = App.UserProfileClosed, testId = Just "member-card-close", extraClass = "onyx-member-card-close" }
+            , div [ class "onyx-member-identity" ]
                 [ Avatar.view { name = displayName, owner = False, size = Avatar.Md, extraClass = "", hidden = True }
                 , div [ class "onyx-member-copy" ]
                     ([ p [ class "onyx-member-name", attribute "id" (cardId ++ "-name") ] [ text displayName ] ]
@@ -621,13 +628,6 @@ cardFor model nick channel =
                         , onClick (App.SafetyOpenReport { nick = nick, guest = account == Nothing })
                         ]
                         [ text "Report" ]
-                    , button
-                        [ attribute "type" "button"
-                        , class "onyx-member-action"
-                        , attribute "aria-label" ("Close profile for " ++ nick)
-                        , onClick App.UserProfileClosed
-                        ]
-                        [ text "Close" ]
                     ]
             , -- v3/gap-usermodes: not in this room -> when were they last here
               if not isSelf && member == Nothing && App.isChannelName model channel then
@@ -933,7 +933,11 @@ moderationReview model =
                 , backdropClass = "onyx-profile-backdrop"
                 , layerAttrs = []
                 , modal = True
-                , attrs = [ attribute "aria-describedby" "moderation-review-desc" ]
+                , attrs =
+                    [ attribute "aria-describedby" "moderation-review-desc"
+                    , -- v3/rx-sheets: kick / ban confirm as destructive
+                      attribute "data-kind" (Moderation.kindToString draft.kind)
+                    ]
                 }
                     [ h2 [ class "onyx-moderation-title" ] [ text title ]
                     , p [ class "onyx-moderation-desc", attribute "id" "moderation-review-desc" ]
@@ -1093,7 +1097,11 @@ safetyShell kind title body guest extra dismissLabel dismissMsg confirmLabel con
         , modal = True
         , attrs = [ attribute "aria-describedby" "person-safety-body", attribute "data-kind" kind ]
         }
-            ([ h2 [ attribute "id" "person-safety-title", class "person-safety__title" ] [ text title ]
+            ([ -- v3/rx-sheets: the shared pinned head and its close.
+               Sheet.headerWith
+                (Sheet.head { scope = "person-safety", title = title, closeLabel = "Close", onClose = dismissMsg }
+                    |> (\h -> { h | titleId = Just "person-safety-title", titleClass = "person-safety__title" })
+                )
              , p [ attribute "id" "person-safety-body", class "person-safety__body" ] [ text body ]
              ]
                 ++ (if guest then

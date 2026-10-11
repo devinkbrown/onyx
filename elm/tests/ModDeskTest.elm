@@ -15,6 +15,7 @@ import Html.Attributes as Attr
 import OperConsole
 import OperDesk
 import OperReply
+import Prefs
 import Set
 import Test exposing (Test, describe, test)
 import Test.Html.Event as Event
@@ -452,13 +453,48 @@ suite =
                     in
                     Expect.all
                         [ \_ -> q |> Query.has [ Selector.text "Room safety", Selector.text "Room desk", Selector.text "You are a room moderator here." ]
-                        , \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Current room") ] |> Query.has [ Selector.text "#c" ]
+                        , -- v3/rx-sheets: the room rides in the pinned head as its subtitle
+                          \_ -> q |> Query.find [ Selector.class "onyx-moddesk-head" ] |> Query.find [ Selector.class "onyx-sheet-sub" ] |> Query.has [ Selector.text "#c" ]
                         , \_ -> q |> Query.findAll [ testId "ban-list-panel" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.findAll [ testId "desk-invite-form" ] |> Query.count (Expect.equal 1)
-                        , \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 1)
+                        , -- v3/gap-people: a room moderator always gets the member form
+                          -- (the room role gates it, not the experience mode)
+                          \_ -> q |> Query.findAll [ testId "desk-member-form" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.findAll [ testId "ban-add-form" ] |> Query.count (Expect.equal 1)
                         , \_ -> q |> Query.has [ Selector.text "Server activity" ]
                         , \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Close room desk") ] |> Event.simulate Event.click |> Event.expect ModerationSheetClose
+                        ]
+                        ()
+            , test "the member-action form appears for a moderator and every action the role offers is listed" <|
+                \_ ->
+                    let
+                        opened =
+                            Tuple.first (update ModerationSheetOpen (roomModel (Set.singleton 'o')))
+
+                        q =
+                            query opened |> Query.find [ testId "desk-member-form" ]
+                    in
+                    Expect.all
+                        [ \_ -> q |> Query.find [ Selector.attribute (Attr.attribute "aria-label" "Member action") ] |> Query.findAll [ Selector.tag "option" ] |> Query.count (Expect.equal 6)
+                        , \_ -> q |> Query.find [ testId "desk-member-submit" ] |> Query.has [ Selector.text "Review action" ]
+                        ]
+                        ()
+            , test "a member action the room role does not offer never stages a review" <|
+                \_ ->
+                    let
+                        stage modes =
+                            let
+                                base =
+                                    roomModel modes
+
+                                desk =
+                                    base.moderationDesk
+                            in
+                            Tuple.first (update (ModerationDeskSubmitMember "#c") { base | moderationDesk = { desk | member = "alice", action = "kick" } })
+                    in
+                    Expect.all
+                        [ \_ -> Expect.equal Nothing (stage (Set.singleton 'v')).moderationDraft
+                        , \_ -> Expect.notEqual Nothing (stage (Set.singleton 'o')).moderationDraft
                         ]
                         ()
             , test "closing hides the sheet" <|

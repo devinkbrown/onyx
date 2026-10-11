@@ -31,6 +31,7 @@ import Organizer
 import View.Attention
 import View.Organize
 import View.GapShell -- v3/gap-shell
+import View.GapClaim -- v3/gap-claim
 
 
 {-| Every open conversation, projected for Home. -}
@@ -114,6 +115,7 @@ home model =
             , -- v3/ui-mobile-shell: the guest "Keep the name" ask lives on
               -- Home (and in the You hub), never as a strip over a room.
               guestClaimChip model
+            , View.GapClaim.homeCard model -- v3/gap-claim
             , View.GapShell.motdCard model -- v3/gap-shell
             , coach model Home.HomeNext
             , View.Organize.homeSaved model -- v3/gap-organize

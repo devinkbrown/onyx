@@ -160,7 +160,7 @@
   background: var(--onyx-panel-2);
 }
 .onyx-railmenu-head .onyx-railmenu-tile { border-radius: calc(var(--radius) * 1.5); }
-.onyx-railmenu-head .onyx-railmenu-face { font-size: 12px; }
+.onyx-railmenu-head .onyx-railmenu-face { font-size: 0.75rem; }
 .onyx-railmenu-titles { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .onyx-railmenu-title {
   margin: 0;
@@ -255,7 +255,7 @@
 
 /* Phones: the bottom sheet's rows are thumb-sized. */
 @media (max-width: 767.98px) {
-  .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 16px; }
+  .onyx-frame .onyx-railmenu .onyx-railmenu-item { min-height: 48px; font-size: 1rem; }
   .onyx-railmenu .onyx-railmenu-item .onyx-shi { width: 20px; height: 20px; }
   .onyx-frame .onyx-railmenu-notify .room-notify-seg { min-height: 44px; font-size: var(--text-md); }
   .onyx-railmenu-head .onyx-railmenu-tile,
@@ -361,7 +361,7 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 18px;
 }
 
@@ -371,7 +371,7 @@
 @media (max-width: 599.98px) {
   /* Phones keep New on the Messages page; the bar stays three glyphs. */
   .onyx-frame .onyx-topbar .onyx-topbar-compose { display: none; }
-  .onyx-mobile-nav .onyx-nav-badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; line-height: 18px; }
+  .onyx-mobile-nav .onyx-nav-badge { min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.6875rem; line-height: 18px; }
 }
 
 /* Two-pane and wider on a notched device (landscape phones, iPads):

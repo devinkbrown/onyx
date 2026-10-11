@@ -241,6 +241,11 @@ moreMenu model name isRoom channel =
                         , attribute "role" "group"
                         , attribute "aria-label" "Room actions"
                         , attribute "data-testid" "room-more-menu"
+                        , -- v3/rx-sheets: the menu joins the overlay focus scope,
+                          -- so focus moves into it, Tab stays in it, and a sheet
+                          -- opened from it hands focus back to the More button.
+                          attribute "data-shortcut-scope" "room-menu"
+                        , attribute "tabindex" "-1"
                         ]
                         ([ div [ class "onyx-room-more-head", attribute "aria-hidden" "true" ]
                             [ span [ class "onyx-room-more-grip" ] []
@@ -286,6 +291,16 @@ moreMenu model name isRoom channel =
                             ++ View.ModDesk.moderationToggle model
                             ++ View.Organize.roomMoreItems model name isRoom -- v3/gap-organize
                             ++ View.GapShell.roomMoreItems model name isRoom -- v3/gap-shell
+                            -- v3/rx-sheets: the phone action sheet's Cancel row
+                            -- (hidden where the menu is an anchored popover).
+                            ++ [ button
+                                    [ type_ "button"
+                                    , class "onyx-room-more-cancel"
+                                    , attribute "data-testid" "room-more-cancel"
+                                    , onClick RoomMenuClose
+                                    ]
+                                    [ text "Cancel" ]
+                               ]
                         )
                     ]
 

@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), plaintextWouldLeak, rawContentDestination, ctcpActionText, ctcpActionWire, messageAction, normalizeActionRow, destinationsLeak, roomDeepLink, slashHelpGroups, paletteEntries, paletteMatches, palettePeople, paletteContext, recentsOwnerKey, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId, userModesCtx, userModesDeferCheck, RailMenu, railMenuFor, peerKnowledge, memberModesIn, isRoomMember, moderationActor, moderationCardKinds, moderationRefusal, webhookGate, transferHandoverPlan, foldWhoxAway, updateGapPeople, gapCollapsedIn, gapHistoryLoadingEmpty, gapDraftStatus, gapPhotoFor, gapDraftPersistable, gapStashOwner)
+module App exposing (AttachmentStatus(..), SceneSpec, sceneSpecFor, shellPaletteCommit, plaintextWouldLeak, rawContentDestination, ctcpActionText, ctcpActionWire, messageAction, normalizeActionRow, destinationsLeak, roomDeepLink, slashHelpGroups, paletteEntries, paletteMatches, palettePeople, paletteContext, recentsOwnerKey, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId, userModesCtx, userModesDeferCheck, RailMenu, railMenuFor, peerKnowledge, memberModesIn, isRoomMember, moderationActor, moderationCardKinds, moderationRefusal, webhookGate, transferHandoverPlan, foldWhoxAway, updateGapPeople, gapCollapsedIn, gapHistoryLoadingEmpty, gapDraftStatus, gapPhotoFor, gapDraftPersistable, gapStashOwner)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -33,6 +33,7 @@ import GapConvo
 import Prefs
 import PrefsPanel
 import Stats
+import ShellPalette
 import Studio
 import Theme
 import ThemeLook
@@ -138,6 +139,8 @@ import Wire
 -- v3/gap-account
 import AccountScope
 import GapAccount
+-- v3/gap-claim
+import GapClaim
 
 
 type ConnectionState
@@ -234,6 +237,7 @@ type alias BanAddForm =
     , extPattern : String
     , extNegated : Bool
     , error : String
+    , reviewing : Bool -- v3/rx-sheets: a block is reviewed before it sends
     }
 
 
@@ -246,6 +250,7 @@ blankBanAdd =
     , extPattern = ""
     , extNegated = False
     , error = ""
+    , reviewing = False
     }
 
 
@@ -999,6 +1004,9 @@ type alias Model =
     , gapConvo : GapConvo.State StagedAttachment
     -- v3/gap-account
     , gapAccount : GapAccount.State
+
+    -- v3/gap-claim
+    , gapClaim : GapClaim.State
     -- v3/gap-auth
     , authGate : AuthGate.State
 
@@ -1009,7 +1017,6 @@ type alias Model =
     -- v3/gap-people
     , peerAccounts : PeerAccount.Accounts
     , rosterLimits : RosterWindow.Limits
-    , tempBanReview : Maybe { channel : String, mask : String, minutes : Int }
     , stewardLeaving : Bool
     , webhookStatus : String
 
@@ -1209,6 +1216,8 @@ type Outbound
         , scheme : String
         , tokens : List ( String, String )
         }
+      -- v3/gap-appearance: the scene renderer (window.OnyxBackdrop)
+    | BackgroundScene SceneSpec
     | BackgroundPreviewRequest { id : String }
     | StudioStoreCustomThemes { json : String }
     | StudioShareCopy { code : String }
@@ -1280,6 +1289,9 @@ type Outbound
     | CtcpTimeReply { to : String }
       -- v3/gap-account
     | GapAccountFx GapAccount.Effect
+      -- v3/gap-claim: scan / attach / delete / dismiss for history that
+      -- predates owner scoping (ports `gapClaimRequest`).
+    | GapClaimFx { op : String, scope : String, guest : String }
     -- v3/gap-auth: the auth-gate port (PoW solve, held-password
     -- IDENTIFY, SETPASS credential staging).
     | AuthGatePort Encode.Value
@@ -1716,7 +1728,30 @@ appearanceApplyFor model =
         , experienceMode = Prefs.experienceModeToString prefs.experienceMode
         , dataTheme = target.dataTheme
         , scheme = studioActiveScheme model
-        , tokens = Dict.toList (studioResolvedTokens model)
+        , tokens = Dict.toList (studioResolvedTokens model) ++ shellPaletteCommit model
+        }
+
+
+{-| v3/gap-appearance — the shell's `--onyx-*` palette for the active
+theme (base + high-contrast sets, `ShellPalette`), committed with the
+theme tokens so every look, custom theme and Studio edit re-skins the
+whole UI. Anchors key on the built-in base (a custom theme's `base`).
+-}
+shellPaletteCommit : Model -> List ( String, String )
+shellPaletteCommit model =
+    let
+        baseId =
+            case List.filter (\custom -> custom.id == model.themeId) model.studioCustoms |> List.head of
+                Just custom ->
+                    custom.base
+
+                Nothing ->
+                    model.themeId
+    in
+    ShellPalette.commitTokens
+        { themeId = baseId
+        , base = ThemeTokens.tokensFor baseId
+        , tokens = studioResolvedTokens model
         }
 
 
@@ -2941,6 +2976,8 @@ type Msg
     | BanAddExtPattern String
     | BanAddExtNegated Bool
     | BanAddSubmit String
+    | BanAddReview String -- v3/rx-sheets
+    | BanAddReviewCancel -- v3/rx-sheets
     | TempBanElapsed { key : String }
     | UnbanReviewRequested { channel : String, mask : String }
     | UnbanReviewConfirmed
@@ -3435,6 +3472,8 @@ type Msg
     | SessionReclaimSignIn
       -- v3/gap-account
     | GapAccountMsg GapAccount.Msg
+      -- v3/gap-claim
+    | GapClaimMsg GapClaim.Msg
     -- v3/gap-auth
     | AuthGateMsg AuthGate.Msg
     | AuthGatePortIn Decode.Value
@@ -4130,6 +4169,9 @@ init nick url =
     , gapConvo = GapConvo.blank
     -- v3/gap-account
     , gapAccount = GapAccount.blank
+
+    -- v3/gap-claim
+    , gapClaim = GapClaim.blank
     -- v3/gap-auth
     , authGate = AuthGate.blank
 
@@ -4140,7 +4182,6 @@ init nick url =
     -- v3/gap-people
     , peerAccounts = PeerAccount.empty
     , rosterLimits = Dict.empty
-    , tempBanReview = Nothing
     , stewardLeaving = False
     , webhookStatus = ""
 
@@ -4754,6 +4795,9 @@ blank =
     , gapConvo = GapConvo.blank
     -- v3/gap-account
     , gapAccount = GapAccount.blank
+
+    -- v3/gap-claim
+    , gapClaim = GapClaim.blank
     -- v3/gap-auth
     , authGate = AuthGate.blank
 
@@ -4764,7 +4808,6 @@ blank =
     -- v3/gap-people
     , peerAccounts = PeerAccount.empty
     , rosterLimits = Dict.empty
-    , tempBanReview = Nothing
     , stewardLeaving = False
     , webhookStatus = ""
 
@@ -23593,14 +23636,15 @@ requestTempBan model channel mask minutes =
                             )
 
 
-{-| Apply a ban-add field edit, clearing a stale submit error. -}
+{-| Apply a ban-add field edit, clearing a stale submit error and any
+staged review (an edited block is reviewed again before it sends). -}
 touchBanAdd : (BanAddForm -> BanAddForm) -> BanAddForm -> BanAddForm
 touchBanAdd edit form =
     let
         edited =
             edit form
     in
-    { edited | error = "" }
+    { edited | error = "", reviewing = False }
 
 
 {-| Resolve the ban-add form to a mask (raw trimmed text, or the
@@ -23631,33 +23675,30 @@ resolveBanAddMask form =
             Just mask
 
 
-{-| Submit the moderation-desk ban-add form (feeds the timed-ban
-core: bad minutes, an unresolvable mask, an unnormalizable entry,
-or an offline link all report into the form instead of sending). -}
-submitBanAdd : Model -> String -> ( Model, List Outbound )
-submitBanAdd model channel =
+{-| Check the moderation-desk ban-add form: bad minutes, an
+unresolvable mask, an unnormalizable entry or an offline link come
+back as the form error; otherwise the mask and minutes to send. -}
+validateBanAdd : Model -> Result String { mask : String, minutes : Int }
+validateBanAdd model =
     let
         form =
             model.banAdd
-
-        fail message =
-            ( { model | banAdd = { form | error = message } }, [] )
     in
     case String.toInt (String.trim form.minutes) of
         Nothing ->
-            fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+            Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
         Just minutes ->
             if minutes < 1 || minutes > maxTempBanMinutes then
-                fail ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
+                Err ("Enter minutes between 1 and " ++ String.fromInt maxTempBanMinutes ++ ".")
 
             else if model.connection /= Live then
-                fail "You are offline — reconnect to add blocks."
+                Err "You are offline — reconnect to add blocks."
 
             else
                 case resolveBanAddMask form of
                     Nothing ->
-                        fail
+                        Err
                             (if form.useExtBan then
                                 "That extended ban does not validate — check the type and pattern."
 
@@ -23668,18 +23709,62 @@ submitBanAdd model channel =
                     Just mask ->
                         case normalizeBanEntry mask Nothing Nothing of
                             Nothing ->
-                                fail "Enter a ban mask."
+                                Err "Enter a ban mask."
 
                             Just _ ->
-                                -- v3/gap-people: guard (match everyone / you),
-                                -- then stage a review; `GapPeople.TempBanConfirm`
-                                -- sends.
+                                -- v3/gap-people: refuse a mask that matches
+                                -- everyone or you. Runs at review time and again
+                                -- at submit (v3/rx-sheets review row).
                                 case TimedBlock.check { nick = model.ourNick, account = model.accountName } mask of
                                     Just problem ->
-                                        fail problem
+                                        Err problem
 
                                     Nothing ->
-                                        ( { model | tempBanReview = Just { channel = channel, mask = String.trim mask, minutes = minutes } }, [] )
+                                        Ok { mask = mask, minutes = minutes }
+
+
+{-| Submit the moderation-desk ban-add form (feeds the timed-ban
+core: bad minutes, an unresolvable mask, an unnormalizable entry,
+or an offline link all report into the form instead of sending). -}
+submitBanAdd : Model -> String -> ( Model, List Outbound )
+submitBanAdd model channel =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok ok ->
+            -- v3/gap-people: the review may have been open for a while — only
+            -- send while we are still a moderator here.
+            if not (isChannelOp model channel) then
+                ( { model | banAdd = { form | error = "You no longer have moderator permission in this room.", reviewing = False } }, [] )
+
+            else
+                let
+                    ( sent, out ) =
+                        requestTempBan model channel ok.mask ok.minutes
+                in
+                ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
+
+
+{-| v3/rx-sheets — stage the block for review (the desk's other bans
+already review first): a valid form shows the confirm row, an invalid
+one reports its error and sends nothing. -}
+reviewBanAdd : Model -> ( Model, List Outbound )
+reviewBanAdd model =
+    let
+        form =
+            model.banAdd
+    in
+    case validateBanAdd model of
+        Err message ->
+            ( { model | banAdd = { form | error = message, reviewing = False } }, [] )
+
+        Ok _ ->
+            ( { model | banAdd = { form | error = "", reviewing = True } }, [] )
 
 
 {-| Fire a timed-ban unban (mirroring the oracle `fire`: an unknown
@@ -39855,7 +39940,9 @@ settleSteps =
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
     , settleStepGapConvo -- v3/gap-convo
+    , settleStepScene -- v3/gap-appearance
     , settleStepGapAccount -- v3/gap-account
+    , settleStepGapClaim -- v3/gap-claim
     , settleStepAuth -- v3/gap-auth
 
     , settleStepRxShell -- v3/rx-shell
@@ -39868,7 +39955,43 @@ settleSteps =
     , settleStepRemembered -- v3/rx-public
     , settleStepUserModes -- v3/gap-usermodes
     , settleStepOper -- v3/gap-oper
+    , settleStepRxSheets -- v3/rx-sheets (last: sees every overlay the steps above opened)
     ]
+
+
+-- v3/rx-sheets
+
+
+{-| One sheet at a time over the You hub: any overlay that opens while
+the hub is open (the reclaim dialog, Notifications, a ring, …) closes
+the hub, so the new sheet is the one topmost layer for paint, focus
+and Escape. The quiet asks (first-run notifications, Add to Home
+Screen) rise on their own and leave the hub alone. Only computed while
+the hub is open.
+-}
+settleStepRxSheets : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepRxSheets _ prior ( next, outs ) =
+    if next.youHubOpen then
+        let
+            before =
+                List.map Tuple.first (overlayStack prior)
+
+            quiet =
+                [ "you", "first-run-notify", "a2hs" ]
+
+            opened =
+                overlayStack next
+                    |> List.map Tuple.first
+                    |> List.filter (\key -> not (List.member key before) && not (List.member key quiet))
+        in
+        if List.isEmpty opened then
+            ( next, outs )
+
+        else
+            ( { next | youHubOpen = False }, outs )
+
+    else
+        ( next, outs )
 
 
 settleStepConnect : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -40157,6 +40280,72 @@ settleShell msg after =
 
         _ ->
             after
+
+
+{-| v3/gap-appearance — what the background renderer should paint: the
+surface (`app` shell, the `appearance` stage, or `none` elsewhere and
+before the stored appearance is read), the resolved background id
+(Appearance previews / staged picks win on its own route), the scene
+motion (the stage's preview override included) and the in-app Reduce
+motion switch. Ports-side policy adds the OS signals.
+-}
+type alias SceneSpec =
+    { id : String
+    , motion : String
+    , reduceMotion : Bool
+    , surface : String
+    }
+
+
+sceneSpecFor : Model -> SceneSpec
+sceneSpecFor model =
+    let
+        surface =
+            if not model.prefsReady then
+                "none"
+
+            else
+                case model.route of
+                    Route.App ->
+                        "app"
+
+                    Route.Appearance ->
+                        "appearance"
+
+                    _ ->
+                        "none"
+    in
+    if surface == "none" then
+        { id = "", motion = "off", reduceMotion = False, surface = surface }
+
+    else if surface == "appearance" then
+        { id = renderedBackground model
+        , motion = appearancePreviewMotion model |> Maybe.withDefault (Prefs.sceneMotionToString model.sceneMotion)
+        , reduceMotion = model.prefs.reduceMotion
+        , surface = surface
+        }
+
+    else
+        { id = ThemeLook.resolveBackgroundId model.backgroundId model.themeId model.customThemes
+        , motion = Prefs.sceneMotionToString model.sceneMotion
+        , reduceMotion = model.prefs.reduceMotion
+        , surface = surface
+        }
+
+
+{-| Tell the renderer whenever the scene it should paint changes (the
+same pattern as the other settle steps: compare before/after). -}
+settleStepScene : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepScene _ prior ( m, outs ) =
+    let
+        next =
+            sceneSpecFor m
+    in
+    if next == sceneSpecFor prior then
+        ( m, outs )
+
+    else
+        ( m, outs ++ [ BackgroundScene next ] )
 
 
 settleStepRoomSettings : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
@@ -41732,6 +41921,13 @@ updateCore msg model =
 
         BanAddSubmit channel ->
             submitBanAdd model channel
+
+        -- v3/rx-sheets
+        BanAddReview _ ->
+            reviewBanAdd model
+
+        BanAddReviewCancel ->
+            ( { model | banAdd = (\form -> { form | reviewing = False }) model.banAdd }, [] )
 
         TempBanElapsed req ->
             fireTempBan model req.key
@@ -46037,6 +46233,10 @@ updateCore msg model =
         GapAccountMsg sub ->
             updateGapAccount sub model
 
+        -- v3/gap-claim
+        GapClaimMsg sub ->
+            updateGapClaim sub model
+
         RoomMenuToggle ->
             ( { model | roomMenuOpen = not model.roomMenuOpen }, [] )
 
@@ -46497,36 +46697,38 @@ updateCore msg model =
                     ( model, [] )
 
                 Just kind ->
-                    -- v3/gap-people: only kinds this role may stage.
+                    -- v3/gap-people: only kinds this role may stage (the
+                    -- role, not the experience mode, is what the server
+                    -- enforces; the form is hidden for everyone else).
                     if not (List.member kind (ModAuthority.deskKinds (moderationActor model channel))) then
                         ( model, [] )
 
                     else
-                    ( { model
-                        | userProfileCard = Nothing
-                        , moderationDraft =
-                            Just
-                                { kind = kind
-                                , channel = channel
-                                , target =
-                                    case String.trim model.moderationDesk.member of
-                                        "" ->
-                                            Nothing
+                        ( { model
+                            | userProfileCard = Nothing
+                            , moderationDraft =
+                                Just
+                                    { kind = kind
+                                    , channel = channel
+                                    , target =
+                                        case String.trim model.moderationDesk.member of
+                                            "" ->
+                                                Nothing
 
-                                        nick ->
-                                            Just nick
-                                , mask = Nothing
-                                , reason =
-                                    case String.trim model.moderationDesk.reason of
-                                        "" ->
-                                            Nothing
+                                            nick ->
+                                                Just nick
+                                    , mask = Nothing
+                                    , reason =
+                                        case String.trim model.moderationDesk.reason of
+                                            "" ->
+                                                Nothing
 
-                                        reason ->
-                                            Just reason
-                                }
-                      }
-                    , []
-                    )
+                                            reason ->
+                                                Just reason
+                                    }
+                          }
+                        , []
+                        )
 
         ModerationDeskSubmitBan channel ->
             -- The desk ban-mask form stages a mask draft into the
@@ -49631,6 +49833,9 @@ overlayStack model =
         -- v3/gap-watch: the start editor sheet, then the inline end confirmation
         , ( "watch-start", model.watch.editor /= Nothing, WatchMsg WatchTogether.EditorClose )
         , ( "watch-end-confirm", model.watch.endConfirm /= Nothing, WatchMsg WatchTogether.CancelEnd )
+        -- v3/gap-appearance: Escape drops a staged (unapplied) background pick
+        -- on the Appearance page, like the oracle's dirty-preview Escape.
+        , ( "background-stage", model.route == Route.Appearance && backgroundDirty model, AppearanceCancelBackground )
         ]
 
 
@@ -49726,6 +49931,13 @@ prefsBoolValue key prefs =
 
         "readerMode" ->
             Just prefs.readerMode
+
+        -- v3/gap-appearance
+        "voiceEntry" ->
+            Just prefs.voiceEntry
+
+        "topicTools" ->
+            Just prefs.topicTools
 
         -- v3/gap-watch
         "watchTogether" ->
@@ -52603,32 +52815,6 @@ updateGapPeople sub model =
             , [ PrefsFocus { id = RosterWindow.rowId groupKey current } ]
             )
 
-        GapPeople.TempBanConfirm ->
-            case model.tempBanReview of
-                Nothing ->
-                    ( model, [] )
-
-                Just review ->
-                    let
-                        form =
-                            model.banAdd
-                    in
-                    if model.connection /= Live then
-                        ( { model | tempBanReview = Nothing, banAdd = { form | error = "You are offline — reconnect to add blocks." } }, [] )
-
-                    else if not (isChannelOp model review.channel) then
-                        ( { model | tempBanReview = Nothing, banAdd = { form | error = "You no longer have moderator permission in this room." } }, [] )
-
-                    else
-                        let
-                            ( sent, out ) =
-                                requestTempBan { model | tempBanReview = Nothing } review.channel review.mask review.minutes
-                        in
-                        ( { sent | banAdd = { blankBanAdd | minutes = form.minutes } }, out )
-
-        GapPeople.TempBanCancel ->
-            ( { model | tempBanReview = Nothing }, [] )
-
         GapPeople.StewardInvite room ->
             updateCore (InviteShareOpen room) { model | stewardRoom = Nothing, stewardLeaving = False }
 
@@ -52671,7 +52857,7 @@ settleStepPeople msg prior ( m, outs ) =
         closed =
             case msg of
                 WsClosed _ ->
-                    { m | peerAccounts = PeerAccount.empty, roomTransfers = Dict.empty, tempBanReview = Nothing }
+                    { m | peerAccounts = PeerAccount.empty, roomTransfers = Dict.empty }
 
                 _ ->
                     m
@@ -52683,23 +52869,16 @@ settleStepPeople msg prior ( m, outs ) =
             else
                 closed
 
-        reviewed =
-            if roomChanged || clearsTempBanReview msg then
-                { windowed | tempBanReview = Nothing }
-
-            else
-                windowed
-
         steward =
             case msg of
                 StewardOpen _ ->
-                    { reviewed | stewardLeaving = False }
+                    { windowed | stewardLeaving = False }
 
                 StewardClose ->
-                    { reviewed | stewardLeaving = False }
+                    { windowed | stewardLeaving = False }
 
                 _ ->
-                    reviewed
+                    windowed
 
         ( transferred, transferOut ) =
             settleTransferActions msg prior steward
@@ -52721,34 +52900,6 @@ quietOfferToast m =
 
     else
         m
-
-
-clearsTempBanReview : Msg -> Bool
-clearsTempBanReview msg =
-    case msg of
-        BanAddMask _ ->
-            True
-
-        BanAddMinutes _ ->
-            True
-
-        BanAddUseExtBan _ ->
-            True
-
-        BanAddExtType _ ->
-            True
-
-        BanAddExtPattern _ ->
-            True
-
-        BanAddExtNegated _ ->
-            True
-
-        ModerationSheetClose ->
-            True
-
-        _ ->
-            False
 
 
 {-| The handover signals (and the registration transfer) behind the
@@ -56277,3 +56428,121 @@ gapIsConnectionDrop msg =
 
         _ ->
             False
+
+
+-- v3/gap-claim
+
+
+gapClaimCtx : Model -> GapClaim.Ctx
+gapClaimCtx model =
+    { scope = model.gapAccount.scope
+    , localHistory = model.prefs.localHistory
+    }
+
+
+{-| The guest scope key of the endpoint's network ("" before one is known). -}
+gapClaimGuestScope : Model -> String
+gapClaimGuestScope model =
+    AccountScope.scopeFor { endpoint = model.endpoint, account = Nothing }
+        |> Maybe.map AccountScope.scopeKey
+        |> Maybe.withDefault ""
+
+
+{-| Fold claim effects: port requests become outbounds; a changed vault
+voids the per-conversation DM privacy proofs and hydrates every open,
+still-empty buffer, so attached history shows without a reload. -}
+gapClaimApply : List GapClaim.Effect -> Model -> ( Model, List Outbound )
+gapClaimApply effects model =
+    List.foldl
+        (\fx ( m, outs ) ->
+            case fx of
+                GapClaim.Request req ->
+                    ( m, outs ++ [ GapClaimFx req ] )
+
+                GapClaim.HistoryChanged ->
+                    let
+                        hydrate =
+                            Dict.toList m.channels
+                                |> List.filterMap
+                                    (\( key, channel ) ->
+                                        if List.isEmpty channel.messages then
+                                            Just (VaultFetch { target = key, limit = keepMessages })
+
+                                        else
+                                            Nothing
+                                    )
+                    in
+                    ( { m | vaultDmPrivacy = Dict.empty }, outs ++ hydrate )
+        )
+        ( model, [] )
+        effects
+
+
+updateGapClaim : GapClaim.Msg -> Model -> ( Model, List Outbound )
+updateGapClaim sub model =
+    let
+        ( next, effects ) =
+            GapClaim.update (gapClaimCtx model) sub model.gapClaim
+
+        place =
+            if model.prefsOpen then
+                "prefs"
+
+            else
+                "home"
+
+        -- Keyboard focus follows the person's own step (the controls
+        -- they used are replaced): confirm lands on the safe choice,
+        -- cancel returns to Delete, a started operation to its status.
+        focus =
+            if next.phase == model.gapClaim.phase then
+                []
+
+            else
+                case sub of
+                    GapClaim.DeleteAsked ->
+                        [ PrefsFocus { id = GapClaim.elementId place "keep" } ]
+
+                    GapClaim.DeleteCancelled ->
+                        [ PrefsFocus { id = GapClaim.elementId place "delete" } ]
+
+                    GapClaim.AttachClicked ->
+                        [ PrefsFocus { id = GapClaim.elementId place "status" } ]
+
+                    GapClaim.DeleteConfirmed ->
+                        [ PrefsFocus { id = GapClaim.elementId place "status" } ]
+
+                    _ ->
+                        []
+
+        ( applied, outs ) =
+            gapClaimApply effects { model | gapClaim = next }
+    in
+    ( applied, outs ++ focus )
+
+
+{-| Scan when a scope settles (signed-in or guest), reset per-scope claim
+state when it moves, and re-count after a local-history erase (which
+removes the unstamped rows too). Never attaches anything by itself. -}
+settleStepGapClaim : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapClaim msg _ ( m0, outs0 ) =
+    let
+        ( s1, fx1 ) =
+            GapClaim.scopeChanged { scope = m0.gapAccount.scope, guest = gapClaimGuestScope m0 } m0.gapClaim
+
+        ( s2, fx2 ) =
+            case msg of
+                GapAccountMsg (GapAccount.VaultCleared { ok }) ->
+                    if ok then
+                        GapClaim.update (gapClaimCtx m0) GapClaim.Rescan s1
+
+                    else
+                        ( s1, [] )
+
+                _ ->
+                    ( s1, [] )
+
+        ( m1, outs1 ) =
+            gapClaimApply (fx1 ++ fx2) { m0 | gapClaim = s2 }
+    in
+    ( m1, outs0 ++ outs1 )

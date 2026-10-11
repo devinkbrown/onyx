@@ -121,6 +121,7 @@ import Browser.Navigation as Nav
 import Json.Decode as Decode
 import Json.Encode as Encode
 import HistoryImport -- v3/gap-import
+import GapClaim -- v3/gap-claim
 import Media
 import Nodes
 import GapConvo
@@ -693,6 +694,10 @@ port appearanceApply :
     }
     -> Cmd msg
 
+{-| v3/gap-appearance — what the background renderer paints
+(`window.OnyxBackdrop.render`, fail-closed when the bundle is absent). -}
+port backgroundScene : { id : String, motion : String, reduceMotion : Bool, surface : String } -> Cmd msg
+
 port studioStoreCustomThemes : { json : String } -> Cmd msg
 
 port studioShareCopy : { code : String } -> Cmd msg
@@ -1024,6 +1029,16 @@ port gapAppBadge : Int -> Cmd msg
 
 
 port gapNotifyClicked : ({ tag : String } -> msg) -> Sub msg
+
+
+-- v3/gap-claim: history from before owner scoping — scan, attach to the
+-- settled scope, delete, or remember "Not now" (ports.js `gapClaim`).
+
+
+port gapClaimRequest : { op : String, scope : String, guest : String } -> Cmd msg
+
+
+port gapClaimAnswer : (Decode.Value -> msg) -> Sub msg
 
 
 type alias Flags =
@@ -1637,6 +1652,10 @@ perform key outbound =
         App.AppearanceApply req ->
             appearanceApply req
 
+        -- v3/gap-appearance
+        App.BackgroundScene req ->
+            backgroundScene req
+
         App.StudioStoreCustomThemes req ->
             studioStoreCustomThemes req
 
@@ -1749,6 +1768,10 @@ perform key outbound =
         -- v3/gap-account
         App.GapAccountFx fx ->
             performGapAccount fx
+
+        -- v3/gap-claim
+        App.GapClaimFx req ->
+            gapClaimRequest req
 
         App.PasskeyCreate args ->
             passkeyCreate
@@ -2141,6 +2164,7 @@ subscriptions model =
         , gapScopedListsLoaded (App.GapAccountMsg << GapAccount.ScopedListsLoaded)
         , gapVaultCleared (App.GapAccountMsg << GapAccount.VaultCleared)
         , gapNotifyClicked (App.GapAccountMsg << GapAccount.NotifyClicked)
+        , gapClaimAnswer (App.GapClaimMsg << GapClaim.Answered) -- v3/gap-claim
         -- v3/gap-auth
         , authGateIn App.AuthGatePortIn
         ]
