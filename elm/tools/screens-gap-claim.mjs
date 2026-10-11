@@ -132,11 +132,11 @@ async function dismissAsks(page, h) {
 
 async function openPrefsHistory(page, h) {
   await dismissAsks(page, h);
-  if (isPhone(page)) {
+  // Whichever form of the shell this viewport shows: the desktop You entry,
+  // else the phone's back-to-list + bottom-nav You.
+  if (!(await clickFirst(page, h, ['[data-testid="you-open"]']))) {
     await clickFirst(page, h, ['[data-testid="room-back"]']);
-    await clickFirst(page, h, ['.onyx-mobile-nav [data-testid="nav-you"]']);
-  } else {
-    await clickFirst(page, h, ['[data-testid="you-open"]']);
+    await clickFirst(page, h, ['.onyx-mobile-nav [data-testid="nav-you"]', '.onyx-primary-nav [data-testid="nav-you"]']);
   }
   await clickFirst(page, h, ['[data-testid="you-settings-open-preferences"]']);
   for (const sel of ['[role="tab"]:has-text("History")', 'button:has-text("History & data")']) {
