@@ -93,7 +93,7 @@
   /* Layering: ONE ladder, low to high. Every z-index in the stylesheets is
      one of these rungs (or a rung +/- a small calc offset, e.g. a menu one
      above its scrim). Components that need to sit "just above" a rung say
-     so with calc(var(--z-x) + 1) instead of inventing a number. Overlay
+     so with a calc() offset (rung + 1) instead of inventing a number. Overlay
      families (sheets, dialogs, toasts) are 60+; in-flow chrome is below 50.
      The numbers are the values the shell has always rendered with. */
   --z-under: -1;      /* decorative canvas behind the shell */
@@ -1182,37 +1182,14 @@ html, body {
 
 .onyx-account-actions { display: flex; gap: 8px; margin: 8px 0; }
 
-.onyx-account-refresh,
-.onyx-account-logout,
-.onyx-account-totp-enroll,
-.onyx-account-totp-copy,
-.onyx-account-totp-confirm-go,
-.onyx-account-totp-disable,
-.onyx-account-cert-bind,
-.onyx-account-cert-remove-go,
-.onyx-account-keytrans-refresh,
-.onyx-account-email-save,
-.onyx-account-password-save,
-.onyx-account-recovery-generate,
-.onyx-account-recovery-refresh,
-.onyx-account-recovery-clear,
-.onyx-account-recovery-copy,
-.onyx-account-recovery-done,
-.onyx-account-passkey-add,
-.onyx-account-passkey-refresh,
-.onyx-account-passkey-rename,
-.onyx-account-passkey-remove,
-.onyx-account-passkey-remove-go,
-.onyx-account-passkey-save,
-.onyx-account-passkey-cancel,
-.onyx-account-data-download,
-.onyx-account-device-publish,
-.onyx-account-device-list,
-.onyx-account-device-remove-legacy,
-.onyx-account-data-history,
-.onyx-account-drop-arm,
-.onyx-account-drop-go,
-.onyx-account-drop-cancel {
+/* The Button primitive (src/primitives/Button.tsx): the quiet outlined
+   default. `onyx-button--primary` / `--ghost` modifiers are Theme Studio's
+   today (css/pol-studio.css §8, scoped to `.ts-studio`); every other
+   outlined action button in the account sheet was a per-instance class
+   with this same body. (`.onyx-account-totp-enroll` is both that panel's box
+   and its Enable button, so it keeps the same body.) */
+.onyx-button,
+.onyx-account-totp-enroll {
   color: var(--onyx-text);
   background: transparent;
   border: 1px solid var(--onyx-line);
