@@ -347,10 +347,11 @@ export default {
       },
     });
     if (isPhone(page)) { await h.tryClick(page, '[data-testid="members-toggle"]'); await page.waitForTimeout(350); }
-    await page.click('.onyx-member:has-text("rue")');
-    await page.waitForTimeout(300);
-    await page.click('[data-testid="member-card-message"]');
-    await page.waitForTimeout(600);
+    // double-click a member row = open a DM with them (same on every layout)
+    await page.dispatchEvent('.onyx-member:has-text("rue")', 'dblclick');
+    await page.waitForTimeout(700);
+    // the phone's Members popover outlives the room it belonged to: dismiss it
+    if (isPhone(page)) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
     await page.fill('#shell-composer-input', 'are you there? the call moved to seven');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(500);
