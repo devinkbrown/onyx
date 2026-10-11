@@ -153,9 +153,11 @@
      `owner` (a string, or null = no scope → reads answer empty, writes
      refuse). Rows written before scoping have no owner and stay
      quarantined: never shown, searched, exported, sent or claimed by
-     whoever opens the app next — only an explicit Clear (or retention
-     age) removes them. A direct call that omits `owner` entirely (the
-     node smokes) addresses only those ownerless rows. */
+     whoever opens the app next, and exempt from retention trimming —
+     only an explicit Clear or the person's own attach / delete decision
+     (v3/gap-claim, below) changes them. A direct call that omits
+     `owner` entirely (the node smokes) addresses only those ownerless
+     rows. */
   var VAULT_OWNER_MAX = 4096;
   /* The retention bucket of rows with no owner stamp. */
   var CLAIM_LEGACY_BUCKET = "";
@@ -12235,7 +12237,8 @@ function fetchPublicFeed(url) {
     var now = (typeof Date !== "undefined" && Date.now) ? Date.now() : NaN;
     /* v3/gap-account: retention is per target AND per owner scope (two
        identities' rows share logical ids and must never evict each
-       other); legacy ownerless rows are their own bucket. */
+       other); legacy ownerless rows are their own bucket, which the
+       sweep skips (v3/gap-claim). */
     var byTarget = {};
     seen.forEach(function (entry) {
       if (!entry.target) return;
