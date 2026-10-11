@@ -658,7 +658,8 @@
   .onyx-frame .onyx-topbar .onyx-palette-launcher,
   .onyx-frame .onyx-topbar .shell-ribbon-bell,
   .onyx-frame .onyx-topbar .onyx-ident { min-height: 44px; }
-  .onyx-frame .onyx-topbar .shell-ribbon-bell { min-width: 44px; }
+  .onyx-frame .onyx-topbar :is(.shell-ribbon-bell, .onyx-topbar-compose, .onyx-ident) { min-width: 44px; }
+  .onyx-frame .onyx-room-header :is(.onyx-room-back, .onyx-call-join) { min-width: 44px; }
   .onyx-frame .onyx-room-header .onyx-room-back,
   .onyx-frame .onyx-room-header .onyx-room-header-btn,
   .onyx-frame .onyx-room-header .onyx-room-header-icon,
