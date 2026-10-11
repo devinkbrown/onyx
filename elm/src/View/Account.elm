@@ -23,6 +23,7 @@ import Passkey exposing (PasskeyCredential, maxLabelLength)
 import Retention
 import Session exposing (CapStatus(..), SessionState(..))
 import View.Account2
+import View.Chanserv -- v3/gap-chanserv
 import View.Sheet as Sheet
 
 
@@ -75,6 +76,7 @@ accountPanel model =
                             , -- v3/account2
                               View.Account2.portableSection model
                             , sessionSection model
+                            , View.Chanserv.myRoomsSection model -- v3/gap-chanserv
                             , capsSection model
                             , retentionSection model
                             , dataSection model

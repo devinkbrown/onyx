@@ -6,6 +6,7 @@ module View.Chanserv exposing
     , listsSection
     , moreRules
     , muteButton
+    , myRoomsSection
     , paceSection
     , registrationSection
     , slowNote
@@ -32,7 +33,7 @@ and a Mute action on the member card.
 import App exposing (Model, Msg(..), NotificationType(..))
 import Chanserv exposing (Registration(..), Tone(..))
 import Dict
-import Html exposing (Html, button, details, div, form, h3, h4, input, label, li, option, p, section, select, span, strong, summary, text, textarea, ul)
+import Html exposing (Html, button, details, div, form, h3, h4, input, label, li, option, p, section, select, span, summary, text, textarea, ul)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, selected, type_, value)
 import Html.Events exposing (on, onClick, onInput, onSubmit)
 import Json.Decode as Decode
@@ -701,8 +702,6 @@ founderTools model ctx room info =
         successor =
             Chanserv.successorOf channel state
 
-        mine =
-            state.myRooms
     in
     [ form [ class "rset-form", onSubmit (cs Chanserv.DescSave) ]
         [ label [ class "rset-label", for "chset-desc" ] [ text "Description" ]
@@ -848,20 +847,6 @@ founderTools model ctx room info =
             ]
         , statusLine model channel "successor"
         ]
-    , details [ class "cs-disclosure", attribute "data-testid" "chset-my-rooms", onOpen (cs Chanserv.MyRoomsLoad) ]
-        ([ summary [] [ text "Rooms you have access to" ] ]
-            ++ listBlock
-                { loading = mine.loading
-                , empty =
-                    if mine.loaded then
-                        "Your account has no registered rooms."
-
-                    else
-                        "Open to load."
-                , label = "Your registered rooms"
-                , rows = List.map (\r -> ( [ span [ class "rset-access-level" ] [ text r.account ], span [ class "rset-hint" ] [ text (levelLabel r.level) ] ], text "" )) mine.rooms
-                }
-        )
     , if state.confirmDrop then
         div [ class "cs-confirm", attribute "role" "group", attribute "aria-label" "Drop registration" ]
             [ p [ class "rset-hint" ] [ text ("Drop the registration for " ++ channel ++ "? The room stays open, but its founder, locked rules, access list and auto-kick list are gone.") ]
@@ -924,6 +909,72 @@ listBlock cfg =
 
 
 
+-- YOUR ROOMS (Account sheet)
+
+
+{-| "Your rooms": the registered rooms this account has a role in
+(`LISTCHANS`), mounted in the Account sheet with that sheet's own
+section classes. Asks only when the person asks.
+-}
+myRoomsSection : Model -> Html Msg
+myRoomsSection model =
+    let
+        mine =
+            model.chanserv.myRooms
+    in
+    section
+        [ class "onyx-account-section cs-my-rooms"
+        , id "acct-rooms"
+        , attribute "aria-labelledby" "acct-rooms-title"
+        , attribute "data-testid" "account-rooms"
+        ]
+        ([ h3 [ class "onyx-account-section__title", id "acct-rooms-title" ] [ text "Your rooms" ]
+         , p [ class "onyx-account-hint" ] [ text "Registered rooms where your account is a founder, host or voice." ]
+         , div [ class "onyx-account-actions" ]
+            [ button
+                [ type_ "button"
+                , class "onyx-account-refresh"
+                , attribute "data-testid" "account-rooms-load"
+                , disabled (not (live model) || mine.loading)
+                , onClick (cs Chanserv.MyRoomsLoad)
+                ]
+                [ text
+                    (if mine.loaded then
+                        "Refresh"
+
+                     else
+                        "Show my rooms"
+                    )
+                ]
+            ]
+         ]
+            ++ (if mine.loading then
+                    [ p [ class "onyx-account-hint", attribute "role" "status" ] [ text "Loading…" ] ]
+
+                else if List.isEmpty mine.rooms then
+                    if mine.loaded then
+                        [ p [ class "onyx-account-empty", attribute "data-testid" "account-rooms-empty" ] [ text "None yet. Open a room's settings to register it." ] ]
+
+                    else
+                        []
+
+                else
+                    [ ul [ class "cs-my-rooms-list", attribute "aria-label" "Your registered rooms" ]
+                        (List.map
+                            (\r ->
+                                li [ class "cs-my-room", attribute "data-testid" "account-room" ]
+                                    [ span [ class "cs-my-room-name" ] [ text r.channel ]
+                                    , span [ class "rset-hint" ] [ text (levelLabel r.level) ]
+                                    ]
+                            )
+                            mine.rooms
+                        )
+                    ]
+               )
+        )
+
+
+
 -- MUTES AND EXCEPTIONS (+Z / +e / +I)
 
 
@@ -944,7 +995,7 @@ listsSection model ctx room =
                 Chanserv.listKinds
                     |> List.filter (\k -> k.letter == tab)
                     |> List.head
-                    |> Maybe.withDefault { letter = 'Z', tab = "Muted", hint = "", add = "Mute", empty = "" }
+                    |> Maybe.withDefault { letter = 'Z', tab = "Muted", name = "Muted people", hint = "", add = "Mute", empty = "" }
 
             current =
                 Chanserv.listOf room.name tab state
@@ -966,13 +1017,7 @@ listsSection model ctx room =
                             , attribute "role" "tab"
                             , attribute "aria-selected" (boolAttr (k.letter == tab))
                             , attribute "aria-controls" "chset-list-panel"
-                            , attribute "tabindex"
-                                (if k.letter == tab then
-                                    "0"
-
-                                 else
-                                    "-1"
-                                )
+                            , attribute "aria-label" k.name
                             , attribute "data-testid" (tabId k.letter)
                             , onClick (cs (Chanserv.ListTab k.letter))
                             ]
@@ -990,7 +1035,7 @@ listsSection model ctx room =
 
                             else
                                 "Not loaded yet."
-                        , label = kind.tab
+                        , label = kind.name
                         , rows =
                             List.map
                                 (\e ->

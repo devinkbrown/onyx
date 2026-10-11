@@ -335,14 +335,55 @@ export default {
     for (const w of want) if (!sent.some((l) => l.startsWith(w))) throw new Error(`wire: missing ${w}; sent ${sent.filter((l) => /^(CHANNEL|CS|MODE|PROP)/.test(l)).join(' | ')}`);
     await reveal(page, h, '[data-testid="chset-registration"]');
   },
-  // Delete room (Room care) with a registered room: INFO, then DROP.
+  // Delete room (Room care): INFO first, DROP only for a registered room,
+  // then the room is emptied and left (asserted on the wire).
   'cs-delete-room': async (page, h) => {
     const state = founder();
-    const { sent } = await boot(page, h, { op: true, account: true, fakes: [services(state)] });
-    await h.tryClick(page, '[data-testid="steward-open"]');
+    const { sent, inject } = await boot(page, h, { account: true, fakes: [services(state)] });
+    await inject(`:${NET} 005 kn PREFIX=(YQqov)*!.@+ CHANMODES=beIZ,k,lfj,imnstCTNgSMWOAphuadErzxwVUFD :are supported`, `:mara!m@${NET} MODE #lounge +Qq kn kn`);
+    await deleteRoom(page, h);
+    const want = ['CHANNEL INFO #lounge', 'CHANNEL DROP #lounge', 'MODE #lounge +si', 'CLEAR #lounge USERS', 'PART #lounge'];
+    let at = -1;
+    for (const w of want) {
+      const next = sent.findIndex((l, i) => i > at && l.startsWith(w));
+      if (next < 0) throw new Error(`wire: missing ${w} after #${at}; sent ${sent.filter((l) => /^(CHANNEL|MODE|CLEAR|PART|KICK)/.test(l)).join(' | ')}`);
+      at = next;
+    }
+  },
+  'cs-delete-room-unregistered': async (page, h) => {
+    const state = { registered: false };
+    const { sent, inject } = await boot(page, h, { account: true, fakes: [services(state)] });
+    await inject(`:mara!m@${NET} MODE #lounge +q kn`);
+    await deleteRoom(page, h);
+    if (sent.some((l) => l.startsWith('CHANNEL DROP'))) throw new Error('wire: DROP sent for an unregistered room');
+    for (const w of ['CHANNEL INFO #lounge', 'MODE #lounge +si', 'KICK #lounge nova', 'PART #lounge']) {
+      if (!sent.some((l) => l.startsWith(w))) throw new Error(`wire: missing ${w}; sent ${sent.filter((l) => /^(CHANNEL|MODE|CLEAR|PART|KICK)/.test(l)).join(' | ')}`);
+    }
+  },
+  // Mute sits next to Kick / Ban on a person's card (hosts only).
+  'cs-member-mute': async (page, h) => {
+    // Kick / Ban / Mute show from the Advanced experience mode up.
+    await page.addInitScript(() => {
+      try { localStorage.setItem('onyx:preferences', JSON.stringify({ experienceMode: 'advanced' })); } catch { /* private mode */ }
+    });
+    await boot(page, h, { op: true });
+    await page.evaluate(() => {
+      const b = document.querySelector('.onyx-roster button[aria-label="View member card for nova"]');
+      if (b) b.click();
+    });
     await h.settle(page, 500);
-    await h.tryClick(page, '[data-testid="steward-delete-room"], button:has-text("Delete room")');
-    await h.settle(page, 400);
-    void sent;
   },
 };
+
+async function deleteRoom(page, h) {
+  await dismissAsks(page, h);
+  // The Room care entry lives in the roster, which phones hide: click it in the DOM.
+  await page.evaluate(() => document.querySelector('[data-testid="steward-open"]')?.click());
+  await h.settle(page, 500);
+  await clickVisible(page, ['[data-testid="steward-delete"]'], h); // asks for the typed name
+  await h.settle(page, 300);
+  await page.fill('[data-testid="steward-delete-name"]', '#lounge');
+  await h.settle(page, 200);
+  await clickVisible(page, ['[data-testid="steward-delete"]'], h);
+  await h.settle(page, 700);
+}

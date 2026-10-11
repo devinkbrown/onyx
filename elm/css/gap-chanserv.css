@@ -81,8 +81,8 @@
   gap: var(--space-2);
 }
 
-.cs-pair > .rset-input,
-.cs-pair > .rset-select { flex: 1 1 6rem; width: auto; min-width: 0; }
+.cs-pair > .rset-input { flex: 1 1 5rem; width: auto; min-width: 0; }
+.cs-pair > .rset-select { flex: 1 1 10rem; width: auto; min-width: 0; }
 .cs-pair-word { flex: none; font-size: var(--text-sm); color: var(--onyx-dim); }
 
 /* Locked rules (MLOCK): one row per rule, name left, choice right. */
@@ -199,9 +199,9 @@
 }
 
 .cs-join-ask > .rset-input,
-.cs-join-key > .rset-input { flex: 1 1 11rem; width: auto; min-width: 0; }
+.cs-join-key > .rset-input { flex: 1 1 7rem; width: auto; min-width: 0; }
 .cs-join-ask > .rset-btn,
-.cs-join-key > .rset-btn { align-self: auto; flex: none; min-width: 6.5rem; }
+.cs-join-key > .rset-btn { align-self: auto; flex: none; min-width: 5.5rem; }
 
 /* Inside the room browser the same actions sit under its refusal line. */
 .chb-admission .cs-join-actions { margin-top: var(--space-2); }
@@ -269,3 +269,19 @@
 @media (prefers-reduced-motion: reduce) {
   .cs-disclosure > summary::after { transition: none; }
 }
+
+/* Account sheet: the registered rooms this account has a role in. */
+.cs-my-rooms .cs-my-rooms-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+.cs-my-room {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+}
+
+.cs-my-room-name { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }

@@ -471,6 +471,8 @@ updateWire =
                 Expect.all
                     [ \_ -> Expect.equal [ wire "LISTCHANS" ] (sendsOf MyRoomsLoad Chanserv.blank)
                     , \_ -> Expect.equal [] (upd { ctx | account = Nothing } MyRoomsLoad Chanserv.blank |> Tuple.second |> sends)
+                    , \_ -> Expect.equal [ wire "LISTCHANS" ] (upd { ctx | room = Nothing } MyRoomsLoad Chanserv.blank |> Tuple.second |> sends)
+                    , \_ -> Expect.equal [] (upd { ctx | live = False } MyRoomsLoad Chanserv.blank |> Tuple.second |> sends)
                     ]
                     ()
         , test "dropping the registration asks twice" <|
@@ -871,7 +873,7 @@ foldReplies =
                 in
                 Expect.all
                     [ \_ -> Expect.equal True done.myRooms.loaded
-                    , \_ -> Expect.equal [ { account = "#a", level = "FOUNDER" }, { account = "#b", level = "OP" } ] done.myRooms.rooms
+                    , \_ -> Expect.equal [ { channel = "#a", level = "FOUNDER" }, { channel = "#b", level = "OP" } ] done.myRooms.rooms
                     ]
                     ()
         , test "a founder-level LISTCHANS row lets a non-INFO founder manage" <|
@@ -1846,6 +1848,29 @@ views =
                     , \_ -> Expect.equal True (View.Chanserv.composerSlowWaiting sentOnce)
                     , \_ -> lacks "composer-slowmode" host
                     , \_ -> lacks "composer-slowmode" (room { op = False, props = [], modes = "" })
+                    ]
+                    ()
+        , test "Your rooms (Account sheet): asks on request, lists registered rooms with roles in words" <|
+            \_ ->
+                let
+                    base =
+                        { blank | connection = Live, accountName = Just "kai", accountOpen = True }
+
+                    ( loading, out ) =
+                        update (ChanservMsg MyRoomsLoad) base
+
+                    listed =
+                        feedAll [ ":srv.test NOTICE me :LISTCHANS #a FOUNDER", ":srv.test NOTICE me :LISTCHANS #b OP", ":srv.test NOTICE me :End of LISTCHANS (2)" ] loading
+
+                    none =
+                        feedAll [ ":srv.test NOTICE me :End of LISTCHANS (0)" ] loading
+                in
+                Expect.all
+                    [ \_ -> Expect.equal [ wire "LISTCHANS" ] (lines out)
+                    , \_ -> has "account-rooms-load" base
+                    , \_ -> query listed |> Query.findAll [ testid "account-room" ] |> Query.count (Expect.equal 2)
+                    , \_ -> query listed |> Query.has [ Selector.text "Founder", Selector.text "Host" ]
+                    , \_ -> has "account-rooms-empty" none
                     ]
                     ()
         , test "Mute shows for hosts on other people only, and flips to Unmute when the list names them" <|

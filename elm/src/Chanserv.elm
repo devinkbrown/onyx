@@ -10,6 +10,7 @@ module Chanserv exposing
     , KnockState(..)
     , MaskEntry
     , MaskList
+    , OwnedRoom
     , Msg(..)
     , Notice
     , RegInfo
@@ -58,6 +59,7 @@ module Chanserv exposing
     , timedDurations
     , timedLetters
     , timedOf
+    , transferLine
     , update
     , validChannel
     , validMask
@@ -129,6 +131,13 @@ type alias RegInfo =
 
 type alias AccessEntry =
     { account : String
+    , level : String
+    }
+
+
+{-| One `LISTCHANS` row: a registered room and this account's level in it. -}
+type alias OwnedRoom =
+    { channel : String
     , level : String
     }
 
@@ -237,7 +246,7 @@ type alias State =
     , access : Dict String (Listed AccessEntry)
     , akick : Dict String (Listed AkickEntry)
     , successor : Dict String (Maybe String)
-    , myRooms : { loading : Bool, loaded : Bool, rooms : List AccessEntry, buffer : List AccessEntry }
+    , myRooms : { loading : Bool, loaded : Bool, rooms : List OwnedRoom, buffer : List OwnedRoom }
     , lists : Dict String MaskList
     , forwards : Dict String String
     , throttles : Dict String String
@@ -511,7 +520,7 @@ server.zig:9719); these are the useful ones, in words.
 -}
 timedLetters : List ( Char, String )
 timedLetters =
-    [ ( 'm', "Moderated (only voiced people talk)" )
+    [ ( 'm', "Moderated" )
     , ( 'i', "Invite only" )
     , ( 'M', "Signed-in speakers only" )
     , ( 'N', "Lock nicknames" )
@@ -587,11 +596,11 @@ accessLevels =
     ]
 
 
-listKinds : List { letter : Char, tab : String, hint : String, add : String, empty : String }
+listKinds : List { letter : Char, tab : String, name : String, hint : String, add : String, empty : String }
 listKinds =
-    [ { letter = 'Z', tab = "Muted", hint = "Muted people stay in the room but can't send messages.", add = "Mute", empty = "No one is muted." }
-    , { letter = 'e', tab = "Ban exceptions", hint = "These masks can join and talk even when a block matches them.", add = "Add exception", empty = "No ban exceptions." }
-    , { letter = 'I', tab = "Invite exceptions", hint = "These masks can join while the room is invite-only.", add = "Add exception", empty = "No invite exceptions." }
+    [ { letter = 'Z', tab = "Muted", name = "Muted people", hint = "Muted people stay in the room but can't send messages.", add = "Mute", empty = "No one is muted." }
+    , { letter = 'e', tab = "Exceptions", name = "Exceptions (ban exceptions)", hint = "Ban exceptions: these names can join and talk even when a block matches them.", add = "Add exception", empty = "No ban exceptions." }
+    , { letter = 'I', tab = "Invite passes", name = "Invite passes (invite exceptions)", hint = "Invite passes: these names can join while the room is invite-only.", add = "Add pass", empty = "No invite passes." }
     ]
 
 
@@ -674,6 +683,19 @@ knockLine channel note =
 
         n ->
             Wire.formatIrcLine "KNOCK" [ channel, String.left 200 n ]
+
+
+{-| `CHANNEL TRANSFER #c <account>`: hand the registration to another
+account (founder only; reply `Channel #c founder transferred to <acct>`,
+which `fold` already applies to a known registration).
+
+Not wired to any control here: ownership transfer belongs to the
+people/ownership slice (v3/gap-people), which owns the confirmation
+flow. This is only the server call helper it can use.
+-}
+transferLine : String -> String -> String
+transferLine channel account =
+    cs "TRANSFER" channel [ account ]
 
 
 modeListLine : String -> Char -> String
@@ -855,7 +877,7 @@ canManage account channel state =
             isFounder account info
                 || (account
                         /= Nothing
-                        && List.any (\r -> key r.account == key channel && List.member (String.toUpper r.level) [ "FOUNDER", "ADMIN" ]) state.myRooms.rooms
+                        && List.any (\r -> key r.channel == key channel && List.member (String.toUpper r.level) [ "FOUNDER", "ADMIN" ]) state.myRooms.rooms
                    )
 
         _ ->
@@ -1477,6 +1499,19 @@ update ctx msg state =
             else
                 ( state, [] )
 
+        MyRoomsLoad ->
+            -- Account-level: asked from the Account sheet, with or without
+            -- an open room.
+            if ctx.live && ctx.account /= Nothing then
+                let
+                    mine =
+                        state.myRooms
+                in
+                ( { state | myRooms = { mine | loading = True, buffer = [] } }, [ Send (Wire.formatIrcLine "LISTCHANS" []) ] )
+
+            else
+                ( state, [] )
+
         DropAsk ->
             ( { state | confirmDrop = True }, [] )
 
@@ -1790,17 +1825,6 @@ roomAct ctx channel msg state =
         SuccessorClear ->
             founderOnly "successor" <|
                 \_ -> ( state, [ Send (Wire.formatIrcLine "SUCCESSOR" [ channel, "CLEAR" ]) ] )
-
-        MyRoomsLoad ->
-            if ctx.account /= Nothing then
-                let
-                    mine =
-                        state.myRooms
-                in
-                ( { state | myRooms = { mine | loading = True, buffer = [] } }, [ Send (Wire.formatIrcLine "LISTCHANS" []) ] )
-
-            else
-                ( state, [] )
 
         DropConfirm ->
             founderOnly "reg" <|
@@ -2782,7 +2806,7 @@ foldServiceWords text words state =
                 mine =
                     state.myRooms
             in
-            ( { state | myRooms = { mine | loading = True, buffer = mine.buffer ++ [ { account = channel, level = level } ] } }, [] )
+            ( { state | myRooms = { mine | loading = True, buffer = mine.buffer ++ [ { channel = channel, level = level } ] } }, [] )
 
         "End" :: "of" :: "LISTCHANS" :: _ ->
             let
