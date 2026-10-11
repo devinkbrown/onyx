@@ -8355,7 +8355,7 @@ function fetchPublicFeed(url) {
           /* Deferred a moment so the sweep stays out of the way of boot. */
           setTimeout(function () {
             claimEnqueue(function (release) {
-              claimScan(vault, { scope: scope, guest: guest }, function (r) {
+              claimScan(vault, { scope: scope, guest: guest, quick: true }, function (r) {
                 var store = claimStorage();
                 var st = claimReadState(store);
                 if (r.ok && r.rows === 0 && st.interrupted) claimWriteState(store, { attach: null });
@@ -12528,59 +12528,100 @@ function fetchPublicFeed(url) {
       done(!(typeof global.indexedDB !== "undefined" && global.indexedDB));
       return;
     }
-    var tx;
-    var cursor;
-    try {
-      tx = db.transaction(STORE, "readonly");
-      cursor = tx.objectStore(STORE).openCursor();
-    } catch (err) {
-      done(false);
-      return;
+    if (opts && opts.quick) {
+      claimLooksClean(db, function (clean) {
+        if (clean) done(true); else claimWalk();
+      });
+    } else {
+      claimWalk();
     }
-    var targets = {};
-    var owners = {};
-    var nTargets = 0;
-    var nOwners = 0;
-    var seen = 0;
-    cursor.onsuccess = function () {
-      var c = cursor.result;
-      if (!c) return;
-      if (seen >= CLAIM_SCAN_CAP) { result.truncated = true; return; }
-      seen += 1;
-      var raw = c.value;
-      var stamp = vaultRowOwner(raw);
-      if (stamp === null) {
-        result.rows += 1;
-        if (wantKeys) result.keys.push(c.primaryKey);
-        var tkey = "t" + String((raw && raw.target) || "").toLowerCase();
-        if (!Object.prototype.hasOwnProperty.call(targets, tkey) && nTargets < CLAIM_TARGETS_CAP) {
-          targets[tkey] = true;
-          nTargets += 1;
-        }
-        var at = (raw && typeof raw.at === "number" && isFinite(raw.at) && raw.at > 0) ? Math.floor(raw.at) : 0;
-        if (at === 0) {
-          result.undated += 1;
-        } else {
-          if (result.oldest === null || at < result.oldest) result.oldest = at;
-          if (result.newest === null || at > result.newest) result.newest = at;
-        }
-      } else if (stamp !== scope && stamp !== spare) {
-        var okey = "o" + stamp;
-        if (!Object.prototype.hasOwnProperty.call(owners, okey) && nOwners < CLAIM_OWNERS_CAP) {
-          owners[okey] = true;
-          nOwners += 1;
-        }
+    function claimWalk() {
+      var tx;
+      var cursor;
+      try {
+        tx = db.transaction(STORE, "readonly");
+        cursor = tx.objectStore(STORE).openCursor();
+      } catch (err) {
+        done(false);
+        return;
       }
-      c.continue();
-    };
-    cursor.onerror = function () { done(false); };
-    tx.oncomplete = function () {
-      result.conversations = nTargets;
-      result.otherOwners = nOwners;
-      done(true);
-    };
-    tx.onerror = function () { done(false); };
-    tx.onabort = function () { done(false); };
+      var targets = {};
+      var owners = {};
+      var nTargets = 0;
+      var nOwners = 0;
+      var seen = 0;
+      cursor.onsuccess = function () {
+        var c = cursor.result;
+        if (!c) return;
+        if (seen >= CLAIM_SCAN_CAP) { result.truncated = true; return; }
+        seen += 1;
+        var raw = c.value;
+        var stamp = vaultRowOwner(raw);
+        if (stamp === null) {
+          result.rows += 1;
+          if (wantKeys) result.keys.push(c.primaryKey);
+          var tkey = "t" + String((raw && raw.target) || "").toLowerCase();
+          if (!Object.prototype.hasOwnProperty.call(targets, tkey) && nTargets < CLAIM_TARGETS_CAP) {
+            targets[tkey] = true;
+            nTargets += 1;
+          }
+          var at = (raw && typeof raw.at === "number" && isFinite(raw.at) && raw.at > 0) ? Math.floor(raw.at) : 0;
+          if (at === 0) {
+            result.undated += 1;
+          } else {
+            if (result.oldest === null || at < result.oldest) result.oldest = at;
+            if (result.newest === null || at > result.newest) result.newest = at;
+          }
+        } else if (stamp !== scope && stamp !== spare) {
+          var okey = "o" + stamp;
+          if (!Object.prototype.hasOwnProperty.call(owners, okey) && nOwners < CLAIM_OWNERS_CAP) {
+            owners[okey] = true;
+            nOwners += 1;
+          }
+        }
+        c.continue();
+      };
+      cursor.onerror = function () { done(false); };
+      tx.oncomplete = function () {
+        result.conversations = nTargets;
+        result.otherOwners = nOwners;
+        done(true);
+      };
+      tx.onerror = function () { done(false); };
+      tx.onabort = function () { done(false); };
+    }
+  }
+
+  /* A cheap proof that NOTHING is unstamped, so the common steady state
+     (everything already owned) costs two index counts instead of reading
+     every row on every page load. Owned rows are keyed by their scope key,
+     a JSON array, so they all start with `["`; an unstamped row's key is
+     its logical id (`#room:12`, `nick:7`), which can never start with a
+     quote because no channel or nick may. Zero keys outside that prefix
+     proves no unstamped row; ANYTHING else (a count, an error, an
+     unusual key) just means "do the full walk", never "clean". */
+  var CLAIM_OWNED_PREFIX = "[\"";
+  function claimLooksClean(db, onDone) {
+    var settled = false;
+    function settle(clean) {
+      if (settled) return;
+      settled = true;
+      onDone(clean);
+    }
+    try {
+      var tx = db.transaction(STORE, "readonly");
+      var store = tx.objectStore(STORE);
+      var below = store.count(IDBKeyRange.upperBound(CLAIM_OWNED_PREFIX, true));
+      var above = store.count(IDBKeyRange.lowerBound(CLAIM_OWNED_PREFIX + "\uffff", true));
+      var counts = { below: -1, above: -1 };
+      below.onsuccess = function () { counts.below = below.result; };
+      above.onsuccess = function () { counts.above = above.result; };
+      tx.oncomplete = function () { settle(counts.below === 0 && counts.above === 0); };
+      tx.onerror = function () { settle(false); };
+      tx.onabort = function () { settle(false); };
+    } catch (err) {
+      settle(false);
+    }
   }
 
   /* One atomic batch. `mode` "attach" re-keys under `owner`, "delete"
@@ -12786,6 +12827,7 @@ function fetchPublicFeed(url) {
     /* v3/gap-claim */
     gapClaim: {
       scan: claimScan,
+      looksClean: claimLooksClean,
       attach: claimAttach,
       remove: claimDelete,
       enqueue: claimEnqueue,

@@ -77,6 +77,17 @@ async function vaultCounts(page) {
   });
 }
 
+/** The real browser's answer to the cheap "nothing unstamped" proof. */
+async function looksClean(page) {
+  return page.evaluate(async () => {
+    const open = indexedDB.open('onyx-vault');
+    const db = await new Promise((res, rej) => { open.onsuccess = () => res(open.result); open.onerror = () => rej(open.error); });
+    const clean = await new Promise((res) => window.OnyxPorts.gapClaim.looksClean(db, res));
+    db.close();
+    return clean;
+  });
+}
+
 /** Load the app once so the client creates its vault, seed it, then join. */
 async function boot(page, h, opts = {}) {
   await phoneUa(page);
@@ -220,11 +231,13 @@ export default {
   'gc-home-attached': async (page, h) => {
     await boot(page, h, { rows: 1284, targets: 17, login: true });
     await page.waitForSelector(HOME_CARD, { timeout: 6000 });
+    if (await looksClean(page)) throw new Error('the cheap proof called a vault with unstamped rows clean');
     await page.click(`${HOME_CARD} [data-testid="claim-attach"]`);
     await page.waitForSelector(`${HOME_CARD} [data-testid="claim-result"]`, { timeout: 12000 });
     await h.settle(page, 300);
     const counts = await vaultCounts(page);
     if (counts.unstamped !== 0) throw new Error(`rows left unstamped: ${counts.unstamped}`);
+    if (!(await looksClean(page))) throw new Error('the cheap proof did not recognise the fully-owned vault');
     // the pinned test endpoint is its own network, so match the account part of the scope key
     if (!Object.keys(counts.byOwner).some((k) => k.endsWith(',"account","kn"]'))) throw new Error('rows were not attached to the account scope');
     await reveal(page, h, HOME_CARD);

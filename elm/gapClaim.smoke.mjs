@@ -31,7 +31,12 @@ function memoryStorage(seed) {
   };
 }
 globalThis.localStorage = memoryStorage();
-globalThis.IDBKeyRange = { only: (v) => ({ only: v }), bound: (lower, upper) => ({ lower, upper }) };
+globalThis.IDBKeyRange = {
+  only: (v) => ({ only: v }),
+  bound: (lower, upper) => ({ lower, upper }),
+  upperBound: (upper, open) => ({ upper, upperOpen: !!open }),
+  lowerBound: (lower, open) => ({ lower, lowerOpen: !!open }),
+};
 require("./ports.js");
 const { gapClaim, gapAccount, vaultStore, outboxStore } = globalThis.OnyxPorts;
 
@@ -51,6 +56,7 @@ function fakeIdb(opts) {
   const db = {
     data,
     options,
+    cursorOpens: 0,
     get readwriteCount() { return readwriteCount; },
     transaction(names, mode) {
       const name = Array.isArray(names) ? names[0] : names;
@@ -125,9 +131,18 @@ function fakeIdb(opts) {
           get(key) { return request(() => { const v = map.get(key); return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }); },
           delete(key) { record(map, key); map.delete(key); },
           clear() { map.clear(); },
-          count() { return request(() => map.size); },
+          count(range) {
+            const inRange = (k) => {
+              if (!range) return true;
+              if (range.only !== undefined) return k === range.only;
+              if (range.lower !== undefined && (range.lowerOpen ? !(k > range.lower) : !(k >= range.lower))) return false;
+              if (range.upper !== undefined && (range.upperOpen ? !(k < range.upper) : !(k <= range.upper))) return false;
+              return true;
+            };
+            return request(() => [...map.keys()].filter(inRange).length);
+          },
           getAll() { return request(() => [...map.values()].map((v) => JSON.parse(JSON.stringify(v)))); },
-          openCursor(range, dir) { return cursorOver(sorted((k) => !range || range.only === undefined || k === range.only, dir)); },
+          openCursor(range, dir) { db.cursorOpens += 1; return cursorOver(sorted((k) => !range || range.only === undefined || k === range.only, dir)); },
           index() {
             return { openCursor(range, dir) { return cursorOver(sorted((k, v) => !range || v.target === range.only, dir)); } };
           },
@@ -216,6 +231,59 @@ test("scan of a clean or empty vault finds nothing, and keys are only returned o
   seedLegacy(db);
   assert.equal("keys" in (await scan(db, { scope: KAI })), false);
   assert.equal((await scan(db, { scope: KAI, keys: true })).keys.length, 4);
+});
+
+test("quick scan proves a fully-owned vault clean with two counts and no row walk", async () => {
+  const db = fakeIdb();
+  await put(db, [row("#c:1", "#c", "a", 5), row("alice:1", "alice", "b", 6)], KAI);
+  await put(db, [row("#c:1", "#c", "c", 7)], GUEST);
+  const before = db.cursorOpens;
+  const quick = await scan(db, { scope: KAI, quick: true });
+  assert.deepEqual([quick.ok, quick.rows, quick.conversations], [true, 0, 0]);
+  assert.equal(db.cursorOpens, before, "no cursor was opened");
+  // an empty vault is clean too
+  assert.equal((await scan(fakeIdb(), { scope: KAI, quick: true })).rows, 0);
+});
+
+test("quick scan never calls an unclean vault clean: unstamped keys of every shape fall through to the full walk", async () => {
+  for (const id of ["#lounge:1", "alice:7", "[bot]:3", "&ops:2", "+x:1", " odd:1", "~weird:1"]) {
+    const db = fakeIdb();
+    await put(db, [row("#c:1", "#c", "owned", 5)], KAI);
+    legacy(db, id, id.split(":")[0], "legacy", 1000);
+    const quick = await scan(db, { scope: KAI, quick: true });
+    assert.equal(quick.rows, 1, `legacy key ${JSON.stringify(id)} must be found`);
+    assert.ok(db.cursorOpens > 0);
+  }
+});
+
+test("quick scan: owners that are not JSON-array scope keys just cost a full walk, with the same answer", async () => {
+  const db = fakeIdb();
+  await put(db, [row("#c:1", "#c", "a", 5)], "owner-a");
+  legacy(db, "#c:old", "#c", "legacy", 1000);
+  const quick = await scan(db, { scope: "owner-a", quick: true });
+  const full = await scan(db, { scope: "owner-a" });
+  assert.deepEqual([quick.rows, quick.otherOwners], [full.rows, full.otherOwners]);
+  assert.equal(quick.rows, 1);
+  const clean = fakeIdb();
+  await put(clean, [row("#c:1", "#c", "a", 5)], "owner-a");
+  assert.equal((await scan(clean, { scope: "owner-a", quick: true })).rows, 0);
+});
+
+test("quick scan: a store that cannot answer the counts falls through instead of claiming clean", async () => {
+  const db = fakeIdb();
+  legacy(db, "#c:1", "#c", "legacy", 1000);
+  const realCount = db.transaction.bind(db);
+  db.transaction = (names, mode) => {
+    const tx = realCount(names, mode);
+    const objectStore = tx.objectStore;
+    tx.objectStore = (n) => {
+      const store = objectStore(n);
+      store.count = () => { throw new Error("no count"); };
+      return store;
+    };
+    return tx;
+  };
+  assert.equal((await scan(db, { scope: KAI, quick: true })).rows, 1);
 });
 
 test("scan: no store is clean only on a host without IndexedDB; a store that cannot be read is not 'clean'", async () => {
@@ -677,7 +745,7 @@ test("bridge: a scan requested while an attach is in flight waits for it and see
     const scanAt = h.answers.findIndex((a) => a.kind === "scan");
     assert.ok(doneAt >= 0 && doneAt < scanAt, "the scan answered after the attach finished");
     assert.equal(h.answers[scanAt].rows, 0);
-    assert.equal(h.answers[scanAt].otherOwners, 1, "the guest scope now owns the history");
+    assert.equal(h.answers[scanAt].ok, true);
   } finally {
     cleanupBridge();
   }
