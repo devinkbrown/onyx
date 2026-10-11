@@ -4213,7 +4213,8 @@ suite =
                     in
                     Expect.all
                         [ \_ -> Expect.equal True (bad.inviteNameError /= Nothing)
-                        , \_ -> Expect.equal [] outBad
+                        , -- v3/rx-public: no navigation; focus returns to the field.
+                          \_ -> Expect.equal [ PrefsFocus { id = "invite-display-name" } ] outBad
                         , \_ -> Expect.equal True (submitBad.inviteNameError /= Nothing)
                         , \_ -> Expect.equal Nothing good.inviteNameError
                         , \_ ->
@@ -4359,7 +4360,10 @@ suite =
                                 |> Query.find [ Selector.tag "h1" ]
                                 |> Query.has [ Selector.text "House rules" ]
                         , \_ ->
+                            -- v3/rx-public: scoped to the rules list (the
+                            -- "Also on Onyx" nav adds its own items).
                             query { blank | route = Route.Guidelines }
+                                |> Query.find [ Selector.class "trust-rules" ]
                                 |> Query.findAll [ Selector.tag "li" ]
                                 |> Query.count (Expect.equal 12)
                         , \_ ->
@@ -4593,7 +4597,8 @@ suite =
                         [ \_ -> Expect.equal Route.Status entered.route
                         , \_ -> Expect.equal True entered.statusLoading
                         , \_ ->
-                            case outEnter of
+                            -- v3/rx-public: the page change also scrolls to the top.
+                            case List.filter (\o -> o /= PageNavigated { fragment = "" }) outEnter of
                                 [ HttpFetch req ] ->
                                     Expect.all
                                         [ \_ -> Expect.equal "network-status" req.key
@@ -4775,7 +4780,8 @@ suite =
                                 [ \_ -> Expect.equal Route.Download navigated.route
                                 , \_ -> Expect.equal True navigated.downloadCatalogLoading
                                 , \_ ->
-                                    case out of
+                                    -- v3/rx-public: the page change also scrolls to the top.
+                                    case List.filter (\o -> o /= PageNavigated { fragment = "" }) out of
                                         [ HttpFetch req ] ->
                                             Expect.all
                                                 [ \_ -> Expect.equal "download-catalog" req.key

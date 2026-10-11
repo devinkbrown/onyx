@@ -378,7 +378,7 @@ keyChangeRow model peer keys =
                     , class "onyx-keychange-accept"
                     , attribute "data-testid" "dm-keychange-accept"
                     , disabled (not ready || accepting)
-                    , onClick (DmKeyAccept peer)
+                    , onClick (DmKeyAccept { peer = peer, pending = Maybe.withDefault "" pending })
                     ]
                     [ text (DmSafety.acceptLabel { accepting = accepting, persistFailed = failed }) ]
                 , button
