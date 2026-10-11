@@ -204,6 +204,7 @@ searchToggle model =
         , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
         , attribute "aria-pressed" (boolAttr model.searchOpen)
         , attribute "title" "Search messages"
+        , attribute "aria-keyshortcuts" "Control+F Meta+F" -- v3/gap-commands
         , disabled (model.activeChannel == Nothing)
         , onClick SearchOpen
         ]

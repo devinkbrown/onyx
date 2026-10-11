@@ -1,4 +1,4 @@
-module App exposing (AttachmentStatus(..), plaintextWouldLeak, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId)
+module App exposing (AttachmentStatus(..), plaintextWouldLeak, ctcpActionText, ctcpActionWire, messageAction, normalizeActionRow, destinationsLeak, roomDeepLink, slashHelpGroups, paletteEntries, paletteMatches, palettePeople, paletteContext, recentsOwnerKey, rawSlashLeakCopy, dmKeyUnresolved, holdDmCopy, ConnectForm, ConnectMode(..), ConnectPhase(..), blankConnectForm, connectGateVisible, connectPhase, connectStatusMessage, connectCanSubmit, connectFieldLabel, connectModeCopy, connectSubmitLabel, connectShowReclaim, validateConnectEmail, validateConnectPassword, validateConnectConfirm, passwordStrength, normalizeConnectRoom, submitConnect, settleConnectGate, Channel, ChatMessage, ConnectionState(..), DownloadCopy(..), GuidesShare(..), InviteCopy(..), Member, MessageReaction, Model, Msg(..), Outbound(..), OutboxEntry, ReclaimPhase(..), StagedAttachment, dmAttachmentBlocked, SaslExchange(..), SessionReclaimNotice, StatsShare(..), ServerSearchStatus(..), VaultHit, VaultRow, VaultSearchMode(..), VaultSearchStatus(..), appearancePreviewMotion, backgroundDirty, blank, displayBody, downloadAvailabilityFor, downloadCatalogState, downloadCopiesReverted, downloadCopyForKey, downloadCopyState, downloadShaFor, downloadShaLoading, foldLine, foldChannelModeIs, foldCreationTime, parseBoundedUnix, maxCreationUnix, ServerStats, PingProbe, emptyServerStats, maxLatencyHistory, latencyProbeIntervalMs, secondOrFirst, latencyCookie, fireLatencyPing, foldLatencyPong, parseLusersCount, parseLenientInt, foldLusers, formatClockUtc, formatRowClock, guidesPlanExport, init, installedGroupEpoch, inviteCard, inviteJoinHref, inviteSignInHref, isInstallPath, messageLocked, millisToIso, onyxosStageIds, parseNameBlocklist, maxHighlightWords, maxHighlightWordLength, normalizeHighlightWord, parseHighlightWords, addHighlightWord, removeHighlightWord, highlightWordsSaveOut, maxChannelNotifyEntries, maxChannelNotifyChannelLength, ChannelNotifyEntry, isValidNotifyChannel, parseChannelNotifyEntries, setChannelNotify, slashChannelTarget, runSlashNotifyMode, maxStarredChannels, parseStarredChannels, starredSaveOut, starChannel, unstarChannel, runSlashStar, maxForumChannels, parseForumChannels, forumChannelsSaveOut, forumPinnedFor, followActiveFor, topicFollowedFor, openPinnedForum, expandSlashTextCommand, takeNonSpaceChars, sendRawSlashCommand, maxAutoJoinChannels, parseAutoJoinChannels, autoJoinSaveOut, addAutoJoin, removeAutoJoin, maxChannelColorEntries, ChannelColorEntry, isValidChannelColor, normalizeChannelColor, parseChannelColorEntries, channelColorsSaveOut, setChannelColor, clearChannelColor, scheduleOwner, ownedScheduledMessages, ownedScheduledMessageCount, scheduledSaveOut, requestScheduleMessage, requestCancelScheduledMessage, purgeScheduledForOwner, ScheduledInflight, ScheduledClaimAsk, ScheduledLabelLink, foldScheduledFenceResult, foldScheduledAddResult, foldScheduledCancelResult, dropScheduledLabelsFor, dispatchableScheduledRow, fireScheduledDispatch, mintScheduledClaimTokens, releaseScheduledDispatch, clearDispatchClaims, foldScheduledDispatchResult, settleAllUnadmitted, sendGrantedClaims, sendValidClaims, takeScheduledLabel, admitSchedulePending, admitScheduledSend, rejectScheduledSend, scheduledSentToast, scheduledUncertainToast, schedulePresetEpoch, openSchedulePopover, submitScheduleAt, scheduleSendLabel, scheduledRowProtected, scheduledRowEncryptionRequired, SlashCommandKind(..), SlashCommand, slashCommands, findSlashCommand, localSlashCommandNames, localSlashCommandList, maxEventTitleChars, eventFutureWindowMs, eventClockSkewMs, sanitizeEventTitle, parseEventTimeMs, parseIso8601Ms, scheduleChannelEvent, clearChannelEvent, writeChannelProp, OperDeskIntent(..), OperDeskCommand, maxBroadcastLength, maxObserveMaskLength, maxKillReasonLength, maxOperNickLength, operEventCategories, operObserveActions, isOperEventCategory, isOperObserveAction, normalizeOperCategory, normalizeObserveActions, normalizeObserveMask, normalizeOperNick, normalizeOperFreeText, parseOperSlashCommand, planOperAction, runSlashOper, priorityFromFragment, renderedBackground, requestDownloadCatalog, resolveThemeApply, rowTime, statsFeedState, statsInspectedChannel, statsInspectorAwaiting, statsMatchingDetail, statsPageUrl, statsShareHref, statusFeedState, stepOnyxosStage, studioActiveScheme, studioResolvedTokens, followKey, parseFollowedKeys, topicTagName, maxTopicLabelBytes, utf8ByteLength, isTopicVisibleConversation, isValidTopicLabel, parseMessageTopic, topicOrNothing, safeNotifyText, followNotifyTopic, recordFollowNotification, recordFollowNotificationRow, recordMentionNotification, recordDmNotification, notifyDmPlaintext, recordDmPlaintextNotification, parseNotifyPermission, notificationBodyFor, cycleVaultSearchMode, parseVaultSearchMode, searchActiveId, searchRecallTerms, searchResults, searchTargetLabel, serverTimeMsOf, update, vaultHits, BoostGroup, BoostSummary, aggregateBoostGroups, summarizeBoosts, rankBoostGroups, ReplyParent, ReplyRef, Capabilities, CapabilityInput, boostTitle, messageAccessibleLabel, capabilities, loadedActionText, suggestSearchQuery, suggestTopicLabel, typingLine, maxBoostChips, maxCompactBoostGroups, getUserProfile, whoisInfoFor, foldWhoisProfile, foldSetname, maxUserMetadataTargets, maxUserMetadataKeys, maxUserMetadataValueLength, maxProfileLinks, maxSelfDisplayNameLength, maxSelfBioLength, maxSelfPronounsLength, maxSelfBannerUrlLength, boundMetadataValue, normalizeProfileText, normalizeProfileColor, normalizeProfileLinks, normalizeProfileBannerUrl, metadataProfilePatch, normalizeMetadataValue, applyUserMetadata, foldMetadataCommand, setOwnMetadata, clearOwnUserMetadata, quarantineOwnerChange, accountOwnerKey, foldAccount, AccountActionError, requestIdentify, foldIdentifyReply, lastErrorText, nickInUsePhrase, nickInUse, reclaimTarget, submitReclaim, isChannelOp, UnbanReview, requestUnbanReview, confirmUnbanReview, NotificationType(..), InboxNotification, InboxFilter(..), addNotification, dismissNotification, markNotificationRead, markAllNotificationsRead, activateNotification, isAttentionNotification, admitLiveDelivery, dmFileBucket, dmMutateBucket, stripStatusmsgTarget, composerSendTarget, composerAudienceOffered, nextComposerAudience, audienceLabel, audienceTitle, sanitizePersonToken, blockedDmComposeCopy, isBlockedDmTarget, refuseBlockedDm, fetchBansOnOpGrant, parseTopicHistoryValue, encodeTopicHistory, persistTopicHistory, maxTopicHistoryParseChannels, notificationContext, notificationKindLabel, notificationKindGlyph, unreadAttentionCount, maxNotificationEntries, normalizeNickAlias, normalizeNickAliases, nextNickAlias, maxNickAliases, maxNickAliasLength, deletedPlaceholder, redactedBody, activeReplyParent, activeEditFor, threadParentIds, editRowBody, storedDraftFor, messageContextMatchesTarget, TranslationStatus(..), TranslationCopyState(..), persistedReplyPreviewText, previewConsentKey, draftReplyTagOf, parseCtcpReplyBody, resolveInboundReply, resolveReplyDisplay, replyTagFor, sanitizePersistedReplyPreviewText, sanitizeReplyRef, recordEdit, revisionsFor, maxEditRevisionsPerMessage, maxEditHistoryMessages, maxEditBodyLength, EditRevision, foldRedact, foldEdit, parseCtcpMutation, foldCtcpMutation, defaultCtcpVersionReply, maxCtcpVersionReplyLength, normalizeCtcpVersionReply, decodeCtcpConfig, parseCtcpQuery, foldCtcpQuery, foldScreenshareCtcp, isCtcpQueryBody, namesTarget, boundNamesTokens, maxNamesScanChars, maxNamesTokenLength, isSwallowedCtcpWire, canEditRow, canDeleteRow, requestEdit, requestDelete, toggleMessageReactions, addMessageReactor, removeMessageReactor, hasReaction, addLocalReaction, removeReactionAt, applyReactionAdd, sendReaction, parseActivityReact, foldActivityReact, foldTagmsgReact, foldReactCommand, offlineMemoFor, clearOfflineMemo, parseMemoBody, trackOfflineMemo, isChannelName, AuditEntry, AuditKind(..), ModerationEntry, ChannelEvent, ChannelEventKind(..), addAuditEntry, addModerationEntry, addChannelEvent, clearChannelEvents, BanEntry, BanListStatus(..), BanListMeta, BanChannelList, BanListView(..), emptyBanListMeta, normalizeBanChannel, normalizeBanEntry, normalizeBanList, setBanList, requestBanList, foldBanListRow, foldEndOfBanList, foldModexEnd, foldModexList, clearBanTransport, banListViewFor, StewardView, stewardViewFor, stewardOfferFor, stewardMembersOf, TempBan, tempBanKey, requestTempBan, fireTempBan, maxTempBanTimers, maxTempBanMinutes, maxTempBanRetries, tempBanRetryMs, UserStatus(..), setUserStatus, whoisRequestTimeoutMs, whoisTimeoutError, activeWhoisNick, fold401, settleWhoisTimeout, NamesBurst, NamesBurstPhase(..), recentNamesBurst, beginNamesBurst, settleNamesBurst, pruneNamesBursts, refreshChannelRoster, pollChannelRosters, rejoinLiveChannels, namesAfterSelfJoin, namesBurstTtlMs, maxLiveChannelUsers, rosterRefreshMs, rosterPollMs, isGuestNick, forcedGuestRename, startNickReclaim, stopNickReclaim, fireNickReclaim, nickReclaimIntervalMs, maxReconnectAttempts, reconnectDelayCapSecs, reconnectDelaySecs, scheduleReconnect, fireReconnect, ReconnectBanner, backOnlineNoticeMs, reconnectBanner, reconnectNow, ToastVariant(..), ToastUndo(..), Toast, ToastInput, maxToastEntries, maxToastTextLength, defaultToastDurationMs, boundToastText, toastIntent, clampToastDuration, addToast, dismissToast, toastLivedMs, expireToasts, fireToastUndo, ChannelListEntry, maxChannelListEntries, channelListTimeoutMs, mergeChannelListRow, parseChannelListRow, refreshChannelList, foldListStart, foldListRow, foldListEnd, fireChannelListTimeout, resetChannelListTransport, softLaunchMemberMax, isSoftLaunchRoom, BrowseSort(..), sortBrowseRooms, visibleBrowseRooms, browseMemberLabel, BrowseStatusInput, browseStatusMessage, BrowserJoinPhase(..), browserJoinTimeoutMs, enterBrowserRoom, settleBrowserJoin, refuseBrowserJoin, fireBrowserJoinTimeout, browserAdmissionMessage, browserAttemptMessage, openBrowser, statsRoomHref, RoomSkin(..), RoomSkinOption, roomSkins, roomSkinOption, defaultFirstLine, suggestedFirstLine, isRoomSpaceChar, isJoinableRoomChar, normalizeCreateRoomName, createTopicMaxChars, isTopicControlChar, sanitizeCreateRoomTopic, isInviteeLeadChar, isInviteeChar, sanitizeCreateInvitee, parseDeepLinkJoin, parseDeepLinkTopic, parseDeepLinkAt, parseDeepLinkQuery, deepLinkQueryValue, DeepLinkQuery, maxDeepLinkTopicBytes, atParamMinMs, atParamFutureSlackMs, selectChannel, firePendingDeepLinkJoin, clearPendingDeepLink, PendingTravel, requestModex, requestTravelTo, runSlashExport, CreateRoomTopicInput, buildCreateRoomTopic, joinCreateTopicParts, formationInviteTarget, formationWindowHours, formationCopy, canFinishCreateRoom, addFormationInvitee, removeFormationInvitee, formationShareReset, applySkinFirstLine, PendingCreateRoom, CreateRoomRequest, pendingCreateRoomTimeoutMs, createRoomOfflineError, startPendingCreateRoom, settlePendingCreateRoom, clearPendingCreateRoomFor, firePendingCreateRoomTimeout, BrowserMode(..), openCreateRoom, createShareUrl, toggleCreateSkin, addCreateInvitee, trackCreateNameInput, requestCreateCopy, foldCreateCopyResult, submitCreateRoom, accountStoreRecordKind, deviceHistoryCopyKind, accountDataVerbVersion, downloadWhatWeStoreHint, deviceHistoryHint, saveDeviceHistoryHint, isExportControl, scrubExportText, safeExportFilenamePart, roomsOwnedByNick, dedupeRooms, AccountStoreRecord, AccountStoreRecordInput, optionalScrubbed, buildAccountStoreRecord, DeviceHistoryCopyMessage, DeviceHistoryCopyRoom, DeviceHistoryCopy, HistoryCopySource, vaultRowHistorySource, copyHistoryMessage, buildDeviceHistoryCopy, accountStoreRecordFilename, deviceHistoryCopyFilename, AccountVerbsBusy(..), encodeOptional, encodeAccountStoreRecord, encodeDeviceHistoryMessage, encodeDeviceHistoryCopy, historyCopySourceDecoder, decodeHistoryCopyTargets, requestAccountRecordDownload, requestDeviceHistoryCopy, receiveDeviceHistoryRows, GuestClaimPhase(..), guestClaimMinPassword, isGuestClaimBusy, guestClaimVisible, resetGuestClaim, requestRegister, requestVerify, chainClaimIdentify, foldRegisterCommand, foldVerifyCommand, foldInvite, maxServerRuleLines, admitServerRule, foldRegisterFail, FriendEntry, WatchEntry, maxContacts, maxContactNickLength, maxFriendNoteLength, maxMonitorNumericTargets, maxMonitorNumericTargetLength, maxMonitorNumericLimit, maxMonitorNumericDescriptionLength, isUnsafeMonitorChar, normalizeContactNick, decodeFriends, decodeWatchList, encodeFriendsForSave, encodeWatchListForSave, ownedMonitorContacts, monitorAddContact, removeMonitorContactIfUnused, saveFriendsFor, saveWatchListFor, requestFriendAdd, requestFriendRemove, requestWatchAdd, requestWatchRemove, setFriendOnline, setWatchOnline, syncMonitorContacts, parseMonitorTargets, parseMonitorLimit, foldContactOnline, foldContactOffline, foldMonitorOnline, foldMonitorOffline, firstOfBang, foldMonitorFull, foldTotpNotice, foldTotpFail, TotpState, TotpStatus(..), blankTotp, maxTotpSecretLength, maxTotpUriLength, totpCodeLength, isTotpCode, requestTotpEnroll, requestTotpConfirm, requestTotpDisable, requestTotpStatus, requestKeytransStatus, requestKeytransProof, foldKeytransNotice, requestCertAdd, requestCertList, requestCertDel, foldCertNotice, Persona, PersonaOffer, maxPersonaEntries, maxPersonaNameLength, maxPersonaHostLength, maxPersonaSourceLength, maxPersonaLabelLength, normalizePersonaToken, boundPersonaLabel, parseVhostPersona, parseVhostOffer, admitPersona, admitPersonaOffer, requestVhostList, requestVhostUse, requestVhostClaim, requestVhostOff, foldVhostNotice, AccountInfo, AccountInfoFields, blankAccountInfoFields, parseAccountInfo, parseAccountBool, parseAccountFlags, applyAccountInfo, requestAccountInfo, foldAccountInfoNote, foldAccountInfoNotice, foldAccountSetNote, requestLogout, requestSessionList, openAccountPanel, TotpCopy(..), boundTotpCode, accountCertNotices, accountKeytransNotices, boundedPasskeyLabel, isValidAccountEmail, minAccountPasswordLength, requestPasskeyList, requestPasskeyRegister, requestPasskeyRemove, requestPasskeyRename, requestAccountSetEmail, requestAccountSetPassword, requestDropAccount, dropReady, requestE2eeKeyStatus, requestE2eeKeyList, requestE2eeKeyPublish, requestE2eeKeyDeleteLegacy, maxAccountInfoTextLength, maxAccountInfoPairs, RecoveryCodesState, blankRecoveryCodes, minRecoveryCodeLength, requestRecoveryCodesStatus, requestRecoveryCodesGenerate, requestRecoveryCodesClear, requestRecoveryCodesLogin, dismissRecoveryCodesFresh, flushPendingRecoveryLogin, foldRecoveryCodesNotice, foldRecoveryCodesFail, maxMotdTextLength, appendMotdLine, startMotd, appendMotd, finishMotd, closeMotd, maxSystemEventTextLength, submitGuestClaim, submitGuestVerify, persistGuestClaimDismiss, ghostNick, reclaimNickWithPassword, certAddLine, foldErrorNumeric, failLabeledSend, thirdParam, setChannelJoinPrompt, clearChannelJoinPrompt, clearJoinPromptFor, Typist, maxTypingTargets, maxTypersPerTarget, maxTypingTargetLength, maxTypingNickLength, typingExpiryMs, typingRateLimitMs, normalizeTypingToken, pruneTypingUsers, setTyping, typistsFor, validActivityChannel, activitySubscribeLine, activityNickToken, parseActivityTyping, foldActivityTyping, foldTagmsgTyping, sendTyping, UserActivity, DeviceMemoryOwner, maxCustomStatusLength, normalizeCustomStatus, normalizeCustomStatusExpiry, deviceMemoryOwner, parseActivity, activityShort, setCustomStatus, setCustomStatusExpiry, foldPropRow, vaultSearchModeToString, vaultStatusLabel, notifyLevel, notifyDndActive, canRunServerSearch, serverResultsForPanel, serverSearchBlockedByE2ee, serverSearchOwnsTarget, serverStatusForPanel, serverStatusLabel, VaultDmPrivacy(..), parseVaultDmPrivacy, vaultDmPrivacyToString, vaultPrivacyFor, foldVaultDmPrivacy, trackVaultDmPrivacy, dmDesignated, maxLiveDmConversations, dmConversationCount, dmLastTime, evictOldestReadInactiveDm, ensureDmShellCapacity, applyHistoryTarget, historyPageSize, isHistoryExhausted, markHistoryExhausted, requestJoinHistory, threadWindowStep, resetThreadWindow, threadRowIndex, threadAnchorIndex, threadWindowFor, captureUnreadDivider, historyReferenceRow, requestRewindHistory, activeChannelTopic, topicTagFor, topicMessageTag, resolveKnownChannelTopic, topicVisibleRows, maxLiveChannels, liveChannelCount, liveUnfurlPrivacy, channelJoinRefused, PinnedMessageState(..), channelPins, pinnedMessageState, pinnedMessageStateLabel, reactionRow, BanAddForm, blankBanAdd, persistableVaultRows, vaultBufferSignature, flushVaultBuffer, ReplayEvent, replayEventKey, compositeReplayKey, openPlainBatchRefFor, firstOpenPlainBatchRef, historyReplayRef, pushReplayEvent, mergeReplayEvents, divertReplayEvent, reasonParam, requestWebPushCheck, requestWebhookCreate, requestWebhookList, requestWebhookDelete, webhookNotices, rememberCompletedGroupPair, roomTrackedOrAdmissible, sessionAdmissibleFor, mediaIndexFor, MediaVaultState(..), keepMessages, composerAssistInputs, composerNickCandidates, activeDmPeer, dmPeerDeviceCount, dmKeyChangedFor, homeInviteChannel, inviteSharePayload, sealKeysFor, prefsRoomDrafts, escapeMsg, overlayStack, roomSettingsCtx, firstRunNotifyOffered, a2hsOffered, polishScheduleGate, polishWorkActive, polishScrubberRoom, polishToolsTriggerId)
 
 {-| Onyx Elm application core — pure Model/Msg/update for the revamped
 UI, wired to the parity core (`Wire`, `Isupport`, `Modes`, `Session`,
@@ -288,8 +288,25 @@ redactedBody =
     "[Message deleted]"
 
 
+{-| The text a row shows. v3/gap-commands: a CTCP ACTION wrapper
+(`\x01ACTION waves\x01`, e.g. a sealed `/me` opened from its envelope)
+shows its action text only — the row view adds the `* nick` lead. -}
 displayBody : ChatMessage -> String
 displayBody message =
+    let
+        raw =
+            rawDisplayBody message
+    in
+    case ctcpActionText raw of
+        Just action ->
+            action
+
+        Nothing ->
+            raw
+
+
+rawDisplayBody : ChatMessage -> String
+rawDisplayBody message =
     if message.redacted || message.deleted then
         deletedPlaceholder
 
@@ -897,6 +914,12 @@ type alias Model =
     , palette : Switcher.Palette
     , shortcutsOpen : Bool
 
+    -- v3/gap-commands
+    , commandsHelpOpen : Bool
+    , paletteRecentIds : Dict String (List String)
+    , singleKeyShortcuts : Bool
+    , ctcpAwaiting : Dict String Float
+
     -- v3/frame
     , roomMenuOpen : Bool
 
@@ -1135,6 +1158,9 @@ type Outbound
     | NotifyPermissionRequest
       -- v3/polish
     | PolishFlagSave { key : String }
+    -- v3/gap-commands
+    | PaletteRecentsSave { owner : String, ids : List String }
+    | SingleKeysSave { enabled : Bool }
     | PwaInstallPrompt
     | PwaUpdateApprove
     | OfflineMemoNotice { channel : String, count : Int, firstMsgId : Int }
@@ -3226,6 +3252,12 @@ type Msg
     | ShortcutsOpen
     | ShortcutsClose
     | ShortcutPressed Switcher.Shortcut
+    -- v3/gap-commands
+    | CommandsHelpOpen
+    | CommandsHelpClose
+    | CommandsHelpInsert String
+    | SingleKeysToggle
+    | GapPrefsLoaded Decode.Value
     -- v3/account2
     | PeopleOpen
     | PeopleClose
@@ -3883,6 +3915,11 @@ init nick url =
     -- v3/switcher
     , palette = Switcher.closed
     , shortcutsOpen = False
+    -- v3/gap-commands
+    , commandsHelpOpen = False
+    , paletteRecentIds = Dict.empty
+    , singleKeyShortcuts = True
+    , ctcpAwaiting = Dict.empty
 
     -- v3/frame
     , roomMenuOpen = False
@@ -4463,6 +4500,11 @@ blank =
     -- v3/switcher
     , palette = Switcher.closed
     , shortcutsOpen = False
+    -- v3/gap-commands
+    , commandsHelpOpen = False
+    , paletteRecentIds = Dict.empty
+    , singleKeyShortcuts = True
+    , ctcpAwaiting = Dict.empty
 
     -- v3/frame
     , roomMenuOpen = False
@@ -7530,6 +7572,8 @@ isCtcpQueryBody isNotice sender ourNick body =
         && String.toLower sender /= String.toLower ourNick
         && String.startsWith "\u{0001}" body
         && String.endsWith "\u{0001}" body
+        -- v3/gap-commands: ACTION is a message (`/me`), never swallowed.
+        && ctcpActionText body == Nothing
 
 
 {-| Whether a wire line is a swallowed CTCP wrapper: a non-self
@@ -8066,15 +8110,21 @@ canEditRow model target messageId =
             False
 
         Just row ->
-            not (String.isEmpty row.from)
-                && String.toLower row.from == String.toLower model.ourNick
-                && row.msgType == "msg"
-                && not row.deleted
-                && not row.redacted
-                && not (messageLocked row)
-                -- v3/dm-key-hold: EDIT carries the new text in the clear, so
-                -- protected conversations offer no edit at all.
-                && not (plaintextWouldLeak model target)
+            row.msgType == "msg" && ownRowMutable model target row
+
+
+{-| Our own live, opened row in an unprotected conversation (the shared
+half of the edit and delete gates). -}
+ownRowMutable : Model -> String -> ChatMessage -> Bool
+ownRowMutable model target row =
+    not (String.isEmpty row.from)
+        && String.toLower row.from == String.toLower model.ourNick
+        && not row.deleted
+        && not row.redacted
+        && not (messageLocked row)
+        -- v3/dm-key-hold: EDIT carries the new text in the clear, so
+        -- protected conversations offer no edit at all.
+        && not (plaintextWouldLeak model target)
 
 
 {-| Whether our own message row may be redacted (mirroring the
@@ -8088,7 +8138,11 @@ canDeleteRow model target messageId =
             False
 
         Just row ->
-            canEditRow model target messageId && not row.pending
+            -- v3/gap-commands: an own `/me` row deletes like a message
+            -- (it is never editable — an edit would drop its action form).
+            (row.msgType == "msg" || row.msgType == "action")
+                && ownRowMutable model target row
+                && not row.pending
 
 
 {-| Request an edit of our own message (mirroring `editMessage`:
@@ -8421,7 +8475,12 @@ messageAccessibleLabel message =
         body =
             String.left 120 (displayBody message)
     in
-    message.from ++ suffix ++ ": " ++ body
+    -- v3/gap-commands: an action reads as a sentence ("kai waves").
+    if messageAction message /= Nothing then
+        message.from ++ suffix ++ " " ++ body
+
+    else
+        message.from ++ suffix ++ ": " ++ body
 
 
 {-| Typing line for a channel (mirroring the typing indicator:
@@ -8915,7 +8974,8 @@ fillPlaintext model messageId envelope plaintext =
                             List.map
                                 (\m ->
                                     if m.id == messageId && m.body == envelope then
-                                        { m | plaintext = Just plaintext }
+                                        -- v3/gap-commands: a sealed `/me` opens as an action row.
+                                        normalizeActionRow { m | plaintext = Just plaintext }
 
                                     else
                                         m
@@ -11169,7 +11229,8 @@ sendRawSlashCommand model target text =
                 leaks =
                     case args of
                         dest :: _ ->
-                            List.member (String.toUpper cmd) rawContentVerbs && plaintextWouldLeak model dest
+                            -- v3/gap-commands: every listed target, STATUSMSG-aware
+                            List.member (String.toUpper cmd) rawContentVerbs && destinationsLeak model dest
 
                         [] ->
                             False
@@ -11187,6 +11248,1062 @@ sendRawSlashCommand model target text =
         [] ->
             -- `String.split` never yields this; kept total.
             ( model, [] )
+
+
+-- v3/gap-commands
+
+
+{-| Action text of a CTCP ACTION body (`/me`): `\x01ACTION waves\x01`
+gives `Just "waves"`. The closing delimiter is optional on the wire
+(some clients drop it); stray delimiters inside never survive, so the
+text can never re-enter the CTCP parsers as a wrapper. -}
+ctcpActionText : String -> Maybe String
+ctcpActionText body =
+    if String.startsWith "\u{0001}ACTION" body then
+        let
+            rest =
+                String.dropLeft 7 body
+
+            inner =
+                if String.endsWith "\u{0001}" rest then
+                    String.dropRight 1 rest
+
+                else
+                    rest
+        in
+        if String.isEmpty inner then
+            Just ""
+
+        else if String.startsWith " " inner then
+            Just (String.filter (\c -> c /= '\u{0001}') (String.dropLeft 1 inner))
+
+        else
+            Nothing
+
+    else
+        Nothing
+
+
+{-| One line of user text for a single-line verb (`/me`, `/notice`,
+CTCP arguments): whitespace runs (newlines included) fold to one
+space and CTCP delimiters drop. -}
+slashLine : String -> String
+slashLine text =
+    String.words (String.filter (\c -> c /= '\u{0001}') text) |> String.join " "
+
+
+{-| The wire body of `/me <text>`. -}
+ctcpActionWire : String -> String
+ctcpActionWire text =
+    "\u{0001}ACTION " ++ slashLine text ++ "\u{0001}"
+
+
+{-| A row's action text when it is an action (`/me`) row — an inbound
+or vault row filed as `action`, or a sealed / echoed body whose
+opened text is an ACTION wrapper. -}
+messageAction : ChatMessage -> Maybe String
+messageAction message =
+    if message.deleted || message.redacted then
+        Nothing
+
+    else if message.msgType == "action" then
+        Just (displayBody message)
+
+    else if message.msgType == "msg" then
+        ctcpActionText (rawDisplayBody message)
+
+    else
+        Nothing
+
+
+{-| File an ACTION-wrapped row as an action row carrying its text
+(the opened plaintext for envelopes — the ciphertext body is never
+touched; the plain body otherwise). -}
+normalizeActionRow : ChatMessage -> ChatMessage
+normalizeActionRow message =
+    if message.msgType /= "msg" then
+        message
+
+    else
+        case message.plaintext of
+            Just plain ->
+                case ctcpActionText plain of
+                    Just action ->
+                        { message | plaintext = Just action, msgType = "action" }
+
+                    Nothing ->
+                        message
+
+            Nothing ->
+                if DmCipher.isEnvelope message.body || GroupEnvelope.isGroupEnvelope message.body then
+                    message
+
+                else
+                    case ctcpActionText message.body of
+                        Just action ->
+                            { message | body = action, msgType = "action" }
+
+                        Nothing ->
+                            message
+
+
+{-| Confirm an optimistic row with its echo body, keeping an own `/me`
+an action row. -}
+confirmEchoBody : String -> ChatMessage -> ChatMessage
+confirmEchoBody body message =
+    case ( message.plaintext, ctcpActionText body ) of
+        ( Nothing, Just action ) ->
+            { message | body = action, msgType = "action" }
+
+        _ ->
+            { message | body = body }
+
+
+{-| Whether plaintext to any of a raw destination list (`a,b`, with
+`STATUSMSG` prefixes) would bypass protection — fail-closed across
+every listed target. -}
+destinationsLeak : Model -> String -> Bool
+destinationsLeak model dest =
+    String.split "," dest
+        |> List.map (\d -> stripStatusmsgTarget model (String.trim d))
+        |> List.any (\d -> not (String.isEmpty d) && plaintextWouldLeak model d)
+
+
+{-| What a registry verb Onyx Server has no wire verb for becomes (the
+server answers `421` to `ME`, `MSG`, `J`, `OP`, `BAN`, `BACK`, `QUOTE`,
+`CTCP`, `STAGE`, `SHARE`…), plus the room-scoped verbs that need the
+active room filled in (`KICK`, `TOPIC`, `INVITE`, `PART`). -}
+type SlashPlan
+    = PlanContent { target : String, text : String, notice : Bool }
+    | PlanOpen { target : String, text : Maybe String, room : Bool }
+    | PlanLines (List String)
+    | PlanJoin String (Maybe String)
+    | PlanAway (Maybe String)
+    | PlanShare
+    | PlanInviteSheet String
+    | PlanStage String (Maybe Bool)
+    | PlanPing (Maybe String)
+    | PlanCtcp { target : String, command : String, args : String }
+    | PlanRaw String
+    | PlanTopicShow String
+    | PlanUsage String
+
+
+{-| First whitespace-delimited word and the trimmed remainder (inner
+spacing kept). -}
+slashSplit : String -> ( String, String )
+slashSplit text =
+    let
+        trimmed =
+            String.trimLeft text
+
+        word =
+            String.fromList (takeNonSpaceChars (String.toList trimmed))
+    in
+    ( word, String.trim (String.dropLeft (String.length word) trimmed) )
+
+
+{-| `MODE` lines granting / removing one list or status mode, three
+targets per line (the RFC 1459 `MODES` floor). -}
+slashModeLines : String -> String -> Char -> List String -> List String
+slashModeLines room sign letter targets =
+    case targets of
+        [] ->
+            []
+
+        _ ->
+            let
+                chunk =
+                    List.take 3 targets
+            in
+            Wire.formatIrcLine "MODE" (room :: (sign ++ String.repeat (List.length chunk) (String.fromChar letter)) :: chunk)
+                :: slashModeLines room sign letter (List.drop 3 targets)
+
+
+{-| Plan a slash line against the active conversation, or `Nothing`
+for verbs handled elsewhere (local verbs, real wire verbs like `NICK`
+and `MODE`). -}
+planSlash : Model -> String -> String -> Maybe SlashPlan
+planSlash model active text =
+    if not (String.startsWith "/" text) then
+        Nothing
+
+    else
+        let
+            body =
+                String.dropLeft 1 text
+
+            ( verbRaw, tail ) =
+                slashSplit body
+
+            verb =
+                String.toLower verbRaw
+
+            activeRoom =
+                if not (String.isEmpty active) && isChannelName model active then
+                    Just active
+
+                else
+                    Nothing
+
+            -- `/verb [#room] rest`: an explicit room first, else the open one.
+            inRoom rest =
+                let
+                    ( first, more ) =
+                        slashSplit rest
+                in
+                if not (String.isEmpty first) && isChannelName model first then
+                    Just ( first, more )
+
+                else
+                    Maybe.map (\room -> ( room, rest )) activeRoom
+
+            usage copy =
+                Just (PlanUsage copy)
+
+            roomOnly name =
+                "Use /" ++ name ++ " in a room, or /" ++ name ++ " #room …"
+
+            validNick raw =
+                Invite.parseNickname (Just raw)
+
+            grant name sign letter =
+                case inRoom tail of
+                    Nothing ->
+                        usage (roomOnly name)
+
+                    Just ( room, rest ) ->
+                        case List.filter (not << String.isEmpty) (String.words rest) of
+                            [] ->
+                                usage ("Use /" ++ name ++ " <nick>.")
+
+                            nicks ->
+                                Just (PlanLines (slashModeLines room sign letter nicks))
+
+            banVerb name sign =
+                case inRoom tail of
+                    Nothing ->
+                        usage (roomOnly name)
+
+                    Just ( room, rest ) ->
+                        case List.filter (not << String.isEmpty) (String.words rest) of
+                            [] ->
+                                usage ("Use /" ++ name ++ " <nick or nick!user@host>.")
+
+                            raws ->
+                                let
+                                    masks =
+                                        List.map (\raw -> ( raw, Ircx.normalizeAccessMask (Just raw) )) raws
+                                in
+                                case List.filter (\( _, mask ) -> mask == Nothing) masks of
+                                    ( bad, _ ) :: _ ->
+                                        usage ("\u{201C}" ++ bad ++ "\u{201D} isn't a nick or hostmask.")
+
+                                    [] ->
+                                        Just (PlanLines (slashModeLines room sign 'b' (List.filterMap Tuple.second masks)))
+        in
+        case verb of
+            "me" ->
+                if String.isEmpty active then
+                    usage "Open a conversation, then use /me <action>."
+
+                else if String.isEmpty (slashLine tail) then
+                    usage "Use /me <action>."
+
+                else
+                    Just (PlanContent { target = active, text = ctcpActionWire tail, notice = False })
+
+            "msg" ->
+                planOpen model "msg" tail
+
+            "query" ->
+                planOpen model "query" tail
+
+            "notice" ->
+                let
+                    ( dest, rest ) =
+                        slashSplit tail
+                in
+                if String.isEmpty dest || String.isEmpty (slashLine rest) then
+                    usage "Use /notice <nick or #room> <message>."
+
+                else if String.contains "," dest then
+                    usage "Send a notice to one nick or room at a time."
+
+                else
+                    Just (PlanContent { target = dest, text = slashLine rest, notice = True })
+
+            "j" ->
+                planJoin model tail
+
+            "join" ->
+                planJoin model tail
+
+            "part" ->
+                case inRoom tail of
+                    Nothing ->
+                        usage (roomOnly "part")
+
+                    Just ( room, reason ) ->
+                        Just
+                            (PlanLines
+                                [ Wire.formatIrcLine "PART"
+                                    (room
+                                        :: (if String.isEmpty reason then
+                                                []
+
+                                            else
+                                                [ slashLine reason ]
+                                           )
+                                    )
+                                ]
+                            )
+
+            "leave" ->
+                planSlash model active ("/part" ++ String.dropLeft (String.length verbRaw) body)
+
+            "topic" ->
+                case inRoom tail of
+                    Nothing ->
+                        usage (roomOnly "topic")
+
+                    Just ( room, topic ) ->
+                        if String.isEmpty (slashLine topic) then
+                            Just (PlanTopicShow room)
+
+                        else
+                            Just (PlanLines [ Wire.formatIrcLine "TOPIC" [ room, slashLine topic ] ])
+
+            "kick" ->
+                case inRoom tail of
+                    Nothing ->
+                        usage (roomOnly "kick")
+
+                    Just ( room, rest ) ->
+                        let
+                            ( nick, reason ) =
+                                slashSplit rest
+                        in
+                        if String.isEmpty nick then
+                            usage "Use /kick <nick> [reason]."
+
+                        else
+                            Just
+                                (PlanLines
+                                    [ Wire.formatIrcLine "KICK"
+                                        ([ room, nick ]
+                                            ++ (if String.isEmpty reason then
+                                                    []
+
+                                                else
+                                                    [ slashLine reason ]
+                                               )
+                                        )
+                                    ]
+                                )
+
+            "invite" ->
+                if String.isEmpty tail then
+                    case activeRoom of
+                        Just room ->
+                            Just (PlanInviteSheet room)
+
+                        Nothing ->
+                            usage "Open a room to share its invite link, or use /invite <nick> #room."
+
+                else
+                    let
+                        ( nick, rest ) =
+                            slashSplit tail
+
+                        ( maybeRoom, _ ) =
+                            slashSplit rest
+
+                        room =
+                            if isChannelName model maybeRoom then
+                                Just maybeRoom
+
+                            else
+                                activeRoom
+                    in
+                    case ( validNick nick, room ) of
+                        ( Nothing, _ ) ->
+                            usage ("\u{201C}" ++ nick ++ "\u{201D} isn't a valid nickname.")
+
+                        ( _, Nothing ) ->
+                            usage "Use /invite <nick> in a room, or /invite <nick> #room."
+
+                        ( Just valid, Just target ) ->
+                            Just (PlanLines [ Wire.formatIrcLine "INVITE" [ valid, target ] ])
+
+            "op" ->
+                grant "op" "+" 'o'
+
+            "deop" ->
+                grant "deop" "-" 'o'
+
+            "voice" ->
+                grant "voice" "+" 'v'
+
+            "devoice" ->
+                grant "devoice" "-" 'v'
+
+            "ban" ->
+                banVerb "ban" "+"
+
+            "unban" ->
+                banVerb "unban" "-"
+
+            "away" ->
+                Just
+                    (PlanAway
+                        (Just
+                            (if String.isEmpty (slashLine tail) then
+                                "Away"
+
+                             else
+                                slashLine tail
+                            )
+                        )
+                    )
+
+            "back" ->
+                Just (PlanAway Nothing)
+
+            "unaway" ->
+                Just (PlanAway Nothing)
+
+            "quote" ->
+                if String.isEmpty tail then
+                    usage "Use /quote <raw IRC line>."
+
+                else
+                    Just (PlanRaw tail)
+
+            "raw" ->
+                if String.isEmpty tail then
+                    usage "Use /raw <raw IRC line>."
+
+                else
+                    Just (PlanRaw tail)
+
+            "ctcp" ->
+                let
+                    ( dest, rest ) =
+                        slashSplit tail
+
+                    ( commandRaw, args ) =
+                        slashSplit rest
+
+                    command =
+                        String.toUpper commandRaw
+                in
+                if String.isEmpty dest || String.isEmpty command then
+                    usage "Use /ctcp <nick> <command> [arguments]."
+
+                else if String.contains "," dest then
+                    usage "Send a CTCP to one nick or room at a time."
+
+                else if String.length command > 32 || not (String.all Char.isAlphaNum command) then
+                    usage ("\u{201C}" ++ commandRaw ++ "\u{201D} isn't a CTCP command.")
+
+                else if command == "ACTION" then
+                    if String.isEmpty (slashLine args) then
+                        usage "Use /ctcp <nick> ACTION <action>."
+
+                    else
+                        Just (PlanContent { target = dest, text = ctcpActionWire args, notice = False })
+
+                else
+                    Just (PlanCtcp { target = dest, command = command, args = slashLine args })
+
+            "share" ->
+                Just PlanShare
+
+            "stage" ->
+                case activeRoom of
+                    Nothing ->
+                        usage "Use /stage in a room."
+
+                    Just room ->
+                        case String.toLower (String.trim tail) of
+                            "" ->
+                                Just (PlanStage room Nothing)
+
+                            "on" ->
+                                Just (PlanStage room (Just True))
+
+                            "off" ->
+                                Just (PlanStage room (Just False))
+
+                            _ ->
+                                usage "Use /stage on, /stage off, or /stage to see its state."
+
+            "ping" ->
+                if String.isEmpty tail then
+                    Just (PlanPing Nothing)
+
+                else
+                    case validNick (Tuple.first (slashSplit tail)) of
+                        Just nick ->
+                            Just (PlanPing (Just nick))
+
+                        Nothing ->
+                            usage "Use /ping, or /ping <nick>."
+
+            _ ->
+                Nothing
+
+
+{-| `/msg` and `/query`: open the conversation, then (when text
+follows) send it through the composer path. -}
+planOpen : Model -> String -> String -> Maybe SlashPlan
+planOpen model verb tail =
+    let
+        ( dest, rest ) =
+            slashSplit tail
+
+        text =
+            if String.isEmpty (String.trim rest) then
+                Nothing
+
+            else
+                Just rest
+    in
+    if String.isEmpty dest then
+        Just
+            (PlanUsage
+                (if verb == "query" then
+                    "Use /query <nick> [message]."
+
+                 else
+                    "Use /msg <nick> <message>."
+                )
+            )
+
+    else if String.contains "," dest then
+        Just (PlanUsage "Message one person or room at a time.")
+
+    else if isChannelName model dest then
+        if Dict.member (String.toLower dest) model.channels then
+            Just (PlanOpen { target = dest, text = text, room = True })
+
+        else
+            Just (PlanUsage ("Join " ++ dest ++ " first (/join " ++ dest ++ ")."))
+
+    else
+        case Invite.parseNickname (Just dest) of
+            Just nick ->
+                Just (PlanOpen { target = nick, text = text, room = False })
+
+            Nothing ->
+                Just (PlanUsage ("\u{201C}" ++ dest ++ "\u{201D} isn't a valid nickname."))
+
+
+{-| `/join` and `/j`: a bare name gets the `#`; one room opens on the
+self-JOIN echo (a room already joined just opens); a comma list goes
+out as written. -}
+planJoin : Model -> String -> Maybe SlashPlan
+planJoin model tail =
+    let
+        ( raw, rest ) =
+            slashSplit tail
+
+        ( key, _ ) =
+            slashSplit rest
+
+        maybeKey =
+            if String.isEmpty key then
+                Nothing
+
+            else
+                Just key
+    in
+    if String.isEmpty raw then
+        Just (PlanUsage "Use /join #room.")
+
+    else if String.contains "," raw then
+        Just (PlanLines [ Wire.formatIrcLine "JOIN" (raw :: Maybe.withDefault [] (Maybe.map List.singleton maybeKey)) ])
+
+    else
+        let
+            channel =
+                if isChannelName model raw then
+                    raw
+
+                else
+                    "#" ++ raw
+        in
+        case parseDeepLinkJoin channel of
+            Just valid ->
+                Just (PlanJoin valid maybeKey)
+
+            Nothing ->
+                Just (PlanUsage ("\u{201C}" ++ raw ++ "\u{201D} isn't a valid room name."))
+
+
+{-| The composer's slash dispatch: translated verbs first, then the
+local verbs, then the raw wire fallthrough for real server verbs. -}
+dispatchComposerSlash : Model -> String -> String -> ( Model, List Outbound )
+dispatchComposerSlash sending target outgoing =
+    case planSlash sending target outgoing of
+        Just plan ->
+            runSlashPlan sending target plan
+
+        Nothing ->
+            case parseSlashLocal outgoing of
+                Just ( verb, nickArg ) ->
+                    -- Local slash commands never hit the wire
+                    -- (online or offline, sealed or not —
+                    -- mirroring the oracle slash dispatch,
+                    -- which runs ahead of delivery). The
+                    -- stored draft drops with the dispatch
+                    -- (a kept visible draft re-seeds it on
+                    -- the next input or switch).
+                    Tuple.mapFirst (dropStoredDraftFor target) (runSlashLocal sending target verb nickArg)
+
+                Nothing ->
+                    if String.startsWith "/" outgoing then
+                        -- Unhandled verbs go out as raw
+                        -- uppercase IRC (mirroring the
+                        -- oracle `sendRaw` fallthrough).
+                        sendRawSlashCommand sending target outgoing
+
+                    else
+                        sendComposerText sending target
+
+
+gapToast : ToastVariant -> String -> String -> Model -> Model
+gapToast variant title description model =
+    addToast
+        { variant = variant
+        , title = title
+        , description =
+            if String.isEmpty description then
+                Nothing
+
+            else
+                Just description
+        , duration = Nothing
+        , groupKey = Nothing
+        , undo = Nothing
+        }
+        model.nowMs
+        model
+
+
+{-| Run one translated verb. Dispatched verbs consume the draft;
+usage problems and protection refusals keep it, with the reason inline.
+-}
+runSlashPlan : Model -> String -> SlashPlan -> ( Model, List Outbound )
+runSlashPlan model active plan =
+    let
+        consumed =
+            { model
+                | composer = ""
+                , composerDrafts = Dict.remove (String.toLower active) model.composerDrafts
+                , composerError = Nothing
+            }
+    in
+    case plan of
+        PlanUsage copy ->
+            ( { model | composerError = Just copy }, [] )
+
+        PlanContent req ->
+            sendSlashContent model active req
+
+        PlanOpen req ->
+            openSlashConversation model active req
+
+        PlanLines lines ->
+            ( consumed, List.map SendLine lines )
+
+        PlanJoin channel key ->
+            if Dict.member (String.toLower channel) model.channels then
+                updateCore (ChannelSelect channel) consumed
+
+            else
+                ( { consumed | pendingDeepLinkJoin = Just channel }
+                , [ SendLine (Wire.formatIrcLine "JOIN" (channel :: Maybe.withDefault [] (Maybe.map List.singleton key))) ]
+                )
+
+        PlanAway Nothing ->
+            let
+                ( back, out ) =
+                    setUserStatus consumed StatusOnline
+            in
+            ( gapToast ToastInfo "You're back" "Your away status is cleared." back, out )
+
+        PlanAway (Just message) ->
+            ( gapToast ToastInfo "You're away" message { consumed | userStatus = StatusIdle }
+            , [ SendLine (Wire.formatIrcLine "AWAY" [ message ]) ]
+            )
+
+        PlanShare ->
+            case activeRoomOf model active of
+                Just room ->
+                    ( consumed, [ ClipboardCopy { text = roomDeepLink model room, tag = roomLinkTag ++ room } ] )
+
+                Nothing ->
+                    ( gapToast ToastWarning "Share a room" "Open a room, then use /share to copy a deep link." consumed, [] )
+
+        PlanInviteSheet room ->
+            updateCore (InviteShareOpen room) consumed
+
+        PlanStage room mode ->
+            runSlashStage consumed room mode
+
+        PlanPing Nothing ->
+            let
+                latency =
+                    case model.latencyMs of
+                        Just ms ->
+                            String.fromInt ms ++ " ms round trip to this node at the last check. Checking again now."
+
+                        Nothing ->
+                            "Measuring the round trip to this node now."
+
+                sentAt =
+                    round model.nowMs
+
+                ( probed, probeOut ) =
+                    if model.pingPending == Nothing then
+                        ( { consumed | pingPending = Just { cookie = latencyCookie sentAt, sentAt = sentAt }, lastPingAt = model.nowMs }
+                        , [ SendLine (Wire.formatIrcLine "PING" [ latencyCookie sentAt ]) ]
+                        )
+
+                    else
+                        ( consumed, [] )
+            in
+            ( gapToast ToastInfo "Latency" latency probed, probeOut )
+
+        PlanPing (Just nick) ->
+            runSlashPlan model active (PlanCtcp { target = nick, command = "PING", args = String.fromInt (round model.nowMs) })
+
+        PlanCtcp req ->
+            if not (String.isEmpty req.args) && destinationsLeak model req.target then
+                ( { model | composerError = Just (rawSlashLeakCopy req.target) }, [] )
+
+            else
+                ( { consumed | ctcpAwaiting = Dict.insert (String.toLower req.target) model.nowMs (Dict.filter (\_ at -> model.nowMs - at < ctcpReplyWindowMs) model.ctcpAwaiting) }
+                , [ SendLine
+                        (Wire.formatIrcLine "PRIVMSG"
+                            [ req.target
+                            , "\u{0001}"
+                                ++ req.command
+                                ++ (if String.isEmpty req.args then
+                                        ""
+
+                                    else
+                                        " " ++ req.args
+                                   )
+                                ++ "\u{0001}"
+                            ]
+                        )
+                  ]
+                )
+
+        PlanRaw line ->
+            sendSlashRaw model consumed line
+
+        PlanTopicShow room ->
+            let
+                topic =
+                    Maybe.withDefault "" (Maybe.map .topic (Dict.get (String.toLower room) model.channels))
+            in
+            ( gapToast ToastInfo
+                ("Topic · " ++ room)
+                (if String.isEmpty (String.trim topic) then
+                    "No topic is set. Use /topic <text> to set one."
+
+                 else
+                    topic
+                )
+                consumed
+            , []
+            )
+
+
+activeRoomOf : Model -> String -> Maybe String
+activeRoomOf model active =
+    if not (String.isEmpty active) && isChannelName model active then
+        Just active
+
+    else
+        Nothing
+
+
+{-| How long a sent CTCP query waits for its reply notice. -}
+ctcpReplyWindowMs : Float
+ctcpReplyWindowMs =
+    60000
+
+
+{-| `/quote` / `/raw`: the line goes out verbatim — one line only, and
+never as a content verb that would bypass sealing or the key hold. -}
+sendSlashRaw : Model -> Model -> String -> ( Model, List Outbound )
+sendSlashRaw model consumed line =
+    let
+        parsed =
+            Wire.parseIrcMessage line
+
+        command =
+            String.toUpper parsed.command
+    in
+    if String.any (\c -> c == '\u{000D}' || c == '\n' || c == '\u{0000}') line then
+        ( { model | composerError = Just "A raw line must be a single line." }, [] )
+
+    else if String.isEmpty command then
+        ( { model | composerError = Just "Use /quote <raw IRC line>." }, [] )
+
+    else
+        case ( List.member command rawContentVerbs, parsed.params ) of
+            ( True, dest :: _ ) ->
+                if destinationsLeak model dest then
+                    ( { model | composerError = Just (rawSlashLeakCopy dest) }, [] )
+
+                else
+                    ( consumed, [ SendLine (line ++ "\u{000D}\n") ] )
+
+            _ ->
+                ( consumed, [ SendLine (line ++ "\u{000D}\n") ] )
+
+
+{-| Content verbs (`/me`, `/notice`, `/ctcp … ACTION`) ride the
+composer send path, so a designated DM or a required-encryption room
+seals and an unresolved DM holds — never plaintext. A notice to a
+protected target seals as a message (envelopes are only ever
+messages). A hold or refusal keeps the typed command. -}
+sendSlashContent : Model -> String -> { target : String, text : String, notice : Bool } -> ( Model, List Outbound )
+sendSlashContent model active req =
+    let
+        original =
+            model.composer
+
+        sameTarget =
+            String.toLower req.target == String.toLower active
+    in
+    if isBlockedDmTarget model req.target then
+        refuseBlockedDm model req.target
+
+    else if req.notice && not (destinationsLeak model req.target) then
+        ( { model
+            | composer = ""
+            , composerDrafts = Dict.remove (String.toLower active) model.composerDrafts
+            , composerError = Nothing
+          }
+        , [ SendLine (Wire.formatIrcLine "NOTICE" [ req.target, req.text ]) ]
+        )
+
+    else
+        let
+            ( sent, out ) =
+                sendComposerText { model | composer = req.text, composerError = Nothing } req.target
+        in
+        if not (String.isEmpty sent.composer) then
+            -- Held (key lookup) or refused (offline seal, no trust
+            -- store): the command stays for a retry or the consent.
+            ( { sent | composer = original }, out )
+
+        else if sameTarget then
+            ( sent, out )
+
+        else
+            -- Sent elsewhere: this conversation's draft is consumed, the
+            -- other's stored draft, reply arm and audience stay put.
+            ( { sent
+                | composerDrafts =
+                    case Dict.get (String.toLower req.target) model.composerDrafts of
+                        Just kept ->
+                            Dict.insert (String.toLower req.target) kept (Dict.remove (String.toLower active) sent.composerDrafts)
+
+                        Nothing ->
+                            Dict.remove (String.toLower active) sent.composerDrafts
+                , replyingTo = model.replyingTo
+                , composerAudience = model.composerAudience
+              }
+            , out
+            )
+
+
+{-| `/msg` and `/query`: open the room or DM (a fresh peer gets its
+shell, like New conversation), then send any text through the composer
+path in that conversation — so the seal, the key-lookup hold and the
+offline refusal all apply exactly as if it had been typed there. -}
+openSlashConversation : Model -> String -> { target : String, text : Maybe String, room : Bool } -> ( Model, List Outbound )
+openSlashConversation model active req =
+    if not req.room && isBlockedDmTarget model req.target then
+        refuseBlockedDm model req.target
+
+    else
+        let
+            leaving =
+                { model
+                    | composer = ""
+                    , composerDrafts = Dict.remove (String.toLower active) model.composerDrafts
+                    , composerError = Nothing
+                    , composerAudience = Nothing
+                }
+
+            shelled =
+                if req.room then
+                    leaving
+
+                else
+                    case ensureDmShellCapacity leaving req.target of
+                        ( room, True ) ->
+                            { room | channels = Dict.insert (String.toLower req.target) (ensureChannel room req.target) room.channels }
+
+                        ( _, False ) ->
+                            leaving
+
+            ( switched, switchOut ) =
+                updateCore (ChannelSelect req.target) shelled
+
+            stored =
+                switched.composer
+        in
+        case req.text of
+            Nothing ->
+                ( switched, switchOut )
+
+            Just text ->
+                let
+                    ( sent, sendOut ) =
+                        sendComposerText { switched | composer = text, composerError = Nothing } req.target
+                in
+                if String.isEmpty sent.composer && not (String.isEmpty stored) then
+                    -- The peer's own unsent draft comes back after the send.
+                    ( { sent | composer = stored, composerDrafts = Dict.insert (String.toLower req.target) stored sent.composerDrafts }
+                    , switchOut ++ sendOut
+                    )
+
+                else
+                    ( sent, switchOut ++ sendOut )
+
+
+{-| `/stage [on|off]` over the existing stage intents. -}
+runSlashStage : Model -> String -> Maybe Bool -> ( Model, List Outbound )
+runSlashStage model room mode =
+    let
+        live =
+            Stage.activeFor model.stage room
+    in
+    case mode of
+        Just True ->
+            if live then
+                ( gapToast ToastInfo "Stage" ("A stage is already live in " ++ room ++ ".") model, [] )
+
+            else if isChannelOp model room then
+                updateCore (StageStart room) model
+
+            else
+                ( gapToast ToastWarning "Stage" "Only room operators can start a stage." model, [] )
+
+        Just False ->
+            if live && model.stage.isHost then
+                updateCore StageEnd model
+
+            else if live then
+                updateCore StageLeave model
+
+            else
+                ( gapToast ToastInfo "Stage" ("No stage is running in " ++ room ++ ".") model, [] )
+
+        Nothing ->
+            ( gapToast ToastInfo
+                "Stage"
+                (if live then
+                    Stage.statusLine model.stage.isSpeaker
+
+                 else
+                    "No stage is running in " ++ room ++ ". Room operators can start one with /stage on."
+                )
+                model
+            , []
+            )
+
+
+{-| The in-app deep link to a room (mirroring the oracle `/share`:
+`${origin}/app/?join=<room>`). -}
+roomDeepLink : Model -> String -> String
+roomDeepLink model room =
+    model.origin ++ "/app/?join=" ++ Url.percentEncode room
+
+
+roomLinkTag : String
+roomLinkTag =
+    "room-link:"
+
+
+nodeAddressTag : String
+nodeAddressTag =
+    "node-address"
+
+
+{-| A CTCP reply notice we asked for (`/ctcp`, `/ping <nick>`) lands
+as a toast instead of a raw notice row; unsolicited ones keep the
+ordinary notice path. -}
+foldCtcpReplyNotice : Model -> Bool -> String -> String -> Maybe ( Model, List Outbound )
+foldCtcpReplyNotice model isNotice sender body =
+    let
+        key =
+            String.toLower sender
+
+        awaited =
+            case Dict.get key model.ctcpAwaiting of
+                Just at ->
+                    model.nowMs - at < ctcpReplyWindowMs
+
+                Nothing ->
+                    False
+    in
+    if not isNotice || not awaited || model.historyMerging then
+        Nothing
+
+    else
+        case parseCtcpQuery body of
+            Nothing ->
+                Nothing
+
+            Just reply ->
+                let
+                    detail =
+                        if reply.cmd == "PING" then
+                            case String.toInt (String.trim reply.arg) of
+                                Just sentAt ->
+                                    String.fromInt (max 0 (round model.nowMs - sentAt)) ++ " ms round trip."
+
+                                Nothing ->
+                                    slashLine reply.arg
+
+                        else
+                            slashLine reply.arg
+                in
+                Just
+                    ( gapToast ToastInfo
+                        (String.left 32 (slashLine reply.cmd) ++ " reply from " ++ sender)
+                        (if String.isEmpty detail then
+                            "(no details)"
+
+                         else
+                            String.left 300 detail
+                        )
+                        { model | ctcpAwaiting = Dict.remove key model.ctcpAwaiting }
+                    , []
+                    )
+
+
+{-| The CTCP side channels that file no row: inbound SCREENSHARE
+wrappers, then CTCP replies we asked for. -}
+foldCtcpSideChannel : Model -> Bool -> String -> String -> Maybe ( Model, List Outbound )
+foldCtcpSideChannel model isNotice sender body =
+    case foldScreenshareCtcp model sender body of
+        Just done ->
+            Just done
+
+        Nothing ->
+            foldCtcpReplyNotice model isNotice sender body
 
 
 {-| First slash arg, trimmed; blank (or absent) means no nick. -}
@@ -12976,28 +14093,28 @@ same order and copy; the suggestion query layer stays ahead — only the
 slashCommands : List SlashCommand
 slashCommands =
     [ { name = "me", usage = "/me <action>", description = "Send an action message.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "topic", usage = "/topic <text>", description = "Set or view the room topic.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "topic", usage = "/topic [#room] [text]", description = "Show or set the room topic.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "nick", usage = "/nick <nick>", description = "Change your nick.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "join", usage = "/join #room", description = "Join a room.", kind = SlashIrc, aliases = [ "j" ], insertText = Nothing, oper = False }
-    , { name = "part", usage = "/part [#room]", description = "Leave the current or named room.", kind = SlashIrc, aliases = [ "leave" ], insertText = Nothing, oper = False }
-    , { name = "msg", usage = "/msg <nick> <text>", description = "Send a private message.", kind = SlashIrc, aliases = [ "query" ], insertText = Nothing, oper = False }
+    , { name = "part", usage = "/part [#room] [reason]", description = "Leave the current or named room.", kind = SlashIrc, aliases = [ "leave" ], insertText = Nothing, oper = False }
+    , { name = "msg", usage = "/msg <nick> [text]", description = "Open a DM and send a message (encrypted where the DM is).", kind = SlashIrc, aliases = [ "query" ], insertText = Nothing, oper = False }
     , { name = "whois", usage = "/whois <nick>", description = "Request profile details.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "invite", usage = "/invite <nick>", description = "Invite someone into the room.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "invite", usage = "/invite [nick] [#room]", description = "Invite someone into the room; on its own, share the room's invite link.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "event", usage = "/event <YYYY-MM-DDThh:mmZ> <title>", description = "Schedule a room event (ops); /event clear to remove.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "webhook", usage = "/webhook <create|list|delete> ...", description = "Manage Discord-compatible incoming webhooks (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "notice", usage = "/notice <target> <text>", description = "Send a notice (no auto-reply expectation).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "away", usage = "/away [message]", description = "Set or clear away status.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "away", usage = "/away [message]", description = "Set yourself away, with an optional message; /back clears it.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "back", usage = "/back", description = "Clear away status.", kind = SlashIrc, aliases = [ "unaway" ], insertText = Nothing, oper = False }
     , { name = "mode", usage = "/mode <target> [modes]", description = "View or change room/user modes.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "modex", usage = "/modex [#room[,nick]]", description = "List named room modes (IRCX MODEX).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "kick", usage = "/kick <nick> [reason]", description = "Remove a person from the room (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "ban", usage = "/ban <mask>", description = "Ban a hostmask from the room (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "unban", usage = "/unban <mask>", description = "Remove a room ban (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "ban", usage = "/ban <nick or mask>", description = "Ban a nick or hostmask from the room (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "unban", usage = "/unban <nick or mask>", description = "Remove a room ban (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "op", usage = "/op <nick>", description = "Grant room operator (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "deop", usage = "/deop <nick>", description = "Remove room operator (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "voice", usage = "/voice <nick>", description = "Grant voice in a moderated room (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "devoice", usage = "/devoice <nick>", description = "Remove voice (ops).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "quote", usage = "/quote <raw>", description = "Send a raw IRC line (advanced).", kind = SlashIrc, aliases = [ "raw" ], insertText = Nothing, oper = False }
+    , { name = "quote", usage = "/quote <raw>", description = "Send a raw IRC line (advanced); messages to encrypted conversations are refused.", kind = SlashIrc, aliases = [ "raw" ], insertText = Nothing, oper = False }
     , { name = "clear", usage = "/clear", description = "Clear local scrollback for this view (this device only).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "ignore", usage = "/ignore <nick>", description = "Hide a nick and silence their notifications locally.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "unignore", usage = "/unignore <nick>", description = "Stop ignoring a nick.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
@@ -13017,12 +14134,12 @@ slashCommands =
     , { name = "export", usage = "/export [txt|json]", description = "Download local scrollback for this view (this device only).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "import", usage = "/import", description = "Import a vault snapshot file back into local history (this device only).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "notify", usage = "/notify all|mentions|mute", description = "Set personal notification mode for the current room.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "ping", usage = "/ping [nick]", description = "Latency check against the server or a peer.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "ctcp", usage = "/ctcp <nick> <cmd>", description = "Send a CTCP query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "ping", usage = "/ping [nick]", description = "Show the round trip to this node, or CTCP-ping someone.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "ctcp", usage = "/ctcp <nick> <command> [args]", description = "Send a CTCP query; the reply shows as a notice.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "stage", usage = "/stage [on|off]", description = "Toggle or query stage mode for the room.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "history", usage = "/history", description = "Open message search / history tools.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "search", usage = "/search <query>", description = "Open message search with a query.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
-    , { name = "help", usage = "/help [command]", description = "List local slash commands or describe one command.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
+    , { name = "help", usage = "/help [command]", description = "List every slash command, or describe one.", kind = SlashIrc, aliases = [], insertText = Nothing, oper = False }
     , { name = "broadcast", usage = "/broadcast <text>", description = "Announce to operators subscribed to ANNOUNCE (opers).", kind = SlashIrc, aliases = [ "wallops" ], insertText = Nothing, oper = True }
     , { name = "kill", usage = "/kill <nick> <reason>", description = "Disconnect someone from the network; the reason is recorded (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
     , { name = "rehash", usage = "/rehash", description = "Ask this node to reload its configuration (opers).", kind = SlashIrc, aliases = [], insertText = Nothing, oper = True }
@@ -14944,18 +16061,9 @@ runSlashLocal model target verb nickArg =
         ( "help", arg ) ->
             case String.toLower (Maybe.withDefault "" arg) of
                 "" ->
-                    ( addToast
-                        { variant = ToastInfo
-                        , title = "Local slash commands"
-                        , description = Just localSlashCommandList
-                        , duration = Nothing
-                        , groupKey = Nothing
-                        , undo = Nothing
-                        }
-                        model.nowMs
-                        { model | composer = "" }
-                    , []
-                    )
+                    -- v3/gap-commands: the full, grouped list of every verb
+                    -- that works, in its own sheet (`slashHelpGroups`).
+                    ( { model | composer = "", commandsHelpOpen = True, palette = Switcher.closed, shortcutsOpen = False }, [] )
 
                 needle ->
                     case findSlashCommand needle of
@@ -30287,7 +31395,8 @@ collapseEchoRows messageIds body channel =
                                 Just m
 
                             else if m.id == keepId then
-                                Just { m | body = body, pending = False, outboxId = Nothing }
+                                -- v3/gap-commands: an echoed `/me` keeps its action row.
+                                Just (confirmEchoBody body { m | pending = False, outboxId = Nothing })
 
                             else
                                 Nothing
@@ -34388,14 +35497,16 @@ renderOptimisticSend model target texts outgoing label audience =
                     , msgType = "msg"
                     , replyTo = Nothing
                     }
+                        -- v3/gap-commands: an own `/me` renders as an action row.
+                        |> normalizeActionRow
 
                 vaultRow =
                     { id = key ++ ":" ++ String.fromInt messageId
                     , target = key
                     , from = rendered.ourNick
-                    , body = text
+                    , body = chatMessage.body
                     , at = floor rendered.nowMs
-                    , rowType = "msg"
+                    , rowType = chatMessage.msgType
                     , deleted = False
                     , redacted = False
                     , replyTo = Nothing
@@ -34709,8 +35820,21 @@ foldChat model message isNotice =
                         sender =
                             Maybe.withDefault "" message.nick
 
-                        ( resolvedBody, inboundReply ) =
+                        ( wireBody, inboundReply ) =
                             resolveInboundReply model (dmFileBucket model bareTarget sender) message body
+
+                        -- v3/gap-commands: a CTCP ACTION (`/me`) files as an
+                        -- action row carrying its text (never the wrapper), so
+                        -- highlights, alerts and previews read the words.
+                        inboundAction =
+                            if isNotice then
+                                Nothing
+
+                            else
+                                ctcpActionText wireBody
+
+                        resolvedBody =
+                            Maybe.withDefault wireBody inboundAction
                     in
                     case
                         if model.historyMerging then
@@ -34723,7 +35847,7 @@ foldChat model message isNotice =
                             ( foldCtcpMutation model bareTarget sender parsed, [] )
 
                         Nothing ->
-                            case foldScreenshareCtcp model sender resolvedBody of
+                            case foldCtcpSideChannel model isNotice sender resolvedBody of
                                 Just done ->
                                     -- Inbound CTCP SCREENSHARE wrapper:
                                     -- START notifies, STOP swallows, both
@@ -34824,6 +35948,9 @@ foldChat model message isNotice =
                                                                                  , msgType =
                                                                                     if isNotice then
                                                                                         "notice"
+
+                                                                                    else if inboundAction /= Nothing && not placeholder then
+                                                                                        "action"
 
                                                                                     else
                                                                                         "msg"
@@ -36165,6 +37292,7 @@ settleSteps =
     , settleStepPolish -- v3/polish
     , settleStepCallsC8 -- v3/calls-c8
     , settleStepShell -- v3/ui-mobile-shell
+    , settleStepGapCommands -- v3/gap-commands
     ]
 
 
@@ -39036,26 +40164,9 @@ updateCore msg model =
                                     ( { model | composerError = Just "Commands can't be queued. Reconnect to run this command." }, [] )
 
                                 else
-                                    case parseSlashLocal outgoing of
-                                        Just ( verb, nickArg ) ->
-                                            -- Local slash commands never hit the wire
-                                            -- (online or offline, sealed or not —
-                                            -- mirroring the oracle slash dispatch,
-                                            -- which runs ahead of delivery). The
-                                            -- stored draft drops with the dispatch
-                                            -- (a kept visible draft re-seeds it on
-                                            -- the next input or switch).
-                                            Tuple.mapFirst (dropStoredDraftFor target) (runSlashLocal sending target verb nickArg)
-
-                                        Nothing ->
-                                            if String.startsWith "/" outgoing then
-                                                -- Unhandled verbs go out as raw
-                                                -- uppercase IRC (mirroring the
-                                                -- oracle `sendRaw` fallthrough).
-                                                sendRawSlashCommand sending target outgoing
-
-                                            else
-                                                sendComposerText sending target
+                                    -- v3/gap-commands: translated verbs, then local
+                                    -- verbs, then the raw wire fallthrough.
+                                    dispatchComposerSlash sending target outgoing
 
         ChannelLinkClicked raw ->
             -- A `#channel` link in a message body (mirrors the oracle
@@ -41996,6 +43107,22 @@ updateCore msg model =
         ShortcutPressed _ ->
             switcherUpdate msg model
 
+        -- v3/gap-commands
+        CommandsHelpOpen ->
+            gapCommandsUpdate msg model
+
+        CommandsHelpClose ->
+            gapCommandsUpdate msg model
+
+        CommandsHelpInsert _ ->
+            gapCommandsUpdate msg model
+
+        SingleKeysToggle ->
+            gapCommandsUpdate msg model
+
+        GapPrefsLoaded _ ->
+            gapCommandsUpdate msg model
+
         NewMessageOpen ->
             ( { model | newMessageOpen = True, newMessageRecipient = "" }, [] )
 
@@ -42986,7 +44113,7 @@ updateCore msg model =
                                                 { c
                                                     | messages =
                                                         List.take keepMessages
-                                                            ({ id = model.messageSeq
+                                                            (normalizeActionRow { id = model.messageSeq
                                                              , from = model.ourNick
                                                              , body = envelope
                                                              , whisper = False
@@ -43151,7 +44278,7 @@ updateCore msg model =
                                     { c
                                         | messages =
                                             List.take keepMessages
-                                                ({ id = model.messageSeq
+                                                (normalizeActionRow { id = model.messageSeq
                                                  , from = model.ourNick
                                                  , body = envelope
                                                  , whisper = False
@@ -43559,6 +44686,7 @@ mergeVaultRows model target rows =
             if List.isEmpty channel.messages then
                 let
                     toChat index row =
+                        normalizeActionRow
                         { id = index
                         , from = row.from
                         , body = row.body
@@ -43913,6 +45041,7 @@ mergeVaultAround model target anchor rows =
                         List.filter (\row -> not (List.member row.id model.vaultSeenIds)) rows
 
                     toChat index row =
+                        normalizeActionRow
                         { id = index
                         , from = row.from
                         , body = row.body
@@ -44103,13 +45232,14 @@ setComposerDraft model draft =
 {-| Palette rows for the current model: joined rooms, DMs, actions. -}
 paletteEntries : Model -> List Switcher.Entry
 paletteEntries model =
-    Switcher.entries (isChannelName model) model.activeChannel (Dict.values model.channels)
+    -- v3/gap-commands: People, the oracle action rows and the query grammar
+    Switcher.build (isChannelName model) (paletteContext model) model.palette.query (Dict.values model.channels) (palettePeople model)
 
 
 {-| Ranked palette rows in display (= navigation) order. -}
 paletteMatches : Model -> List Switcher.Matched
 paletteMatches model =
-    Switcher.matches model.palette.query (paletteEntries model)
+    Switcher.matchesWith (paletteRecents model) model.palette.query (paletteEntries model)
 
 
 {-| Global shell keys only act inside the connected app shell (never on
@@ -44208,6 +45338,18 @@ switcherUpdate msg model =
                 Switcher.CallChord name ->
                     callChord name model
 
+                -- v3/gap-commands: the shell chords act only in the app
+                -- shell, never under the palette or the shortcuts sheet.
+                Switcher.AppChord chord ->
+                    if shellKeysLive model && not palette.open && not model.shortcutsOpen && not model.commandsHelpOpen then
+                        runAppChord chord model
+
+                    else
+                        ( model, [] )
+
+                Switcher.SingleKeys enabled ->
+                    ( { model | singleKeyShortcuts = enabled }, [] )
+
                 Switcher.UnknownShortcut ->
                     ( model, [] )
 
@@ -44223,9 +45365,11 @@ runPaletteEntry index model =
 
         Just matched ->
             let
-                shut =
-                    { model | palette = Switcher.closed }
+                -- v3/gap-commands: the run row joins the owner's recents.
+                ( shut, recentOut ) =
+                    recordPaletteRecent matched.entry { model | palette = Switcher.closed }
             in
+            Tuple.mapSecond ((++) recentOut) <|
             case matched.entry.target of
                 Switcher.GoRoom name ->
                     updateCore (ChannelSelect name) shut
@@ -44260,6 +45404,647 @@ runPaletteEntry index model =
                 Switcher.Do Switcher.Leave ->
                     updateCore SessionDisconnect shut
 
+                other ->
+                    runGapPaletteTarget other shut
+
+-- v3/gap-commands — the palette, the shell chords, the commands sheet
+
+
+{-| Everything the palette knows about the shell. -}
+paletteContext : Model -> Switcher.Context
+paletteContext model =
+    let
+        active =
+            model.activeChannel
+
+        activeIsRoom =
+            Maybe.map (isChannelName model) active |> Maybe.withDefault False
+    in
+    { active = active
+    , activeIsRoom = activeIsRoom
+    , live = model.connection == Live
+    , starred = Maybe.map (isStarredRoom model) active |> Maybe.withDefault False
+    , muted = Maybe.map (\name -> notifyLevel model name == "none") active |> Maybe.withDefault False
+    , dnd = notifyDndActive model
+    , away = model.userStatus /= StatusOnline
+    , compact = model.prefs.transcriptDensity == Prefs.TranscriptCompact
+    , call =
+        if model.calls.lifecycle /= Media.Idle then
+            model.calls.channel
+
+        else
+            Nothing
+    , voice = activeIsRoom && model.prefs.voiceEntry
+    , node = Maybe.withDefault "" model.endpoint
+    , themes = List.map (\meta -> { id = meta.id, label = meta.label }) ThemeLook.themeMeta
+    , theme = model.themeId
+    }
+
+
+isStarredRoom : Model -> String -> Bool
+isStarredRoom model name =
+    Set.member (String.toLower name) model.starredChannels || Set.member name model.starredChannels
+
+
+{-| People the palette offers (mirroring the oracle `peopleCommands`:
+members of the open room without a DM row yet), then contacts. -}
+palettePeople : Model -> List Switcher.Person
+palettePeople model =
+    let
+        dmKeys =
+            Dict.values model.channels
+                |> List.filter (\c -> not (isChannelName model c.name))
+                |> List.map (\c -> String.toLower c.name)
+                |> Set.fromList
+
+        self =
+            String.toLower model.ourNick
+
+        eligible nick =
+            let
+                key =
+                    String.toLower nick
+            in
+            not (String.isEmpty key) && key /= self && not (Set.member key dmKeys)
+
+        members =
+            case model.activeChannel |> Maybe.andThen (\name -> Dict.get (String.toLower name) model.channels) of
+                Just room ->
+                    if isChannelName model room.name then
+                        Dict.values room.members
+                            |> List.map .nick
+                            |> List.filter eligible
+                            |> List.sortBy String.toLower
+                            |> List.take 200
+                            |> List.map (\nick -> { nick = nick, hint = "In " ++ room.name })
+
+                    else
+                        []
+
+                Nothing ->
+                    []
+
+        listed =
+            Set.fromList (List.map (\p -> String.toLower p.nick) members)
+
+        contacts =
+            Dict.values model.friends
+                |> List.filter (\f -> eligible f.nick && not (Set.member (String.toLower f.nick) listed))
+                |> List.sortBy (\f -> String.toLower f.nick)
+                |> List.take 100
+                |> List.map
+                    (\f ->
+                        { nick = f.nick
+                        , hint =
+                            if f.online then
+                                "Contact · online"
+
+                            else
+                                "Contact"
+                        }
+                    )
+    in
+    members ++ contacts
+
+
+{-| Recents belong to the device-memory owner; ownerless sessions keep
+them for the session only (key `""`, never persisted). -}
+recentsOwnerKey : Model -> String
+recentsOwnerKey model =
+    case deviceMemoryOwner model of
+        Just owner ->
+            owner.serverUrl ++ "|" ++ owner.identity
+
+        Nothing ->
+            ""
+
+
+paletteRecents : Model -> List String
+paletteRecents model =
+    Maybe.withDefault [] (Dict.get (recentsOwnerKey model) model.paletteRecentIds)
+
+
+recordPaletteRecent : Switcher.Entry -> Model -> ( Model, List Outbound )
+recordPaletteRecent entry model =
+    case Switcher.recentId entry of
+        Nothing ->
+            ( model, [] )
+
+        Just id ->
+            let
+                key =
+                    recentsOwnerKey model
+
+                next =
+                    Switcher.recordRecent id (paletteRecents model)
+            in
+            ( { model | paletteRecentIds = Dict.insert key next model.paletteRecentIds }
+            , if String.isEmpty key then
+                []
+
+              else
+                [ PaletteRecentsSave { owner = key, ids = next } ]
+            )
+
+
+{-| Boot snapshot from `ports.js`: `{ recents: { owner: [ids] },
+singleKeys: bool }`, validated fail-closed (at most 8 owners, 8 ids
+each, bounded strings). -}
+foldGapPrefs : Decode.Value -> Model -> Model
+foldGapPrefs raw model =
+    let
+        idList =
+            Decode.list Decode.string
+                |> Decode.map (List.filter (\id -> not (String.isEmpty id) && String.length id <= 200) >> List.take 8)
+
+        recents =
+            Decode.decodeValue (Decode.field "recents" (Decode.keyValuePairs idList)) raw
+                |> Result.withDefault []
+                |> List.filter (\( owner, _ ) -> not (String.isEmpty owner) && String.length owner <= 600)
+                |> List.take 8
+                |> Dict.fromList
+
+        singleKeys =
+            Decode.decodeValue (Decode.field "singleKeys" Decode.bool) raw
+                |> Result.withDefault model.singleKeyShortcuts
+    in
+    { model | paletteRecentIds = Dict.union model.paletteRecentIds recents, singleKeyShortcuts = singleKeys }
+
+
+{-| A palette run or a shell chord runs a local verb without touching
+the composer draft (the slash path clears it; these never came from
+the composer). -}
+runLocalVerb : Model -> String -> String -> Maybe String -> ( Model, List Outbound )
+runLocalVerb model target verb arg =
+    let
+        ( ran, out ) =
+            runSlashLocal model target verb arg
+    in
+    ( { ran | composer = model.composer }, out )
+
+
+{-| Join a room by name (a joined room just opens; a new one opens on
+the self-JOIN echo through the pending-join triple). -}
+joinRoomByName : Model -> String -> Maybe String -> ( Model, List Outbound )
+joinRoomByName model channel key =
+    if Dict.member (String.toLower channel) model.channels then
+        updateCore (ChannelSelect channel) model
+
+    else if model.connection /= Live then
+        ( model, [] )
+
+    else
+        ( { model | pendingDeepLinkJoin = Just channel }
+        , [ SendLine (Wire.formatIrcLine "JOIN" (channel :: Maybe.withDefault [] (Maybe.map List.singleton key))) ]
+        )
+
+
+{-| Open (or start) a DM from the palette's People rows, mirroring New
+conversation: a fresh peer gets its shell; blocked peers coach. -}
+openPersonDm : String -> Model -> ( Model, List Outbound )
+openPersonDm nick model =
+    let
+        shelled =
+            if isBlockedDmTarget model nick || isChannelName model nick then
+                model
+
+            else
+                case ensureDmShellCapacity model nick of
+                    ( room, True ) ->
+                        { room | channels = Dict.insert (String.toLower nick) (ensureChannel room nick) room.channels }
+
+                    ( _, False ) ->
+                        model
+    in
+    updateCore (MemberMessage nick) shelled
+
+
+{-| Run the palette's v3/gap-commands targets (`shut` already has the
+palette closed). -}
+runGapPaletteTarget : Switcher.Target -> Model -> ( Model, List Outbound )
+runGapPaletteTarget target shut =
+    let
+        activeTarget =
+            Maybe.withDefault "" shut.activeChannel
+    in
+    case target of
+        Switcher.GoPerson nick ->
+            openPersonDm nick shut
+
+        Switcher.ViewProfile nick ->
+            requestWhois shut nick
+
+        Switcher.Do (Switcher.JoinTyped room) ->
+            joinRoomByName shut room Nothing
+
+        Switcher.Do Switcher.Preferences ->
+            updateCore PrefsOpen shut
+
+        Switcher.Do Switcher.ThemeStudio ->
+            youHubGo Nav.YouAppearance shut
+
+        Switcher.Do Switcher.ScheduledMessages ->
+            updateCore (SetShowScheduledMessages True) shut
+
+        Switcher.Do Switcher.SlashCommands ->
+            ( { shut | commandsHelpOpen = True, shortcutsOpen = False }, [] )
+
+        Switcher.Do Switcher.SearchMessages ->
+            updateCore SearchOpen shut
+
+        Switcher.Do (Switcher.CopyRoomLink room) ->
+            ( shut, [ ClipboardCopy { text = roomDeepLink shut room, tag = roomLinkTag ++ room } ] )
+
+        Switcher.Do Switcher.CopyNodeAddress ->
+            case shut.endpoint of
+                Just node ->
+                    ( shut, [ ClipboardCopy { text = node, tag = nodeAddressTag } ] )
+
+                Nothing ->
+                    ( shut, [] )
+
+        Switcher.Do (Switcher.InvitePeople room) ->
+            updateCore (InviteShareOpen room) shut
+
+        Switcher.Do (Switcher.StartVoice room) ->
+            updateCore (CallJoin { channel = room, video = False }) shut
+
+        Switcher.Do Switcher.ReturnToCall ->
+            case shut.calls.channel of
+                Just room ->
+                    updateCore (CallsReturnToCall room) shut
+
+                Nothing ->
+                    ( shut, [] )
+
+        Switcher.Do Switcher.MarkAllRead ->
+            updateCore HomeMarkAllCaughtUp shut
+
+        Switcher.Do (Switcher.MarkRead name) ->
+            runLocalVerb shut name "read" Nothing
+
+        Switcher.Do (Switcher.CatchUp name) ->
+            updateCore (ChannelSelect name) shut
+
+        Switcher.Do (Switcher.LeaveRoom room) ->
+            if shut.connection == Live then
+                ( gapToast ToastInfo ("Leaving " ++ room) "" shut, [ SendLine (Wire.formatIrcLine "PART" [ room ]) ] )
+
+            else
+                ( shut, [] )
+
+        Switcher.Do (Switcher.ToggleStar room) ->
+            runLocalVerb shut
+                room
+                (if isStarredRoom shut room then
+                    "unstar"
+
+                 else
+                    "star"
+                )
+                Nothing
+
+        Switcher.Do (Switcher.ToggleMute room) ->
+            runLocalVerb shut
+                room
+                (if notifyLevel shut room == "none" then
+                    "unmute"
+
+                 else
+                    "mute"
+                )
+                Nothing
+
+        Switcher.Do Switcher.ToggleDnd ->
+            updateCore NotifyDndToggle shut
+
+        Switcher.Do (Switcher.PauseAlerts minutes) ->
+            runLocalVerb shut activeTarget "snooze" (Just (String.fromInt minutes))
+
+        Switcher.Do Switcher.ToggleAway ->
+            toggleAway shut
+
+        Switcher.Do Switcher.ToggleDensity ->
+            updateCore
+                (AppearanceSetPref
+                    { key = "transcriptDensity"
+                    , value =
+                        if shut.prefs.transcriptDensity == Prefs.TranscriptCompact then
+                            "grouped"
+
+                        else
+                            "irc"
+                    }
+                )
+                shut
+
+        Switcher.Do (Switcher.SwitchTheme id) ->
+            updateCore (AppearanceSetTheme { id = id }) shut
+
+        _ ->
+            ( shut, [] )
+
+
+toggleAway : Model -> ( Model, List Outbound )
+toggleAway model =
+    if model.userStatus == StatusOnline then
+        setUserStatus model StatusIdle
+            |> Tuple.mapFirst (gapToast ToastInfo "You're away" "Others see you as away.")
+
+    else
+        setUserStatus model StatusOnline
+            |> Tuple.mapFirst (gapToast ToastInfo "You're back" "Your away status is cleared.")
+
+
+{-| One shell chord (the oracle `shortcutsRegistry` handlers). -}
+runAppChord : Switcher.AppChord -> Model -> ( Model, List Outbound )
+runAppChord chord model =
+    let
+        order =
+            Switcher.conversationOrder (isChannelName model) (isStarredRoom model) (Dict.values model.channels)
+
+        active =
+            model.activeChannel
+
+        withActive run =
+            case active of
+                Just target ->
+                    run target
+
+                Nothing ->
+                    ( model, [] )
+
+        withRoom run =
+            withActive
+                (\target ->
+                    if isChannelName model target then
+                        run target
+
+                    else
+                        ( model, [] )
+                )
+
+        isUnread name =
+            case Dict.get (String.toLower name) model.channels of
+                Just c ->
+                    c.unread > 0 || c.highlights > 0
+
+                Nothing ->
+                    False
+    in
+    case chord of
+        Switcher.ConversationStep delta ->
+            case Switcher.stepConversation delta active order of
+                Just name ->
+                    updateCore (ChannelSelect name) model
+
+                Nothing ->
+                    ( model, [] )
+
+        Switcher.UnreadStep delta ->
+            case Switcher.stepUnread delta active order isUnread of
+                Just name ->
+                    updateCore (ChannelSelect name) model
+
+                Nothing ->
+                    ( gapToast ToastInfo "All caught up" "No other conversation has unread messages." model, [] )
+
+        Switcher.GoHome ->
+            updateCore (NavSelect Nav.Home) model
+
+        Switcher.GoJumpToDate ->
+            withActive (\_ -> updateCore JumpToDateOpen model)
+
+        Switcher.OpenPreferences ->
+            updateCore PrefsOpen model
+
+        Switcher.OpenAccount ->
+            updateCore (SetAccountOpen True) model
+
+        Switcher.MarkConversationRead ->
+            withActive (\target -> runLocalVerb model target "read" Nothing)
+
+        Switcher.ToggleDndChord ->
+            updateCore NotifyDndToggle model
+
+        Switcher.ToggleRoomMute ->
+            withRoom
+                (\room ->
+                    runLocalVerb model
+                        room
+                        (if notifyLevel model room == "none" then
+                            "unmute"
+
+                         else
+                            "mute"
+                        )
+                        Nothing
+                )
+
+        Switcher.ToggleRoomStar ->
+            withRoom
+                (\room ->
+                    runLocalVerb model
+                        room
+                        (if isStarredRoom model room then
+                            "unstar"
+
+                         else
+                            "star"
+                        )
+                        Nothing
+                )
+
+        Switcher.AttachFiles ->
+            -- The composer's own gates: protected DMs take no uploads.
+            withActive
+                (\target ->
+                    if dmDesignated model target then
+                        ( { model | composerError = Just dmAttachmentBlocked }, [] )
+
+                    else
+                        updateCore AttachPick model
+                )
+
+        Switcher.ScheduleSend ->
+            -- The tools tray's gate: a draft to schedule, no edit, no files.
+            withActive
+                (\_ ->
+                    let
+                        gate =
+                            polishScheduleGate model
+                    in
+                    if Schedule.canScheduleComposer gate then
+                        updateCore ScheduleOpen model
+
+                    else
+                        ( gapToast ToastInfo "Send later" (Maybe.withDefault "" (Schedule.scheduleComposerRefusal gate)) model, [] )
+                )
+
+        Switcher.ExportTranscript ->
+            withActive (\target -> runLocalVerb model target "export" (Just "txt"))
+
+        Switcher.FollowToggle ->
+            withActive
+                (\target ->
+                    let
+                        topic =
+                            if isChannelName model target then
+                                activeChannelTopic model target
+
+                            else
+                                Nothing
+
+                        following =
+                            Set.member (followKey target topic) model.followed
+
+                        ( next, out ) =
+                            if following then
+                                updateCore (UnfollowConversation { target = target, topic = topic }) model
+
+                            else
+                                updateCore (FollowConversation { target = target, topic = topic }) model
+                    in
+                    ( gapToast ToastInfo
+                        (if following then
+                            "Unfollowed " ++ target
+
+                         else
+                            "Following " ++ target
+                        )
+                        (if following then
+                            "You'll only hear about mentions here."
+
+                         else
+                            "New messages here land in your inbox."
+                        )
+                        next
+                    , out
+                    )
+                )
+
+
+{-| `v3/gap-commands` updates (the commands sheet, the single-key
+preference, the boot snapshot). -}
+gapCommandsUpdate : Msg -> Model -> ( Model, List Outbound )
+gapCommandsUpdate msg model =
+    case msg of
+        CommandsHelpOpen ->
+            if shellKeysLive model then
+                ( { model | commandsHelpOpen = True, palette = Switcher.closed, shortcutsOpen = False }, [] )
+
+            else
+                ( model, [] )
+
+        CommandsHelpClose ->
+            ( { model | commandsHelpOpen = False }, [] )
+
+        CommandsHelpInsert verb ->
+            case model.activeChannel of
+                Just _ ->
+                    ( { model | commandsHelpOpen = False, composer = "/" ++ verb ++ " ", composerError = Nothing }, [] )
+
+                Nothing ->
+                    ( { model | commandsHelpOpen = False }, [] )
+
+        SingleKeysToggle ->
+            let
+                next =
+                    not model.singleKeyShortcuts
+            in
+            ( { model | singleKeyShortcuts = next }, [ SingleKeysSave { enabled = next } ] )
+
+        GapPrefsLoaded raw ->
+            ( foldGapPrefs raw model, [] )
+
+        _ ->
+            ( model, [] )
+
+
+{-| Clipboard receipts for the room link (`/share`, the palette) and
+the node address. -}
+settleStepGapCommands : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
+settleStepGapCommands msg _ ( m, outs ) =
+    case msg of
+        ClipboardResult { tag, ok } ->
+            if String.startsWith roomLinkTag tag then
+                ( gapToast
+                    (if ok then
+                        ToastSuccess
+
+                     else
+                        ToastWarning
+                    )
+                    (if ok then
+                        "Room link copied"
+
+                     else
+                        "Copy failed"
+                    )
+                    (if ok then
+                        roomDeepLink m (String.dropLeft (String.length roomLinkTag) tag)
+
+                     else
+                        "Could not write the invite link to the clipboard."
+                    )
+                    m
+                , outs
+                )
+
+            else if tag == nodeAddressTag then
+                ( gapToast
+                    (if ok then
+                        ToastSuccess
+
+                     else
+                        ToastWarning
+                    )
+                    (if ok then
+                        "Node address copied"
+
+                     else
+                        "Copy failed"
+                    )
+                    (if ok then
+                        Maybe.withDefault "" m.endpoint
+
+                     else
+                        "Could not write the node address to the clipboard."
+                    )
+                    m
+                , outs
+                )
+
+            else
+                ( m, outs )
+
+        _ ->
+            ( m, outs )
+
+
+{-| The slash commands sheet (`/help`): every verb that works, grouped,
+registry order inside each group; operator verbs only for operators. -}
+slashHelpGroups : Bool -> List ( String, List SlashCommand )
+slashHelpGroups oper =
+    let
+        named names =
+            List.filterMap (\name -> List.head (List.filter (\c -> c.name == name) slashCommands)) names
+    in
+    [ ( "Messages", named [ "me", "msg", "notice", "ctcp", "ping" ] )
+    , ( "Rooms", named [ "join", "part", "topic", "invite", "share", "kick", "ban", "unban", "op", "deop", "voice", "devoice", "mode", "modex", "stage", "event", "webhook" ] )
+    , ( "You", named [ "nick", "away", "back", "whois", "ignore", "unignore", "highlight", "unhighlight", "snooze", "dnd" ] )
+    , ( "This device", named [ "read", "star", "unstar", "mute", "unmute", "notify", "autojoin", "unautojoin", "color", "clear", "search", "history", "export", "import", "help" ] )
+    , ( "Text", named [ "shrug", "tableflip", "unflip", "lenny", "disapprove" ] )
+    , ( "Advanced", named [ "quote" ] )
+    ]
+        ++ (if oper then
+                [ ( "Operators", named [ "broadcast", "kill", "rehash", "privs", "events", "observe" ] ) ]
+
+            else
+                []
+           )
+
+
 -- v3/frame
 
 
@@ -44292,6 +46077,8 @@ overlayStack model =
         , ( "call-ring-out", model.calls.lifecycle == Media.RingingOut, CallCancel )
         , ( "media-lightbox", model.mediaLightbox /= Nothing, MediaLightboxClose )
         , ( "shortcuts", model.shortcutsOpen, ShortcutsClose )
+        -- v3/gap-commands
+        , ( "commands-help", model.commandsHelpOpen, CommandsHelpClose )
         , ( "palette", model.palette.open, PaletteClose )
         , ( "reaction-picker", model.reactionPicker /= Nothing, ReactionPickerClose )
         , ( "message-menu", model.messageMenu /= Nothing, MessageMenuClose )

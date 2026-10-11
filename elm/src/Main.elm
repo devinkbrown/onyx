@@ -554,6 +554,18 @@ scope rules and sends a short shortcut name. -}
 port shortcut : (String -> msg) -> Sub msg
 
 
+{-| v3/gap-commands — the palette recents (per device-memory owner) and
+the single-key shortcuts preference, saved to `localStorage` by
+`ports.js`, which sends the boot snapshot back once at wire time. -}
+port paletteRecentsSave : { owner : String, ids : List String } -> Cmd msg
+
+
+port singleKeysSave : { enabled : Bool } -> Cmd msg
+
+
+port gapPrefsLoaded : (Decode.Value -> msg) -> Sub msg
+
+
 port transcriptDownload : { filename : String, body : String, mime : String } -> Cmd msg
 
 port mediaSave : { href : String, name : String } -> Cmd msg
@@ -1351,6 +1363,13 @@ perform key outbound =
         App.PolishFlagSave req ->
             polishFlagSave req
 
+        -- v3/gap-commands
+        App.PaletteRecentsSave req ->
+            paletteRecentsSave req
+
+        App.SingleKeysSave req ->
+            singleKeysSave req
+
         App.PwaInstallPrompt ->
             pwaInstallPrompt ()
 
@@ -1613,6 +1632,8 @@ subscriptions model =
         , visibilityChanged (\state -> App.VisibilityChanged { visible = state.visible, focused = state.focused })
         , searchHotkey (\_ -> App.SearchHotkey)
         , shortcut (\name -> App.ShortcutPressed (Switcher.shortcutFromString name))
+        -- v3/gap-commands
+        , gapPrefsLoaded App.GapPrefsLoaded
         , retentionPolicyLoaded App.RetentionPolicyLoaded
         , retentionPolicyApplied (\receipt -> App.RetentionPolicyApplied { saved = receipt.saved, pruned = receipt.pruned })
         , vaultRows App.VaultRowsReceived

@@ -9874,10 +9874,9 @@ suite =
                         update ComposerSend { blank | activeChannel = Just "#c", composer = "/help frobnicate" }
                 in
                 Expect.all
-                    [ \_ -> Expect.equal [ "Local slash commands" ] (List.map .title bare.toasts)
-                    , \_ ->
-                        Expect.equal [ "/clear · /ignore · /read · /star · /mute · /autojoin · /highlight · /snooze · /dnd · /color · /share · /export · /notify · /search · /help" ]
-                            (List.filterMap .description bare.toasts)
+                    -- v3/gap-commands: bare /help opens the full slash-commands sheet.
+                    [ \_ -> Expect.equal [] (List.map .title bare.toasts)
+                    , \_ -> Expect.equal ( True, "" ) ( bare.commandsHelpOpen, bare.composer )
                     , \_ -> Expect.equal [] bareOut
                     , \_ -> Expect.equal [ "/mute [#channel]" ] (List.map .title hit.toasts)
                     , \_ ->
@@ -18247,15 +18246,22 @@ suite =
                             Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = text })
                     in
                     Expect.all
-                        [ \_ -> Expect.equal [ SendLine "AWAY Gone fishing\r\n" ] (send "/away Gone fishing")
+                        -- v3/gap-commands: registry verbs Onyx Server has no
+                        -- wire verb for are translated (GapCommandsTest); real
+                        -- server verbs still go out as written.
+                        [ \_ -> Expect.equal [ SendLine "AWAY :Gone fishing\r\n" ] (send "/away Gone fishing")
                         , \_ -> Expect.equal [ SendLine "AWAY away\r\n" ] (send "/AWAY away")
                         , \_ -> Expect.equal [ SendLine "JOIN #c\r\n" ] (send "  /join #c  ")
-                        -- v3/dm-key-hold: a raw content verb to an unresolved DM peer is refused.
-                        , \_ -> Expect.equal [] (send "/msg bob hi")
+                        , \_ -> Expect.equal [ SendLine "NICK kai\r\n" ] (send "/nick kai")
+                        , \_ -> Expect.equal [ SendLine "MODE #c +m\r\n" ] (send "/mode #c +m")
+                        -- v3/dm-key-hold: content to an unresolved DM peer never leaves as plaintext.
+                        , \_ -> Expect.equal False (List.any (\o -> o == SendLine "PRIVMSG bob hi\r\n") (send "/msg bob hi"))
                         , \_ ->
-                            Expect.equal [ SendLine "MSG bob hi\r\n" ]
-                                (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
-                        , \_ -> Expect.equal [ SendLine "QUOTE  a\r\n" ] (send "/quote  a")
+                            Expect.equal True
+                                (List.member (SendLine "PRIVMSG bob hi\r\n")
+                                    (Tuple.second (update ComposerSend { blank | ourNick = "alice", activeChannel = Just "#c", composer = "/msg bob hi", dmKeyAnswered = Set.singleton "bob" }))
+                                )
+                        , \_ -> Expect.equal [ SendLine "a\r\n" ] (send "/quote  a")
                         , \_ -> Expect.equal [ SendLine "\r\n" ] (send "/")
                         ]
                         ()
@@ -21014,7 +21020,7 @@ suite =
                         ()
             ]
         , describe "CTCP queries"
-            [ test "inbound ACTION is swallowed with no row and no reply" <|
+            [ test "inbound ACTION files an action row and never replies" <|
                 \_ ->
                     let
                         room =
@@ -21023,9 +21029,16 @@ suite =
                         ( acted, outs ) =
                             feed room ":bob!u@h PRIVMSG #c :\u{0001}ACTION waves\u{0001}"
                     in
+                    -- v3/gap-commands: `/me` lines are messages, not queries.
                     Expect.all
-                        [ \_ -> Expect.equal [] (dmMessages acted "#c")
-                        , \_ -> Expect.equal [] outs
+                        [ \_ -> Expect.equal [ ( "bob", "waves", "action" ) ] (List.map (\m -> ( m.from, m.body, m.msgType )) (dmMessages acted "#c"))
+                        , \_ -> Expect.equal [] (List.filter (\o -> case o of
+                                                                    SendLine _ ->
+                                                                        True
+
+                                                                    _ ->
+                                                                        False
+                                                               ) outs)
                         ]
                         ()
             , test "unknown CTCP is swallowed silently" <|
