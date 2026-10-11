@@ -90,6 +90,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Modes
+import Services
 import Set exposing (Set)
 import Wire
 
@@ -697,43 +698,24 @@ memoMaxLength =
     400
 
 
-{-| `MEMO` lines (`handleMemo` `server.zig:52990`). -}
+{-| `MEMO` lines (`handleMemo` `server.zig:52990`), through `Services.memo`.
+A bare `FORWARD` asks for the current target; the 400-character cap and the
+one-line rule are checked here before the text goes to the builder.
+-}
 memoLine : List String -> Maybe String
 memoLine args =
     case args of
-        [ "LIST" ] ->
-            Just (Wire.formatIrcLine "MEMO" [ "LIST" ])
-
-        [ "CLEAR" ] ->
-            Just (Wire.formatIrcLine "MEMO" [ "CLEAR" ])
-
         [ "FORWARD" ] ->
             Just (Wire.formatIrcLine "MEMO" [ "FORWARD" ])
 
-        [ "FORWARD", "OFF" ] ->
-            Just (Wire.formatIrcLine "MEMO" [ "FORWARD", "OFF" ])
-
-        [ "FORWARD", account ] ->
-            Maybe.map (\a -> Wire.formatIrcLine "MEMO" [ "FORWARD", a ]) (wireToken account)
-
-        [ "IGNORE", "LIST" ] ->
-            Just (Wire.formatIrcLine "MEMO" [ "IGNORE", "LIST" ])
-
-        [ "IGNORE", "ADD", account ] ->
-            Maybe.map (\a -> Wire.formatIrcLine "MEMO" [ "IGNORE", "ADD", a ]) (wireToken account)
-
-        [ "IGNORE", "DEL", account ] ->
-            Maybe.map (\a -> Wire.formatIrcLine "MEMO" [ "IGNORE", "DEL", a ]) (wireToken account)
-
         [ "SEND", account, text ] ->
-            case ( wireToken account, cleanText memoMaxLength text ) of
-                ( Just a, Just t ) ->
-                    Just (Wire.formatIrcLine "MEMO" [ "SEND", a, t ])
+            cleanText memoMaxLength text
+                |> Maybe.andThen (\t -> Services.memo "SEND" [ account, t ])
 
-                _ ->
-                    Nothing
+        sub :: rest ->
+            Services.memo sub rest
 
-        _ ->
+        [] ->
             Nothing
 
 
@@ -778,13 +760,13 @@ autojoinLine : String -> Maybe String -> Maybe String
 autojoinLine sub channel =
     case ( sub, channel ) of
         ( "LIST", Nothing ) ->
-            Just (Wire.formatIrcLine "AUTOJOIN" [ "LIST" ])
+            Services.autojoin "LIST" []
 
         ( "ADD", Just c ) ->
-            Maybe.map (\x -> Wire.formatIrcLine "AUTOJOIN" [ "ADD", x ]) (wireToken c)
+            wireToken c |> Maybe.andThen (\t -> Services.autojoin "ADD" [ t ])
 
         ( "DEL", Just c ) ->
-            Maybe.map (\x -> Wire.formatIrcLine "AUTOJOIN" [ "DEL", x ]) (wireToken c)
+            wireToken c |> Maybe.andThen (\t -> Services.autojoin "DEL" [ t ])
 
         _ ->
             Nothing
@@ -811,7 +793,7 @@ whowasLine nick =
 
 seenLine : String -> Maybe String
 seenLine account =
-    Maybe.map (\a -> Wire.formatIrcLine "SEEN" [ a ]) (wireToken account)
+    Services.seen account
 
 
 utf8Bytes : String -> Int
@@ -2000,10 +1982,10 @@ foldWire ctx message state =
                     ( reasserted, effects ) =
                         reassertModes ctx { settled | reassert = False }
                 in
-                done reasserted effects
+                observe reasserted effects
 
             else
-                done settled []
+                observe settled []
 
         "MODE" ->
             -- `:me!u@h MODE me :+R-g` — the reflection of a self change.
@@ -2022,13 +2004,13 @@ foldWire ctx message state =
             -- `281 <me> <nick> :is on your accept list`
             case at 1 of
                 Just nick ->
-                    done { state | acceptBuffer = state.acceptBuffer ++ [ nick ] } []
+                    observe { state | acceptBuffer = state.acceptBuffer ++ [ nick ] } []
 
                 Nothing ->
-                    done state []
+                    observe state []
 
         "282" ->
-            done { state | accepts = state.acceptBuffer, acceptBuffer = [], acceptLoading = False, acceptKnown = True } []
+            observe { state | accepts = state.acceptBuffer, acceptBuffer = [], acceptLoading = False, acceptKnown = True } []
 
         "716" ->
             -- `716 <me> <target> :is in +g mode (must be accepted)`
@@ -2054,7 +2036,7 @@ foldWire ctx message state =
                 done { state | notedAt = Dict.insert key ctx.nowMs state.notedAt }
                     [ DmNote
                         { peer = target
-                        , text = "Not delivered — " ++ target ++ " approves new conversations first. Onyx let them know you'd like to talk. Once they accept, send your message again."
+                        , text = target ++ " approves new conversations first. Onyx let them know you'd like to talk. Once they accept, send your message again."
                         }
                     ]
 
@@ -2115,7 +2097,7 @@ foldWire ctx message state =
                 done state
                     [ DmNote
                         { peer = target
-                        , text = "Not delivered — " ++ target ++ " only accepts messages from people signed in to an Onyx account. Keep your name with an account to message them."
+                        , text = target ++ " only accepts messages from people signed in to an Onyx account. Keep your name with an account to message them."
                         }
                     ]
 
@@ -2138,10 +2120,10 @@ foldWire ctx message state =
                 masks =
                     str 1 |> String.split "," |> List.map String.trim |> List.filter (not << String.isEmpty)
             in
-            done { state | silenceBuffer = state.silenceBuffer ++ masks } []
+            observe { state | silenceBuffer = state.silenceBuffer ++ masks } []
 
         "272" ->
-            done { state | silenced = state.silenceBuffer, silenceBuffer = [], silenceLoading = False, silenceKnown = True } []
+            observe { state | silenced = state.silenceBuffer, silenceBuffer = [], silenceLoading = False, silenceKnown = True } []
 
         "314" ->
             -- `314 <me> <nick> <user> <host> * :<realname>`

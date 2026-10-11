@@ -305,7 +305,7 @@ modeTests =
                         Expect.all
                             [ \_ -> Expect.equal [ "MODE kn +g\r\n", "MODE kn\r\n" ] (sent r.effects)
                             , \_ -> Expect.equal True (U.modePending r.state 'g')
-                            , \_ -> Expect.equal True r.consume
+                            , \_ -> Expect.equal False r.consume
                             ]
                             ()
 

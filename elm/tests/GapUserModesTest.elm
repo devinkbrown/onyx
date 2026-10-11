@@ -148,7 +148,7 @@ wireTests =
                         update (WsLineReceived ":onyx.test 001 kn :Welcome") { signedIn | connection = Registering }
                 in
                 Expect.equal True (List.member "MODE kn\r\n" (sends outs))
-        , test "221 seeds the switches without reaching the numeric log" <|
+        , test "221 seeds the switches and still reaches the numeric log" <|
             \_ ->
                 let
                     ( m, _ ) =
@@ -157,7 +157,7 @@ wireTests =
                 Expect.all
                     [ \_ -> Expect.equal True (UserModes.modeOn m.userModes 'R')
                     , \_ -> Expect.equal True (UserModes.modeOn m.userModes 'i')
-                    , \_ -> Expect.equal [] m.serviceLog
+                    , \_ -> Expect.equal [ "+iR" ] (List.take 1 m.serviceLog)
                     ]
                     ()
         , test "004 teaches which modes the server offers, and the old fold still runs" <|
@@ -463,11 +463,11 @@ scheduleTests =
 storageTests : Test
 storageTests =
     describe "owner-scoped storage"
-        [ test "the owner's slot is requested once it is known" <|
+        [ test "the owner's slot is requested when registration names the owner" <|
             \_ ->
                 let
                     ( m, outs ) =
-                        run (um UserModes.OpenPrivacyPanel) signedIn
+                        update (WsLineReceived ":onyx.test 001 kn :Welcome") { signedIn | connection = Registering }
                 in
                 Expect.all
                     [ \_ ->
@@ -486,6 +486,22 @@ storageTests =
                     , \_ -> Expect.equal True (m.userModesOwner /= Nothing)
                     ]
                     ()
+        , test "the same owner is not requested twice" <|
+            \_ ->
+                let
+                    ( once, _ ) =
+                        update (WsLineReceived ":onyx.test 001 kn :Welcome") { signedIn | connection = Registering }
+
+                    ( _, outs ) =
+                        update (WsLineReceived ":onyx.test 001 kn :Welcome") once
+                in
+                Expect.equal [] (List.filter (\o -> case o of
+                                                        UserModesRequest _ ->
+                                                            True
+
+                                                        _ ->
+                                                            False
+                                                ) outs)
         , test "stored wishes are re-applied when they arrive after 221" <|
             \_ ->
                 let
@@ -510,8 +526,14 @@ storageTests =
                     u =
                         signedIn.userModes
 
+                    before =
+                        { signedIn
+                            | userModesOwner = Just { serverUrl = "wss://irc.example", identity = "someone" }
+                            , userModes = { u | wanted = Set.fromList [ 'R' ], serverIgnore = True }
+                        }
+
                     ( m, _ ) =
-                        run (um UserModes.OpenPrivacyPanel) { signedIn | userModesOwner = Just { serverUrl = "wss://irc.example", identity = "someone" }, userModes = { u | wanted = Set.fromList [ 'R' ], serverIgnore = True } }
+                        update (WsLineReceived ":onyx.test 001 kn :Welcome") { before | connection = Registering }
                 in
                 Expect.all
                     [ \_ -> Expect.equal Set.empty m.userModes.wanted

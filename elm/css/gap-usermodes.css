@@ -354,6 +354,13 @@ button.um-choice.um-choice--on { border-color: var(--onyx-accent); background: v
 .um-choice__title { font-size: var(--text-sm); font-weight: 600; }
 .um-choice__hint { font-size: var(--text-2xs); line-height: var(--leading-snug); color: var(--onyx-dim); }
 
+/* The picker is narrow; with the extra choice it must never clip: the
+   custom-time row wraps and the popover may use a little more width. */
+.onyx-schedule-pop { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; }
+.onyx-schedule-pop .onyx-schedule-custom { flex-wrap: wrap; }
+.onyx-schedule-pop .onyx-schedule-when { flex: 1 1 160px; min-width: 0; }
+.onyx-schedule-pop .onyx-schedule-sub { overflow-wrap: anywhere; }
+
 /* ── scheduled sheet: held by the server ──────────────────────────── */
 
 .um-held-wrap:empty { display: none; }

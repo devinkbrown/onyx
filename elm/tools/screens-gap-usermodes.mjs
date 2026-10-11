@@ -243,9 +243,12 @@ export default {
   },
   'um-dm-note': async (page, h) => {
     const inject = await boot(page, h, { account: 'kn' });
-    await dm(page, h, inject, 'mira');
-    await clickVisible(page, ['[data-testid="room-back"]'], h).catch(() => {});
-    await slash(page, h, '/query mira');
+    await dm(page, h, inject, 'mira', 'hey - are you around?');
+    await page.evaluate(() => {
+      const el = [...document.querySelectorAll('button, a, li')].find((b) => /mira/.test(b.textContent || '') && !/Message requests/.test(b.textContent || '') && b.offsetParent);
+      if (el) el.click();
+    });
+    await h.settle(page, 500);
     await inject(`:${NET} 716 kn mira :is in +g mode (must be accepted)`, `:${NET} 717 kn mira :has been informed that you messaged them`);
   },
   'um-memo': async (page, h) => {
@@ -331,10 +334,17 @@ export default {
     await h.tryClick(page, '[data-testid="composer-schedule"]');
     await clickVisible(page, ['[data-testid="um-where-server"]'], h);
     await clickVisible(page, ['.onyx-schedule-preset'], h);
-    await h.settle(page, 500);
+    await h.settle(page, 600);
+    await page.fill('#shell-composer-input', 'and a local one');
+    await h.tryClick(page, '[data-testid="composer-more-tools"]');
+    await h.tryClick(page, '[data-testid="composer-schedule"]');
+    await clickVisible(page, ['[data-testid="um-where-device"]'], h);
+    await clickVisible(page, ['.onyx-schedule-preset'], h);
+    await h.settle(page, 600);
+    await page.fill('#shell-composer-input', 'x');
     await h.tryClick(page, '[data-testid="composer-more-tools"]');
     await h.tryClick(page, '[data-testid="composer-schedule"]');
     await clickVisible(page, ['.onyx-schedule-view'], h);
-    await h.settle(page, 400);
+    await h.settle(page, 500);
   },
 };

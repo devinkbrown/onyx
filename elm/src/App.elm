@@ -20313,8 +20313,29 @@ requestIdentityProfile previous model =
                         ( { withOverrides | topicReadOwner = Just owner }
                         , [ TopicReadRequest { serverUrl = owner.serverUrl, identity = owner.identity } ]
                         )
+
+                -- v3/gap-usermodes: the privacy modes, server-ignore opt-in,
+                -- real name and held sends ride the same owner transition.
+                ( withUserModes, userModesOutbound ) =
+                    if withTopics.userModesOwner == Just owner then
+                        ( withTopics, [] )
+
+                    else
+                        ( { withTopics
+                            | userModesOwner = Just owner
+                            , userModes =
+                                -- The first owner starts from nothing; a new
+                                -- owner must not inherit the previous one's.
+                                if withTopics.userModesOwner == Nothing then
+                                    withTopics.userModes
+
+                                else
+                                    UserModes.clearOwned withTopics.userModes
+                          }
+                        , [ UserModesRequest { serverUrl = owner.serverUrl, identity = owner.identity } ]
+                        )
             in
-            ( withTopics, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound ++ overridesOutbound ++ topicsOutbound )
+            ( withUserModes, profileOutbound ++ aliasOutbound ++ contactsOutbound ++ ctcpOutbound ++ overridesOutbound ++ topicsOutbound ++ userModesOutbound )
 
 
 {-| Set our custom-status expiry (mirroring `setCustomStatusExpiry`:
@@ -44403,7 +44424,7 @@ applyUserModesEffect message effect model =
 
         UserModes.DmNote note ->
             if Dict.member (String.toLower note.peer) model.channels && not (isChannelName model note.peer) then
-                ( appendLiveRow model note.peer note.text message, [] )
+                ( appendLiveRow model note.peer ("Not delivered — " ++ note.text) message, [] )
 
             else
                 ( addToast
@@ -44585,9 +44606,9 @@ userModesAutojoinCopy model added =
             "Reconnect will no longer force-join this room from this device."
 
 
-{-| Post-update step: load the owner's stored wishes when the owner
-changes, end in-flight asks with the socket, and refresh the server-held
-lists when the sheet that shows them opens. -}
+{-| Post-update step: end in-flight asks with the socket and refresh the
+server-held lists when the sheet that shows them opens. The owner's stored
+wishes load with the other owner-scoped slots (`requestIdentityProfile`). -}
 settleStepUserModes : Msg -> Model -> ( Model, List Outbound ) -> ( Model, List Outbound )
 settleStepUserModes msg prior ( model, outs ) =
     let
@@ -44599,32 +44620,8 @@ settleStepUserModes msg prior ( model, outs ) =
                 _ ->
                     model
 
-        owner =
-            deviceMemoryOwner closed
-
-        ( loading, loadOuts ) =
-            case owner of
-                Just o ->
-                    if owner /= closed.userModesOwner then
-                        ( { closed
-                            | userModesOwner = owner
-                            , userModes =
-                                -- The first owner starts from nothing; a new
-                                -- owner must not inherit the previous one's.
-                                if closed.userModesOwner == Nothing then
-                                    closed.userModes
-
-                                else
-                                    UserModes.clearOwned closed.userModes
-                          }
-                        , [ UserModesRequest { serverUrl = o.serverUrl, identity = o.identity } ]
-                        )
-
-                    else
-                        ( closed, [] )
-
-                Nothing ->
-                    ( closed, [] )
+        loading =
+            closed
 
         privacyVisible m =
             m.prefsOpen && m.prefsCategory == PrefsPanel.Privacy
@@ -44668,7 +44665,7 @@ settleStepUserModes msg prior ( model, outs ) =
                 ( loading, [] )
                 opened
     in
-    ( refreshed, outs ++ loadOuts ++ refreshOuts )
+    ( refreshed, outs ++ refreshOuts )
 
 
 
