@@ -800,7 +800,7 @@
   box-shadow: var(--elev-3);
   animation: ui-sheet-pop var(--dur-base) var(--ease);
 }
-.onyx-toast--success { box-shadow: inset 3px 0 0 var(--onyx-accent), var(--elev-3); }
+.onyx-toast--success { box-shadow: inset 3px 0 0 var(--onyx-success), var(--elev-3); } /* v3/gap-appearance */
 .onyx-toast--danger { box-shadow: inset 3px 0 0 var(--onyx-bad), var(--elev-3); }
 .onyx-toast--warning { box-shadow: inset 3px 0 0 var(--onyx-warn), var(--elev-3); }
 .onyx-toast__dismiss { display: inline-grid; place-items: center; min-width: 32px; min-height: 32px; border-radius: var(--radius); }

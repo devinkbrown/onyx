@@ -63,7 +63,18 @@ function assetRoot() {
     rmSync(out, { recursive: true, force: true });
     throw new Error(`could not bundle the voice engine (needs the repo's esbuild; set ESBUILD=...): ${err.message}`, { cause: err });
   }
-  return { dir: here, appJs, voiceJs: join(out, "voice.js"), cleanup() { rmSync(out, { recursive: true, force: true }); } };
+  /* v3/gap-appearance: index.html also loads the background renderer
+     (backdrop.js), built by media/build-backdrop.mjs. */
+  try {
+    execFileSync(process.execPath, [join(here, "media/build-backdrop.mjs"), findEsbuild(), out], {
+      cwd: here,
+      stdio: ["ignore", "ignore", "inherit"],
+    });
+  } catch (err) {
+    rmSync(out, { recursive: true, force: true });
+    throw new Error(`could not bundle the background renderer (needs the repo's esbuild; set ESBUILD=...): ${err.message}`, { cause: err });
+  }
+  return { dir: here, appJs, voiceJs: join(out, "voice.js"), backdropJs: join(out, "backdrop.js"), cleanup() { rmSync(out, { recursive: true, force: true }); } };
 }
 
 function findEsbuild() {
@@ -93,6 +104,7 @@ function localResources(root, fetched) {
         fetched.push(rel);
         const file = rel === "app.js" && root.appJs ? root.appJs
           : rel === "voice.js" && root.voiceJs ? root.voiceJs
+          : rel === "backdrop.js" && root.backdropJs ? root.backdropJs
           : join(root.dir, rel);
         try {
           const type = rel.endsWith(".js") ? "application/javascript" : rel.endsWith(".css") ? "text/css" : "application/octet-stream";
@@ -163,6 +175,10 @@ async function boot(path, setup) {
     virtualConsole,
     beforeParse(window) {
       installSocketStub(window, log);
+      /* v3/gap-appearance: jsdom has no 2D canvas (it logs "not
+         implemented"); model a browser without one, so the background
+         renderer's fail-closed path runs (no scene, opaque ground). */
+      window.HTMLCanvasElement.prototype.getContext = () => null;
       if (setup) setup(window);
       window.addEventListener("error", (e) => errors.push(`window.error: ${e.message}`));
       if (!window.matchMedia) {
@@ -214,6 +230,11 @@ test("compiled bundle boots at /app, connects through the gate, joins and sends"
     /* v3/calls-engine: the voice engine mounts before ports.js wires it. */
     assert.ok(loader.fetched.some((f) => /^voice(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads the voice engine");
     assert.equal(typeof window.OnyxVoiceEngine?.joinVoice, "function", "window.OnyxVoiceEngine is mounted");
+    /* v3/gap-appearance: the background renderer mounts before ports.js. */
+    assert.ok(loader.fetched.some((f) => /^backdrop(\.[0-9a-f]+)?\.js$/.test(f)), "index.html loads the background renderer");
+    assert.equal(typeof window.OnyxBackdrop?.render, "function", "window.OnyxBackdrop is mounted");
+    assert.equal(doc.documentElement.dataset.scene, undefined, "no 2D context: the scene never claims the ground");
+    assert.equal(doc.getElementById("onyx-scene"), null, "no 2D context: no canvas left behind");
     /* Video is switched off on the live network (codec too heavy for the
        stock SendQ): the engine says so and refuses to start a camera. */
     assert.equal(window.OnyxVoiceEngine.videoEnabled, false, "video is switched off");

@@ -7,7 +7,7 @@
  *   node tools/elm-overlay.mjs <dist> <elm-dist>
  *
  * <elm-dist> is the output of elm/tools/build.sh (hashed app.*.js,
- * voice.*.js, voice-worker.*.js, ports.*.js, app.*.css, css/*.css,
+ * voice.*.js, voice-worker.*.js, backdrop.*.js, ports.*.js, app.*.css, css/*.css,
  * index.html, opcodec_wasm.{js,wasm}).
  *
  * 1. Copies the hashed Elm assets to <dist>/assets/elm/ (the deploy's
@@ -45,7 +45,7 @@ const assetOut = join(dist, 'assets', 'elm');
 mkdirSync(join(assetOut, 'css'), { recursive: true });
 const copied = [];
 for (const name of readdirSync(elmDist)) {
-  if (/^(app|ports|voice|voice-worker)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
+  if (/^(app|ports|voice|voice-worker|backdrop)\.[0-9a-f]{12}\.(js|css)$/.test(name)) {
     copyFileSync(join(elmDist, name), join(assetOut, name));
     copied.push(name);
   }
@@ -63,6 +63,9 @@ if (!copied.some((n) => /^app\..*\.js$/.test(n))) fail('hashed app.*.js not foun
 if (!copied.some((n) => /^ports\..*\.js$/.test(n))) fail('hashed ports.*.js not found in elm dist');
 if (!copied.some((n) => /^voice\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice.*.js (calls engine) not found in elm dist');
 if (!copied.some((n) => /^voice-worker\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed voice-worker.*.js not found in elm dist');
+// v3/gap-appearance: the background renderer (window.OnyxBackdrop).
+if (!copied.some((n) => /^backdrop\.[0-9a-f]{12}\.js$/.test(n))) fail('hashed backdrop.*.js (background renderer) not found in elm dist');
+if (!copied.some((n) => /^css\/gap-appearance\.[0-9a-f]{12}\.css$/.test(n))) fail('hashed css/gap-appearance.*.css (theme bridge) not found in elm dist');
 // The engine loads its codec from the site root; Vite copies public/ there.
 for (const codec of ['opcodec_wasm.js', 'opcodec_wasm.wasm']) {
   if (!existsSync(join(dist, codec))) {

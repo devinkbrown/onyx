@@ -102,7 +102,7 @@ type alias ThemeMeta =
 
 themeMeta : List ThemeMeta
 themeMeta =
-    [ { id = "ocean", label = "Ocean", description = "The flagship — mineral night, quiet cyan signal, and matte, focused surfaces.", scheme = "dark", signatureBg = "deep-current", swatch = [ "#65adf5", "#b4bfca", "#343b43" ] }
+    [ { id = "ocean", label = "Ocean", description = "The flagship — abyssal night, one quiet sea-glass signal, and matte, focused surfaces.", scheme = "dark", signatureBg = "deep-current", swatch = [ "#46c08a", "#b4bfca", "#181e27" ] }
     , { id = "tide", label = "Ocean · Tide", description = "Shallow sunlit water — lifted azure surfaces, a more luminous crest, pale sand-cyan shallows.", scheme = "dark", signatureBg = "caustics", swatch = [ "#00b8ed", "#5dcbd1", "#12262e" ] }
     , { id = "abyss", label = "Ocean · Abyss", description = "The deep trench — near-black water, restrained azure that glows, high-contrast sea-foam.", scheme = "dark", signatureBg = "bioluminescence", swatch = [ "#0091cb", "#51a0ad", "#050c10" ] }
     , { id = "reef", label = "Ocean · Reef", description = "Living reef — azure current warmed by living coral. A touch more colour.", scheme = "dark", signatureBg = "caustics", swatch = [ "#0094bc", "#f19173", "#081a21" ] }

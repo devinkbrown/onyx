@@ -4,10 +4,11 @@ module View.Prefs exposing (prefsSheet)
 opened from the You hub → This device → Preferences.
 
 Ported categories: Display, Conversation, History & data, Import &
-export, Accessibility (the oracle's `App & tools` is not ported). Look,
-text size, density, and privacy switches stay on `/appearance` — the
-Display pane links there instead of duplicating them. Message density
-is a placeholder row here (owned by the density slice).
+export, Accessibility (the oracle's `App & tools` is not ported). Looks,
+backgrounds and privacy switches stay on `/appearance` — the Display
+pane links there. Text size, density and conversation width live here
+too (v3/gap-appearance), as do reactions, room tools and blocked link
+hosts under Conversation.
 
 Every preference write goes through the existing folds:
 `AppearanceSetPref` (storage + DOM apply), `SetVaultSearchMode`,
@@ -16,9 +17,9 @@ Every preference write goes through the existing folds:
 -}
 
 import App exposing (Model, Msg(..))
-import Html exposing (Html, button, div, h2, h3, li, nav, p, section, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, disabled, hidden, id, tabindex, type_)
-import Html.Events exposing (onClick, preventDefaultOn)
+import Html exposing (Html, button, div, h2, h3, input, label, li, nav, p, section, span, strong, text, ul)
+import Html.Attributes exposing (attribute, autocomplete, class, disabled, for, hidden, id, placeholder, spellcheck, tabindex, type_, value)
+import Html.Events exposing (on, onClick, preventDefaultOn)
 import Json.Decode as Decode
 import Nav
 import Prefs
@@ -160,12 +161,34 @@ panelBody : Model -> Category -> List (Html Msg)
 panelBody model category =
     case category of
         Display ->
-            [ sectionHead "Display" "Reading rhythm and transcript behavior. For look, text size, and motion, open Appearance."
+            [ sectionHead "Display" "Reading size, rhythm and width on this device. For looks and backgrounds, open Appearance."
             , appearanceLauncher
-            , section [ class "pref-group pref-placeholder", attribute "data-testid" "pref-density-placeholder" ]
-                [ h3 [ class "pref-label" ] [ text "Message density" ]
-                , p [ class "pref-desc" ] [ text "Compact, cozy, and roomy layouts are coming to this panel. Until then, set density in Appearance." ]
-                ]
+            -- v3/gap-appearance: text size, density and width apply live
+            -- everywhere (css/gap-appearance.css reads the <html> attributes).
+            , segmented
+                { groupId = "pref-font-scale"
+                , legend = "Text size"
+                , description = "Scales every label, message and control. Your browser's own text size still applies on top."
+                , options = [ ( "sm", "Small" ), ( "md", "Medium" ), ( "lg", "Large" ) ]
+                , current = Prefs.fontScaleToString model.prefs.fontScale
+                , onSelect = \value -> AppearanceSetPref { key = "fontScale", value = value }
+                }
+            , segmented
+                { groupId = "pref-density"
+                , legend = "Density"
+                , description = "Spacing between messages and list rows. Touch screens keep comfortable tap targets."
+                , options = [ ( "compact", "Compact" ), ( "cozy", "Cozy" ), ( "roomy", "Roomy" ) ]
+                , current = Prefs.densityToString model.prefs.density
+                , onSelect = \value -> AppearanceSetPref { key = "density", value = value }
+                }
+            , segmented
+                { groupId = "pref-width"
+                , legend = "Conversation width"
+                , description = "Measured keeps messages at a comfortable reading width on wide screens; Full uses the whole column."
+                , options = [ ( "measured", "Measured" ), ( "full", "Full" ) ]
+                , current = Prefs.widthToString model.prefs.width
+                , onSelect = \value -> AppearanceSetPref { key = "width", value = value }
+                }
             , segmented
                 { groupId = "pref-clock"
                 , legend = "Clock"
@@ -185,6 +208,30 @@ panelBody model category =
                 , description = "Removes the quiet system lines from the feed."
                 , value = model.prefs.hideEvents
                 }
+            -- v3/gap-appearance: reactions, room tools, blocked link hosts.
+            , segmented
+                { groupId = "pref-reaction-density"
+                , legend = "Reactions"
+                , description = "How much of each message's reactions to show."
+                , options = [ ( "full", "Full" ), ( "compact", "Fewer" ), ( "counts-only", "Totals" ), ( "hidden", "Hidden" ) ]
+                , current = Prefs.reactionDensityToString model.prefs.reactionDensity
+                , onSelect = \value -> AppearanceSetPref { key = "reactionDensity", value = value }
+                }
+            , toggle
+                { key = "voiceEntry"
+                , legend = "Calls"
+                , title = "Show join voice and video controls"
+                , description = "The room header's join-call button and live call presence."
+                , value = model.prefs.voiceEntry
+                }
+            , toggle
+                { key = "topicTools"
+                , legend = "Topics"
+                , title = "Show topic, forum and follow tools"
+                , description = "Named-conversation filters, forum cards and follow buttons in rooms."
+                , value = model.prefs.topicTools
+                }
+            , blockedHostsGroup model
             , section [ class "pref-group" ]
                 [ h3 [ class "pref-label" ] [ text "Alerts" ]
                 , p [ class "pref-desc" ] [ text "Desktop alerts, sound, do not disturb, keywords, and ignored people." ]
@@ -269,6 +316,46 @@ panelBody model category =
                 , value = model.prefs.highContrast
                 }
             ]
+
+
+{-| v3/gap-appearance — host suffixes that never get a link preview
+(commit on blur or Enter; entries are validated and normalized by
+`Prefs.parseBlockedHosts`, and the effective list is read back below). -}
+blockedHostsGroup : Model -> Html Msg
+blockedHostsGroup model =
+    let
+        current =
+            Prefs.formatBlockedHosts model.prefs.blockedHosts
+    in
+    section [ class "pref-group pref-blocked-hosts", attribute "data-testid" "pref-blocked-hosts" ]
+        [ div [ class "pref-group-head" ]
+            [ label [ class "pref-label", for "pref-blocked-hosts-input" ] [ text "Blocked link hosts" ] ]
+        , p [ class "pref-desc", id "pref-blocked-hosts-desc" ]
+            [ text "Links to these sites (and their subdomains) never fetch a preview. Separate with commas." ]
+        , input
+            [ type_ "text"
+            , id "pref-blocked-hosts-input"
+            , class "pref-input"
+            , value current
+            , placeholder "example.com, intranet.local"
+            , autocomplete False
+            , spellcheck False
+            , attribute "autocapitalize" "off"
+            , attribute "inputmode" "url"
+            , attribute "aria-describedby" "pref-blocked-hosts-desc pref-blocked-hosts-status"
+            , on "change" (Decode.at [ "target", "value" ] Decode.string |> Decode.map (\raw -> AppearanceSetPref { key = "blockedHosts", value = raw }))
+            ]
+            []
+        , p [ class "pref-status", id "pref-blocked-hosts-status", attribute "role" "status" ]
+            [ text
+                (if List.isEmpty model.prefs.blockedHosts then
+                    "No hosts blocked."
+
+                 else
+                    "Blocking " ++ PrefsPanel.countLabel (List.length model.prefs.blockedHosts) "host" ++ ": " ++ current ++ "."
+                )
+            ]
+        ]
 
 
 sectionHead : String -> String -> Html Msg

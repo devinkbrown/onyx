@@ -219,7 +219,9 @@ categoryVectors =
                     , \q -> q |> Query.find [ Selector.id "pref-category-panel-history" ] |> Query.has [ Selector.attribute (Html.Attributes.hidden True) ]
                     , \q -> q |> Query.has [ Selector.attribute (attr "aria-label" "Open appearance settings") ]
                     , \q -> q |> Query.hasNot [ Selector.text "Export vault" ]
-                    , \q -> q |> Query.has [ Selector.attribute (attr "data-testid" "pref-density-placeholder") ]
+                    , \q -> q |> Query.has [ Selector.attribute (attr "data-testid" "pref-density") ]
+                    , \q -> q |> Query.has [ Selector.attribute (attr "data-testid" "pref-font-scale") ]
+                    , \q -> q |> Query.has [ Selector.attribute (attr "data-testid" "pref-width") ]
                     ]
                     (sheet opened)
         , test "selecting a tab swaps the visible pane" <|

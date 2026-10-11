@@ -580,6 +580,10 @@ port appearanceApply :
     }
     -> Cmd msg
 
+{-| v3/gap-appearance — what the background renderer paints
+(`window.OnyxBackdrop.render`, fail-closed when the bundle is absent). -}
+port backgroundScene : { id : String, motion : String, reduceMotion : Bool, surface : String } -> Cmd msg
+
 port studioStoreCustomThemes : { json : String } -> Cmd msg
 
 port studioShareCopy : { code : String } -> Cmd msg
@@ -1383,6 +1387,10 @@ perform key outbound =
 
         App.AppearanceApply req ->
             appearanceApply req
+
+        -- v3/gap-appearance
+        App.BackgroundScene req ->
+            backgroundScene req
 
         App.StudioStoreCustomThemes req ->
             studioStoreCustomThemes req

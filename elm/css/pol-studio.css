@@ -280,7 +280,7 @@
 
 @media (hover: hover) { .ap-choice-toggle:hover { background: color-mix(in oklab, var(--onyx-panel-2) 60%, transparent); } }
 .ap-choice-toggle:active { background: var(--onyx-panel-2); }
-.ap-choice-toggle:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -2px; }
+.ap-choice-toggle:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 
 .ap-choice-toggle > span { min-width: 0; overflow-wrap: anywhere; }
 

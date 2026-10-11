@@ -1,0 +1,256 @@
+/* v3/gap-appearance — themes, text size, density, width, contrast and the
+   background scene, for every surface. Loaded right after app.css.
+
+   1. Theme bridge. The shell paints with --onyx-*; the active theme (built-
+      in, custom, or a Theme Studio session) arrives as palette tokens. The
+      ONE derivation is Elm's ShellPalette (AA-guarded, Ocean anchored to the
+      house cut), committed inline on <html> as --onyx-theme-<slot> (base) and
+      --onyx-theme-hc-<slot> (high contrast). This file only selects a set;
+      the fallbacks are the house values, so first paint is unchanged.
+   2. High contrast follows the Raise-contrast switch AND prefers-contrast.
+   3. One focus ring (--focus-ring), thicker under high contrast.
+   4. Theme Studio radius / duration / font stacks drive the shell.
+   5. A 16px root; Text size scales it (rem type and spacing follow).
+   6. Density: transcript rhythm and row heights (44px targets kept on touch).
+   7. Conversation width: measured (default) or full.
+   8. Light grounds: nick tints and scrims stay readable.
+   9. The background scene (#onyx-scene, mounted by backdrop.js) shows
+      through the transcript behind a veil; panels stay opaque. */
+
+/* ── 1. Theme bridge ──────────────────────────────────────────────────── */
+
+:root {
+  --onyx-bg: var(--onyx-theme-bg, #0b0e12);
+  --onyx-panel: var(--onyx-theme-panel, #12161c);
+  --onyx-panel-2: var(--onyx-theme-panel-2, #181e27);
+  --onyx-line: var(--onyx-theme-line, #232b36);
+  --onyx-text: var(--onyx-theme-text, #e8e6e1);
+  --onyx-dim: var(--onyx-theme-dim, #9aa3ad);
+  --onyx-faint: var(--onyx-theme-faint, #5d6670);
+  --onyx-accent: var(--onyx-theme-accent, #46c08a);
+  --onyx-accent-ink: var(--onyx-theme-accent-ink, #06281a);
+  --onyx-warn: var(--onyx-theme-warn, #d9a13b);
+  --onyx-bad: var(--onyx-theme-bad, #e5484d);
+  /* Success is its own token: the accent no longer doubles as "ok". */
+  --onyx-success: var(--onyx-theme-success, #46c08a);
+  /* The focus colour is the accent (budget: location, action, focus, mention). */
+  --onyx-focus: var(--onyx-accent);
+}
+
+/* ── 2. High contrast: the switch, or the OS asking for more ─────────── */
+
+:root[data-high-contrast='true'] {
+  --onyx-line: var(--onyx-theme-hc-line, #5a6675);
+  --onyx-text: var(--onyx-theme-hc-text, #e8e6e1);
+  --onyx-dim: var(--onyx-theme-hc-dim, #c9d0d7);
+  --onyx-faint: var(--onyx-theme-hc-faint, #9aa3ad);
+  --onyx-accent: var(--onyx-theme-hc-accent, #46c08a);
+  --onyx-accent-ink: var(--onyx-theme-hc-accent-ink, #06281a);
+  --onyx-warn: var(--onyx-theme-hc-warn, #d9a13b);
+  --onyx-bad: var(--onyx-theme-hc-bad, #e5484d);
+  --onyx-success: var(--onyx-theme-hc-success, #46c08a);
+  --focus-width: 3px;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --onyx-line: var(--onyx-theme-hc-line, #5a6675);
+    --onyx-text: var(--onyx-theme-hc-text, #e8e6e1);
+    --onyx-dim: var(--onyx-theme-hc-dim, #c9d0d7);
+    --onyx-faint: var(--onyx-theme-hc-faint, #9aa3ad);
+    --onyx-accent: var(--onyx-theme-hc-accent, #46c08a);
+    --onyx-accent-ink: var(--onyx-theme-hc-accent-ink, #06281a);
+    --onyx-warn: var(--onyx-theme-hc-warn, #d9a13b);
+    --onyx-bad: var(--onyx-theme-hc-bad, #e5484d);
+    --onyx-success: var(--onyx-theme-hc-success, #46c08a);
+    --focus-width: 3px;
+  }
+}
+
+/* ── 3. One focus ring ────────────────────────────────────────────────
+   Every focus indicator is `outline: var(--focus-ring)`. Placement is
+   inset (--focus-offset) by default — never clipped by a scroller — or
+   outside (--focus-offset-out) on filled / free-standing buttons where an
+   inset ring would vanish into the fill. */
+
+:root {
+  --focus-width: 2px;
+  --focus-ring: var(--focus-width) solid var(--onyx-focus);
+  --focus-offset: calc(-1 * var(--focus-width));
+  --focus-offset-out: 2px;
+}
+
+:root[data-high-contrast='true'] { --focus-width: 3px; }
+
+/* ── 4. Theme Studio tokens that drive the shell ──────────────────────
+   Radius: the base radius (--r-0) plus the mean of small / medium
+   (Ocean 0 + (4 + 8) / 2 = the house 6px). Duration: the theme's --dur is
+   the base step; fast / micro keep the 160 / 100 ratio (Ocean 220ms →
+   220 / 160 / 100, the house ladder). Fonts: --font-sans sets the body,
+   --font-display the page titles, --font-serif quotes; unset = today's. */
+
+:root {
+  --radius: calc(var(--r-0, 0px) + (var(--r-sm, 4px) + var(--r-md, 8px)) / 2);
+  --dur-base: var(--dur, 220ms);
+  --dur-fast: calc(var(--dur, 220ms) * 16 / 22);
+  --dur-micro: calc(var(--dur, 220ms) * 10 / 22);
+}
+
+body {
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
+}
+
+h1 {
+  font-family: var(--font-display, var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif));
+}
+
+blockquote,
+.shell-msg-blockquote {
+  font-family: var(--font-serif, inherit);
+}
+
+/* Reduced motion wins over the theme's duration (re-asserted after the
+   derivation above, which would otherwise outrank app.css's zeroing). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-micro: 0ms;
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+  }
+}
+
+:root[data-reduce-motion='true'] {
+  --dur-micro: 0ms;
+  --dur-fast: 0ms;
+  --dur-base: 0ms;
+}
+
+/* ── 5. Root size and Text size ───────────────────────────────────────
+   app.css sets `html, body { font: var(--text-md) … }`, which made the
+   ROOT 15px (every rem token at 93.75%). The root is the browser's own
+   size again (16px by default, larger when the user asks), and Text size
+   scales it, so the --text-* and --space-* ladders follow. Small keeps
+   body text at 14px+ (the se / fold floor). */
+
+html { font-size: 100%; }
+:root[data-font-scale='sm'] { font-size: 93.75%; }
+:root[data-font-scale='lg'] { font-size: 112.5%; }
+
+/* Transcript text still set in px elsewhere: rem twins (identical at the
+   default size) so Text size reaches it. */
+.onyx-system { font-size: 0.75rem; }
+.onyx-day-divider { font-size: 0.75rem; }
+.onyx-continuation:not(.onyx-message--compact) > .onyx-ts { font-size: 0.65625rem; }
+.onyx-message--compact .onyx-ts { font-size: 0.75rem; }
+
+/* ── 6. Density ───────────────────────────────────────────────────────
+   Cozy is the house rhythm (no overrides). Compact tightens the
+   transcript everywhere and row heights only where a fine pointer is in
+   charge (touch keeps 44px targets); Roomy opens both up. */
+
+:root[data-density='compact'] .onyx-message:not(.onyx-message--compact) { line-height: 1.4; }
+:root[data-density='compact'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation) {
+  margin-top: var(--space-1);
+  padding-top: 2px;
+}
+:root[data-density='compact'] .onyx-message--compact { padding-block: 0; line-height: 1.35; }
+:root[data-density='compact'] .onyx-day-divider { margin-block: var(--space-2); }
+
+:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact) { line-height: 1.62; padding-block: 3px; }
+:root[data-density='roomy'] .onyx-message:not(.onyx-message--compact):not(.onyx-continuation) {
+  margin-top: var(--space-5);
+  padding-top: var(--space-2);
+}
+:root[data-density='roomy'] .onyx-message--compact { padding-block: 4px; line-height: 1.6; }
+:root[data-density='roomy'] .onyx-day-divider { margin-block: var(--space-6); }
+
+@media (hover: hover) and (pointer: fine) {
+  :root[data-density='compact'] .onyx-rail .onyx-rail-item { min-height: 28px; padding-block: 2px; }
+  :root[data-density='compact'] .onyx-frame .onyx-mlist-main,
+  :root[data-density='compact'] .onyx-roster .onyx-member { min-height: 32px; }
+  :root[data-density='compact'] .onyx-home-row { min-height: 36px; padding-block: 4px; }
+}
+
+:root[data-density='roomy'] .onyx-rail .onyx-rail-item { min-height: 44px; padding-block: var(--space-2); }
+:root[data-density='roomy'] .onyx-frame .onyx-mlist-main,
+:root[data-density='roomy'] .onyx-roster .onyx-member { min-height: 48px; }
+:root[data-density='roomy'] .onyx-home-row { min-height: 52px; padding-block: var(--space-2); }
+
+/* ── 7. Conversation width ────────────────────────────────────────────
+   Measured (default) keeps the reading measure; Full lets the transcript
+   run the width of its column. App shell only — public pages keep theirs. */
+
+:root[data-width='full'] .onyx-frame { --shell-measure: none; }
+
+/* ── 8. Light grounds ─────────────────────────────────────────────────
+   Nick tints are light hues made for a dark ground (inline style from
+   Avatar.nickTint); on a light shell the same hue darkens to read AA. */
+
+:root[data-shell-scheme='light'] :is(.onyx-sender, .onyx-thread-msg-from) { filter: brightness(0.4) saturate(1.15); }
+:root[data-shell-scheme='light'] { color-scheme: light; }
+
+/* ── 9. The background scene ──────────────────────────────────────────
+   backdrop.js mounts <canvas id="onyx-scene"> under <html> (outside the
+   <body> Elm owns) and flags
+   <html data-scene="app|appearance"> only once it actually paints (fail
+   closed: no bundle, no 2D context, Off or reduced data → the opaque
+   ground stays). The canvas sits at z-index -1 above the root ground;
+   body turns transparent so the transcript (itself transparent) shows it
+   through a veil — the canvas opacity — while rails, headers, the
+   composer and sheets stay opaque. The scene's own ground is luminance-
+   capped dark; on a light shell it is inverted into a pale ground. */
+
+#onyx-scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+  opacity: var(--onyx-scene-alpha, 0.3);
+}
+
+/* The Appearance stage previews the scene at full presence. */
+:root[data-scene='appearance'] #onyx-scene { --onyx-scene-alpha: 0.7; }
+
+:root[data-shell-scheme='light'] #onyx-scene {
+  --onyx-scene-alpha: 0.24;
+  filter: invert(1) hue-rotate(180deg);
+}
+
+:root[data-high-contrast='true'] #onyx-scene { --onyx-scene-alpha: 0.2; }
+@media (prefers-contrast: more) {
+  #onyx-scene { --onyx-scene-alpha: 0.2; }
+}
+
+:root[data-scene] body { background: transparent; }
+:root[data-scene='appearance'] .ap,
+:root[data-scene='appearance'] .ap-background-host { background: transparent; }
+
+/* Reduce transparency: the scene stays off the reading surface. */
+:root[data-reduce-transparency='true'] #onyx-scene { display: none; }
+:root[data-reduce-transparency='true'][data-scene] body { background: var(--onyx-bg); }
+
+/* ── 10. Preferences: the blocked-hosts field ─────────────────────────── */
+
+.pref-blocked-hosts .pref-label { display: block; }
+.pref-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--onyx-line);
+  border-radius: var(--radius);
+  background: var(--onyx-bg);
+  color: var(--onyx-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.pref-input::placeholder { color: var(--onyx-faint); }
+.pref-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-focus); }
+@media (hover: none), (pointer: coarse) {
+  /* 44px target and 16px text (no iOS focus zoom). */
+  .pref-input { min-height: var(--target-min); font-size: 16px; }
+}

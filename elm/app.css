@@ -492,7 +492,7 @@ html, body {
   font-size: var(--text-sm);
   padding: 5px var(--space-2);
 }
-.onyx-rail-filter-input:focus { outline: 1px solid var(--onyx-accent); outline-offset: 0; }
+.onyx-rail-filter-input:focus { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 .onyx-rail .onyx-rail-filter-unread,
 .onyx-rail .onyx-rail-filter-clear,
 .onyx-rail .onyx-rail-new,
@@ -1088,7 +1088,7 @@ html, body {
   padding: 8px 10px;
 }
 
-.onyx-toast--success { border-color: var(--onyx-accent); }
+.onyx-toast--success { border-color: var(--onyx-success); } /* v3/gap-appearance */
 .onyx-toast--danger { border-color: var(--onyx-bad); }
 .onyx-toast--warning { border-color: var(--onyx-warn); }
 .onyx-toast--info { border-color: var(--onyx-line); }
@@ -1503,7 +1503,7 @@ html, body {
 .onyx-account-passkey-rename,
 .onyx-account-drop-confirm { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; align-items: flex-start; }
 .onyx-account-recovery-fresh { margin: 8px 0; }
-.onyx-account-passkey-ok { font-size: 13px; color: var(--onyx-accent); }
+.onyx-account-passkey-ok { font-size: 13px; color: var(--onyx-success); } /* v3/gap-appearance */
 .onyx-account-passkey-row { display: flex; gap: 10px; align-items: baseline; }
 .onyx-account-passkey-id { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .onyx-account-passkey-name { font-size: 13px; }
@@ -1945,7 +1945,7 @@ html, body {
 }
 .conn-input::placeholder { color: var(--onyx-faint); opacity: 1; }
 .conn-input:hover:not(:disabled) { border-color: color-mix(in oklab, var(--onyx-dim) 45%, var(--onyx-line)); }
-.conn-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -1px; border-color: var(--onyx-accent); }
+.conn-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); border-color: var(--onyx-focus); } /* v3/gap-appearance: one focus ring */
 .conn-input[aria-invalid="true"] { border-color: var(--onyx-bad); }
 .conn-input:disabled { opacity: 0.6; }
 .conn-hint { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--onyx-faint); }
@@ -1994,7 +1994,7 @@ html, body {
   cursor: pointer;
 }
 .conn-submit:hover:not(:disabled) { background: color-mix(in oklab, var(--onyx-accent) 88%, var(--onyx-text)); }
-.conn-submit:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-submit:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 .conn-submit:disabled {
   color: color-mix(in oklab, var(--onyx-text) 50%, transparent);
   background: color-mix(in oklab, var(--onyx-accent) 16%, var(--onyx-panel-2));
@@ -2016,7 +2016,7 @@ html, body {
 .conn-alt-btn { min-height: var(--target-min); padding: 0 var(--space-3); background: transparent; font-weight: 650; }
 .conn-alt-btn:hover:not(:disabled) { border-color: var(--onyx-dim); background: var(--onyx-panel-2); }
 .conn-alt-btn:disabled { opacity: 0.5; cursor: default; }
-.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-brand:focus-visible, .conn-foot a:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.conn-cancel:focus-visible, .conn-alt-btn:focus-visible, .conn-link:focus-visible, .conn-brand:focus-visible, .conn-foot a:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 .conn-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 var(--space-5); }
 .conn-foot a {
   display: inline-flex;
@@ -2176,7 +2176,7 @@ html, body {
 }
 
 .onyx-nav-btn:hover { color: var(--onyx-text); background: var(--onyx-panel-2); }
-.onyx-nav-btn:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 1px; }
+.onyx-nav-btn:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 
 .onyx-nav-btn--active,
 .onyx-nav-btn--dialog-open {
@@ -2324,7 +2324,7 @@ html, body {
 }
 .onyx-home-row:hover, .onyx-home-room:hover { background: var(--onyx-panel-2); }
 .onyx-home-row:focus-visible, .onyx-home-room:focus-visible, .onyx-home-action:focus-visible,
-.onyx-home-caught-up-button:focus-visible, .onyx-coach-dismiss:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-home-caught-up-button:focus-visible, .onyx-coach-dismiss:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 .onyx-home-avatar {
   flex: none; width: 28px; height: 28px; display: grid; place-items: center;
   border-radius: var(--radius); background: var(--onyx-panel-2); color: var(--onyx-dim); font-weight: 600; font-size: var(--text-sm);
@@ -2552,7 +2552,7 @@ html, body {
   padding: var(--space-1) var(--space-2);
   width: 100%;
 }
-.onyx-roster-filter-input:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: -2px; }
+.onyx-roster-filter-input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 .onyx-roster-empty { color: var(--onyx-dim); font-size: var(--text-sm); margin: var(--space-2) 0; }
 .onyx-roster .onyx-member { align-items: center; flex-wrap: wrap; min-height: 36px; }
 .onyx-roster .onyx-member.onyx-away { opacity: 1; }
@@ -2628,7 +2628,7 @@ html, body {
 .onyx-palette-launcher:hover { color: var(--onyx-text); }
 .onyx-palette-launcher:focus-visible,
 .onyx-spotlight-close:focus-visible,
-.onyx-shortcuts-close:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 1px; }
+.onyx-shortcuts-close:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } /* v3/gap-appearance */
 .onyx-palette-kbd,
 .onyx-spotlight-foot kbd,
 .shortcuts-overlay__kbd {
@@ -2982,7 +2982,7 @@ html, body {
   cursor: pointer;
 }
 .onyx-jump-latest--unread { color: var(--onyx-accent-ink); background: var(--onyx-accent); border-color: var(--onyx-accent); }
-.onyx-jump-latest:focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-jump-latest:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset-out); } /* v3/gap-appearance */
 .onyx-jump-latest-count { font-variant-numeric: tabular-nums; }
 
 /* Compact: the IRC-heritage line — time, name inline, no avatar. */
@@ -3145,7 +3145,7 @@ html, body {
   --onyx-dim: #c9d0d7;
   --onyx-faint: #9aa3ad;
 }
-:root[data-high-contrast='true'] :focus-visible { outline: 3px solid var(--lapis-bright) !important; outline-offset: 1px; }
+/* v3/gap-appearance: high contrast thickens the one focus ring (--focus-width, css/gap-appearance.css). */
 :root[data-reduce-transparency='true'] .onyx-sheet-backdrop,
 :root[data-reduce-transparency='true'] .onyx-spotlight-backdrop { background: var(--onyx-bg); }
 :root[data-reduce-transparency='true'] * { backdrop-filter: none !important; }
