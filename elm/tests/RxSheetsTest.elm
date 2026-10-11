@@ -11,6 +11,8 @@ import App exposing (..)
 import Expect
 import Html
 import Html.Attributes as Attr
+import Json.Encode as Encode
+import Moderation
 import Polish
 import Test exposing (Test, describe, test)
 import Test.Html.Event as Event
@@ -60,6 +62,7 @@ suite =
         [ banReviewSuite
         , youHubSuite
         , memberCardSuite
+        , nestedEscapeSuite
         ]
 
 
@@ -229,6 +232,54 @@ memberCardSuite =
                             |> Event.simulate Event.click
                             |> Event.expect UserProfileClosed
                     , \_ -> Expect.equal (Just UserProfileClosed) (escapeMsg carded)
+                    ]
+                    ()
+        ]
+
+
+{-| The room desk renders its member-action review INSIDE the desk's own
+panel (a nested layer). Escape on the review must close the review
+alone: the sheet's handler stops the key there so it never bubbles to
+the desk panel's own Escape handler (both used to close at once). -}
+nestedEscapeSuite : Test
+nestedEscapeSuite =
+    let
+        deskWithReview =
+            { opped | moderationOpen = True }
+                |> step
+                    (ModerationPropose
+                        { kind = Moderation.Ban, channel = "#c", target = Just "alice", mask = Nothing, reason = Nothing }
+                    )
+
+        escape =
+            Event.custom "keydown" (Encode.object [ ( "key", Encode.string "Escape" ) ])
+    in
+    describe "Escape in a nested sheet"
+        [ test "the review sits inside the desk panel and Escape on it cancels only the review" <|
+            \_ ->
+                let
+                    desk =
+                        query deskWithReview |> Query.find [ Selector.attribute (Attr.attribute "data-shortcut-scope" "moderation-cockpit") ]
+                in
+                Expect.all
+                    [ \_ -> desk |> Query.find [ Selector.attribute (Attr.attribute "data-shortcut-scope" "moderation-review") ] |> Query.has [ Selector.attribute (Attr.attribute "role" "dialog") ]
+                    , \_ ->
+                        desk
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-shortcut-scope" "moderation-review") ]
+                            |> Event.simulate escape
+                            |> Event.expect ModerationCancel
+                    , \_ -> Expect.equal (Just ModerationCancel) (escapeMsg deskWithReview)
+                    ]
+                    ()
+        , test "after the review is cancelled the desk is still open and is the next Escape owner" <|
+            \_ ->
+                let
+                    cancelled =
+                        step ModerationCancel deskWithReview
+                in
+                Expect.all
+                    [ \_ -> Expect.equal True cancelled.moderationOpen
+                    , \_ -> Expect.equal (Just ModerationSheetClose) (escapeMsg cancelled)
                     ]
                     ()
         ]

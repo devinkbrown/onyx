@@ -498,8 +498,8 @@ const sheets = {
     await boot(page, h, { op: true });
     await clickVisible(page, ['[data-testid="room-more"]'], h);
     await clickVisible(page, ['[data-testid="moderation-open"]'], h);
-    await page.selectOption('[data-testid="desk-member-select"]', 'mara').catch(() => {});
-    await page.selectOption('[data-testid="desk-action-select"]', 'ban').catch(() => {});
+    await page.selectOption('[data-testid="desk-member-select"]', 'sol', { timeout: 2000 }).catch(() => {});
+    await page.selectOption('[data-testid="desk-action-select"]', 'ban', { timeout: 2000 }).catch(() => {});
     await h.settle(page, 250);
     const open = () => openFrom(page, h, ['[data-testid="desk-member-submit"]']);
     await open();
@@ -660,5 +660,16 @@ for (const name of ['rx-you', 'rx-prefs', 'rx-account', 'rx-palette', 'rx-room-s
 for (const name of ['rx-you', 'rx-prefs', 'rx-notify', 'rx-account', 'rx-moddesk']) {
   variants[name.replace('rx-', 'rx-bigfont-')] = bigFont(name);
 }
+
+/* Dev probe: PROBE_SCENARIO=<sheet scenario> PROBE_FILE=<js file whose
+   expression is evaluated in the page after the scenario>; the result is
+   printed as a "PROBE" line (screens.mjs lists it with the PROBLEMs). */
+variants['rx-probe'] = async (page, h) => {
+  await sheets[process.env.PROBE_SCENARIO || 'rx-you'](page, h);
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(process.env.PROBE_FILE, 'utf8');
+  const out = await page.evaluate(src);
+  await page.evaluate((o) => console.error('PROBE ' + JSON.stringify(o)), out);
+};
 
 export default { ...shell, ...sheets, ...variants };

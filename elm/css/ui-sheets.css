@@ -52,6 +52,10 @@
   --onyx-i-mail: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 6.5h15v11h-15z'/><path d='M5 7l7 6 7-6'/></svg>");
 }
 
+/* A long placeholder or value ends in an ellipsis, never a hard cut. */
+.onyx-sheet input:not([type="checkbox"]):not([type="radio"]),
+.onyx-sheet select { text-overflow: ellipsis; }
+
 /* Shared mask-icon box: size + currentColor fill. */
 .onyx-sheet-x,
 .ui-icon {
@@ -448,7 +452,7 @@
   -webkit-mask: var(--onyx-i-search) center / contain no-repeat;
   mask: var(--onyx-i-search) center / contain no-repeat;
 }
-.onyx-spotlight-input { font-size: var(--text-lg); padding: 10px 0; }
+.onyx-spotlight-input { font-size: var(--text-lg); padding: 10px 0; min-width: 0; text-overflow: ellipsis; }
 .onyx-spotlight-input::placeholder { color: var(--onyx-faint); }
 .onyx-spotlight-close { --sheet-close: 32px; margin: 0; }
 
@@ -753,7 +757,9 @@
 .chb .chb-skins { padding: var(--space-3); }
 .chb .chb-skin { flex: 1 1 140px; padding: var(--space-2) var(--space-3); }
 .chb .chb-skin[aria-pressed="true"] { border-color: var(--onyx-text); background: var(--onyx-panel-2); }
+.onyx-sheet .chb-check,
 .chb .chb-check { align-items: center; min-height: 32px; }
+@media (pointer: coarse) { .onyx-sheet .chb-check { min-height: 44px; } }
 .chb .chb-create-actions {
   position: sticky;
   bottom: calc(-1 * var(--sheet-pad));
@@ -889,10 +895,20 @@
   .onyx-prefs .pref-category-tab[aria-selected="true"] { background: var(--onyx-panel-2); color: var(--onyx-text); box-shadow: none; border-color: var(--onyx-dim); }
   .onyx-prefs .pref-category-tab__summary { display: none; }
   /* Reset stays reachable: it rides at the end of the chip row. */
-  .onyx-prefs .pref-category-nav { display: flex; align-items: center; gap: var(--space-2); padding-right: var(--sheet-pad); }
+  .onyx-prefs .pref-category-nav { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: var(--space-2); padding-right: var(--sheet-pad); }
   .onyx-prefs .pref-category-nav__landmark { flex: 1; min-width: 0; }
-  .onyx-prefs .pref-category-nav .pref-reset-all { flex: none; align-self: center; margin: 0; white-space: nowrap; font-size: var(--text-sm); }
+  .onyx-prefs .pref-category-nav .pref-reset-all { flex: none; align-self: center; width: auto; margin: 0; white-space: nowrap; font-size: var(--text-sm); }
   .onyx-prefs .pref-category-content { padding: var(--space-4) var(--sheet-pad) calc(var(--space-6) + env(safe-area-inset-bottom, 0px)); }
+  /* The chip row fades at its right edge: it scrolls. */
+  .onyx-prefs .pref-category-nav__landmark {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+.pref-reset-all__short { display: none; }
+@media (max-width: 640px) {
+  .pref-reset-all__full { display: none; }
+  .pref-reset-all__short { display: inline; }
 }
 
 /* Account: on phones, touch screens and short windows the 16-entry
@@ -1168,6 +1184,8 @@
   .onyx-sheet-head-actions { padding-top: 0; }
   .onyx-sheet-layer[data-swipe="true"] > .onyx-sheet > :is(.onyx-sheet-head, .jump-to-date-head)::before { top: 6px; }
   .onyx-sheet.onyx-you > .onyx-you-head { padding-block: var(--space-3); }
+  /* Prefs: the category row sits flush under the head's seam. */
+  .onyx-sheet.onyx-prefs > .onyx-sheet-head { margin-bottom: 0; }
 }
 
 @media (max-height: 520px) and (min-width: 600px) {
@@ -1194,6 +1212,14 @@
   .onyx-account { --account-head-h: 61px; }
   .onyx-prefs .pref-category-content { padding-block: var(--space-3); }
   .onyx-prefs .pref-category-tab { min-height: 44px; padding-block: 4px; }
+
+  /* The You hub: a wider dialog whose identity card sits in two
+     columns (who you are | presence + status), so the first screen of
+     a 390px-tall window shows the settings list too. */
+  .onyx-sheet-layer > .onyx-you { --sheet-w: 640px; width: min(640px, 100%); }
+  .onyx-you .onyx-you-identity { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); column-gap: var(--space-5); align-items: start; }
+  .onyx-you .onyx-you-identity > * { grid-column: 1; }
+  .onyx-you .onyx-you-identity > .a2-status { grid-column: 2; grid-row: 1 / span 4; margin-top: 0; }
 
   .onyx-spotlight {
     align-items: start;
