@@ -435,8 +435,17 @@
 }
 
 .onyx-watch-end-row { display: flex; }
-.onyx-watch-end { color: var(--onyx-dim); }
-.onyx-watch-end:hover { color: var(--onyx-bad); }
+
+/* Ending is destructive: a quiet outlined button (it reads as a control,
+   not a caption) that only turns red on intent; the confirmation that
+   follows carries the weight. */
+.onyx-watch-end {
+  padding: 0 14px;
+  border: 1px solid var(--onyx-line);
+  color: var(--onyx-dim);
+}
+
+.onyx-watch-end:hover { border-color: var(--onyx-bad); color: var(--onyx-bad); text-decoration: none; }
 
 .onyx-watch-confirm {
   display: flex;
@@ -527,7 +536,7 @@
 .onyx-watch-open-wide:hover { border-color: var(--onyx-dim); }
 
 .onyx-watch-hide { align-self: flex-start; }
-.onyx-watch-col > :is(.onyx-watch-hide, .onyx-watch-end-row) { margin-left: calc(-1 * var(--space-1)); }
+.onyx-watch-col > .onyx-watch-hide { margin-left: calc(-1 * var(--space-1)); }
 
 .onyx-watch :is(button, a, input, select):focus-visible {
   outline: var(--focus-ring);
@@ -589,6 +598,9 @@
 
   .onyx-watch-title { flex: 0 1 auto; }
   .onyx-watch-line { flex: 1 1 auto; min-width: 0; }
+  /* One line has no room for the link's host without clipping it to a
+     fragment; the host stays on the Open button's name and in details. */
+  .onyx-watch-line > .onyx-watch-site { display: none; }
   .onyx-watch-track { margin-bottom: var(--space-1); }
 
   .onyx-watch-details { max-height: min(58dvh, 300px); }
@@ -703,6 +715,23 @@
 
 @media (max-width: 767.98px) {
   .onyx-watch-sheet-actions > .onyx-watch-btn { flex: 1 1 10rem; min-height: var(--target-min); }
+}
+
+/* Short viewports (phone landscape): title across, link and length side
+   by side, hints folded away (they stay the fields' accessible
+   descriptions), so Review is reachable without scrolling. */
+@media (max-height: 520px) {
+  .onyx-watch-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .onyx-watch-form > :not(.onyx-watch-field),
+  .onyx-watch-form > .onyx-watch-field:first-child { grid-column: 1 / -1; }
+
+  .onyx-watch-form .onyx-watch-hint { display: none; }
+  .onyx-watch-review { gap: var(--space-3); }
 }
 
 @media (max-width: 359.98px) {
