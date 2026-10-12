@@ -5,7 +5,7 @@ chat, local-first history, end-to-end encrypted direct messages, and realtime
 voice/video through the Cadence media stack.
 
 The live first-party network is available at [eshmaki.me](https://eshmaki.me/).
-This repository contains the SolidJS client. The daemon is maintained in the
+This repository contains the Elm web client. The daemon is maintained in the
 separate [Onyx Server repository](https://github.com/devinkbrown/onyx-server).
 
 Onyx is released under the [GNU Affero General Public License v3.0 or later](LICENSE).
@@ -46,11 +46,11 @@ following table is intentionally conservative:
 | --- | --- | --- |
 | IRC/IRCX text chat | Available | WebSocket transport, CAP/IRCv3, SASL, reconnect, and session resume. |
 | Local history and search | Available | Browser-local IndexedDB vault; see [`docs/search-and-history.md`](docs/search-and-history.md). |
-| E2EE direct messages | Implemented | Device keys, TOFU/key-change handling, multi-device fan-out, and fail-closed open/seal behavior are wired in `src/lib/e2ee/` and the store. The connected server still has to publish the peer-key contract. |
+| E2EE direct messages | Implemented | Device keys, TOFU/key-change handling, multi-device fan-out, and fail-closed open/seal behavior are wired in the Elm `DmCipher` / `Keyring` modules and the `ports.js` crypto ports. The connected server still has to publish the peer-key contract. |
 | Cadence voice/video and media E2EE | Implemented | Media capability and the actual negotiated security state remain visible in the UI. |
 | Passkeys | Server-gated | The client supports the WebAuthn ceremony; the connected server must expose `WEBAUTHN`. |
 | Group E2EE | Staged | Control-record foundations exist; full room key installation and production acceptance are not claimed. See [`docs/protocol/group-e2ee-c1.md`](docs/protocol/group-e2ee-c1.md). |
-| Self-hosted deployment | Buildable | Point the client at your own Onyx Server with `VITE_IRC_WS`; the first-party `deploy.sh` is host-specific. |
+| Self-hosted deployment | Buildable | Point the client at your own Onyx Server with `?ws=wss://…`; the first-party `deploy.sh` is host-specific. |
 
 The code and tests are the source of truth. Roadmap documents are historical
 planning material and may describe work before or after the current checkout.
@@ -68,8 +68,10 @@ planning material and may describe work before or after the current checkout.
 - Node.js 20 or newer.
 - [pnpm](https://pnpm.io/) — this repository intentionally uses pnpm, not npm
   or yarn.
+- The [Elm 0.19.1](https://github.com/elm/compiler/releases/tag/0.19.1) compiler on
+  `PATH` (a sandbox-friendly bootstrap is in [`elm/README.md`](elm/README.md)).
 - A reachable Onyx Server WebSocket endpoint for connected chat. The default
-  build probes the first-party mesh nodes; a local build can pin another node.
+  build probes the first-party mesh nodes; `?ws=` pins another node.
 
 ### Install and start
 
@@ -77,15 +79,14 @@ planning material and may describe work before or after the current checkout.
 git clone https://github.com/devinkbrown/onyx.git
 cd onyx
 pnpm install
-cp .env.example .env.local
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). A build with no
-`VITE_IRC_WS` probes the configured public nodes and attaches to the fastest
-reachable one. To use a different server, set `VITE_IRC_WS` in `.env.local`;
-Vite reads `VITE_*` values at build/dev-server startup, so restart after
-changing them.
+`pnpm dev` builds the client and static site into `dist/` and serves it at
+[http://127.0.0.1:3000](http://127.0.0.1:3000). With no pin the client probes the
+configured public nodes and attaches to the fastest reachable one. To use a
+different server, open `/app/?ws=wss://your.host/ws`. The client has no
+build-time environment variables.
 
 For the full configuration table, endpoint expectations, media upload boundary,
 and static hosting notes, read [`docs/configuration.md`](docs/configuration.md).
@@ -104,22 +105,23 @@ preview. It never writes the production `out/` tree.
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm dev` | Start the Vite development server on port 3000. |
-| `pnpm build` | Create a production bundle in `dist/`. |
-| `pnpm preview` | Serve the current `dist/` bundle on port 4173. |
-| `pnpm typecheck` | Run strict TypeScript checking. |
+| `pnpm dev` | Build, then serve `dist/` on port 3000. |
+| `pnpm build` | Elm build + static site generation into `dist/`. |
+| `pnpm preview` | Serve the current `dist/` bundle on port 3000. |
+| `pnpm typecheck` | Run strict TypeScript checking (the bundled engine). |
 | `pnpm lint` | Run ESLint. |
-| `pnpm test` | Run the Vitest unit/component suite. |
-| `pnpm test:e2e` | Run Playwright against a production preview. |
+| `pnpm test` | Run the Vitest suites (engine, static-site generator, release tooling). |
+| `pnpm test:smoke` | Run every `elm/*.smoke.mjs` jsdom suite. |
 | `pnpm site:check` | Run typecheck, lint, unit tests, and a production build. |
-| `pnpm site:workbench` | Open the safe local dev/check/preview workbench. |
+| `pnpm site:workbench` | Open the safe local build/check/preview workbench. |
 | `pnpm check:server-contract` | Compare the client contract against a sibling Onyx Server checkout when available. |
 | `pnpm desktop:test` | Build and test the native desktop host through the pinned Zig/native toolchain. |
 
-Before opening a pull request, run:
+Before opening a pull request, run the Elm compile and `elm-test` (see
+[`elm/README.md`](elm/README.md)), then:
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm test
+pnpm test:smoke && pnpm typecheck && pnpm lint && pnpm test
 ```
 
 The longer release and browser-evidence checklist is in
@@ -147,25 +149,27 @@ your role:
 
 ## Architecture in one paragraph
 
-The app is a SolidJS 1.9 + Vite 7 SPA. `src/index.tsx` owns the route table;
-`src/lib/irc/` parses and formats the WebSocket wire; one Zustand vanilla store
-in `src/lib/store/` owns shared state; and `useStore` bridges store selectors to
-fine-grained Solid signals. The vault in `src/lib/vault/` keeps device-local
-history, `src/lib/e2ee/` owns direct-message cryptography and device identity,
-`src/lib/cadence-media/` owns voice/video, and `src/shell/` contains the chat
-surface. See [`docs/architecture.md`](docs/architecture.md) for the source map
-and the invariants that matter when changing any of these layers.
+The app is an Elm 0.19.1 SPA. `elm/src/Main.elm` owns ports, subscriptions and
+routing; `elm/src/App.elm` owns the model and `update`; pure modules (`Wire`,
+`Session`, `DmCipher`, `GroupControl`, …) parse and validate the IRC/IRCX wire and
+the crypto-adjacent formats; `elm/src/View/` renders every surface. Side effects —
+the WebSocket, the IndexedDB history vault, WebCrypto, WebAuthn, uploads — sit
+behind ports in `elm/ports.js`, and the Cadence voice engine and canvas
+backgrounds are TypeScript in `elm/engine/` bundled by esbuild. See
+[`docs/architecture.md`](docs/architecture.md) for the source map and the
+invariants that matter when changing any of these layers.
 
 ## Deployment boundary
 
 The checked-in `deploy.sh` is the first-party eshmaki.me deployment path. It
 expects the private community-site overlay and nginx layout used by that host,
-materialises route-specific SPA documents, stamps the service worker, and then
-syncs `dist/` to the live-served `out/` directory. It is not a generic
+builds the Elm client and its route-specific documents (`pnpm build`), stamps the
+service worker, and then syncs `dist/` to the live-served `out/` directory. It is not a generic
 self-hosting installer.
 
 For a different host, build with `pnpm build` and serve `dist/` from a static
-server configured for SPA route fallbacks and WebSocket connectivity. Do not
+server (every route has its own document; unknown paths get `404.html`) with
+WebSocket connectivity. Do not
 point a test, preview, or generic build at `out/`; only the reviewed deployment
 script may write that tree. Details are in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

@@ -83,7 +83,7 @@ const PIN_STORE = 'pins';
  * directions. NOTE: `toLowerCase()` is NOT the server's RFC1459/services
  * casemapping — that mismatch is a pre-existing, store-wide convention, not
  * introduced here. If the client ever adopts server-authoritative account
- * folding, the store keys and this pin key must move together (a solidjs-coder /
+ * folding, the store keys and this pin key must move together (an onyx-coder-leaf /
  * onyx-server-ircx co-check), or the buckets will diverge and the gate will silently
  * degrade.
  */

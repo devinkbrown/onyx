@@ -86,7 +86,7 @@
     return "q" + Date.now().toString(36) + outboxLabelCounter.toString(36);
   }
 
-  /* v3/gap-account: the deprecated SolidJS client used the same
+  /* v3/gap-account: the removed SolidJS client used the same
      `onyx-vault` name at schema v6 (compound keys, different stores).
      Opening it at v3 fails with VersionError, which left the whole
      vault (history, outbox, schedule) unavailable for anyone who used

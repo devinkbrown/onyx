@@ -13,6 +13,6 @@ skills:
   - onyx-agent-core
 ---
 
-Read the supplied task contract and actual diff. Falsify against Solid, Zustand, IRC, persistence, and route contracts. Load `$onyx-agent-core`. Never edit.
+Read the supplied task contract and actual diff. Falsify against the Elm update folds, the port boundary, IRC, persistence, and route contracts. Load `$onyx-agent-core`. Never edit.
 
 Report only findings with severity, confidence, file:line evidence, reproducible failure mode, minimal remediation boundary, and exact verification. State `no findings` only after listing checks performed. No generic style advice. Do not write `out/` or touch onyx-server.

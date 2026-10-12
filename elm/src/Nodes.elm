@@ -14,8 +14,8 @@ module Nodes exposing
 `src/app/nodes.ts`.
 
 The network is a single mesh, so which node a client attaches to is
-purely a routing/latency concern. A pin (`?ws=`, mirroring
-`VITE_IRC_WS`) always wins and disables probing; otherwise every node
+purely a routing/latency concern. A pin (`?ws=`, the runtime successor of the Solid
+client's build-time `VITE_IRC_WS`) always wins and disables probing; otherwise every node
 is timed with a bodyless HTTPS HEAD against its web tier and the
 lowest-latency reachable node wins, with a random node as the
 inconclusive-probe fallback so there is always a target.

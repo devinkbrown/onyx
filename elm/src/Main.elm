@@ -1101,7 +1101,7 @@ init rawFlags url key =
         nick =
             Maybe.withDefault "guest" bootNick
 
-        -- `?ws=` pin (mirrors `VITE_IRC_WS`): present wins and
+        -- `?ws=` pin (successor of the Solid client's `VITE_IRC_WS`): present wins and
         -- disables probing; absent probes the registry.
         wsPin =
             case decodeField "wsPin" Decode.string rawFlags of
@@ -1252,7 +1252,7 @@ init rawFlags url key =
 
             ( Just _, Just pin ) ->
                 -- Pinned endpoint connects directly (mirrors the
-                -- `VITE_IRC_WS` leg of `selectBestNode`).
+                -- pin leg of the Solid client's `selectBestNode`).
                 perform key (App.WsConnect { url = pin })
 
             ( Just _, Nothing ) ->

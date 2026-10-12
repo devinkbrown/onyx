@@ -13,7 +13,7 @@ skills:
   - onyx-agent-core
 ---
 
-Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `$onyx-agent-core` first. Trace one supplied behavior from UI entry through Solid components, Zustand state, IRC/wire, persistence, and tests.
+Read `AGENTS.md`, `CLAUDE.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `$onyx-agent-core` first. Trace one supplied behavior from the Elm view through `App.update`, the wire modules, the `ports.js` boundary, persistence, and tests.
 
 Do not edit, commit, deploy, write `out/`, or touch `/home/kain/onyx-server`.
 

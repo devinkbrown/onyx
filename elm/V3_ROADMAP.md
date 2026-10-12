@@ -1,7 +1,7 @@
 # Onyx v3 (Elm) — build-out roadmap
 
 Goal: the Elm client becomes a complete, shippable Onyx — every surface a
-user can reach in the SolidJS client is reachable here, and it works and
+user could reach in the (now removed; tag `solid-client-final`) SolidJS client is reachable here, and it works and
 feels finished, not just correct in unit tests.
 
 This file is the plan and the status per slice. What is missing, row by row, is in
@@ -171,7 +171,7 @@ announced by a toast only. Details: *Remaining gaps → Calls* in the parity map
 | 7.2 | Responsive pass: every sheet and surface on every viewport class | M | **done** (v3/frame, rx-shell, rx-convo, rx-sheets, rx-calls, rx-public: the 15-viewport matrix from 320×568 to 3440×1440 with zero PROBLEM lines per slice gate). The matrix was run by the slice builders; it was not re-run for this doc refresh |
 | 7.3 | PWA: install sheet, update-available banner, service worker | S | **done** (v3/polish: Add to Home Screen over a captured `beforeinstallprompt`, update strip; v3/gap-pwa-safety: `ports.js` registers the deployed `/sw.js` — https / loopback only, after load, HEAD-probed, silent on failure — closed-tab Web Push with a bounded wait, page-restore reconnect). Updates are approval-only; the update strip renders only inside the app frame |
 | 7.4 | Browser e2e for the Elm build (connect → join → send) | M | **partial.** Browserless: `ShipFlowTest` (6 keyboard-only flows) + `bundleBoot.smoke.mjs`. Real browser: `elm/tools/screens*.mjs` (24 scenario files) and `call-e2e.mjs`. **Not there:** a Playwright test suite for the Elm build |
-| 7.5 | Build + deploy path for the Elm bundle | M | **done except CSP.** `elm/tools/build.sh` → `elm/dist-elm/`: `--optimize` build, esbuild minify (4.2 MB → 1.2 MB), content-hashed local scripts and stylesheets, the voice engine and the background renderer bundled. `./deploy.sh` with `ONYX_CLIENT=elm` builds it and overlays it onto every SPA document (`tools/elm-overlay.mjs`); plain builds never touch `out/`. **Pending:** a Content-Security-Policy — `index.html` still has an inline boot script needing a hash or extraction, and nginx sends only `frame-ancestors` |
+| 7.5 | Build + deploy path for the Elm bundle | M | **done except CSP.** `elm/tools/build.sh` → `elm/dist-elm/`: `--optimize` build, esbuild minify (4.2 MB → 1.2 MB), content-hashed local scripts and stylesheets, the voice engine and the background renderer bundled. `./deploy.sh` (no client switch; the Solid pipeline is gone) runs `pnpm build` — `build.sh`, then `tools/build-site.mjs`, which generates every SPA document from the route table (`tools/site/routes.mjs`) — and syncs it; plain builds never touch `out/`. **Pending:** a Content-Security-Policy — `index.html` still has an inline boot script needing a hash or extraction, and nginx sends only `frame-ancestors` |
 | 7.6 | Visual regression screenshots per surface | M | **partial.** Real-browser screenshots exist for every slice's scenarios (`screens.mjs`), plus a rendered-contrast audit (`contrast-audit.mjs`) and `css-coverage`. **Not there:** baseline diffing |
 
 ## Phase 8 — Long tail

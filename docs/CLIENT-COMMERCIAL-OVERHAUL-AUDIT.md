@@ -927,7 +927,7 @@ The work should be divided by decision complexity and file ownership, not by arb
 | Astra product/design auditor | gpt-6-astra, medium, normal speed | Whole-product audit, IA, design direction, feature/UI inventory, cross-surface coherence, roadmap synthesis, final design critique | Large mechanical edits across unrelated files |
 | Astra final adjudicator | gpt-6-astra, high or xhigh only when needed | Resolve conflicts between visual, accessibility, security, performance, and consumer requirements; review the final candidate | Routine token renames or repetitive test updates |
 | Sol integration lead | gpt-5.6-sol, high or xhigh | Cross-cutting shell facades, state ownership, route migration, integration seams, release orchestration | Isolated copy or one-component CSS changes |
-| Terra bounded implementation | gpt-5.6-terra, medium/high | SolidJS components, responsive CSS, bounded feature slices, browser tests, focused refactors | Security/key semantics without an independent review |
+| Terra bounded implementation | gpt-5.6-terra, medium/high | UI components, responsive CSS, bounded feature slices, browser tests, focused refactors | Security/key semantics without an independent review |
 | Luna mechanical support | gpt-5.6-luna, low/medium | Inventory generation, token replacement proposals, fixture scaffolding, docs synchronization, repetitive test matrices | Product decisions, privacy claims, E2EE, calls, release judgment |
 | Independent reviewer | Fresh model/context | Commercial UX red team, accessibility red team, security/privacy review, performance review, release-gate review | Reviewing only its own writer’s work |
 
