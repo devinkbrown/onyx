@@ -31,7 +31,8 @@
 #   ONYX_LIVE_OUT   Absolute path whose basename is `out` (default: $checkout/out).
 #                   When set, must already be absolute (raw relatives rejected).
 #                   Target must not itself be a symlink.
-#   ONYX_CLIENT     solid (default) or elm. With elm, the Elm v3 client
+#   ONYX_CLIENT     elm (default) or solid (deprecated; kept only until the Solid
+#                   source is removed). With elm, the Elm v3 client
 #                   (elm/) is built and overlaid onto every SPA document
 #                   (tools/elm-overlay.mjs) after the normal Vite build, so
 #                   route metadata, feeds, sw.js and backups are unchanged.
@@ -791,7 +792,7 @@ deploy_main() {
   grep -q "onyx-shell-${version}" dist/sw.js \
     || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
 
-  case "${ONYX_CLIENT:-solid}" in
+  case "${ONYX_CLIENT:-elm}" in
     solid) ;;
     elm)
       echo "==> ONYX_CLIENT=elm: building the Elm v3 client and overlaying SPA documents"
