@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Zig-native FreeBSD / OpenBSD desktop host for the Onyx SolidJS SPA.
+//! Zig-native FreeBSD / OpenBSD desktop host for the Onyx Elm web client.
 //!
 //! Separate from the Native SDK path (`desktop/main.zig` + runner):
 //! this host is cross-compiled to `x86_64-freebsd` or `x86_64-openbsd`,

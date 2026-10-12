@@ -42,7 +42,7 @@ RECONNECT_MIN, RECONNECT_MAX = 6, 300
 MAX_MESSAGE_TEXT_BYTES = 360  # stay comfortably under IRC's 512-byte line cap
 # IRCv3 caps we use if the server offers them (graceful degrade otherwise).
 WANT_CAPS = {"server-time", "message-tags", "account-tag", "echo-message"}
-VERSION = "Onyx-announce 1.0 (Vite 8 + SolidJS Onyx Server web-client build bot)"
+VERSION = "Onyx-announce 1.0 (Elm Onyx Server web-client build bot)"
 START = time.time()
 PROTECTED_TOPIC_CHANNELS = {"#root"}
 
@@ -187,8 +187,8 @@ def stats_lines() -> list[str]:
 
 def project_lines() -> list[str]:
     return [
-        f"{B}{BLUE}\U0001f48e Onyx{RST} — the Onyx Server web client. A SolidJS, dark-luxury, "
-        f"mesh-native chat + realtime-media app. Fully recoded (Vite 8 + Solid signals).",
+        f"{B}{BLUE}\U0001f48e Onyx{RST} — the Onyx Server web client. An Elm, dark-luxury, "
+        f"mesh-native chat + realtime-media app. Fully recoded in Elm.",
         f"IRCv3/IRCX over WebSocket, SASL + SESSION-TOKEN resume, threaded chat, live "
         f"presence/activity, E2EE voice/video via {B}Suimyaku{RST}+{B}Tsumugi{RST} (no WebRTC).",
         f"Headline: deep theming + {B}Theme Studio{RST} customization + animated/solid "

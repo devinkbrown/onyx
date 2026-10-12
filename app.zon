@@ -23,7 +23,7 @@
     .security = .{
         .navigation = .{
             // Packaged assets use productionSource origin zero://app only.
-            // Dev is the exact Vite loopback origin (no trailing slash in origin form).
+            // Dev is the exact `pnpm dev` loopback origin (no trailing slash in origin form).
             // zero://inline is not required by productionSource — omit it.
             .allowed_origins = .{ "zero://app", "http://127.0.0.1:3000" },
             .external_links = .{ .action = "deny" },

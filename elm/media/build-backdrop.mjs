@@ -15,7 +15,7 @@
  * elm/engine + elm/media, when an expected variant is missing, or when the
  * output does not mount window.OnyxBackdrop.
  */
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
@@ -32,11 +32,17 @@ const fail = (msg) => {
   process.exit(1);
 };
 
-process.env.ESBUILD_BINARY_PATH ||= (() => {
-  const pkgDir = resolve(dirname(esbuildBin), '..');
+// Point the esbuild JS API at the NATIVE binary next to the package (resolved
+// through symlinks, so `node_modules/esbuild/bin/esbuild` and the pnpm store
+// path both work). Never point it at the JS launcher script: that launcher
+// re-executes ESBUILD_BINARY_PATH, i.e. itself, in an endless process chain.
+// When the native binary is not found, leave the variable unset and let the
+// API resolve its own.
+if (!process.env.ESBUILD_BINARY_PATH) {
+  const pkgDir = realpathSync(resolve(dirname(esbuildBin), '..'));
   const native = resolve(pkgDir, '..', '@esbuild', `${process.platform}-${process.arch}`, 'bin', 'esbuild');
-  return existsSync(native) ? native : esbuildBin;
-})();
+  if (existsSync(native)) process.env.ESBUILD_BINARY_PATH = native;
+}
 const require = createRequire(import.meta.url);
 const esbuild = require(resolve(dirname(esbuildBin), '..', 'lib', 'main.js'));
 
