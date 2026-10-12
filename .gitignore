@@ -73,3 +73,7 @@ elm/elm-stuff/
 
 # Elm static bundle (elm/tools/build.sh output; never deployed by hand)
 /elm/dist-elm/
+
+# Python bytecode (tools/*.py)
+__pycache__/
+*.pyc

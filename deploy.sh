@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Onyx deploy controller — build to dist/, stage allowlisted legacy support
-# resources, then rsync the staged tree into an explicit live out target.
+# Onyx deploy controller — build the Elm client and static site into dist/,
+# stage allowlisted legacy support resources, then rsync the staged tree into
+# an explicit live out target.
 # Live assets/ use compatibility retention: root rsync excludes /assets/ with
 # --delete; assets rsync has no --delete so prior hashed chunks survive.
 #
@@ -10,17 +11,21 @@
 # worktree (e.g. /home/kain/onyx-public-launch); relative ./out is NOT the
 # production tree. Set ONYX_LIVE_OUT=/home/kain/onyx/out for a live release.
 #
-# Vite builds to dist/ — never out/ — so plain `pnpm build` / tests / e2e can
-# never wipe or half-replace production. ONLY this script writes the live out.
+# `pnpm build` is the one build: elm/tools/build.sh compiles the Elm client
+# (elm/) into elm/dist-elm/, then tools/build-site.mjs assembles dist/ from
+# that, public/ and the route table. It never touches out/, so plain builds
+# and tests can never wipe or half-replace production. ONLY this script writes
+# the live out. There is exactly one client and one build path.
 #
 # AUTHORITY
 # ---------
-# The Vite/Solid Landing (and materialised SPA route documents) is authoritative
-# for the public root and all SPA routes. /home/kain/landing is no longer the
-# public website: it may only contribute explicitly allowlisted, non-conflicting
-# legacy support resources (self-host, why, memory, …). Root documents
-# (index.html, 404.html, robots.txt, sitemap.xml, favicons) and SPA-owned paths are never
-# overlaid from landing.
+# The Elm client's generated documents (root index.html, every SPA route
+# document and the flat 404.html) are authoritative for the public root and all
+# SPA routes. /home/kain/landing is no longer the public website: it may only
+# contribute explicitly allowlisted, non-conflicting legacy support resources
+# (self-host, why, memory, …). Root documents (index.html, 404.html,
+# robots.txt, sitemap.xml, favicons) and SPA-owned paths are never overlaid
+# from landing.
 #
 # Usage:
 #   ./deploy.sh
@@ -31,10 +36,8 @@
 #   ONYX_LIVE_OUT   Absolute path whose basename is `out` (default: $checkout/out).
 #                   When set, must already be absolute (raw relatives rejected).
 #                   Target must not itself be a symlink.
-#   ONYX_CLIENT     solid (default) or elm. With elm, the Elm v3 client
-#                   (elm/) is built and overlaid onto every SPA document
-#                   (tools/elm-overlay.mjs) after the normal Vite build, so
-#                   route metadata, feeds, sw.js and backups are unchanged.
+#   ONYX_ELM_BIN_DIR  Directory holding the `elm` 0.19.1 compiler (default /tmp).
+#   ELM_HOME        Elm package cache (default /tmp/elmhome).
 #   DEPLOY_DRY_RUN  Exactly 0 or 1 (default 0). If 1, build/stage/assert only —
 #                   no live backup/rsync/ACL.
 #   ONYX_WEB_USER   Account granted execute on the live parent (default: http)
@@ -343,7 +346,7 @@ fingerprint_spa_owned() {
     for name in "${SPA_OWNED_BLOCKLIST[@]}"; do
       path="${staged}/${name}"
       if [[ -L "${path}" ]]; then
-        # Symlink at SPA-owned name is never expected from Vite output.
+        # Symlink at SPA-owned name is never expected from the build output.
         printf '%s\tSYMLINK\n' "${name}"
         continue
       fi
@@ -742,29 +745,34 @@ deploy_main() {
 
   assert_no_spa_owned_in_landing_dist "${LANDING}/dist" || exit 1
 
-  echo "==> building static export -> dist/"
-  NODE_OPTIONS="--disable-warning=DEP0205" pnpm build
+  echo "==> building the Elm client and static site -> dist/"
+  PATH="${ONYX_ELM_BIN_DIR:-/tmp}:${PATH}" ELM_HOME="${ELM_HOME:-/tmp/elmhome}" \
+    NODE_OPTIONS="--disable-warning=DEP0205" pnpm build \
+    || { echo "FAIL: build failed — NOT deploying"; exit 1; }
 
   test -f dist/index.html || { echo "FAIL: dist/index.html missing — build broken, NOT deploying"; exit 1; }
   test -f dist/sw.js      || { echo "FAIL: dist/sw.js missing"; exit 1; }
 
-  # Guard: Vite root must still be the Solid Landing after build.
+  # Guard: the root document must carry the authoritative public title and boot the Elm client.
   verify_public_title dist/index.html \
     || { echo "FAIL: dist/index.html missing authoritative public title — refusing deploy"; exit 1; }
+  grep -q 'Elm.Main.init' dist/index.html \
+    || { echo "FAIL: dist/index.html does not boot the Elm client — refusing deploy"; exit 1; }
 
-  # SPA route entrypoints. solid-router is client-routed but the build emits only
-  # dist/index.html; hard loads need materialised documents with route metadata.
-  echo "==> materialising route-correct SPA entrypoints"
-  node tools/materialize-route-entrypoints.mjs dist
-
+  # SPA route entrypoints: the Elm client is client-routed, so hard loads need
+  # the per-route documents tools/build-site.mjs generated.
   test -f dist/app/index.html \
-    || { echo "FAIL: dist/app/index.html missing after materialise"; exit 1; }
+    || { echo "FAIL: dist/app/index.html missing after build"; exit 1; }
   test -f dist/download/index.html \
-    || { echo "FAIL: dist/download/index.html missing after materialise"; exit 1; }
+    || { echo "FAIL: dist/download/index.html missing after build"; exit 1; }
   test -f dist/404.html \
-    || { echo "FAIL: dist/404.html missing after materialise"; exit 1; }
+    || { echo "FAIL: dist/404.html missing after build"; exit 1; }
   test ! -e dist/404/index.html \
-    || { echo "FAIL: materialiser must emit flat dist/404.html, never dist/404/index.html"; exit 1; }
+    || { echo "FAIL: the build must emit flat dist/404.html, never dist/404/index.html"; exit 1; }
+  if grep -rlq '/assets/index-' dist --include='*.html'; then
+    echo "FAIL: a document still loads a legacy /assets/index-* bundle — refusing deploy" >&2
+    exit 1
+  fi
 
   # Optional: stage site-local public release artifacts (never the default).
   # Six public lanes: windows + linux + macos-x86_64 + macos-arm64 + freebsd + openbsd.
@@ -790,21 +798,6 @@ deploy_main() {
   sed -i "s/onyx-shell-__BUILD_VERSION__/onyx-shell-${version}/" dist/sw.js
   grep -q "onyx-shell-${version}" dist/sw.js \
     || { echo "FAIL: sw.js placeholder not found — check public/sw.js has 'onyx-shell-__BUILD_VERSION__'"; exit 1; }
-
-  case "${ONYX_CLIENT:-solid}" in
-    solid) ;;
-    elm)
-      echo "==> ONYX_CLIENT=elm: building the Elm v3 client and overlaying SPA documents"
-      PATH="${ONYX_ELM_BIN_DIR:-/tmp}:${PATH}" ELM_HOME="${ELM_HOME:-/tmp/elmhome}" bash elm/tools/build.sh \
-        || { echo "FAIL: Elm build failed — NOT deploying"; exit 1; }
-      node tools/elm-overlay.mjs dist elm/dist-elm \
-        || { echo "FAIL: Elm overlay failed — NOT deploying"; exit 1; }
-      verify_public_title dist/index.html \
-        || { echo "FAIL: dist/index.html lost the authoritative public title in the Elm overlay"; exit 1; }
-      ;;
-    *)
-      echo "FAIL: ONYX_CLIENT must be solid or elm (got: ${ONYX_CLIENT})"; exit 1 ;;
-  esac
 
   # Build legacy landing only to harvest allowlisted support resources.
   echo "==> building legacy landing (allowlisted support resources only)"
@@ -836,7 +829,7 @@ deploy_main() {
 
   # Explicitly ensure we did not copy landing index (landing index lacks data-theme=ocean).
   if grep -q 'class="no-js"' dist/index.html 2>/dev/null && ! grep -q 'data-theme=' dist/index.html; then
-    echo "FAIL: dist/index.html looks like legacy landing root — overlay bug" >&2
+    echo "FAIL: dist/index.html looks like legacy landing root — staging bug" >&2
     exit 1
   fi
 
