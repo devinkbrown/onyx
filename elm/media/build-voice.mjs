@@ -11,17 +11,18 @@
  *                            build.sh hashes it with the other index.html
  *                            assets
  *   opcodec_wasm.js / .wasm  the codec, copied from public/ (the engine loads
- *                            it from the site root, where the Vite deploy
- *                            already serves it)
+ *                            it from the site root, where tools/build-site.mjs
+ *                            serves public/ too)
  *
- * MediaEngine.ts spawns its worker with Vite's
+ * The engine lives in elm/engine (the `@/` alias, see tsconfig.json). MediaEngine.ts
+ * spawns its worker with the bundler idiom
  * `new URL('./videoEncodeWorker.ts', import.meta.url)`, which plain esbuild
  * cannot resolve (IIFE `import.meta` is empty). A load hook rewrites exactly
  * that expression to the hashed worker URL voice-engine.ts publishes; the
  * build FAILS if the expression is ever missing so the rewrite cannot rot.
  */
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, readFileSync, renameSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, realpathSync, renameSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 
@@ -39,11 +40,17 @@ const fail = (msg) => {
 };
 
 // The esbuild JS API lives next to the CLI the build already located.
-process.env.ESBUILD_BINARY_PATH ||= (() => {
-  const pkgDir = resolve(dirname(esbuildBin), '..');
+// Point the esbuild JS API at the NATIVE binary next to the package (resolved
+// through symlinks, so `node_modules/esbuild/bin/esbuild` and the pnpm store
+// path both work). Never point it at the JS launcher script: that launcher
+// re-executes ESBUILD_BINARY_PATH, i.e. itself, in an endless process chain.
+// When the native binary is not found, leave the variable unset and let the
+// API resolve its own.
+if (!process.env.ESBUILD_BINARY_PATH) {
+  const pkgDir = realpathSync(resolve(dirname(esbuildBin), '..'));
   const native = resolve(pkgDir, '..', '@esbuild', `${process.platform}-${process.arch}`, 'bin', 'esbuild');
-  return existsSync(native) ? native : esbuildBin;
-})();
+  if (existsSync(native)) process.env.ESBUILD_BINARY_PATH = native;
+}
 const require = createRequire(import.meta.url);
 const esbuild = require(resolve(dirname(esbuildBin), '..', 'lib', 'main.js'));
 
@@ -62,7 +69,7 @@ const common = {
 const workerTmp = join(outDir, 'voice-worker.js');
 await esbuild.build({
   ...common,
-  entryPoints: [join(repo, 'src/lib/cadence-media/videoEncodeWorker.ts')],
+  entryPoints: [join(repo, 'elm/engine/lib/cadence-media/videoEncodeWorker.ts')],
   format: 'esm',
   outfile: workerTmp,
 });
@@ -97,9 +104,10 @@ const result = await esbuild.build({
   metafile: true,
 });
 const inputs = Object.keys(result.metafile.inputs);
-if (inputs.some((p) => /solid-js|lib[\\/]store[\\/]/.test(p))) {
-  fail(`voice bundle pulled in UI/store code: ${inputs.filter((p) => /solid-js|store/.test(p)).join(', ')}`);
-}
+// The bundle may contain engine and glue code only: nothing from node_modules
+// and nothing outside elm/engine + elm/media.
+const stray = inputs.filter((p) => !/^elm[\\/](engine|media)[\\/]/.test(p));
+if (stray.length) fail(`voice bundle pulled in code outside elm/engine and elm/media: ${stray.join(', ')}`);
 
 // 3. codec -----------------------------------------------------------------
 for (const name of ['opcodec_wasm.js', 'opcodec_wasm.wasm']) {

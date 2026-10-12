@@ -1,10 +1,12 @@
 # Onyx Elm client (v3)
 
-The Elm client is the Onyx web product: the build `./deploy.sh` ships with
-`ONYX_CLIENT=elm`. The SolidJS client in `src/` is deprecated; it is kept as the
-behavioural oracle that the status docs compare against, and its TypeScript tests are
-the source of many Elm test vectors (`src/lib/**/*.test.ts`,
-`onyx-client-contract.v2.json`).
+The Elm client is the Onyx web product and the only client: `./deploy.sh` builds and
+ships it (there is no client switch). The SolidJS client that preceded it was removed
+from the tree. It is the behavioural "oracle" the status docs compare against, and its
+TypeScript tests are the source of many Elm test vectors; both are recoverable from
+the annotated tag `solid-client-final` (`git show solid-client-final:src/<path>` — the
+`src/…` paths cited throughout `elm/` and `elm/design/` point into that tag). The
+contract file `docs/protocol/onyx-client-contract.v2.json` is still in the tree.
 
 Status docs live in [`design/INDEX.md`](design/INDEX.md): the roadmap
 ([V3_ROADMAP.md](V3_ROADMAP.md)), the protocol matrix ([COVERAGE.md](COVERAGE.md)),
@@ -22,13 +24,24 @@ the client parity map, the server feature map, the design direction and the call
   `Keyring.elm`, … — pure protocol and crypto-adjacent modules (validation, parsing,
   packing, transcripts, fail-closed display rules).
 - `src/View.elm` and `src/View/*.elm` — every rendered surface.
-- `ports.js` (+ `historyImport.js`, `media/*.ts` for the Cadence voice engine and the
-  background renderer) — the JS side: WebSocket, IndexedDB vault, WebCrypto, WebAuthn,
-  WebRTC, uploads, notifications, service worker registration.
+- `ports.js` (+ `historyImport.js`) — the JS side: WebSocket, IndexedDB vault,
+  WebCrypto, WebAuthn, uploads, notifications, service worker registration. It also
+  runs the legacy `ocean-*` → `onyx:*` localStorage copy when the script loads.
+- `engine/` and `media/` — the TypeScript bundled into the build with esbuild:
+  `engine/` is the Cadence media engine (`lib/cadence-media`), E2EE device keys / DM
+  envelope cipher / key pins (`lib/e2ee`), the IRC parser (`lib/irc`), the net helpers
+  and the canvas background engine with its 17 variants (`backgrounds/`), with
+  co-located Vitest suites; `media/` holds the bundle entries (`voice-engine.ts` →
+  `window.OnyxVoiceEngine`, `backdrop.ts` → `window.OnyxBackdrop`), their adapters
+  and `build-voice.mjs` / `build-backdrop.mjs`. `@/` resolves to `elm/engine/`
+  (tsconfig `paths`, esbuild, vitest).
 - `app.css` + `css/*.css` — styles (tokens first, then per-surface sheets; the `index.html` link order IS the cascade order and is documented there).
 - `tests/` — elm-test vectors; `*.smoke.mjs` — jsdom smoke suites over the real bundle and
-  `ports.js`; `tools/` — build (`build.sh`), screenshots (`screens*.mjs`), CSS coverage,
-  contrast audit, style map, call end-to-end.
+  `ports.js`; `tools/` — build (`build.sh`), smoke runner (`smokes.sh`), screenshots
+  (`screens*.mjs`), CSS coverage, contrast audit, style map, call end-to-end.
+- The static site around the app (route documents, `public/`, `/assets/elm/`) is
+  assembled by `../tools/build-site.mjs`; `pnpm build` runs `tools/build.sh` and then
+  that.
 - `design/` — design and status documents (see `design/INDEX.md`).
 
 Crypto (AES-GCM, Ed25519, ECDH, SCRAM), WebSocket, IndexedDB, WebAuthn,
@@ -72,10 +85,12 @@ export PATH=/tmp:$PATH ELM_HOME=/tmp/elmhome
 cd elm
 /tmp/elm make src/Main.elm --output /dev/null                  # typecheck the app
 node /tmp/elmtools/package/bin/elm-test --compiler /tmp/elm    # full suite
-for s in *.smoke.mjs; do node "$s" || echo "FAIL $s"; done     # smoke suites
+bash tools/smokes.sh                                           # every *.smoke.mjs (= pnpm test:smoke)
 node tools/css-coverage.mjs                                    # 0 unstyled, 0 undefined vars
 bash tools/build.sh                                            # → dist-elm/ (never touches out/)
 node tools/screens.mjs --vp all --out <dir>                    # real-Chromium aspect-ratio matrix
+cd .. && pnpm typecheck && pnpm lint && pnpm test              # TS engine, ESLint, Vitest (engine + site)
+pnpm build                                                     # elm build + dist/ (never touches out/)
 ```
 
 CSS changes also pass the pixel-regression harness (`tools/css-regress.mjs`: shoot the

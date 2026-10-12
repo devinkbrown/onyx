@@ -27824,8 +27824,8 @@ setConnectForm f model =
     { model | connectForm = f model.connectForm }
 
 
-{-| Open a socket under `nick`: the `?ws=` pin dials directly (mirroring
-`VITE_IRC_WS`); otherwise the registry probe picks the node and
+{-| Open a socket under `nick`: the `?ws=` pin dials directly (the successor of the
+Solid client's build-time `VITE_IRC_WS`); otherwise the registry probe picks the node and
 `NodesProbed` dials the winner.
 -}
 dialConnect : Model -> String -> ( Model, List Outbound )

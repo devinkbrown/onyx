@@ -1,6 +1,6 @@
 # Onyx client roadmap — Q4 2026
 
-**Audience: contributor and maintainer.** The feature plan for the Onyx SolidJS
+**Audience: contributor and maintainer.** The feature plan for the Onyx web
 client, organized in four waves. Every "already shipped" claim below is cited to
 a real path in this tree; every gap is a gap because the file that would contain
 it does not exist or is demonstrably thin, not because a summary said so.

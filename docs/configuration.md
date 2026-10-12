@@ -4,18 +4,22 @@ Onyx is a build-time-configured static client. It does not contain server
 credentials and it does not turn arbitrary environment variables into browser
 secrets.
 
-## Vite variables
+## Runtime configuration
 
-Copy [`.env.example`](../.env.example) to `.env.local` for local work.
+The Elm client has **no build-time environment variables**: the static bundle is
+identical for every deployment and carries no server credentials. What can be
+configured:
 
-| Variable | Default | Meaning |
+| Setting | Where | Meaning |
 | --- | --- | --- |
-| `VITE_IRC_WS` | unset | Pins one Onyx Server WebSocket endpoint. When unset, `src/app/nodes.ts` probes its configured node registry and selects the fastest response. |
-| `VITE_DEFAULT_CHANNEL` | unused | Reserved for a future first-run/default-channel surface. It is currently not read by the client. |
-| `VITE_MEDIA_URL` | `/upload` in a first-party production build | Base URL for multipart uploads. The client posts the file in a field named `file`. |
+| `?ws=wss://host/ws` | page URL | Pins one Onyx Server WebSocket endpoint and disables node probing. When absent, `elm/src/Nodes.elm` lists the configured nodes and `ports.js` probes them and selects the fastest response. |
+| `?nick=` | page URL | Pre-fills the nick on the connect gate. |
+| `mediaUrl` flag | boot script in `elm/index.html` | Base URL for multipart uploads. `null` (the shipped value) means same-origin `/upload`. The client posts the file in a field named `file`. |
 
-All `VITE_*` values are embedded into the bundle. Never put passwords, access
-tokens, private keys, or server-only credentials in them.
+Anything in a URL or in the shipped HTML is public: never put passwords, access
+tokens, private keys, or server-only credentials there. To point a self-hosted
+build at your own node, either link users to `/app/?ws=wss://your.host/ws` or
+edit the `nodes` list in `elm/src/Nodes.elm` and rebuild.
 
 ## WebSocket endpoint expectations
 
@@ -30,14 +34,14 @@ vendor extensions it needs. A reverse proxy must preserve:
 - binary WebSocket frames for Cadence media;
 - the server's origin and authentication policy.
 
-`VITE_IRC_WS` is a URL, not an HTTP health endpoint. The automatic node probe
+`?ws=` is a URL, not an HTTP health endpoint. The automatic node probe
 uses HTTPS HEAD requests only to estimate latency; it does not open throwaway
 IRC sockets.
 
 ## Uploads and link previews
 
-The upload client sends multipart form data to `${VITE_MEDIA_URL}/upload` (or
-same-origin `/upload` when the variable is unset). The deployment must enforce
+The upload client sends multipart form data to same-origin `/upload` (or the
+`mediaUrl` flag's base when a deployment sets one). The deployment must enforce
 size, content-type, authentication, retention, and malware policy at that
 boundary; the browser is not an authorization boundary.
 
@@ -50,9 +54,11 @@ validation.
 ## Browser storage
 
 - `localStorage` keys use the `onyx:` prefix. Legacy `ocean-*` values are copied
-  forward by the first import in `src/index.tsx`.
-- Conversation history is stored in IndexedDB by `src/lib/vault/` and is
-  bounded by the retention policy; the default target is 400 messages.
+  forward (never deleted) by `migrateLegacyStorage`, which `elm/ports.js` runs
+  when it loads, before the boot script reads any flag.
+- Conversation history is stored in IndexedDB (`onyx-vault`, written by
+  `elm/ports.js`) and is bounded by the retention policy; the default target is
+  400 messages.
 - DM/device keys use a separate `onyx-keys` database and are not erased by
   clearing ordinary history.
 - E2EE DM plaintext is never persisted in the history vault. Browser profile
@@ -63,13 +69,18 @@ validation.
 For a generic host:
 
 ```bash
-pnpm build
-# serve dist/ with SPA fallback and the required WebSocket/media endpoints
+pnpm build   # needs the Elm 0.19.1 compiler on PATH; writes dist/
+# serve dist/ as static files with the required WebSocket/media endpoints
 ```
 
+`dist/` contains one HTML document per route (plus the flat `404.html`), so a
+generic static host needs no SPA fallback rewrite: unknown paths should return
+`404.html` with a 404 status (`tools/serve.mjs` and `ops/nginx/` show both
+behaviours).
+
 The first-party `deploy.sh` is intentionally host-specific. It assumes the
-eshmaki.me nginx layout, a separately staged community-site overlay, route
-materialization, service-worker stamping, and a live `out/` directory. It is
+eshmaki.me nginx layout, a separately staged community-site overlay,
+service-worker stamping, and a live `out/` directory. It is
 not a portable installer and should not be copied into a different host
 without reviewing every path and permission operation.
 
@@ -79,8 +90,10 @@ This prevents a test or ordinary build from replacing the live site.
 
 ## Route metadata
 
-The Solid route table in `src/index.tsx` and `ROUTE_ENTRYPOINTS` in
-`tools/materialize-route-entrypoints.mjs` are a pair. When adding or renaming a
-public route, update both and its route tests. Otherwise direct links,
-crawlers, and social unfurls can receive the wrong title or canonical URL even
-when client-side navigation appears to work.
+The Elm route table (`elm/src/Route.elm`) and `ROUTE_ENTRYPOINTS` in
+`tools/site/routes.mjs` are a pair; `tools/build-site.mjs` turns the latter into
+one static document per route (title, description, canonical URL, Open Graph /
+Twitter metadata). When adding or renaming a public route, update both and the
+sitemap; `pnpm test` (`tools/site/site.test.mjs`) fails when the two drift.
+Otherwise direct links, crawlers, and social unfurls can receive the wrong title
+or canonical URL even when client-side navigation appears to work.

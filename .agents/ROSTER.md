@@ -5,7 +5,7 @@ Project path: `/home/kain/onyx`. Daemon is a **different** repo (`/home/kain/ony
 ## Project Claude agents (`.claude/agents/`)
 | Agent | Mode | Use for |
 |-------|------|---------|
-| `onyx-coder-leaf` | Implement | Bounded client TS/TSX outside specialist sinks |
+| `onyx-coder-leaf` | Implement | Bounded client Elm / JS / TS outside specialist sinks |
 | `onyx-explorer` | Read-only | Trace a feature before coding |
 | `onyx-spec-architect` | Read-only | Implementation blueprint |
 | `onyx-adversarial-reviewer` | Read-only | Falsify a diff |
@@ -22,9 +22,8 @@ Project path: `/home/kain/onyx`. Daemon is a **different** repo (`/home/kain/ony
 ## Global specialists (`~/.claude/agents/`) — MUST route deep work
 | Domain | Agent |
 |--------|-------|
-| General Solid/TS implement + review | `solidjs-coder` |
 | IRC-over-wss wire | `onyx-irc` |
-| Zustand store fold-back | `onyx-store` |
+| Elm model/`update` fold-back | `onyx-store` |
 | E2EE DM / passkeys / credentials | `onyx-crypto` |
 | Message render / XSS sink | `onyx-render` |
 | IndexedDB vault | `onyx-vault` |
@@ -35,7 +34,7 @@ Project path: `/home/kain/onyx`. Daemon is a **different** repo (`/home/kain/ony
 | Accessibility audits | `onyx-a11y` |
 | Cmd-K / Spotlight | `onyx-cmdk` |
 | Perf / virtualization | `onyx-perf` |
-| Playwright critical flows | `onyx-e2e` |
+| Real-browser critical flows (`elm/tools/screens*.mjs`) | `onyx-e2e` |
 
 ## Skills (`.agents/skills/` → `.claude/skills/`)
 `onyx-agent-core`, `onyx-client-verification`, `onyx-roadmap-execution`, `cross-model-handoff`, `onyx-agent-toolkit`.

@@ -1,9 +1,12 @@
 # Contributing to Onyx
 
 **Audience: contributor.** How to set up, test, gate, and safely deploy the Onyx
-client. Onyx is a **SolidJS 1.9 + Vite 7** SPA — see the docs hub
-([`docs/README.md`](docs/README.md)), [`docs/architecture.md`](docs/architecture.md)
-for the `src/` map, and [`CLAUDE.md`](CLAUDE.md) for working conventions.
+web client. Onyx is an **Elm** single-page app with a small JavaScript/TypeScript
+port layer — see the docs hub ([`docs/README.md`](docs/README.md)),
+[`docs/architecture.md`](docs/architecture.md) for the source map,
+[`elm/README.md`](elm/README.md) for the toolchain bootstrap, and
+[`CLAUDE.md`](CLAUDE.md) for working conventions. (The SolidJS client this
+replaced was removed; it is recoverable at the `solid-client-final` tag.)
 
 ## Prerequisites
 
@@ -11,68 +14,78 @@ for the `src/` map, and [`CLAUDE.md`](CLAUDE.md) for working conventions.
   a pnpm workspace (`pnpm-workspace.yaml`). Mixing package managers corrupts the
   install.
 - Node 20+ (`@types/node` is pinned to `^20`).
+- The **Elm 0.19.1** compiler on `PATH` (and `elm-test` for the Elm suite). The
+  sandbox-friendly bootstrap is in [`elm/README.md`](elm/README.md).
 
 ```bash
 pnpm install
-pnpm dev          # Vite dev server on http://localhost:3000
+export PATH=/tmp:$PATH ELM_HOME=/tmp/elmhome   # wherever your elm binary / package cache live
+pnpm dev          # builds the Elm client + site, serves dist/ on http://127.0.0.1:3000
 ```
 
 ## Scripts (`package.json`)
 
 | Command | What it does |
 |---|---|
-| `pnpm dev` | Vite dev server (port 3000, host exposed). |
-| `pnpm build` | Production build → **`dist/`** (never `out/`). |
-| `pnpm preview` | Serve the built `dist/` locally (port 4173). |
-| `pnpm typecheck` | `tsc -p tsconfig.json --noEmit`. |
-| `pnpm lint` | ESLint (`eslint --cache`). |
-| `pnpm test` | Vitest unit run (co-located `*.test.ts[x]`). |
-| `pnpm test:watch` | Vitest in watch mode. |
-| `pnpm test:coverage` | Vitest with V8 coverage. |
-| `pnpm test:e2e` | Playwright e2e (`tests/e2e`). |
+| `pnpm dev` | `pnpm build`, then serve `dist/` on port 3000 (`tools/serve.mjs`). |
+| `pnpm build` | `elm/tools/build.sh` → `elm/dist-elm/`, then `tools/build-site.mjs` → **`dist/`** (never `out/`). |
+| `pnpm preview` | Serve the existing `dist/` (no rebuild). |
+| `pnpm typecheck` | `tsc -p tsconfig.json --noEmit` over `elm/engine` + `elm/media`. |
+| `pnpm lint` | ESLint (`eslint --cache`) over `elm/*.js`, the smoke suites, and the TypeScript engine. |
+| `pnpm test` | Vitest: the `elm/engine` suites, `tools/` tests and the static-site contract tests. |
+| `pnpm test:smoke` | Every `elm/*.smoke.mjs` suite (jsdom over the real bundle and `ports.js`). |
+| `pnpm test:deploy` | `tools/deploy-controller.test.sh` — deploy.sh path validation, rollback and allowlist safety. |
+| `pnpm test:watch` / `test:coverage` | Vitest watch / V8 coverage. |
 | `pnpm site:check` | Safe website gate: typecheck, lint, tests, then build to `dist/`. |
-| `pnpm site:workbench` | Interactive local menu for dev, safe gates, preview, and deploy-plan inspection. Never writes `out/`. |
+| `pnpm site:workbench` | Interactive local menu for build/serve, safe gates and preview. Never writes `out/`. |
 
 ## Quality gates (run before you finish)
 
-All three must pass:
-
 ```bash
+(cd elm && elm make src/Main.elm --output /dev/null && elm-test)   # Elm compiles + vectors pass
+pnpm test:smoke
 pnpm typecheck
 pnpm lint
 pnpm test
+node elm/tools/css-coverage.mjs      # 0 unstyled classes, 0 undefined CSS variables
 ```
 
-TypeScript is **strict**, and `noUncheckedIndexedAccess` is on
-(`tsconfig.json`) — indexed access yields `T | undefined`, so handle the
-`undefined` case rather than asserting it away.
+UI changes also need real-browser evidence: `node elm/tools/screens.mjs --vp all`
+(see [`elm/README.md`](elm/README.md)). TypeScript is **strict**, and
+`noUncheckedIndexedAccess` is on (`tsconfig.json`) — indexed access yields
+`T | undefined`, so handle the `undefined` case rather than asserting it away.
 
 ## Tests
 
-- **Unit (Vitest + `@solidjs/testing-library`):** co-located next to sources as
-  `*.test.ts` / `*.test.tsx` (e.g. `src/lib/store/store.channel.test.ts`). Setup
-  is `vitest.setup.ts`; IndexedDB is faked with `fake-indexeddb`. Write tests
-  first for new store slices, vault bounds, IRC parsing, and theme/contrast math.
-- **E2E (Playwright, `tests/e2e/`):** critical user flows. Connected e2e must hit
-  the **live origin** because the WebSocket transport is origin-sensitive; the
-  DEV-only `window.__onyx` store handle is available for harness assertions.
-  `tests/_legacy-ocean-e2e/` is dead — do not extend it.
+- **Elm (`elm/tests/`, elm-test + elm-program-test):** vectors for every protocol
+  fold, parser and view contract; new behaviour gets a vector first.
+- **Smoke (`elm/*.smoke.mjs`):** jsdom suites over the real `ports.js` and the
+  built bundle, with stubbed WebSocket/IndexedDB. Every change to `ports.js`
+  needs one.
+- **Unit (Vitest):** co-located `*.test.ts` next to the engine sources in
+  `elm/engine/` (setup in `vitest.setup.ts`, IndexedDB faked with
+  `fake-indexeddb`), plus `tools/**/*.test.{mjs,ts}` for the site generator, the
+  service worker contract and the release tooling.
+- **Screens (`elm/tools/screens*.mjs`):** headless Chromium against a fake local
+  IRC server — never the live network. Connected checks against production are
+  not part of the gates.
 
-## SolidJS conventions
+## Elm conventions
 
-- Read store state in components via `useStore(s => …)` (reactive). `getState()`
-  is a non-reactive snapshot — do not use it for values a component must react to.
-- Mutate state only through immutable `set()` store actions; dispatch server
-  commands with `get().client?.sendRaw(...)` and fold replies back through the
-  message handler.
-- Do not destructure props, and do not read signals in the component body where
-  reactivity is expected — read them in JSX or inside `createMemo`/effects.
+- Effects are data: `update` returns state plus `List Outbound`; only `Main.elm`
+  talks to ports. Pure protocol folds live in their own modules with vectors.
+- New feature code goes in its own module, wired into `App.elm` through a
+  `-- v3/<slice>` block and the `settleSteps` list; keep `App.elm` edits minimal.
+- Security-sensitive paths (auth, crypto, storage, uploads) fail closed, never log
+  secrets and never put secrets in URLs.
+- CSS: tokens live in `elm/app.css`; the `<link>` order in `elm/index.html` is the
+  cascade order; run the CSS gates in `elm/README.md` after touching a stylesheet.
 
 ## Persistence & wire-key contract
 
 - `localStorage` keys use the `onyx:` prefix. Legacy `ocean-*` keys are migrated
-  (copied, never deleted) by `src/lib/migrateStorage.ts`, which **must stay the
-  first import** in `src/index.tsx`.
+  (copied, never deleted) by `migrateLegacyStorage` at the top of `elm/ports.js`,
+  which runs when the script loads — keep it ahead of anything that reads flags.
 - IRCX METADATA/PROP keys prefixed `ocean.` (e.g. `ocean.display-name`,
   `ocean.accent`, `ocean.links`, `ocean.watch`) are **wire format** —
   server-persisted and shared with other clients. Never rename them.
@@ -81,55 +94,53 @@ TypeScript is **strict**, and `noUncheckedIndexedAccess` is on
 
 **Only `deploy.sh` writes `out/`.** nginx serves this checkout's `out/` tree
 directly at eshmaki.me, so `out/` *is* production. To keep a plain build, a test run, or a
-Playwright web server from ever wiping or half-replacing the live site, Vite
-builds to `dist/` (`vite.config.ts`), and `deploy.sh` is the single path that
-syncs `dist/ → out/`.
+screenshot server from ever wiping or half-replacing the live site, `pnpm build`
+writes only `dist/` (`tools/build-site.mjs` refuses any `out` directory), and
+`deploy.sh` is the single path that syncs `dist/ → out/`. There is one client and
+one build path: `deploy.sh` has no client switch.
 
-Vite builds to `dist/` (`vite.config.ts`) so a plain build, test run, or
-Playwright web server can never wipe or half-replace production. **`deploy.sh`
-is the only writer of the live out.**
-
-The **Vite/Solid Landing** is authoritative for the public root and all SPA
-routes. `/home/kain/landing` is **legacy support only**: deploy builds it and
-stages **allowlisted** non-conflicting paths (`self-host`,
-`why`, `memory`, `onyxOS`, `fonts`). `/guides/` and `/community/` are SPA
-Getting started how-tos. It never overlays root
-documents (`index.html`, `robots.txt`, `sitemap.xml`, favicons) or SPA-owned
-routes/assets/service worker. SPA-owned content is fingerprinted before staging
-and re-verified afterward.
+The generated **Elm documents** (root, every route, the flat 404) are authoritative
+for the public root and all SPA routes. `/home/kain/landing` is **legacy support
+only**: deploy builds it and stages **allowlisted** non-conflicting paths
+(`self-host`, `why`, `memory`, `onyxOS`, `fonts`). `/guides/` and `/community/` are
+SPA Getting started how-tos. It never overlays root documents (`index.html`,
+`robots.txt`, `sitemap.xml`, favicons) or SPA-owned routes/assets/service worker.
+SPA-owned content is fingerprinted before staging and re-verified afterward.
 
 `./deploy.sh` (or `DEPLOY_DRY_RUN=1 …` for build/stage/assert only — no live
 mutation; `DEPLOY_DRY_RUN` must be exactly `0` or `1`):
 
 1. Resolves and validates `ONYX_LIVE_OUT` (absolute, basename `out`, not `/`,
    not the checkout root, not `dist`, not a symlink).
-2. `pnpm build` → `dist/` (aborts if `dist/index.html` or `dist/sw.js` is missing).
-3. Materialises SPA route entrypoints with route-correct canonical, Open Graph,
-   title, and description metadata so hard loads do not 404 and pre-hydration
-   crawlers see the right page. **Keep `ROUTE_ENTRYPOINTS` in
-   `tools/materialize-route-entrypoints.mjs` in sync with the `<Route>` table in
-   `src/index.tsx`.**
+2. `pnpm build` → `dist/` (aborts unless the root document boots the Elm client and
+   `dist/sw.js`, `dist/app/index.html`, `dist/download/index.html` and a flat
+   `dist/404.html` exist, and no document loads a legacy `/assets/index-*` bundle).
+   `tools/build-site.mjs` writes route-correct canonical, Open Graph, title and
+   description metadata so hard loads do not 404 and pre-hydration crawlers see
+   the right page. **Keep `ROUTE_ENTRYPOINTS` in `tools/site/routes.mjs` in sync
+   with the parser in `elm/src/Route.elm`** (a test fails when they drift).
 3. Stamps the service-worker cache name (`onyx-shell-<version>`) into `dist/sw.js`.
 4. Overlays the separately managed community-site build configured on the
    first-party host.
-5. `rsync -a --delete dist/ out/`.
+5. Hard-link snapshot of the current live tree, `rsync` into `out/` (`--delete`
+   except `assets/`, which keeps earlier hashed files), post-sync verification,
+   and automatic proven rollback on failure.
 
-Controller unit tests: `bash tools/deploy-controller.test.sh` (never mutates
-`/home/kain/onyx/out`).
+Controller unit tests: `pnpm test:deploy` (never mutates `/home/kain/onyx/out`).
 
 Never point a build, test, or script at the live `out/` yourself.
 
 ## Interactive website workbench
 
 Use `pnpm site:workbench` for an operator-facing local loop. It offers only
-safe actions: start Vite, run the full `site:check` gate, preview the current
-`dist/` build, or inspect the deployment boundary. It intentionally has no
-deploy action: `./deploy.sh` remains an explicit, separately reviewed operator
-decision and the sole writer of the nginx-served `out/` tree.
+safe actions: build and serve, run the full `site:check` gate, or preview the
+current `dist/` build. It intentionally has no deploy action: `./deploy.sh`
+remains an explicit, separately reviewed operator decision and the sole writer of
+the nginx-served `out/` tree.
 
 ## Public repository conventions
 
-Active development is on the `onyx-solid` branch. The brand is **Onyx** (formerly
+The brand is **Onyx** (formerly
 Ocean, briefly Ruri — both are dead names; do not reintroduce them except as the
 documented `ocean.*` wire keys and legacy `ocean-*` migration shims). The client
 source is public under AGPL-3.0-or-later. Do not commit credentials, private

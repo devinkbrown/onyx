@@ -1,6 +1,6 @@
 # Onyx public-launch roadmap (executable)
 
-This is the **total-overhaul** plan for a public Onyx 1.0 surface: one SolidJS
+This is the **total-overhaul** plan for a public Onyx 1.0 surface: one web
 client, honest claims, and gated distribution. Status below is evidence-based —
 do not mark distribution green without a green gate.
 
@@ -93,7 +93,7 @@ Companions:
 
 ## Phase 3 — One client: web / PWA / Zig desktop
 
-**Goal:** Same SolidJS SPA on three surfaces with truthful detection and no capability lies.
+**Goal:** Same web SPA on three surfaces with truthful detection and no capability lies.
 
 | Item | Status |
 |------|--------|

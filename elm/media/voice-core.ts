@@ -29,6 +29,7 @@ import type {
   CadenceMediaCallbacks,
   CadencePeerState,
   CallState,
+  MediaClient,
   MediaKind,
 } from '@/lib/cadence-media/types';
 import type { AudioUnlock, PlatformInfo } from './platform';
@@ -100,15 +101,11 @@ export interface VoiceAdapterOptions {
   userActivation?(): boolean | null;
 }
 
-/** The engine reads these members of its IRC client and nothing else. */
-export interface VoiceClientShim {
-  readonly binaryHandlers: Set<(data: Uint8Array) => void>;
-  readonly extraMessageHandlers: Set<(msg: IRCMessage) => void>;
-  readonly currentNick: string;
+/** The engine reads these members of its transport and nothing else
+ *  (`MediaClient`); the shim also reports whether binary media is admitted. */
+export interface VoiceClientShim extends MediaClient {
   readonly admitsMediaBinary: boolean;
-  sendRaw(command: string, ...params: string[]): void;
   send(line: string): void;
-  sendBinary(bytes: Uint8Array): boolean;
 }
 
 const MAX_NICK = 256;

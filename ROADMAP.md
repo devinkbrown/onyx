@@ -1,7 +1,7 @@
 # Onyx Roadmap — what sets this apart, and what to build next
 
 *Started 2026-07-02 · **status refresh 2026-07-21** · covers **Onyx Server**
-(daemon), **Onyx** (SolidJS client), the community site (landing), and stats.
+(daemon), **Onyx** (web client), the community site (landing), and stats.
 Brand: **Onyx** = network/product/client; **Onyx Server** = pure-Zig engine.
 "IRCXNet" is retired public identity only.*
 

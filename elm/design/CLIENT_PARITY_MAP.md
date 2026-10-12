@@ -1,5 +1,7 @@
 # Client parity map — SolidJS (deprecated) → Elm (the product)
 
+> **Note (history).** The SolidJS source this map compares against was removed from the tree in the `v3/remove-solid` change; it is available at the annotated git tag `solid-client-final` (commit `be033eca`). Every `src/…` / `tests/…` path and line number cited below refers to that tag (`git show solid-client-final:src/<path>`), not the working tree. References to `tools/materialize-route-entrypoints.mjs` and `tools/elm-overlay.mjs` refer to the pipeline replaced by `tools/build-site.mjs` + `tools/site/routes.mjs`.
+
 Written 2026-10-10 against `7e03d47f` (branch `v3/map-oracle`) as read-only cartography. **Refreshed
 2026-10-11 against `609cb240`** (every gap and polish slice merged): each row was re-verified in the code
 at that commit and its status, evidence and note rewritten. Where this file says "then" it means the

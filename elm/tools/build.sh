@@ -43,12 +43,12 @@ if compgen -G "$ELM_DIR/css/*.css" >/dev/null; then
 fi
 
 # Minify (Elm's own --optimize output is unminified) and bundle the voice
-# engine: esbuild comes with the repo's Vite toolchain. ESBUILD=<binary>
+# engine: esbuild is a devDependency of this repo. ESBUILD=<binary>
 # overrides; without one the build fails (calls need the bundled engine).
 ESBUILD_BIN="${ESBUILD:-}"
 if [ -z "$ESBUILD_BIN" ]; then
   for root in "$ELM_DIR/.." "$(git -C "$ELM_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/.."; do
-    for cand in "$root"/node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild; do
+    for cand in "$root"/node_modules/esbuild/bin/esbuild "$root"/node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild; do
       if [ -x "$cand" ]; then ESBUILD_BIN="$cand"; break 2; fi
     done
   done
@@ -75,7 +75,7 @@ if [ -n "$ESBUILD_BIN" ]; then
   node "$ELM_DIR/media/build-voice.mjs" "$ESBUILD_BIN" "$OUT"
   # v3/gap-appearance: the background renderer behind window.OnyxBackdrop
   # (the canvas engine + 17 canvas variants). Mandatory like voice.js: the
-  # build fails if it cannot be bundled or would pull in Solid code.
+  # build fails if it cannot be bundled or would pull in code outside elm/engine.
   node "$ELM_DIR/media/build-backdrop.mjs" "$ESBUILD_BIN" "$OUT"
 else
   echo "error: esbuild not found — the voice engine cannot be bundled (set ESBUILD=...)" >&2

@@ -39,7 +39,7 @@ For the original P0/P1/P2 index, drift reconciliation, and document links, see:
 | [C-06](ROADMAP-2026-Q4.md#c-06--notification-decision-surface) | "Why was I (not) notified" trace surface | `onyx-notify` | `pnpm typecheck && pnpm test` |
 | [C-07](ROADMAP-2026-Q4.md#c-07--accessibility-from-css-coverage-to-a-tested-contract) | A11y: focus-trap + live-region primitives replacing conventions | `onyx-a11y` | `pnpm typecheck && pnpm test` |
 | [C-09](ROADMAP-2026-Q4.md#c-09--public-roadmap-honesty-pass) | Roadmap cross-link honesty pass | `doc-writer` | (manual) |
-| [CL-01…CL-06](ROADMAP-2026-Q4.md#release-track--polish-cl-xx) | Polish track (command discoverability, a11y enforcement, dead surfaces) | `solidjs-coder` · `onyx-a11y` | `pnpm typecheck && pnpm lint && pnpm test` |
+| [CL-01…CL-06](ROADMAP-2026-Q4.md#release-track--polish-cl-xx) | Polish track (command discoverability, a11y enforcement, dead surfaces) | `onyx-coder-leaf` · `onyx-a11y` | `pnpm typecheck && pnpm lint && pnpm test` |
 | [CP-01…CP-06](ROADMAP-2026-Q4.md#release-track--performance-cp-xx) | Performance track (render budget, bundle budget, store cost) | `onyx-perf` | `pnpm typecheck && pnpm test && pnpm build` |
 | **CX-5…CX-10** | EVENT for people, auditorium roster, DATA lines, WHOIS+PROP identity, IRCX slash verbs | `onyx-irc` · `onyx-ui` · `onyx-store` · `onyx-cmdk` | `pnpm typecheck && pnpm test` |
 | **HX-11…HX-14** | Client harden: render XSS, store poison, E2EE notify fail-closed, origin-strict WSS | `onyx-render` · `onyx-store` · `onyx-crypto` · `onyx-irc` | `pnpm test` |

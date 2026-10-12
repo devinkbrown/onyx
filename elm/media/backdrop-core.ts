@@ -20,7 +20,7 @@
  * never claims `data-scene` on <html>, so the shell keeps its opaque ground.
  */
 import { BackgroundEngine, type BackgroundVariant } from '@/backgrounds/engine';
-import { deriveBackgroundPolicy, type BackgroundPolicy } from '@/backgrounds/backgroundPolicy';
+import { deriveBackgroundPolicy, type BackgroundPolicy, type SceneMotion } from '@/backgrounds/backgroundPolicy';
 import { aurora } from '@/backgrounds/variants/aurora';
 import { auroraRibbons } from '@/backgrounds/variants/aurora-ribbons';
 import { bioluminescence } from '@/backgrounds/variants/bioluminescence';
@@ -39,7 +39,7 @@ import { pyriteField } from '@/backgrounds/variants/pyrite-field';
 import { resin } from '@/backgrounds/variants/resin';
 import { tideBands } from '@/backgrounds/variants/tide-bands';
 
-export type SceneMotion = 'adaptive' | 'animated' | 'still' | 'off';
+export type { SceneMotion };
 export type SceneSurface = 'app' | 'appearance';
 
 export interface SceneSpec {

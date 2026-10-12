@@ -144,7 +144,7 @@ pub fn build(b: *std.Build) void {
     linkPlatform(b, target, app_mod, exe, selected_platform, web_engine, web_layer, native_sdk_path, cef_dir, cef_auto_install, macos_sysroot);
     b.installArtifact(exe);
 
-    // Reuse the existing SolidJS/Vite SPA at the repo root (pnpm, dist/).
+    // Reuse the existing Elm web client + static site at the repo root (pnpm, dist/).
     // Do not scaffold a separate frontend/ tree.
     const frontend_install = b.addSystemCommand(&.{ "pnpm", "install", "--frozen-lockfile" });
     const frontend_install_step = b.step("frontend-install", "Install frontend dependencies (pnpm)");
@@ -152,7 +152,7 @@ pub fn build(b: *std.Build) void {
 
     const frontend_build = b.addSystemCommand(&.{ "pnpm", "run", "build" });
     frontend_build.step.dependOn(&frontend_install.step);
-    const frontend_step = b.step("frontend-build", "Build the SolidJS frontend into dist/");
+    const frontend_step = b.step("frontend-build", "Build the Elm web client and static site into dist/");
     frontend_step.dependOn(&frontend_build.step);
 
     const run = b.addRunArtifact(exe);

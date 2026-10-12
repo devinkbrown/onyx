@@ -1,0 +1,589 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+/**
+ * keyPinning.ts — trust-on-first-use (TOFU) device-key pinning, the key-change
+ * anti-MITM gate, and a comparable "safety number" for out-of-band verification.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The DM cipher (dmCipher.ts) derives a per-peer key from the peer's published
+ * `ocean.dm-key` device point. That point arrives through the SERVER's METADATA
+ * directory, and dmCipher only validates it STRUCTURALLY (65-byte uncompressed
+ * SEC1) — it never proves the point belongs to the claimed peer. A Byzantine or
+ * compromised node can therefore hand us a forged device key and machine-in-
+ * the-middle an "end-to-end" DM.
+ *
+ * This module adds the standard client-side defence, as Signal/WhatsApp/Matrix
+ * do: PIN the peer's key on first use, and on any later SILENT change refuse to
+ * seal/open under the new key until the user explicitly re-pins (having verified
+ * the peer out-of-band via the safety number). It needs NO daemon change.
+ *
+ * KNOWN LIMITATION (inherent to TOFU): if an attacker is present on the VERY
+ * FIRST contact, we pin the attacker's key. That residual risk is exactly what
+ * the safety number closes — two humans compare the 60-digit number out-of-band
+ * and detect a MITM even on first contact. Multi-device pins use one conversation
+ * number over the full device set (`safetyNumberForDeviceSet`); the DM sheet
+ * surfaces device count without exposing raw keys. Follow-ups: bind the KEYTRANS
+ * proof to the pinned key (onyx-crypto + a daemon co-check).
+ *
+ * Storage: its OWN IndexedDB ('onyx-key-pins'), deliberately SEPARATE from the
+ * device-key store ('onyx-keys'). Keeping trust state in a sibling DB means we
+ * never touch the identity-key store's schema/version — a botched DB_VERSION
+ * bump there would orphan the device key and silently lose decryptable history.
+ * It also lets "reset trust / re-pin everyone" stay independent of "forget my
+ * identity key".
+ */
+
+import {
+  deviceKeys,
+  isEnvelope,
+  isValidPeerPublicKey,
+  normalizePeerDeviceKeys,
+  openDm,
+  sealDmToDevices,
+} from './dmCipher';
+import {
+  deviceMemoryOwnerKey,
+  type DeviceMemoryOwner,
+} from '@/lib/deviceMemoryOwner';
+
+/** Multi-device pin blob — JSON so legacy single-key string pins stay readable. */
+const MULTI_PIN_PREFIX = '{"v":1,"k":';
+
+function encodeMultiPin(keys: readonly string[]): string {
+  const normalized = normalizePeerDeviceKeys(keys);
+  return JSON.stringify({ v: 1, k: normalized });
+}
+
+function parsePinnedKeys(raw: string | null): string[] | null {
+  if (raw === null) return null;
+  if (isValidPeerPublicKey(raw)) return [raw];
+  if (!raw.startsWith(MULTI_PIN_PREFIX) && !raw.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(raw) as { v?: unknown; k?: unknown };
+    if (parsed?.v !== 1 || !Array.isArray(parsed.k)) return null;
+    const keys = normalizePeerDeviceKeys(
+      parsed.k.filter((entry): entry is string => typeof entry === 'string'),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── pin store (sibling IndexedDB) ─────────────────────────────────────────────
+
+const PIN_DB_NAME = 'onyx-key-pins';
+const PIN_DB_VERSION = 1;
+const PIN_STORE = 'pins';
+
+/**
+ * Normalize the account identifier for the pin bucket. This DELIBERATELY matches
+ * the store's existing `peerDmKeys`/`dms` keying (`nick.toLowerCase()`) so a pin
+ * and the peer key it guards land in the same bucket in both send and receive
+ * directions. NOTE: `toLowerCase()` is NOT the server's RFC1459/services
+ * casemapping — that mismatch is a pre-existing, store-wide convention, not
+ * introduced here. If the client ever adopts server-authoritative account
+ * folding, the store keys and this pin key must move together (an onyx-coder-leaf /
+ * onyx-server-ircx co-check), or the buckets will diverge and the gate will silently
+ * degrade.
+ */
+function acctKey(account: string): string {
+  return account.toLowerCase();
+}
+
+/**
+ * Physical trust bucket. Signed sessions always include the local owner, so two
+ * accounts on the same browser can make independent trust decisions about the
+ * same peer. Omitting `owner` deliberately addresses only the legacy bucket;
+ * old unowned pins stay quarantined instead of being claimed by the next login.
+ */
+function pinRecordKey(account: string, owner?: DeviceMemoryOwner): string | null {
+  const peer = acctKey(account);
+  if (owner === undefined) return peer;
+  const ownerKey = deviceMemoryOwnerKey(owner);
+  return ownerKey ? JSON.stringify([ownerKey, peer]) : null;
+}
+
+function openPinsDb(): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    try {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      const req = indexedDB.open(PIN_DB_NAME, PIN_DB_VERSION);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(PIN_STORE)) {
+          req.result.createObjectStore(PIN_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** ok:false means the store could not be read at all — callers MUST fail closed. */
+type PinRead = { ok: true; key: string | null } | { ok: false };
+
+/**
+ * Serialize TOFU pin decisions per trust bucket. Concurrent first-contact
+ * seal/open for the same account must not both observe "no pin" and both win
+ * — only one presented key may establish the pin; the other re-reads as changed.
+ */
+const _pinChains = new Map<string, Promise<void>>();
+
+function withPinChain<T>(recordKey: string, fn: () => Promise<T>): Promise<T> {
+  const previous = _pinChains.get(recordKey) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  _pinChains.set(
+    recordKey,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
+function readPin(account: string, owner?: DeviceMemoryOwner): Promise<PinRead> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve({ ok: false });
+  return new Promise((resolve) => {
+    void openPinsDb().then((db) => {
+      if (!db) return resolve({ ok: false });
+      try {
+        const tx = db.transaction(PIN_STORE, 'readonly');
+        const get = tx.objectStore(PIN_STORE).get(recordKey);
+        get.onsuccess = () => {
+          const val = get.result;
+          db.close();
+          // Missing → first-use. A present but non-string value is corruption,
+          // not an empty pin: treating it as first-use would silently re-TOFU
+          // over a damaged trust record.
+          if (val === undefined) {
+            resolve({ ok: true, key: null });
+            return;
+          }
+          if (typeof val === 'string') {
+            resolve({ ok: true, key: val });
+            return;
+          }
+          resolve({ ok: false });
+        };
+        get.onerror = () => {
+          db.close();
+          resolve({ ok: false });
+        };
+      } catch {
+        db.close();
+        resolve({ ok: false });
+      }
+    });
+  });
+}
+
+function writePin(account: string, key: string, owner?: DeviceMemoryOwner): Promise<boolean> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    void openPinsDb().then((db) => {
+      if (!db) return resolve(false);
+      try {
+        const tx = db.transaction(PIN_STORE, 'readwrite');
+        tx.objectStore(PIN_STORE).put(key, recordKey);
+        tx.oncomplete = () => {
+          db.close();
+          resolve(true);
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve(false);
+        };
+        tx.onabort = () => {
+          db.close();
+          resolve(false);
+        };
+      } catch {
+        db.close();
+        resolve(false);
+      }
+    });
+  });
+}
+
+function deletePin(account: string, owner?: DeviceMemoryOwner): Promise<void> {
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return Promise.resolve();
+  return new Promise((resolve) => {
+    void openPinsDb().then((db) => {
+      if (!db) return resolve();
+      try {
+        const tx = db.transaction(PIN_STORE, 'readwrite');
+        tx.objectStore(PIN_STORE).delete(recordKey);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve();
+        };
+      } catch {
+        db.close();
+        resolve();
+      }
+    });
+  });
+}
+
+// ── public pin API ────────────────────────────────────────────────────────────
+
+/** The device key currently pinned for an account, or null if none / unreadable. */
+export async function pinnedPeerKey(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string | null> {
+  const read = await readPin(account, owner);
+  if (!read.ok || read.key === null) return null;
+  const keys = parsePinnedKeys(read.key);
+  return keys?.[0] ?? null;
+}
+
+/** All pinned device keys for an account (single-key pins return a 1-length list). */
+export async function pinnedPeerKeys(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string[] | null> {
+  const read = await readPin(account, owner);
+  if (!read.ok) return null;
+  if (read.key === null) return [];
+  return parsePinnedKeys(read.key);
+}
+
+/**
+ * Pin (first use) or re-pin (explicit user accept of a key change) an account's
+ * device key. Rejects a structurally invalid key so garbage is never pinned.
+ * Returns false if the key is invalid OR the write could not be persisted — in
+ * which case the caller must fail closed rather than proceed unverified.
+ */
+export async function pinPeerKey(
+  account: string,
+  key: string,
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  if (!isValidPeerPublicKey(key)) return false;
+  return writePin(account, key, owner);
+}
+
+/**
+ * Pin a multi-device key set (Era 3 C2). One key is stored as a legacy single
+ * string; two or more as a versioned JSON multi-pin blob.
+ */
+export async function pinPeerKeys(
+  account: string,
+  keys: readonly string[],
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  const normalized = normalizePeerDeviceKeys(keys);
+  if (normalized.length === 0) return false;
+  if (normalized.length === 1) return writePin(account, normalized[0]!, owner);
+  return writePin(account, encodeMultiPin(normalized), owner);
+}
+
+/** Persist a bounded, pre-hashed trust binding for protocols that authenticate
+ * more than one public key (for example media static + signing keys). The
+ * caller must compute a SHA-256 base64url digest; storing only that digest keeps
+ * this API from becoming a generic garbage bucket while allowing composite
+ * device identities to use the same owner-scoped TOFU database. */
+export async function pinPeerTrustBinding(
+  account: string,
+  binding: string,
+  owner?: DeviceMemoryOwner,
+): Promise<boolean> {
+  if (!/^[A-Za-z0-9_-]{43}$/u.test(binding)) return false;
+  return writePin(account, binding, owner);
+}
+
+/** Forget an account's pin (drops back to first-use on next contact). */
+export function unpinPeerKey(account: string, owner?: DeviceMemoryOwner): Promise<void> {
+  return deletePin(account, owner);
+}
+
+/** The trust verdict for a presented key against the account's pin. */
+export type PeerKeyVerdict =
+  /** No pin yet — trust-on-first-use will pin this key. */
+  | 'first-use'
+  /** Presented key equals the pinned key — proceed silently. */
+  | 'unchanged'
+  /** Presented key differs from the pin — a possible MITM; block until accepted. */
+  | 'changed'
+  /** The pin store could not be read — cannot verify trust, so fail closed. */
+  | 'unreadable';
+
+/**
+ * Compare a presented device key against the account's pin WITHOUT mutating
+ * anything. Pure read: pinning happens explicitly in the gated seal/open paths
+ * or via pinPeerKey, so a mere status check never establishes trust.
+ */
+export async function peerKeyStatus(
+  account: string,
+  presentedKey: string,
+  owner?: DeviceMemoryOwner,
+): Promise<PeerKeyVerdict> {
+  const read = await readPin(account, owner);
+  if (!read.ok) return 'unreadable';
+  if (read.key === null) return 'first-use';
+  const pinned = parsePinnedKeys(read.key);
+  if (!pinned) {
+    // Corrupt multi-pin / non-key garbage — fail closed rather than re-TOFU.
+    return read.key === presentedKey ? 'unchanged' : 'changed';
+  }
+  return pinned.includes(presentedKey) ? 'unchanged' : 'changed';
+}
+
+/**
+ * Trust verdict for a whole device-key set. First-use when no pin exists;
+ * unchanged when every presented key is already pinned (extras already known
+ * are fine); changed when any presented key is new after a pin exists.
+ */
+export async function peerDeviceSetStatus(
+  account: string,
+  presentedKeys: readonly string[],
+  owner?: DeviceMemoryOwner,
+): Promise<PeerKeyVerdict> {
+  const keys = normalizePeerDeviceKeys(presentedKeys);
+  if (keys.length === 0) return 'unreadable';
+  const read = await readPin(account, owner);
+  if (!read.ok) return 'unreadable';
+  if (read.key === null) return 'first-use';
+  const pinned = parsePinnedKeys(read.key);
+  if (!pinned || pinned.length === 0) return 'changed';
+  const pinnedSet = new Set(pinned);
+  for (const key of keys) {
+    if (!pinnedSet.has(key)) return 'changed';
+  }
+  return 'unchanged';
+}
+
+// ── gated seal / open (the anti-MITM enforcement points) ──────────────────────
+
+/** Outcome of a trust-gated seal. Only `sealed` puts ciphertext on the wire. */
+export type SealTrustedOutcome =
+  | { status: 'sealed'; envelope: string; keyStatus: 'first-use' | 'unchanged' }
+  /** The peer's key silently changed — nothing sent; warn + require re-pin. */
+  | { status: 'key-changed'; envelope: null; pinnedKey: string }
+  /** Invalid key, unreadable/unwritable pin store, or a seal failure. */
+  | { status: 'unavailable'; envelope: null };
+
+/**
+ * Seal a DM to a peer ONLY if their presented device key is trusted:
+ *  - first-use  -> pin the key (TOFU), then seal;
+ *  - unchanged  -> seal;
+ *  - changed    -> BLOCK (no ciphertext), report the pinned key for the warning;
+ *  - unreadable -> fail closed (unavailable).
+ *
+ * Fail-closed throughout: on any inability to establish or verify trust we emit
+ * NO ciphertext and NO plaintext — the caller must not fall back to an
+ * unencrypted send. Preserves the underlying static-static seal (sealDm).
+ */
+export async function sealDmTrusted(
+  account: string,
+  presentedKey: string,
+  plaintext: string,
+  owner?: DeviceMemoryOwner,
+): Promise<SealTrustedOutcome> {
+  return sealDmTrustedToDevices(account, [presentedKey], plaintext, owner);
+}
+
+/**
+ * Trust-gated multi-device seal (Era 3 C2). Pins the full device set on first
+ * use; blocks when any presented key is not already trusted. Emits a single
+ * ONYXDM1 or ONYXDMN1 envelope — never plaintext fallback.
+ */
+export async function sealDmTrustedToDevices(
+  account: string,
+  presentedKeys: readonly string[],
+  plaintext: string,
+  owner?: DeviceMemoryOwner,
+): Promise<SealTrustedOutcome> {
+  const keys = normalizePeerDeviceKeys(presentedKeys);
+  if (keys.length === 0) return { status: 'unavailable', envelope: null };
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return { status: 'unavailable', envelope: null };
+
+  return withPinChain(recordKey, async () => {
+    const verdict = await peerDeviceSetStatus(account, keys, owner);
+    if (verdict === 'unreadable') return { status: 'unavailable', envelope: null };
+    if (verdict === 'changed') {
+      const pinnedKey = (await pinnedPeerKey(account, owner)) ?? '';
+      return { status: 'key-changed', envelope: null, pinnedKey };
+    }
+    if (verdict === 'first-use') {
+      if (!(await pinPeerKeys(account, keys, owner))) {
+        return { status: 'unavailable', envelope: null };
+      }
+    }
+
+    const envelope = await sealDmToDevices(keys, plaintext);
+    if (!envelope) return { status: 'unavailable', envelope: null };
+    return {
+      status: 'sealed',
+      envelope,
+      keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged',
+    };
+  });
+}
+
+/** Outcome of a trust-gated open. Only `opened` yields plaintext. */
+export type OpenTrustedOutcome =
+  | { status: 'opened'; plaintext: string; keyStatus: 'first-use' | 'unchanged' }
+  /**
+   * Ciphertext stays locked. `key-changed` = the sender key silently changed
+   * (do not decrypt under an unverified key); `undecryptable` = not our
+   * envelope / wrong or rotated key; `unavailable` = invalid key or unreadable
+   * pin store. Every reason maps to LOCKED_PLACEHOLDER, never a plaintext leak.
+   */
+  | { status: 'locked'; reason: 'key-changed' | 'undecryptable' | 'unavailable' };
+
+/**
+ * Open a DM from a peer ONLY if their presented device key is trusted. A
+ * silently-changed sender key stays LOCKED — we do not even attempt to decrypt
+ * with a key that may be forged.
+ *
+ * The receive path is OPEN-THEN-PIN (deliberately asymmetric with the send
+ * path's pin-then-seal): on first contact we decrypt FIRST and pin only after a
+ * successful GCM auth. A key that never produced a validly-sealed message from a
+ * holder of its private half is therefore never pinned — this defeats a cheap
+ * pin-poisoning DoS where an origin-spoofed PRIVMSG carries a random valid-shaped
+ * key (whose secret the attacker does not hold) purely to occupy the pin slot
+ * and block the real peer. A decrypt failure locks as undecryptable. Preserves
+ * openDm.
+ */
+export async function openDmTrusted(
+  account: string,
+  presentedKey: string,
+  envelope: string,
+  owner?: DeviceMemoryOwner,
+): Promise<OpenTrustedOutcome> {
+  if (!isEnvelope(envelope)) return { status: 'locked', reason: 'undecryptable' };
+  if (!isValidPeerPublicKey(presentedKey)) return { status: 'locked', reason: 'unavailable' };
+  const recordKey = pinRecordKey(account, owner);
+  if (!recordKey) return { status: 'locked', reason: 'unavailable' };
+
+  return withPinChain(recordKey, async () => {
+    const verdict = await peerKeyStatus(account, presentedKey, owner);
+    if (verdict === 'unreadable') return { status: 'locked', reason: 'unavailable' };
+    if (verdict === 'changed') return { status: 'locked', reason: 'key-changed' };
+
+    // Decrypt before establishing trust. On an unchanged pin this is the normal
+    // open; on first-use it also cryptographically confirms the key before pinning.
+    const plaintext = await openDm(presentedKey, envelope);
+    if (plaintext == null) return { status: 'locked', reason: 'undecryptable' };
+
+    if (verdict === 'first-use') {
+      // Pin only a key we have just confirmed can produce a valid message.
+      if (!(await pinPeerKey(account, presentedKey, owner))) return { status: 'locked', reason: 'unavailable' };
+    }
+    return { status: 'opened', plaintext, keyStatus: verdict === 'first-use' ? 'first-use' : 'unchanged' };
+  });
+}
+
+// ── safety number (out-of-band verification) ──────────────────────────────────
+
+/** Domain-separation + version tag for the safety-number hash. */
+const SAFETY_LABEL = 'onyx-safety-v1';
+/** Digits per readable group. */
+const GROUP_DIGITS = 5;
+/** Number of groups -> 60 digits total, matching the Signal display length. */
+const GROUP_COUNT = 12;
+/** Bytes consumed per 5-digit group (a 40-bit big-endian window). */
+const BYTES_PER_GROUP = 5;
+/** 10^5 — the modulus that maps a 40-bit window to a 5-digit group. */
+const GROUP_MODULUS = 100000;
+
+/**
+ * Turn `count` 5-byte windows of `bytes` into zero-padded 5-digit decimal groups
+ * (libsignal's NumericFingerprintGenerator encoding: a 40-bit big-endian window
+ * mod 100000). `bytes` must hold at least count*5 bytes.
+ */
+function encodeGroups(bytes: Uint8Array, count: number): string {
+  const groups: string[] = [];
+  for (let g = 0; g < count; g++) {
+    const off = g * BYTES_PER_GROUP;
+    // 40-bit big-endian value. Multiply (not bit-shift) to stay in Number's
+    // exact-integer range — a 40-bit value is well under 2^53.
+    let v = 0;
+    for (let i = 0; i < BYTES_PER_GROUP; i++) v = v * 256 + bytes[off + i]!;
+    groups.push(String(v % GROUP_MODULUS).padStart(GROUP_DIGITS, '0'));
+  }
+  return groups.join(' ');
+}
+
+/**
+ * A stable, order-independent 60-digit safety number over two device keys, for
+ * out-of-band comparison (read aloud / scan) to detect a MITM'd or swapped key.
+ *
+ * Construction (a de-scoped libsignal NumericFingerprint):
+ *  - sort the two base64url keys -> order-independence, matching the cipher's
+ *    own sorted-`info` convention in sharedKeyWith;
+ *  - one domain-separated SHA-512 over `label 0x00 keyLo 0x00 keyHi` gives 64
+ *    bytes; the first 60 become twelve 5-digit groups via Signal's proven
+ *    40-bit-window-mod-100000 encoding (encodeGroups).
+ *
+ * Single-pass (no Signal-style 5200x iteration) is sound HERE: a ~199-bit,
+ * full-number comparison over already-256-bit-high-entropy ECDH points makes a
+ * colliding-truncation second-preimage infeasible. Signal iterates only to slow
+ * a brute-force grind against a SHORT prefix of a fingerprint that also mixes a
+ * LOW-entropy stable identifier (a phone number); neither the partial-compare
+ * nor the low-entropy input applies to two random curve points. Matrix's SAS
+ * likewise uses un-iterated hashing for the same interactive-comparison job.
+ *
+ * Returns null if either key is structurally invalid.
+ */
+export async function safetyNumber(keyA_b64: string, keyB_b64: string): Promise<string | null> {
+  return safetyNumberForDeviceSet(keyA_b64, [keyB_b64]);
+}
+
+/**
+ * Conversation safety number over OUR local device key and a peer's full
+ * multi-device key set (Era 3 C2). One number per DM — never per-device nags.
+ *
+ * Construction matches pairwise `safetyNumber` when `peerKeys` has a single
+ * valid key: sort every key (local + peers), then domain-separated SHA-512 over
+ * `label 0x00 k1 0x00 k2 …`. Adding or removing a peer device changes the
+ * number, so out-of-band compare covers the whole trusted fan-out set.
+ *
+ * Returns null when the local key is invalid or no valid peer keys remain.
+ */
+export async function safetyNumberForDeviceSet(
+  localKey_b64: string,
+  peerKeys_b64: readonly string[],
+): Promise<string | null> {
+  if (!isValidPeerPublicKey(localKey_b64)) return null;
+  const peers = normalizePeerDeviceKeys(peerKeys_b64);
+  if (peers.length === 0) return null;
+
+  const sorted = [localKey_b64, ...peers].sort();
+  const material = new TextEncoder().encode(`${SAFETY_LABEL}\x00${sorted.join('\x00')}`);
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-512', material.buffer as ArrayBuffer));
+  // SHA-512 = 64 bytes; encodeGroups consumes the first 60 (12 x 5).
+  return encodeGroups(digest, GROUP_COUNT);
+}
+
+/**
+ * The safety number binding OUR device key to the peer's PINNED key set — the
+ * value the DM UI surfaces for out-of-band verification. Multi-device pins use
+ * the full set (one conversation number). Null if we have no device key or the
+ * peer is not yet pinned.
+ */
+export async function peerSafetyNumber(
+  account: string,
+  owner?: DeviceMemoryOwner,
+): Promise<string | null> {
+  const pinned = await pinnedPeerKeys(account, owner);
+  if (!pinned || pinned.length === 0) return null;
+  const mine = await deviceKeys();
+  if (!mine) return null;
+  return safetyNumberForDeviceSet(mine.publicB64, pinned);
+}

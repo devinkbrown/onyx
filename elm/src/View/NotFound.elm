@@ -4,7 +4,7 @@ module View.NotFound exposing (notFound)
 kicker, heading, sub-copy, and the app-miss-aware action. Rendered
 inside the public frame by `View`. The title is set through the Elm
 document head; other document metadata is static head metadata stamped
-at deploy time by `tools/materialize-route-entrypoints.mjs`.
+at deploy time by `tools/build-site.mjs`.
 -}
 
 import App exposing (Msg)

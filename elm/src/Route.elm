@@ -4,14 +4,16 @@ module Route exposing
     , toPath
     )
 
-{-| Application routes — Elm port of the `@solidjs/router` table in
-`src/index.tsx` (`/`, `/about`, `/app`, `/appearance`, `/stats`,
+{-| Application routes (`/`, `/about`, `/app`, `/appearance`, `/stats`,
 `/status`, `/roadmap`, `/invite`, `/guides`, `/community`, `/privacy`,
 `/guidelines`, `/contact`, `/accessibility`, `/glossary`, `/integrations`,
-`/agents`).
+`/agents`, `/onyxos`, `/download` and its `/install` alias).
 
-Kept in sync with `ROUTE_ENTRYPOINTS` in
-`tools/materialize-route-entrypoints.mjs` the same way the TS table is.
+Kept in sync with `ROUTE_ENTRYPOINTS` in `tools/site/routes.mjs`, which
+generates the static document (title, description, canonical, share
+metadata) every path serves on a hard load; `tools/site/site.test.mjs`
+fails when the two drift. (This table was ported from the removed SolidJS
+client's router, recoverable at the `solid-client-final` tag.)
 -}
 
 import Url exposing (Url)

@@ -17,7 +17,7 @@
      specificity a later file wins, and several rules rely on that (the
      newer slices re-cut v1 rules from app.css). Do not reorder, add or drop a
      file without re-shooting the pixel matrix (elm/tools/css-regress.mjs).
-     tools/elm-overlay.mjs copies every stylesheet link below in this
+     tools/build-site.mjs copies every stylesheet link below in this
      order and requires css/gap-appearance.css; elm/tools/build.sh requires
      app.css; both hash the file names.
       1  app.css                  tokens (:root: palette, space, type, motion, radius, elevation, z-index ladder), the zero-specificity button floor, v1 component rules

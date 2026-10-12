@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline/promises';
 import { spawn } from 'node:child_process';
 
 const choices = [
-  ['1', 'Start Vite development server', ['pnpm', ['dev']]],
+  ['1', 'Build the site and serve it locally', ['pnpm', ['dev']]],
   ['2', 'Run the full safe website gate', ['pnpm', ['site:check']]],
   ['3', 'Preview the current dist/ build', ['pnpm', ['preview']]],
 ];
