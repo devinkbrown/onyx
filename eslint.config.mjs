@@ -1,9 +1,8 @@
-// Flat ESLint config for the real stack (SolidJS + TypeScript + Vite).
-// The old config imported eslint-config-next, a leftover from the dead
-// Next.js era that was never installed — lint had been broken since the port.
+// Flat ESLint config for the Elm client's JavaScript/TypeScript: ports.js and
+// the smoke suites (browser/node JS), the engine bundled into the Elm build
+// (elm/engine, elm/media — TypeScript), and the repo-root configs.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import solid from 'eslint-plugin-solid/configs/typescript';
 
 // Globals the Elm client JS uses (browser for ports.js, node for the
 // smoke suites); declared explicitly instead of pulling in `globals`.
@@ -78,10 +77,6 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/**/*.{ts,tsx}'],
-    ...solid,
-  },
-  {
     // Elm client JS: ports.js runs in the browser (and is loaded by the
     // node smoke tests via require), the *.smoke.mjs suites run in node.
     files: ['elm/**/*.{js,mjs,cjs}'],
@@ -91,8 +86,8 @@ export default tseslint.config(
   },
   {
     rules: {
-      // The store bridges Zustand and Solid; `any` appears at a few untyped
-      // protocol boundaries. Surface as warnings, fail on real errors.
+      // `any` appears at a few untyped protocol boundaries (WebCrypto / media
+      // glue). Surface as warnings, fail on real errors.
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'warn',
@@ -103,8 +98,6 @@ export default tseslint.config(
       // IRC protocol code matches control characters by design (CTCP \x01,
       // formatting \x02..\x1f, channel-name \x07) — not an accident here.
       'no-control-regex': 'off',
-      // `let el; <div ref={el} />` is the canonical Solid ref pattern.
-      'no-unassigned-vars': 'off',
       'no-useless-escape': 'warn',
       'no-useless-assignment': 'warn',
     },

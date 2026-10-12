@@ -64,7 +64,7 @@ assert_contains() {
 # Capture whether PROD_OUT mtime/inode changed during the suite.
 prod_marker_before=""
 if [[ -d "${PROD_OUT}" ]]; then
-  prod_marker_before="$(find "${PROD_OUT}" -printf '%T@ %i %p\n' 2>/dev/null | sha256sum | awk '{print $1}')"
+  prod_marker_before="$(find "${PROD_OUT}" -exec stat -c '%Y %i %n' {} + 2>/dev/null | LC_ALL=C sort | sha256sum | awk '{print $1}')"
 else
   prod_marker_before="ABSENT"
 fi
@@ -275,8 +275,12 @@ HTML
 echo "const CACHE_NAME = 'onyx-shell-vtest';" >"${TMP}/verify/sw.js"
 assert_ok "verify_live_out accepts good tree" \
   verify_live_out "${TMP}/verify" "vtest"
-assert_ok "pre-deploy title guard accepts current source title" \
-  verify_public_title "${ROOT}/index.html"
+# The authoritative title lives in the route table that generates the root
+# document (tools/site/routes.mjs); deploy.sh's guard must accept exactly it.
+node --input-type=module -e "import { HOME_ENTRYPOINT } from '${ROOT}/tools/site/routes.mjs'; console.log('<title>' + HOME_ENTRYPOINT.title + '</title>');" \
+  >"${TMP}/home-title.html"
+assert_ok "pre-deploy title guard accepts the route-table home title" \
+  verify_public_title "${TMP}/home-title.html"
 for wrong_title in \
   'Onyx — a room for your people' \
   'Onyx — unrelated page' \
@@ -685,7 +689,7 @@ if [[ "${prod_marker_before}" == "ABSENT" ]]; then
     PASS=$((PASS + 1))
   fi
 else
-  prod_marker_after="$(find "${PROD_OUT}" -printf '%T@ %i %p\n' 2>/dev/null | sha256sum | awk '{print $1}')"
+  prod_marker_after="$(find "${PROD_OUT}" -exec stat -c '%Y %i %n' {} + 2>/dev/null | LC_ALL=C sort | sha256sum | awk '{print $1}')"
   assert_eq "production /home/kain/onyx/out marker unchanged" \
     "${prod_marker_before}" "${prod_marker_after}"
 fi

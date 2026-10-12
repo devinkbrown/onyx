@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:smoke": "bash elm/tools/smokes.sh",
+    "test:deploy": "bash tools/deploy-controller.test.sh",
     "site:check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "site:workbench": "node tools/site-workbench.mjs",
     "check:server-contract": "node tools/check-server-contract.mjs ../onyx-server/docs/reference/protocol/onyx-client-contract.v1.json",

@@ -14,7 +14,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['elm/engine/**/*.{test,spec}.ts', 'tools/**/*.test.mjs'],
+    include: ['elm/engine/**/*.{test,spec}.ts', 'tools/**/*.test.{mjs,ts}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'elm/dist-elm/**', '.wt/**'],
     // IDB / WebCrypto cases exceed the default 5s under load.
     testTimeout: 60_000,
