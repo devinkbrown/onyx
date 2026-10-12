@@ -1,53 +1,36 @@
 import { defineConfig } from 'vitest/config';
-import { searchForWorkspaceRoot } from 'vite';
-import solid from 'vite-plugin-solid';
 import { fileURLToPath, URL } from 'node:url';
 
-// Onyx test harness — vitest + SolidJS (vite-plugin-solid + jsdom).
-// fs.allow is computed (not hardcoded to /home/kain/onyx) so vitest runs INSIDE a fleet
-// worktree too: the worktree root + the resolved workspace root + the shared pnpm store are
-// all served, so jest-dom's realpath resolves within the allow-list wherever the checkout lives.
-// This unblocks parallel test-gating across worktrees instead of serializing in the main tree.
+// Onyx unit-test harness — vitest + jsdom for the TypeScript engine that the Elm
+// build bundles (elm/engine: Cadence media engine, E2EE helpers, IRC parser,
+// canvas background engine) and the static-site contract tests under tools/.
+// The Elm app itself is tested with elm-test and the elm/*.smoke.mjs suites.
 export default defineConfig({
-  plugins: [solid()],
-  server: {
-    fs: {
-      allow: [
-        searchForWorkspaceRoot(process.cwd()),
-        process.cwd(),
-        '/home/kain/.local/share/pnpm/store',
-      ],
-    },
-  },
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
-    // Critical for Solid reactivity under test.
-    conditions: ['development', 'browser'],
+    // `@/` is the engine root, matching tsconfig `paths` and the esbuild bundles.
+    alias: { '@': fileURLToPath(new URL('./elm/engine', import.meta.url)) },
   },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tools/**/*.test.mjs'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'tests/e2e/**', '.wt/**'],
-    // Full-suite IDB/materialization cases (export bounds, vault prune) and Solid
-    // panel journeys exceed 5s under load; default 5s produced load flakes.
+    include: ['elm/engine/**/*.{test,spec}.ts', 'tools/**/*.test.mjs'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/out/**', 'elm/dist-elm/**', '.wt/**'],
+    // IDB / WebCrypto cases exceed the default 5s under load.
     testTimeout: 60_000,
     hookTimeout: 30_000,
-    // Cap concurrency so fake-indexeddb + jsdom suites do not thrash each other
-    // (PreferencesPanel toggle/import flaked under full-suite IDB pollution).
+    // Cap concurrency so fake-indexeddb + jsdom suites do not thrash each other.
     maxWorkers: 2,
     fileParallelism: true,
-    server: { deps: { inline: [/solid-js/, /@solidjs\/.*/] } },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/lib/**/*.{ts,tsx}', 'src/primitives/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
+      include: ['elm/engine/lib/**/*.ts'],
       exclude: [
-        'src/**/*.{test,spec}.{ts,tsx}',
-        'src/**/*.d.ts',
-        'src/lib/cadence-media/OpcodecWasm.ts',
-        'src/lib/cadence-media/videoEncodeWorker.ts',
+        'elm/engine/**/*.{test,spec}.ts',
+        'elm/engine/**/*.d.ts',
+        'elm/engine/lib/cadence-media/OpcodecWasm.ts',
+        'elm/engine/lib/cadence-media/videoEncodeWorker.ts',
       ],
       thresholds: { lines: 80, functions: 80, statements: 80, branches: 70 },
     },

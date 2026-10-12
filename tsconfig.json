@@ -4,9 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker"],
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "types": ["vitest/globals"],
     "strict": true,
     "noEmit": true,
     "allowJs": false,
@@ -18,9 +16,9 @@
     "noUncheckedIndexedAccess": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./elm/engine/*"]
     }
   },
-  "include": ["src", "vite.config.ts"],
-  "exclude": ["node_modules", "out", "dist", ".wt", "app", "components", "hooks", "lib"]
+  "include": ["elm/engine", "elm/media", "vitest.config.ts"],
+  "exclude": ["node_modules", "out", "dist", "elm/dist-elm", ".wt"]
 }

@@ -11,8 +11,9 @@
  * Off, never for viewport width or a coarse pointer.
  */
 import type { BackgroundQuality } from './engine';
-import type { SceneMotion } from '@/lib/prefs/sceneMotion';
 
+/** The user's background-motion preference (the Elm `Prefs` sceneMotion values). */
+export type SceneMotion = 'adaptive' | 'animated' | 'still' | 'off';
 export type BackgroundMode = 'animated' | 'still' | 'off';
 export type SceneDetail = 'sparse' | 'balanced' | 'full';
 export type BackgroundPolicyReason =

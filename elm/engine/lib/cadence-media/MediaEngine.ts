@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import type { IRCClient } from '../irc/client';
 import {
   OpcodecWasm, CadenceVoxEncoder, CadenceVisEncoder,
   rgbaToYuv420,
@@ -45,7 +44,7 @@ import type { IRCMessage } from '../irc/types';
 import type {
   CallState, VoiceCallState, MediaKind,
   CadencePeerState, CadenceRoomStats, NetworkQualityTier,
-  CadenceMediaCallbacks, CadenceChannelInfo,
+  CadenceMediaCallbacks, CadenceChannelInfo, MediaClient,
 } from './types';
 
 // WS media-plane Cadence band ids: media bands are >= 64. band_id discriminates
@@ -355,7 +354,7 @@ type LocalRecordingSession = {
 };
 
 export class CadenceMediaEngine {
-  private client: IRCClient | null = null;
+  private client: MediaClient | null = null;
   private readonly cb: CadenceMediaCallbacks;
   private readonly defaultKind: MediaKind;
 
@@ -369,7 +368,7 @@ export class CadenceMediaEngine {
   private wsVidSeq = 0;
   private readonly streamRouter = new MediaStreamRouter();
   /** Client this engine's media handlers are currently registered on. */
-  private boundMediaClient: IRCClient | null = null;
+  private boundMediaClient: MediaClient | null = null;
   // Stable references so they can be added to / removed from the client's
   // subscriber sets across setClient transitions.
   private readonly onMediaServerMessageBound = (msg: IRCMessage) => this.handleMediaServerMessage(msg);
@@ -512,7 +511,7 @@ export class CadenceMediaEngine {
     highResolutionCapability.prime();
   }
 
-  setClient(client: IRCClient | null) {
+  setClient(client: MediaClient | null) {
     const prev = this.client;
     const replacedClient = Boolean(prev && client && prev !== client);
     this.client = client;

@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BackgroundFrameContext, BackgroundVariant } from './engine';
 import { hexToHsl } from './reactivity';
-import { backgroundRegistry } from './registry';
 import {
   applyPaperGrain,
   capLuminance,
@@ -14,8 +13,45 @@ import {
   paperGrainCount,
 } from './variants/layers';
 import { readBackgroundTheme, type BackgroundTheme } from './variants/utils';
+import { aurora } from './variants/aurora';
 import { auroraRibbons } from './variants/aurora-ribbons';
+import { bioluminescence } from './variants/bioluminescence';
+import { caustics } from './variants/caustics';
+import { deepCurrent } from './variants/deep-current';
+import { ember } from './variants/ember';
+import { forest } from './variants/forest';
+import { frost } from './variants/frost';
+import { goldVeins } from './variants/gold-veins';
+import { inkWash } from './variants/ink-wash';
+import { lapisGradient } from './variants/lapis-gradient';
+import { mist } from './variants/mist';
+import { obsidian } from './variants/obsidian';
+import { paperGrain } from './variants/paper-grain';
+import { pyriteField } from './variants/pyrite-field';
+import { resin } from './variants/resin';
 import { tideBands } from './variants/tide-bands';
+
+/** The canvas-engine variants (everything the Elm backdrop bundle ships; the
+ *  same 17 elm/media/backdrop-core.ts registers and build-backdrop.mjs counts). */
+const backgroundRegistry = [
+  deepCurrent,
+  bioluminescence,
+  caustics,
+  aurora,
+  pyriteField,
+  goldVeins,
+  ember,
+  forest,
+  resin,
+  inkWash,
+  mist,
+  frost,
+  auroraRibbons,
+  tideBands,
+  obsidian,
+  lapisGradient,
+  paperGrain,
+] as const satisfies readonly BackgroundVariant[];
 
 const THEME: BackgroundTheme = {
   ink: '#07090f',
@@ -184,7 +220,7 @@ describe('signature presets route through the shared pipeline', () => {
     expect(routed.map((entry) => entry.id).sort()).toEqual(
       [...backgroundRegistry.map((v) => v.id)].sort(),
     );
-    expect(routed.length).toBeGreaterThanOrEqual(17);
+    expect(routed.length).toBe(17);
   });
 
   it.each(routed)('$id paints the shared luminance-capped ground', ({ variant }) => {

@@ -3,7 +3,7 @@
 import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IRCClient } from '../irc/client';
+import type { MediaClient } from './types';
 import { CadenceMediaEngine } from './MediaEngine';
 import { mediaStreamId } from './mediaStream';
 import { MooringGroup } from './MooringGroup';
@@ -24,13 +24,13 @@ beforeEach(() => {
   _resetDeviceSigningForTests();
 });
 
-function mediaClient(): IRCClient {
+function mediaClient(): MediaClient {
   return {
     binaryHandlers: new Set(),
     extraMessageHandlers: new Set(),
     sendRaw: vi.fn(() => true),
     sendBinary: vi.fn(() => true),
-  } as unknown as IRCClient;
+  } as unknown as MediaClient;
 }
 
 function callbacks(overrides: Partial<CadenceMediaCallbacks> = {}): CadenceMediaCallbacks {

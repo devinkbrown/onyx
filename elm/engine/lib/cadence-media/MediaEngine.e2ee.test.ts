@@ -3,7 +3,7 @@ import 'fake-indexeddb/auto';
 import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { IRCClient } from '@/lib/irc/client';
+import type { MediaClient } from './types';
 import { toB64url, type DeviceKeys } from '@/lib/e2ee/dmCipher';
 import { CadenceMediaEngine } from './MediaEngine';
 import type { CadenceMediaCallbacks } from './types';
@@ -62,7 +62,7 @@ function callbacks(
 function relayClient(
   sender: string,
   recipient: CadenceMediaEngine,
-): IRCClient {
+): MediaClient {
   return {
     currentNick: sender,
     binaryHandlers: new Set(),
@@ -74,7 +74,7 @@ function relayClient(
       return true;
     }),
     sendBinary: vi.fn(() => true),
-  } as unknown as IRCClient;
+  } as unknown as MediaClient;
 }
 
 describe('CadenceMediaEngine media E2EE negotiation', () => {
@@ -138,7 +138,7 @@ describe('CadenceMediaEngine media E2EE negotiation', () => {
           return true;
         }),
         sendBinary: vi.fn(() => true),
-      } as unknown as IRCClient);
+      } as unknown as MediaClient);
     }
     const aliceInternal = alice as unknown as EngineInternals;
     const phoneInternal = bobPhone as unknown as EngineInternals;
@@ -252,7 +252,7 @@ describe('CadenceMediaEngine media E2EE negotiation', () => {
           return true;
         }),
         sendBinary: vi.fn(() => true),
-      } as unknown as IRCClient);
+      } as unknown as MediaClient);
     }
     const aliceInternal = alice as unknown as EngineInternals;
     const bobInternal = bob as unknown as EngineInternals;

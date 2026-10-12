@@ -7,14 +7,13 @@
  *   node elm/media/build-backdrop.mjs <esbuild-binary> <out-dir>
  *
  * Emits <out-dir>/backdrop.js: the window.OnyxBackdrop adapter (IIFE) around
- * the SolidJS client's canvas engine + its 17 canvas variants
- * (src/backgrounds/engine.ts, backgroundPolicy.ts, variants/*). build.sh
- * hashes it with the other index.html assets.
+ * the canvas engine + its 17 canvas variants (elm/engine/backgrounds/engine.ts,
+ * backgroundPolicy.ts, variants/*). build.sh hashes it with the other
+ * index.html assets.
  *
- * Fails closed (non-zero exit) when the bundle would pull in Solid / UI /
- * store code (the DOM scenes are Solid components and must never ride
- * along), when an expected variant is missing, or when the output does not
- * mount window.OnyxBackdrop.
+ * Fails closed (non-zero exit) when the bundle would pull in anything outside
+ * elm/engine + elm/media, when an expected variant is missing, or when the
+ * output does not mount window.OnyxBackdrop.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -57,8 +56,8 @@ const result = await esbuild.build({
 });
 
 const inputs = Object.keys(result.metafile.inputs);
-const forbidden = inputs.filter((p) => /solid-js|lib[\\/]store[\\/]|backgrounds[\\/]scenes[\\/]|\.tsx$/.test(p));
-if (forbidden.length) fail(`backdrop bundle pulled in UI/Solid code: ${forbidden.join(', ')}`);
+const forbidden = inputs.filter((p) => !/^elm[\\/](engine|media)[\\/]/.test(p) || /\.tsx$/.test(p));
+if (forbidden.length) fail(`backdrop bundle pulled in code outside elm/engine and elm/media: ${forbidden.join(', ')}`);
 const variants = inputs.filter((p) => /backgrounds[\\/]variants[\\/][a-z-]+\.ts$/.test(p) && !/utils|layers/.test(p));
 if (variants.length !== 17) fail(`expected the 17 canvas variants, bundled ${variants.length}`);
 if (!inputs.some((p) => /backgrounds[\\/]engine\.ts$/.test(p))) fail('BackgroundEngine missing from the bundle');

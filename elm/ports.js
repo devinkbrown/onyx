@@ -9,6 +9,51 @@
 (function (global) {
   "use strict";
 
+  /* Legacy `ocean-*` -> `onyx:*` localStorage migration. Carried over from
+     the removed SolidJS client's src/lib/migrateStorage.ts (recoverable at
+     the `solid-client-final` tag), which ran as that app's first import, so a
+     browser that last visited before the rename kept its data. Every
+     `ocean-`-prefixed key is COPIED to its `onyx:`-prefixed name when the new
+     key is absent: the new key always wins, legacy keys are NEVER deleted (an
+     older build still finds them), keys are snapshotted before any write, and
+     one failing key (quota, security) never stops the rest. Runs once, right
+     here at script load, before the inline boot script in index.html reads
+     any `onyx:` flag; `storage` is injectable for the smoke test. */
+  var LEGACY_STORAGE_PREFIX = "ocean-";
+  var CURRENT_STORAGE_PREFIX = "onyx:";
+
+  function migrateLegacyStorage(storage) {
+    try {
+      if (!storage) return 0;
+      var legacyKeys = [];
+      for (var i = 0; i < storage.length; i++) {
+        var key = storage.key(i);
+        if (key && key.indexOf(LEGACY_STORAGE_PREFIX) === 0) legacyKeys.push(key);
+      }
+      var copied = 0;
+      for (var j = 0; j < legacyKeys.length; j++) {
+        var next = CURRENT_STORAGE_PREFIX + legacyKeys[j].slice(LEGACY_STORAGE_PREFIX.length);
+        try {
+          if (storage.getItem(next) !== null) continue;
+          var value = storage.getItem(legacyKeys[j]);
+          if (value !== null) {
+            storage.setItem(next, value);
+            copied += 1;
+          }
+        } catch (err) { /* quota / security error on one key: keep going */ }
+      }
+      return copied;
+    } catch (err) {
+      return 0; /* storage unavailable (privacy mode, sandboxed frame) */
+    }
+  }
+
+  (function runLegacyStorageMigration() {
+    var storage = null;
+    try { storage = global.localStorage || null; } catch (err) { storage = null; }
+    migrateLegacyStorage(storage);
+  })();
+
   var VAULT_KEEP = 400;
   var DB_NAME = "onyx-vault";
   var DB_VERSION = 3;
@@ -14000,6 +14045,8 @@ function fetchPublicFeed(url) {
     installPageLifecycle: installPageLifecycle,
     swUrl: SW_URL,
     memKV: memKV,
+    /* legacy `ocean-*` -> `onyx:*` localStorage copy (also run at load) */
+    migrateLegacyStorage: migrateLegacyStorage,
     /* v3/gap-shell */
     gapShell: {
       wire: wireGapShell,

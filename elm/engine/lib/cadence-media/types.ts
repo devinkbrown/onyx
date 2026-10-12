@@ -3,6 +3,23 @@
 // Public types — exported from cadence-media
 // -------------------------------------------------------------------
 
+import type { IRCMessage } from '../irc/types';
+
+/**
+ * The transport the engine drives, and the ONLY members of it the engine
+ * reads. elm/media/voice-core.ts adapts the single WebSocket that
+ * elm/ports.js owns to this shape (it was the SolidJS client's IRCClient
+ * before that client was removed).
+ */
+export interface MediaClient {
+  readonly binaryHandlers: Set<(data: Uint8Array) => void>;
+  readonly extraMessageHandlers: Set<(msg: IRCMessage) => void>;
+  readonly currentNick: string;
+  sendRaw(command: string, ...params: string[]): void;
+  send?(line: string): void;
+  sendBinary(bytes: Uint8Array): boolean;
+}
+
 export type CallState     = 'idle' | 'ringing_out' | 'ringing_in' | 'in_call';
 export type VoiceCallState = CallState;
 export type MediaKind     = 'voice' | 'video' | 'screen';
