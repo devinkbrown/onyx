@@ -1,7 +1,13 @@
-# Onyx — IRC webchat (SolidJS)
+# Onyx — IRC webchat (Elm)
 
 Modern web client for the **Onyx** network, running on the **Onyx Server** engine
-(pure-Zig mesh daemon). Public source; default branch `onyx-solid`.
+(pure-Zig mesh daemon). Public source; default branch `onyx-elm`.
+
+**The product client is the Elm app in `elm/`** (Elm UI in `elm/src`, private
+TypeScript runtime in `elm/runtime`, browser bridge `elm/ports.js`). The SolidJS
+tree under `src/` is deprecated; `elm/runtime` still imports a few `src/lib`
+helpers. Ship with `ONYX_CLIENT=elm ./deploy.sh`. The Stack/Layout notes below
+describe the legacy SolidJS client unless they say otherwise.
 The brand is **Onyx** (formerly Ocean, briefly Ruri — both dead names).
 Branded house: **Onyx** = network/product/client; **Onyx Server** = engine/daemon/
 protocol; "IRCXNet" = retired public identity, legacy/wire token only.
