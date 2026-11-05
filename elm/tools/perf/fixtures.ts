@@ -262,7 +262,7 @@ function sendInitialRows(socket: WebSocketRoute, channel = '#perf-0'): void {
 
 export async function joinConfiguredRooms(page: Page, wire: { joinedRooms(): readonly string[] }, count = ROOM_COUNT) {
   if (count <= 0) return;
-  const roomsToggle = page.getByRole('button', { name: 'Rooms', exact: true });
+  const roomsToggle = page.locator('.onyx-mobile-nav [data-testid="nav-rooms"]');
   const roomsRail = page.locator('#client-rooms');
   if (!(await roomsRail.isVisible())) {
     await roomsToggle.click({ timeout: 5_000 });
@@ -342,7 +342,7 @@ export async function signInFixtureAccount(page: Page, accountId: string) {
 }
 
 export async function enterRoom(page: Page, channel = '#perf-0') {
-  await page.goto(`/app/?ws=${encodeURIComponent('wss://perf.measure.test/ws')}`);
+  await page.goto(`/app/?ws=${encodeURIComponent('wss://perf.measure.test/ws')}&nick=guest`);
   const rooms = page.locator('#client-rooms');
   await rooms.getByRole('button', { name: new RegExp(channel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click({ timeout: 8_000 });
 }

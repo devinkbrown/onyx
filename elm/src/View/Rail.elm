@@ -1,16 +1,24 @@
 module View.Rail exposing (rail)
 
-{-| Conversation rail: rooms and direct messages stay in separate,
+{-| The collection sidebar: rooms and direct messages stay in separate,
 alphabetized groups. The active conversation and unread activity have
 both visual and accessible labels.
+
+v3/shell-nav: the selected nav destination picks the collection (Rooms
+shows Favorites then rooms, Messages shows direct conversations, Home
+shows both as separate groups), and a single-select filter row (All /
+Unread / @Mentions / Favorites) narrows it. On desktop this is the 280px
+sidebar beside the icon rail; under 768px it is the full Rooms /
+Messages page (see `rail.css`).
 -}
 
 import App exposing (Channel, Model, Msg(..))
 import Dict
 import Html exposing (Html, button, div, h2, h3, li, p, section, span, text, ul)
-import Html.Attributes exposing (attribute, class, classList, id, type_)
+import Html.Attributes exposing (attribute, class, classList, id, tabindex, type_)
 import Html.Events exposing (onClick)
 import Modes
+import Nav
 
 
 rail : Model -> Html Msg
@@ -21,33 +29,177 @@ rail model =
                 |> Dict.values
                 |> List.sortWith (\a b -> Modes.compareNicks a.name b.name)
 
-        ( rooms, directMessages ) =
+        ( allRooms, allDirect ) =
             List.partition (\channel -> App.isChannelName model channel.name) conversations
+
+        passes =
+            List.filter (Nav.passesFilter model.railFilter model.starredChannels)
+
+        starred channel =
+            Nav.passesFilter Nav.FilterFavorites model.starredChannels channel
+
+        ( favorites, rooms ) =
+            if model.railFilter == Nav.FilterFavorites then
+                ( [], passes allRooms )
+
+            else
+                List.partition starred (passes allRooms)
+
+        directMessages =
+            passes allDirect
+
+        collection =
+            case model.navSection of
+                Nav.Rooms ->
+                    "rooms"
+
+                Nav.Messages ->
+                    "messages"
+
+                _ ->
+                    "all"
+
+        title =
+            case collection of
+                "rooms" ->
+                    "Rooms"
+
+                "messages" ->
+                    "Messages"
+
+                _ ->
+                    "Conversations"
+
+        shownTotal =
+            case collection of
+                "rooms" ->
+                    List.length allRooms
+
+                "messages" ->
+                    List.length allDirect
+
+                _ ->
+                    List.length conversations
+
+        showRooms =
+            collection /= "messages"
+
+        showDirect =
+            collection /= "rooms"
+
+        filtering =
+            model.railFilter /= Nav.FilterAll
+
+        nothingMatches =
+            filtering
+                && (not showRooms || List.isEmpty favorites && List.isEmpty rooms)
+                && (not showDirect || List.isEmpty directMessages)
     in
-    section [ class "onyx-rail", id "client-rooms", attribute "aria-label" "Conversations" ]
-        [ div [ class "onyx-rail-heading" ]
-            [ h2 [] [ text "Conversations" ]
-            , span [ class "onyx-rail-total", attribute "aria-label" (countLabel (List.length conversations) "conversation") ]
-                [ text (String.fromInt (List.length conversations)) ]
-            ]
-        , div [ class "onyx-rail-actions" ]
-            [ button
-                [ onClick App.BrowserOpen
-                , class "onyx-rail-browse"
-                , type_ "button"
-                ]
-                [ text "Browse rooms" ]
-            , button
-                [ onClick App.CreateRoomOpen
-                , class "onyx-rail-browse"
-                , type_ "button"
-                ]
-                [ text "Start a room" ]
-            ]
-        , conversationGroup model "rail-rooms-heading" "Rooms" rooms (emptyRooms model)
-        , conversationGroup model "rail-direct-heading" "Direct messages" directMessages
-            "Your direct conversations will appear here."
+    section
+        [ class "onyx-rail"
+        , id "client-rooms"
+        , tabindex -1
+        , attribute "aria-label" title
+        , attribute "data-collection" collection
         ]
+        ([ div [ class "onyx-rail-heading" ]
+            [ h2 [] [ text title ]
+            , span [ class "onyx-rail-total", attribute "aria-label" (countLabel shownTotal "conversation") ]
+                [ text (String.fromInt shownTotal) ]
+            ]
+         , filterRow model
+         ]
+            ++ (if showRooms then
+                    [ div [ class "onyx-rail-actions" ]
+                        [ button
+                            [ onClick App.BrowserOpen
+                            , class "onyx-rail-browse"
+                            , type_ "button"
+                            ]
+                            [ text "Browse rooms" ]
+                        , button
+                            [ onClick App.CreateRoomOpen
+                            , class "onyx-rail-browse"
+                            , type_ "button"
+                            ]
+                            [ text "Start a room" ]
+                        ]
+                    ]
+
+                else
+                    []
+               )
+            ++ (if nothingMatches then
+                    [ p [ class "onyx-rail-empty onyx-rail-filter-empty", attribute "role" "status" ]
+                        [ text (filterEmptyCopy model.railFilter) ]
+                    ]
+
+                else
+                    []
+               )
+            ++ (if showRooms && not (List.isEmpty favorites) then
+                    [ conversationGroup model "rail-favorites-heading" "Favorites" favorites "" ]
+
+                else
+                    []
+               )
+            ++ (if showRooms && not (filtering && List.isEmpty rooms) then
+                    [ conversationGroup model "rail-rooms-heading" "Rooms" rooms (emptyRooms model) ]
+
+                else
+                    []
+               )
+            ++ (if showDirect && not (filtering && List.isEmpty directMessages) then
+                    [ conversationGroup model "rail-direct-heading" "Direct messages" directMessages
+                        "Your direct conversations will appear here."
+                    ]
+
+                else
+                    []
+               )
+        )
+
+
+{-| Single-select filter row: a group of toggle buttons, exactly one
+pressed. -}
+filterRow : Model -> Html Msg
+filterRow model =
+    div [ class "onyx-rail-filters", attribute "role" "group", attribute "aria-label" "Filter conversations" ]
+        (List.map
+            (\filter ->
+                button
+                    [ type_ "button"
+                    , classList [ ( "onyx-rail-filter", True ), ( "onyx-rail-filter--on", model.railFilter == filter ) ]
+                    , attribute "aria-pressed"
+                        (if model.railFilter == filter then
+                            "true"
+
+                         else
+                            "false"
+                        )
+                    , attribute "data-testid" ("rail-filter-" ++ Nav.filterKey filter)
+                    , onClick (RailFilterSet filter)
+                    ]
+                    [ text (Nav.filterLabel filter) ]
+            )
+            Nav.allFilters
+        )
+
+
+filterEmptyCopy : Nav.Filter -> String
+filterEmptyCopy filter =
+    case filter of
+        Nav.FilterUnread ->
+            "Nothing unread. You are all caught up."
+
+        Nav.FilterMentions ->
+            "No mentions waiting for you."
+
+        Nav.FilterFavorites ->
+            "No favorites yet. Use /star in a room to keep it here."
+
+        Nav.FilterAll ->
+            ""
 
 
 conversationGroup : Model -> String -> String -> List Channel -> String -> Html Msg

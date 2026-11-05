@@ -3,12 +3,13 @@ module View.Topbar exposing (connectionLabel, reclaimDialog, reconnectBanner, se
 {-| Shell top bar: brand mark, active-channel topic, connection pill.
 -}
 
-import App exposing (Model, Msg(..), isGuestNick)
+import App exposing (Model, Msg(..))
 import Dict
 import Html exposing (Html, b, button, div, form, h1, header, input, label, p, span, text)
 import Html.Attributes exposing (attribute, class, classList, disabled, for, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import View.Inbox exposing (inbox)
+import Nav
 import Session
 import RuntimeDomain
 
@@ -16,11 +17,21 @@ import RuntimeDomain
 topbar : Model -> Html Msg
 topbar model =
     header [ class "onyx-topbar" ]
-        [ div [ class "onyx-brand" ]
+        [ backControl model
+        , div [ class "onyx-brand" ]
             [ span [ class "onyx-gem" ] []
             , h1 [] [ text "Onyx" ]
             ]
-        , div [ class "onyx-topic" ] [ text (activeTopic model) ]
+        , p [ class "onyx-topbar-title", attribute "data-testid" "page-title" ] [ text (pageTitle model) ]
+        , div [ class "onyx-topic" ]
+            [ text
+                (if conversationShown model then
+                    activeTopic model
+
+                 else
+                    ""
+                )
+            ]
         , clientTools model
         , button
             [ type_ "button"
@@ -38,45 +49,100 @@ topbar model =
             , span [ class "onyx-conn-name" ] [ text "Connect" ]
             , span [ class "onyx-conn-state" ] [ text (connectionLabel model) ]
             ]
-        , identityChip model
         ]
+
+
+{-| A conversation is on screen (not Home, not the calls hub). On
+phones the collection page can still cover it; CSS handles that. -}
+conversationShown : Model -> Bool
+conversationShown model =
+    not model.callsOpen && Nav.isCollection model.navSection && model.activeChannel /= Nothing
+
+
+{-| v3/shell-nav: under 768px a conversation is a page pushed over its
+collection; this control pops back to the list. Hidden on wider
+screens, where the sidebar is always beside the conversation. -}
+backControl : Model -> Html Msg
+backControl model =
+    if conversationShown model then
+        button
+            [ type_ "button"
+            , class "onyx-back"
+            , attribute "data-testid" "room-back"
+            , attribute "aria-label" ("Back to " ++ Nav.label model.navSection)
+            , onClick NavBack
+            ]
+            [ span [ class "onyx-back-chevron", attribute "aria-hidden" "true" ] []
+            , span [ class "onyx-back-label" ] [ text (Nav.label model.navSection) ]
+            ]
+
+    else
+        text ""
+
+
+{-| The phone bar's title: the page you are on. -}
+pageTitle : Model -> String
+pageTitle model =
+    if model.callsOpen then
+        "Calls"
+
+    else
+        case ( model.navSection, model.clientRoomsOpen, model.activeChannel ) of
+            ( Nav.Home, _, _ ) ->
+                "Home"
+
+            ( section, False, Just name ) ->
+                if Nav.isCollection section then
+                    name
+
+                else
+                    Nav.label section
+
+            ( section, _, _ ) ->
+                Nav.label section
 
 
 clientTools : Model -> Html Msg
 clientTools model =
     div [ class "onyx-topbar-tools", attribute "role" "group", attribute "aria-label" "Conversation tools" ]
-        [ clientPanelToggle "Rooms" "client-rooms" model.clientRoomsOpen ToggleClientRooms
-        , clientPanelToggle "Members" "client-members" model.clientMembersOpen ToggleClientMembers
-        , button
-            [ class "onyx-calls-toggle"
-            , classList [ ( "onyx-calls-toggle-open", model.callsOpen ) ]
-            , onClick ToggleCalls
-            ]
-            [ text "Calls" ]
-        , button
-            [ class "onyx-search-toggle"
-            , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
-            , attribute "aria-pressed"
-                (if model.searchOpen then
-                    "true"
+        (if conversationShown model then
+            [ case model.activeChannel of
+                Just name ->
+                    if App.isChannelName model name then
+                        clientPanelToggle "Members" "client-members" model.clientMembersOpen ToggleClientMembers
 
-                 else
-                    "false"
-                )
-            , disabled (model.activeChannel == Nothing)
-            , onClick SearchOpen
+                    else
+                        text ""
+
+                Nothing ->
+                    text ""
+            , button
+                [ class "onyx-search-toggle onyx-convo-tool"
+                , classList [ ( "onyx-search-toggle-open", model.searchOpen ) ]
+                , attribute "aria-pressed"
+                    (if model.searchOpen then
+                        "true"
+
+                     else
+                        "false"
+                    )
+                , onClick SearchOpen
+                ]
+                [ text "Search" ]
+            , pinsToggle model
+            , mediaToggle model
+            , inbox model
             ]
-            [ text "Search" ]
-        , pinsToggle model
-        , mediaToggle model
-        , inbox model
-        ]
+
+         else
+            [ inbox model ]
+        )
 
 
 clientPanelToggle : String -> String -> Bool -> Msg -> Html Msg
 clientPanelToggle label panelId open message =
     button
-        [ class "onyx-client-panel-toggle"
+        [ class "onyx-client-panel-toggle onyx-convo-tool"
         , type_ "button"
         , attribute "aria-controls" panelId
         , attribute "aria-expanded" (if open then "true" else "false")
@@ -106,7 +172,7 @@ pinsToggle model =
                 "Pinned messages"
     in
     button
-        [ class "onyx-pins-toggle"
+        [ class "onyx-pins-toggle onyx-convo-tool"
         , classList [ ( "onyx-pins-toggle-open", model.showPinnedMessages ) ]
         , attribute "aria-pressed"
             (if model.showPinnedMessages then
@@ -137,7 +203,7 @@ mediaToggle model =
                     "Pictures, files, and links for " ++ channel
     in
     button
-        [ class "onyx-media-toggle"
+        [ class "onyx-media-toggle onyx-convo-tool"
         , classList [ ( "onyx-media-toggle-open", model.mediaIndexOpen ) ]
         , attribute "aria-pressed"
             (if model.mediaIndexOpen then
@@ -152,69 +218,6 @@ mediaToggle model =
         , onClick MediaIndexOpen
         ]
         [ text "Media" ]
-
-
-{-| Own identity chip: the current nick, an `alias` badge while the
-nick differs from the authenticated account (or nick ENFORCEMENT
-parked us on a guest nick), and a warning state explaining a forced
-guest rename. While a reclaim target exists the chip is a button that
-opens the reclaim dialog.
--}
-identityChip : Model -> Html Msg
-identityChip model =
-    let
-        guest =
-            isGuestNick model.ourNick
-
-        inner =
-            [ span [ class "onyx-ident-nick" ] [ text model.ourNick ]
-            , if model.currentNickIsAlias then
-                span [ class "onyx-ident-badge" ] [ text "alias" ]
-
-              else
-                text ""
-            ]
-
-        attrs =
-            [ classList
-                [ ( "onyx-ident", True )
-                , ( "onyx-ident-action", True )
-                , ( "onyx-ident-alias", model.currentNickIsAlias )
-                , ( "onyx-ident-guest", guest )
-                ]
-            , attribute "title" (identityTitle model guest)
-            ]
-    in
-    case App.reclaimTarget model of
-        Just target ->
-            button
-                (attrs
-                    ++ [ type_ "button"
-                       , attribute "aria-label" ("Reclaim the nick " ++ target)
-                       , onClick ReclaimOpen
-                       ]
-                )
-                inner
-
-        Nothing ->
-            -- The identity chip is the "You" affordance: a pending
-            -- reclaim wins, otherwise a signed-in nick opens Account.
-            case model.accountName of
-                Just _ ->
-                    button
-                        (attrs
-                            ++ [ type_ "button"
-                               , attribute "aria-label" "Open account settings"
-                               , attribute "data-testid" "account-open"
-                               , onClick (SetAccountOpen True)
-                               ]
-                        )
-                        inner
-
-                Nothing ->
-                    button
-                        (attrs ++ [ type_ "button", attribute "aria-label" "Choose your chat name or sign in", onClick ConnectionDialogOpen ])
-                        inner
 
 
 {-| Nick reclaim dialog, mirroring the connect form's GHOST reclaim:
@@ -275,18 +278,6 @@ reclaimDialog model =
                             ]
                         ]
                     ]
-
-
-identityTitle : Model -> Bool -> String
-identityTitle model guest =
-    if guest then
-        "The server moved you to " ++ model.ourNick ++ ": your nick is protected — sign in to reclaim it."
-
-    else if model.currentNickIsAlias then
-        "This nick differs from your account nick."
-
-    else
-        "Signed in as " ++ model.ourNick ++ "."
 
 
 {-| Recovery banner strip, mirroring the oracle `ReconnectStatusBanner`:

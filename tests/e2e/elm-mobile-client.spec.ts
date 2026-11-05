@@ -33,17 +33,40 @@ for (const width of [320, 390, 768]) {
         }
       });
     });
-    await page.goto('/app/?ws=wss%3A%2F%2Fmobile-layout.test%2Fws');
-    const rooms = page.getByRole('button', { name: 'Rooms', exact: true });
-    const members = page.getByRole('button', { name: 'Members', exact: true });
-    await expect(rooms).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('#client-rooms')).toBeHidden();
+    await page.goto('/app/?ws=wss%3A%2F%2Fmobile-layout.test%2Fws&nick=guest');
+    const phone = width < 768;
+    // v3/shell-nav: phones get the bottom bar (Home · Rooms · Messages ·
+    // Calls · You); wider screens the icon rail plus the collection sidebar.
+    const nav = page.locator(phone ? '.onyx-mobile-nav' : '.onyx-primary-nav');
+    await expect(nav).toBeVisible();
+    await expect(page.locator(phone ? '.onyx-primary-nav' : '.onyx-mobile-nav')).toBeHidden();
+    const rooms = nav.getByTestId('nav-rooms');
+    await expect(nav.getByTestId('nav-home')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('home')).toBeVisible();
+    if (phone) {
+      await expect(rooms).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.locator('#client-rooms')).toBeHidden();
+      for (const box of await nav.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect()))) {
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+      }
+    }
     await expect(page.locator('#client-members')).toBeHidden();
     await rooms.click();
+    await expect(rooms).toHaveAttribute('aria-current', 'page');
+    if (phone) await expect(rooms).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#client-rooms')).toBeVisible();
     await page.locator('#client-rooms').getByRole('button', { name: /#mobile/ }).click();
-    await expect(rooms).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('#client-rooms')).toBeHidden();
+    const back = page.getByTestId('room-back');
+    if (phone) {
+      await expect(page.locator('#client-rooms')).toBeHidden();
+      await expect(rooms).toHaveAttribute('aria-expanded', 'false');
+      await expect(back).toHaveAccessibleName('Back to Rooms');
+    } else {
+      await expect(page.locator('#client-rooms')).toBeVisible();
+      await expect(back).toBeHidden();
+    }
+    const members = page.getByRole('button', { name: 'Members', exact: true });
     await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();
     await expect(page.getByText('A message that should remain readable on a phone.')).toBeInViewport();
     const connectionOpen = page.getByTestId('connection-open');
@@ -67,7 +90,7 @@ for (const width of [320, 390, 768]) {
     await expect(page.getByLabel('Message', { exact: true })).toHaveValue('');
     await members.click();
     await expect(page.locator('#client-members')).toBeVisible();
-    await expect(page.locator('#client-rooms')).toBeHidden();
+    if (phone) await expect(page.locator('#client-rooms')).toBeHidden();
     await expect(page.locator('.onyx-thread-pane')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#client-members')).toBeHidden();
@@ -76,11 +99,13 @@ for (const width of [320, 390, 768]) {
       scrollWidth: document.documentElement.scrollWidth,
       composerBottom: document.querySelector('.onyx-composer')!.getBoundingClientRect().bottom,
       height: innerHeight,
+      threadRight: document.querySelector('.onyx-thread-pane')!.getBoundingClientRect().right,
       threadWidth: document.querySelector('.onyx-thread-pane')!.getBoundingClientRect().width,
     }));
     expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.width);
     expect(geometry.composerBottom).toBeLessThanOrEqual(geometry.height);
-    expect(geometry.threadWidth).toBe(geometry.width);
+    if (phone) expect(geometry.threadWidth).toBe(geometry.width);
+    else expect(geometry.threadRight).toBe(geometry.width);
     expect(await page.locator('.onyx-attachments').evaluate(element => Math.abs(element.getBoundingClientRect().top - document.querySelector('.onyx-schedule')!.getBoundingClientRect().top))).toBeLessThan(2);
     await page.setViewportSize({ width, height: 568 });
     await expect.poll(() => page.locator('.onyx-composer').evaluate(element => element.getBoundingClientRect().bottom))
@@ -106,18 +131,57 @@ for (const width of [320, 390, 768]) {
     await expect(page.getByRole('dialog', { name: 'Notification inbox' })).toBeInViewport();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'Notification inbox' })).toBeHidden();
-    await page.getByRole('button', { name: 'Calls', exact: true }).click();
+    // You: a dialog that never becomes the location; full screen on phones.
+    const you = nav.getByTestId('nav-you');
+    await you.click();
+    const youDialog = page.getByRole('dialog', { name: 'You', exact: true });
+    await expect(youDialog).toBeFocused();
+    await expect(you).toHaveAttribute('aria-expanded', 'true');
+    if (phone) {
+      const box = (await youDialog.boundingBox())!;
+      expect(box.width).toBe(width);
+    }
+    await page.keyboard.press('Escape');
+    await expect(youDialog).toBeHidden();
+    await expect(you).toBeFocused();
+    await expect(rooms).toHaveAttribute('aria-current', 'page');
+    if (phone) {
+      await back.click();
+      await expect(page.locator('#client-rooms')).toBeVisible();
+      await expect(page.locator('#client-rooms')).toBeFocused();
+    }
+    await nav.getByTestId('nav-calls').click();
     await expect(page.locator('.onyx-main-calls')).toBeVisible();
+    await expect(nav.getByTestId('nav-calls')).toHaveAttribute('aria-current', 'page');
     expect(errors).toEqual([]);
   });
 }
 
-test('desktop client retains both sidebars', async ({ page }) => {
+test('desktop client retains both sidebars beside the icon rail', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/app/?ws=wss%3A%2F%2Fmobile-layout.test%2Fws');
+  await page.routeWebSocket('wss://mobile-layout.test/ws', socket => {
+    let nick = 'guest';
+    socket.onMessage(message => {
+      const line = String(message).trim();
+      if (line.startsWith('NICK ')) nick = line.slice(5).trim();
+      if (line.startsWith('CAP LS')) socket.send(':server CAP * LS :');
+      if (line === 'CAP END') {
+        socket.send(`:server 001 ${nick} :Welcome`);
+        socket.send(`:${nick}!u@h JOIN #mobile`);
+      }
+    });
+  });
+  await page.goto('/app/?ws=wss%3A%2F%2Fmobile-layout.test%2Fws&nick=guest');
+  await expect(page.locator('.onyx-primary-nav')).toBeVisible();
+  await expect(page.locator('#client-rooms')).toBeVisible();
+  await page.locator('#client-rooms').getByRole('button', { name: /#mobile/ }).click();
   await expect(page.locator('#client-rooms')).toBeVisible();
   await expect(page.locator('#client-members')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Rooms', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Members', exact: true })).toBeHidden();
+  const navWidth = await page.locator('.onyx-primary-nav').evaluate(element => element.getBoundingClientRect().width);
+  const railWidth = await page.locator('#client-rooms').evaluate(element => element.getBoundingClientRect().width);
+  expect(navWidth).toBe(56);
+  expect(railWidth).toBe(280);
 });
 
 
@@ -146,8 +210,8 @@ test('confirmed browser join opens the conversation without a second selection',
       }
     });
   });
-  await page.goto('/app/?ws=wss%3A%2F%2Fjoin-layout.test%2Fws');
-  await page.getByRole('button', { name: 'Rooms', exact: true }).click();
+  await page.goto('/app/?ws=wss%3A%2F%2Fjoin-layout.test%2Fws&nick=guest');
+  await page.locator('.onyx-mobile-nav').getByTestId('nav-rooms').click();
   await page.locator('#client-rooms').getByRole('button', { name: 'Browse rooms', exact: true }).click();
   await page.getByRole('button', { name: 'Join #root', exact: true }).click();
   await expect(page.getByLabel('Message', { exact: true })).toBeEnabled();

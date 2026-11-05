@@ -50,8 +50,8 @@ for (const width of [390, 1280]) {
         if (line.startsWith('CHATHISTORY BEFORE #history')) history(120, 149);
       });
     });
-    await page.goto('/app/?ws=wss%3A%2F%2Fhistory-ui.test%2Fws');
-    if (width < 960) await page.getByRole('button', { name: 'Rooms', exact: true }).click();
+    await page.goto('/app/?ws=wss%3A%2F%2Fhistory-ui.test%2Fws&nick=guest');
+    if (width < 768) await page.locator('.onyx-mobile-nav').getByTestId('nav-rooms').click();
     await page.locator('#client-rooms').getByRole('button', { name: /#history/ }).click();
     await expect(page.getByText('History message 199', { exact: true })).toBeInViewport();
     await page.getByRole('button', { name: 'Load older messages from the network' }).click();
@@ -76,7 +76,7 @@ test('chat-name changes stay pending until confirmation and recover from rejecti
       if (line === 'NICK taken') socket.send(`:server 433 ${nick} taken :Nickname in use`);
     });
   });
-  await page.goto('/app/?ws=wss%3A%2F%2Fidentity-ui.test%2Fws');
+  await page.goto('/app/?ws=wss%3A%2F%2Fidentity-ui.test%2Fws&nick=guest');
   await expect(page.locator('.onyx-conn-live')).toBeVisible();
   const connectionOpen = page.getByTestId('connection-open');
   await expect(connectionOpen).toHaveAccessibleName(/^Connect\./);
@@ -130,8 +130,8 @@ for (const width of [390, 1280]) {
         }
       });
     });
-    await page.goto('/app/?ws=wss%3A%2F%2Freading-ui.test%2Fws');
-    if (width < 960) await page.getByRole('button', { name: 'Rooms', exact: true }).click();
+    await page.goto('/app/?ws=wss%3A%2F%2Freading-ui.test%2Fws&nick=guest');
+    if (width < 768) await page.locator('.onyx-mobile-nav').getByTestId('nav-rooms').click();
     await page.locator('#client-rooms').getByRole('button', { name: /#reading/ }).click();
     for (let index = 0; index < 200; index++) inject!(index);
     const row = (index: number) => page.getByText(`Reading fixture message ${index} with enough text to wrap comfortably.`, { exact: true });

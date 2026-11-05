@@ -8,8 +8,8 @@ through the Elm document head.
 -}
 
 import App exposing (Msg)
-import Html exposing (Html, a, article, div, h1, p, text)
-import Html.Attributes exposing (class, href)
+import Html exposing (Html, a, article, div, h1, nav, p, text)
+import Html.Attributes exposing (attribute, class, href)
 
 
 {-| The 404 body. `isAppMiss` selects the action target and label. -}
@@ -29,5 +29,10 @@ notFound isAppMiss =
                         "Back to home"
                     )
                 ]
+            ]
+        , nav [ class "site-quiet-links", attribute "aria-label" "Other places to go" ]
+            [ a [ href "/guides/" ] [ text "Guides" ]
+            , a [ href "/about/" ] [ text "About Onyx" ]
+            , a [ href "/status/" ] [ text "Status" ]
             ]
         ]

@@ -20,10 +20,14 @@ import Invite exposing (inviteTitle)
 import Media
 import Browser
 import Html exposing (Html, div, main_)
-import Html.Attributes exposing (class, classList, id, style)
+import Html.Attributes exposing (attribute, class, classList, id, style)
 import Route
 import Guides exposing (surfaceForRoute, surfaceTitle)
 import View.Connection
+import View.Connect
+import View.Home exposing (home)
+import View.Nav
+import Nav
 import View.About
 import View.Appearance
 import View.Calls exposing (callsHub, mediaControlPanel, recordingStatus)
@@ -117,7 +121,16 @@ viewBody model =
                                 View.Roadmap.route model
 
                             _ ->
-                                [ shell model ]
+                                case model.connectGate of
+                                    Just current ->
+                                        if App.connectGateVisible model then
+                                            [ View.Connect.gate model current ]
+
+                                        else
+                                            [ shell model ]
+
+                                    Nothing ->
+                                        [ shell model ]
 
 
 {-| A miss under `/app` offers the app; anywhere else offers home. -}
@@ -186,7 +199,29 @@ documentTitle model =
 
 shell : Model -> Html Msg
 shell model =
-    div [ class "onyx-shell" ]
+    div
+        [ class "onyx-shell"
+        , attribute "data-nav" (Nav.idKey model.navSection)
+        , attribute "data-collection-open" (boolString model.clientRoomsOpen)
+        , attribute "data-calls" (boolString model.callsOpen)
+        ]
+        [ View.Nav.primaryNav model
+        , div [ class "onyx-shell-column" ] (shellColumn model)
+        , View.Nav.mobileNav model
+        ]
+
+
+boolString : Bool -> String
+boolString on =
+    if on then
+        "true"
+
+    else
+        "false"
+
+
+shellColumn : Model -> List (Html Msg)
+shellColumn model =
         ([ topbar model
          , recordingStatus model.mediaControlView (Maybe.map2 (==) model.mediaControlViewOwner model.runtimeOwnerStamp |> Maybe.withDefault False)
          , reconnectBanner model
@@ -216,6 +251,15 @@ shell model =
                             (model.runtimeDomainPending /= Nothing)
                         ]
 
+                 else if model.navSection == Nav.Home then
+                    main_
+                        [ class "onyx-main onyx-main-home"
+                        , classList [ ( "onyx-main-rooms-open", model.clientRoomsOpen ) ]
+                        ]
+                        [ rail model
+                        , home model
+                        ]
+
                  else
                     main_
                         [ class "onyx-main"
@@ -225,14 +269,9 @@ shell model =
                             ]
                         ]
                         [ rail model
-                        , thread model
+                        , div [ class "onyx-convo" ] [ thread model, composer model ]
                         , roster model
                         ]
-               , if model.callsOpen then
-                    div [] []
-
-                 else
-                    composer model
                , toaster model
                , stewardPanel model
                , guestClaim model
@@ -246,6 +285,7 @@ shell model =
                , moderationReview model
                , personSafetySheet model
                , View.Connection.dialog model
+               , View.Nav.youDialog model
                , View.RuntimeServices.view model.runtimeDomainResult model.sessionRecoveryView model.webAuthnObservationView model.privateAccountStatus (model.runtimeDomainPending /= Nothing) model.activeChannel model.composer (model.eventClock + 1) model.accountName (Maybe.map .networkId model.runtimeOwnerStamp) model.groupBackupRoomInput (model.accountName /= Nothing) (model.calls.lifecycle /= Media.Idle) model.callSelfMuted model.callSelfDeafened
                ]
         )

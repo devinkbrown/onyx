@@ -7,7 +7,7 @@ async function openClient(browser: import('@playwright/test').Browser, route: st
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   const wire = await installWire(page, route, wireOptions);
-  await page.goto(`/app/?ws=${encodeURIComponent(`wss://${route}.test/ws`)}`);
+  await page.goto(`/app/?ws=${encodeURIComponent(`wss://${route}.test/ws`)}&nick=guest`);
   await expect(page.locator('.onyx-conn-live')).toBeVisible({ timeout: 30_000 });
   await signInFixtureAccount(page, 'stressaccount');
   await joinConfiguredRooms(page, wire, 2);
@@ -106,7 +106,7 @@ test('stress mock wire, persistence failures, hidden replay, and context isolati
   });
   const quotaPage = await quotaContext.newPage();
   const quotaWire = await installWire(quotaPage, 'stress.quota');
-  await quotaPage.goto(`/app/?ws=${encodeURIComponent('wss://stress.quota.test/ws')}`);
+  await quotaPage.goto(`/app/?ws=${encodeURIComponent('wss://stress.quota.test/ws')}&nick=guest`);
   await expect(quotaPage.locator('.onyx-conn-live')).toBeVisible({ timeout: 30_000 });
   await signInFixtureAccount(quotaPage, 'stressaccount');
   await joinConfiguredRooms(quotaPage, quotaWire, 2);

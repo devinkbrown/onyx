@@ -13,6 +13,7 @@ import Download
 import Expect
 import Stats
 import Html
+import Nav
 import Html.Attributes as Attr
 import Ids
 import Isupport
@@ -99,8 +100,25 @@ channelModel =
         |> (\m -> Tuple.first (update (ChannelSelect "#c") m))
 
 
+{-| Render the conversation surfaces. Since v3/shell-nav the shell opens
+on Home, which hides the thread, composer and members rail; these
+vectors cover those surfaces, so a fixture still parked on Home renders
+the Rooms location instead (real folds reach it through `ChannelSelect`
+or `NavSelect`). `queryRaw` renders the model as it is.
+-}
 query : Model -> Query.Single Msg
 query model =
+    queryRaw
+        (if model.navSection == Nav.Home then
+            { model | navSection = Nav.Rooms }
+
+         else
+            model
+        )
+
+
+queryRaw : Model -> Query.Single Msg
+queryRaw model =
     View.view model
         |> .body
         |> Html.div []
@@ -308,11 +326,11 @@ suite =
                 in
                 Expect.equal ( ( "me", Nothing, Just "That chat name is already in use. Try another name." ), [] )
                     ( ( rejected.ourNick, rejected.connectionNickPending, rejected.connectionDialogError ), sent )
-        , test "rail groups rooms and direct messages with selected semantics" <|
+        , test "Home rail groups rooms and direct messages with selected semantics" <|
             \_ ->
                 let
                     joined = feed channelModel ":bob!u@h PRIVMSG me :hello privately"
-                    q = query joined
+                    q = queryRaw { joined | navSection = Nav.Home }
                 in
                 Expect.all
                     [ \_ -> Query.has [ Selector.text "Direct messages" ] q
@@ -371,12 +389,13 @@ suite =
             \_ ->
                 query { blank | connectionDialogOpen = True, connectionSignIn = True, identifyReplyAccount = Just "account" }
                     |> Query.has [ Selector.text "Disconnect to retry" ]
-        , test "mobile room control exposes its panel and dispatches the toggle" <|
+        , test "Rooms navigation opens the collection" <|
             \_ ->
-                query blank
-                    |> Query.find [ Selector.tag "button", Selector.attribute (Attr.attribute "aria-controls" "client-rooms") ]
+                queryRaw blank
+                    |> Query.findAll [ Selector.tag "button", Selector.attribute (Attr.attribute "data-testid" "nav-rooms") ]
+                    |> Query.first
                     |> Event.simulate Event.click
-                    |> Event.expect ToggleClientRooms
+                    |> Event.expect (NavSelect Nav.Rooms)
         , test "mobile panels switch exclusively and Escape closes them" <|
             \_ ->
                 let
@@ -406,7 +425,7 @@ suite =
             \_ ->
                 let
                     opened =
-                        Tuple.first (update ToggleClientMembers blank)
+                        Tuple.first (update ToggleClientMembers channelModel)
 
                     q =
                         query opened
@@ -2308,58 +2327,52 @@ suite =
                             |> Query.has [ Selector.text "@" ]
                     ]
                     ()
-        , test "topbar identity chip names the nick without a badge" <|
+        , test "You dialog names the nick without a badge" <|
             \_ ->
                 let
                     q =
-                        query channelModel
+                        query (Tuple.first (update (NavSelect Nav.You) channelModel))
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "you-dialog") ]
                 in
                 Expect.all
-                    [ \_ -> Query.has [ Selector.class "onyx-ident", Selector.text "me" ] q
+                    [ \_ -> Query.find [ Selector.attribute (Attr.attribute "data-testid" "you-nick") ] q |> Query.has [ Selector.text "me" ]
                     , \_ -> Query.hasNot [ Selector.class "onyx-ident-badge" ] q
-                    , \_ -> Query.hasNot [ Selector.class "onyx-ident-guest" ] q
+                    , \_ -> Query.has [ Selector.attribute (Attr.attribute "role" "dialog"), Selector.attribute (Attr.attribute "aria-modal" "true") ] q
                     ]
                     ()
-        , test "topbar flags an enforced guest rename" <|
+        , test "You dialog flags an enforced guest rename" <|
             \_ ->
                 let
                     q =
-                        query (feed channelModel ":me!u@h NICK Guest123")
-
-                    chip =
-                        Query.find [ Selector.class "onyx-ident" ] q
+                        query (Tuple.first (update (NavSelect Nav.You) (feed channelModel ":me!u@h NICK Guest123")))
+                            |> Query.find [ Selector.attribute (Attr.attribute "data-testid" "you-dialog") ]
                 in
                 Expect.all
-                    [ \_ -> Query.has [ Selector.class "onyx-ident-guest" ] q
-                    , \_ ->
-                        chip
-                            |> Query.has
-                                [ Selector.text "Guest123"
-                                , Selector.text "alias"
-                                , Selector.attribute
-                                    (Attr.title "The server moved you to Guest123: your nick is protected — sign in to reclaim it.")
-                                ]
+                    [ \_ -> Query.has [ Selector.text "Guest123", Selector.text "alias" ] q
+                    , \_ -> Query.has [ Selector.text "Guest name — sign in or keep a name to protect it." ] q
                     ]
                     ()
-        , test "identity chip offers reclaim while parked on an alias" <|
+        , test "You dialog offers reclaim while parked on an alias" <|
             \_ ->
                 let
                     parked =
-                        { channelModel | currentNickIsAlias = True, accountName = Just "alice" }
+                        { channelModel | currentNickIsAlias = True, accountName = Just "alice", youOpen = True }
 
                     q =
                         query parked
 
                     shut =
-                        query channelModel
+                        query { channelModel | youOpen = True }
                 in
                 Expect.all
-                    [ \_ -> Query.has [ Selector.class "onyx-ident-action" ] q
-                    , \_ ->
-                        Query.find [ Selector.class "onyx-ident-action" ] q
-                            |> Query.has [ Selector.text "alias" ]
+                    [ \_ ->
+                        Query.find [ Selector.attribute (Attr.attribute "data-testid" "you-reclaim") ] q
+                            |> Event.simulate Event.click
+                            |> Event.expect (YouThen ReclaimOpen)
+                    , \_ -> Query.find [ Selector.attribute (Attr.attribute "data-testid" "you-nick") ] q |> Query.has [ Selector.text "alias" ]
                     , \_ -> Query.hasNot [ Selector.class "onyx-reclaim" ] q
-                    , \_ -> Query.has [ Selector.attribute (Attr.attribute "aria-label" "Choose your chat name or sign in") ] shut
+                    , \_ -> Query.hasNot [ Selector.attribute (Attr.attribute "data-testid" "you-reclaim") ] shut
+                    , \_ -> Query.has [ Selector.text "Sign in or change name" ] shut
                     ]
                     ()
         , test "reclaim dialog gates submit on the password" <|
@@ -2466,11 +2479,11 @@ suite =
                 in
                 Expect.all
                     [ \_ ->
-                        query one
+                        query { one | navSection = Nav.Messages }
                             |> Query.find [ Selector.class "onyx-rail-offline" ]
                             |> Query.has [ Selector.text "1 offline" ]
                     , \_ ->
-                        query two
+                        query { two | navSection = Nav.Messages }
                             |> Query.find [ Selector.class "onyx-rail-offline" ]
                             |> Query.has [ Selector.text "2 offline" ]
                     ]
@@ -3314,6 +3327,7 @@ suite =
                                 |> Query.count (Expect.equal 2)
                         , \_ ->
                             query tagged
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
                                 |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
@@ -3327,6 +3341,7 @@ suite =
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
                             query cleared
+                                |> Query.find [ Selector.class "topic-filter-bar" ]
                                 |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "All" ] ]
                                 |> Query.has [ Selector.attribute (Attr.attribute "aria-pressed" "true") ]
                         , \_ ->
@@ -4170,7 +4185,7 @@ suite =
                             Query.find [ Selector.class "chb-count--started" ] searched
                                 |> Query.has [ Selector.text "Just started" ]
                         , \_ ->
-                            Query.findAll [ Selector.attribute (Attr.attribute "aria-pressed" "true") ] sorted
+                            Query.findAll [ Selector.class "chb-sort-btn", Selector.attribute (Attr.attribute "aria-pressed" "true") ] sorted
                                 |> Query.count (Expect.equal 1)
                         ]
                         ()
@@ -4326,12 +4341,13 @@ suite =
                                 |> Event.expect CallLeave
                         ]
                         ()
-            , test "topbar calls button toggles the hub" <|
+            , test "Calls navigation toggles the hub" <|
                 \_ ->
-                query blank
-                    |> Query.find [ Selector.tag "button", Selector.containing [ Selector.text "Calls" ] ]
+                queryRaw blank
+                    |> Query.findAll [ Selector.tag "button", Selector.attribute (Attr.attribute "data-testid" "nav-calls") ]
+                    |> Query.first
                     |> Event.simulate Event.click
-                    |> Event.expect ToggleCalls
+                    |> Event.expect (NavSelect Nav.Calls)
             ]
         , describe "landing"
             [ test "landing renders intro, ways-in ledger, trust, and shelf" <|
@@ -4778,6 +4794,7 @@ suite =
                                 |> Query.has [ Selector.text "House rules" ]
                         , \_ ->
                             query { blank | route = Route.Guidelines }
+                                |> Query.find [ Selector.class "site-ruled" ]
                                 |> Query.findAll [ Selector.tag "li" ]
                                 |> Query.count (Expect.equal 12)
                         , \_ ->

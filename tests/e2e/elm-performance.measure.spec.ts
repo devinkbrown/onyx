@@ -230,7 +230,7 @@ async function measureMode(browser: Browser, mode: 'desktop' | 'mobile') {
       }, true);
     });
     const coldStart = Date.now();
-    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}`);
+    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}&nick=guest`);
     await expect(page.locator('.onyx-conn-live')).toBeVisible({ timeout: 30_000 });
     const coldStartMs = Date.now() - coldStart;
     const datasetPreparationStarted = Date.now();
@@ -240,13 +240,13 @@ async function measureMode(browser: Browser, mode: 'desktop' | 'mobile') {
     const seeded = await seedOwnedRows(page, { networkId: `custom:wss://perf.measure.${mode}.test/ws`, accountId: 'perfaccount' });
     const persistedRowsActual = seeded.countOwned;
     checkpoint(mode, 'dataset-ready');
-    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}`);
+    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}&nick=guest`);
     await expect(page.locator('.onyx-conn-live')).toBeVisible({ timeout: 30_000 });
     await signInFixtureAccount(page, 'perfaccount');
     await joinConfiguredRooms(page, wire, ROOM_COUNT);
     await expect.poll(() => wire.joinedRooms().length).toBe(ROOM_COUNT);
     wire.emitInitialRows('#perf-0');
-    if (mode === 'mobile') await page.getByRole('button', { name: 'Rooms', exact: true }).click();
+    if (mode === 'mobile') await page.locator('.onyx-mobile-nav [data-testid="nav-rooms"]').click();
     await page.locator('#client-rooms').getByRole('button', { name: /#perf-0/ }).click();
     await expect(page.locator('.onyx-message')).toHaveCount(120);
     await expect.poll(() => page.locator('[data-loaded-message-count]').getAttribute('data-loaded-message-count')).not.toBeNull();
@@ -512,7 +512,7 @@ async function measureMode(browser: Browser, mode: 'desktop' | 'mobile') {
       gc = { available: true, requested: true, usedSizeBytes: postGc.usedSize, totalSizeBytes: postGc.totalSize };
     } catch { /* Null/unavailable is reported; it is never treated as zero. */ }
     const warmStart = Date.now();
-    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}`);
+    await page.goto(`/app/?ws=${encodeURIComponent(`wss://perf.measure.${mode}.test/ws`)}&nick=guest`);
     await expect(page.locator('.onyx-conn-live')).toBeVisible({ timeout: 30_000 });
     const warmStartMs = Date.now() - warmStart;
     const metrics = {

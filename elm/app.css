@@ -866,6 +866,7 @@ html, body {
   border: none;
   cursor: pointer;
   font-size: 14px;
+  min-width: 44px;
 }
 
 .guest-claim-veil {
@@ -1701,34 +1702,8 @@ html, body {
   }
   .onyx-client-panel-toggle[aria-expanded='true'] { border-color: var(--onyx-accent); }
 
-  .onyx-main {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    overflow: hidden;
-  }
-  .onyx-main > .onyx-rail,
-  .onyx-main > .onyx-roster { display: none; }
-  /* Rooms and members cover the conversation as a thumb-reachable sheet
-     instead of squeezing the transcript into the leftover half. */
-  .onyx-main-rooms-open > .onyx-rail,
-  .onyx-main-members-open > .onyx-roster {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    z-index: 45;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    top: auto;
-    max-height: min(72dvh, 34rem);
-    padding: 16px 12px max(16px, env(safe-area-inset-bottom));
-    background: var(--onyx-panel);
-    border: 0;
-    border-top: 1px solid var(--onyx-line);
-    border-radius: 16px 16px 0 0;
-    box-shadow: 0 -16px 48px #000a;
-    overflow: auto;
-  }
+  /* v3/shell-nav: the collection page, members sheet and frame
+     breakpoints live in rail.css. */
   .onyx-rail button,
   .onyx-member { min-height: 44px; }
   .onyx-member { align-items: center; }
@@ -1944,3 +1919,118 @@ html, body {
 .onyx-suggest-row button, .onyx-unread-jump, .onyx-first-hour button { min-height: 44px; }
 .onyx-first-hour { display: flex; gap: 12px; align-items: center; padding: 8px 0; }
 @media (max-width: 60rem) { .onyx-composer > div.onyx-reading-bar { order: -1; } }
+
+/* ═══ v3/connect-gate — guest / sign in / create account ══════════════
+   Ported from the v3 gate (c18b9591, `.conn-*`), restyled in this
+   shell's language. The gate sits outside .onyx-shell, so its controls
+   carry their own baseline. */
+.onyx-gate {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.onyx-gate-card {
+  width: min(440px, 100%);
+  padding: clamp(20px, 5vw, 36px);
+  background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line);
+  border-radius: 16px;
+}
+.onyx-gate-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.onyx-gate-brand-name { font-family: Georgia, "Times New Roman", serif; font-size: 17px; }
+.onyx-gate-title { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 400; line-height: 1.15; }
+.onyx-gate-body { margin: 6px 0 16px; color: var(--onyx-dim); line-height: 1.6; }
+.onyx-gate-status {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  margin: 0 0 16px; padding: 10px 12px;
+  border: 1px solid var(--onyx-line); border-radius: 8px; font-size: 13px; color: var(--onyx-dim);
+}
+.onyx-gate-status p { margin: 0; display: flex; align-items: baseline; gap: 8px; min-width: 0; line-height: 1.5; }
+.onyx-gate-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--onyx-warn); transform: translateY(-1px); }
+.onyx-gate-status--ready .onyx-gate-dot { background: var(--onyx-accent); }
+.onyx-gate-status--offline .onyx-gate-dot { background: var(--onyx-bad); }
+.onyx-gate-form { display: flex; flex-direction: column; gap: 14px; }
+.onyx-gate-field { display: flex; flex-direction: column; gap: 6px; }
+.onyx-gate-label { font-weight: 650; }
+.onyx-gate-input {
+  width: 100%; min-height: 44px; padding: 8px 12px;
+  font: inherit; font-size: 16px; color: var(--onyx-text);
+  background: var(--onyx-bg); border: 1px solid var(--onyx-line); border-radius: 8px;
+}
+.onyx-gate-input::placeholder { color: var(--onyx-dim); opacity: 1; }
+.onyx-gate-input:disabled { opacity: 0.6; }
+.onyx-gate-hint { margin: 0; color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
+.onyx-gate-error { margin: 0; color: var(--onyx-warn); line-height: 1.5; }
+.onyx-gate :focus-visible { outline: 2px solid var(--onyx-accent); outline-offset: 2px; }
+.onyx-gate-primary,
+.onyx-gate-secondary {
+  min-height: 44px; padding: 10px 16px;
+  font: inherit; font-weight: 650; border-radius: 8px; cursor: pointer;
+}
+.onyx-gate-primary { color: var(--onyx-accent-ink); background: var(--onyx-accent); border: 1px solid var(--onyx-accent); }
+.onyx-gate-primary:disabled { cursor: default; opacity: 0.55; }
+.onyx-gate-secondary { color: var(--onyx-text); background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); }
+.onyx-gate-secondary:disabled { cursor: default; opacity: 0.5; }
+.onyx-gate-modes { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--onyx-line); }
+.onyx-gate-modes-title { margin: 0 0 10px; color: var(--onyx-dim); font-size: 11px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; }
+.onyx-gate-mode-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.onyx-gate-mode-list > button { flex: 1 1 140px; }
+.onyx-gate-skip { margin-top: 12px; font-size: 13px; color: var(--onyx-dim); line-height: 1.5; }
+.onyx-gate-skip p { margin: 4px 0 0; }
+.onyx-gate-link {
+  min-height: 44px; padding: 10px 0; font: inherit; font-weight: 650;
+  color: var(--onyx-accent); background: none; border: 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+@media (max-width: 47.99rem) {
+  .onyx-gate { place-items: start center; }
+  .onyx-gate-card { border: 0; background: transparent; padding: 8px 4px; }
+  .onyx-gate-title { font-size: 26px; }
+}
+
+/* ═══ v3/shell-nav — the You dialog ═══════════════════════════════════
+   Centered on wide screens, a full-screen dialog under 768px. */
+.onyx-you-veil {
+  position: fixed; inset: 0; z-index: 70;
+  display: grid; place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.72);
+}
+.onyx-you {
+  width: min(440px, 100%); max-height: calc(100dvh - 24px); overflow-y: auto;
+  padding: 20px; background: var(--onyx-panel);
+  border: 1px solid var(--onyx-line); border-radius: 16px;
+}
+.onyx-you-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.onyx-you-head h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 26px; font-weight: 400; }
+.onyx-shell .onyx-you-close { min-height: 44px; min-width: 44px; padding: 8px 14px; }
+.onyx-you-identity { display: flex; gap: 14px; align-items: flex-start; padding: 0 0 16px; border-bottom: 1px solid var(--onyx-line); }
+.onyx-you-face {
+  flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); font-weight: 750;
+}
+.onyx-you-facts { min-width: 0; }
+.onyx-you-facts p { margin: 0 0 4px; overflow-wrap: anywhere; }
+.onyx-you-nick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 17px; font-weight: 650; }
+.onyx-you-desc { color: var(--onyx-dim); font-size: 13px; line-height: 1.5; }
+.onyx-you-conn { display: flex; align-items: center; gap: 8px; color: var(--onyx-dim); font-size: 13px; }
+.onyx-you-conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--onyx-warn); flex: none; }
+.onyx-you-conn[data-state="live"] .onyx-you-conn-dot { background: var(--onyx-accent); }
+.onyx-you-conn[data-state="offline"] .onyx-you-conn-dot { background: var(--onyx-bad); }
+.onyx-you-doors { display: grid; gap: 8px; margin-top: 16px; }
+.onyx-shell .onyx-you-door {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; min-height: 52px; padding: 10px 14px; text-align: left;
+  color: var(--onyx-text); text-decoration: none;
+  background: var(--onyx-panel-2); border: 1px solid var(--onyx-line); border-radius: 8px;
+}
+.onyx-you-door small { color: var(--onyx-dim); font-size: 12px; }
+@media (max-width: 47.99rem) {
+  .onyx-you-veil { padding: 0; place-items: stretch; }
+  .onyx-you {
+    width: 100%; max-height: none; height: 100dvh; border: 0; border-radius: 0;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  }
+}

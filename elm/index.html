@@ -216,7 +216,8 @@
       wsUrl: initialWsUrl,
       wsPin: params.get("ws"),
       mediaUrl: null,
-      nick: params.get("nick") || "guest",
+      // A missing ?nick= arms the connect gate; Elm still dials as "guest".
+      nick: params.get("nick"),
       origin: window.location.origin,
       nowMs: Date.now(),
       e2eeDms: e2eeDms,

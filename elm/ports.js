@@ -4811,7 +4811,15 @@ function fetchPublicFeed(url) {
         activePanel = root;
         if (root) {
           try {
-            if (!returnTargets.has(root)) returnTargets.set(root, document.activeElement || null);
+            if (!returnTargets.has(root)) {
+              var opener = document.activeElement || null;
+              /* A dialog opened from inside a closing one (the You doors)
+                 inherits that dialog's opener, so focus returns to the
+                 control the person started from. */
+              if (closing && back && back.isConnected
+                && (!opener || opener === document.body || !opener.isConnected)) opener = back;
+              returnTargets.set(root, opener);
+            }
             if (!root.hasAttribute("tabindex")) root.setAttribute("tabindex", "-1");
           } catch (err) { /* best-effort */ }
           var destination = closing && back && root.contains(back) ? back : root;

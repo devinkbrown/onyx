@@ -114,6 +114,7 @@ provisioning), media transport, uploads.
 -}
 
 import App
+import ConnectGate
 import Attribution
 import Browser
 import Browser.Events
@@ -126,6 +127,7 @@ import Nodes
 import Session
 import Ids
 import RuntimeDomain
+import Browser.Dom
 import Task
 import Time
 import Url
@@ -1536,6 +1538,17 @@ init rawFlags url key =
                 , mediaUrl = decodeField "mediaUrl" Decode.string rawFlags
                 , nowMs = Maybe.withDefault 0 (decodeField "nowMs" Decode.float rawFlags)
                 , sessionTokens = { credentials = [] }
+
+                -- v3/connect-gate: a visit without a pinned `?nick=`
+                -- meets the gate on `/app`; a pinned nick (invites,
+                -- dev, e2e) keeps the dial-straight-in path.
+                , connectGate =
+                    case decodeField "nick" Decode.string rawFlags of
+                        Just _ ->
+                            Nothing
+
+                        Nothing ->
+                            Just ConnectGate.arm
             }
       , navKey = key
       , clientSafetyState = Nothing
@@ -1649,6 +1662,9 @@ perform key app outbound =
 
         App.WsConnect req ->
             wsConnect req
+
+        App.FocusElement elementId ->
+            Task.attempt (\_ -> App.ShellFocusSettled) (Browser.Dom.focus elementId)
 
         App.UploadPick req ->
             uploadPick req
@@ -2247,6 +2263,9 @@ subscriptions model =
                             -- panels' Escape-to-close over page chrome).
                             if model.app.connectionDialogOpen then
                                 Decode.succeed App.ConnectionDialogClose
+
+                            else if model.app.youOpen then
+                                Decode.succeed App.YouClose
 
                             else if model.app.mediaLightbox /= Nothing then
                                 Decode.succeed App.MediaLightboxClose
