@@ -70,6 +70,8 @@ export function createWorkerLifecycle(deps: WorkerLifecycleDependencies): {
   register(req: RequestContext): Promise<WorkerStatus>;
   reportClientState(state: ClientActivationState): void;
   requestActivation(req: ActivationIntent): Promise<ActivationResult>;
+  /** Build id of a registered worker waiting to replace this page's build, if any. */
+  waitingTarget(): string | null;
   dispose(): void;
 } {
   const serviceWorker = deps.platform.serviceWorker;
@@ -276,8 +278,13 @@ export function createWorkerLifecycle(deps: WorkerLifecycleDependencies): {
     } finally { cleanup(); }
   };
 
+  const waitingTarget = (): string | null => {
+    if (disposed || !registration?.waiting || !waitingBuildId || waitingBuildId === build.buildId) return null;
+    return waitingBuildId;
+  };
+
   return {
-    register, reportClientState, requestActivation,
+    register, reportClientState, requestActivation, waitingTarget,
     dispose() { if (disposed) return; disposed = true; for (const cleanup of [...pending]) cleanup(); releaseLease?.(); releaseLease = null; leaseJob = null; leaseId = null; leaseValidUntil = 0; leaseTargetBuildId = null; leaseWorker = null; serviceWorker?.removeEventListener('message', respondToStateRequest); serviceWorker?.removeEventListener('message', releaseOnWorkerStatus); serviceWorker?.removeEventListener('controllerchange', releaseOnControllerChange); localState = null; registration = null; },
   };
 }

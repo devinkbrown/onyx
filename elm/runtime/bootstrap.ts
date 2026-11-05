@@ -1332,6 +1332,38 @@ export function createBrowserRuntime(config: BrowserRuntimeConfig) {
     let released=false;
     return ()=>{if(released)return;released=true;const active=activationBarrier;if(active?.token!==token)return;activationBarrier=null;active.releaseFreeze();};
   };
+  // Automatic shell updates. A deployed build installs as a waiting service
+  // worker; without this, a page only moved to it through the manual
+  // "Activate this update when safe" control, so returning visitors (notably
+  // iOS, which rarely closes tabs) kept an old build indefinitely. When the
+  // page is idle (no unsaved draft, call or private mutation, per
+  // clientActivationState), ask the waiting worker to activate through the
+  // same safety protocol, then reload once onto the new build.
+  let autoUpdateRunning=false;let autoUpdateReloaded=false;
+  const autoUpdateShell=async():Promise<void>=>{
+    if(disposed||autoUpdateRunning||autoUpdateReloaded||!workerLifecycle||!buildCompatibility)return;
+    if(typeof document!=='undefined'&&document.visibilityState==='hidden')return;
+    const owner=snapshot();const local=clientActivationState(owner);if(!local?.canActivate)return;
+    const requestId=makeRequestId(randomRef());if(!requestId)return;
+    autoUpdateRunning=true;
+    try{
+      const req={schemaVersion:1 as const,requestId,owner};
+      workerLifecycle.reportClientState(local);
+      const registered=await workerLifecycle.register(req);
+      if(disposed||registered.status!=='waiting')return;
+      const target=workerLifecycle.waitingTarget();if(!target)return;
+      if(!clientActivationState(snapshot())?.canActivate)return;
+      const result=await workerLifecycle.requestActivation({...req,targetBuildId:target,action:'when-safe'});
+      if(disposed||result.status!=='ready'||!clientActivationState(snapshot())?.canActivate)return;
+      autoUpdateReloaded=true;
+      try{globalThis.location?.reload();}catch{/* navigation unavailable */}
+    }catch{/* best effort; the manual control remains available */}
+    finally{autoUpdateRunning=false;}
+  };
+  if(workerLifecycle&&buildCompatibility&&typeof document!=='undefined'&&typeof setTimeout==='function'){
+    setTimeout(()=>{void autoUpdateShell();},8000);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void autoUpdateShell();});
+  }
   const workerTargets=new Map<string,{readonly ownerRef:string;readonly buildId:string}>();
   const workerActivations=new Map<string,{readonly ownerRef:string;readonly requestId:RequestId;readonly buildId:string}>();
   const pushConsentRefs=new Map<string,string>();

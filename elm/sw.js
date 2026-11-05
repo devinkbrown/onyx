@@ -6,6 +6,7 @@ const BUILD_CONFIG = BUILD_ENVELOPE?.buildCompatibility ? {
 } : null;
 const SCHEMA = 1;
 const CACHE_PREFIX = 'onyx-elm-shell:';
+const LEGACY_CACHE_PREFIX = 'onyx-shell-';
 const BUILD_ID = BUILD_CONFIG?.buildId;
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD_ID || 'invalid'}`;
 const MAX_HANDSHAKE_MS = 1800;
@@ -206,13 +207,25 @@ self.addEventListener('install', (event) => {
     for (const path of BUILD_CONFIG.publicNavigationPaths) {
       if (!allowedByPath.has(path)) throw new Error(`Navigation path is not a staged shell asset: ${path}`);
     }
+    // One-time migration: the pre-November worker cached every same-origin
+    // GET cache-first under `onyx-shell-*` and has no activation protocol,
+    // so returning visitors stayed on that old site forever. When its cache
+    // is present, replace it immediately instead of waiting.
+    if ((await caches.keys()).some((key) => key.startsWith(LEGACY_CACHE_PREFIX))) await self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     if (!validConfig(BUILD_CONFIG)) return;
+    const legacyKeys = (await caches.keys()).filter((key) => key.startsWith(LEGACY_CACHE_PREFIX));
     await self.clients.claim();
+    if (legacyKeys.length > 0) {
+      await Promise.all(legacyKeys.map((key) => caches.delete(key)));
+      // Pages still run the old cached build; load them once onto this one.
+      const pages = await self.clients.matchAll({ type: 'window' });
+      for (const page of pages) { try { await page.navigate(page.url); } catch { /* page closed */ } }
+    }
     const live = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const retainedBuilds = new Set([BUILD_ID]);
     for (const client of live) {
